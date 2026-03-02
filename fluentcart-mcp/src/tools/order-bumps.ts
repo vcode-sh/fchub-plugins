@@ -60,7 +60,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 				'Statuses: active, draft.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().optional().describe('Results per page (default: 15)'),
+				per_page: z.number().max(50).optional().describe('Results per page (default: 15, max: 50)'),
 				search: z.string().optional().describe('Search bumps by title or ID'),
 				sort_by: z
 					.enum(['id', 'title', 'created_at'])

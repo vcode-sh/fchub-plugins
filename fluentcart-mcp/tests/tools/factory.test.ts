@@ -2,7 +2,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { FluentCartClient } from '../../src/api/client.js'
 import { FluentCartApiError } from '../../src/api/errors.js'
-import { createTool, deleteTool, getTool, postTool, putTool } from '../../src/tools/_factory.js'
+import {
+	createTool,
+	deleteTool,
+	getTool,
+	MAX_RESPONSE_CHARS,
+	postTool,
+	putTool,
+	truncateResponse,
+} from '../../src/tools/_factory.js'
 
 function mockClient(): FluentCartClient {
 	return {
@@ -76,7 +84,7 @@ describe('getTool', () => {
 		expect(client.get).toHaveBeenCalledWith('/products', {}, true)
 	})
 
-	it('returns formatted success response', async () => {
+	it('returns compact JSON without structuredContent', async () => {
 		const client = mockClient()
 		const payload = { id: 1, name: 'Order #1' }
 		vi.mocked(client.get).mockResolvedValue({ data: payload, status: 200 })
@@ -84,9 +92,29 @@ describe('getTool', () => {
 
 		const result = await tool.handler({})
 
-		expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(payload, null, 2) }])
-		expect(result.structuredContent).toEqual(payload)
+		expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(payload) }])
+		expect(result).not.toHaveProperty('structuredContent')
 		expect(result.isError).toBeUndefined()
+	})
+
+	it('applies transform before formatting response', async () => {
+		const client = mockClient()
+		const payload = { id: 1, trans: { big: 'data' }, shop: { name: 'Store' } }
+		vi.mocked(client.get).mockResolvedValue({ data: payload, status: 200 })
+		const tool = getTool(client, {
+			...baseConfig,
+			endpoint: '/app/init',
+			transform: (data) => {
+				const { trans, ...rest } = data as Record<string, unknown>
+				return rest
+			},
+		})
+
+		const result = await tool.handler({})
+
+		const parsed = JSON.parse(result.content[0].text)
+		expect(parsed).toEqual({ id: 1, shop: { name: 'Store' } })
+		expect(parsed).not.toHaveProperty('trans')
 	})
 
 	it('returns formatted error when client throws', async () => {
@@ -158,6 +186,22 @@ describe('postTool', () => {
 		await tool.handler({ email: 'a@b.com' })
 
 		expect(client.post).toHaveBeenCalledWith('/checkout', { email: 'a@b.com' }, true)
+	})
+
+	it('applies transform to post response', async () => {
+		const client = mockClient()
+		vi.mocked(client.post).mockResolvedValue({ data: { id: 1, secret: 'x' }, status: 201 })
+		const tool = postTool(client, {
+			...baseConfig,
+			endpoint: '/orders',
+			transform: (data) => {
+				const { secret, ...rest } = data as Record<string, unknown>
+				return rest
+			},
+		})
+
+		const result = await tool.handler({})
+		expect(JSON.parse(result.content[0].text)).toEqual({ id: 1 })
 	})
 
 	it('returns formatted error when client throws', async () => {
@@ -269,7 +313,7 @@ describe('createTool', () => {
 		})
 	})
 
-	it('wraps handler result in formatSuccess', async () => {
+	it('wraps handler result in compact JSON without structuredContent', async () => {
 		const client = mockClient()
 		const payload = { orders: [1, 2, 3] }
 		const tool = createTool(client, {
@@ -279,8 +323,8 @@ describe('createTool', () => {
 
 		const result = await tool.handler({ id: 1 })
 
-		expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(payload, null, 2) }])
-		expect(result.structuredContent).toEqual(payload)
+		expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(payload) }])
+		expect(result).not.toHaveProperty('structuredContent')
 		expect(result.isError).toBeUndefined()
 	})
 
@@ -391,5 +435,62 @@ describe('resolveEndpoint (tested indirectly)', () => {
 		await tool.handler({ page: 3 })
 
 		expect(client.get).toHaveBeenCalledWith('/orders', { page: 3 }, undefined)
+	})
+})
+
+describe('truncateResponse', () => {
+	it('returns data unchanged when under size limit', () => {
+		const data = { id: 1, name: 'test' }
+		expect(truncateResponse(data)).toBe(data)
+	})
+
+	it('returns small arrays unchanged', () => {
+		const data = [1, 2, 3]
+		expect(truncateResponse(data)).toBe(data)
+	})
+
+	it('truncates oversized arrays with metadata', () => {
+		const bigItem = { data: 'x'.repeat(1000) }
+		const items = Array.from({ length: 200 }, (_, i) => ({ ...bigItem, id: i }))
+		const result = truncateResponse(items) as Record<string, unknown>
+
+		expect(result._truncated).toBe(true)
+		expect(result._total).toBe(200)
+		expect(typeof result._showing).toBe('number')
+		expect(result._showing as number).toBeLessThan(200)
+		expect(Array.isArray(result.items)).toBe(true)
+		expect(JSON.stringify(result).length).toBeLessThanOrEqual(MAX_RESPONSE_CHARS)
+	})
+
+	it('truncates oversized paginated response with data array', () => {
+		const bigItem = { data: 'x'.repeat(1000) }
+		const items = Array.from({ length: 200 }, (_, i) => ({ ...bigItem, id: i }))
+		const paginated = { data: items, current_page: 1, total: 200, per_page: 200 }
+		const result = truncateResponse(paginated) as Record<string, unknown>
+
+		expect(result._truncated).toBe(true)
+		expect(result._total).toBe(200)
+		expect(result.current_page).toBe(1)
+		expect(Array.isArray(result.data)).toBe(true)
+		expect((result.data as unknown[]).length).toBeLessThan(200)
+	})
+
+	it('returns truncation notice for oversized non-array objects', () => {
+		const obj: Record<string, string> = {}
+		for (let i = 0; i < 1000; i++) {
+			obj[`key_${i}`] = 'x'.repeat(200)
+		}
+		const result = truncateResponse(obj) as Record<string, unknown>
+
+		expect(result._truncated).toBe(true)
+		expect(result._message).toContain('Response too large')
+	})
+
+	it('handles empty arrays in paginated response', () => {
+		const data = { data: [], total: 0 }
+		const json = JSON.stringify(data)
+		if (json.length <= MAX_RESPONSE_CHARS) {
+			expect(truncateResponse(data)).toBe(data)
+		}
 	})
 })

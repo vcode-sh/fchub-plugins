@@ -100,7 +100,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 			schema: z.object({
 				customerId: z.number().describe('Customer ID'),
 				page: z.number().optional().describe('Page number'),
-				per_page: z.number().optional().describe('Results per page'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 				search: z.string().optional().describe('Search keyword'),
 				order_by: z.string().optional().describe('Sort field'),
 				order_type: z.string().optional().describe('Sort direction: ASC, DESC'),

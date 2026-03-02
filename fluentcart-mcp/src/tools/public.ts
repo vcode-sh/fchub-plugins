@@ -33,8 +33,12 @@ export function publicTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'List Public Products',
 			description:
 				'Retrieve publicly available products. No authentication required. ' +
-				'Returns the full public product catalogue for storefront display.',
-			schema: z.object({}),
+				'Returns the public product catalogue for storefront display. ' +
+				'Use page/per_page to control result size.',
+			schema: z.object({
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
+			}),
 			endpoint: '/public/products',
 			isPublic: true,
 		}),

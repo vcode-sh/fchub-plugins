@@ -13,7 +13,7 @@ export function activityTools(client: FluentCartClient): ToolDefinition[] {
 				'Returns audit trail of actions performed in the store.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().optional().describe('Results per page (default: 10)'),
+				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				search: z.string().optional().describe('Search activity logs by keyword'),
 				log_type: z.string().optional().describe('Filter by log type'),
 				module_name: z.string().optional().describe('Filter by module name (e.g. "Order")'),

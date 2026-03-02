@@ -8,17 +8,30 @@ export function applicationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_app_init',
 			title: 'Initialise Application',
 			description:
-				'Retrieve full application bootstrap data including translations, shop config, REST config, and asset URLs. ' +
-				'Use to validate the connection and inspect store configuration.',
+				'Retrieve application bootstrap data including shop config, REST config, and asset URLs. ' +
+				'Use to validate the connection and inspect store configuration. ' +
+				'Translation strings are excluded for performance.',
 			schema: z.object({}),
 			endpoint: '/app/init',
+			transform: (data) => {
+				if (typeof data === 'object' && data !== null) {
+					const { trans, ...rest } = data as Record<string, unknown>
+					return rest
+				}
+				return data
+			},
 		}),
 
 		getTool(client, {
 			name: 'fluentcart_app_get_attachments',
 			title: 'Get Attachments',
-			description: 'Retrieve WordPress media library attachments available to FluentCart.',
-			schema: z.object({}),
+			description:
+				'Retrieve WordPress media library attachments available to FluentCart. ' +
+				'Supports pagination for large media libraries.',
+			schema: z.object({
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
+			}),
 			endpoint: '/app/attachments',
 		}),
 

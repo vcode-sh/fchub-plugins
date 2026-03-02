@@ -7,17 +7,26 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_variant_list_all',
 			title: 'List All Variants',
-			description: 'Retrieve a list of all product variants across all products.',
-			schema: z.object({}),
+			description:
+				'Retrieve a paginated list of all product variants across all products. ' +
+				'Use page/per_page to control result size.',
+			schema: z.object({
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
+			}),
 			endpoint: '/variants',
 		}),
 
 		getTool(client, {
 			name: 'fluentcart_variant_list',
 			title: 'List Variations',
-			description: 'Retrieve a list of product variations with optional product filtering.',
+			description:
+				'Retrieve a list of product variations with optional product filtering. ' +
+				'Use page/per_page to control result size.',
 			schema: z.object({
 				product_id: z.number().optional().describe('Filter by product ID'),
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 			}),
 			endpoint: '/products/variants',
 		}),
@@ -100,9 +109,11 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_variant_fetch_by_ids',
 			title: 'Fetch Variations by IDs',
-			description: 'Retrieve multiple variations by their IDs in a single request.',
+			description:
+				'Retrieve multiple variations by their IDs in a single request. ' +
+				'Limit to 20 IDs per request to avoid oversized responses.',
 			schema: z.object({
-				variation_ids: z.string().describe('Comma-separated variation IDs'),
+				variation_ids: z.string().describe('Comma-separated variation IDs (max 20)'),
 			}),
 			endpoint: '/products/fetchVariationsByIds',
 		}),

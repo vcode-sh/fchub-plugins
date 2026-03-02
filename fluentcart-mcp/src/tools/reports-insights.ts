@@ -9,7 +9,7 @@ const dateRange = {
 
 const dateRangeWithPerPage = {
 	...dateRange,
-	per_page: z.number().optional().describe('Number of results to return'),
+	per_page: z.number().max(50).optional().describe('Number of results to return (max: 50)'),
 }
 
 const dateRangeWithGroup = {
@@ -109,7 +109,7 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 				'Search and retrieve customers who have made multiple purchases. Supports pagination.',
 			schema: z.object({
 				...dateRange,
-				per_page: z.number().optional().describe('Results per page'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 				current_page: z.number().optional().describe('Page number'),
 			}),
 			endpoint: '/reports/search-repeat-customer',

@@ -14,7 +14,7 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 				'Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().optional().describe('Results per page (default: 10)'),
+				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				search: z.string().optional().describe('Search subscriptions by keyword'),
 			}),
 			endpoint: '/subscriptions',

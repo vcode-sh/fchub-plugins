@@ -14,7 +14,7 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 				'Monetary values (minimum_amount, maximum_amount, fixed value) in smallest currency unit (cents).',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().optional().describe('Results per page (default: 10)'),
+				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				search: z.string().optional().describe('Search by coupon code or name'),
 			}),
 			endpoint: '/coupons',
@@ -24,31 +24,40 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_coupon_create',
 			title: 'Create Coupon',
 			description:
-				'Create a new coupon. For fixed-type coupons, value is in smallest currency unit (cents). ' +
-				'For percentage-type, value is the percentage (e.g. 15 = 15% off). ' +
+				'Create a new coupon. For fixed-type coupons, amount is in smallest currency unit (cents). ' +
+				'For percentage-type, amount is the percentage (e.g. 15 = 15% off). ' +
 				'Types: percentage, fixed, free_shipping.',
 			schema: z.object({
-				code: z.string().optional().describe('Coupon code (unique identifier)'),
-				name: z.string().optional().describe('Display name'),
-				type: z.string().optional().describe('Coupon type: percentage, fixed, free_shipping'),
-				value: z
+				title: z.string().describe('Coupon display name (required)'),
+				code: z.string().describe('Coupon code — unique identifier (required)'),
+				type: z.string().describe('Coupon type: percentage, fixed, free_shipping (required)'),
+				amount: z
 					.number()
+					.describe('Discount value — percentage or amount in cents for fixed type (required)'),
+				status: z.string().describe('Status: active, inactive, scheduled (required)'),
+				stackable: z
+					.string()
+					.describe("Allow stacking with other coupons: 'yes' or 'no' (required)"),
+				show_on_checkout: z.string().describe("Show on checkout page: 'yes' or 'no' (required)"),
+				notes: z.string().optional().describe('Internal notes (defaults to empty string)'),
+				start_date: z.string().optional().describe('Start date (ISO 8601)'),
+				end_date: z.string().optional().describe('End date (ISO 8601)'),
+				conditions: z
+					.object({
+						max_uses: z.number().optional().describe('Max number of uses (null for unlimited)'),
+						min_purchase_amount: z.number().optional().describe('Minimum order amount in cents'),
+						max_discount_amount: z.number().optional().describe('Maximum discount amount in cents'),
+						included_products: z
+							.array(z.number())
+							.optional()
+							.describe('Product IDs this coupon applies to'),
+						included_categories: z
+							.array(z.number())
+							.optional()
+							.describe('Category IDs this coupon applies to'),
+					})
 					.optional()
-					.describe('Discount value — percentage or amount in cents for fixed type'),
-				status: z.string().optional().describe('Status: active, inactive'),
-				usage_limit: z.number().optional().describe('Max number of uses (null for unlimited)'),
-				minimum_amount: z.number().optional().describe('Minimum order amount in cents'),
-				maximum_amount: z.number().optional().describe('Maximum order amount in cents'),
-				valid_from: z.string().optional().describe('Start date (ISO 8601)'),
-				valid_until: z.string().optional().describe('End date (ISO 8601)'),
-				applicable_products: z
-					.array(z.number())
-					.optional()
-					.describe('Product IDs this coupon applies to'),
-				applicable_categories: z
-					.array(z.number())
-					.optional()
-					.describe('Category IDs this coupon applies to'),
+					.describe('Coupon conditions and restrictions'),
 			}),
 			endpoint: '/coupons',
 		}),
@@ -68,20 +77,37 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_coupon_update',
 			title: 'Update Coupon',
 			description:
-				'Update an existing coupon. Monetary values in smallest currency unit (cents). ' +
+				'Update an existing coupon. All required fields must be sent (no partial updates). ' +
+				'Monetary values in smallest currency unit (cents). ' +
 				'Types: percentage, fixed, free_shipping.',
 			schema: z.object({
 				coupon_id: z.number().describe('Coupon ID'),
+				title: z.string().optional().describe('Coupon display name'),
 				code: z.string().optional().describe('Coupon code'),
-				name: z.string().optional().describe('Display name'),
 				type: z.string().optional().describe('Coupon type: percentage, fixed, free_shipping'),
-				value: z.number().optional().describe('Discount value'),
-				status: z.string().optional().describe('Status: active, inactive'),
-				usage_limit: z.number().optional().describe('Max number of uses'),
-				minimum_amount: z.number().optional().describe('Minimum order amount in cents'),
-				maximum_amount: z.number().optional().describe('Maximum order amount in cents'),
-				valid_from: z.string().optional().describe('Start date (ISO 8601)'),
-				valid_until: z.string().optional().describe('End date (ISO 8601)'),
+				amount: z.number().optional().describe('Discount value — percentage or amount in cents'),
+				status: z.string().optional().describe('Status: active, inactive, scheduled'),
+				stackable: z.string().optional().describe("Allow stacking: 'yes' or 'no'"),
+				show_on_checkout: z.string().optional().describe("Show on checkout: 'yes' or 'no'"),
+				notes: z.string().optional().describe('Internal notes'),
+				start_date: z.string().optional().describe('Start date (ISO 8601)'),
+				end_date: z.string().optional().describe('End date (ISO 8601)'),
+				conditions: z
+					.object({
+						max_uses: z.number().optional().describe('Max number of uses'),
+						min_purchase_amount: z.number().optional().describe('Minimum order amount in cents'),
+						max_discount_amount: z.number().optional().describe('Maximum discount amount in cents'),
+						included_products: z
+							.array(z.number())
+							.optional()
+							.describe('Product IDs this coupon applies to'),
+						included_categories: z
+							.array(z.number())
+							.optional()
+							.describe('Category IDs this coupon applies to'),
+					})
+					.optional()
+					.describe('Coupon conditions and restrictions'),
 			}),
 			endpoint: '/coupons/:coupon_id',
 		}),
@@ -99,8 +125,13 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_coupon_list_alt',
 			title: 'List Coupons (Simple)',
-			description: 'Alternative endpoint for listing all coupons in a simplified format.',
-			schema: z.object({}),
+			description:
+				'Alternative endpoint for listing coupons in a simplified format. ' +
+				'Use page/per_page to control result size.',
+			schema: z.object({
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
+			}),
 			endpoint: '/coupons/listCoupons',
 		}),
 

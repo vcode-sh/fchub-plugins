@@ -153,8 +153,13 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_unfulfilled_orders',
 			title: 'Get Unfulfilled Orders',
-			description: 'Orders that have not yet been fulfilled or shipped.',
-			schema: z.object({}),
+			description:
+				'Orders that have not yet been fulfilled or shipped. ' +
+				'Use page/per_page to control result size.',
+			schema: z.object({
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
+			}),
 			endpoint: '/reports/get-unfulfilled-orders',
 		}),
 

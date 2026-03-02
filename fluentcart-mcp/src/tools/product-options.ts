@@ -34,10 +34,8 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 				'Groups define option categories like Size, Color, or Material.',
 			schema: z.object({
 				title: z.string().describe('Group display name (e.g. "Size", "Color")'),
-				slug: z
-					.string()
-					.optional()
-					.describe('URL-friendly identifier (auto-generated from title if omitted)'),
+				slug: z.string().describe('URL-friendly identifier (required, must be unique)'),
+				description: z.string().optional().describe('Group description'),
 			}),
 			endpoint: '/options/attr/group',
 		}),

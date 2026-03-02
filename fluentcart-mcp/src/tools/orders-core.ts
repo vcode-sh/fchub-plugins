@@ -15,7 +15,7 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 				'Payment statuses: pending, paid, partially_refunded, refunded, failed.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().optional().describe('Results per page (default: 10)'),
+				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				search: z.string().optional().describe('Search orders by keyword'),
 				order_by: z.string().optional().describe('Sort field (default: id)'),
 				order_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),

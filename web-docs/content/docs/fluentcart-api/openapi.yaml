@@ -1520,8 +1520,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
     post:
       operationId: updateProductPricing
-      summary: Update product pricing
-      description: Update pricing information for a product. Prices must be specified in cents.
+      summary: Save product pricing (full product update)
+      description: |
+        Save product pricing via a full product update. This is NOT a surgical price patch —
+        it requires the complete product payload including title, detail, and variants array.
+        Prices must be in smallest currency unit (cents).
+        Use GET /products/{product_id}/pricing first to read current values.
       tags:
       - Products
       security:
@@ -1534,23 +1538,82 @@ paths:
           type: integer
         description: Product ID
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+              - post_title
+              - detail
+              - variants
               properties:
-                price:
-                  type: integer
-                  description: Price in cents
-                sale_price:
-                  type: integer
-                  description: Sale price in cents
-                sku:
+                post_title:
                   type: string
-                  description: Stock keeping unit
+                  description: Product title
+                post_status:
+                  type: string
+                  description: Product status (publish, draft)
+                detail:
+                  type: object
+                  required:
+                  - fulfillment_type
+                  properties:
+                    fulfillment_type:
+                      type: string
+                      enum:
+                      - digital
+                      - physical
+                      description: Fulfillment type
+                    variation_type:
+                      type: string
+                      enum:
+                      - simple
+                      - variable
+                      description: Variation type
+                variants:
+                  type: array
+                  description: Product variants with pricing
+                  items:
+                    type: object
+                    required:
+                    - post_id
+                    - variation_title
+                    - item_price
+                    properties:
+                      id:
+                        type: integer
+                        description: Variant ID (required for existing variants)
+                      post_id:
+                        type: integer
+                        description: Parent product ID
+                      variation_title:
+                        type: string
+                        description: Variant display title
+                      item_price:
+                        type: integer
+                        description: Price in cents
+                      compare_price:
+                        type: integer
+                        description: Compare-at/original price in cents
+                      sku:
+                        type: string
+                        description: SKU
+                      payment_type:
+                        type: string
+                        description: Payment type (onetime, subscription)
+                      stock_status:
+                        type: string
+                        description: Stock status (in-stock, out-of-stock)
+                      fulfillment_type:
+                        type: string
+                        description: Variant fulfillment type
+                      item_status:
+                        type: string
+                        description: Variant status (active, inactive)
       responses:
         '200':
-          description: Pricing updated
+          description: Product pricing saved
           content:
             application/json:
               schema:
@@ -3082,6 +3145,9 @@ paths:
                 last_name:
                   type: string
                   description: Last name
+                full_name:
+                  type: string
+                  description: Full name (required if store uses full-name checkout mode)
                 phone:
                   type: string
                   description: Phone number
@@ -3253,14 +3319,29 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+              - name
+              - email
               properties:
                 type:
                   type: string
                   description: Address type (billing, shipping)
-                first_name:
+                name:
                   type: string
-                last_name:
+                  description: Full name (required)
+                email:
                   type: string
+                  format: email
+                  description: Email address (required)
+                label:
+                  type: string
+                  description: Address label (e.g. Home, Office)
+                company_name:
+                  type: string
+                  description: Company name
+                phone:
+                  type: string
+                  description: Phone number
                 address_1:
                   type: string
                 address_2:
@@ -3832,13 +3913,21 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+              - title
+              - code
+              - type
+              - amount
+              - status
+              - stackable
+              - show_on_checkout
               properties:
-                code:
-                  type: string
-                  description: Coupon code
-                name:
+                title:
                   type: string
                   description: Coupon display name
+                code:
+                  type: string
+                  description: Coupon code (unique identifier)
                 type:
                   type: string
                   enum:
@@ -3846,39 +3935,62 @@ paths:
                   - fixed
                   - free_shipping
                   description: Coupon type
-                value:
+                amount:
                   type: number
                   description: Discount value (percentage or amount in cents for fixed type)
                 status:
                   type: string
+                  enum:
+                  - active
+                  - inactive
+                  - scheduled
                   description: Coupon status
-                usage_limit:
-                  type: integer
-                  description: Maximum number of times the coupon can be used
-                minimum_amount:
-                  type: integer
-                  description: Minimum order amount in cents
-                maximum_amount:
-                  type: integer
-                  description: Maximum order amount in cents
-                valid_from:
+                stackable:
+                  type: string
+                  enum:
+                  - 'yes'
+                  - 'no'
+                  description: Allow stacking with other coupons
+                show_on_checkout:
+                  type: string
+                  enum:
+                  - 'yes'
+                  - 'no'
+                  description: Show on checkout page
+                notes:
+                  type: string
+                  description: Internal notes (defaults to empty string)
+                start_date:
                   type: string
                   format: date-time
                   description: Start date for coupon validity
-                valid_until:
+                end_date:
                   type: string
                   format: date-time
                   description: End date for coupon validity
-                applicable_products:
-                  type: array
-                  items:
-                    type: integer
-                  description: Product IDs the coupon applies to
-                applicable_categories:
-                  type: array
-                  items:
-                    type: integer
-                  description: Category IDs the coupon applies to
+                conditions:
+                  type: object
+                  description: Coupon conditions and restrictions
+                  properties:
+                    max_uses:
+                      type: integer
+                      description: Maximum number of times the coupon can be used
+                    min_purchase_amount:
+                      type: integer
+                      description: Minimum order amount in cents
+                    max_discount_amount:
+                      type: integer
+                      description: Maximum discount amount in cents
+                    included_products:
+                      type: array
+                      items:
+                        type: integer
+                      description: Product IDs the coupon applies to
+                    included_categories:
+                      type: array
+                      items:
+                        type: integer
+                      description: Category IDs the coupon applies to
       responses:
         '200':
           description: Coupon created
@@ -3944,34 +4056,70 @@ paths:
             schema:
               type: object
               properties:
+                title:
+                  type: string
+                  description: Coupon display name
                 code:
                   type: string
-                name:
-                  type: string
+                  description: Coupon code
                 type:
                   type: string
                   enum:
                   - percentage
                   - fixed
                   - free_shipping
-                value:
+                amount:
                   type: number
+                  description: Discount value (percentage or amount in cents for fixed type)
                 status:
                   type: string
-                usage_limit:
-                  type: integer
-                minimum_amount:
-                  type: integer
-                  description: Minimum order amount in cents
-                maximum_amount:
-                  type: integer
-                  description: Maximum order amount in cents
-                valid_from:
+                  enum:
+                  - active
+                  - inactive
+                  - scheduled
+                stackable:
+                  type: string
+                  enum:
+                  - 'yes'
+                  - 'no'
+                  description: Allow stacking with other coupons
+                show_on_checkout:
+                  type: string
+                  enum:
+                  - 'yes'
+                  - 'no'
+                  description: Show on checkout page
+                notes:
+                  type: string
+                  description: Internal notes
+                start_date:
                   type: string
                   format: date-time
-                valid_until:
+                  description: Start date
+                end_date:
                   type: string
                   format: date-time
+                  description: End date
+                conditions:
+                  type: object
+                  description: Coupon conditions and restrictions
+                  properties:
+                    max_uses:
+                      type: integer
+                    min_purchase_amount:
+                      type: integer
+                      description: Minimum order amount in cents
+                    max_discount_amount:
+                      type: integer
+                      description: Maximum discount amount in cents
+                    included_products:
+                      type: array
+                      items:
+                        type: integer
+                    included_categories:
+                      type: array
+                      items:
+                        type: integer
       responses:
         '200':
           description: Coupon updated
@@ -10445,11 +10593,19 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+              - title
+              - slug
               properties:
                 title:
                   type: string
+                  description: Group display name (e.g. Size, Color)
                 slug:
                   type: string
+                  description: URL-friendly identifier (required, must be unique)
+                description:
+                  type: string
+                  description: Group description
       responses:
         '200':
           description: Attribute group created
@@ -12058,15 +12214,16 @@ components:
           type: integer
         code:
           type: string
-        name:
+        title:
           type: string
+          description: Coupon display name
         type:
           type: string
           enum:
           - percentage
           - fixed
           - free_shipping
-        value:
+        amount:
           type: number
           description: Discount value (percentage or fixed amount in cents)
         status:
@@ -12074,37 +12231,59 @@ components:
           enum:
           - active
           - inactive
-        usage_limit:
-          type: integer
-          nullable: true
-          description: Maximum number of uses (null for unlimited)
+          - scheduled
+        stackable:
+          type: string
+          enum:
+          - 'yes'
+          - 'no'
+          description: Allow stacking with other coupons
+        show_on_checkout:
+          type: string
+          enum:
+          - 'yes'
+          - 'no'
+          description: Show on checkout page
+        notes:
+          type: string
+          description: Internal notes
         usage_count:
           type: integer
-        minimum_amount:
-          type: integer
-          nullable: true
-          description: Minimum order amount in cents
-        maximum_amount:
-          type: integer
-          nullable: true
-          description: Maximum order amount in cents
-        valid_from:
+        start_date:
           type: string
           format: date-time
           nullable: true
-        valid_until:
+        end_date:
           type: string
           format: date-time
           nullable: true
-        applicable_products:
-          type: array
-          items:
-            type: integer
-          description: Product IDs this coupon applies to
-        applicable_categories:
-          type: array
-          items:
-            type: integer
+        conditions:
+          type: object
+          nullable: true
+          description: Coupon conditions and restrictions
+          properties:
+            max_uses:
+              type: integer
+              nullable: true
+              description: Maximum number of uses (null for unlimited)
+            min_purchase_amount:
+              type: integer
+              nullable: true
+              description: Minimum order amount in cents
+            max_discount_amount:
+              type: integer
+              nullable: true
+              description: Maximum discount amount in cents
+            included_products:
+              type: array
+              items:
+                type: integer
+              description: Product IDs this coupon applies to
+            included_categories:
+              type: array
+              items:
+                type: integer
+              description: Category IDs this coupon applies to
         created_at:
           type: string
           format: date-time

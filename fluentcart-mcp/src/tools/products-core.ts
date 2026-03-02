@@ -15,7 +15,7 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 				'Views: all, published, draft, trashed.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().optional().describe('Results per page (default: 10)'),
+				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				filter_type: z
 					.string()
 					.optional()
@@ -42,7 +42,12 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 				post_status: z.string().optional().describe('Status: publish, draft (default: draft)'),
 				post_content: z.string().optional().describe('Long description (HTML)'),
 				post_excerpt: z.string().optional().describe('Short description'),
-				fulfillment_type: z.string().optional().describe('Fulfillment type: digital, physical'),
+				detail: z
+					.object({
+						fulfillment_type: z.string().optional().describe('Fulfillment type: digital, physical'),
+					})
+					.optional()
+					.describe('Product detail object'),
 			}),
 			endpoint: '/products',
 		}),
@@ -146,9 +151,11 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_product_fetch_by_ids',
 			title: 'Fetch Products by IDs',
-			description: 'Retrieve multiple products by their IDs in a single request.',
+			description:
+				'Retrieve multiple products by their IDs in a single request. ' +
+				'Limit to 20 IDs per request to avoid oversized responses.',
 			schema: z.object({
-				product_ids: z.string().describe('Comma-separated product IDs'),
+				product_ids: z.string().describe('Comma-separated product IDs (max 20)'),
 			}),
 			endpoint: '/products/fetchProductsByIds',
 		}),

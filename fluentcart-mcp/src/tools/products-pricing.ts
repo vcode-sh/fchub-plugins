@@ -20,12 +20,36 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 			name: 'fluentcart_product_pricing_update',
 			title: 'Update Product Pricing',
 			description:
-				'Update pricing for a product. Prices must be in smallest currency unit (cents).',
+				'Save product pricing via full product update. This is NOT a surgical price patch — ' +
+				'it requires the complete product payload including title, detail, and variants array. ' +
+				'Prices must be in smallest currency unit (cents). ' +
+				'Use fluentcart_product_pricing_get first to read current values.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				price: z.number().optional().describe('Price in cents'),
-				sale_price: z.number().optional().describe('Sale price in cents'),
-				sku: z.string().optional().describe('Stock keeping unit'),
+				post_title: z.string().describe('Product title'),
+				post_status: z.string().optional().describe('Product status: publish, draft'),
+				detail: z
+					.object({
+						fulfillment_type: z.string().describe('Fulfillment: digital, physical'),
+						variation_type: z.string().optional().describe('Variation type: simple, variable'),
+					})
+					.describe('Product detail object'),
+				variants: z
+					.array(
+						z.object({
+							id: z.number().optional().describe('Variant ID (required for existing variants)'),
+							post_id: z.number().describe('Parent product ID'),
+							variation_title: z.string().describe('Variant display title'),
+							item_price: z.number().describe('Price in cents'),
+							compare_price: z.number().optional().describe('Compare-at/original price in cents'),
+							sku: z.string().optional().describe('SKU'),
+							payment_type: z.string().optional().describe('Payment type: onetime, subscription'),
+							stock_status: z.string().optional().describe('Stock status: in-stock, out-of-stock'),
+							fulfillment_type: z.string().optional().describe('Variant fulfillment type'),
+							item_status: z.string().optional().describe('Variant status: active, inactive'),
+						}),
+					)
+					.describe('Product variants with pricing'),
 			}),
 			endpoint: '/products/:product_id/pricing',
 		}),

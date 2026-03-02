@@ -13,7 +13,7 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 				'Monetary values in smallest currency unit (cents).',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().optional().describe('Results per page (default: 10)'),
+				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				search: z.string().optional().describe('Search by name or email'),
 				order_by: z.string().optional().describe('Sort field (default: id)'),
 				order_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
@@ -29,6 +29,10 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 				email: z.string().describe('Customer email address (required, must be unique)'),
 				first_name: z.string().optional().describe('First name'),
 				last_name: z.string().optional().describe('Last name'),
+				full_name: z
+					.string()
+					.optional()
+					.describe('Full name (required if store uses full-name checkout mode)'),
 				phone: z.string().optional().describe('Phone number'),
 				status: z.string().optional().describe('Customer status: active, inactive'),
 				additional_info: z
@@ -79,9 +83,13 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_customer_orders_simple',
 			title: 'Get Customer Orders (Simple)',
-			description: 'Retrieve customer orders in a simplified format.',
+			description:
+				'Retrieve customer orders in a simplified format. ' +
+				'Use page/per_page to control result size.',
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 			}),
 			endpoint: '/customers/:customer_id/order',
 		}),
@@ -137,8 +145,11 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 				type: z.string().optional().describe('Address type: billing, shipping'),
-				first_name: z.string().optional().describe('First name'),
-				last_name: z.string().optional().describe('Last name'),
+				name: z.string().describe('Full name (required)'),
+				email: z.string().describe('Email address (required)'),
+				label: z.string().optional().describe('Address label (e.g. Home, Office)'),
+				company_name: z.string().optional().describe('Company name'),
+				phone: z.string().optional().describe('Phone number'),
 				address_1: z.string().optional().describe('Address line 1'),
 				address_2: z.string().optional().describe('Address line 2'),
 				city: z.string().optional().describe('City'),
@@ -156,8 +167,11 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({
 				customer_id: z.number().optional().describe('Customer ID'),
 				type: z.string().optional().describe('Address type: billing, shipping'),
-				first_name: z.string().optional().describe('First name'),
-				last_name: z.string().optional().describe('Last name'),
+				name: z.string().describe('Full name (required)'),
+				email: z.string().describe('Email address (required)'),
+				label: z.string().optional().describe('Address label (e.g. Home, Office)'),
+				company_name: z.string().optional().describe('Company name'),
+				phone: z.string().optional().describe('Phone number'),
 				address_1: z.string().optional().describe('Address line 1'),
 				address_2: z.string().optional().describe('Address line 2'),
 				city: z.string().optional().describe('City'),
@@ -175,8 +189,11 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 				address_id: z.number().optional().describe('Address ID to update'),
-				first_name: z.string().optional().describe('First name'),
-				last_name: z.string().optional().describe('Last name'),
+				name: z.string().optional().describe('Full name'),
+				email: z.string().optional().describe('Email address'),
+				label: z.string().optional().describe('Address label (e.g. Home, Office)'),
+				company_name: z.string().optional().describe('Company name'),
+				phone: z.string().optional().describe('Phone number'),
 				address_1: z.string().optional().describe('Address line 1'),
 				address_2: z.string().optional().describe('Address line 2'),
 				city: z.string().optional().describe('City'),
