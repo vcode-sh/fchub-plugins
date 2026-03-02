@@ -1,0 +1,40 @@
+name: Feature Request
+description: Got an idea? I'm listening. Probably.
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Which plugin?
+      description: Which plugin should this feature live in?
+      options:
+        - fchub-p24
+        - fchub-fakturownia
+        - fchub-memberships
+        - wc-fc
+        - New plugin / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you want?
+      description: Describe the feature. Be as specific as you can.
+      placeholder: I want the plugin to...
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why do you want it?
+      description: What problem does this solve? "It would be cool" is not a problem statement.
+      placeholder: This would help because...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Have you tried solving this another way? Workarounds? Other plugins?
+    validations:
+      required: false

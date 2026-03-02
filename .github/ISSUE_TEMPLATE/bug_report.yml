@@ -1,0 +1,77 @@
+name: Bug Report
+description: Something broke. Let's fix it.
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Which plugin?
+      description: Pick the one that's misbehaving.
+      options:
+        - fchub-p24
+        - fchub-fakturownia
+        - fchub-memberships
+        - wc-fc
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What went wrong? Be specific. "It doesn't work" tells me nothing.
+      placeholder: Describe the bug...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Walk me through it. Step by step. Like I'm five.
+      placeholder: |
+        1. Go to...
+        2. Click on...
+        3. Watch it fail...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual behaviour
+      description: What should have happened, and what actually happened instead?
+    validations:
+      required: true
+  - type: input
+    id: wp-version
+    attributes:
+      label: WordPress version
+      placeholder: "6.7"
+    validations:
+      required: true
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      placeholder: "8.1"
+    validations:
+      required: true
+  - type: input
+    id: fc-version
+    attributes:
+      label: FluentCart version
+      placeholder: "1.3.9"
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or logs
+      description: If applicable. Error logs are worth their weight in gold.
+    validations:
+      required: false
