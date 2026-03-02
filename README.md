@@ -14,7 +14,7 @@ FluentCart and FluentCommunity plugins that actually do things WordPress forgot 
 | [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net — because the WP media library and video is a war crime | 1.0.0 |
 | [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — products, orders, subscriptions, customers, coupons. Your escape hatch | 1.0.0 |
 
-All require [FluentCart](https://fluentcart.com) except fchub-stream which needs [FluentCommunity](https://fluentcommunity.com). WordPress 6.0+. PHP 8.3+.
+All require [FluentCart](https://fluentcart.com) except fchub-stream which needs [FluentCommunity](https://fluentcommunity.com). WordPress 6.5+. PHP 8.3+.
 
 ## Downloads
 

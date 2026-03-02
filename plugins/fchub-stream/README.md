@@ -15,7 +15,7 @@ Lets your FluentCommunity members upload videos directly to Cloudflare Stream or
 
 ## Requirements
 
-- WordPress 6.0+
+- WordPress 6.5+
 - PHP 8.3+
 - [FluentCommunity](https://fluentcommunity.com) installed and active
 - A Cloudflare Stream or Bunny.net account (the cloud bit is on you)
