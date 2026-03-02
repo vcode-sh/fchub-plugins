@@ -1,26 +1,32 @@
-# fchub-plugins
+# FCHub Plugins
 
-I got tired of having my FluentCart plugins scattered across a dev repo like socks after laundry day. So here they are. One monorepo. Four plugins. Zero excuses.
+FluentCart and FluentCommunity plugins that actually do things WordPress forgot to ship. One monorepo, five plugins, zero vendor lock-in.
+
+**[fchub.co](https://fchub.co)** — docs, downloads, and everything else.
 
 ## Plugins
 
-| Plugin | The pitch | Version |
-|--------|-----------|---------|
-| [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway — take money from Polish people, professionally | 1.0.0 |
-| [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 — keep the tax office off your back | 1.0.0 |
-| [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip — the full "pay me to read" stack | 1.0.0 |
-| [fchub-stream](plugins/fchub-stream/) | Video streaming for FluentCommunity — Cloudflare Stream & Bunny.net | 0.9.6 |
-| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — your escape plan | 1.0.0 |
+| Plugin | What it does | Version |
+|--------|-------------|---------|
+| [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway — because Stripe doesn't speak Polish | 1.0.0 |
+| [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 — automate paperwork before the tax office automates you | 1.0.0 |
+| [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling — 15k lines of PHP and Vue so people can pay to read your blog | 1.0.0 |
+| [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net — because the WP media library and video is a war crime | 1.0.0 |
+| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — products, orders, subscriptions, customers, coupons. Your escape hatch | 1.0.0 |
 
-All require [FluentCart](https://fluentcart.com) (except fchub-stream which needs [FluentCommunity](https://fluentcommunity.com)). WordPress 6.0+. PHP 8.3+. A functioning will to live (optional).
+All require [FluentCart](https://fluentcart.com) except fchub-stream which needs [FluentCommunity](https://fluentcommunity.com). WordPress 6.0+. PHP 8.3+.
+
+## Downloads
+
+Grab the latest ZIPs from [GitHub Releases](https://github.com/vcode-sh/fchub-plugins/releases) or visit **[fchub.co](https://fchub.co)** for docs and install guides.
 
 ## Translations
 
-| Language | Status | Path |
-|----------|--------|------|
+| Language | Coverage | Path |
+|----------|----------|------|
 | [Polish (pl_PL)](translations/fluent-cart/) | ~96% | `translations/fluent-cart/` |
 
-I translated FluentCart into Polish because nobody else was going to. PRs welcome if you fancy finishing the last 4%.
+Translated FluentCart into Polish because nobody else was going to. PRs welcome if you fancy finishing the last 4%.
 
 ## Build
 
@@ -29,33 +35,33 @@ I translated FluentCart into Polish because nobody else was going to. PRs welcom
 ./build.sh fchub-p24          # just one
 ```
 
-ZIPs land in `dist/`. Correct directory structure, ready for WordPress upload. No magic required.
+ZIPs land in `dist/`. Correct directory structure, ready for WordPress upload.
 
 ## Release
 
-Tag it. Push it. GitHub Actions does the rest.
+Tag per plugin. Push. GitHub Actions builds the ZIP and publishes the release.
 
 ```bash
-git tag fchub-p24/v1.0.0
-git push origin fchub-p24/v1.0.0
+git tag fchub-p24/v1.0.1
+git push origin fchub-p24/v1.0.1
 ```
 
-The workflow checks that the version in your plugin header matches the tag. If they don't match, it fails loudly. You deserve it.
+Version in the plugin header must match the tag. If they disagree, the build fails loudly. You deserve it.
 
 ## CI
 
 PRs touching `plugins/` get:
 
-- **PHPUnit** — fchub-p24, fchub-memberships, and fchub-stream
+- **PHPUnit** — fchub-p24, fchub-memberships, fchub-stream
 - **Vite build** — fchub-memberships and fchub-stream (making sure the Vue apps didn't spontaneously combust)
 
 ## Development
 
-Everything lives in `plugins/{slug}/`. That's the source of truth. Edit there.
+Everything lives in `plugins/{slug}/`. Edit there. That's the source of truth.
 
 ### Docker
 
-I use a companion dev repo with volume mounts pointing here:
+I use a companion dev repo with volume mounts:
 
 ```yaml
 volumes:
@@ -63,7 +69,7 @@ volumes:
   # ... you get the idea
 ```
 
-Edit file. Refresh browser. See change. Revolutionary, I know.
+Edit file. Refresh browser. See change. Revolutionary.
 
 ### Tests & builds
 
@@ -85,11 +91,12 @@ cd plugins/fchub-stream/portal-app && npm install && npm run dev
 plugins/
   fchub-p24/              Przelewy24 gateway
   fchub-fakturownia/      Fakturownia invoices
-  fchub-memberships/      Membership system (15k+ LOC of questionable decisions)
+  fchub-memberships/      Membership system
   fchub-stream/           Video streaming for FluentCommunity
   wc-fc/                  WooCommerce migrator
 translations/
   fluent-cart/            Polish translation
+web-docs/                 fchub.co documentation site
 .github/workflows/
   release.yml             Tag → ZIP → GitHub Release
   ci.yml                  PR checks
@@ -98,4 +105,4 @@ build.sh                  Local ZIP builder
 
 ## License
 
-GPLv2 or later. Built by me — [Vibe Code](https://x.com/vcode_sh)
+GPLv2 or later. Built by [Vibe Code](https://x.com/vcode_sh).
