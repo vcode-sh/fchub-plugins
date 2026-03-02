@@ -91,25 +91,33 @@ export default function ContactPage() {
 								crisis about code architecture. This is where the work happens.
 							</p>
 							<div className="flex flex-wrap gap-2 pt-2">
-								<Button variant="outline" size="sm" asChild>
-									<a
-										href={`${GITHUB_REPO}/issues/new/choose`}
-										target="_blank"
-										rel="noopener noreferrer"
-									>
-										<Bug className="size-3" />
-										Report a Bug
-									</a>
+								<Button
+									variant="outline"
+									size="sm"
+									render={
+										<a
+											href={`${GITHUB_REPO}/issues/new/choose`}
+											target="_blank"
+											rel="noopener noreferrer"
+										/>
+									}
+								>
+									<Bug className="size-3" />
+									Report a Bug
 								</Button>
-								<Button variant="outline" size="sm" asChild>
-									<a
-										href={`${GITHUB_REPO}/issues/new/choose`}
-										target="_blank"
-										rel="noopener noreferrer"
-									>
-										<Lightbulb className="size-3" />
-										Request a Feature
-									</a>
+								<Button
+									variant="outline"
+									size="sm"
+									render={
+										<a
+											href={`${GITHUB_REPO}/issues/new/choose`}
+											target="_blank"
+											rel="noopener noreferrer"
+										/>
+									}
+								>
+									<Lightbulb className="size-3" />
+									Request a Feature
 								</Button>
 							</div>
 						</div>
@@ -127,15 +135,19 @@ export default function ContactPage() {
 								general banter about FluentCart&apos;s lack of documentation.
 							</p>
 							<div className="pt-2">
-								<Button variant="outline" size="sm" asChild>
-									<a
-										href={TELEGRAM_URL}
-										target="_blank"
-										rel="noopener noreferrer"
-									>
-										<Send className="size-3" />
-										Join the Group
-									</a>
+								<Button
+									variant="outline"
+									size="sm"
+									render={
+										<a
+											href={TELEGRAM_URL}
+											target="_blank"
+											rel="noopener noreferrer"
+										/>
+									}
+								>
+									<Send className="size-3" />
+									Join the Group
 								</Button>
 							</div>
 						</div>
@@ -153,15 +165,19 @@ export default function ContactPage() {
 								opinionated takes on the WordPress ecosystem.
 							</p>
 							<div className="pt-2">
-								<Button variant="outline" size="sm" asChild>
-									<a
-										href={X_URL}
-										target="_blank"
-										rel="noopener noreferrer"
-									>
-										<Twitter className="size-3" />
-										Follow @vcode_sh
-									</a>
+								<Button
+									variant="outline"
+									size="sm"
+									render={
+										<a
+											href={X_URL}
+											target="_blank"
+											rel="noopener noreferrer"
+										/>
+									}
+								>
+									<Twitter className="size-3" />
+									Follow @vcode_sh
 								</Button>
 							</div>
 						</div>

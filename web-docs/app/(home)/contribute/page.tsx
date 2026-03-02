@@ -135,15 +135,19 @@ export default function ContributePage() {
 						</div>
 					</div>
 					<div className="flex justify-center">
-						<Button variant="outline" size="lg" asChild>
-							<a
-								href={`${GITHUB_REPO}/issues/new?title=Plugin+submission:+&labels=plugin-submission`}
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								<GitPullRequest />
-								Open a GitHub Issue
-							</a>
+						<Button
+							variant="outline"
+							size="lg"
+							render={
+								<a
+									href={`${GITHUB_REPO}/issues/new?title=Plugin+submission:+&labels=plugin-submission`}
+									target="_blank"
+									rel="noopener noreferrer"
+								/>
+							}
+						>
+							<GitPullRequest />
+							Open a GitHub Issue
 						</Button>
 					</div>
 				</motion.section>
@@ -227,25 +231,33 @@ export default function ContributePage() {
 							</li>
 						</ul>
 						<div className="flex gap-3 pt-2">
-							<Button variant="outline" size="sm" asChild>
-								<a
-									href={`${GITHUB_REPO}/blob/main/CONTRIBUTING.md`}
-									target="_blank"
-									rel="noopener noreferrer"
-								>
-									<ExternalLink />
-									CONTRIBUTING.md
-								</a>
+							<Button
+								variant="outline"
+								size="sm"
+								render={
+									<a
+										href={`${GITHUB_REPO}/blob/main/CONTRIBUTING.md`}
+										target="_blank"
+										rel="noopener noreferrer"
+									/>
+								}
+							>
+								<ExternalLink />
+								CONTRIBUTING.md
 							</Button>
-							<Button variant="outline" size="sm" asChild>
-								<a
-									href={`${GITHUB_REPO}/issues/new/choose`}
-									target="_blank"
-									rel="noopener noreferrer"
-								>
-									<ExternalLink />
-									Issue Templates
-								</a>
+							<Button
+								variant="outline"
+								size="sm"
+								render={
+									<a
+										href={`${GITHUB_REPO}/issues/new/choose`}
+										target="_blank"
+										rel="noopener noreferrer"
+									/>
+								}
+							>
+								<ExternalLink />
+								Issue Templates
 							</Button>
 						</div>
 					</div>
@@ -270,15 +282,19 @@ export default function ContributePage() {
 							the help.
 						</p>
 						<div className="pt-2">
-							<Button variant="outline" size="sm" asChild>
-								<a
-									href={`${GITHUB_REPO}/tree/main/translations`}
-									target="_blank"
-									rel="noopener noreferrer"
-								>
-									<ExternalLink />
-									translations/
-								</a>
+							<Button
+								variant="outline"
+								size="sm"
+								render={
+									<a
+										href={`${GITHUB_REPO}/tree/main/translations`}
+										target="_blank"
+										rel="noopener noreferrer"
+									/>
+								}
+							>
+								<ExternalLink />
+								translations/
 							</Button>
 						</div>
 					</div>

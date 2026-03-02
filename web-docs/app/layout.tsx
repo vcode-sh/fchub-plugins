@@ -1,6 +1,7 @@
 import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { acidGrotesk } from "./fonts";
 import "./global.css";
 
@@ -52,7 +53,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
             value: { dark: "dark" },
           }}
         >
-          {children}
+          <TooltipProvider>{children}</TooltipProvider>
         </RootProvider>
       </body>
     </html>

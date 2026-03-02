@@ -14,7 +14,7 @@ export function baseOptions(): BaseLayoutProps {
             height={24}
             className="size-6"
           />
-          <span className="font-semibold">FCHub Docs</span>
+          <span className="font-semibold">FCHub.co</span>
         </div>
       ),
     },

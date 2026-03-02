@@ -19,13 +19,13 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemMedia,
-	ItemTitle,
-} from "@/components/ui/item";
+	Card,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 
 const GITHUB_REPO = "https://github.com/vcode-sh/fchub-plugins";
 
@@ -145,51 +145,55 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
 
 	if (plugin.comingSoon) {
 		return (
-			<Item variant="outline" className="opacity-50">
-				<ItemMedia variant="icon">
-					<Icon />
-				</ItemMedia>
-				<ItemContent>
-					<ItemTitle>
-						{plugin.title}
+			<Card className="opacity-50 gap-0 py-0">
+				<CardHeader className="bg-muted/50 rounded-t-xl py-3">
+					<div className="flex items-center gap-2">
+						<Icon className="size-4" />
+						<CardTitle>{plugin.title}</CardTitle>
 						<Badge variant="secondary">Coming Soon</Badge>
-					</ItemTitle>
-					<ItemDescription>{plugin.description}</ItemDescription>
-				</ItemContent>
-			</Item>
+					</div>
+				</CardHeader>
+				<CardContent className="py-4">
+					<CardDescription>{plugin.description}</CardDescription>
+				</CardContent>
+			</Card>
 		);
 	}
 
 	return (
-		<Item variant="outline">
-			<ItemMedia variant="icon">
-				<Icon />
-			</ItemMedia>
-			<ItemContent>
-				<ItemTitle>{plugin.title}</ItemTitle>
-				<ItemDescription>{plugin.description}</ItemDescription>
-			</ItemContent>
-			<ItemActions>
-				<Button variant="ghost" size="sm" asChild>
-					<Link href={plugin.docsHref}>
-						<BookOpen />
-						Docs
-					</Link>
+		<Card className="h-full gap-0 py-0">
+			<CardHeader className="bg-muted/50 rounded-t-xl py-3">
+				<div className="flex items-center gap-2">
+					<Icon className="size-4" />
+					<CardTitle>{plugin.title}</CardTitle>
+				</div>
+			</CardHeader>
+			<CardContent className="pt-4 pb-6">
+				<CardDescription>{plugin.description}</CardDescription>
+			</CardContent>
+			<CardFooter className="gap-2 mt-auto justify-end bg-muted/50 rounded-b-xl py-3">
+				<Button variant="secondary" size="xs" render={<Link href={plugin.docsHref} />}>
+					<BookOpen />
+					Docs
 				</Button>
 				{plugin.downloadUrl && (
-					<Button variant="ghost" size="sm" asChild>
-						<a
-							href={plugin.downloadUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							<Download />
-							Download
-						</a>
+					<Button
+						variant="outline"
+						size="xs"
+						render={
+							<a
+								href={plugin.downloadUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+							/>
+						}
+					>
+						<Download />
+						Download
 					</Button>
 				)}
-			</ItemActions>
-		</Item>
+			</CardFooter>
+		</Card>
 	);
 }
 
@@ -229,20 +233,28 @@ export default function HomePage() {
 					FluentCart and FluentCommunity forgot to ship. So I did.
 				</p>
 				<div className="flex items-center justify-center gap-3 mb-4">
-					<Button variant="outline" size="lg" asChild>
-						<a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer">
-							View on GitHub
-						</a>
+					<Button
+						variant="default"
+						size="lg"
+						render={
+							<a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" />
+						}
+					>
+						View on GitHub
 					</Button>
-					<Button variant="ghost" size="lg" asChild>
-						<a
-							href="https://t.me/+s_-YxYytlelmMDM0"
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							<Send />
-							Join Telegram
-						</a>
+					<Button
+						variant="outline"
+						size="lg"
+						render={
+							<a
+								href="https://t.me/+s_-YxYytlelmMDM0"
+								target="_blank"
+								rel="noopener noreferrer"
+							/>
+						}
+					>
+						<Send />
+						Join Telegram
 					</Button>
 				</div>
 				<p className="text-xs text-muted-foreground">
