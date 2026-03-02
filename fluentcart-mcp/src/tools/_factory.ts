@@ -38,6 +38,19 @@ interface CustomToolConfig extends BaseToolConfig {
 	handler: (client: FluentCartClient, input: Record<string, unknown>) => Promise<unknown>
 }
 
+function resolveEndpoint(
+	endpoint: string,
+	input: Record<string, unknown>,
+): { path: string; rest: Record<string, unknown> } {
+	const rest = { ...input }
+	const path = endpoint.replace(/:(\w+)/g, (_, key: string) => {
+		const value = rest[key]
+		delete rest[key]
+		return String(value ?? '')
+	})
+	return { path, rest }
+}
+
 function formatSuccess(data: unknown) {
 	const text = JSON.stringify(data, null, 2)
 	return {
@@ -89,7 +102,8 @@ export function getTool(client: FluentCartClient, config: EndpointToolConfig): T
 		},
 		handler: async (input) => {
 			try {
-				const response = await client.get(config.endpoint, input, config.isPublic)
+				const { path, rest } = resolveEndpoint(config.endpoint, input)
+				const response = await client.get(path, rest, config.isPublic)
 				return formatSuccess(response.data)
 			} catch (error) {
 				return formatError(error)
@@ -110,7 +124,8 @@ export function postTool(client: FluentCartClient, config: EndpointToolConfig): 
 		},
 		handler: async (input) => {
 			try {
-				const response = await client.post(config.endpoint, input, config.isPublic)
+				const { path, rest } = resolveEndpoint(config.endpoint, input)
+				const response = await client.post(path, rest, config.isPublic)
 				return formatSuccess(response.data)
 			} catch (error) {
 				return formatError(error)
@@ -132,7 +147,8 @@ export function putTool(client: FluentCartClient, config: EndpointToolConfig): T
 		},
 		handler: async (input) => {
 			try {
-				const response = await client.put(config.endpoint, input)
+				const { path, rest } = resolveEndpoint(config.endpoint, input)
+				const response = await client.put(path, rest)
 				return formatSuccess(response.data)
 			} catch (error) {
 				return formatError(error)
@@ -154,7 +170,8 @@ export function deleteTool(client: FluentCartClient, config: EndpointToolConfig)
 		},
 		handler: async (input) => {
 			try {
-				const response = await client.delete(config.endpoint, input)
+				const { path, rest } = resolveEndpoint(config.endpoint, input)
+				const response = await client.delete(path, rest)
 				return formatSuccess(response.data)
 			} catch (error) {
 				return formatError(error)

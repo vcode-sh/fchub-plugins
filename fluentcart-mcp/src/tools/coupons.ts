@@ -1,0 +1,175 @@
+import { z } from 'zod'
+import type { FluentCartClient } from '../api/client.js'
+import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+
+export function couponTools(client: FluentCartClient): ToolDefinition[] {
+	return [
+		getTool(client, {
+			name: 'fluentcart_coupon_list',
+			title: 'List Coupons',
+			description:
+				'Retrieve a paginated list of coupons with optional search. ' +
+				'Returns coupon code, type, value, status, and usage stats. ' +
+				'Types: percentage, fixed, free_shipping. Statuses: active, inactive. ' +
+				'Monetary values (minimum_amount, maximum_amount, fixed value) in smallest currency unit (cents).',
+			schema: z.object({
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z.number().optional().describe('Results per page (default: 10)'),
+				search: z.string().optional().describe('Search by coupon code or name'),
+			}),
+			endpoint: '/coupons',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_coupon_create',
+			title: 'Create Coupon',
+			description:
+				'Create a new coupon. For fixed-type coupons, value is in smallest currency unit (cents). ' +
+				'For percentage-type, value is the percentage (e.g. 15 = 15% off). ' +
+				'Types: percentage, fixed, free_shipping.',
+			schema: z.object({
+				code: z.string().optional().describe('Coupon code (unique identifier)'),
+				name: z.string().optional().describe('Display name'),
+				type: z.string().optional().describe('Coupon type: percentage, fixed, free_shipping'),
+				value: z
+					.number()
+					.optional()
+					.describe('Discount value — percentage or amount in cents for fixed type'),
+				status: z.string().optional().describe('Status: active, inactive'),
+				usage_limit: z.number().optional().describe('Max number of uses (null for unlimited)'),
+				minimum_amount: z.number().optional().describe('Minimum order amount in cents'),
+				maximum_amount: z.number().optional().describe('Maximum order amount in cents'),
+				valid_from: z.string().optional().describe('Start date (ISO 8601)'),
+				valid_until: z.string().optional().describe('End date (ISO 8601)'),
+				applicable_products: z
+					.array(z.number())
+					.optional()
+					.describe('Product IDs this coupon applies to'),
+				applicable_categories: z
+					.array(z.number())
+					.optional()
+					.describe('Category IDs this coupon applies to'),
+			}),
+			endpoint: '/coupons',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_coupon_get',
+			title: 'Get Coupon',
+			description:
+				'Retrieve detailed information about a specific coupon including usage stats and eligibility rules.',
+			schema: z.object({
+				coupon_id: z.number().describe('Coupon ID'),
+			}),
+			endpoint: '/coupons/:coupon_id',
+		}),
+
+		putTool(client, {
+			name: 'fluentcart_coupon_update',
+			title: 'Update Coupon',
+			description:
+				'Update an existing coupon. Monetary values in smallest currency unit (cents). ' +
+				'Types: percentage, fixed, free_shipping.',
+			schema: z.object({
+				coupon_id: z.number().describe('Coupon ID'),
+				code: z.string().optional().describe('Coupon code'),
+				name: z.string().optional().describe('Display name'),
+				type: z.string().optional().describe('Coupon type: percentage, fixed, free_shipping'),
+				value: z.number().optional().describe('Discount value'),
+				status: z.string().optional().describe('Status: active, inactive'),
+				usage_limit: z.number().optional().describe('Max number of uses'),
+				minimum_amount: z.number().optional().describe('Minimum order amount in cents'),
+				maximum_amount: z.number().optional().describe('Maximum order amount in cents'),
+				valid_from: z.string().optional().describe('Start date (ISO 8601)'),
+				valid_until: z.string().optional().describe('End date (ISO 8601)'),
+			}),
+			endpoint: '/coupons/:coupon_id',
+		}),
+
+		deleteTool(client, {
+			name: 'fluentcart_coupon_delete',
+			title: 'Delete Coupon',
+			description: 'Permanently delete a coupon. This action cannot be undone.',
+			schema: z.object({
+				coupon_id: z.number().describe('Coupon ID'),
+			}),
+			endpoint: '/coupons/:coupon_id',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_coupon_list_alt',
+			title: 'List Coupons (Simple)',
+			description: 'Alternative endpoint for listing all coupons in a simplified format.',
+			schema: z.object({}),
+			endpoint: '/coupons/listCoupons',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_coupon_apply',
+			title: 'Apply Coupon',
+			description:
+				'Apply a coupon to an order. Validates eligibility before applying. ' +
+				'Side effect: recalculates order totals with the discount.',
+			schema: z.object({
+				code: z.string().describe('Coupon code to apply'),
+				order_id: z.number().describe('Order ID to apply the coupon to'),
+			}),
+			endpoint: '/coupons/apply',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_coupon_cancel',
+			title: 'Cancel Coupon',
+			description:
+				'Remove an applied coupon from an order. ' +
+				'Side effect: recalculates order totals without the discount.',
+			schema: z.object({
+				code: z.string().describe('Coupon code to remove'),
+				order_id: z.number().describe('Order ID to remove the coupon from'),
+			}),
+			endpoint: '/coupons/cancel',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_coupon_reapply',
+			title: 'Re-apply Coupon',
+			description:
+				'Re-apply a previously cancelled coupon to an order. ' +
+				'Side effect: recalculates order totals with the discount.',
+			schema: z.object({
+				code: z.string().optional().describe('Coupon code to re-apply'),
+				order_id: z.number().optional().describe('Order ID'),
+			}),
+			endpoint: '/coupons/re-apply',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_coupon_check_eligibility',
+			title: 'Check Product Eligibility',
+			description: 'Check whether a specific product is eligible for a coupon.',
+			schema: z.object({
+				coupon_id: z.number().describe('Coupon ID'),
+				product_id: z.number().describe('Product ID to check eligibility for'),
+			}),
+			endpoint: '/coupons/checkProductEligibility',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_coupon_settings_get',
+			title: 'Get Coupon Settings',
+			description: 'Retrieve global coupon settings for the store.',
+			schema: z.object({}),
+			endpoint: '/coupons/getSettings',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_coupon_settings_save',
+			title: 'Save Coupon Settings',
+			description: 'Save global coupon settings for the store.',
+			schema: z.object({
+				settings: z.record(z.string(), z.unknown()).optional().describe('Coupon settings object'),
+			}),
+			endpoint: '/coupons/storeCouponSettings',
+		}),
+	]
+}

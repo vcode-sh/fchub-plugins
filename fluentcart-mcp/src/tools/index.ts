@@ -1,13 +1,18 @@
 import type { FluentCartClient } from '../api/client.js'
 import type { ToolDefinition } from './_factory.js'
+import { couponTools } from './coupons.js'
+import { customerTools } from './customers.js'
+import { orderCoreTools } from './orders-core.js'
+import { orderTransactionTools } from './orders-transactions.js'
+import { productCatalogTools } from './products-catalog.js'
+import { productCoreTools } from './products-core.js'
+import { productPricingTools } from './products-pricing.js'
+import { productVariantTools } from './products-variants.js'
+import { subscriptionTools } from './subscriptions.js'
 
-// v1.0 tool modules will be imported here as they're built:
-// import { orderTools } from './orders.js'
-// import { productTools } from './products.js'
-// import { customerTools } from './customers.js'
-// import { subscriptionTools } from './subscriptions.js'
-// import { couponTools } from './coupons.js'
-// import { reportTools } from './reports.js'
+// v1.0 tool modules — wired up as they're built:
+// import { reportCoreTools } from './reports-core.js'
+// import { reportInsightTools } from './reports-insights.js'
 // import { orderBumpTools } from './order-bumps.js'
 // import { productOptionTools } from './product-options.js'
 // import { integrationTools } from './integrations.js'
@@ -20,14 +25,19 @@ import type { ToolDefinition } from './_factory.js'
 // import { publicTools } from './public.js'
 // import { miscTools } from './misc.js'
 
-export function createAllTools(_client: FluentCartClient): ToolDefinition[] {
+export function createAllTools(client: FluentCartClient): ToolDefinition[] {
 	return [
-		// ...orderTools(client),
-		// ...productTools(client),
-		// ...customerTools(client),
-		// ...subscriptionTools(client),
-		// ...couponTools(client),
-		// ...reportTools(client),
+		...subscriptionTools(client),
+		...couponTools(client),
+		...orderCoreTools(client),
+		...orderTransactionTools(client),
+		...customerTools(client),
+		...productCoreTools(client),
+		...productPricingTools(client),
+		...productVariantTools(client),
+		...productCatalogTools(client),
+		// ...reportCoreTools(client),
+		// ...reportInsightTools(client),
 		// ...orderBumpTools(client),
 		// ...productOptionTools(client),
 		// ...integrationTools(client),
