@@ -16,6 +16,8 @@ jobs:
             has_tests: true
           - plugin: fchub-memberships
             has_tests: true
+          - plugin: fchub-stream
+            has_tests: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +46,7 @@ jobs:
         working-directory: plugins/${{ matrix.plugin }}
         run: ./vendor/bin/phpunit
 
-  vite-build:
+  vite-build-memberships:
     name: Vite Build (fchub-memberships)
     runs-on: ubuntu-latest
     steps:
@@ -88,3 +90,68 @@ jobs:
           fi
 
           echo "Build validation passed: $JS_COUNT JS file(s) in assets/dist/"
+
+  vite-build-stream:
+    name: Vite Build (fchub-stream)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for changes
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/fchub-stream/ | wc -l)
+          echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.count > 0
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build admin-app
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-stream/admin-app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Validate admin-app build
+        if: steps.changes.outputs.count > 0
+        run: |
+          if [ ! -d "plugins/fchub-stream/admin/dist" ] || [ -z "$(ls -A plugins/fchub-stream/admin/dist)" ]; then
+            echo "::error::admin-app build produced no output in admin/dist/"
+            exit 1
+          fi
+
+          JS_COUNT=$(find plugins/fchub-stream/admin/dist -name "*.js" | wc -l)
+          if [ "$JS_COUNT" -eq 0 ]; then
+            echo "::error::No JS files found in admin/dist/"
+            exit 1
+          fi
+
+          echo "admin-app build validation passed: $JS_COUNT JS file(s)"
+
+      - name: Build portal-app
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-stream/portal-app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Validate portal-app build
+        if: steps.changes.outputs.count > 0
+        run: |
+          if [ ! -d "plugins/fchub-stream/portal-app/dist" ] || [ -z "$(ls -A plugins/fchub-stream/portal-app/dist)" ]; then
+            echo "::error::portal-app build produced no output in portal-app/dist/"
+            exit 1
+          fi
+
+          JS_COUNT=$(find plugins/fchub-stream/portal-app/dist -name "*.js" | wc -l)
+          if [ "$JS_COUNT" -eq 0 ]; then
+            echo "::error::No JS files found in portal-app/dist/"
+            exit 1
+          fi
+
+          echo "portal-app build validation passed: $JS_COUNT JS file(s)"

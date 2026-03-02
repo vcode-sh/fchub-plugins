@@ -1,0 +1,10 @@
+# Services
+
+Business logic services for stream management.
+Services should be stateless and focused on specific domain logic.
+
+Example structure:
+- `StreamService.php` - Core stream operations
+- `StreamingService.php` - Streaming provider integration
+- `AnalyticsService.php` - Stream analytics
+

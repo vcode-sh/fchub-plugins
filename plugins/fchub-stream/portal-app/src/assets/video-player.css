@@ -1,0 +1,151 @@
+/**
+ * FCHub Stream - Video Player Styles
+ *
+ * CSS classes for video player rendering in posts and comments.
+ * Replaces inline styles for better maintainability.
+ *
+ * @package FCHub_Stream
+ * @since 1.0.0
+ */
+
+/**
+ * Video Player Margin Fix
+ *
+ * Removes unwanted margins around video players.
+ * Used by both VideoUploadController and ShortcodeProcessor.
+ */
+.fchub-stream-player-wrapper {
+  margin: 0 !important;
+}
+
+/**
+ * Video Player Container
+ *
+ * Base container for iframe video players.
+ */
+.fchub-stream-player-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+
+/**
+ * Video Player Iframe
+ *
+ * Styles for the actual video iframe element.
+ */
+.fchub-stream-player-iframe {
+  width: 100%;
+  height: auto;
+  border: none;
+  border-radius: 8px;
+}
+
+/**
+ * Pending/Processing Overlay
+ *
+ * Overlay shown while video is encoding.
+ */
+.fchub-stream-player-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.fchub-stream-player-overlay-text {
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/**
+ * Comment Video Notification
+ *
+ * Simple notification shown in comment composers
+ * instead of full video preview.
+ */
+.fchub-stream-comment-notification {
+  padding: 12px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+.fchub-stream-comment-notification-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.fchub-stream-comment-notification-icon {
+  width: 20px;
+  height: 20px;
+  color: #16a34a;
+}
+
+.fchub-stream-comment-notification-title {
+  color: #166534;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.fchub-stream-comment-notification-message {
+  color: #15803d;
+  font-size: 13px;
+  margin: 0 0 8px 28px;
+}
+
+.fchub-stream-comment-notification-remove {
+  margin-left: 28px;
+  padding: 4px 12px;
+  background: white;
+  border: 1px solid #86efac;
+  color: #dc2626;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fchub-stream-comment-notification-remove:hover {
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+
+/**
+ * Responsive Adjustments
+ */
+@media (max-width: 768px) {
+  .fchub-stream-player-iframe {
+    border-radius: 4px;
+  }
+
+  .fchub-stream-comment-notification {
+    padding: 10px;
+    margin: 10px 0;
+  }
+
+  .fchub-stream-comment-notification-title {
+    font-size: 13px;
+  }
+
+  .fchub-stream-comment-notification-message {
+    font-size: 12px;
+    margin-left: 24px;
+  }
+
+  .fchub-stream-comment-notification-remove {
+    margin-left: 24px;
+    font-size: 12px;
+  }
+}

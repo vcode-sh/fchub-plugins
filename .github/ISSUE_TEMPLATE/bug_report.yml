@@ -11,6 +11,7 @@ body:
         - fchub-p24
         - fchub-fakturownia
         - fchub-memberships
+        - fchub-stream
         - wc-fc
     validations:
       required: true

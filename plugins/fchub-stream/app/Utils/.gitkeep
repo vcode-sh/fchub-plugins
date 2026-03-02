@@ -1,0 +1,10 @@
+# Utils
+
+Utility classes and helper functions.
+These should be stateless helper classes.
+
+Example structure:
+- `StreamHelper.php` - Stream-related utilities
+- `VideoHelper.php` - Video processing utilities
+- `ValidationHelper.php` - Input validation
+

@@ -19,6 +19,7 @@ ALL_PLUGINS=(
     "fchub-p24|fchub-p24.php"
     "fchub-fakturownia|fchub-fakturownia.php"
     "fchub-memberships|fchub-memberships.php"
+    "fchub-stream|fchub-stream.php"
     "wc-fc|wc-fc.php"
 )
 
@@ -41,7 +42,7 @@ usage() {
     printf "Build distribution ZIPs for FCHub plugins.\n\n"
     printf "${BOLD}Arguments:${NC}\n"
     printf "  plugin-slug    Build only the specified plugin (optional)\n"
-    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, wc-fc\n\n"
+    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, fchub-stream, wc-fc\n\n"
     printf "${BOLD}Examples:${NC}\n"
     printf "  ./build.sh                    Build all plugins\n"
     printf "  ./build.sh fchub-p24          Build only fchub-p24\n"
@@ -136,6 +137,26 @@ for entry in "${PLUGINS[@]}"; do
                 error "npm build failed — assets/dist/ is empty"
             fi
             success "npm build complete"
+        fi
+    fi
+
+    # Run npm build for fchub-stream (admin-app + portal-app)
+    if [ "$slug" = "fchub-stream" ]; then
+        if [ -d "$plugin_dir/admin-app" ]; then
+            info "Running npm build for $slug/admin-app ..."
+            (cd "$plugin_dir/admin-app" && npm ci --silent && npm run build --silent)
+            if [ ! -d "$plugin_dir/admin/dist" ] || [ -z "$(ls -A "$plugin_dir/admin/dist" 2>/dev/null)" ]; then
+                error "npm build failed — admin/dist/ is empty"
+            fi
+            success "admin-app build complete"
+        fi
+        if [ -d "$plugin_dir/portal-app" ]; then
+            info "Running npm build for $slug/portal-app ..."
+            (cd "$plugin_dir/portal-app" && npm ci --silent && npm run build --silent)
+            if [ ! -d "$plugin_dir/portal-app/dist" ] || [ -z "$(ls -A "$plugin_dir/portal-app/dist" 2>/dev/null)" ]; then
+                error "npm build failed — portal-app/dist/ is empty"
+            fi
+            success "portal-app build complete"
         fi
     fi
 

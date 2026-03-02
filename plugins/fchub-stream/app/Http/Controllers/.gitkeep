@@ -1,0 +1,10 @@
+# Controllers
+
+HTTP controllers for REST API endpoints.
+Controllers should handle request/response and delegate to services.
+
+Example structure:
+- `StreamController.php` - Stream CRUD operations
+- `StreamingController.php` - Live streaming endpoints
+- `AnalyticsController.php` - Analytics endpoints
+

@@ -9,9 +9,10 @@ I got tired of having my FluentCart plugins scattered across a dev repo like soc
 | [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway — take money from Polish people, professionally | 1.0.0 |
 | [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 — keep the tax office off your back | 1.0.0 |
 | [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip — the full "pay me to read" stack | 1.0.0 |
+| [fchub-stream](plugins/fchub-stream/) | Video streaming for FluentCommunity — Cloudflare Stream & Bunny.net | 0.9.6 |
 | [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — your escape plan | 1.0.0 |
 
-All require [FluentCart](https://fluentcart.com). WordPress 6.8+. PHP 8.3+. A functioning will to live (optional).
+All require [FluentCart](https://fluentcart.com) (except fchub-stream which needs [FluentCommunity](https://fluentcommunity.com)). WordPress 6.0+. PHP 8.3+. A functioning will to live (optional).
 
 ## Translations
 
@@ -45,8 +46,8 @@ The workflow checks that the version in your plugin header matches the tag. If t
 
 PRs touching `plugins/` get:
 
-- **PHPUnit** — fchub-p24 and fchub-memberships
-- **Vite build** — fchub-memberships (making sure the Vue app didn't spontaneously combust)
+- **PHPUnit** — fchub-p24, fchub-memberships, and fchub-stream
+- **Vite build** — fchub-memberships and fchub-stream (making sure the Vue apps didn't spontaneously combust)
 
 ## Development
 
@@ -72,6 +73,10 @@ cd plugins/fchub-p24 && composer install && ./vendor/bin/phpunit
 
 # Vue admin app (memberships)
 cd plugins/fchub-memberships && npm install && npm run dev
+
+# Vue apps (stream)
+cd plugins/fchub-stream/admin-app && npm install && npm run dev
+cd plugins/fchub-stream/portal-app && npm install && npm run dev
 ```
 
 ## Repo structure
@@ -81,6 +86,7 @@ plugins/
   fchub-p24/              Przelewy24 gateway
   fchub-fakturownia/      Fakturownia invoices
   fchub-memberships/      Membership system (15k+ LOC of questionable decisions)
+  fchub-stream/           Video streaming for FluentCommunity
   wc-fc/                  WooCommerce migrator
 translations/
   fluent-cart/            Polish translation

@@ -1,0 +1,85 @@
+# Version Control
+.git/
+.gitignore
+.gitattributes
+.distignore
+
+# Development Documentation
+CLAUDE.md
+*.md
+knowledgebase/
+docs/
+
+# Vue.js Source Files (keep only built dist/)
+admin-app/src/
+admin-app/node_modules/
+admin-app/package.json
+admin-app/package-lock.json
+admin-app/vite.config.js
+admin-app/eslint.config.js
+admin-app/postcss.config.js
+admin-app/tailwind.config.js
+admin-app/.prettierrc
+admin-app/.prettierignore
+admin-app/index.html
+admin-app/README.md
+admin-app/.gitignore
+
+portal-app/src/
+portal-app/node_modules/
+portal-app/package.json
+portal-app/package-lock.json
+portal-app/vite.config.js
+portal-app/README.md
+portal-app/.gitignore
+
+# Tests
+tests/
+test-scripts/
+phpunit.xml
+phpunit.xml.dist
+.phpunit.cache/
+.phpunit.result.cache
+coverage/
+
+# Code Quality Tools
+phpcs.xml
+.php_cs
+.php_cs.cache
+
+# IDE & Editor
+.vscode/
+.idea/
+.claude/
+*.sublime-project
+*.sublime-workspace
+.mcp.json
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Development Dependencies
+composer.json
+composer.lock
+node_modules/
+vendor/
+
+# Logs
+*.log
+
+# Temporary Files
+*.tmp
+*.bak
+*.swp
+*~
+.cache/
+*.code-workspace
+
+# Built ZIP files
+*.zip
+
+# Environment Files
+.env
+.env.local
+.env.*.local

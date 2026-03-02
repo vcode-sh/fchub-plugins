@@ -68,6 +68,18 @@ npm install && npm run build    # production
 npm install && npm run dev      # dev with HMR
 ```
 
+### fchub-stream
+```bash
+# PHP
+composer install && ./vendor/bin/phpunit
+
+# Vue admin app
+cd admin-app && npm install && npm run dev
+
+# Vue portal app
+cd portal-app && npm install && npm run dev
+```
+
 ### wc-fc
 No build step. Just PHP doing PHP things.
 

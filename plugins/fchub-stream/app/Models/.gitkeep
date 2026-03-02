@@ -1,0 +1,10 @@
+# Models
+
+Data models representing database entities.
+Models should handle data access and transformation.
+
+Example structure:
+- `Stream.php` - Stream model
+- `StreamSession.php` - Stream session model
+- `StreamViewer.php` - Viewer model
+
