@@ -1,0 +1,105 @@
+---
+title: Products
+description: Full product lifecycle management. Pricing plans, variations, downloads, and product metadata.
+---
+
+The full product toolkit. Create, update, duplicate, and delete products — including variations, pricing, downloads, bundles, taxonomy terms, upgrade paths, and integrations. It's a lot, because products are complicated.
+
+## Endpoints
+
+### Core
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List products](/docs/fluentcart-api/listProducts) | Paginated list with filtering and search |
+| `GET` | [List public products](/docs/fluentcart-api/listPublicProducts) | Public storefront products (no auth required) |
+| `GET` | [Get product details](/docs/fluentcart-api/getProduct) | Detailed info for a specific product |
+| `GET` | [Fetch products by IDs](/docs/fluentcart-api/fetchProductsByIds) | Retrieve multiple products by ID |
+| `GET` | [Search product by name](/docs/fluentcart-api/searchProductByName) | Search products by name |
+| `GET` | [Get related products](/docs/fluentcart-api/getRelatedProducts) | Related products for a given product |
+| `GET` | [Suggest SKU](/docs/fluentcart-api/suggestSku) | Generate a suggested SKU |
+| `GET` | [Get max excerpt word count](/docs/fluentcart-api/getMaxExcerptWordCount) | Maximum allowed excerpt length |
+| `POST` | [Create product](/docs/fluentcart-api/createProduct) | Create a new product |
+| `POST` | [Update product detail](/docs/fluentcart-api/updateProductDetail) | Update a product record |
+| `POST` | [Duplicate product](/docs/fluentcart-api/duplicateProduct) | Duplicate an existing product |
+| `POST` | [Create dummy products](/docs/fluentcart-api/createDummyProducts) | Create test products |
+| `POST` | [Bulk product actions](/docs/fluentcart-api/productsBulkAction) | Perform bulk actions on products |
+| `POST` | [Update editor mode](/docs/fluentcart-api/updateLongDescEditorMode) | Switch long description editor mode |
+| `DELETE` | [Delete product](/docs/fluentcart-api/deleteProduct) | Delete a product |
+
+### Variations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List variations](/docs/fluentcart-api/listVariations) | Variations for a product |
+| `GET` | [List all variants](/docs/fluentcart-api/listAllVariants) | All variants across all products |
+| `GET` | [Fetch variations by IDs](/docs/fluentcart-api/fetchVariationsByIds) | Retrieve multiple variations by ID |
+| `GET` | [Find subscription variants](/docs/fluentcart-api/findSubscriptionVariants) | Variants supporting subscriptions |
+| `GET` | [Search variant by name](/docs/fluentcart-api/searchVariantByName) | Search variants by name |
+| `GET` | [Search variant options](/docs/fluentcart-api/searchProductVariantOptions) | Search variant options |
+| `POST` | [Create variation](/docs/fluentcart-api/createVariation) | Create a new variation |
+| `POST` | [Update variation](/docs/fluentcart-api/updateVariation) | Update an existing variation |
+| `POST` | [Set variation media](/docs/fluentcart-api/setVariationMedia) | Set image for a variation |
+| `POST` | [Update variant option](/docs/fluentcart-api/updateVariantOption) | Update variant attribute config |
+| `PUT` | [Update pricing table](/docs/fluentcart-api/updateVariationPricingTable) | Update variation pricing |
+| `DELETE` | [Delete variation](/docs/fluentcart-api/deleteVariation) | Delete a variation |
+
+### Pricing
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get product pricing](/docs/fluentcart-api/getProductPricing) | Product pricing info (in cents) |
+| `GET` | [Get pricing widgets](/docs/fluentcart-api/getProductPricingWidgets) | Pricing widgets for a product |
+| `POST` | [Update product pricing](/docs/fluentcart-api/updateProductPricing) | Update pricing |
+
+### Inventory
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `PUT` | [Update inventory](/docs/fluentcart-api/updateProductInventory) | Update variant inventory |
+| `PUT` | [Update stock management](/docs/fluentcart-api/updateProductManageStock) | Enable or disable stock tracking |
+
+### Downloads
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get downloadable URL](/docs/fluentcart-api/getDownloadableUrl) | Retrieve download URL |
+| `POST` | [Sync downloadable files](/docs/fluentcart-api/syncDownloadableFiles) | Synchronise downloadable files |
+| `PUT` | [Update downloadable file](/docs/fluentcart-api/updateDownloadableFile) | Update a file record |
+| `DELETE` | [Delete downloadable file](/docs/fluentcart-api/deleteDownloadableFile) | Delete a downloadable file |
+
+### Taxonomy & Terms
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get product terms](/docs/fluentcart-api/fetchTerms) | Product categories and tags |
+| `POST` | [Get terms by parent](/docs/fluentcart-api/fetchTermByParent) | Terms filtered by parent |
+| `POST` | [Add product terms](/docs/fluentcart-api/addProductTerms) | Add terms to a product |
+| `POST` | [Sync taxonomy terms](/docs/fluentcart-api/syncTaxonomyTerms) | Synchronise taxonomy terms |
+| `POST` | [Delete taxonomy terms](/docs/fluentcart-api/deleteTaxonomyTerms) | Remove terms from a product |
+
+### Bundles & Upgrades
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get bundle info](/docs/fluentcart-api/getProductBundleInfo) | Product bundle configuration |
+| `GET` | [Get upgrade settings](/docs/fluentcart-api/getUpgradeSettings) | Upgrade path settings |
+| `GET` | [Get variation upgrade paths](/docs/fluentcart-api/getVariationUpgradePaths) | Upgrade paths for a variation |
+| `POST` | [Save bundle info](/docs/fluentcart-api/saveProductBundleInfo) | Save bundle configuration |
+| `POST` | [Save upgrade path](/docs/fluentcart-api/saveUpgradeSetting) | Create an upgrade path |
+| `POST` | [Update upgrade path](/docs/fluentcart-api/updateUpgradePath) | Update an existing upgrade path |
+| `DELETE` | [Delete upgrade path](/docs/fluentcart-api/deleteUpgradePath) | Delete an upgrade path |
+
+### Integrations & Shipping/Tax
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get product integrations](/docs/fluentcart-api/getProductIntegrations) | Integration feeds on a product |
+| `GET` | [Get integration settings](/docs/fluentcart-api/getProductIntegrationSettings) | Settings for a product integration |
+| `POST` | [Save product integration](/docs/fluentcart-api/saveProductIntegration) | Save an integration feed |
+| `POST` | [Toggle feed status](/docs/fluentcart-api/changeProductIntegrationFeedStatus) | Enable or disable a feed |
+| `POST` | [Update shipping class](/docs/fluentcart-api/updateProductShippingClass) | Assign shipping class |
+| `POST` | [Remove shipping class](/docs/fluentcart-api/removeProductShippingClass) | Remove shipping class |
+| `POST` | [Update tax class](/docs/fluentcart-api/updateProductTaxClass) | Assign tax class |
+| `POST` | [Remove tax class](/docs/fluentcart-api/removeProductTaxClass) | Remove tax class |
+| `DELETE` | [Delete product integration](/docs/fluentcart-api/deleteProductIntegration) | Delete an integration feed |

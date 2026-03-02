@@ -1,0 +1,30 @@
+---
+title: Licensing
+description: Software licence key management, activations, and validation.
+---
+
+Software licence key management across the API. These endpoints span multiple sections — licence activation lives under [Settings](/docs/fluentcart-api/settings), licence analytics under [Reports](/docs/fluentcart-api/reports), and licence generation under [Orders](/docs/fluentcart-api/orders).
+
+## Endpoints
+
+### Activation & Settings
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get license settings](/docs/fluentcart-api/getLicenseSettings) | Licence activation status and details |
+| `POST` | [Activate license](/docs/fluentcart-api/activateLicense) | Activate a FluentCart Pro licence key |
+| `DELETE` | [Deactivate license](/docs/fluentcart-api/deactivateLicense) | Deactivate the current licence |
+
+### Order Licence Generation
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | [Generate missing licenses](/docs/fluentcart-api/generateMissingLicenses) | Generate missing licence keys for an order |
+
+### Analytics
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get license summary](/docs/fluentcart-api/getLicenseSummary) | Licence summary statistics |
+| `GET` | [Get license chart](/docs/fluentcart-api/getLicenseChart) | Licence issuance and activation over time |
+| `GET` | [Get license pie chart](/docs/fluentcart-api/getLicensePieChart) | Licence distribution chart |

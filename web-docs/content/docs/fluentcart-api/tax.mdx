@@ -1,0 +1,54 @@
+---
+title: Tax
+description: Tax classes, rates, and regional tax configuration.
+---
+
+Tax configuration for the brave. Classes, rates, EU VAT, OSS overrides, country-specific tax IDs — everything you need to keep the taxman happy (or at least informed).
+
+## Endpoints
+
+### Configuration
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get tax settings](/docs/fluentcart-api/getTaxSettings) | Global tax configuration |
+| `GET` | [Get configuration rates](/docs/fluentcart-api/getTaxConfigurationRates) | Tax configuration rate setup |
+| `POST` | [Save tax settings](/docs/fluentcart-api/saveTaxSettings) | Update global tax config |
+| `POST` | [Save configured countries](/docs/fluentcart-api/saveConfiguredCountries) | Save countries with tax enabled |
+
+### Classes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List tax classes](/docs/fluentcart-api/listTaxClasses) | All tax classes |
+| `POST` | [Create tax class](/docs/fluentcart-api/createTaxClass) | Create a new tax class |
+| `PUT` | [Update tax class](/docs/fluentcart-api/updateTaxClass) | Update an existing class |
+| `DELETE` | [Delete tax class](/docs/fluentcart-api/deleteTaxClass) | Delete a tax class |
+
+### Rates
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List tax rates](/docs/fluentcart-api/listTaxRates) | All configured rates across countries |
+| `GET` | [List tax records](/docs/fluentcart-api/listTaxRecords) | Tax records for reporting |
+| `GET` | [Get country tax rates](/docs/fluentcart-api/getCountryTaxRates) | Rates for a specific country |
+| `GET` | [Get country tax ID](/docs/fluentcart-api/getCountryTaxId) | Tax ID for a country |
+| `POST` | [Create tax rate](/docs/fluentcart-api/createTaxRate) | Create a new rate |
+| `POST` | [Save country tax ID](/docs/fluentcart-api/saveCountryTaxId) | Save or update a country tax ID |
+| `POST` | [Mark taxes as filed](/docs/fluentcart-api/markTaxesAsFiled) | Mark tax records as filed |
+| `PUT` | [Update tax rate](/docs/fluentcart-api/updateTaxRate) | Update an existing rate |
+| `DELETE` | [Delete tax rate](/docs/fluentcart-api/deleteTaxRate) | Delete a rate |
+| `DELETE` | [Delete country tax rates](/docs/fluentcart-api/deleteCountryTaxRates) | Delete all rates for a country |
+
+### EU VAT & OSS
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get EU tax rates](/docs/fluentcart-api/getEuTaxRates) | EU member state standard VAT rates |
+| `POST` | [Save EU VAT settings](/docs/fluentcart-api/saveEuVatSettings) | Update EU VAT configuration |
+| `POST` | [Save OSS tax override](/docs/fluentcart-api/saveOssTaxOverride) | Create an OSS tax rate override |
+| `POST` | [Save OSS shipping override](/docs/fluentcart-api/saveOssShippingOverride) | Create an OSS shipping tax override |
+| `POST` | [Save shipping tax override](/docs/fluentcart-api/saveShippingTaxOverride) | Create a shipping-specific tax override |
+| `DELETE` | [Delete OSS tax override](/docs/fluentcart-api/deleteOssTaxOverride) | Remove an OSS tax override |
+| `DELETE` | [Delete OSS shipping override](/docs/fluentcart-api/deleteOssShippingOverride) | Remove an OSS shipping override |
+| `DELETE` | [Delete shipping tax override](/docs/fluentcart-api/deleteShippingTaxOverride) | Remove a shipping tax override |

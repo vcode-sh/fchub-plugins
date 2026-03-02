@@ -1,0 +1,18 @@
+---
+title: Subscriptions
+description: Recurring billing management. View, cancel, pause, and modify active subscriptions.
+---
+
+Recurring revenue, the holy grail. List, inspect, pause, cancel, and reactivate subscriptions — or fetch the latest state from the payment gateway when things get out of sync.
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List subscriptions](/docs/fluentcart-api/listSubscriptions) | Paginated list with filtering and search |
+| `GET` | [Get subscription details](/docs/fluentcart-api/getSubscription) | Detailed info for a specific subscription |
+| `PUT` | [Cancel subscription](/docs/fluentcart-api/cancelSubscription) | Cancel a subscription |
+| `PUT` | [Pause subscription](/docs/fluentcart-api/pauseSubscription) | Pause an active subscription |
+| `PUT` | [Resume subscription](/docs/fluentcart-api/resumeSubscription) | Resume a paused subscription |
+| `PUT` | [Reactivate subscription](/docs/fluentcart-api/reactivateSubscription) | Reactivate a cancelled or expired subscription |
+| `PUT` | [Fetch from gateway](/docs/fluentcart-api/fetchSubscription) | Sync subscription data from the payment gateway |

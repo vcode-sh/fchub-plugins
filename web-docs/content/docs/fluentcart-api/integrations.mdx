@@ -1,0 +1,23 @@
+---
+title: Integrations
+description: Third-party integration feeds and webhook configuration.
+---
+
+The integration feed system. Configure global-level feeds that fire on order events, manage integration settings, install plugins, and retrieve dynamic field options for feed configuration.
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List integration addons](/docs/fluentcart-api/listAddons) | All available integrations and their status |
+| `GET` | [Get global feeds](/docs/fluentcart-api/getGlobalFeeds) | All global-level integration feeds |
+| `GET` | [Get feed lists](/docs/fluentcart-api/getFeedLists) | Available feed lists for a provider |
+| `GET` | [Get feed settings](/docs/fluentcart-api/getIntegrationFeedSettings) | Settings for a specific feed |
+| `GET` | [Get global settings](/docs/fluentcart-api/getGlobalSettings) | Global settings for an integration |
+| `GET` | [Get dynamic options](/docs/fluentcart-api/getDynamicOptions) | Dynamic select options for feed fields |
+| `POST` | [Get chained data](/docs/fluentcart-api/getChainedData) | Dependent data for feed fields |
+| `POST` | [Save feed settings](/docs/fluentcart-api/saveIntegrationFeedSettings) | Create or update a feed |
+| `POST` | [Save global settings](/docs/fluentcart-api/saveGlobalSettings) | Update global integration settings |
+| `POST` | [Change feed status](/docs/fluentcart-api/changeIntegrationFeedStatus) | Enable or disable a feed |
+| `POST` | [Install plugin](/docs/fluentcart-api/installPlugin) | Install an integration plugin |
+| `DELETE` | [Delete feed](/docs/fluentcart-api/deleteIntegrationFeed) | Delete a global integration feed |

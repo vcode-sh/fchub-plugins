@@ -1,10 +1,5 @@
 import type { ResolvedConfig } from '../config/types.js'
-
-export interface ApiError {
-	status: number
-	message: string
-	body?: unknown
-}
+import { errorFromStatus, FluentCartApiError } from './errors.js'
 
 export interface ApiResponse<T = unknown> {
 	data: T
@@ -12,17 +7,6 @@ export interface ApiResponse<T = unknown> {
 }
 
 const DEFAULT_TIMEOUT = 30_000
-
-const ERROR_MAP: Record<number, [string, (err: ApiError) => string]> = {
-	401: [
-		'Authentication failed',
-		() =>
-			'Check your WordPress username and Application Password. Generate one at: WordPress Admin → Users → Application Passwords.',
-	],
-	403: ['Permission denied', () => 'Your WordPress user lacks permission for this operation.'],
-	404: ['Resource not found', (err) => err.message],
-	422: ['Validation error', (err) => JSON.stringify(err.body)],
-}
 
 function buildUrl(base: string, path: string, params?: Record<string, unknown>): URL {
 	const url = new URL(`${base}${path}`)
@@ -38,19 +22,8 @@ function buildUrl(base: string, path: string, params?: Record<string, unknown>):
 
 async function handleErrorResponse(response: Response): Promise<never> {
 	const body = await response.json().catch(() => null)
-	const apiError: ApiError = {
-		status: response.status,
-		message: (body as Record<string, string> | null)?.message ?? response.statusText,
-		body,
-	}
-
-	const mapping = ERROR_MAP[response.status]
-	if (mapping) {
-		const [label, formatter] = mapping
-		throw new Error(`${label}: ${formatter(apiError)}`)
-	}
-
-	throw new Error(`API error ${response.status}: ${apiError.message}`)
+	const message = (body as Record<string, string> | null)?.message ?? response.statusText
+	throw errorFromStatus(response.status, message, body)
 }
 
 export function createClient(config: ResolvedConfig) {
@@ -94,9 +67,18 @@ export function createClient(config: ResolvedConfig) {
 			return { data, status: response.status }
 		} catch (error) {
 			if (error instanceof DOMException && error.name === 'AbortError') {
-				throw new Error(`Request timed out after ${timeout}ms: ${method} ${path}`)
+				throw new FluentCartApiError(
+					'TIMEOUT',
+					`Request timed out after ${timeout}ms: ${method} ${path}`,
+				)
 			}
-			throw error
+			if (error instanceof FluentCartApiError) {
+				throw error
+			}
+			throw new FluentCartApiError(
+				'CONNECTION_ERROR',
+				error instanceof Error ? error.message : String(error),
+			)
 		} finally {
 			clearTimeout(timer)
 		}

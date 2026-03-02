@@ -1,0 +1,98 @@
+---
+title: Reports
+description: Revenue, order, and product analytics. Date-filtered reporting endpoints.
+---
+
+Numbers, charts, and analytics. Revenue breakdowns, order charts, product performance, customer insights, subscription cohorts, refund analysis, and retention metrics. All date-filterable, all JSON.
+
+## Endpoints
+
+### Overview
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get reports overview](/docs/fluentcart-api/getReportsOverview) | Summary for the reports dashboard |
+| `GET` | [Get report overview](/docs/fluentcart-api/getReportOverview) | Summarised report overview |
+| `GET` | [Get dashboard summary](/docs/fluentcart-api/getDashboardSummary) | Key metrics for the main dashboard |
+| `GET` | [Get report dashboard stats](/docs/fluentcart-api/getReportDashboardStats) | Dashboard statistics |
+| `GET` | [Get report meta](/docs/fluentcart-api/getReportMeta) | Report metadata |
+| `GET` | [Get report sources](/docs/fluentcart-api/getReportSources) | Available report data sources |
+| `GET` | [Get quick order stats](/docs/fluentcart-api/getQuickOrderStats) | Quick order statistics for a date range |
+| `GET` | [Get recent orders](/docs/fluentcart-api/getRecentOrders) | Most recent orders for the dashboard |
+| `GET` | [Get recent activities](/docs/fluentcart-api/getRecentActivities) | Recent activity log entries |
+
+### Revenue & Sales
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get revenue](/docs/fluentcart-api/getRevenue) | Revenue report |
+| `GET` | [Get revenue by group](/docs/fluentcart-api/getRevenueByGroup) | Revenue segmented by group or category |
+| `GET` | [Get sales report](/docs/fluentcart-api/getSalesReport) | Comprehensive sales report |
+| `GET` | [Get sales growth](/docs/fluentcart-api/getSalesGrowth) | Sales growth metrics over time |
+| `GET` | [Get sales growth chart](/docs/fluentcart-api/getSalesGrowthChart) | Sales growth chart data |
+
+### Orders
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get order chart](/docs/fluentcart-api/getOrderChart) | Order chart data |
+| `GET` | [Get orders by group](/docs/fluentcart-api/getOrdersByGroup) | Orders segmented by group |
+| `GET` | [Get order completion time](/docs/fluentcart-api/getOrderCompletionTime) | Time-to-completion analytics |
+| `GET` | [Get order value distribution](/docs/fluentcart-api/getOrderValueDistribution) | Order value distribution |
+| `GET` | [Get item count distribution](/docs/fluentcart-api/getItemCountDistribution) | Orders by number of items |
+| `GET` | [Get unfulfilled orders](/docs/fluentcart-api/getUnfulfilledOrders) | Orders not yet shipped |
+| `GET` | [Get report by day and hour](/docs/fluentcart-api/getReportByDayAndHour) | Order activity heatmap data |
+
+### Products
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get product report](/docs/fluentcart-api/getProductReport) | Product performance with sales data |
+| `GET` | [Get product performance](/docs/fluentcart-api/getProductPerformance) | Product performance metrics |
+| `GET` | [Get top products sold](/docs/fluentcart-api/getTopProductsSold) | Top-selling products by units |
+| `GET` | [Get top sold products](/docs/fluentcart-api/getTopSoldProducts) | Top-selling products with revenue |
+| `GET` | [Get top sold variants](/docs/fluentcart-api/getTopSoldVariants) | Top-selling variants with revenue |
+| `GET` | [Get cart report](/docs/fluentcart-api/getCartReport) | Cart analytics and abandonment rates |
+
+### Customers
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get customer report](/docs/fluentcart-api/getCustomerReport) | Customer analytics |
+| `GET` | [Get daily signups](/docs/fluentcart-api/getDailySignups) | Daily customer signup counts |
+| `GET` | [Get new vs returning](/docs/fluentcart-api/getNewVsReturningCustomer) | New vs returning customer breakdown |
+| `GET` | [Search repeat customers](/docs/fluentcart-api/searchRepeatCustomers) | Find repeat customers |
+| `GET` | [Get country heat map](/docs/fluentcart-api/getCountryHeatMap) | Customer distribution by country |
+
+### Subscriptions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get subscription chart](/docs/fluentcart-api/getSubscriptionChart) | Subscription chart data |
+| `GET` | [Get subscription cohorts](/docs/fluentcart-api/getSubscriptionCohorts) | Subscription cohort analysis |
+| `GET` | [Get subscription retention](/docs/fluentcart-api/getSubscriptionRetention) | Subscription retention metrics |
+| `GET` | [Get future renewals](/docs/fluentcart-api/getFutureRenewals) | Upcoming renewal dates and expected revenue |
+
+### Refunds
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get refund chart](/docs/fluentcart-api/getRefundChart) | Refund chart data |
+| `GET` | [Get refund data by group](/docs/fluentcart-api/getRefundDataByGroup) | Refund data by grouping dimension |
+| `GET` | [Get weeks between refund](/docs/fluentcart-api/getWeeksBetweenRefund) | Average time from purchase to refund |
+
+### Retention
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get retention chart](/docs/fluentcart-api/getRetentionChart) | Retention chart data |
+| `GET` | [Get retention status](/docs/fluentcart-api/getRetentionSnapshotsStatus) | Retention snapshot generation status |
+| `POST` | [Generate retention snapshots](/docs/fluentcart-api/generateRetentionSnapshots) | Trigger retention snapshot generation |
+
+### Licensing
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get license chart](/docs/fluentcart-api/getLicenseChart) | Licence issuance and activation over time |
+| `GET` | [Get license pie chart](/docs/fluentcart-api/getLicensePieChart) | Licence distribution chart |
+| `GET` | [Get license summary](/docs/fluentcart-api/getLicenseSummary) | Licence summary statistics |

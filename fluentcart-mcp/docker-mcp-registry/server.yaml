@@ -1,0 +1,22 @@
+name: fluentcart
+type: server
+meta:
+  category: ecommerce
+  tags: [ecommerce, wordpress, fluentcart, orders, products, subscriptions]
+about:
+  title: FluentCart
+  description: 200+ AI tools for FluentCart — orders, products, customers, subscriptions, coupons, reports.
+  icon: https://fchub.co/icon.png
+source:
+  project: https://github.com/vcode-sh/fchub-plugins
+config:
+  secrets:
+    - name: fluentcart.url
+      env: FLUENTCART_URL
+      example: "https://your-store.com"
+    - name: fluentcart.username
+      env: FLUENTCART_USERNAME
+      example: "admin"
+    - name: fluentcart.app_password
+      env: FLUENTCART_APP_PASSWORD
+      example: "aBcD eFgH iJkL mNoP"

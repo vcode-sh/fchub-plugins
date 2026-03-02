@@ -1,0 +1,34 @@
+---
+title: Orders
+description: Create, retrieve, update, and manage orders. Includes line items, addresses, transactions, and status changes.
+---
+
+The bread and butter of any e-commerce API. Everything you need to create, fetch, update, and occasionally delete orders — plus transactions, addresses, shipping, and disputes.
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List orders](/docs/fluentcart-api/listOrders) | Retrieve a paginated list of orders with filtering and search |
+| `GET` | [Get order details](/docs/fluentcart-api/getOrder) | Retrieve a single order by ID |
+| `GET` | [Get customer orders](/docs/fluentcart-api/getCustomerOrdersPaginated) | Paginated orders for a specific customer |
+| `GET` | [Get order transactions](/docs/fluentcart-api/getOrderTransactions) | All transactions for a specific order |
+| `GET` | [Get transaction details](/docs/fluentcart-api/getTransactionDetails) | Details of a specific transaction |
+| `GET` | [Get shipping methods](/docs/fluentcart-api/getShippingMethods) | Available shipping methods for order creation |
+| `POST` | [Create order](/docs/fluentcart-api/createOrder) | Create a new order with items and customer info |
+| `POST` | [Create custom order](/docs/fluentcart-api/createCustomOrder) | Create a custom line item on an existing order |
+| `POST` | [Update order](/docs/fluentcart-api/updateOrder) | Update an existing order |
+| `POST` | [Change order customer](/docs/fluentcart-api/changeOrderCustomer) | Change the customer on an order |
+| `POST` | [Create and change customer](/docs/fluentcart-api/createAndChangeCustomer) | Create a new customer and assign to order |
+| `POST` | [Calculate shipping](/docs/fluentcart-api/calculateShipping) | Calculate shipping costs for an order |
+| `POST` | [Mark order as paid](/docs/fluentcart-api/markOrderAsPaid) | Manually mark an order as paid |
+| `POST` | [Refund order](/docs/fluentcart-api/refundOrder) | Process a refund |
+| `POST` | [Accept dispute](/docs/fluentcart-api/acceptDispute) | Accept a transaction dispute |
+| `POST` | [Generate missing licenses](/docs/fluentcart-api/generateMissingLicenses) | Generate missing licence keys for an order |
+| `POST` | [Bulk order actions](/docs/fluentcart-api/ordersBulkAction) | Perform bulk actions on multiple orders |
+| `PUT` | [Update order address](/docs/fluentcart-api/updateOrderAddress) | Update billing or shipping address on an order |
+| `POST` | [Update order address ID](/docs/fluentcart-api/updateOrderAddressId) | Update the address ID associated with an order |
+| `PUT` | [Update order statuses](/docs/fluentcart-api/updateOrderStatuses) | Update order statuses |
+| `PUT` | [Sync order statuses](/docs/fluentcart-api/syncOrderStatuses) | Synchronise statuses with the payment gateway |
+| `PUT` | [Update transaction status](/docs/fluentcart-api/updateTransactionStatus) | Update status of a specific transaction |
+| `DELETE` | [Delete order](/docs/fluentcart-api/deleteOrder) | Soft-delete an order |

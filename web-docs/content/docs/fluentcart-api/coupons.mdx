@@ -1,0 +1,23 @@
+---
+title: Coupons
+description: Discount code management. Create percentage or fixed-amount coupons with usage limits and expiry dates.
+---
+
+Everybody loves a discount. Create, update, and manage coupon codes — percentage or fixed amount, with usage limits, expiry dates, and product eligibility checks.
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List coupons](/docs/fluentcart-api/listCoupons) | Paginated list with filtering and search |
+| `GET` | [List coupons (alt)](/docs/fluentcart-api/listCouponsAlt) | Alternative coupon listing endpoint |
+| `GET` | [Get coupon details](/docs/fluentcart-api/getCoupon) | Detailed info for a specific coupon |
+| `GET` | [Get coupon settings](/docs/fluentcart-api/getCouponSettings) | Global coupon configuration |
+| `POST` | [Create coupon](/docs/fluentcart-api/createCoupon) | Create a new coupon |
+| `POST` | [Apply coupon](/docs/fluentcart-api/applyCoupon) | Apply a coupon to an order or cart |
+| `POST` | [Cancel coupon](/docs/fluentcart-api/cancelCoupon) | Remove an applied coupon |
+| `POST` | [Re-apply coupon](/docs/fluentcart-api/reApplyCoupon) | Re-apply a previously cancelled coupon |
+| `POST` | [Check product eligibility](/docs/fluentcart-api/checkProductEligibility) | Check if a product qualifies for a coupon |
+| `POST` | [Store coupon settings](/docs/fluentcart-api/storeCouponSettings) | Save global coupon settings |
+| `PUT` | [Update coupon](/docs/fluentcart-api/updateCoupon) | Update an existing coupon |
+| `DELETE` | [Delete coupon](/docs/fluentcart-api/deleteCoupon) | Delete a coupon |

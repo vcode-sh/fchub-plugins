@@ -1,0 +1,851 @@
+{
+  "manifest_version": "0.3",
+  "name": "fluentcart-mcp",
+  "version": "1.0.0",
+  "display_name": "FluentCart",
+  "description": "200+ tools for managing your FluentCart store — orders, products, customers, subscriptions, coupons, reports.",
+  "author": {
+    "name": "Vibe Code",
+    "email": "hello@vcode.sh",
+    "url": "https://vcode.sh"
+  },
+  "license": "MIT",
+  "homepage": "https://fchub.co/docs/fluentcart-mcp",
+  "repository": "https://github.com/vcode-sh/fchub-plugins",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "FLUENTCART_URL": "${user_config.store_url}",
+        "FLUENTCART_USERNAME": "${user_config.username}",
+        "FLUENTCART_APP_PASSWORD": "${user_config.app_password}"
+      }
+    }
+  },
+  "user_config": {
+    "store_url": {
+      "type": "string",
+      "title": "WordPress URL",
+      "description": "Full URL to your WordPress site (e.g. https://your-store.com)",
+      "required": true
+    },
+    "username": {
+      "type": "string",
+      "title": "WordPress Username",
+      "description": "Admin username with REST API access",
+      "required": true
+    },
+    "app_password": {
+      "type": "string",
+      "title": "Application Password",
+      "description": "Generate at WordPress Admin > Users > Your Profile > Application Passwords",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "tools": [
+    {
+      "name": "fluentcart_subscription_list",
+      "description": "Retrieve a paginated list of subscriptions with optional filtering. Returns subscription summaries with status, billing interval, and amounts. Monetary values in smallest currency unit (cents). Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed."
+    },
+    {
+      "name": "fluentcart_subscription_get",
+      "description": "Retrieve detailed information about a specific subscription including billing dates, gateway info, and payment history. Monetary values in smallest currency unit (cents). Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed."
+    },
+    {
+      "name": "fluentcart_subscription_cancel",
+      "description": "Cancel a subscription associated with an order. Can cancel immediately or at end of billing period. Side effect: may trigger refund depending on gateway and cancel_immediately flag."
+    },
+    {
+      "name": "fluentcart_subscription_fetch",
+      "description": "Fetch and synchronise subscription data from the payment gateway. Use when subscription state may be out of sync with the gateway (e.g. after manual gateway changes)."
+    },
+    {
+      "name": "fluentcart_subscription_pause",
+      "description": "Pause an active subscription. Optionally set a date to auto-resume. Only active subscriptions can be paused."
+    },
+    {
+      "name": "fluentcart_subscription_reactivate",
+      "description": "Reactivate a cancelled or expired subscription. Creates a new billing cycle from the reactivation date."
+    },
+    {
+      "name": "fluentcart_subscription_resume",
+      "description": "Resume a paused subscription. Only paused subscriptions can be resumed."
+    },
+    {
+      "name": "fluentcart_coupon_list",
+      "description": "Retrieve a paginated list of coupons with optional search. Returns coupon code, type, value, status, and usage stats. Types: percentage, fixed, free_shipping. Statuses: active, inactive. Monetary values (minimum_amount, maximum_amount, fixed value) in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_coupon_create",
+      "description": "Create a new coupon. For fixed-type coupons, value is in smallest currency unit (cents). For percentage-type, value is the percentage (e.g. 15 = 15% off). Types: percentage, fixed, free_shipping."
+    },
+    {
+      "name": "fluentcart_coupon_get",
+      "description": "Retrieve detailed information about a specific coupon including usage stats and eligibility rules."
+    },
+    {
+      "name": "fluentcart_coupon_update",
+      "description": "Update an existing coupon. Monetary values in smallest currency unit (cents). Types: percentage, fixed, free_shipping."
+    },
+    {
+      "name": "fluentcart_coupon_delete",
+      "description": "Permanently delete a coupon. This action cannot be undone."
+    },
+    {
+      "name": "fluentcart_coupon_list_alt",
+      "description": "Alternative endpoint for listing all coupons in a simplified format."
+    },
+    {
+      "name": "fluentcart_coupon_apply",
+      "description": "Apply a coupon to an order. Validates eligibility before applying. Side effect: recalculates order totals with the discount."
+    },
+    {
+      "name": "fluentcart_coupon_cancel",
+      "description": "Remove an applied coupon from an order. Side effect: recalculates order totals without the discount."
+    },
+    {
+      "name": "fluentcart_coupon_reapply",
+      "description": "Re-apply a previously cancelled coupon to an order. Side effect: recalculates order totals with the discount."
+    },
+    {
+      "name": "fluentcart_coupon_check_eligibility",
+      "description": "Check whether a specific product is eligible for a coupon."
+    },
+    {
+      "name": "fluentcart_coupon_settings_get",
+      "description": "Retrieve global coupon settings for the store."
+    },
+    {
+      "name": "fluentcart_coupon_settings_save",
+      "description": "Save global coupon settings for the store."
+    },
+    {
+      "name": "fluentcart_order_list",
+      "description": "Retrieve a paginated list of orders with optional filtering. Returns order summaries with customer info, payment status, and totals. Monetary values in smallest currency unit (cents). Statuses: pending, processing, completed, canceled. Payment statuses: pending, paid, partially_refunded, refunded, failed."
+    },
+    {
+      "name": "fluentcart_order_create",
+      "description": "Create a new order with items and customer information. Monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_order_get",
+      "description": "Retrieve detailed order information including items, transactions, addresses, activities, and customer data. Monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_order_update",
+      "description": "Update an existing order. Subscription orders cannot be edited. Completed orders cannot have their status updated."
+    },
+    {
+      "name": "fluentcart_order_delete",
+      "description": "Delete an order (soft delete). This action cannot be undone."
+    },
+    {
+      "name": "fluentcart_order_mark_paid",
+      "description": "Mark an order as paid manually. Side effect: triggers order paid hooks and integration feeds."
+    },
+    {
+      "name": "fluentcart_order_refund",
+      "description": "Process a refund for an order. Amount in smallest currency unit (cents). Side effect: sends refund to payment gateway if applicable."
+    },
+    {
+      "name": "fluentcart_order_update_statuses",
+      "description": "Update payment, shipping, and order statuses independently. Payment: pending, paid, partially_refunded, refunded, failed. Shipping: pending, shipped, delivered, returned, unshipped."
+    },
+    {
+      "name": "fluentcart_order_sync_statuses",
+      "description": "Synchronise order statuses with the payment gateway."
+    },
+    {
+      "name": "fluentcart_order_change_customer",
+      "description": "Change the customer associated with an order."
+    },
+    {
+      "name": "fluentcart_order_create_and_change_customer",
+      "description": "Create a new customer and associate them with the order."
+    },
+    {
+      "name": "fluentcart_order_update_address_id",
+      "description": "Update the address ID associated with an order."
+    },
+    {
+      "name": "fluentcart_order_update_address",
+      "description": "Update a billing or shipping address on an order."
+    },
+    {
+      "name": "fluentcart_order_create_custom",
+      "description": "Create a custom order line item on an existing order."
+    },
+    {
+      "name": "fluentcart_order_generate_licenses",
+      "description": "Generate any missing licenses for digital products in an order."
+    },
+    {
+      "name": "fluentcart_order_transactions",
+      "description": "Retrieve all transactions for a specific order. Transaction types: charge, refund. Statuses: succeeded, pending, failed, refunded, disputed."
+    },
+    {
+      "name": "fluentcart_order_transaction_get",
+      "description": "Retrieve details of a specific transaction on an order."
+    },
+    {
+      "name": "fluentcart_order_transaction_update_status",
+      "description": "Update the status of a specific transaction. Statuses: succeeded, pending, failed, refunded, disputed."
+    },
+    {
+      "name": "fluentcart_order_accept_dispute",
+      "description": "Accept a dispute for a transaction. Side effect: may trigger refund."
+    },
+    {
+      "name": "fluentcart_order_bulk_action",
+      "description": "Perform bulk actions on multiple orders. Actions: update_status, delete, export."
+    },
+    {
+      "name": "fluentcart_order_calculate_shipping",
+      "description": "Calculate shipping costs for an order based on items and shipping address."
+    },
+    {
+      "name": "fluentcart_order_shipping_methods",
+      "description": "Retrieve available shipping methods for order creation."
+    },
+    {
+      "name": "fluentcart_order_customer_orders",
+      "description": "Retrieve paginated orders for a specific customer with filtering. Monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_customer_list",
+      "description": "Retrieve a paginated list of customers with optional filtering. Returns customer summary with name, email, order count, and total spend. Monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_customer_create",
+      "description": "Create a new customer record. Email is required and must be unique."
+    },
+    {
+      "name": "fluentcart_customer_get",
+      "description": "Retrieve detailed customer information including addresses, labels, and stats. LTV and monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_customer_update",
+      "description": "Update an existing customer profile."
+    },
+    {
+      "name": "fluentcart_customer_update_additional_info",
+      "description": "Update custom metadata fields on a customer record."
+    },
+    {
+      "name": "fluentcart_customer_orders_simple",
+      "description": "Retrieve customer orders in a simplified format."
+    },
+    {
+      "name": "fluentcart_customer_stats",
+      "description": "Retrieve statistics for a customer including order count and total spend. Monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_customer_recalculate_ltv",
+      "description": "Recalculate the lifetime value for a customer. LTV is stored in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_customer_addresses",
+      "description": "Retrieve all billing and shipping addresses for a customer."
+    },
+    {
+      "name": "fluentcart_customer_address_select",
+      "description": "Retrieve address options for the customer address selector dropdown."
+    },
+    {
+      "name": "fluentcart_customer_address_create",
+      "description": "Create a new billing or shipping address for a customer."
+    },
+    {
+      "name": "fluentcart_customer_address_add",
+      "description": "Alternative endpoint to add a new address to a customer."
+    },
+    {
+      "name": "fluentcart_customer_address_update",
+      "description": "Update an existing customer address."
+    },
+    {
+      "name": "fluentcart_customer_address_delete",
+      "description": "Delete a customer address. This action cannot be undone."
+    },
+    {
+      "name": "fluentcart_customer_address_make_primary",
+      "description": "Set an address as the primary address for a customer."
+    },
+    {
+      "name": "fluentcart_customer_attachable_users",
+      "description": "Retrieve WordPress users that can be attached to customer records."
+    },
+    {
+      "name": "fluentcart_customer_attach_user",
+      "description": "Attach a WordPress user account to a customer record."
+    },
+    {
+      "name": "fluentcart_customer_detach_user",
+      "description": "Detach the linked WordPress user from a customer record."
+    },
+    {
+      "name": "fluentcart_customer_bulk_action",
+      "description": "Perform bulk actions on multiple customers. Actions: update_status, delete, export."
+    },
+    {
+      "name": "fluentcart_product_list",
+      "description": "Retrieve a paginated list of products with optional filtering. Returns product summaries with title, status, type, and price. Monetary values in smallest currency unit (cents). Types: simple, variable, subscription. Views: all, published, draft, trashed."
+    },
+    {
+      "name": "fluentcart_product_create",
+      "description": "Create a new product. Defaults to draft status. Set fulfillment_type in detail object: digital or physical."
+    },
+    {
+      "name": "fluentcart_product_get",
+      "description": "Retrieve detailed product information including pricing, media, and detail metadata. Monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_product_delete",
+      "description": "Delete a product. This action cannot be undone."
+    },
+    {
+      "name": "fluentcart_product_duplicate",
+      "description": "Create a duplicate copy of an existing product."
+    },
+    {
+      "name": "fluentcart_product_bulk_action",
+      "description": "Perform bulk actions on multiple products."
+    },
+    {
+      "name": "fluentcart_product_update_detail",
+      "description": "Update a product detail record (fulfillment type, stock settings, etc.)."
+    },
+    {
+      "name": "fluentcart_product_search_by_name",
+      "description": "Search for products by name. Returns matching products."
+    },
+    {
+      "name": "fluentcart_product_search_variant_by_name",
+      "description": "Search for product variants by name."
+    },
+    {
+      "name": "fluentcart_product_search_variant_options",
+      "description": "Search for product variant options (attribute combinations)."
+    },
+    {
+      "name": "fluentcart_product_suggest_sku",
+      "description": "Generate a suggested SKU based on a product title."
+    },
+    {
+      "name": "fluentcart_product_fetch_by_ids",
+      "description": "Retrieve multiple products by their IDs in a single request."
+    },
+    {
+      "name": "fluentcart_product_find_subscription_variants",
+      "description": "Find product variants that support subscription billing."
+    },
+    {
+      "name": "fluentcart_product_pricing_get",
+      "description": "Retrieve pricing information for a product. All prices in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_product_pricing_update",
+      "description": "Update pricing for a product. Prices must be in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_product_pricing_widgets",
+      "description": "Retrieve pricing widgets and display components for a product."
+    },
+    {
+      "name": "fluentcart_product_related",
+      "description": "Retrieve related products for cross-sell and upsell."
+    },
+    {
+      "name": "fluentcart_product_bundle_info",
+      "description": "Retrieve bundle information for a bundled product."
+    },
+    {
+      "name": "fluentcart_product_bundle_save",
+      "description": "Save bundle configuration for a product variation."
+    },
+    {
+      "name": "fluentcart_product_tax_class_update",
+      "description": "Assign a tax class to a product."
+    },
+    {
+      "name": "fluentcart_product_tax_class_remove",
+      "description": "Remove the tax class assignment from a product."
+    },
+    {
+      "name": "fluentcart_product_shipping_class_update",
+      "description": "Assign a shipping class to a product."
+    },
+    {
+      "name": "fluentcart_product_shipping_class_remove",
+      "description": "Remove the shipping class assignment from a product."
+    },
+    {
+      "name": "fluentcart_product_manage_stock_update",
+      "description": "Enable or disable stock management for a product."
+    },
+    {
+      "name": "fluentcart_product_inventory_update",
+      "description": "Update inventory quantity for a specific product variant."
+    },
+    {
+      "name": "fluentcart_product_sync_downloadable_files",
+      "description": "Synchronise downloadable files for a digital product."
+    },
+    {
+      "name": "fluentcart_product_downloadable_update",
+      "description": "Update a downloadable file record."
+    },
+    {
+      "name": "fluentcart_product_downloadable_delete",
+      "description": "Delete a downloadable file from a product."
+    },
+    {
+      "name": "fluentcart_product_downloadable_url",
+      "description": "Retrieve the download URL for a downloadable file."
+    },
+    {
+      "name": "fluentcart_product_upgrade_settings",
+      "description": "Retrieve upgrade path settings for a product."
+    },
+    {
+      "name": "fluentcart_product_upgrade_path_save",
+      "description": "Create a new upgrade path setting for a product."
+    },
+    {
+      "name": "fluentcart_product_upgrade_path_update",
+      "description": "Update an existing upgrade path."
+    },
+    {
+      "name": "fluentcart_product_upgrade_path_delete",
+      "description": "Delete an upgrade path."
+    },
+    {
+      "name": "fluentcart_product_terms",
+      "description": "Retrieve product terms (categories, tags) list."
+    },
+    {
+      "name": "fluentcart_product_terms_by_parent",
+      "description": "Retrieve product terms filtered by parent term."
+    },
+    {
+      "name": "fluentcart_product_terms_add",
+      "description": "Add terms (categories, tags) to a product."
+    },
+    {
+      "name": "fluentcart_product_taxonomy_sync",
+      "description": "Synchronise taxonomy terms for a product (replaces existing)."
+    },
+    {
+      "name": "fluentcart_product_taxonomy_delete",
+      "description": "Delete taxonomy terms from a product."
+    },
+    {
+      "name": "fluentcart_product_integrations",
+      "description": "Retrieve integration feeds configured for a product."
+    },
+    {
+      "name": "fluentcart_product_integration_settings",
+      "description": "Retrieve settings for a specific integration on a product."
+    },
+    {
+      "name": "fluentcart_product_integration_save",
+      "description": "Save an integration feed for a product."
+    },
+    {
+      "name": "fluentcart_product_integration_delete",
+      "description": "Delete an integration feed from a product."
+    },
+    {
+      "name": "fluentcart_product_integration_feed_status",
+      "description": "Enable or disable an integration feed on a product."
+    },
+    {
+      "name": "fluentcart_variant_list_all",
+      "description": "Retrieve a list of all product variants across all products."
+    },
+    {
+      "name": "fluentcart_variant_list",
+      "description": "Retrieve a list of product variations with optional product filtering."
+    },
+    {
+      "name": "fluentcart_variant_create",
+      "description": "Create a new product variation. Price in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_variant_update",
+      "description": "Update an existing product variation."
+    },
+    {
+      "name": "fluentcart_variant_delete",
+      "description": "Delete a product variation. This action cannot be undone."
+    },
+    {
+      "name": "fluentcart_variant_set_media",
+      "description": "Set the media (image) for a product variation."
+    },
+    {
+      "name": "fluentcart_variant_pricing_table_update",
+      "description": "Update the pricing table for a product variation. Prices in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_product_variant_option_update",
+      "description": "Update a product variant option (attribute configuration)."
+    },
+    {
+      "name": "fluentcart_variant_fetch_by_ids",
+      "description": "Retrieve multiple variations by their IDs in a single request."
+    },
+    {
+      "name": "fluentcart_variant_upgrade_paths",
+      "description": "Retrieve upgrade paths for a specific variation."
+    },
+    {
+      "name": "fluentcart_report_overview",
+      "description": "High-level financial overview: gross/net revenue by month and quarter with YoY growth, plus top countries. Monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_summary",
+      "description": "Summarised report overview for the reports dashboard page."
+    },
+    {
+      "name": "fluentcart_report_meta",
+      "description": "Report metadata: available date ranges, filter options, and configuration."
+    },
+    {
+      "name": "fluentcart_report_dashboard_stats",
+      "description": "Key dashboard stats: total orders, paid orders, paid order items, and total paid amounts with comparison data. Amounts in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_revenue",
+      "description": "Revenue data grouped by day/week/month: net revenue, shipping, tax, refunds, order counts. Includes period comparison and fluctuations. Values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_revenue_by_group",
+      "description": "Revenue segmented by product group or category. Values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_sales",
+      "description": "Comprehensive sales report for a date range."
+    },
+    {
+      "name": "fluentcart_report_sales_growth",
+      "description": "Sales growth metrics over time for a date range."
+    },
+    {
+      "name": "fluentcart_report_sales_growth_chart",
+      "description": "Sales growth chart data with periodic comparisons, grouped by interval."
+    },
+    {
+      "name": "fluentcart_report_order_chart",
+      "description": "Order chart data: gross sales, net revenue, order/item counts, averages grouped by date. Supports period comparison. Values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_orders_by_group",
+      "description": "Order data grouped by a dimension (e.g. payment method, product type)."
+    },
+    {
+      "name": "fluentcart_report_quick_order_stats",
+      "description": "Quick order statistics for a given lookback period."
+    },
+    {
+      "name": "fluentcart_report_recent_orders",
+      "description": "Most recent orders for the dashboard widget."
+    },
+    {
+      "name": "fluentcart_report_unfulfilled_orders",
+      "description": "Orders that have not yet been fulfilled or shipped."
+    },
+    {
+      "name": "fluentcart_report_dashboard_summary",
+      "description": "Summary of key metrics for the main dashboard view."
+    },
+    {
+      "name": "fluentcart_report_recent_activities",
+      "description": "Most recent activity log entries for the dashboard."
+    },
+    {
+      "name": "fluentcart_report_product",
+      "description": "Retrieve a comprehensive product performance report with sales data. Revenue values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_product_performance",
+      "description": "Retrieve individual product performance metrics including conversion rates and revenue trends. Revenue values in smallest currency unit (cents). Optionally filter by product ID."
+    },
+    {
+      "name": "fluentcart_report_top_products_sold",
+      "description": "Retrieve the top-selling products ranked by total units sold. Revenue values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_top_sold_products",
+      "description": "Retrieve top-selling products with revenue and quantity data. Alternative ranking to top-products-sold. Revenue values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_top_sold_variants",
+      "description": "Retrieve top-selling product variants with revenue and quantity data. Revenue values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_customer",
+      "description": "Retrieve customer analytics including acquisition, lifetime value, and activity metrics. Monetary values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_new_vs_returning",
+      "description": "Retrieve analytics comparing new customer orders against returning customer orders over a date range."
+    },
+    {
+      "name": "fluentcart_report_daily_signups",
+      "description": "Retrieve daily customer signup counts over a date range."
+    },
+    {
+      "name": "fluentcart_report_repeat_customers",
+      "description": "Search and retrieve customers who have made multiple purchases. Supports pagination."
+    },
+    {
+      "name": "fluentcart_report_refund_chart",
+      "description": "Retrieve refund data over time for charting, including refund amounts and counts. Refund amounts in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_refund_by_group",
+      "description": "Retrieve refund data segmented by grouping dimension. Refund amounts in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_subscription_chart",
+      "description": "Retrieve subscription metrics over time including new subscriptions, renewals, and churn."
+    },
+    {
+      "name": "fluentcart_report_future_renewals",
+      "description": "Retrieve upcoming subscription renewal dates and expected revenue. Revenue values in smallest currency unit (cents)."
+    },
+    {
+      "name": "fluentcart_report_license_summary",
+      "description": "Retrieve a summary of license statistics including total issued, active, expired, and revoked."
+    },
+    {
+      "name": "fluentcart_order_bump_list",
+      "description": "Retrieve a paginated list of order bump configurations. Returns bump summaries with title, status, and associated product variant. Statuses: active, draft."
+    },
+    {
+      "name": "fluentcart_order_bump_get",
+      "description": "Retrieve detailed information about a specific order bump including its config, discount settings, display conditions, and associated product variant."
+    },
+    {
+      "name": "fluentcart_order_bump_create",
+      "description": "Create a new order bump configuration. Requires a title and a product variation ID (src_object_id) for the promotional product. Returns the created bump with its new ID."
+    },
+    {
+      "name": "fluentcart_order_bump_update",
+      "description": "Update an existing order bump configuration. Only provided fields are changed. Use this to modify title, description, status, discount, conditions, or priority."
+    },
+    {
+      "name": "fluentcart_order_bump_delete",
+      "description": "Permanently delete an order bump configuration. This cannot be undone."
+    },
+    {
+      "name": "fluentcart_attribute_group_list",
+      "description": "Retrieve all product attribute groups (e.g. Size, Color). Returns group ID, title, slug, and associated terms."
+    },
+    {
+      "name": "fluentcart_attribute_group_get",
+      "description": "Retrieve a specific attribute group by ID, including its terms."
+    },
+    {
+      "name": "fluentcart_attribute_group_create",
+      "description": "Create a new product attribute group. Groups define option categories like Size, Color, or Material."
+    },
+    {
+      "name": "fluentcart_attribute_group_update",
+      "description": "Update an existing attribute group title or slug."
+    },
+    {
+      "name": "fluentcart_attribute_group_delete",
+      "description": "Permanently delete an attribute group and all its terms. This action cannot be undone."
+    },
+    {
+      "name": "fluentcart_attribute_term_list",
+      "description": "Retrieve all terms for a specific attribute group. For example, terms \"Small\", \"Medium\", \"Large\" under the \"Size\" group."
+    },
+    {
+      "name": "fluentcart_attribute_term_create",
+      "description": "Create a new term within an attribute group. For example, add \"Red\" to the \"Color\" group."
+    },
+    {
+      "name": "fluentcart_attribute_term_update",
+      "description": "Update an existing attribute term title or slug."
+    },
+    {
+      "name": "fluentcart_attribute_term_delete",
+      "description": "Permanently delete an attribute term. This action cannot be undone."
+    },
+    {
+      "name": "fluentcart_attribute_term_reorder",
+      "description": "Update the sort order (serial) of an attribute term within its group. Lower numbers appear first."
+    },
+    {
+      "name": "fluentcart_integration_list_addons",
+      "description": "Retrieve all available integration addons and their status. Returns addon metadata including name, description, logo, category, whether the required plugin is installed, and current configuration status."
+    },
+    {
+      "name": "fluentcart_integration_get_global_settings",
+      "description": "Retrieve global settings for a specific integration by its settings key. Returns current configuration values and field definitions (type, label, tips). Field types: text, password, select, link, authenticate-button."
+    },
+    {
+      "name": "fluentcart_integration_save_global_settings",
+      "description": "Update global settings for a specific integration. Pass settings_key plus integration-specific fields as top-level properties. Field names vary per integration -- use get_global_settings first to discover them."
+    },
+    {
+      "name": "fluentcart_integration_get_global_feeds",
+      "description": "Retrieve all global-level integration feeds. Global feeds run on order-level events (e.g. order_paid_done, order_refunded) unlike product feeds which are scoped to specific products."
+    },
+    {
+      "name": "fluentcart_integration_get_feed_settings",
+      "description": "Retrieve settings and field definitions for a specific integration feed. Pass integration_name to get a blank template for creating a new feed, or additionally pass integration_id to load an existing feed for editing."
+    },
+    {
+      "name": "fluentcart_integration_save_feed_settings",
+      "description": "Create or update an integration feed configuration. Use get_feed_settings first to discover available fields for the integration provider. Include integration_id in the body to update an existing feed, omit to create new."
+    },
+    {
+      "name": "fluentcart_integration_change_feed_status",
+      "description": "Enable or disable a global integration feed without modifying its settings."
+    },
+    {
+      "name": "fluentcart_integration_delete_feed",
+      "description": "Permanently delete a global integration feed. This action cannot be undone."
+    },
+    {
+      "name": "fluentcart_integration_get_feed_lists",
+      "description": "Retrieve available lists for a specific integration provider. Returns mailing lists, contact groups, tags, or similar collections depending on the provider (e.g. FluentCRM lists, Mailchimp audiences)."
+    },
+    {
+      "name": "fluentcart_integration_get_dynamic_options",
+      "description": "Retrieve dynamic select options for integration feed fields. Used when a feed field depends on a remote data source (e.g. fetching CRM tags, membership levels, or course lists)."
+    },
+    {
+      "name": "fluentcart_integration_get_chained_data",
+      "description": "Retrieve chained/dependent data for integration feed fields. Used when selecting a value in one field determines the options in another (e.g. selecting a list then loading its fields or segments)."
+    },
+    {
+      "name": "fluentcart_integration_install_plugin",
+      "description": "Install a required integration plugin from WordPress.org. Requires super admin permissions. Use list_addons first to find the addon_key."
+    },
+    {
+      "name": "fluentcart_settings_get_store",
+      "description": "Retrieve store configuration settings including currency, address, checkout options, page assignments (checkout, cart, receipt, shop), button texts, and order mode (test/live)."
+    },
+    {
+      "name": "fluentcart_settings_save_store",
+      "description": "Update store configuration settings. Accepts any key-value pairs from getStoreSettings (e.g. store_name, currency, order_mode, checkout page IDs, button texts). Only provided keys are updated; omitted keys remain unchanged."
+    },
+    {
+      "name": "fluentcart_payment_get_all",
+      "description": "Retrieve all available payment methods with their status and configuration. Returns both active and inactive gateways (Stripe, PayPal, manual, etc.)."
+    },
+    {
+      "name": "fluentcart_payment_get_settings",
+      "description": "Retrieve settings for a specific payment method by its key. Returns method-specific configuration fields and current values."
+    },
+    {
+      "name": "fluentcart_settings_get_modules",
+      "description": "Retrieve module configuration including available modules (Turnstile, Stock Management, Licensing, Order Bump) and their activation status."
+    },
+    {
+      "name": "fluentcart_settings_get_permissions",
+      "description": "Retrieve available WordPress roles and currently configured capability permissions for FluentCart access control. Returns role names, keys, and capability flags."
+    },
+    {
+      "name": "fluentcart_settings_save_permissions",
+      "description": "Update capability-based permission assignments for WordPress roles. Replaces the full capability list; omitted capabilities are removed."
+    },
+    {
+      "name": "fluentcart_settings_get_confirmation_shortcodes",
+      "description": "Retrieve available shortcodes for use in the order confirmation page template. Returns placeholder tokens that can be inserted into confirmation content."
+    },
+    {
+      "name": "fluentcart_label_list",
+      "description": "Retrieve all available labels for organising orders, customers, and other entities. Returns label ID, text value, colour hex code, and timestamps."
+    },
+    {
+      "name": "fluentcart_label_create",
+      "description": "Create a new label for tagging orders, customers, etc."
+    },
+    {
+      "name": "fluentcart_label_update_selections",
+      "description": "Update which labels are assigned to a specific entity. Replaces all current label assignments with the provided list."
+    },
+    {
+      "name": "fluentcart_activity_list",
+      "description": "Retrieve a paginated list of activity log entries. Supports filtering by log type, module name, and module ID. Returns audit trail of actions performed in the store."
+    },
+    {
+      "name": "fluentcart_activity_delete",
+      "description": "Delete a specific activity log entry. This action is irreversible."
+    },
+    {
+      "name": "fluentcart_activity_mark_read",
+      "description": "Update the read status of an activity log entry. Can mark as either read or unread."
+    },
+    {
+      "name": "fluentcart_note_attach",
+      "description": "Attach or update a note on an order. Use for adding admin comments, internal memos, or status updates to an order."
+    },
+    {
+      "name": "fluentcart_dashboard_onboarding",
+      "description": "Retrieve the store onboarding/setup wizard status. Returns which setup steps have been completed and how many remain."
+    },
+    {
+      "name": "fluentcart_dashboard_overview",
+      "description": "Retrieve dashboard overview including product count, order count, revenue, and refund totals. Monetary values are in the smallest currency unit (cents) when has_currency is true."
+    },
+    {
+      "name": "fluentcart_app_init",
+      "description": "Retrieve full application bootstrap data including translations, shop config, REST config, and asset URLs. Use to validate the connection and inspect store configuration."
+    },
+    {
+      "name": "fluentcart_app_get_attachments",
+      "description": "Retrieve WordPress media library attachments available to FluentCart."
+    },
+    {
+      "name": "fluentcart_app_upload_attachment",
+      "description": "Upload a media attachment to the WordPress media library via FluentCart. Note: the underlying API expects multipart/form-data; this tool sends JSON which may have limited support. For binary uploads, use the WP media uploader directly."
+    },
+    {
+      "name": "fluentcart_app_get_widgets",
+      "description": "Retrieve dashboard widget data for the FluentCart admin panel. Optionally filter by widget type or request specific data."
+    },
+    {
+      "name": "fluentcart_public_product_views",
+      "description": "Retrieve product view data for the storefront. No authentication required. Returns publicly visible product information for frontend display."
+    },
+    {
+      "name": "fluentcart_public_product_search",
+      "description": "Search published products by name. No authentication required. Returns matching products visible on the storefront."
+    },
+    {
+      "name": "fluentcart_public_products",
+      "description": "Retrieve publicly available products. No authentication required. Returns the full public product catalogue for storefront display."
+    },
+    {
+      "name": "fluentcart_public_user_login",
+      "description": "Frontend login endpoint. Authenticates a user by email and password, returning customer data with an authentication token."
+    },
+    {
+      "name": "fluentcart_misc_countries",
+      "description": "Retrieve a list of all available countries as value/name pairs. Each entry contains an ISO 3166-1 alpha-2 code and the country name."
+    },
+    {
+      "name": "fluentcart_misc_country_info",
+      "description": "Retrieve detailed information about a specific country including states/provinces and address locale configuration."
+    },
+    {
+      "name": "fluentcart_misc_filter_options",
+      "description": "Retrieve available filter options for advanced filtering on orders, customers, and other entities. Returns field definitions usable in advanced filter queries."
+    },
+    {
+      "name": "fluentcart_misc_form_search_options",
+      "description": "Retrieve search/autocomplete options for form fields. Returns available options for dynamic form field population."
+    }
+  ]
+}

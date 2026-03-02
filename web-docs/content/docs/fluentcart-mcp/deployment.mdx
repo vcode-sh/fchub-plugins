@@ -1,0 +1,102 @@
+---
+title: Deployment
+description: Run FluentCart MCP on a VPS with Docker, because apparently localhost wasn't enough for you.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The stdio transport works brilliantly for local AI clients. But if you want ChatGPT, remote clients, or the warm fuzzy feeling of a public endpoint — you'll need the HTTP transport running on a server somewhere.
+
+## Docker Image
+
+The repo ships a multi-stage `Dockerfile` that builds and runs the HTTP transport. Nothing exotic.
+
+```bash
+docker build -t fluentcart-mcp .
+docker run -d \
+  -p 3000:3000 \
+  -e FLUENTCART_URL=https://your-store.com \
+  -e FLUENTCART_USERNAME=admin \
+  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP" \
+  -e FLUENTCART_MCP_API_KEY=your-secret-key \
+  fluentcart-mcp
+```
+
+The container exposes port `3000` and starts with `--transport http` by default.
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `FLUENTCART_URL` | Yes | Full URL to your WordPress site |
+| `FLUENTCART_USERNAME` | Yes | WordPress admin username |
+| `FLUENTCART_APP_PASSWORD` | Yes | WordPress Application Password |
+| `FLUENTCART_MCP_API_KEY` | No | Bearer token for the MCP endpoint. If set, all requests to `/mcp` must include `Authorization: Bearer <key>`. If not set, the endpoint is open. |
+
+## Dokploy Setup
+
+If you're running Dokploy (or similar), point it at the repo and set the build context.
+
+<Steps>
+<Step>
+### Create a new application
+
+In Dokploy, create a new application. Point it at your git repo. Set the build context to `fluentcart-mcp/` — that's where the Dockerfile lives.
+</Step>
+<Step>
+### Set environment variables
+
+Add all four environment variables from the table above. The `FLUENTCART_MCP_API_KEY` is strongly recommended for production — without it, anyone who finds your endpoint can talk to your store.
+</Step>
+<Step>
+### Deploy
+
+Hit deploy. The multi-stage build will install dependencies, compile TypeScript, and produce a lean production image. Exposed port is `3000`.
+</Step>
+</Steps>
+
+## Cloudflare Tunnel
+
+If you're using Cloudflare Tunnels (and you should be — free SSL, no port forwarding, no firewall fiddling):
+
+1. In Cloudflare Zero Trust dashboard, add a public hostname
+2. Set the subdomain (e.g. `mcp.your-domain.com`)
+3. Point it at `http://localhost:3000` (or whatever your container's internal address is)
+4. Save
+
+Your MCP endpoint is now at `https://mcp.your-domain.com/mcp`.
+
+## Health Check
+
+```bash
+curl https://mcp.your-domain.com/health
+```
+
+Should return:
+
+```json
+{"status":"ok"}
+```
+
+If it doesn't, something's broken. Check the container logs.
+
+## Connecting Clients
+
+### ChatGPT
+
+Paste your endpoint URL into ChatGPT's MCP server configuration:
+
+```
+https://mcp.your-domain.com/mcp
+```
+
+ChatGPT will negotiate the connection via Streamable HTTP. If you've set a bearer token, you'll need to configure that in the auth settings as well.
+
+### Any HTTP-capable MCP client
+
+Same deal. Point the client at your `/mcp` endpoint. Set the bearer token if configured. The server speaks standard MCP over Streamable HTTP — no special sauce required.
+
+<Callout type="warn">
+The HTTP transport creates a fresh server instance per request (stateless mode). This keeps things simple and works with scale-to-zero deployments, but it means each request resolves config and registers all 200+ tools. On a reasonable VPS, this adds maybe 10-20ms overhead. Not exactly a crisis.
+</Callout>

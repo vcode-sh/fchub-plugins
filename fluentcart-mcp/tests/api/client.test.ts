@@ -1,4 +1,5 @@
 import { createClient } from '../../src/api/client.js'
+import { FluentCartApiError } from '../../src/api/errors.js'
 import type { ResolvedConfig } from '../../src/config/types.js'
 
 const testConfig: ResolvedConfig = {
@@ -126,7 +127,7 @@ describe('createClient', () => {
 	})
 
 	describe('error handling', () => {
-		it('401 throws "Authentication failed" message', async () => {
+		it('401 throws FluentCartApiError with AUTH_FAILED code', async () => {
 			mockFetch.mockResolvedValue(
 				mockResponse({
 					ok: false,
@@ -137,10 +138,11 @@ describe('createClient', () => {
 			)
 
 			const client = createClient(testConfig)
+			await expect(client.get('/products')).rejects.toThrow(FluentCartApiError)
 			await expect(client.get('/products')).rejects.toThrow('Authentication failed')
 		})
 
-		it('403 throws "Permission denied" message', async () => {
+		it('403 throws FluentCartApiError with FORBIDDEN code', async () => {
 			mockFetch.mockResolvedValue(
 				mockResponse({
 					ok: false,
@@ -151,10 +153,11 @@ describe('createClient', () => {
 			)
 
 			const client = createClient(testConfig)
+			await expect(client.get('/products')).rejects.toThrow(FluentCartApiError)
 			await expect(client.get('/products')).rejects.toThrow('Permission denied')
 		})
 
-		it('404 throws "Resource not found" message', async () => {
+		it('404 throws FluentCartApiError with NOT_FOUND code', async () => {
 			mockFetch.mockResolvedValue(
 				mockResponse({
 					ok: false,
@@ -165,10 +168,11 @@ describe('createClient', () => {
 			)
 
 			const client = createClient(testConfig)
+			await expect(client.get('/products/999')).rejects.toThrow(FluentCartApiError)
 			await expect(client.get('/products/999')).rejects.toThrow('Resource not found')
 		})
 
-		it('422 throws "Validation error" with body', async () => {
+		it('422 throws FluentCartApiError with VALIDATION_ERROR code and detail', async () => {
 			const validationBody = { message: 'Invalid input', errors: { title: 'required' } }
 			mockFetch.mockResolvedValue(
 				mockResponse({
@@ -180,19 +184,36 @@ describe('createClient', () => {
 			)
 
 			const client = createClient(testConfig)
+			await expect(client.post('/products', {})).rejects.toThrow(FluentCartApiError)
 			await expect(client.post('/products', {})).rejects.toThrow('Validation error')
 		})
 
-		it('timeout throws "Request timed out" message', async () => {
+		it('429 throws FluentCartApiError with RATE_LIMITED code', async () => {
+			mockFetch.mockResolvedValue(
+				mockResponse({
+					ok: false,
+					status: 429,
+					statusText: 'Too Many Requests',
+					json: () => Promise.resolve({ message: 'Rate limit exceeded' }),
+				}),
+			)
+
+			const client = createClient(testConfig)
+			await expect(client.get('/products')).rejects.toThrow(FluentCartApiError)
+			await expect(client.get('/products')).rejects.toThrow('Rate limited')
+		})
+
+		it('timeout throws FluentCartApiError with TIMEOUT code', async () => {
 			const abortError = new DOMException('The operation was aborted', 'AbortError')
 			mockFetch.mockRejectedValue(abortError)
 
 			const timeoutConfig: ResolvedConfig = { ...testConfig, timeout: 100 }
 			const client = createClient(timeoutConfig)
+			await expect(client.get('/products')).rejects.toThrow(FluentCartApiError)
 			await expect(client.get('/products')).rejects.toThrow('Request timed out after 100ms')
 		})
 
-		it('unknown error (500) throws "API error 500" message', async () => {
+		it('500 throws FluentCartApiError with SERVER_ERROR code', async () => {
 			mockFetch.mockResolvedValue(
 				mockResponse({
 					ok: false,
@@ -203,7 +224,20 @@ describe('createClient', () => {
 			)
 
 			const client = createClient(testConfig)
-			await expect(client.get('/products')).rejects.toThrow('API error 500')
+			await expect(client.get('/products')).rejects.toThrow(FluentCartApiError)
+			await expect(client.get('/products')).rejects.toThrow('Server error')
+		})
+
+		it('network error throws FluentCartApiError with CONNECTION_ERROR code', async () => {
+			mockFetch.mockRejectedValue(new TypeError('fetch failed'))
+
+			const client = createClient(testConfig)
+			await expect(client.get('/products')).rejects.toThrow(FluentCartApiError)
+			try {
+				await client.get('/products')
+			} catch (error) {
+				expect((error as FluentCartApiError).code).toBe('CONNECTION_ERROR')
+			}
 		})
 	})
 

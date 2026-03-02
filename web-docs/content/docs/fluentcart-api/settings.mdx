@@ -1,0 +1,83 @@
+---
+title: Settings
+description: Store configuration, payment gateways, email settings, and general preferences.
+---
+
+Everything that lives in the settings panel. Store configuration, payment method management, module toggles, licence activation, confirmation pages, storage drivers, and plugin addons.
+
+## Endpoints
+
+### Store
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get store settings](/docs/fluentcart-api/getStoreSettings) | Currency, address, checkout options, and page assignments |
+| `GET` | [Get module settings](/docs/fluentcart-api/getModuleSettings) | Module configuration and activation states |
+| `GET` | [Get confirmation shortcodes](/docs/fluentcart-api/getConfirmationShortcodes) | Available confirmation page shortcodes |
+| `POST` | [Save store settings](/docs/fluentcart-api/saveStoreSettings) | Update store configuration |
+| `POST` | [Save module settings](/docs/fluentcart-api/saveModuleSettings) | Update module activation states |
+| `POST` | [Save confirmation settings](/docs/fluentcart-api/saveConfirmationSettings) | Save confirmation page settings |
+
+### Payment Methods
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get all payment methods](/docs/fluentcart-api/getAllPaymentMethods) | All configured payment methods |
+| `GET` | [Get payment method settings](/docs/fluentcart-api/getPaymentMethodSettings) | Settings for a specific method |
+| `GET` | [Get connect info](/docs/fluentcart-api/getPaymentMethodConnectInfo) | OAuth URLs and connection info |
+| `POST` | [Save payment method settings](/docs/fluentcart-api/savePaymentMethodSettings) | Save method configuration |
+| `POST` | [Save payment method design](/docs/fluentcart-api/savePaymentMethodDesign) | Save checkout display settings |
+| `POST` | [Reorder payment methods](/docs/fluentcart-api/reorderPaymentMethods) | Change method display order |
+| `POST` | [Disconnect payment method](/docs/fluentcart-api/disconnectPaymentMethod) | Disconnect a payment method |
+
+### PayPal
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Check PayPal webhook](/docs/fluentcart-api/checkPayPalWebhook) | Check webhook configuration status |
+| `POST` | [Get PayPal seller auth token](/docs/fluentcart-api/getPayPalSellerAuthToken) | Retrieve seller auth token |
+| `POST` | [Setup PayPal webhook](/docs/fluentcart-api/setupPayPalWebhook) | Configure PayPal webhook |
+
+### Payment Addons
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | [Install payment addon](/docs/fluentcart-api/installPaymentAddon) | Install a payment method addon |
+| `POST` | [Activate payment addon](/docs/fluentcart-api/activatePaymentAddon) | Activate an installed addon |
+| `POST` | [Check addon update](/docs/fluentcart-api/checkPaymentAddonUpdate) | Check for available updates |
+| `POST` | [Update payment addon](/docs/fluentcart-api/updatePaymentAddon) | Update to the latest version |
+
+### Plugin Addons
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get plugin addons](/docs/fluentcart-api/getPluginAddons) | Available plugin addons |
+| `POST` | [Install plugin addon](/docs/fluentcart-api/installPluginAddon) | Install a plugin addon |
+| `POST` | [Activate plugin addon](/docs/fluentcart-api/activatePluginAddon) | Activate an installed addon |
+| `POST` | [Check addon update](/docs/fluentcart-api/checkPluginAddonUpdate) | Check for available updates |
+| `POST` | [Update plugin addon](/docs/fluentcart-api/updatePluginAddon) | Update to the latest version |
+
+### Licence
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get license settings](/docs/fluentcart-api/getLicenseSettings) | Licence activation status and details |
+| `POST` | [Activate license](/docs/fluentcart-api/activateLicense) | Activate a FluentCart Pro licence key |
+| `DELETE` | [Deactivate license](/docs/fluentcart-api/deactivateLicense) | Deactivate the current licence |
+
+### Storage
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get active storage drivers](/docs/fluentcart-api/getActiveStorageDrivers) | Currently active storage drivers |
+| `GET` | [List storage drivers](/docs/fluentcart-api/listStorageDrivers) | All available storage drivers |
+| `GET` | [Get driver settings](/docs/fluentcart-api/getStorageDriverSettings) | Settings for a specific driver |
+| `POST` | [Save driver settings](/docs/fluentcart-api/saveStorageDriverSettings) | Save driver configuration |
+| `POST` | [Verify connection](/docs/fluentcart-api/verifyStorageDriverConnection) | Test storage driver connection |
+
+### Permissions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get permissions](/docs/fluentcart-api/getPermissions) | Current permission assignments |
+| `POST` | [Save permissions](/docs/fluentcart-api/savePermissions) | Update role capability assignments |

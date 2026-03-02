@@ -1,0 +1,32 @@
+startCommand:
+  type: stdio
+
+configSchema:
+  type: object
+  required: [fluentcartUrl, username, appPassword]
+  properties:
+    fluentcartUrl:
+      type: string
+      description: WordPress site URL
+    username:
+      type: string
+      description: WordPress admin username
+    appPassword:
+      type: string
+      description: WordPress Application Password
+
+commandFunction: |-
+  (config) => ({
+    command: 'node',
+    args: ['dist/index.js'],
+    env: {
+      FLUENTCART_URL: config.fluentcartUrl,
+      FLUENTCART_USERNAME: config.username,
+      FLUENTCART_APP_PASSWORD: config.appPassword
+    }
+  })
+
+exampleConfig:
+  fluentcartUrl: "https://your-store.com"
+  username: "admin"
+  appPassword: "aBcD eFgH iJkL mNoP"

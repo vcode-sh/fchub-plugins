@@ -1,0 +1,27 @@
+---
+title: Roles & Permissions
+description: User capability management for FluentCart admin access.
+---
+
+Custom roles and capability-based permissions. Create roles with specific FluentCart capabilities, manage who has access to what, and see which users hold management positions.
+
+## Endpoints
+
+### Roles
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get all roles](/docs/fluentcart-api/getAllRoles) | All roles with titles, descriptions, and capabilities |
+| `GET` | [Get role details](/docs/fluentcart-api/getRoleDetails) | Details for a specific role |
+| `GET` | [Get role managers](/docs/fluentcart-api/getRoleManagers) | Users assigned to FluentCart management roles |
+| `GET` | [Get user list](/docs/fluentcart-api/getUserList) | Available WordPress users |
+| `POST` | [Create role](/docs/fluentcart-api/createRole) | Create a new custom role |
+| `POST` | [Update role](/docs/fluentcart-api/updateRole) | Update role title, description, or capabilities |
+| `DELETE` | [Delete role](/docs/fluentcart-api/deleteRole) | Delete a custom role (built-in roles protected) |
+
+### Permissions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [Get permissions](/docs/fluentcart-api/getPermissions) | Current capability assignments for WordPress roles |
+| `POST` | [Save permissions](/docs/fluentcart-api/savePermissions) | Update role capability assignments |

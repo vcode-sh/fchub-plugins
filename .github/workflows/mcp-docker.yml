@@ -1,0 +1,95 @@
+# Build and push fluentcart-mcp Docker image to GHCR + Docker Hub.
+#
+# Triggered by the same tag convention as mcp-release.yml:
+#   git tag fluentcart-mcp/v1.0.0
+#   git push origin fluentcart-mcp/v1.0.0
+#
+# Requires secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+name: MCP Docker
+
+on:
+  push:
+    tags:
+      - 'fluentcart-mcp/v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (without v prefix)'
+        required: true
+        default: ''
+
+env:
+  GHCR_IMAGE: ghcr.io/vcode-sh/fluentcart-mcp
+  DOCKERHUB_IMAGE: vcodesh/fluentcart-mcp
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set-version.outputs.VERSION }}
+    steps:
+      - name: Set version from tag
+        id: set-version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && \
+                "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${GITHUB_REF#refs/tags/fluentcart-mcp/v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+  build-and-push:
+    name: Build & Push
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,amd64
+
+      - name: Prepare Docker tags
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.DOCKERHUB_IMAGE }}
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=raw,value=latest
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./fluentcart-mcp
+          file: ./fluentcart-mcp/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          cache-from: type=registry,ref=${{ env.GHCR_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.GHCR_IMAGE }}:buildcache,mode=max

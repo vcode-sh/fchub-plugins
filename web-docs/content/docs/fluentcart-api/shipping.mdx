@@ -1,0 +1,38 @@
+---
+title: Shipping
+description: Shipping zones, methods, and rate configuration.
+---
+
+Zones, methods, classes — the full shipping configuration stack. Create geographic zones, attach methods with rates, and organise products into shipping classes.
+
+## Endpoints
+
+### Zones
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List shipping zones](/docs/fluentcart-api/listShippingZones) | Paginated list with search |
+| `GET` | [Get shipping zone](/docs/fluentcart-api/getShippingZone) | Zone details including its methods |
+| `GET` | [Get zone states](/docs/fluentcart-api/getZoneStates) | Available states for a zone's region |
+| `POST` | [Create shipping zone](/docs/fluentcart-api/createShippingZone) | Create a new zone |
+| `POST` | [Update zones order](/docs/fluentcart-api/updateShippingZonesOrder) | Reorder shipping zones |
+| `PUT` | [Update shipping zone](/docs/fluentcart-api/updateShippingZone) | Update zone name, region, or order |
+| `DELETE` | [Delete shipping zone](/docs/fluentcart-api/deleteShippingZone) | Delete a zone and its methods |
+
+### Methods
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | [Create shipping method](/docs/fluentcart-api/createShippingMethod) | Create a new method in a zone |
+| `PUT` | [Update shipping method](/docs/fluentcart-api/updateShippingMethod) | Update method settings, cost, or status |
+| `DELETE` | [Delete shipping method](/docs/fluentcart-api/deleteShippingMethod) | Delete a method from its zone |
+
+### Classes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List shipping classes](/docs/fluentcart-api/listShippingClasses) | All shipping classes |
+| `GET` | [Get shipping class](/docs/fluentcart-api/getShippingClass) | Details of a specific class |
+| `POST` | [Create shipping class](/docs/fluentcart-api/createShippingClass) | Create a new class |
+| `PUT` | [Update shipping class](/docs/fluentcart-api/updateShippingClass) | Update an existing class |
+| `DELETE` | [Delete shipping class](/docs/fluentcart-api/deleteShippingClass) | Delete a class |

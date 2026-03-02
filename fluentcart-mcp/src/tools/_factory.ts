@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
+import { FluentCartApiError } from '../api/errors.js'
 
 export interface ToolAnnotations {
 	readOnlyHint?: boolean
@@ -64,6 +65,12 @@ function formatSuccess(data: unknown) {
 }
 
 function formatError(error: unknown) {
+	if (error instanceof FluentCartApiError) {
+		return {
+			content: [{ type: 'text' as const, text: `Error [${error.code}]: ${error.message}` }],
+			isError: true,
+		}
+	}
 	const message = error instanceof Error ? error.message : String(error)
 	return {
 		content: [{ type: 'text' as const, text: `Error: ${message}` }],

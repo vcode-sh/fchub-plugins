@@ -1,0 +1,19 @@
+---
+title: Email Notifications
+description: Email template management and notification configuration.
+---
+
+Transactional emails, notification templates, and global email settings. Toggle notifications on or off, customise templates, and configure your outgoing email setup.
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List email notifications](/docs/fluentcart-api/listEmailNotifications) | All notification templates with triggers and settings |
+| `GET` | [Get email notification](/docs/fluentcart-api/getEmailNotification) | Details of a specific template |
+| `GET` | [Get email settings](/docs/fluentcart-api/getEmailSettings) | Global email configuration |
+| `GET` | [Get email shortcodes](/docs/fluentcart-api/getEmailShortcodes) | Available template shortcodes |
+| `POST` | [Get email template](/docs/fluentcart-api/getEmailTemplate) | Rendered HTML of a template |
+| `POST` | [Enable/disable notification](/docs/fluentcart-api/enableDisableEmailNotification) | Toggle a notification on or off |
+| `POST` | [Save email settings](/docs/fluentcart-api/saveEmailSettings) | Update global email settings |
+| `PUT` | [Update email notification](/docs/fluentcart-api/updateEmailNotification) | Update a notification template |

@@ -1,6 +1,6 @@
 # fluentcart-mcp
 
-I built an MCP server for [FluentCart](https://fluentcart.com). It gives AI assistants direct access to your store — orders, products, customers, subscriptions, coupons, reports, the lot. 200 tools, open source, MIT licensed.
+I built an MCP server for [FluentCart](https://fluentcart.com). It gives AI assistants direct access to your store — orders, products, customers, subscriptions, coupons, reports, the lot. 200+ tools, open source, MIT licensed.
 
 Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Codex CLI, and anything else that speaks MCP.
 
@@ -80,7 +80,7 @@ npx fluentcart-mcp setup
 
 ## What's Inside
 
-I built 200 tools across 17 modules:
+I built 200+ tools across 17 modules:
 
 | Module | Tools | What It Covers |
 |--------|-------|----------------|

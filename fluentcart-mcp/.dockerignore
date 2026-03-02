@@ -1,0 +1,11 @@
+node_modules
+dist
+tests
+coverage
+.github
+*.test.ts
+*.spec.ts
+.env
+.env.*
+biome.jsonc
+vitest.config.ts

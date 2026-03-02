@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { FluentCartClient } from '../../src/api/client.js'
+import { FluentCartApiError } from '../../src/api/errors.js'
 import { createTool, deleteTool, getTool, postTool, putTool } from '../../src/tools/_factory.js'
 
 function mockClient(): FluentCartClient {
@@ -96,6 +97,21 @@ describe('getTool', () => {
 		const result = await tool.handler({})
 
 		expect(result.content).toEqual([{ type: 'text', text: 'Error: Network failure' }])
+		expect(result.isError).toBe(true)
+	})
+
+	it('formats FluentCartApiError with error code', async () => {
+		const client = mockClient()
+		vi.mocked(client.get).mockRejectedValue(
+			new FluentCartApiError('AUTH_FAILED', 'Authentication failed: Invalid credentials', 401),
+		)
+		const tool = getTool(client, { ...baseConfig, endpoint: '/orders' })
+
+		const result = await tool.handler({})
+
+		expect(result.content[0].text).toBe(
+			'Error [AUTH_FAILED]: Authentication failed: Invalid credentials',
+		)
 		expect(result.isError).toBe(true)
 	})
 

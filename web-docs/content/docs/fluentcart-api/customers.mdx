@@ -1,0 +1,30 @@
+---
+title: Customers
+description: Customer records, addresses, purchase history, and account details.
+---
+
+Your customer database, fully exposed. Create, update, and query customer records — complete with addresses, WordPress user linking, and lifetime value tracking.
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | [List customers](/docs/fluentcart-api/listCustomers) | Paginated list with filtering and search |
+| `GET` | [Get customer details](/docs/fluentcart-api/getCustomer) | Detailed info for a specific customer |
+| `GET` | [Get customer addresses](/docs/fluentcart-api/getCustomerAddresses) | All addresses for a customer |
+| `GET` | [Get address select options](/docs/fluentcart-api/getCustomerAddressSelect) | Address dropdown options |
+| `GET` | [Get customer orders](/docs/fluentcart-api/getCustomerOrdersSimple) | Customer orders in simplified format |
+| `GET` | [Get customer stats](/docs/fluentcart-api/getCustomerStats) | Customer statistics |
+| `GET` | [Get attachable users](/docs/fluentcart-api/getAttachableUsers) | WordPress users available for linking |
+| `POST` | [Create customer](/docs/fluentcart-api/createCustomer) | Create a new customer record |
+| `POST` | [Create customer address](/docs/fluentcart-api/createCustomerAddress) | Add a new address |
+| `POST` | [Add customer address](/docs/fluentcart-api/addCustomerAddress) | Alternative address creation endpoint |
+| `POST` | [Attach user](/docs/fluentcart-api/attachUser) | Link a WordPress user to a customer |
+| `POST` | [Detach user](/docs/fluentcart-api/detachUser) | Unlink a WordPress user from a customer |
+| `POST` | [Set primary address](/docs/fluentcart-api/makeAddressPrimary) | Set an address as primary |
+| `POST` | [Recalculate customer LTV](/docs/fluentcart-api/recalculateCustomerLtv) | Recalculate lifetime value |
+| `POST` | [Bulk customer actions](/docs/fluentcart-api/customersBulkAction) | Perform bulk actions on customers |
+| `PUT` | [Update customer](/docs/fluentcart-api/updateCustomer) | Update customer information |
+| `PUT` | [Update customer address](/docs/fluentcart-api/updateCustomerAddress) | Update an existing address |
+| `PUT` | [Update additional info](/docs/fluentcart-api/updateCustomerAdditionalInfo) | Update additional customer fields |
+| `DELETE` | [Delete customer address](/docs/fluentcart-api/deleteCustomerAddress) | Delete a customer's address |

@@ -1,6 +1,6 @@
 {
   "name": "fluentcart-mcp",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "description": "MCP server for the FluentCart REST API — AI-agent-friendly tools for managing orders, products, customers, subscriptions, and more.",
   "type": "module",
   "exports": {
@@ -25,7 +25,8 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "pack:mcpb": "npm run build && npm prune --production && mcpb pack . fluentcart-mcp.mcpb"
   },
   "keywords": [
     "mcp",
@@ -57,11 +58,14 @@
     "access": "public"
   },
   "dependencies": {
+    "@clack/prompts": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "express": "^5.2.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.5",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.3.3",
     "@vitest/coverage-v8": "^4.0.18",
     "typescript": "^5.9.3",

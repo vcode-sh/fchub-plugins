@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { createClient } from './api/client.js'
 import { resolveConfig } from './config/resolver.js'
 import { resolveApiUrls } from './config/types.js'
+import { createLogger } from './logging.js'
 import { createAllTools } from './tools/index.js'
 
 const require = createRequire(import.meta.url)
@@ -32,6 +33,10 @@ export function createServer(): McpServer {
 			tool.handler,
 		)
 	}
+
+	const logger = createLogger(server)
+	logger.info(`fluentcart-mcp v${version} started — ${tools.length} tools registered`)
+	logger.debug(`config source: ${process.env.FLUENTCART_URL ? 'env' : 'file'}`)
 
 	return server
 }
