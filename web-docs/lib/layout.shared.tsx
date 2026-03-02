@@ -1,5 +1,5 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
-import { Send } from "lucide-react";
+import { Send, Twitter } from "lucide-react";
 import Image from "next/image";
 
 export function baseOptions(): BaseLayoutProps {
@@ -18,8 +18,15 @@ export function baseOptions(): BaseLayoutProps {
         </div>
       ),
     },
-    githubUrl: "https://github.com/vcode-sh",
+    githubUrl: "https://github.com/vcode-sh/fchub-plugins",
     links: [
+      {
+        type: "icon",
+        label: "Follow on X",
+        icon: <Twitter size={18} />,
+        text: "X",
+        url: "https://x.com/vcode_sh",
+      },
       {
         type: "icon",
         label: "Join Telegram Group",

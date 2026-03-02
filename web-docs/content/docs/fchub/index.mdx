@@ -1,32 +1,62 @@
 ---
 title: What is FCHub?
-description: A collection of plugins that extend FluentCommunity with features it should have had from the start.
+description: Open-source WordPress plugins for FluentCart and FluentCommunity. Payments, invoicing, memberships, video, migrations — the bits nobody else shipped.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
 
-FCHub is a suite of plugins built for [FluentCommunity](https://www.flavor.dev/wordpress-plugins/fluent-community/) — the WordPress community platform by WPManageNinja. Each plugin adds functionality that the community has been asking for but hasn't shipped yet.
+FCHub is a collection of open-source plugins for [FluentCart](https://www.flavor.dev/wordpress-plugins/fluent-cart/) and [FluentCommunity](https://www.flavor.dev/wordpress-plugins/fluent-community/) — the WordPress e-commerce and community platforms by WPManageNinja.
 
-## The Plugins
+Payments, invoicing, memberships, video streaming, WooCommerce migrations — things people actually need but nobody got around to building. So I did.
+
+## FluentCart Plugins
+
+<Cards>
+  <Card
+    title="Przelewy24"
+    href="/docs/fchub-p24"
+  >
+    Polish payment gateway. Because Stripe doesn't speak Polish.
+  </Card>
+  <Card
+    title="Fakturownia"
+    href="/docs/fchub-fakturownia"
+  >
+    Invoice automation with KSeF 2.0. Automate paperwork before the tax office automates you.
+  </Card>
+  <Card
+    title="Memberships"
+    href="/docs/fchub-memberships"
+  >
+    Plans, content gating, drip scheduling. 15k lines so people can pay to read your blog.
+  </Card>
+  <Card
+    title="WC Migrator"
+    href="/docs/wc-fc"
+  >
+    Products, orders, subscriptions, customers. Your WooCommerce escape hatch.
+  </Card>
+</Cards>
+
+## FluentCommunity Plugins
 
 <Cards>
   <Card
     title="FCHub Stream"
     href="/docs/fchub-stream"
   >
-    Direct video uploads to Cloudflare Stream or Bunny.net. No YouTube detours. No WordPress media library.
+    Video uploads via Cloudflare Stream and Bunny.net. Because WP media and video don't mix.
   </Card>
 </Cards>
-
-## Why FCHub Exists
-
-FluentCommunity is a solid community platform. But like most WordPress plugins, it ships with a core feature set and leaves the rest for "future updates." Some of those updates take a while. Sometimes a long while.
-
-FCHub fills the gaps. Video uploads and more — features that modern communities expect out of the box. Each plugin works independently, so you only install what you need.
 
 ## How It Works
 
 - **Separate plugins** — Install only what you need. No bloat.
-- **Built for FluentCommunity** — Deep integration, not a generic bolt-on.
-- **Licensed per plugin** — Each plugin has its own license. Free trials available at [fchub.co](https://fchub.co).
-- **Independent updates** — Each plugin updates on its own schedule.
+- **Open source** — GPLv2. Code's on [GitHub](https://github.com/vcode-sh/fchub-plugins). Read it, fork it, improve it.
+- **Independent updates** — Each plugin has its own release cycle.
+- **PHP 8.3+** — Modern PHP only. Not negotiable.
+- **WordPress 6.8+** — Keeps things sane.
+
+## Who Makes This
+
+[Vibe Code](https://x.com/vcode_sh). One person. No committee. No roadmap meetings.

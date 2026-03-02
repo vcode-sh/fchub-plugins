@@ -12,10 +12,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_URL || "http://localhost:3000"),
   title: {
-    default: "FCHub Documentation",
-    template: "%s | FCHub Docs",
+    default: "FCHub — WordPress Plugins for FluentCart & FluentCommunity",
+    template: "%s | FCHub",
   },
-  description: "Official documentation for FCHub plugins and features",
+  description:
+    "Payments, invoicing, memberships, video streaming, and migration plugins for FluentCart and FluentCommunity. Open source, GPLv2.",
   icons: {
     icon: "/fchub-icon.webp",
     apple: "/fchub-icon.webp",

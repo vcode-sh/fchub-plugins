@@ -108,7 +108,7 @@ Reported by [Jacob Windham](https://github.com/vcode-sh/fchub-plugins/issues). V
 
 **What Was Broken:**
 
-- Edit post with video → save → video disappeared. `isset($var)` when `$var = null` returns false. We thought user didn't send media. They sent null.
+- Edit post with video → save → video disappeared. `isset($var)` when `$var = null` returns false. I thought user didn't send media. They sent null.
 - Remove video from post → save → video stayed in post AND Cloudflare. Hook #1 deleted it. Hook #2 saw "no media in request" and restored existing video. Teamwork at its finest.
 
 **The Fix:**
@@ -224,14 +224,14 @@ Videos work after encoding. No 404 mystery. No refresh gymnastics.
 <div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
 - Fixed "Video not found" errors after encoding finished
 - Fixed encoding screen flashing on every page refresh
-- Cloudflare said "ready!" at 40% encoding. We believed them. Mistake.
-- Now we verify videos are 100% done AND files accessible before showing player
+- Cloudflare said "ready!" at 40% encoding. I believed them. Mistake.
+- Now I verify videos are 100% done AND files accessible before showing player
 - Encoding → video works automatically. Zero refresh. Zero 404 errors.
 </div>
 
 **What Was Broken:**
 <div className="pl-4 border-l-2 border-fd-border space-y-2 mt-2">
-- Cloudflare webhook: `pctComplete: 40%` → we rendered iframe → manifest 404
+- Cloudflare webhook: `pctComplete: 40%` → rendered iframe → manifest 404
 - Webhooks "best effort" → many never arrived → database stuck at pending forever
 - Every refresh: encoding flash → polling → iframe (annoying)
 </div>
@@ -258,7 +258,7 @@ Videos work after encoding. No refresh gymnastics. No trust issues with CDN prov
 <div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
 - Fixed that annoying thing where encoding screen disappeared, "Video not found" appeared, you refreshed the page, and suddenly video worked
 - Cloudflare was lying. Said video was ready. Wasn't ready. Classic.
-- Now we wait for Cloudflare to actually finish (not just pretend to finish) before showing player
+- Now I wait for Cloudflare to actually finish (not just pretend to finish) before showing player
 - Encoding screen → video works automatically. Zero refresh. Zero 404 errors. Zero trust issues with CDN providers.
 </div>
 
@@ -276,16 +276,16 @@ Videos work after encoding. No refresh gymnastics. No trust issues with CDN prov
 **What Actually Happened:**
 
 - Cloudflare sends "ready!" webhook when video is 40% done encoding
-- We believed it (mistake)
+- I believed it (mistake)
 - Rendered video player immediately
 - Player tried loading video that wasn't actually done encoding yet
 - 404 errors. User confusion. Page refreshes. Sadness.
 
 **What Happens Now:**
 
-- We don't trust Cloudflare's "ready!" until it's actually 100% done
-- Then we check if video files are actually accessible (not just "ready")
-- Then we render player
+- I don't trust Cloudflare's "ready!" until it's actually 100% done
+- Then I check if video files are actually accessible (not just "ready")
+- Then I render player
 - Video works. First try. No refresh needed.
 
 Built because "just refresh the page" is not a feature. It's giving up.
