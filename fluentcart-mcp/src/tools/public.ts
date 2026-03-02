@@ -52,15 +52,5 @@ export function publicTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/user/login',
 			isPublic: true,
 		}),
-
-		getTool(client, {
-			name: 'fluentcart_public_welcome',
-			title: 'Get Welcome Message',
-			description:
-				'Retrieve the FluentCart welcome/status message. No authentication required. ' +
-				'Useful for checking if the FluentCart API is reachable and configured.',
-			schema: z.object({}),
-			endpoint: '/welcome',
-		}),
 	]
 }

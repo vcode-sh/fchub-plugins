@@ -1,0 +1,475 @@
+---
+title: Setup Guide
+description: How to connect FluentCart MCP to Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, and Codex CLI. I made it as painless as I possibly could.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Separator } from '@/components/ui/separator';
+
+This takes about 5 minutes. You'll generate a password in WordPress, paste a config snippet into your AI client, and you're done. I've made it as boring and straightforward as possible — no ceremony, no hoops.
+
+## Prerequisites
+
+<Steps>
+<Step>
+### Install Node.js 22+
+
+My server needs Node.js 22 or higher. Check what you've got:
+
+```bash
+node --version
+```
+
+See `v22.x.x` or higher? Brilliant. Move on. If not, grab it from [nodejs.org](https://nodejs.org) or use [nvm](https://github.com/nvm-sh/nvm):
+
+```bash
+nvm install 22
+nvm use 22
+```
+
+<Callout type="info" title="Why 22?">
+I use native fetch and top-level await. These aren't optional — they're baked into how the server works. Node 20 and below won't cut it.
+</Callout>
+
+</Step>
+<Step>
+### Generate a WordPress Application Password
+
+Application Passwords have been built into WordPress since version 5.6. They let my server talk to your site's REST API without you handing over your actual login password. Sensible, that.
+
+1. Log in to your WordPress admin
+2. Go to **Users → Profile** (or click your username in the top-right)
+3. Scroll to the **Application Passwords** section
+4. Type a name — `FluentCart MCP` works fine
+5. Click **Add New Application Password**
+6. **Copy the password immediately**
+
+It looks something like: `aBcD eFgH iJkL mNoP qRsT uVwX`
+
+<Callout type="warn" title="WordPress Shows This Once">
+I mean it. WordPress shows the password exactly once. Close that page without copying it and you're generating a new one. Ask me how I know.
+</Callout>
+
+<Callout type="info" title="Which Account?">
+Use an **Administrator** account. My server needs admin access to do useful things. A limited-permission user will get 403 errors on nearly everything, which rather defeats the purpose.
+</Callout>
+
+</Step>
+<Step>
+### Grab Your Three Values
+
+You need exactly these:
+
+| Value | Example |
+|-------|---------|
+| **WordPress URL** | `https://your-store.com` |
+| **Username** | `admin` |
+| **Application Password** | `aBcD eFgH iJkL mNoP qRsT uVwX` |
+
+The URL is the root of your WordPress site. No trailing slash. No `/wp-admin/`. Just the domain.
+
+</Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Configure Your AI Client
+
+Pick your weapon. Each one takes about 60 seconds.
+
+<Tabs items={['Claude Desktop', 'Claude Code', 'Cursor', 'VS Code + Copilot', 'Windsurf', 'Codex CLI']}>
+<Tab value="Claude Desktop">
+
+### Claude Desktop
+
+Anthropic's standalone app. The one with the nice icon.
+
+<Steps>
+<Step>
+### Open the Config File
+
+- **macOS**: **Claude** menu → **Settings** → **Developer** → **Edit Config**
+- **Windows**: **File** → **Settings** → **Developer** → **Edit Config**
+
+This opens `claude_desktop_config.json`. If you prefer to find it manually:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+</Step>
+
+<Step>
+### Paste This
+
+Replace the placeholder values with your actual credentials:
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://your-store.com",
+        "FLUENTCART_USERNAME": "admin",
+        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
+      }
+    }
+  }
+}
+```
+
+<Callout type="info" title="Already Have Other MCP Servers?">
+Don't replace the whole file. Add `"fluentcart": {...}` inside your existing `mcpServers` object. Comma after the previous entry. You know the drill.
+</Callout>
+
+</Step>
+
+<Step>
+### Restart the App
+
+Fully close and reopen Claude Desktop. Look for the hammer icon in the chat input — click it and you should see FluentCart tools listed.
+
+No hammer? Check **Settings → Developer** for error messages.
+</Step>
+</Steps>
+
+</Tab>
+<Tab value="Claude Code">
+
+### Claude Code
+
+The terminal-based one. My personal favourite, obviously.
+
+<Steps>
+<Step>
+### One Command
+
+```bash
+claude mcp add fluentcart \
+  -e FLUENTCART_URL=https://your-store.com \
+  -e FLUENTCART_USERNAME=admin \
+  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
+  -- npx -y fluentcart-mcp
+```
+
+That's it. Start a new session and you're connected.
+
+</Step>
+<Step>
+### Check It Works
+
+In your next Claude Code session, try:
+
+```
+Show me the FluentCart dashboard stats
+```
+
+If you see store data, you're golden. You can also verify with:
+
+```bash
+claude mcp list
+```
+
+</Step>
+</Steps>
+
+</Tab>
+<Tab value="Cursor">
+
+### Cursor
+
+The AI code editor. Good taste.
+
+<Steps>
+<Step>
+### Open MCP Settings
+
+**Settings** → **Cursor Settings** → **MCP** → **Add new global MCP server**
+
+This opens the `mcp.json` config file.
+</Step>
+
+<Step>
+### Paste This
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://your-store.com",
+        "FLUENTCART_USERNAME": "admin",
+        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
+      }
+    }
+  }
+}
+```
+
+Save.
+</Step>
+
+<Step>
+### Verify
+
+Back in **Settings → MCP**, you should see `fluentcart` with a green dot. Red dot means something's wrong — click it for the error.
+
+Open Cursor's AI chat (Cmd+L / Ctrl+L) and ask about your store.
+</Step>
+</Steps>
+
+</Tab>
+<Tab value="VS Code + Copilot">
+
+### VS Code with GitHub Copilot
+
+MCP support lives in Copilot Chat's agent mode.
+
+<Steps>
+<Step>
+### Create the Config
+
+Create or edit `.vscode/mcp.json` in your workspace:
+
+```json
+{
+  "servers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://your-store.com",
+        "FLUENTCART_USERNAME": "admin",
+        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
+      }
+    }
+  }
+}
+```
+
+Or if you prefer user-level settings (`settings.json`):
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "fluentcart": {
+        "command": "npx",
+        "args": ["-y", "fluentcart-mcp"],
+        "env": {
+          "FLUENTCART_URL": "https://your-store.com",
+          "FLUENTCART_USERNAME": "admin",
+          "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
+        }
+      }
+    }
+  }
+}
+```
+
+</Step>
+
+<Step>
+### Switch to Agent Mode
+
+Open Copilot Chat and switch to **Agent** mode using the mode selector at the top. This is mandatory — regular Chat mode doesn't use MCP servers. Microsoft's design choice, not mine.
+</Step>
+</Steps>
+
+</Tab>
+<Tab value="Windsurf">
+
+### Windsurf
+
+Codeium's editor. Supports MCP natively.
+
+<Steps>
+<Step>
+### Open MCP Config
+
+Command palette (Cmd+Shift+P / Ctrl+Shift+P) → search **"Open MCP Config"**. This opens `mcp_config.json`.
+</Step>
+
+<Step>
+### Paste This
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://your-store.com",
+        "FLUENTCART_USERNAME": "admin",
+        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
+      }
+    }
+  }
+}
+```
+
+Save. Windsurf picks up the change automatically.
+</Step>
+
+<Step>
+### Verify
+
+Open Cascade and ask about your store. If you see FluentCart tools in the tool list, you're in.
+</Step>
+</Steps>
+
+</Tab>
+<Tab value="Codex CLI">
+
+### OpenAI Codex CLI
+
+<Steps>
+<Step>
+### Set Environment Variables
+
+Add to your `.bashrc`, `.zshrc`, or wherever you keep these:
+
+```bash
+export FLUENTCART_URL="https://your-store.com"
+export FLUENTCART_USERNAME="admin"
+export FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX"
+```
+
+</Step>
+
+<Step>
+### Add to Codex Config
+
+In `~/.codex/config.json`:
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://your-store.com",
+        "FLUENTCART_USERNAME": "admin",
+        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
+      }
+    }
+  }
+}
+```
+
+</Step>
+
+<Step>
+### Run It
+
+Start a Codex session and ask about your store. The server starts automatically.
+</Step>
+</Steps>
+
+</Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## Alternative: Shared Config File
+
+If you use multiple AI clients (or just hate repeating yourself), you can create one config file that my server reads automatically. Then your AI client configs don't need any credentials at all.
+
+**macOS / Linux:**
+
+```bash
+mkdir -p ~/.config/fluentcart-mcp
+```
+
+```json title="~/.config/fluentcart-mcp/config.json"
+{
+  "url": "https://your-store.com",
+  "username": "admin",
+  "appPassword": "aBcD eFgH iJkL mNoP qRsT uVwX"
+}
+```
+
+**Windows:**
+
+```json title="%APPDATA%\fluentcart-mcp\config.json"
+{
+  "url": "https://your-store.com",
+  "username": "admin",
+  "appPassword": "aBcD eFgH iJkL mNoP qRsT uVwX"
+}
+```
+
+Then your AI client config simplifies to:
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"]
+    }
+  }
+}
+```
+
+<Callout type="info" title="Priority">
+Environment variables beat the config file. If you set `FLUENTCART_URL` as an env var and also have `url` in the config file, the env var wins. I check env vars first — deliberately.
+</Callout>
+
+## Multiple Stores
+
+Managing more than one store? Create separate MCP server entries:
+
+```json
+{
+  "mcpServers": {
+    "store-production": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://shop.example.com",
+        "FLUENTCART_USERNAME": "admin",
+        "FLUENTCART_APP_PASSWORD": "xxxx xxxx xxxx xxxx"
+      }
+    },
+    "store-staging": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://staging.example.com",
+        "FLUENTCART_USERNAME": "admin",
+        "FLUENTCART_APP_PASSWORD": "yyyy yyyy yyyy yyyy"
+      }
+    }
+  }
+}
+```
+
+Just tell the AI which store you're talking about: "Check orders on production" or "Create a test product on staging." It's smart enough to figure out which connection to use.
+
+## Test the Connection
+
+After all that, ask your AI:
+
+> "Get the FluentCart dashboard stats"
+
+If you see store data — orders, revenue, customer count — you're done. Well played.
+
+If you see errors, I've catalogued every failure mode on the [Troubleshooting](/docs/fluentcart-mcp/troubleshooting) page.
+
+## Next Steps
+
+<Cards>
+  <Card title="Usage &amp; Examples" href="/docs/fluentcart-mcp/usage">
+    Now that you're connected — what do you actually say to it? Example prompts for every category.
+  </Card>
+  <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
+    The full inventory of 200+ tools. Everything my server can do, listed by module.
+  </Card>
+</Cards>

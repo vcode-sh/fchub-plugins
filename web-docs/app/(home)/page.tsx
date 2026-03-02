@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
 	ArrowRightLeft,
 	BookOpen,
+	Bot,
 	Braces,
 	CreditCard,
 	Download,
@@ -278,23 +279,41 @@ export default function HomePage() {
 			<motion.div
 				initial="hidden"
 				animate="visible"
-				variants={itemVariants}
-				className="max-w-4xl w-full mt-4"
+				variants={containerVariants}
+				className="max-w-4xl w-full mt-4 space-y-3"
 			>
-				<Link href="/docs/fluentcart-api" className="block group">
-					<Card className="gap-0 py-0 transition-colors hover:border-primary/30">
-						<CardContent className="flex items-center gap-3 py-3">
-							<Braces className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
-							<div className="flex-1">
-								<CardTitle className="text-sm">REST API Reference</CardTitle>
-								<CardDescription className="text-xs">
-									Full OpenAPI docs for the FluentCart API. Every endpoint, every parameter, zero guesswork.
-								</CardDescription>
-							</div>
-							<Badge variant="secondary" className="text-[10px] h-4">New</Badge>
-						</CardContent>
-					</Card>
-				</Link>
+				<motion.div variants={itemVariants}>
+					<Link href="/fluentcart-mcp" className="block group">
+						<Card className="gap-0 py-0 transition-colors hover:border-primary/30">
+							<CardContent className="flex items-center gap-3 py-3">
+								<Bot className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
+								<div className="flex-1">
+									<CardTitle className="text-sm">FluentCart MCP Server</CardTitle>
+									<CardDescription className="text-xs">
+										200+ AI-agent tools for your FluentCart store. Talk to your orders, products, and reports in plain English.
+									</CardDescription>
+								</div>
+								<Badge variant="secondary" className="text-[10px] h-4">New</Badge>
+							</CardContent>
+						</Card>
+					</Link>
+				</motion.div>
+				<motion.div variants={itemVariants}>
+					<Link href="/docs/fluentcart-api" className="block group">
+						<Card className="gap-0 py-0 transition-colors hover:border-primary/30">
+							<CardContent className="flex items-center gap-3 py-3">
+								<Braces className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
+								<div className="flex-1">
+									<CardTitle className="text-sm">REST API Reference</CardTitle>
+									<CardDescription className="text-xs">
+										Full OpenAPI docs for the FluentCart API. Every endpoint, every parameter, zero guesswork.
+									</CardDescription>
+								</div>
+								<Badge variant="secondary" className="text-[10px] h-4">New</Badge>
+							</CardContent>
+						</Card>
+					</Link>
+				</motion.div>
 			</motion.div>
 
 			<motion.div

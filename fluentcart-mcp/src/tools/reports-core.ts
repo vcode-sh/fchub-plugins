@@ -173,15 +173,5 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({}),
 			endpoint: '/reports/get-recent-activities',
 		}),
-
-		getTool(client, {
-			name: 'fluentcart_dashboard_stats',
-			title: 'Get Dashboard Stats',
-			description:
-				'Dashboard statistics: product count, order count, revenue, and refund totals. ' +
-				'Monetary values indicated by has_currency flag, in smallest currency unit (cents).',
-			schema: z.object({}),
-			endpoint: '/dashboard/stats',
-		}),
 	]
 }

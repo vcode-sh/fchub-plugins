@@ -327,18 +327,19 @@ describe('resolveEndpoint (tested indirectly)', () => {
 		expect(client.get).toHaveBeenCalledWith('/orders/123', {}, undefined)
 	})
 
-	it('handles missing path parameter as empty string', async () => {
+	it('rejects missing path parameter with error', async () => {
 		const client = mockClient()
-		vi.mocked(client.get).mockResolvedValue({ data: {}, status: 200 })
 		const tool = getTool(client, {
 			...baseConfig,
 			endpoint: '/orders/:id',
 			schema: z.object({}),
 		})
 
-		await tool.handler({})
+		const result = await tool.handler({})
 
-		expect(client.get).toHaveBeenCalledWith('/orders/', {}, undefined)
+		expect(result.isError).toBe(true)
+		expect(result.content[0].text).toContain('Missing required path parameter')
+		expect(client.get).not.toHaveBeenCalled()
 	})
 
 	it('separates path params from remaining input', async () => {

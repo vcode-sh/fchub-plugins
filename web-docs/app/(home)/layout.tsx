@@ -5,6 +5,7 @@ import {
 } from "fumadocs-ui/layouts/home/navbar";
 import {
 	ArrowRightLeft,
+	Bot,
 	Braces,
 	CreditCard,
 	Flame,
@@ -110,6 +111,11 @@ export default function Layout({ children }: LayoutProps<"/">) {
 							</NavigationMenuContent>
 						</NavbarMenu>
 					),
+				},
+				{
+					text: "MCP",
+					url: "/fluentcart-mcp",
+					icon: <Bot size={18} />,
 				},
 				{
 					text: "API",

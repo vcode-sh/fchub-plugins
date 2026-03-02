@@ -1,0 +1,211 @@
+---
+title: Troubleshooting
+description: Something broke? I've seen every failure mode. Auth errors, timeouts, missing tools — all covered here.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+
+Something's not working. It happens. I've catalogued every failure mode I've encountered (and the ones users have reported) so you can fix it without filing an issue. Most problems are one of three things: connection, authentication, or timeouts.
+
+## Quick Diagnosis
+
+Before you do anything else, run this in your terminal:
+
+```bash
+curl -u "username:application_password" https://your-store.com/wp-json/fluent-cart/v2/app/init
+```
+
+Replace `username` and `application_password` with your actual values. What you get back tells you exactly where the problem is:
+
+| Response | What It Means |
+|----------|---------------|
+| JSON with store data | Connection and auth work fine. Your issue is in the AI client config. |
+| `401 Unauthorized` | Wrong username or Application Password. |
+| `403 Forbidden` | Your user doesn't have admin permissions. |
+| `404 Not Found` | FluentCart isn't installed, or the URL is wrong. |
+| Connection refused | WordPress is unreachable. Network issue, not mine. |
+
+## Common Issues
+
+<Accordions type="multiple">
+<Accordion title="Server Not Starting / No Tools Appearing">
+
+**What you see**: Claude Desktop has no hammer icon. Cursor shows a red dot. The AI says it can't find any FluentCart tools.
+
+**What's actually wrong** (in order of likelihood):
+
+1. **Node.js missing or too old**
+   ```bash
+   node --version
+   ```
+   I need `v22.0.0` or higher. If you don't have Node at all, get it from [nodejs.org](https://nodejs.org). If you have an older version, upgrade. I won't apologise for requiring modern JavaScript.
+
+2. **npx not found**
+   It comes with Node.js. If `which npx` returns nothing, your Node installation is broken. Reinstall.
+
+3. **JSON syntax error**
+   The number one cause of "it just doesn't work." A trailing comma, a missing quote, a rogue bracket. Paste your config into [jsonlint.com](https://jsonlint.com) and see what it says. I can't debug your JSON for you.
+
+4. **Wrong config file location**
+   - Claude Desktop (macOS): `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - Claude Desktop (Windows): `%APPDATA%\Claude\claude_desktop_config.json`
+   - Cursor: Check **Settings → MCP** for the path
+
+5. **Didn't restart the app**
+   Claude Desktop, Cursor, and VS Code don't hot-reload MCP configs. Close the app completely (not just the window — quit it) and reopen.
+
+</Accordion>
+<Accordion title="Authentication Failed (401)">
+
+**What you see**: Errors about "authentication failed", "invalid credentials", or HTTP 401.
+
+**What's actually wrong:**
+
+1. **Wrong Application Password**
+   The password has spaces between groups: `aBcD eFgH iJkL mNoP`. Include the spaces. It's case-sensitive. Copy it exactly.
+
+2. **Wrong username**
+   Use the WordPress login name, not the display name. If your display name is "John Smith" but your login is "john", use `john`. Check **Users → Profile** in WordPress admin.
+
+3. **Application Passwords disabled**
+   Security plugins love disabling things. Wordfence, iThemes Security, Solid Security — any of them might have turned off Application Passwords. Check your security plugin settings.
+
+   Some managed hosts (WP Engine, Kinsta, etc.) also disable them by default. Check with your host.
+
+4. **HTTP instead of HTTPS**
+   WordPress blocks Application Passwords over plain HTTP. If you're on a local dev site, add this to `wp-config.php`:
+   ```php
+   define('WP_ENVIRONMENT_TYPE', 'local');
+   ```
+
+5. **Password was deleted or regenerated**
+   If you made a new Application Password in WordPress, update it in your MCP config and restart the client. The old one is dead.
+
+</Accordion>
+<Accordion title="Permission Denied (403)">
+
+**What you see**: "permission denied", "forbidden", HTTP 403.
+
+**What's wrong**: Your WordPress user isn't an Administrator.
+
+**Fix**: Go to **Users** in WordPress admin and check the role. FluentCart's REST API needs admin capabilities for nearly everything. Using an Editor or Subscriber account won't work. I can't lower the permission requirements — that's FluentCart's decision, not mine.
+
+</Accordion>
+<Accordion title="Not Found (404)">
+
+**What you see**: "not found", "route not found", HTTP 404.
+
+**What's actually wrong:**
+
+1. **FluentCart not installed**
+   Check **Plugins** in WordPress admin. FluentCart must be installed and activated. My server talks to FluentCart endpoints — if FluentCart isn't there, those endpoints don't exist.
+
+2. **Wrong URL**
+   The URL should be the root of your WordPress site:
+   - Correct: `https://shop.example.com`
+   - Wrong: `https://shop.example.com/wp-admin/`
+   - Wrong: `https://shop.example.com/wp-json/`
+   - Wrong: `https://shop.example.com/` (trailing slash is technically fine, I strip it)
+
+3. **Permalinks set to "Plain"**
+   WordPress REST API needs pretty permalinks. Go to **Settings → Permalinks** and pick literally anything except "Plain". Hit Save even if you don't change anything — this flushes rewrite rules.
+
+4. **REST API blocked**
+   Security plugins and `.htaccess` rules sometimes block `/wp-json/`. Check your security plugin settings and server config.
+
+</Accordion>
+<Accordion title="Timeout Errors">
+
+**What you see**: Requests die after 30 seconds. "timeout", "aborted", "ETIMEDOUT".
+
+**What to do:**
+
+1. **Increase the timeout**
+   My default is 30 seconds. If your server is slow, bump it up via the `FLUENTCART_TIMEOUT` env var (milliseconds):
+   ```json
+   "env": {
+     "FLUENTCART_URL": "https://your-store.com",
+     "FLUENTCART_USERNAME": "admin",
+     "FLUENTCART_APP_PASSWORD": "...",
+     "FLUENTCART_TIMEOUT": "60000"
+   }
+   ```
+
+2. **Check your server**
+   Run `curl https://your-store.com/wp-json/`. If curl also hangs, that's a network or server problem. Not something I can fix from my end.
+
+3. **Ask for less data**
+   Listing 10,000 orders in one request will be slow on any server. Use pagination — "Show me the last 10 orders" instead of "Show me all orders." I designed every list tool to support `per_page` and `page` parameters for exactly this reason.
+
+</Accordion>
+<Accordion title="AI Ignores FluentCart / Won't Use Tools">
+
+**What you see**: The AI doesn't mention FluentCart. It says it can't access your store. It just... doesn't use the tools.
+
+**What's happening:**
+
+1. **Server not connected**
+   Verify the connection:
+   - Claude Desktop: **Settings → Developer** — is `fluentcart` green?
+   - Cursor: **Settings → MCP** — green dot = connected
+   - Claude Code: `claude mcp list`
+
+2. **Too many MCP servers**
+   Some clients choke when you have 15 MCP servers connected. Try disabling the ones you're not using right now.
+
+3. **Wrong mode**
+   - VS Code Copilot: You must be in **Agent** mode. Regular Chat won't use MCP tools. That's Microsoft's restriction, not mine.
+   - Some clients have "tool use" toggles — make sure it's on.
+
+4. **The AI just needs a nudge**
+   Sometimes the AI doesn't realise it has FluentCart tools until you mention them explicitly: "Use the FluentCart tools to show me my recent orders." After the first use, it remembers.
+
+</Accordion>
+<Accordion title="SSL / Certificate Errors">
+
+**What you see**: UNABLE_TO_VERIFY_LEAF_SIGNATURE, certificate chain errors, SSL handshake failures.
+
+**What to do:**
+
+1. **Self-signed certs (local dev)**
+   If your local WordPress has a self-signed cert, add this env var:
+   ```json
+   "env": {
+     "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+   }
+   ```
+
+   <Callout type="warn" title="Local Development Only">
+   Do not use this in production. It disables all SSL verification. You know this, but I'm contractually obligated to say it.
+   </Callout>
+
+2. **Cloudflare issues**
+   If you're behind Cloudflare with "Full (strict)" SSL, your origin server needs a valid cert. "Full" (without strict) is more forgiving.
+
+</Accordion>
+<Accordion title="Prices Look Insane">
+
+**What you see**: A $49.99 product shows as 4999. Totals are 100x too large.
+
+**That's correct.** FluentCart stores money in the smallest currency unit — cents, pence, grosze. 4999 = $49.99. 10000 = €100.00. 4000 = 40.00 PLN.
+
+The AI usually converts these for you. If it doesn't, tell it: "Show prices in dollars, not cents." I documented the currency format in every tool description so the AI knows to convert, but occasionally it shows the raw value.
+
+</Accordion>
+</Accordions>
+
+## Still Stuck?
+
+If none of the above helps:
+
+1. Check [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues) — someone might've hit the same problem
+2. Open a new issue with: error message, Node.js version, AI client name, and what you tried
+3. Do not include your Application Password in the issue. I don't want it, and neither does anyone else
+
+<Cards>
+  <Card title="GitHub Issues" href="https://github.com/vcode-sh/fchub-plugins/issues">
+    Report bugs, request features, or just tell me what went wrong.
+  </Card>
+</Cards>

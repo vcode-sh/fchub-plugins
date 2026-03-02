@@ -1,6 +1,7 @@
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import {
   ArrowRightLeft,
+  Bot,
   Braces,
   CreditCard,
   Heart,
@@ -40,6 +41,7 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
               "/docs/fchub-memberships": <Users size={16} />,
               "/docs/wc-fc": <ArrowRightLeft size={16} />,
               "/docs/fluentcart-api": <Braces size={16} />,
+              "/docs/fluentcart-mcp": <Bot size={16} />,
             };
 
             const descriptionMap: Record<string, string> = {
@@ -52,6 +54,7 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
               "/docs/fchub-memberships": "FluentCart",
               "/docs/wc-fc": "FluentCart",
               "/docs/fluentcart-api": "FluentCart REST API",
+              "/docs/fluentcart-mcp": "FluentCart MCP Server",
             };
 
             return {

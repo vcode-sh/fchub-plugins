@@ -128,14 +128,14 @@ describe('resolveApiUrls', () => {
 		expect(resolved.adminBase).toBe('https://shop.test/wp-json/fluent-cart/v2')
 	})
 
-	it('adds publicBase with /wp-json/fluent-cart-public/v2', () => {
+	it('adds publicBase with same namespace as adminBase', () => {
 		const resolved = resolveApiUrls({
 			url: 'https://shop.test',
 			username: 'admin',
 			appPassword: 'pass',
 		})
 
-		expect(resolved.publicBase).toBe('https://shop.test/wp-json/fluent-cart-public/v2')
+		expect(resolved.publicBase).toBe('https://shop.test/wp-json/fluent-cart/v2')
 	})
 
 	it('strips trailing slashes from input URL', () => {
@@ -146,6 +146,6 @@ describe('resolveApiUrls', () => {
 		})
 
 		expect(resolved.adminBase).toBe('https://shop.test/wp-json/fluent-cart/v2')
-		expect(resolved.publicBase).toBe('https://shop.test/wp-json/fluent-cart-public/v2')
+		expect(resolved.publicBase).toBe('https://shop.test/wp-json/fluent-cart/v2')
 	})
 })

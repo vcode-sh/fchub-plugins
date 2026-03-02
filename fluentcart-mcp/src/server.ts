@@ -1,8 +1,12 @@
+import { createRequire } from 'node:module'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { createClient } from './api/client.js'
 import { resolveConfig } from './config/resolver.js'
 import { resolveApiUrls } from './config/types.js'
 import { createAllTools } from './tools/index.js'
+
+const require = createRequire(import.meta.url)
+const { version } = require('../package.json') as { version: string }
 
 export function createServer(): McpServer {
 	const config = resolveConfig()
@@ -11,7 +15,7 @@ export function createServer(): McpServer {
 
 	const server = new McpServer({
 		name: 'fluentcart-mcp',
-		version: '0.1.0',
+		version,
 	})
 
 	const tools = createAllTools(client)

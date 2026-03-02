@@ -108,7 +108,7 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Search Product by Name',
 			description: 'Search for products by name. Returns matching products.',
 			schema: z.object({
-				search: z.string().optional().describe('Search term'),
+				name: z.string().optional().describe('Search term'),
 			}),
 			endpoint: '/products/searchProductByName',
 		}),
@@ -136,8 +136,10 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_product_suggest_sku',
 			title: 'Suggest SKU',
-			description: 'Generate a suggested SKU for a new product.',
-			schema: z.object({}),
+			description: 'Generate a suggested SKU based on a product title.',
+			schema: z.object({
+				title: z.string().describe('Product title to generate SKU from'),
+			}),
 			endpoint: '/products/suggest-sku',
 		}),
 

@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { version } = require('../package.json') as { version: string }
+
 const args = process.argv.slice(2)
 
 if (args.includes('--version') || args.includes('-v')) {
-	console.log('0.1.0')
+	console.log(version)
 	process.exit(0)
 }
 
@@ -22,7 +27,7 @@ Environment variables:
   FLUENTCART_USERNAME         WordPress username
   FLUENTCART_APP_PASSWORD     WordPress Application Password
 
-Documentation: https://github.com/vcode-sh/fluentcart-mcp
+Documentation: https://github.com/vcode-sh/fchub-plugins/tree/main/fluentcart-mcp
 `)
 	process.exit(0)
 }

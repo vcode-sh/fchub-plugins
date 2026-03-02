@@ -41,13 +41,14 @@
   ],
   "author": "Vibe Code <hello@vcode.sh>",
   "license": "MIT",
-  "homepage": "https://github.com/vcode-sh/fluentcart-mcp",
+  "homepage": "https://github.com/vcode-sh/fchub-plugins/tree/main/fluentcart-mcp",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vcode-sh/fluentcart-mcp.git"
+    "url": "git+https://github.com/vcode-sh/fchub-plugins.git",
+    "directory": "fluentcart-mcp"
   },
   "bugs": {
-    "url": "https://github.com/vcode-sh/fluentcart-mcp/issues"
+    "url": "https://github.com/vcode-sh/fchub-plugins/issues"
   },
   "engines": {
     "node": ">=22.0.0"

@@ -48,14 +48,18 @@ function resolveEndpoint(
 		delete rest[key]
 		return String(value ?? '')
 	})
+	if (path.includes('//') || path.endsWith('/')) {
+		throw new Error(`Missing required path parameter in ${endpoint}`)
+	}
 	return { path, rest }
 }
 
 function formatSuccess(data: unknown) {
 	const text = JSON.stringify(data, null, 2)
+	const structured = Array.isArray(data) ? { items: data } : data
 	return {
 		content: [{ type: 'text' as const, text }],
-		structuredContent: data as Record<string, unknown>,
+		structuredContent: structured as Record<string, unknown>,
 	}
 }
 

@@ -1,0 +1,304 @@
+---
+title: Usage & Examples
+description: How to talk to your FluentCart store through AI. I show you what to ask, how to ask it, and what to expect back.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Separator } from '@/components/ui/separator';
+
+You're connected. Now what?
+
+You just... talk. No special syntax. No commands to memorise. No tool names to remember. I built 200+ tools with descriptions so rich that any halfway decent AI can figure out which one to use from plain English. Describe what you want and let the AI sort it out.
+
+## How to Talk to It
+
+You don't need to know my tool names or API parameters. The AI translates your intent into the right calls:
+
+| Don't say this | Say this instead |
+|----------------|------------------|
+| "Call fluentcart_orders_list with per_page=10" | "Show me the latest 10 orders" |
+| "Use fluentcart_product_create with type digital" | "Create a new digital product called Pro License" |
+| "Execute fluentcart_coupon_create" | "Make a 20% off coupon code" |
+
+The AI picks the right tool, fills in the parameters, and calls my server. You'll see it working — most clients show which tools are being called in real time.
+
+<Callout type="info" title="Specificity Wins">
+"Show me orders" works. "Show me pending orders from the last 7 days sorted by total, highest first" works better. The more context you give, the more precise the results. I designed every tool schema to accept useful filters — help the AI use them.
+</Callout>
+
+## Example Prompts by Category
+
+I've organised these by the things people actually ask. Pick a section, steal a prompt, adjust to taste.
+
+<Accordions type="multiple">
+<Accordion title="Orders & Support">
+
+**Looking up orders:**
+- "Show me order #1234"
+- "List all pending orders"
+- "Find orders from customer john@example.com"
+- "What are the most recent 5 orders?"
+- "Show me unfulfilled orders"
+
+**Managing orders:**
+- "Mark order #1234 as paid"
+- "Refund order #1234 — customer received a damaged item"
+- "Change the shipping address on order #1234 to 123 New Street, London"
+- "Update order #1234 status to processing"
+- "Cancel order #1234"
+
+**Transactions & disputes:**
+- "Show me the transaction details for order #1234"
+- "Accept the dispute on order #1234"
+- "What shipping methods are available for this order?"
+
+**Bulk operations:**
+- "Delete all cancelled orders older than 90 days"
+- "Mark orders #100, #101, and #102 as completed"
+
+</Accordion>
+<Accordion title="Products & Catalogue">
+
+**Finding products:**
+- "List all products"
+- "Search for products with 'license' in the name"
+- "Show me product #42"
+- "What are my digital products?"
+
+**Creating products:**
+- "Create a new digital product called 'Starter Plan' at $29"
+- "Duplicate product #42"
+- "Create a physical product called 'T-Shirt' at $25 with inventory tracking"
+
+**Updating products:**
+- "Change the price of product #42 to $49"
+- "Update the inventory for product #42 to 150 units"
+- "Add a tax class to product #42"
+
+**Variants:**
+- "List all variations for product #42"
+- "Create a new variation: Size Large, Colour Blue, price $35"
+- "Update the pricing table for variant #7"
+
+**Downloads & licences:**
+- "Show downloadable files for product #42"
+- "Generate a download URL for file #3 on product #42"
+- "Generate missing licences for order #1234"
+
+**Categories & tags:**
+- "List all product categories"
+- "Add product #42 to the 'Premium' category"
+
+</Accordion>
+<Accordion title="Customers">
+
+**Finding customers:**
+- "Find the customer with email jane@example.com"
+- "List all customers"
+- "Search for customers named 'Smith'"
+
+**Customer details:**
+- "Show me customer #15's full profile"
+- "What's the order history for customer #15?"
+- "What's the lifetime value for customer #15?"
+- "Recalculate the LTV for customer #15"
+
+**Managing customers:**
+- "Create a new customer: Jane Smith, jane@example.com"
+- "Update customer #15's phone number to +44 7700 900000"
+- "Add a billing address for customer #15"
+
+**Addresses:**
+- "Show all addresses for customer #15"
+- "Make the address at 123 High Street the primary address for customer #15"
+- "Delete address #3 from customer #15"
+
+</Accordion>
+<Accordion title="Subscriptions">
+
+**Viewing subscriptions:**
+- "List all active subscriptions"
+- "Show subscription #42"
+- "What subscriptions does customer #15 have?"
+
+**Managing subscriptions:**
+- "Pause subscription #42"
+- "Resume subscription #42"
+- "Cancel subscription #42"
+- "Reactivate subscription #42"
+
+<Callout type="warn" title="These Are Real Actions">
+Pausing, cancelling, or reactivating a subscription affects real billing. The AI will usually confirm before pulling the trigger, but be clear about what you want. "Cancel subscription #42" is not something you can casually undo.
+</Callout>
+
+</Accordion>
+<Accordion title="Coupons & Promotions">
+
+**Creating coupons:**
+- "Create a coupon code SUMMER25 for 25% off"
+- "Make a $10 fixed discount coupon that expires on December 31st"
+- "Create a coupon that only works on digital products"
+
+**Managing coupons:**
+- "List all active coupons"
+- "Show me coupon #5"
+- "Delete the EXPIRED2024 coupon"
+
+**Applying coupons:**
+- "Apply coupon SUMMER25 to order #1234"
+- "Remove the coupon from order #1234"
+- "Check if product #42 is eligible for coupon SUMMER25"
+
+**Order bumps:**
+- "List all order bumps"
+- "Create an order bump: offer Product #42 at 20% off when buying Product #10"
+- "Delete order bump #3"
+
+</Accordion>
+<Accordion title="Reports & Analytics">
+
+This is where it gets genuinely useful. Instead of staring at charts in the admin panel, you just ask questions.
+
+**Revenue:**
+- "What's my revenue this month?"
+- "Show me revenue by day for the last 30 days"
+- "Compare this month's sales to last month"
+- "What's the sales growth trend?"
+
+**Orders:**
+- "How many orders did I get this week?"
+- "Show me the order chart for the last 90 days"
+- "What are my quick order stats?"
+- "List recent unfulfilled orders"
+
+**Products:**
+- "What are my top 10 selling products?"
+- "Show me product performance for product #42"
+- "Which variants sell the most?"
+
+**Customers:**
+- "Show me new vs returning customer breakdown"
+- "How many new signups this month?"
+- "Find repeat customers"
+
+**Subscriptions:**
+- "Show me the subscription chart"
+- "What future renewals are coming up?"
+
+**Dashboard:**
+- "Give me an overview of the store"
+- "Show me the dashboard summary"
+- "What are today's stats?"
+
+</Accordion>
+<Accordion title="Settings & Configuration">
+
+**Store settings:**
+- "Show me the current store settings"
+- "What payment methods are available?"
+- "What are the current module settings?"
+
+**Integrations:**
+- "List all installed addons"
+- "Show the global settings for the Mailchimp integration"
+- "What integration feeds are configured?"
+
+**Product options:**
+- "List all attribute groups"
+- "Create a new attribute group called 'Sizes'"
+- "Add terms Small, Medium, Large to the Sizes attribute group"
+
+</Accordion>
+<Accordion title="Everything Else">
+
+**Activity log:**
+- "Show me recent activity"
+- "What happened in the last 24 hours?"
+
+**Notes:**
+- "Add a note to order #1234: Customer called about delivery delay"
+
+**Labels:**
+- "List all labels"
+- "Create a label called 'VIP'"
+
+**Public endpoints:**
+- "Search public products for 'starter'"
+- "Get the store welcome message"
+
+**Lookup data:**
+- "List all countries"
+- "Show me state/province info for the US"
+- "What filter options are available?"
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Tips I've Learned
+
+### Give it IDs when you have them
+
+The AI can't guess which order you mean. "Show me order #1234" is instant. "Show me that order from yesterday" requires the AI to search, filter, and hope for the best.
+
+### Chain requests
+
+You can absolutely ask for multiple things at once:
+- "Find customer jane@example.com, show her order history, and create a 10% loyalty coupon for her"
+
+The AI will call multiple tools in sequence. It's surprisingly good at this.
+
+### Ask for analysis, not just data
+
+My tools return raw data, but the AI can interpret it:
+- "Summarise this week's sales performance"
+- "Compare this month's revenue to last month and tell me if we're on track"
+- "Which of my top 10 products had declining sales this month?"
+
+I provide the data. The AI provides the insight. Division of labour.
+
+### Describe support scenarios
+
+Rather than issuing individual commands, describe the whole situation:
+- "Customer john@example.com says he was charged twice. Check his recent orders and see if there's a duplicate."
+- "Customer wants to upgrade from Basic to Pro. What subscriptions do they have and what are the options?"
+
+The AI will investigate, call the right tools, and report back.
+
+## What It Can't Do
+
+I built a lot of tools, but I'm not delusional. There are limits:
+
+| Can't Do | Why |
+|----------|-----|
+| **Charge credit cards** | Payments require customer interaction (redirects, card forms). My server can mark orders as paid, but it can't process payments. |
+| **Send emails** | Email templates live in FluentCart's UI. Not an API surface I can reach. |
+| **Edit checkout pages** | That's frontend work — HTML/CSS/JS. Not API territory. |
+| **Upload product images** | File uploads aren't part of the current API surface. Use WordPress admin for media. |
+| **Configure shipping zones** | One-time setup work. I'm adding this in v1.1. |
+| **Manage tax rates** | Complex and legally sensitive. Coming in v1.1. |
+| **Touch other WordPress data** | My server only talks to FluentCart endpoints. It can't read your blog posts, other plugins, or WordPress users. |
+
+## A Note About Money
+
+FluentCart stores all monetary values in the **smallest currency unit**. Cents for USD/EUR, grosze for PLN, pence for GBP. This means:
+
+- **$49.99** is stored as **4999**
+- **€100.00** is stored as **10000**
+- **40.00 PLN** is stored as **4000**
+
+The AI usually converts these when presenting results to you. But if you see numbers that look 100x too large, that's why. When creating products or coupons, just say the human amount — "price it at $49" — and the AI will handle the conversion. I documented the currency format in every tool description precisely so the AI gets this right.
+
+## Next Steps
+
+<Cards>
+  <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
+    Every tool I built, listed by module. The complete inventory.
+  </Card>
+  <Card title="Troubleshooting" href="/docs/fluentcart-mcp/troubleshooting">
+    Something not working? I've seen every failure mode. Start here.
+  </Card>
+</Cards>

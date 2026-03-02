@@ -1,0 +1,15 @@
+{
+  "title": "FluentCart MCP",
+  "root": true,
+  "description": "AI-agent MCP server for FluentCart.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "setup",
+    "---Usage---",
+    "usage",
+    "tools",
+    "---Reference---",
+    "troubleshooting"
+  ]
+}

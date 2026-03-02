@@ -18,7 +18,7 @@ export function resolveApiUrls(config: FluentCartConfig): ResolvedConfig {
 	return {
 		...config,
 		adminBase: `${base}/wp-json/fluent-cart/v2`,
-		publicBase: `${base}/wp-json/fluent-cart-public/v2`,
+		publicBase: `${base}/wp-json/fluent-cart/v2`,
 	}
 }
 
