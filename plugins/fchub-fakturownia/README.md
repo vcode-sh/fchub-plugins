@@ -15,8 +15,8 @@ Order comes in, invoice goes out. Automatically. To [Fakturownia](https://faktur
 
 ## Requirements
 
-- WordPress 6.0+
-- PHP 7.4+
+- WordPress 6.8+
+- PHP 8.3+
 - [FluentCart](https://fluentcart.com) installed and active
 - [Fakturownia](https://fakturownia.pl) account
 

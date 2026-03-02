@@ -23,8 +23,8 @@ Turns FluentCart into a membership platform. Create plans, gate content behind t
 
 ## Requirements
 
-- WordPress 6.0+
-- PHP 7.4+
+- WordPress 6.8+
+- PHP 8.3+
 - [FluentCart](https://fluentcart.com) installed and active
 - Node.js 20+ (dev only, for building the Vue app)
 

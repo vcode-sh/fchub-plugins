@@ -11,7 +11,7 @@ I got tired of having my FluentCart plugins scattered across a dev repo like soc
 | [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip — the full "pay me to read" stack | 1.0.0 |
 | [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — your escape plan | 1.0.0 |
 
-All require [FluentCart](https://fluentcart.com). WordPress 6.0+. PHP 7.4+. A functioning will to live (optional).
+All require [FluentCart](https://fluentcart.com). WordPress 6.8+. PHP 8.3+. A functioning will to live (optional).
 
 ## Translations
 

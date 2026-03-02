@@ -33,7 +33,7 @@ The plugin works like this:
 
 ## Requirements
 
-- WordPress 6.0+
+- WordPress 6.8+
 - PHP 8.1+
 - FluentCart 1.3.9+ (required)
 - FluentCRM (optional — for automation features)

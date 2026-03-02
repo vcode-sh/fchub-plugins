@@ -15,8 +15,8 @@ Lets your FluentCart store accept payments through Przelewy24. Cards, bank trans
 
 ## Requirements
 
-- WordPress 6.0+
-- PHP 7.4+
+- WordPress 6.8+
+- PHP 8.3+
 - [FluentCart](https://fluentcart.com) installed and active
 - A Przelewy24 merchant account (the one thing I can't automate for you)
 

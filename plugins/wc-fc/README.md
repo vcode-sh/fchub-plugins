@@ -18,8 +18,8 @@ Reads your WooCommerce database. Maps everything into FluentCart. Products becom
 
 ## Requirements
 
-- WordPress 6.0+
-- PHP 7.4+
+- WordPress 6.8+
+- PHP 8.3+
 - [WooCommerce](https://woocommerce.com) (active, with actual data)
 - [FluentCart](https://fluentcart.com) (active)
 - A database backup. Non-negotiable
