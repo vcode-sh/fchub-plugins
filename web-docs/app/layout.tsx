@@ -23,10 +23,12 @@ export const metadata: Metadata = {
     title: "FCHub — WordPress Plugins for FluentCart & FluentCommunity",
     description:
       "Payments, invoicing, memberships, video streaming, and migration plugins for FluentCart and FluentCommunity. Open source, GPLv2.",
+    images: "/fchub-share.jpg",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     creator: "@vcode_sh",
+    images: "/fchub-share.jpg",
   },
   icons: {
     icon: "/fchub-icon.webp",
