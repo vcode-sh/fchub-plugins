@@ -5,6 +5,7 @@ import {
 } from "fumadocs-ui/layouts/home/navbar";
 import {
 	ArrowRightLeft,
+	Braces,
 	CreditCard,
 	Flame,
 	GitPullRequest,
@@ -109,6 +110,11 @@ export default function Layout({ children }: LayoutProps<"/">) {
 							</NavigationMenuContent>
 						</NavbarMenu>
 					),
+				},
+				{
+					text: "API",
+					url: "/docs/fluentcart-api",
+					icon: <Braces size={18} />,
 				},
 				{
 					text: "Contribute",

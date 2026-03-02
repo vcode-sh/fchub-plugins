@@ -7,6 +7,7 @@
     "dev": "lsof -ti:3000 | xargs kill -9 2>/dev/null || true && next dev",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
+    "generate-openapi": "bun run scripts/generate-openapi.mts",
     "lint": "biome check",
     "format": "biome format --write"
   },
@@ -19,6 +20,7 @@
     "embla-carousel-react": "^8.6.0",
     "fumadocs-core": "^16.6.8",
     "fumadocs-mdx": "^14.2.9",
+    "fumadocs-openapi": "^10.3.14",
     "fumadocs-ui": "npm:@fumadocs/base-ui@latest",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.576.0",
@@ -30,12 +32,13 @@
     "react-dom": "^19.2.4",
     "react-resizable-panels": "^4.7.0",
     "recharts": "2.15.4",
+    "shiki": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "vaul": "^1.1.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.4",
+    "@biomejs/biome": "^2.4.5",
     "@tailwindcss/postcss": "^4.2.1",
     "@types/mdx": "^2.0.13",
     "@types/node": "^25.3.3",

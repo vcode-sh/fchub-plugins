@@ -1,0 +1,92 @@
+---
+title: FluentCart REST API
+description: The full REST API reference for FluentCart. Orders, products, customers, subscriptions — everything your store needs, served as clean JSON.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Separator } from '@/components/ui/separator';
+
+The FluentCart REST API gives you programmatic access to your entire store. Orders, products, customers, subscriptions, coupons, shipping, tax — it's all here, patiently waiting for your HTTP requests.
+
+Built on the WordPress REST API, every endpoint lives under the `fluent-cart/v2` namespace. You authenticate with standard WordPress methods, get JSON back, and carry on with your life. No surprises, no drama.
+
+## Base URL
+
+```
+https://your-site.com/wp-json/fluent-cart/v2/
+```
+
+Replace `your-site.com` with whatever domain your WordPress lives on. All endpoints in this reference are relative to this base URL.
+
+## Authentication
+
+FluentCart piggybacks on WordPress authentication — because why reinvent the wheel when there's a perfectly good one rolling already. The simplest approach for server-to-server calls is application passwords (WordPress 5.6+). Pass your credentials via the `Authorization` header:
+
+```bash
+curl -X GET "https://your-site.com/wp-json/fluent-cart/v2/orders" \
+  -H "Authorization: Basic base64(username:application_password)"
+```
+
+All API requests require an authenticated user with appropriate capabilities. No auth, no data — refreshingly unambiguous.
+
+<Separator className="my-8" />
+
+## Endpoint Groups
+
+<Cards>
+  <Card title="Orders" href="/docs/fluentcart-api/orders">
+    Create, retrieve, update, and manage orders. Includes line items, addresses, transactions, and status changes.
+  </Card>
+  <Card title="Products" href="/docs/fluentcart-api/products">
+    Full product lifecycle management. Pricing plans, variations, downloads, and product metadata.
+  </Card>
+  <Card title="Customers" href="/docs/fluentcart-api/customers">
+    Customer records, addresses, purchase history, and account details.
+  </Card>
+  <Card title="Subscriptions" href="/docs/fluentcart-api/subscriptions">
+    Recurring billing management. View, cancel, pause, and modify active subscriptions.
+  </Card>
+  <Card title="Coupons" href="/docs/fluentcart-api/coupons">
+    Discount code management. Create percentage or fixed-amount coupons with usage limits and expiry dates.
+  </Card>
+  <Card title="Shipping" href="/docs/fluentcart-api/shipping">
+    Shipping zones, methods, and rate configuration.
+  </Card>
+  <Card title="Tax" href="/docs/fluentcart-api/tax">
+    Tax classes, rates, and regional tax configuration.
+  </Card>
+  <Card title="Reports" href="/docs/fluentcart-api/reports">
+    Revenue, order, and product analytics. Date-filtered reporting endpoints.
+  </Card>
+  <Card title="Settings" href="/docs/fluentcart-api/settings">
+    Store configuration, payment gateways, email settings, and general preferences.
+  </Card>
+  <Card title="Email Notifications" href="/docs/fluentcart-api/email-notifications">
+    Email template management and notification configuration.
+  </Card>
+  <Card title="Integrations" href="/docs/fluentcart-api/integrations">
+    Third-party integration feeds and webhook configuration.
+  </Card>
+  <Card title="Files & Storage" href="/docs/fluentcart-api/files">
+    File upload, download management, and digital product delivery.
+  </Card>
+  <Card title="Licensing" href="/docs/fluentcart-api/licensing">
+    Software licence key management, activations, and validation.
+  </Card>
+  <Card title="Roles & Permissions" href="/docs/fluentcart-api/roles-permissions">
+    User capability management for FluentCart admin access.
+  </Card>
+  <Card title="Dashboard" href="/docs/fluentcart-api/dashboard">
+    Store overview statistics and quick-glance metrics.
+  </Card>
+</Cards>
+
+<Separator className="my-8" />
+
+## OpenAPI Specification
+
+The full API is documented using the OpenAPI 3.0 specification. Each endpoint page in this section is auto-generated from the spec — request parameters, response schemas, and an interactive playground for testing against your own store. I didn't write all this by hand, I'm not a masochist.
+
+<Callout type="info" title="Work in Progress">
+This API reference is generated from a live FluentCart instance. I'm expanding endpoint coverage as I document more of the API surface. If something's missing, it's probably next on the list.
+</Callout>
