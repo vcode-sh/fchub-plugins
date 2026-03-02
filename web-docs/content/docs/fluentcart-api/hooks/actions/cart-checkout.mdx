@@ -1,0 +1,284 @@
+---
+title: Cart & Checkout Hooks
+description: From "add to cart" to "thank you for your money" — every hook in the shopping flow.
+icon: ShoppingCart
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+The journey from "I want that" to "I own that" is paved with hooks. These fire during the cart and checkout flow — adding items, removing them (because the customer had a moment of financial clarity), saving customer data, completing the cart, and rendering the receipt page.
+
+If you're building analytics tracking, custom checkout fields, or any kind of conversion funnel logic, this is your section.
+
+---
+
+## item_added
+
+`fluent_cart/cart/item_added` — Something landed in the cart
+
+**Fires when:** A product is successfully added to the shopping cart. The item exists in the cart and the cart totals have been recalculated. This is the "intent to buy" signal — useful for analytics, remarketing pixels, and inventory reservation systems.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Cart item and cart data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'cart_item' => [
+        'id' => 1,
+        'cart_id' => 123,
+        'product_id' => 456,
+        'variation_id' => 789,
+        'quantity' => 2,
+        'price' => 5000            // Unit price in cents
+    ],
+    'cart' => []                    // Full cart model
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/cart/item_added', function ($data) {
+    $item = $data['cart_item'];
+    $cart = $data['cart'];
+
+    // Fire a server-side analytics event (GA4 Measurement Protocol, etc.)
+    wp_remote_post('https://www.google-analytics.com/mp/collect', [
+        'body' => json_encode([
+            'client_id' => $_COOKIE['_ga'] ?? 'server',
+            'events' => [[
+                'name' => 'add_to_cart',
+                'params' => [
+                    'currency'  => 'USD',
+                    'value'     => $item->price * $item->quantity / 100,
+                    'item_id'   => $item->product_id,
+                    'item_name' => get_the_title($item->product_id),
+                    'quantity'  => $item->quantity,
+                ],
+            ]],
+        ]),
+        'headers' => ['Content-Type' => 'application/json'],
+    ]);
+}, 10, 1);
+```
+
+---
+
+## item_removed
+
+`fluent_cart/cart/item_removed` — Second thoughts, materialised
+
+**Fires when:** A product is removed from the shopping cart. The item is gone, cart totals recalculated. Useful for tracking cart abandonment patterns or adjusting reserved inventory.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Removed cart item and updated cart |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'cart_item' => [
+        'id' => 1,
+        'cart_id' => 123,
+        'product_id' => 456,
+        'variation_id' => 789
+    ],
+    'cart' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/cart/item_removed', function ($data) {
+    $item = $data['cart_item'];
+
+    // Release any inventory reservation
+    release_stock_reservation($item->product_id, $item->variation_id);
+
+    // Track removal for abandonment analysis
+    do_action('custom_analytics_event', 'remove_from_cart', [
+        'product_id' => $item->product_id,
+        'cart_id'     => $item->cart_id,
+    ]);
+}, 10, 1);
+```
+
+---
+
+## cart_completed
+
+`fluent_cart/cart_completed` — Cart successfully converted to an order
+
+**Fires when:** A cart crosses the finish line and becomes an actual order. This is the conversion moment — the cart ID maps to an order ID, and the customer has committed to the purchase. Note: committed to the *purchase*, not the *payment*. The order exists but may still be awaiting payment.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Cart, new order, and customer data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'cart' => [
+        'id' => 123,
+        'customer_id' => 456,
+        'total' => 10000
+    ],
+    'order' => [],       // The newly created order
+    'customer' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/cart_completed', function ($data) {
+    $cart  = $data['cart'];
+    $order = $data['order'];
+
+    // Fire conversion tracking pixel
+    do_action('custom_analytics_event', 'purchase', [
+        'transaction_id' => $order->id,
+        'value'          => $order->total / 100,
+        'currency'       => $order->currency,
+        'items'          => $order->order_items,
+    ]);
+
+    // Clear any abandoned cart records for this customer
+    as_enqueue_async_action('clear_abandoned_cart_records', [
+        'customer_id' => $cart->customer_id,
+    ], 'cart-cleanup');
+}, 10, 1);
+```
+
+This is subtly different from `order_created`. The cart completion hook gives you access to both the cart *and* the resulting order, which is handy if you're tracking conversion rates or cleaning up cart-specific data.
+
+---
+
+## customer_data_saved
+
+`fluent_cart/checkout/customer_data_saved` — Customer info captured during checkout
+
+**Fires when:** Customer information (name, email, address) is saved during the checkout process. This often fires before payment — the customer has filled in their details and the system has persisted them. Ideal for CRM syncing, fraud checks, or pre-payment validation.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Customer data and cart |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'customer' => [
+        'id' => 456,
+        'email' => '[email protected]',
+        'first_name' => 'John',
+        'last_name' => 'Doe'
+    ],
+    'cart' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/checkout/customer_data_saved', function ($data) {
+    $customer = $data['customer'];
+
+    // Sync to FluentCRM before payment — capture the lead even if they abandon
+    if (function_exists('fluentcrm')) {
+        FluentCrm\App\Models\Subscriber::updateOrCreate(
+            ['email' => $customer->email],
+            [
+                'first_name' => $customer->first_name,
+                'last_name'  => $customer->last_name,
+                'status'     => 'subscribed',
+            ]
+        );
+    }
+
+    // Run a basic fraud check
+    $riskScore = check_fraud_score($customer->email);
+    if ($riskScore > 80) {
+        update_option('_flagged_checkout_' . $customer->id, $riskScore);
+    }
+}, 10, 1);
+```
+
+This fires during checkout, not after. The customer hasn't paid yet, so don't grant access or trigger fulfilment here. But it's perfect for capturing lead data — if they abandon checkout, you've already got their email for a follow-up.
+
+---
+
+## after_receipt
+
+`fluent_cart/after_receipt` — The thank-you page, after the receipt
+
+**Fires when:** The order receipt has been rendered on the thank-you/confirmation page. This is a display hook — it outputs directly to the page, so anything you `echo` here will appear below the receipt. Use it for custom messaging, upsells, tracking scripts, or anything else that belongs on the confirmation page.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'customer_id' => 456,
+        'total' => 10000
+    ]
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/after_receipt', function ($data) {
+    $order = $data['order'];
+    ?>
+    <div class="post-purchase-upsell" style="margin-top: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+        <h3>While you're here...</h3>
+        <p>Customers who bought this also grabbed our
+            <a href="/product/premium-addon">Premium Add-on</a> — 20% off for the next 24 hours.
+        </p>
+    </div>
+
+    <!-- Conversion tracking -->
+    <script>
+    gtag('event', 'purchase', {
+        transaction_id: '<?php echo esc_js($order->id); ?>',
+        value: <?php echo esc_js($order->total / 100); ?>,
+        currency: '<?php echo esc_js($order->currency); ?>'
+    });
+    </script>
+    <?php
+}, 10, 1);
+```
+
+This is one of the few hooks where `echo`-ing HTML is not only acceptable but expected. Just remember to escape your output — XSS on a thank-you page would be a spectacularly bad look.

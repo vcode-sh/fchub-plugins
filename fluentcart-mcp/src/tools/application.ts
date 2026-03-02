@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
+import { TTL } from '../cache.js'
 import { getTool, postTool, type ToolDefinition } from './_factory.js'
 
 export function applicationTools(client: FluentCartClient): ToolDefinition[] {
@@ -8,11 +9,10 @@ export function applicationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_app_init',
 			title: 'Initialise Application',
 			description:
-				'Retrieve application bootstrap data including shop config, REST config, and asset URLs. ' +
-				'Use to validate the connection and inspect store configuration. ' +
-				'Translation strings are excluded for performance.',
+				'Get app bootstrap data: shop config, REST config, asset URLs. Translation strings excluded.',
 			schema: z.object({}),
 			endpoint: '/app/init',
+			cache: { key: 'app_init', ttlMs: TTL.MEDIUM },
 			transform: (data) => {
 				if (typeof data === 'object' && data !== null) {
 					const { trans, ...rest } = data as Record<string, unknown>
@@ -25,9 +25,7 @@ export function applicationTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_app_get_attachments',
 			title: 'Get Attachments',
-			description:
-				'Retrieve WordPress media library attachments available to FluentCart. ' +
-				'Supports pagination for large media libraries.',
+			description: 'Get WordPress media library attachments available to FluentCart.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
@@ -39,9 +37,7 @@ export function applicationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_app_upload_attachment',
 			title: 'Upload Attachment',
 			description:
-				'Upload a media attachment to the WordPress media library via FluentCart. ' +
-				'Note: the underlying API expects multipart/form-data; this tool sends JSON ' +
-				'which may have limited support. For binary uploads, use the WP media uploader directly.',
+				'Upload media to WordPress via FluentCart. Sends JSON; for binary uploads use WP media uploader.',
 			schema: z.object({
 				file: z.string().describe('URL or path of the file to attach'),
 			}),
@@ -51,9 +47,7 @@ export function applicationTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_app_get_widgets',
 			title: 'Get Dashboard Widgets',
-			description:
-				'Retrieve dashboard widget data for the FluentCart admin panel. ' +
-				'Optionally filter by widget type or request specific data.',
+			description: 'Get dashboard widget data for the FluentCart admin panel.',
 			schema: z.object({
 				filter: z.string().optional().describe('Widget filter type'),
 				data: z.string().optional().describe('Specific widget data to retrieve'),

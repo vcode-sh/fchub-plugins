@@ -1,0 +1,492 @@
+---
+title: Orders & Payments Filters
+description: Filters for order lifecycle, payment methods, invoicing, shipping statuses, taxes, and Stripe metadata. The money filters.
+icon: Receipt
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+This is where the money lives. Every filter in this section touches orders, payments, invoices, shipping, taxes, or Stripe metadata — the bits of your store that, if broken, result in angry emails rather than mild inconvenience. Tread carefully, return correctly, and test thoroughly. Or don't. It's your support inbox.
+
+## order_statuses
+
+`fluent_cart/order_statuses` — Modify the list of available order statuses.
+
+**Runs when:** The system retrieves order statuses — for dropdowns, status badges, filtering, and internal logic. This is a registry, not a display filter. Adding a status here makes it available everywhere.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$statuses` | `array` | Associative array of status slugs to labels |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified statuses. Removing a built-in status won't end well — orders already in that status become ghosts.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$statuses = [
+    'pending'    => 'Pending',
+    'processing' => 'Processing',
+    'completed'  => 'Completed',
+    'canceled'   => 'Canceled',
+    'refunded'   => 'Refunded',
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/order_statuses', function (array $statuses, array $data): array {
+    // Add a custom status for orders awaiting manual review
+    $statuses['awaiting_review'] = 'Awaiting Review';
+
+    // Rename an existing status for clarity
+    $statuses['processing'] = 'Being Packed';
+
+    return $statuses;
+}, 10, 2);
+```
+
+Adding a status is easy. Making the rest of your application understand what that status means is the actual work. You'll need to handle transitions, email triggers, and display logic yourself.
+
+---
+
+## order/view
+
+`fluent_cart/order/view` — Modify order data before it's displayed.
+
+**Runs when:** An order is prepared for display — in the admin panel or customer portal. The order has already been loaded from the database; this filter lets you augment or reshape the data before it reaches the UI.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$order` | `array` | The full order data array |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified order data. The admin Vue app expects certain keys to exist, so remove things at your own peril.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$order = [
+    'id'             => 123,
+    'customer_id'    => 456,
+    'status'         => 'completed',
+    'payment_status' => 'paid',
+    'total'          => 10000,  // in cents
+    'items'          => [],
+    'customer'       => [],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/order/view', function (array $order, array $data): array {
+    // Attach external fulfilment data from your warehouse API
+    $order['fulfilment'] = get_post_meta($order['id'], '_warehouse_tracking', true) ?: null;
+
+    // Calculate and expose profit margin for admin eyes only
+    if (current_user_can('manage_options')) {
+        $cost = (int) get_post_meta($order['id'], '_item_cost_total', true);
+        $order['profit_margin'] = $order['total'] - $cost;
+    }
+
+    return $order;
+}, 10, 2);
+```
+
+---
+
+## single_order_downloads
+
+`fluent_cart/single_order_downloads` — Modify the downloadable files attached to an order.
+
+**Runs when:** The system prepares the download list for a specific order — whether the customer is viewing their downloads or an admin is checking order details. You can add bonus files, remove expired ones, or inject custom download links.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$downloadData` | `array` | Array of download groups, each with a title and file list |
+| `$data` | `array` | Context including order object and scope |
+
+**Returns:** `array` — The modified download data. Each entry needs at minimum a `title` and a `downloads` array.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$downloadData = [
+    [
+        'title'           => 'Product Name - Variation Title',
+        'product_id'      => 123,
+        'variation_id'    => 456,
+        'additional_html' => '',
+        'downloads'       => [
+            [
+                'id'   => 1,
+                'name' => 'File Name',
+                'url'  => 'https://example.com/file.pdf',
+                'size' => '1.5 MB',
+                'type' => 'pdf',
+            ],
+        ],
+    ],
+];
+
+$data = [
+    'order' => [
+        'id'          => 123,
+        'customer_id' => 456,
+        'status'      => 'completed',
+    ],
+    'scope' => 'admin', // or 'customer'
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/single_order_downloads', function (array $downloadData, array $data): array {
+    $order = $data['order'];
+
+    // Inject a personalised licence certificate for completed orders
+    if ($order['status'] === 'completed') {
+        $downloadData[] = [
+            'title'     => 'Licence Certificate',
+            'downloads' => [
+                [
+                    'name' => 'licence-certificate.pdf',
+                    'url'  => home_url('/generate-certificate?order=' . $order['id']),
+                    'type' => 'pdf',
+                ],
+            ],
+        ];
+    }
+
+    return $downloadData;
+}, 10, 2);
+```
+
+---
+
+## payment_statuses
+
+`fluent_cart/payment_statuses` — Modify the list of available payment statuses.
+
+**Runs when:** Payment statuses are retrieved for display or internal logic. Same principle as `order_statuses` — this is a registry.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$statuses` | `array` | Associative array of payment status slugs to labels |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified payment statuses. Don't remove `paid` unless you enjoy existential crises in your payment flow.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$statuses = [
+    'pending'              => 'Pending',
+    'paid'                 => 'Paid',
+    'failed'               => 'Failed',
+    'refunded'             => 'Refunded',
+    'partially_refunded'   => 'Partially Refunded',
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/payment_statuses', function (array $statuses, array $data): array {
+    // Add statuses for manual payment workflows
+    $statuses['awaiting_transfer'] = 'Awaiting Bank Transfer';
+    $statuses['under_review']      = 'Under Review';
+
+    return $statuses;
+}, 10, 2);
+```
+
+---
+
+## checkout_active_payment_methods
+
+`fluent_cart/checkout_active_payment_methods` — Control which payment methods appear at checkout.
+
+**Runs when:** The checkout page builds the list of available payment options. This runs after methods have been loaded from config — you're filtering the final list that the customer sees.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$paymentMethods` | `array` | Associative array of active payment methods |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified payment methods. Return an empty array and your customers can browse but never buy. Conceptual art, really.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$paymentMethods = [
+    'stripe' => [
+        'title'   => 'Credit Card',
+        'enabled' => true,
+    ],
+    'paypal' => [
+        'title'   => 'PayPal',
+        'enabled' => true,
+    ],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/checkout_active_payment_methods', function (array $paymentMethods, array $data): array {
+    // Only show Stripe for orders over a certain threshold
+    // (You'd need to access the cart total from context or session)
+    $cartTotal = WC()->cart->get_total('edit') ?? 0;
+
+    if ($cartTotal < 1000) {
+        // Under $10? No PayPal — the fees aren't worth it
+        unset($paymentMethods['paypal']);
+    }
+
+    return $paymentMethods;
+}, 10, 2);
+```
+
+---
+
+## invoice_prefix
+
+`fluent_cart/invoice_prefix` — Customise the prefix used when generating invoice numbers.
+
+**Runs when:** An invoice number is being generated. The prefix is prepended to the sequential number, giving you control over the format without touching the numbering logic.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$prefix` | `string` | The current invoice prefix |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `string` — The modified prefix. Return `null` and you'll get invoice numbers starting with the word "null", which is technically accurate for some businesses.
+
+**Example:**
+
+```php
+add_filter('fluent_cart/invoice_prefix', function (string $prefix, array $data): string {
+    // Year-based prefix for cleaner accounting
+    return 'INV-' . date('Y') . '-';
+}, 10, 2);
+```
+
+Simple, boring, essential. Your accountant will appreciate this one even if nobody else does.
+
+---
+
+## shipping_statuses
+
+`fluent_cart/shipping_statuses` — Modify the list of available shipping statuses.
+
+**Runs when:** Shipping statuses are retrieved. Used in dropdowns, order views, and fulfilment workflows.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$statuses` | `array` | Associative array of shipping status slugs to labels |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified shipping statuses.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$statuses = [
+    'unshipped'   => 'Unshipped',
+    'shipped'     => 'Shipped',
+    'delivered'   => 'Delivered',
+    'unshippable' => 'Unshippable',
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/shipping_statuses', function (array $statuses, array $data): array {
+    // Add granular tracking statuses
+    $statuses['picked']      = 'Picked from Warehouse';
+    $statuses['in_transit']  = 'In Transit';
+    $statuses['out_for_delivery'] = 'Out for Delivery';
+
+    return $statuses;
+}, 10, 2);
+```
+
+---
+
+## payments/stripe_metadata_onetime
+
+`fluent_cart/payments/stripe_metadata_onetime` — Add custom metadata to Stripe one-time payment intents.
+
+**Runs when:** A one-time (non-subscription) payment intent is created in Stripe. Stripe metadata is limited to 50 keys with 500-character values — plan accordingly.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$metadata` | `array` | The metadata array heading to Stripe |
+| `$context` | `array` | Order and transaction model objects |
+
+**Returns:** `array` — The modified metadata. Stripe silently truncates values over 500 characters, so don't try to stuff your novel in there.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$metadata = [
+    'fct_ref_id'       => 'order-uuid-here',
+    'Name'             => 'Customer Full Name',
+    'Email'            => '[email protected]',
+    'order_reference'  => 'fct_order_id_123',
+];
+
+$context = [
+    'order'       => /* Order Model Object */,
+    'transaction' => /* Transaction Model Object */,
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/payments/stripe_metadata_onetime', function (array $metadata, array $context): array {
+    $order = $context['order'];
+
+    // Add your internal reference for reconciliation
+    $metadata['erp_reference'] = get_post_meta($order->id, '_erp_order_id', true);
+    $metadata['source']        = 'fluentcart';
+    $metadata['environment']   = wp_get_environment_type();
+
+    return $metadata;
+}, 10, 2);
+```
+
+This metadata shows up in the Stripe Dashboard, making it vastly easier to match Stripe charges to your orders without playing detective.
+
+---
+
+## payments/stripe_metadata_subscription
+
+`fluent_cart/payments/stripe_metadata_subscription` — Add custom metadata to Stripe subscription payment intents.
+
+**Runs when:** A subscription payment intent is created in Stripe. Identical to the one-time variant, but with subscription context available.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$metadata` | `array` | The metadata array heading to Stripe |
+| `$context` | `array` | Order, transaction, and subscription model objects |
+
+**Returns:** `array` — The modified metadata. Same 50-key, 500-char limits apply.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$metadata = [
+    'fct_ref_id'          => 'order-uuid-here',
+    'email'               => '[email protected]',
+    'name'                => 'Customer Full Name',
+    'subscription_item'   => 'Subscription Product Name',
+    'order_reference'     => 'fct_order_id_123',
+];
+
+$context = [
+    'order'        => /* Order Model Object */,
+    'transaction'  => /* Transaction Model Object */,
+    'subscription' => /* Subscription Model Object */,
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/payments/stripe_metadata_subscription', function (array $metadata, array $context): array {
+    $subscription = $context['subscription'];
+
+    // Tag subscriptions with billing details for Stripe reporting
+    $metadata['billing_interval'] = $subscription->billing_interval;
+    $metadata['plan_name']        = $subscription->plan_name ?? 'Unknown';
+    $metadata['source']           = 'fluentcart';
+
+    return $metadata;
+}, 10, 2);
+```
+
+Particularly useful if you're piping Stripe data into analytics tools or need to reconcile subscription charges across systems. Your finance team will either thank you or continue not knowing what metadata is.
+
+---
+
+## tax/country_tax_titles
+
+`fluent_cart/tax/country_tax_titles` — Customise the tax field labels shown per country.
+
+**Runs when:** Tax-related fields are displayed and the system needs to show the correct local terminology. Australia calls it ABN/GST, the EU says VAT, the US says Tax ID, and everyone argues about who's right.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$taxTitles` | `array` | Country code to tax label mapping |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified tax titles. Return the wrong label and your customers will be mildly confused, which is still better than most government tax forms.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$taxTitles = [
+    'AU' => 'ABN/GST',
+    'GB' => 'VAT Number',
+    'US' => 'Tax ID',
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/tax/country_tax_titles', function (array $taxTitles, array $data): array {
+    // Add titles for countries FluentCart doesn't cover by default
+    $taxTitles['CA'] = 'GST/HST Number';
+    $taxTitles['IN'] = 'GSTIN';
+    $taxTitles['BR'] = 'CNPJ/CPF';
+    $taxTitles['PL'] = 'NIP';
+
+    return $taxTitles;
+}, 10, 2);
+```

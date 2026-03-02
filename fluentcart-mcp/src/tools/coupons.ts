@@ -8,10 +8,8 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_coupon_list',
 			title: 'List Coupons',
 			description:
-				'Retrieve a paginated list of coupons with optional search. ' +
-				'Returns coupon code, type, value, status, and usage stats. ' +
-				'Types: percentage, fixed, free_shipping. Statuses: active, inactive. ' +
-				'Monetary values (minimum_amount, maximum_amount, fixed value) in smallest currency unit (cents).',
+				'List coupons with optional search. ' +
+				'Types: percentage, fixed, free_shipping. Statuses: active, inactive.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
@@ -24,9 +22,8 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_coupon_create',
 			title: 'Create Coupon',
 			description:
-				'Create a new coupon. For fixed-type coupons, amount is in smallest currency unit (cents). ' +
-				'For percentage-type, amount is the percentage (e.g. 15 = 15% off). ' +
-				'Types: percentage, fixed, free_shipping.',
+				'Create a new coupon. For fixed type, amount is in cents. ' +
+				'For percentage, amount is the percent value (e.g. 15 = 15% off).',
 			schema: z.object({
 				title: z.string().describe('Coupon display name (required)'),
 				code: z.string().describe('Coupon code — unique identifier (required)'),
@@ -65,8 +62,7 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_coupon_get',
 			title: 'Get Coupon',
-			description:
-				'Retrieve detailed information about a specific coupon including usage stats and eligibility rules.',
+			description: 'Get coupon details including usage stats and eligibility rules.',
 			schema: z.object({
 				coupon_id: z.number().describe('Coupon ID'),
 			}),
@@ -78,7 +74,6 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Update Coupon',
 			description:
 				'Update an existing coupon. All required fields must be sent (no partial updates). ' +
-				'Monetary values in smallest currency unit (cents). ' +
 				'Types: percentage, fixed, free_shipping.',
 			schema: z.object({
 				coupon_id: z.number().describe('Coupon ID'),
@@ -122,25 +117,11 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/coupons/:coupon_id',
 		}),
 
-		getTool(client, {
-			name: 'fluentcart_coupon_list_alt',
-			title: 'List Coupons (Simple)',
-			description:
-				'Alternative endpoint for listing coupons in a simplified format. ' +
-				'Use page/per_page to control result size.',
-			schema: z.object({
-				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
-			}),
-			endpoint: '/coupons/listCoupons',
-		}),
-
 		postTool(client, {
 			name: 'fluentcart_coupon_apply',
 			title: 'Apply Coupon',
 			description:
-				'Apply a coupon to an order. Validates eligibility before applying. ' +
-				'Side effect: recalculates order totals with the discount.',
+				'Apply a coupon to an order. Side effect: recalculates order totals with discount.',
 			schema: z.object({
 				code: z.string().describe('Coupon code to apply'),
 				order_id: z.number().describe('Order ID to apply the coupon to'),
@@ -152,8 +133,7 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_coupon_cancel',
 			title: 'Cancel Coupon',
 			description:
-				'Remove an applied coupon from an order. ' +
-				'Side effect: recalculates order totals without the discount.',
+				'Remove an applied coupon from an order. Side effect: recalculates totals without discount.',
 			schema: z.object({
 				code: z.string().describe('Coupon code to remove'),
 				order_id: z.number().describe('Order ID to remove the coupon from'),
@@ -165,8 +145,7 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_coupon_reapply',
 			title: 'Re-apply Coupon',
 			description:
-				'Re-apply a previously cancelled coupon to an order. ' +
-				'Side effect: recalculates order totals with the discount.',
+				'Re-apply a previously cancelled coupon. Side effect: recalculates totals with discount.',
 			schema: z.object({
 				code: z.string().optional().describe('Coupon code to re-apply'),
 				order_id: z.number().optional().describe('Order ID'),

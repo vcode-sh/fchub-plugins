@@ -9,9 +9,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_attribute_group_list',
 			title: 'List Attribute Groups',
-			description:
-				'Retrieve all product attribute groups (e.g. Size, Color). ' +
-				'Returns group ID, title, slug, and associated terms.',
+			description: 'Get all product attribute groups (e.g. Size, Color) with their terms.',
 			schema: z.object({}),
 			endpoint: '/options/attr/groups',
 		}),
@@ -19,7 +17,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_attribute_group_get',
 			title: 'Get Attribute Group',
-			description: 'Retrieve a specific attribute group by ID, including its terms.',
+			description: 'Get a specific attribute group by ID, including its terms.',
 			schema: z.object({
 				group_id: z.number().describe('Attribute group ID'),
 			}),
@@ -29,9 +27,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_attribute_group_create',
 			title: 'Create Attribute Group',
-			description:
-				'Create a new product attribute group. ' +
-				'Groups define option categories like Size, Color, or Material.',
+			description: 'Create an attribute group (e.g. Size, Color, Material).',
 			schema: z.object({
 				title: z.string().describe('Group display name (e.g. "Size", "Color")'),
 				slug: z.string().describe('URL-friendly identifier (required, must be unique)'),
@@ -43,7 +39,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_attribute_group_update',
 			title: 'Update Attribute Group',
-			description: 'Update an existing attribute group title or slug.',
+			description: 'Update an attribute group title or slug.',
 			schema: z.object({
 				group_id: z.number().describe('Attribute group ID'),
 				title: z.string().optional().describe('Group display name'),
@@ -55,9 +51,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		deleteTool(client, {
 			name: 'fluentcart_attribute_group_delete',
 			title: 'Delete Attribute Group',
-			description:
-				'Permanently delete an attribute group and all its terms. ' +
-				'This action cannot be undone.',
+			description: 'Delete an attribute group and all its terms. Cannot be undone.',
 			schema: z.object({
 				group_id: z.number().describe('Attribute group ID'),
 			}),
@@ -69,9 +63,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_attribute_term_list',
 			title: 'List Attribute Terms',
-			description:
-				'Retrieve all terms for a specific attribute group. ' +
-				'For example, terms "Small", "Medium", "Large" under the "Size" group.',
+			description: 'Get all terms for an attribute group (e.g. Small, Medium, Large under Size).',
 			schema: z.object({
 				group_id: z.number().describe('Parent attribute group ID'),
 			}),
@@ -81,9 +73,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_attribute_term_create',
 			title: 'Create Attribute Term',
-			description:
-				'Create a new term within an attribute group. ' +
-				'For example, add "Red" to the "Color" group.',
+			description: 'Create a term within an attribute group (e.g. add "Red" to Color).',
 			schema: z.object({
 				group_id: z.number().describe('Parent attribute group ID'),
 				title: z.string().describe('Term display name (e.g. "Red", "Large")'),
@@ -98,7 +88,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_attribute_term_update',
 			title: 'Update Attribute Term',
-			description: 'Update an existing attribute term title or slug.',
+			description: 'Update an attribute term title or slug.',
 			schema: z.object({
 				group_id: z.number().describe('Parent attribute group ID'),
 				term_id: z.number().describe('Attribute term ID'),
@@ -111,7 +101,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		deleteTool(client, {
 			name: 'fluentcart_attribute_term_delete',
 			title: 'Delete Attribute Term',
-			description: 'Permanently delete an attribute term. This action cannot be undone.',
+			description: 'Delete an attribute term. Cannot be undone.',
 			schema: z.object({
 				group_id: z.number().describe('Parent attribute group ID'),
 				term_id: z.number().describe('Attribute term ID'),
@@ -122,9 +112,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_attribute_term_reorder',
 			title: 'Update Term Sort Order',
-			description:
-				'Update the sort order (serial) of an attribute term within its group. ' +
-				'Lower numbers appear first.',
+			description: 'Update sort order of an attribute term. Lower numbers appear first.',
 			schema: z.object({
 				group_id: z.number().describe('Parent attribute group ID'),
 				term_id: z.number().describe('Attribute term ID'),

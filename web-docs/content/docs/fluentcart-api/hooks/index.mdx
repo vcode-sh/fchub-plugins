@@ -1,0 +1,71 @@
+---
+title: Hooks Reference
+description: Every action and filter hook FluentCart exposes. The bits that make it actually extensible.
+icon: Webhook
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Separator } from '@/components/ui/separator';
+
+FluentCart fires hooks at practically every meaningful moment — order created, payment processed, subscription renewed, cart modified, customer sneezed. These are the extension points that let you bolt your own logic onto the store without touching core code. Which is good, because touching core code is how plugins die.
+
+**Action hooks** let you *do something* when an event occurs. Think notifications, syncing external systems, granting access, logging — side effects, basically.
+
+**Filter hooks** let you *change data* as it flows through the system. Modify prices, tweak settings, add fields, rewrite statuses — whatever the data pipeline will tolerate.
+
+<Separator className="my-8" />
+
+## Action Hooks
+
+Things happened. Now it's your turn.
+
+<Cards>
+  <Card title="Orders" href="/docs/fluentcart-api/hooks/actions/orders">
+    Order lifecycle from creation to deletion. Payments, status changes, refunds — the full emotional arc.
+  </Card>
+  <Card title="Subscriptions & Licences" href="/docs/fluentcart-api/hooks/actions/subscriptions-licenses">
+    Recurring revenue hooks. Activations, renewals, cancellations, and the dreaded end-of-term.
+  </Card>
+  <Card title="Cart & Checkout" href="/docs/fluentcart-api/hooks/actions/cart-checkout">
+    The shopping flow — cart updates, checkout fields rendered, orders placed, sessions cleaned up.
+  </Card>
+  <Card title="Customers & Users" href="/docs/fluentcart-api/hooks/actions/customers-users">
+    Customer creation, updates, and the WordPress user relationship dance.
+  </Card>
+  <Card title="Products & Coupons" href="/docs/fluentcart-api/hooks/actions/products-coupons">
+    Product CRUD and coupon lifecycle. For when the catalogue needs monitoring.
+  </Card>
+  <Card title="Payments & Integrations" href="/docs/fluentcart-api/hooks/actions/payments-integrations">
+    Payment method registration and integration feed execution.
+  </Card>
+  <Card title="Admin & Templates" href="/docs/fluentcart-api/hooks/actions/admin-templates">
+    Admin panel setup, frontend rendering, email templates, and system-level plumbing.
+  </Card>
+</Cards>
+
+<Separator className="my-8" />
+
+## Filter Hooks
+
+Data's passing through. Fancy changing it?
+
+<Cards>
+  <Card title="Settings & Configuration" href="/docs/fluentcart-api/hooks/filters/settings-configuration">
+    Admin app data, store settings, menu titles, module fields — the control panel of the control panel.
+  </Card>
+  <Card title="Orders & Payments" href="/docs/fluentcart-api/hooks/filters/orders-payments">
+    Order views, payment statuses, invoice prefixes, shipping statuses, Stripe metadata, and tax labels.
+  </Card>
+  <Card title="Products & Pricing" href="/docs/fluentcart-api/hooks/filters/products-pricing">
+    Currency settings, add-to-cart text, stock availability, download permissions, and coupon validation.
+  </Card>
+  <Card title="Cart & Checkout" href="/docs/fluentcart-api/hooks/filters/cart-checkout">
+    Estimated totals, address fields, and checkout page styling.
+  </Card>
+  <Card title="Customers & Subscriptions" href="/docs/fluentcart-api/hooks/filters/customers-subscriptions">
+    Customer views, subscription statuses, and customer portal tabs.
+  </Card>
+  <Card title="Integrations & Advanced" href="/docs/fluentcart-api/hooks/filters/integrations-advanced">
+    Integration actions, smartcode fallbacks, and custom storage drivers.
+  </Card>
+</Cards>

@@ -1,6 +1,6 @@
 # fluentcart-mcp
 
-I built an MCP server for [FluentCart](https://fluentcart.com). It gives AI assistants direct access to your store — orders, products, customers, subscriptions, coupons, reports, the lot. 200 tools, open source, MIT licensed.
+I built an MCP server for [FluentCart](https://fluentcart.com). It gives AI assistants direct access to your store — orders, products, customers, subscriptions, coupons, reports, the lot. 194 tools (or 3, if you're feeling dynamic), open source, MIT licensed.
 
 Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Codex CLI, ChatGPT, and anything else that speaks MCP.
 
@@ -105,20 +105,29 @@ npx fluentcart-mcp setup
 | **stdio** (default) | — | Local clients: Claude Desktop, Cursor, VS Code |
 | **HTTP** | `--transport http` | Remote clients: ChatGPT, VPS deployments, Docker |
 
-HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and `--host`). Stateless — each request creates a fresh server instance.
+HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and `--host`).
+
+### Toolset Modes
+
+| Mode | Flag | Tools | Token Cost |
+|------|------|-------|------------|
+| **static** (default) | — | 194 tools registered upfront | ~20K tokens |
+| **dynamic** | `--mode dynamic` | 3 meta-tools (search, describe, execute) | ~1.5K tokens |
+
+Dynamic mode gives the AI 3 tools to discover and execute any of the 194 tools on demand. Same capabilities, ~96% fewer tokens in context. Trade-off: 2-3 extra tool calls per workflow.
 
 ## What's Inside
 
-200 tools across 17 modules:
+194 tools across 17 modules:
 
 | Module | Tools | What It Covers |
 |--------|-------|----------------|
 | **Orders** | 23 | List, create, update, refund, disputes, bulk actions |
 | **Products** | 53 | CRUD, pricing, variants, downloads, categories |
-| **Customers** | 19 | Profiles, addresses, stats, lifetime value |
+| **Customers** | 17 | Profiles, addresses, stats, lifetime value |
 | **Subscriptions** | 7 | List, pause, resume, cancel, reactivate |
-| **Coupons** | 12 | Create, apply, eligibility, settings |
-| **Reports** | 30 | Revenue, sales, top products, customer insights |
+| **Coupons** | 11 | Create, apply, eligibility, settings |
+| **Reports** | 27 | Revenue, sales, top products, customer insights |
 | **Order Bumps** | 5 | Upsell management |
 | **Product Options** | 10 | Attribute groups and terms |
 | **Integrations** | 12 | Addon and feed management |
@@ -132,6 +141,8 @@ HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and
 | **Miscellaneous** | 4 | Country/form lookups |
 
 Every tool has rich descriptions with business context, validated parameters via Zod, and AI-friendly annotations (read-only, destructive, idempotent hints).
+
+Plus: **4 MCP Resources** (store config, countries, payment methods, filter options), **5 MCP Prompts** (store analysis, order investigation, customer overview, catalog summary, subscription health), and in-memory caching for static data.
 
 ## Example Prompts
 

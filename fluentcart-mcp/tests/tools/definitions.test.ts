@@ -12,9 +12,25 @@ const mockClient = {
 const tools = createAllTools(mockClient)
 
 describe('tool definitions', () => {
-	it('should register more than 100 tools', () => {
+	it('should register between 190 and 200 tools (6 removed in Phase 7)', () => {
 		console.log(`Total tools registered: ${tools.length}`)
-		expect(tools.length).toBeGreaterThan(100)
+		expect(tools.length).toBeGreaterThanOrEqual(190)
+		expect(tools.length).toBeLessThanOrEqual(200)
+	})
+
+	it('should not contain removed tools', () => {
+		const names = tools.map((t) => t.name)
+		const removedTools = [
+			'fluentcart_coupon_list_alt',
+			'fluentcart_customer_address_add',
+			'fluentcart_customer_orders_simple',
+			'fluentcart_report_top_sold_products',
+			'fluentcart_report_dashboard_summary',
+			'fluentcart_report_summary',
+		]
+		for (const removed of removedTools) {
+			expect(names, `${removed} should have been removed`).not.toContain(removed)
+		}
 	})
 
 	it('should have no duplicate tool names', () => {

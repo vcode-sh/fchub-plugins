@@ -7,9 +7,7 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_pricing_get',
 			title: 'Get Product Pricing',
-			description:
-				'Retrieve pricing information for a product. ' +
-				'All prices in smallest currency unit (cents).',
+			description: 'Get pricing information for a product. Prices in cents.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),
@@ -20,10 +18,8 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 			name: 'fluentcart_product_pricing_update',
 			title: 'Update Product Pricing',
 			description:
-				'Save product pricing via full product update. This is NOT a surgical price patch — ' +
-				'it requires the complete product payload including title, detail, and variants array. ' +
-				'Prices must be in smallest currency unit (cents). ' +
-				'Use fluentcart_product_pricing_get first to read current values.',
+				'Save product pricing via full product update (NOT a surgical price patch). ' +
+				'Requires complete payload: title, detail, variants. Prices in cents. Use pricing_get first.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 				post_title: z.string().describe('Product title'),
@@ -57,7 +53,7 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_pricing_widgets',
 			title: 'Get Product Pricing Widgets',
-			description: 'Retrieve pricing widgets and display components for a product.',
+			description: 'Get pricing widgets and display components for a product.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),
@@ -67,7 +63,7 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_related',
 			title: 'Get Related Products',
-			description: 'Retrieve related products for cross-sell and upsell.',
+			description: 'Get related products for cross-sell and upsell.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),
@@ -77,7 +73,7 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_bundle_info',
 			title: 'Get Product Bundle Info',
-			description: 'Retrieve bundle information for a bundled product.',
+			description: 'Get bundle information for a bundled product.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),

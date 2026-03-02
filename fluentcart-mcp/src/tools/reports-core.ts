@@ -1,15 +1,16 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
+import { TTL } from '../cache.js'
 import { getTool, type ToolDefinition } from './_factory.js'
 
 const dateRange = {
-	'params[startDate]': z.string().optional().describe('Start date (YYYY-MM-DD)'),
-	'params[endDate]': z.string().optional().describe('End date (YYYY-MM-DD)'),
+	startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+	endDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
 }
 
 const dateRangeWithGroup = {
 	...dateRange,
-	'params[groupKey]': z
+	groupKey: z
 		.enum(['daily', 'weekly', 'monthly'])
 		.optional()
 		.describe('Grouping interval: daily, weekly, or monthly'),
@@ -17,14 +18,8 @@ const dateRangeWithGroup = {
 
 const dateRangeWithCompare = {
 	...dateRangeWithGroup,
-	'params[compare_startDate]': z
-		.string()
-		.optional()
-		.describe('Comparison period start date (YYYY-MM-DD)'),
-	'params[compare_endDate]': z
-		.string()
-		.optional()
-		.describe('Comparison period end date (YYYY-MM-DD)'),
+	compare_startDate: z.string().optional().describe('Comparison period start date (YYYY-MM-DD)'),
+	compare_endDate: z.string().optional().describe('Comparison period end date (YYYY-MM-DD)'),
 }
 
 export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
@@ -33,18 +28,9 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_overview',
 			title: 'Get Reports Overview',
 			description:
-				'High-level financial overview: gross/net revenue by month and quarter with YoY growth, ' +
-				'plus top countries. Monetary values in smallest currency unit (cents).',
+				'Financial overview: gross/net revenue by month/quarter with YoY growth and top countries. Values in cents.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/overview',
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_report_summary',
-			title: 'Get Report Overview',
-			description: 'Summarised report overview for the reports dashboard page.',
-			schema: z.object({ ...dateRange }),
-			endpoint: '/reports/report-overview',
 		}),
 
 		getTool(client, {
@@ -53,14 +39,14 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'Report metadata: available date ranges, filter options, and configuration.',
 			schema: z.object({}),
 			endpoint: '/reports/fetch-report-meta',
+			cache: { key: 'report_meta', ttlMs: TTL.MEDIUM },
 		}),
 
 		getTool(client, {
 			name: 'fluentcart_report_dashboard_stats',
 			title: 'Get Report Dashboard Stats',
 			description:
-				'Key dashboard stats: total orders, paid orders, paid order items, and total paid amounts ' +
-				'with comparison data. Amounts in smallest currency unit (cents).',
+				'Dashboard stats: total orders, paid orders, paid items, and paid amounts with comparison. Values in cents.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/dashboard-stats',
 		}),
@@ -69,8 +55,7 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_revenue',
 			title: 'Get Revenue Report',
 			description:
-				'Revenue data grouped by day/week/month: net revenue, shipping, tax, refunds, order counts. ' +
-				'Includes period comparison and fluctuations. Values in smallest currency unit (cents).',
+				'Revenue grouped by day/week/month: net revenue, shipping, tax, refunds, order counts with comparison. Values in cents.',
 			schema: z.object({ ...dateRangeWithCompare }),
 			endpoint: '/reports/revenue',
 		}),
@@ -78,8 +63,7 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_revenue_by_group',
 			title: 'Get Revenue by Group',
-			description:
-				'Revenue segmented by product group or category. Values in smallest currency unit (cents).',
+			description: 'Revenue segmented by product group or category. Values in cents.',
 			schema: z.object({ ...dateRangeWithGroup }),
 			endpoint: '/reports/revenue-by-group',
 		}),
@@ -112,8 +96,7 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_order_chart',
 			title: 'Get Order Chart',
 			description:
-				'Order chart data: gross sales, net revenue, order/item counts, averages grouped by date. ' +
-				'Supports period comparison. Values in smallest currency unit (cents).',
+				'Order chart: gross sales, net revenue, order/item counts, averages grouped by date with comparison. Values in cents.',
 			schema: z.object({ ...dateRangeWithCompare }),
 			endpoint: '/reports/order-chart',
 		}),
@@ -121,10 +104,10 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_orders_by_group',
 			title: 'Get Orders by Group',
-			description: 'Order data grouped by a dimension (e.g. payment method, product type).',
+			description: 'Order data grouped by dimension (e.g. payment method, product type).',
 			schema: z.object({
 				...dateRange,
-				'params[groupKey]': z.string().optional().describe('Grouping dimension key'),
+				groupKey: z.string().optional().describe('Grouping dimension key'),
 			}),
 			endpoint: '/reports/fetch-order-by-group',
 		}),
@@ -153,22 +136,12 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_unfulfilled_orders',
 			title: 'Get Unfulfilled Orders',
-			description:
-				'Orders that have not yet been fulfilled or shipped. ' +
-				'Use page/per_page to control result size.',
+			description: 'Orders not yet fulfilled or shipped. Supports pagination.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 			}),
 			endpoint: '/reports/get-unfulfilled-orders',
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_report_dashboard_summary',
-			title: 'Get Dashboard Summary',
-			description: 'Summary of key metrics for the main dashboard view.',
-			schema: z.object({ ...dateRange }),
-			endpoint: '/reports/get-dashboard-summary',
 		}),
 
 		getTool(client, {

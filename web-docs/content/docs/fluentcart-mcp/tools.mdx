@@ -1,13 +1,13 @@
 ---
 title: Tool Reference
-description: Every tool I built into FluentCart MCP, listed by module. 200+ tools covering orders, products, customers, subscriptions, reports, and more.
+description: Every tool I built into FluentCart MCP, listed by module. 194 tools covering orders, products, customers, subscriptions, reports, and more.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-This is the complete inventory. Every tool, every module, every HTTP method. I organised 200+ tools into 17 modules so the AI (and you) can find what it needs.
+This is the complete inventory. Every tool, every module, every HTTP method. I organised 194 tools into 17 modules so the AI (and you) can find what it needs.
 
 You'll never need to call these yourself — the AI picks the right tool based on what you ask. But if you want to know exactly what's possible, or you want to verify that a specific capability exists before asking for it, this is your reference.
 
@@ -15,6 +15,24 @@ Every tool follows the naming pattern `fluentcart_{resource}_{action}`.
 
 <Callout type="info" title="Relax">
 This page is a lookup table, not homework. The AI already knows all of this. You're here out of curiosity or because you want to confirm something specific.
+</Callout>
+
+## Dynamic Mode
+
+Don't fancy loading 194 tool definitions into your LLM context? Fair enough. Start the server with `--mode dynamic` and you get 3 meta-tools instead:
+
+| Tool | What It Does |
+|------|-------------|
+| `fluentcart_search_tools` | Search tools by keyword and optional category. Returns names, titles, descriptions. |
+| `fluentcart_describe_tools` | Get full input schemas and annotations for specific tools (max 10 per request). |
+| `fluentcart_execute_tool` | Execute any tool by name with provided input. |
+
+The AI discovers tools on demand instead of loading all 194 upfront. ~96% token reduction (~20K down to ~1.5K). Same tools, same results — just lazily loaded.
+
+Categories for filtering: `product`, `order`, `customer`, `coupon`, `report`, `subscription`, `integration`, `setting`, `label`, `activity`, `note`, `dashboard`, `application`, `public`, `misc`.
+
+<Callout type="info" title="Trade-off">
+Dynamic mode adds 2-3 extra tool calls per workflow (search, describe, then execute). If latency matters more than token budget, stick with the default static mode.
 </Callout>
 
 ## Tool Annotations
@@ -155,7 +173,7 @@ Downloads, upgrade paths, taxonomies, product-level integrations.
 | `fluentcart_product_integration_feed_status` | POST | Toggle product integration feed status |
 
 </Accordion>
-<Accordion title="Customers (19 tools)">
+<Accordion title="Customers (17 tools)">
 
 Profiles, addresses, stats, user linking.
 
@@ -166,13 +184,11 @@ Profiles, addresses, stats, user linking.
 | `fluentcart_customer_create` | POST | Create a new customer |
 | `fluentcart_customer_update` | PUT | Update customer info |
 | `fluentcart_customer_update_additional_info` | PUT | Update additional customer fields |
-| `fluentcart_customer_orders_simple` | GET | Get customer's order list |
 | `fluentcart_customer_stats` | GET | Get customer statistics |
 | `fluentcart_customer_recalculate_ltv` | POST | Recalculate lifetime value |
 | `fluentcart_customer_addresses` | GET | List customer addresses |
 | `fluentcart_customer_address_select` | GET | Get address dropdown data |
 | `fluentcart_customer_address_create` | POST | Create a new address |
-| `fluentcart_customer_address_add` | POST | Add an existing address to a customer |
 | `fluentcart_customer_address_update` | PUT | Update an address |
 | `fluentcart_customer_address_delete` | DELETE | Delete an address |
 | `fluentcart_customer_address_make_primary` | POST | Set an address as primary |
@@ -199,14 +215,13 @@ The full subscription lifecycle. List, inspect, pause, resume, cancel, reactivat
 **Statuses:** `active`, `trialing`, `paused`, `failing`, `past_due`, `expiring`, `canceled`, `expired`, `completed`
 
 </Accordion>
-<Accordion title="Coupons (12 tools)">
+<Accordion title="Coupons (11 tools)">
 
 Creation, application, and eligibility checks.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
 | `fluentcart_coupon_list` | GET | List coupons with pagination |
-| `fluentcart_coupon_list_alt` | GET | Alternative coupon listing |
 | `fluentcart_coupon_get` | GET | Get coupon by ID |
 | `fluentcart_coupon_create` | POST | Create a new coupon |
 | `fluentcart_coupon_update` | PUT | Update a coupon |
@@ -219,14 +234,13 @@ Creation, application, and eligibility checks.
 | `fluentcart_coupon_settings_save` | POST | Update coupon system settings |
 
 </Accordion>
-<Accordion title="Reports — Core (16 tools)">
+<Accordion title="Reports — Core (14 tools)">
 
 Revenue, sales, orders, and dashboard metrics.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
 | `fluentcart_report_overview` | GET | Full reports overview |
-| `fluentcart_report_summary` | GET | Report summary by type |
 | `fluentcart_report_meta` | GET | Report metadata and filters |
 | `fluentcart_report_dashboard_stats` | GET | Dashboard statistics |
 | `fluentcart_report_revenue` | GET | Revenue report with date range |
@@ -239,11 +253,10 @@ Revenue, sales, orders, and dashboard metrics.
 | `fluentcart_report_quick_order_stats` | GET | Quick order summary |
 | `fluentcart_report_recent_orders` | GET | Most recent orders |
 | `fluentcart_report_unfulfilled_orders` | GET | Orders awaiting fulfilment |
-| `fluentcart_report_dashboard_summary` | GET | Dashboard summary widget |
 | `fluentcart_report_recent_activities` | GET | Recent store activities |
 
 </Accordion>
-<Accordion title="Reports — Insights (14 tools)">
+<Accordion title="Reports — Insights (13 tools)">
 
 Product performance, customer behaviour, subscription trends, refund analysis.
 
@@ -252,7 +265,6 @@ Product performance, customer behaviour, subscription trends, refund analysis.
 | `fluentcart_report_product` | GET | Product-level report |
 | `fluentcart_report_product_performance` | GET | Detailed product performance |
 | `fluentcart_report_top_products_sold` | GET | Top-selling products |
-| `fluentcart_report_top_sold_products` | GET | Alternative top products view |
 | `fluentcart_report_top_sold_variants` | GET | Top-selling variants |
 | `fluentcart_report_customer` | GET | Customer analytics |
 | `fluentcart_report_new_vs_returning` | GET | New vs returning breakdown |
@@ -419,10 +431,10 @@ Lookup data that other tools depend on.
 |--------|-------|------|
 | Orders (Core + Transactions) | 23 | CRUD + workflows |
 | Products (Core + Pricing + Variants + Catalogue) | 53 | Full catalogue management |
-| Customers | 19 | Profiles, addresses, stats |
+| Customers | 17 | Profiles, addresses, stats |
 | Subscriptions | 7 | Lifecycle management |
-| Coupons | 12 | Discounts and promotions |
-| Reports (Core + Insights) | 30 | Analytics and metrics |
+| Coupons | 11 | Discounts and promotions |
+| Reports (Core + Insights) | 27 | Analytics and metrics |
 | Order Bumps | 5 | Upsell offers |
 | Product Options | 10 | Attributes and terms |
 | Integrations | 12 | Third-party addons |
@@ -434,6 +446,11 @@ Lookup data that other tools depend on.
 | Application | 4 | App info |
 | Public | 4 | Public-facing |
 | Miscellaneous | 4 | Utilities |
-| **Total** | **200** | |
+| **Total (static mode)** | **194** | |
+| **Total (dynamic mode)** | **3** | Meta-tools that proxy to all 194 |
+
+Key endpoints also feature **response transforms** — `order_get`, `product_get`, `customer_get` and all list endpoints strip HTML blobs, embedded objects, and serialised metadata before returning. Less noise, fewer tokens, same useful data.
+
+Static reference data (`countries`, `filter_options`, `app_init`, `report_meta`) is cached in-memory with TTL, so repeated calls don't hit the API again.
 
 And there's about 130 more coming in v1.1 — shipping, taxes, email templates, customer portal, checkout, and the niche analytics nobody asked for but I built anyway.

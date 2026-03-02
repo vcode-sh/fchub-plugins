@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { ResolvedConfig } from '../config/types.js'
 import { errorFromStatus, FluentCartApiError } from './errors.js'
 
@@ -54,7 +55,7 @@ export function createClient(config: ResolvedConfig) {
 		try {
 			const response = await fetch(url.toString(), {
 				method,
-				headers,
+				headers: { ...headers, 'X-Request-Id': randomUUID() },
 				body: method !== 'GET' && options?.body ? JSON.stringify(options.body) : undefined,
 				signal: controller.signal,
 			})

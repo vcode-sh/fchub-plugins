@@ -1,0 +1,205 @@
+---
+title: Customers & Subscriptions Filters
+description: Filters for customer data, subscription statuses, and the customer portal. Where recurring revenue meets recurring headaches.
+icon: UserCog
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+Customers and subscriptions — the two things that keep the lights on. These filters let you modify customer display data, extend subscription statuses, reshape subscription views, and control the customer portal's default behaviour. If you're building anything that touches customer profiles, subscription management, or the self-service portal, this is your section.
+
+## customer/view
+
+`fluent_cart/customer/view` — Modify customer data before it's displayed in the admin.
+
+**Runs when:** Customer data is prepared for the admin interface. The customer record has been loaded from the database — this filter lets you augment it with additional fields, computed values, or data from external systems before it reaches the screen.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$customer` | `array` | The customer data array |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified customer data. The admin UI expects standard keys (`id`, `email`, `first_name`, etc.) to exist. Add what you like, but don't remove what's already there unless you enjoy blank screens.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$customer = [
+    'id'           => 456,
+    'email'        => '[email protected]',
+    'first_name'   => 'John',
+    'last_name'    => 'Doe',
+    'total_orders' => 5,
+    'total_spent'  => 50000,  // in cents
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/customer/view', function (array $customer, array $data): array {
+    $userId = $customer['id'];
+
+    // Pull in loyalty points from your rewards system
+    $customer['loyalty_points'] = (int) get_user_meta($userId, 'loyalty_points', true);
+
+    // Calculate customer lifetime in days
+    $registered = get_userdata($userId)->user_registered ?? null;
+    if ($registered) {
+        $customer['days_as_customer'] = (int) ((time() - strtotime($registered)) / DAY_IN_SECONDS);
+    }
+
+    // Tag high-value customers
+    if (($customer['total_spent'] ?? 0) > 100000) {
+        $customer['tier'] = 'VIP';
+    }
+
+    return $customer;
+}, 10, 2);
+```
+
+This is display-only — modifying the array here doesn't save anything to the database. If you want to persist data, you'll need to handle that separately. This just controls what the admin sees.
+
+---
+
+## subscription_statuses
+
+`fluent_cart/subscription_statuses` — Modify the list of available subscription statuses.
+
+**Runs when:** Subscription statuses are retrieved for dropdowns, badge rendering, filtering, and internal logic. Same registry pattern as order statuses — adding a status here makes it available globally.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$statuses` | `array` | Associative array of status slugs to labels |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified statuses. Removing `active` would be a bold experiment in subscription management theory. Not recommended.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$statuses = [
+    'pending'  => 'Pending',
+    'active'   => 'Active',
+    'canceled' => 'Canceled',
+    'expired'  => 'Expired',
+    'paused'   => 'Paused',
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/subscription_statuses', function (array $statuses, array $data): array {
+    // Add granular statuses for payment recovery workflows
+    $statuses['past_due']   = 'Past Due';
+    $statuses['on_hold']    = 'On Hold';
+    $statuses['grace']      = 'Grace Period';
+
+    return $statuses;
+}, 10, 2);
+```
+
+Adding a status is the easy part. The hard part is making your payment gateway, email notifications, and customer portal understand what that status means. A status without behaviour is just a label.
+
+---
+
+## subscription/view
+
+`fluent_cart/subscription/view` — Modify subscription data before it's displayed.
+
+**Runs when:** A subscription is prepared for display — in the admin panel or customer-facing views. Like `customer/view` and `order/view`, this is a display filter, not a persistence layer.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$subscription` | `array` | The subscription data array |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified subscription data. Don't remove `status` or `id` unless you're conducting a UI stress test.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$subscription = [
+    'id'                => 789,
+    'customer_id'       => 456,
+    'status'            => 'active',
+    'plan_id'           => 123,
+    'billing_interval'  => 'month',
+    'next_payment_date' => '2025-02-15',
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/subscription/view', function (array $subscription, array $data): array {
+    // Add a human-readable billing summary
+    $interval = $subscription['billing_interval'] ?? 'month';
+    $subscription['billing_summary'] = match ($interval) {
+        'week'  => 'Billed weekly',
+        'month' => 'Billed monthly',
+        'year'  => 'Billed annually',
+        default => "Billed every {$interval}",
+    };
+
+    // Flag subscriptions nearing their next payment
+    $nextPayment = strtotime($subscription['next_payment_date'] ?? '+1 year');
+    if ($nextPayment - time() < 3 * DAY_IN_SECONDS) {
+        $subscription['payment_imminent'] = true;
+    }
+
+    return $subscription;
+}, 10, 2);
+```
+
+---
+
+## customer_portal/active_tab
+
+`fluent_cart/customer_portal/active_tab` — Control which tab is active by default in the customer portal.
+
+**Runs when:** The customer portal loads and needs to decide which tab to show first. By default, FluentCart picks one. This filter lets you override that choice — perhaps to land customers on their subscriptions, downloads, or a custom tab.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$activeTab` | `string` | The current default tab identifier |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `string` — The tab identifier to activate. Return a tab that doesn't exist and the portal will likely show nothing or fall back to the first available tab. Either way, not a great look.
+
+**Example:**
+
+```php
+add_filter('fluent_cart/customer_portal/active_tab', function (string $activeTab, array $data): string {
+    // Default to subscriptions for customers who have active subs
+    $customer = fluentCart('customer')->getCurrentCustomer();
+
+    if ($customer && $customer->hasActiveSubscriptions()) {
+        return 'subscriptions';
+    }
+
+    // Default to downloads for customers with digital products
+    if ($customer && $customer->hasDownloads()) {
+        return 'downloads';
+    }
+
+    return $activeTab;
+}, 10, 2);
+```
+
+A small quality-of-life improvement that shows customers what they actually care about. Most people visiting the portal want to manage their subscription or grab a download — not admire their order history.

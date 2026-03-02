@@ -7,9 +7,7 @@ export function labelTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_label_list',
 			title: 'List Labels',
-			description:
-				'Retrieve all available labels for organising orders, customers, and other entities. ' +
-				'Returns label ID, text value, colour hex code, and timestamps.',
+			description: 'Get all labels for organising orders, customers, and other entities.',
 			schema: z.object({}),
 			endpoint: '/labels',
 		}),
@@ -28,9 +26,7 @@ export function labelTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_label_update_selections',
 			title: 'Update Label Selections',
-			description:
-				'Update which labels are assigned to a specific entity. ' +
-				'Replaces all current label assignments with the provided list.',
+			description: 'Replace all label assignments on an entity with the provided list.',
 			schema: z.object({
 				bind_to_type: z.string().describe('Entity type to label (e.g. "order", "customer")'),
 				bind_to_id: z.number().describe('Entity ID to update labels for'),

@@ -7,9 +7,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_variant_list_all',
 			title: 'List All Variants',
-			description:
-				'Retrieve a paginated list of all product variants across all products. ' +
-				'Use page/per_page to control result size.',
+			description: 'List all product variants across all products with pagination.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
@@ -20,9 +18,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_variant_list',
 			title: 'List Variations',
-			description:
-				'Retrieve a list of product variations with optional product filtering. ' +
-				'Use page/per_page to control result size.',
+			description: 'List product variations with optional product filtering.',
 			schema: z.object({
 				product_id: z.number().optional().describe('Filter by product ID'),
 				page: z.number().optional().describe('Page number (default: 1)'),
@@ -34,7 +30,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_variant_create',
 			title: 'Create Variation',
-			description: 'Create a new product variation. Price in smallest currency unit (cents).',
+			description: 'Create a new product variation. Price in cents.',
 			schema: z.object({
 				product_id: z.number().optional().describe('Parent product ID'),
 				title: z.string().optional().describe('Variation title'),
@@ -62,7 +58,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		deleteTool(client, {
 			name: 'fluentcart_variant_delete',
 			title: 'Delete Variation',
-			description: 'Delete a product variation. This action cannot be undone.',
+			description: 'Delete a product variation. Cannot be undone.',
 			schema: z.object({
 				variant_id: z.number().describe('Variant ID'),
 			}),
@@ -83,9 +79,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		putTool(client, {
 			name: 'fluentcart_variant_pricing_table_update',
 			title: 'Update Variation Pricing Table',
-			description:
-				'Update the pricing table for a product variation. ' +
-				'Prices in smallest currency unit (cents).',
+			description: 'Update the pricing table for a product variation. Prices in cents.',
 			schema: z.object({
 				variant_id: z.number().describe('Variant ID'),
 				item_price: z.number().optional().describe('Price in cents'),
@@ -109,9 +103,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_variant_fetch_by_ids',
 			title: 'Fetch Variations by IDs',
-			description:
-				'Retrieve multiple variations by their IDs in a single request. ' +
-				'Limit to 20 IDs per request to avoid oversized responses.',
+			description: 'Retrieve multiple variations by IDs. Limit to 20 per request.',
 			schema: z.object({
 				variation_ids: z.string().describe('Comma-separated variation IDs (max 20)'),
 			}),
@@ -121,7 +113,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_variant_upgrade_paths',
 			title: 'Get Variation Upgrade Paths',
-			description: 'Retrieve upgrade paths for a specific variation.',
+			description: 'Get upgrade paths for a specific variation.',
 			schema: z.object({
 				variant_id: z.number().describe('Variant ID'),
 			}),

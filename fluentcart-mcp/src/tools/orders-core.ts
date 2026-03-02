@@ -8,11 +8,9 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_order_list',
 			title: 'List Orders',
 			description:
-				'Retrieve a paginated list of orders with optional filtering. ' +
-				'Returns order summaries with customer info, payment status, and totals. ' +
-				'Monetary values in smallest currency unit (cents). ' +
+				'List orders with optional filtering. ' +
 				'Statuses: pending, processing, completed, canceled. ' +
-				'Payment statuses: pending, paid, partially_refunded, refunded, failed.',
+				'Payment: pending, paid, partially_refunded, refunded, failed.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
@@ -21,14 +19,29 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 				order_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
 			}),
 			endpoint: '/orders',
+			transform: (data: unknown) => {
+				const resp = data as Record<string, unknown>
+				const wrapper = (resp?.orders ?? resp) as Record<string, unknown>
+				if (wrapper && Array.isArray(wrapper.data)) {
+					wrapper.data = (wrapper.data as Record<string, unknown>[]).map((item) => ({
+						id: item.id,
+						receipt_number: item.receipt_number,
+						status: item.status,
+						payment_status: item.payment_status,
+						payment_method: item.payment_method,
+						total_amount: item.total_amount,
+						customer_id: item.customer_id,
+						created_at: item.created_at,
+					}))
+				}
+				return resp
+			},
 		}),
 
 		postTool(client, {
 			name: 'fluentcart_order_create',
 			title: 'Create Order',
-			description:
-				'Create a new order with items and customer information. ' +
-				'Monetary values in smallest currency unit (cents).',
+			description: 'Create a new order with items and customer information.',
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID (required)'),
 				items: z
@@ -51,20 +64,34 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_order_get',
 			title: 'Get Order',
 			description:
-				'Retrieve detailed order information including items, transactions, addresses, ' +
-				'activities, and customer data. Monetary values in smallest currency unit (cents).',
+				'Get full order details including items, transactions, addresses, and customer data.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 			}),
 			endpoint: '/orders/:order_id',
+			transform: (data: unknown) => {
+				const resp = data as Record<string, unknown>
+				const order = (resp?.order ?? resp) as Record<string, unknown>
+				const { activities, post_content, ...rest } = order
+				if (rest.customer && typeof rest.customer === 'object') {
+					const c = rest.customer as Record<string, unknown>
+					rest.customer = { id: c.id, name: c.full_name || c.first_name, email: c.email }
+				}
+				if (Array.isArray(rest.transactions)) {
+					rest.transactions = (rest.transactions as Record<string, unknown>[]).map((t) => {
+						const { meta, ...txRest } = t
+						return txRest
+					})
+				}
+				return resp?.order ? { ...resp, order: rest } : rest
+			},
 		}),
 
 		postTool(client, {
 			name: 'fluentcart_order_update',
 			title: 'Update Order',
 			description:
-				'Update an existing order. Subscription orders cannot be edited. ' +
-				'Completed orders cannot have their status updated.',
+				'Update an existing order. Subscription orders cannot be edited. Completed orders cannot change status.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 				status: z.string().optional().describe('Order status'),
@@ -87,8 +114,7 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_order_mark_paid',
 			title: 'Mark Order as Paid',
 			description:
-				'Mark an order as paid manually. ' +
-				'Side effect: triggers order paid hooks and integration feeds.',
+				'Mark an order as paid manually. Side effect: triggers order paid hooks and integration feeds.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 				payment_method: z.string().optional().describe('Payment method used'),
@@ -102,8 +128,7 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_order_refund',
 			title: 'Refund Order',
 			description:
-				'Process a refund for an order. Amount in smallest currency unit (cents). ' +
-				'Side effect: sends refund to payment gateway if applicable.',
+				'Process a refund for an order. Side effect: sends refund to payment gateway if applicable.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 				amount: z.number().optional().describe('Refund amount in cents'),

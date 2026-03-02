@@ -8,9 +8,7 @@ export function activityTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_activity_list',
 			title: 'List Activities',
 			description:
-				'Retrieve a paginated list of activity log entries. ' +
-				'Supports filtering by log type, module name, and module ID. ' +
-				'Returns audit trail of actions performed in the store.',
+				'List activity log entries with optional filtering by type, module, and keyword.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
@@ -25,7 +23,7 @@ export function activityTools(client: FluentCartClient): ToolDefinition[] {
 		deleteTool(client, {
 			name: 'fluentcart_activity_delete',
 			title: 'Delete Activity',
-			description: 'Delete a specific activity log entry. This action is irreversible.',
+			description: 'Delete an activity log entry. This action is irreversible.',
 			schema: z.object({
 				activity_id: z.number().describe('Activity log entry ID to delete'),
 			}),
@@ -35,8 +33,7 @@ export function activityTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_activity_mark_read',
 			title: 'Mark Activity Read',
-			description:
-				'Update the read status of an activity log entry. ' + 'Can mark as either read or unread.',
+			description: 'Update read status of an activity log entry.',
 			schema: z.object({
 				activity_id: z.number().describe('Activity log entry ID'),
 				status: z.enum(['read', 'unread']).describe('New read status: "read" or "unread"'),

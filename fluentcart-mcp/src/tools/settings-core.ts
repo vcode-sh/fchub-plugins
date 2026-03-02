@@ -8,8 +8,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_settings_get_store',
 			title: 'Get Store Settings',
 			description:
-				'Retrieve store configuration settings including currency, address, checkout options, ' +
-				'page assignments (checkout, cart, receipt, shop), button texts, and order mode (test/live).',
+				'Get store config: currency, address, checkout options, page assignments, button texts, and order mode.',
 			schema: z.object({
 				settings_name: z.string().optional().describe('Retrieve a specific settings group by name'),
 			}),
@@ -20,9 +19,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_settings_save_store',
 			title: 'Save Store Settings',
 			description:
-				'Update store configuration settings. Accepts any key-value pairs from getStoreSettings ' +
-				'(e.g. store_name, currency, order_mode, checkout page IDs, button texts). ' +
-				'Only provided keys are updated; omitted keys remain unchanged.',
+				'Update store settings. Only provided keys are updated; omitted keys remain unchanged.',
 			schema: z.object({
 				settings: z
 					.record(z.string(), z.unknown())
@@ -36,9 +33,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_payment_get_all',
 			title: 'Get All Payment Methods',
-			description:
-				'Retrieve all available payment methods with their status and configuration. ' +
-				'Returns both active and inactive gateways (Stripe, PayPal, manual, etc.).',
+			description: 'Get all payment methods with status and configuration (active and inactive).',
 			schema: z.object({}),
 			endpoint: '/settings/payment-methods/all',
 		}),
@@ -46,9 +41,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_payment_get_settings',
 			title: 'Get Payment Method Settings',
-			description:
-				'Retrieve settings for a specific payment method by its key. ' +
-				'Returns method-specific configuration fields and current values.',
+			description: 'Get settings for a specific payment method by key.',
 			schema: z.object({
 				method: z.string().describe('Payment method key (e.g. "stripe", "paypal", "przelewy24")'),
 			}),
@@ -59,8 +52,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_settings_get_modules',
 			title: 'Get Module Settings',
 			description:
-				'Retrieve module configuration including available modules (Turnstile, Stock Management, ' +
-				'Licensing, Order Bump) and their activation status.',
+				'Get module config: Turnstile, Stock Management, Licensing, Order Bump and their activation status.',
 			schema: z.object({}),
 			endpoint: '/settings/modules',
 		}),
@@ -68,9 +60,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_settings_get_permissions',
 			title: 'Get Permissions',
-			description:
-				'Retrieve available WordPress roles and currently configured capability permissions ' +
-				'for FluentCart access control. Returns role names, keys, and capability flags.',
+			description: 'Get WordPress roles and FluentCart capability permissions for access control.',
 			schema: z.object({}),
 			endpoint: '/settings/permissions',
 		}),
@@ -79,8 +69,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_settings_save_permissions',
 			title: 'Save Permissions',
 			description:
-				'Update capability-based permission assignments for WordPress roles. ' +
-				'Replaces the full capability list; omitted capabilities are removed.',
+				'Update capability permissions for WordPress roles. Replaces full list; omitted capabilities are removed.',
 			schema: z.object({
 				capability: z.array(z.string()).describe('Array of capability strings to assign to roles'),
 			}),
@@ -90,9 +79,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_settings_get_confirmation_shortcodes',
 			title: 'Get Confirmation Shortcodes',
-			description:
-				'Retrieve available shortcodes for use in the order confirmation page template. ' +
-				'Returns placeholder tokens that can be inserted into confirmation content.',
+			description: 'Get available shortcodes for the order confirmation page template.',
 			schema: z.object({}),
 			endpoint: '/settings/confirmation/shortcode',
 		}),

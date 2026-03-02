@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createRequire } from 'node:module'
+import type { ToolsetMode } from './server.js'
 
 const require = createRequire(import.meta.url)
 const { version } = require('../package.json') as { version: string }
@@ -33,6 +34,7 @@ Usage:
 
 Options:
   --transport <stdio|http>    Transport mode (default: stdio)
+  --mode <static|dynamic>     Toolset mode (default: static)
   --port <number>             HTTP server port (default: 3000)
   --host <address>            HTTP server bind address (default: 0.0.0.0)
 
@@ -47,6 +49,7 @@ Documentation: https://github.com/vcode-sh/fchub-plugins/tree/main/fluentcart-mc
 }
 
 const transport = getFlag('transport', 'stdio')
+const mode = getFlag('mode', 'static') as ToolsetMode
 
 // CLI sub-commands (setup, etc.) only when not using transport flags
 if (transport === 'stdio' && args.length > 0 && !args[0]!.startsWith('--')) {
@@ -59,12 +62,12 @@ if (transport === 'http') {
 	const port = Number.parseInt(getFlag('port', '3000'), 10)
 	const host = getFlag('host', '0.0.0.0')
 	const { startHttpServer } = await import('./transport/http.js')
-	await startHttpServer(port, host)
+	await startHttpServer(port, host, mode)
 } else {
 	const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js')
 	const { createServer } = await import('./server.js')
 
-	const server = createServer()
+	const server = createServer(mode)
 	const stdioTransport = new StdioServerTransport()
 	await server.connect(stdioTransport)
 }

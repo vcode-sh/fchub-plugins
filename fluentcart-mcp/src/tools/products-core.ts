@@ -8,11 +8,8 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_product_list',
 			title: 'List Products',
 			description:
-				'Retrieve a paginated list of products with optional filtering. ' +
-				'Returns product summaries with title, status, type, and price. ' +
-				'Monetary values in smallest currency unit (cents). ' +
-				'Types: simple, variable, subscription. ' +
-				'Views: all, published, draft, trashed.',
+				'List products with optional filtering by type, status, and search. ' +
+				'Types: simple, variable, subscription.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
@@ -29,14 +26,27 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 					.describe('Filter by status: all, published, draft, trashed'),
 			}),
 			endpoint: '/products',
+			transform: (data: unknown) => {
+				const resp = data as Record<string, unknown>
+				const wrapper = (resp?.products ?? resp) as Record<string, unknown>
+				if (wrapper && Array.isArray(wrapper.data)) {
+					wrapper.data = (wrapper.data as Record<string, unknown>[]).map((item) => ({
+						ID: item.ID,
+						post_title: item.post_title,
+						post_status: item.post_status,
+						post_name: item.post_name,
+						post_date: item.post_date,
+					}))
+				}
+				return resp
+			},
 		}),
 
 		postTool(client, {
 			name: 'fluentcart_product_create',
 			title: 'Create Product',
 			description:
-				'Create a new product. Defaults to draft status. ' +
-				'Set fulfillment_type in detail object: digital or physical.',
+				'Create a product (defaults to draft). Set detail.fulfillment_type: digital or physical.',
 			schema: z.object({
 				post_title: z.string().describe('Product title (required)'),
 				post_status: z.string().optional().describe('Status: publish, draft (default: draft)'),
@@ -55,13 +65,23 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_product_get',
 			title: 'Get Product',
-			description:
-				'Retrieve detailed product information including pricing, media, and detail metadata. ' +
-				'Monetary values in smallest currency unit (cents).',
+			description: 'Get full product details including pricing, media, and metadata.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID (WordPress post ID)'),
 			}),
 			endpoint: '/products/:product_id',
+			transform: (data: unknown) => {
+				const resp = data as Record<string, unknown>
+				const product = (resp?.product ?? resp) as Record<string, unknown>
+				const { post_content, integrations, ...rest } = product
+				if (Array.isArray(rest.variants)) {
+					rest.variants = (rest.variants as Record<string, unknown>[]).map((v) => {
+						const { pricing_table, ...vRest } = v
+						return vRest
+					})
+				}
+				return resp?.product ? { ...resp, product: rest } : rest
+			},
 		}),
 
 		deleteTool(client, {
@@ -111,7 +131,7 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_product_search_by_name',
 			title: 'Search Product by Name',
-			description: 'Search for products by name. Returns matching products.',
+			description: 'Search for products by name.',
 			schema: z.object({
 				name: z.string().optional().describe('Search term'),
 			}),
@@ -151,9 +171,7 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_product_fetch_by_ids',
 			title: 'Fetch Products by IDs',
-			description:
-				'Retrieve multiple products by their IDs in a single request. ' +
-				'Limit to 20 IDs per request to avoid oversized responses.',
+			description: 'Retrieve multiple products by their IDs. Limit to 20 IDs per request.',
 			schema: z.object({
 				product_ids: z.string().describe('Comma-separated product IDs (max 20)'),
 			}),

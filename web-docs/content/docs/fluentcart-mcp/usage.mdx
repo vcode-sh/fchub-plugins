@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 
 You're connected. Now what?
 
-You just... talk. No special syntax. No commands to memorise. No tool names to remember. I built 200+ tools with descriptions so rich that any halfway decent AI can figure out which one to use from plain English. Describe what you want and let the AI sort it out.
+You just... talk. No special syntax. No commands to memorise. No tool names to remember. I built 194 tools with descriptions so rich that any halfway decent AI can figure out which one to use from plain English. Describe what you want and let the AI sort it out.
 
 ## How to Talk to It
 
@@ -290,6 +290,88 @@ FluentCart stores all monetary values in the **smallest currency unit**. Cents f
 - **40.00 PLN** is stored as **4000**
 
 The AI usually converts these when presenting results to you. But if you see numbers that look 100x too large, that's why. When creating products or coupons, just say the human amount — "price it at $49" — and the AI will handle the conversion. I documented the currency format in every tool description precisely so the AI gets this right.
+
+## Dynamic Mode
+
+By default, all 194 tools are registered as static MCP tool definitions. That's ~20K tokens of context the LLM loads on every turn. If your context window budget matters (and it should), start the server with `--mode dynamic`:
+
+```bash
+npx fluentcart-mcp --mode dynamic
+```
+
+Or in your Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp", "--mode", "dynamic"],
+      "env": { ... }
+    }
+  }
+}
+```
+
+Instead of 194 tool definitions, the AI gets 3:
+
+1. **`fluentcart_search_tools`** — Find tools by keyword and category
+2. **`fluentcart_describe_tools`** — Get full schemas for specific tools
+3. **`fluentcart_execute_tool`** — Run any tool by name
+
+The AI searches for what it needs, reads the schema, then executes. Same tools, same results — just discovered lazily instead of dumped upfront. ~96% fewer tokens in the initial context.
+
+<Callout type="info" title="When to Use Dynamic Mode">
+If you have a large conversation or use other MCP servers alongside this one, dynamic mode keeps your token budget sane. If you only use FluentCart and value speed over savings, static mode is fine.
+</Callout>
+
+<Separator className="my-8" />
+
+## MCP Resources
+
+Four read-only resources for reference data. These are browsable context the AI can read without calling tools — useful for grounding conversations with store configuration:
+
+| Resource URI | Description |
+|-------------|-------------|
+| `fluentcart://store/config` | Store settings and configuration (currency, locale, modules) |
+| `fluentcart://store/countries` | Supported countries and their details |
+| `fluentcart://store/payment-methods` | Configured payment methods |
+| `fluentcart://store/filter-options` | Available filter options for orders, products, customers |
+
+Resources are application-controlled — the client decides when to read them. Static data is cached in-memory, so repeated reads don't hit the API.
+
+<Separator className="my-8" />
+
+## MCP Prompts
+
+Five pre-built workflows that guide the AI through multi-step operations. Think of them as recipes — the AI knows which tools to call and in what order:
+
+| Prompt | Arguments | What It Does |
+|--------|-----------|-------------|
+| `analyze-store-performance` | `startDate`, `endDate` | Revenue overview, KPIs, and best sellers for a date range |
+| `investigate-order` | `order_id` | Deep-dive into order details, transactions, and activity timeline |
+| `customer-overview` | `customer_id` | Full customer profile with stats, addresses, and spending history |
+| `catalog-summary` | *(none)* | Catalog health report — product count, top sellers, store metrics |
+| `subscription-health` | `startDate`, `endDate` | Subscription churn, renewal success, and revenue forecast |
+
+Not all MCP clients support prompts yet. Claude Desktop and Claude Code do. If yours doesn't, just ask for the same thing in plain English — the AI will figure out the same tool sequence on its own.
+
+<Separator className="my-8" />
+
+## Response Caching
+
+Static reference data is cached in-memory so the AI doesn't re-fetch the same 250-country list every time it needs to validate an address:
+
+| Endpoint | Cache TTL |
+|----------|-----------|
+| Countries list | 1 hour |
+| Filter options | 10 minutes |
+| App init (store config) | 10 minutes |
+| Report metadata | 10 minutes |
+
+The cache lives in the server process. Restart the server to clear it. No external dependencies, no Redis, no drama.
+
+<Separator className="my-8" />
 
 ## Next Steps
 

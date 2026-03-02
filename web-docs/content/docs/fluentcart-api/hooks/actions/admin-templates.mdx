@@ -1,0 +1,175 @@
+---
+title: Admin & Template Hooks
+description: System-level hooks for initialisation, module activation, and injecting HTML into the checkout.
+icon: LayoutDashboard
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+The infrastructure hooks. These fire when FluentCart boots up, when modules get activated, and when the checkout form is being rendered. Less exciting than order hooks, arguably more important — if you're building an add-on that needs to initialise alongside FluentCart or inject UI into the checkout flow, this is where it starts.
+
+---
+
+## fluentcart_loaded
+
+`fluentcart_loaded` — FluentCart is fully initialised and ready
+
+**Fires when:** The FluentCart plugin has completed its entire bootstrap process — services are registered, database connections are established, modules are loaded, and the system is ready for business. This is the earliest safe point to interact with FluentCart's internals.
+
+Note the naming: this hook does *not* use the `fluent_cart/` prefix. It's just `fluentcart_loaded`. One of those charming inconsistencies that keeps you on your toes.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Empty array |
+
+**Example:**
+
+```php
+add_action('fluentcart_loaded', function ($data) {
+    // Safe to use FluentCart classes and services from here
+    if (!class_exists('\FluentCart\App\App')) {
+        return;
+    }
+
+    // Register custom REST API routes
+    add_action('rest_api_init', function () {
+        register_rest_route('my-plugin/v1', '/fluentcart-data', [
+            'methods'             => 'GET',
+            'callback'            => 'get_custom_fluentcart_data',
+            'permission_callback' => function () {
+                return current_user_can('manage_options');
+            },
+        ]);
+    });
+
+    // Load your plugin's FluentCart-dependent features
+    require_once __DIR__ . '/includes/fluentcart-extensions.php';
+}, 10, 1);
+```
+
+If you're building a plugin that depends on FluentCart, hook into `fluentcart_loaded` rather than checking `class_exists` on every request. It's cleaner and guarantees the full FluentCart stack is available. Just make sure FluentCart is loaded before your plugin — either by declaring it as a dependency in your plugin headers or by using a late `plugins_loaded` priority.
+
+---
+
+## module/activated/&#123;module_key&#125;
+
+`fluent_cart/module/activated/{module_key}` — A FluentCart module has been switched on
+
+**Fires when:** A FluentCart module is activated through the admin interface. The `{'{module_key}'}` is the module's identifier — `subscriptions`, `licensing`, `shipping`, etc. Use this to run setup tasks that should only happen when a specific module is enabled.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Module key and module data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'module_key' => 'subscriptions',
+    'module' => []       // Module configuration data
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+// Run setup when the subscriptions module is activated
+add_action('fluent_cart/module/activated/subscriptions', function ($data) {
+    // Create custom database tables for subscription extensions
+    global $wpdb;
+    $charset = $wpdb->get_charset_collate();
+
+    $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}custom_subscription_meta (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        subscription_id BIGINT UNSIGNED NOT NULL,
+        meta_key VARCHAR(255) NOT NULL,
+        meta_value LONGTEXT,
+        PRIMARY KEY (id),
+        KEY subscription_id (subscription_id),
+        KEY meta_key (meta_key(191))
+    ) {$charset};";
+
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    dbDelta($sql);
+}, 10, 1);
+
+// Run setup when the licensing module is activated
+add_action('fluent_cart/module/activated/licensing', function ($data) {
+    // Schedule licence expiry cron job
+    if (!wp_next_scheduled('check_licence_expirations')) {
+        wp_schedule_event(time(), 'daily', 'check_licence_expirations');
+    }
+}, 10, 1);
+```
+
+This only fires at the moment of activation, not on every page load. If you need to check whether a module is currently active, use FluentCart's internal module API rather than relying on this hook.
+
+---
+
+## before_checkout_form
+
+`fluent_cart/before_checkout_form` — Right before the checkout form renders
+
+**Fires when:** The checkout page is being rendered, immediately before the checkout form HTML is output. This is a display hook — anything you `echo` here appears above the form fields. Use it for trust badges, promotional banners, legal notices, or anything the customer should see before they start filling in their details.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Empty array |
+
+**Example:**
+
+```php
+add_action('fluent_cart/before_checkout_form', function ($data) {
+    ?>
+    <div class="checkout-trust-banner" style="padding: 1rem; margin-bottom: 1.5rem; background: #f0f9ff; border-left: 4px solid #0284c7; border-radius: 4px;">
+        <strong>Secure Checkout</strong> — Your payment details are encrypted with 256-bit SSL.
+        All transactions are processed by Stripe. We never store your card details.
+    </div>
+    <?php
+}, 10, 1);
+```
+
+---
+
+## after_checkout_form
+
+`fluent_cart/after_checkout_form` — Right after the checkout form renders
+
+**Fires when:** The checkout form HTML has been output, and you can inject content below it. The mirror image of `before_checkout_form`. Useful for supplementary information, terms and conditions links, or additional trust signals that work better below the form.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Empty array |
+
+**Example:**
+
+```php
+add_action('fluent_cart/after_checkout_form', function ($data) {
+    ?>
+    <div class="checkout-footer-info" style="margin-top: 1.5rem; font-size: 0.875rem; color: #6b7280;">
+        <p>
+            By completing this purchase, you agree to our
+            <a href="/terms" target="_blank">Terms of Service</a> and
+            <a href="/privacy" target="_blank">Privacy Policy</a>.
+        </p>
+        <div class="payment-logos" style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center;">
+            <img src="/wp-content/themes/your-theme/images/visa.svg" alt="Visa" height="24" />
+            <img src="/wp-content/themes/your-theme/images/mastercard.svg" alt="Mastercard" height="24" />
+            <img src="/wp-content/themes/your-theme/images/amex.svg" alt="Amex" height="24" />
+        </div>
+    </div>
+    <?php
+}, 10, 1);
+```
+
+Between `before_checkout_form` and `after_checkout_form`, you can wrap the entire checkout experience in custom context without touching FluentCart's core templates. That said, don't go overboard — the checkout page exists to collect payment, not to display your life story. Keep additions minimal and relevant.

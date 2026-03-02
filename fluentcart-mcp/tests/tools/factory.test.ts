@@ -438,6 +438,253 @@ describe('resolveEndpoint (tested indirectly)', () => {
 	})
 })
 
+describe('cache integration in endpoint tools', () => {
+	it('uses cached response on second call', async () => {
+		const client = mockClient()
+		const payload = { id: 1, name: 'Countries' }
+		vi.mocked(client.get).mockResolvedValue({ data: payload, status: 200 })
+		const tool = getTool(client, {
+			...baseConfig,
+			endpoint: '/misc/countries',
+			cache: { key: 'test_countries', ttlMs: 60_000 },
+		})
+
+		const result1 = await tool.handler({})
+		const result2 = await tool.handler({})
+
+		expect(client.get).toHaveBeenCalledTimes(1)
+		expect(result1.content[0].text).toBe(result2.content[0].text)
+	})
+
+	it('calls fetcher again after cache is cleared', async () => {
+		const { clearCache } = await import('../../src/cache.js')
+		clearCache()
+
+		const client = mockClient()
+		vi.mocked(client.get).mockResolvedValue({ data: { id: 2 }, status: 200 })
+		const tool = getTool(client, {
+			...baseConfig,
+			endpoint: '/misc/filters',
+			cache: { key: 'test_filters', ttlMs: 60_000 },
+		})
+
+		await tool.handler({})
+		clearCache()
+		await tool.handler({})
+
+		expect(client.get).toHaveBeenCalledTimes(2)
+	})
+
+	it('does not cache when cache config is absent', async () => {
+		const client = mockClient()
+		vi.mocked(client.get).mockResolvedValue({ data: { id: 3 }, status: 200 })
+		const tool = getTool(client, {
+			...baseConfig,
+			endpoint: '/orders',
+		})
+
+		await tool.handler({})
+		await tool.handler({})
+
+		expect(client.get).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('P1.2 response transforms', () => {
+	it('order_get transform strips activities and post_content', async () => {
+		const client = mockClient()
+		const fullOrder = {
+			id: 1,
+			status: 'completed',
+			activities: [{ id: 1, type: 'note' }],
+			post_content: '<p>Long HTML content</p>',
+			customer: { id: 5, full_name: 'John Doe', email: 'john@test.com', phone: '123', labels: [] },
+			transactions: [{ id: 10, amount: 100, meta: { gateway: 'stripe' } }],
+		}
+		vi.mocked(client.get).mockResolvedValue({ data: fullOrder, status: 200 })
+
+		const { orderCoreTools } = await import('../../src/tools/orders-core.js')
+		const tools = orderCoreTools(client)
+		const orderGet = tools.find((t) => t.name === 'fluentcart_order_get')!
+
+		const result = await orderGet.handler({ order_id: 1 })
+		const parsed = JSON.parse(result.content[0].text)
+
+		expect(parsed).not.toHaveProperty('activities')
+		expect(parsed).not.toHaveProperty('post_content')
+		expect(parsed.customer).toEqual({ id: 5, name: 'John Doe', email: 'john@test.com' })
+		expect(parsed.transactions[0]).not.toHaveProperty('meta')
+	})
+
+	it('order_list transform returns only summary fields', async () => {
+		const client = mockClient()
+		const listResponse = {
+			data: [
+				{
+					id: 1,
+					receipt_number: 'ORD-001',
+					status: 'completed',
+					payment_status: 'paid',
+					payment_method: 'stripe',
+					total_amount: 5000,
+					customer_id: 5,
+					created_at: '2025-01-01',
+					items: [{ id: 10 }],
+					customer: { id: 5, email: 'jane@test.com' },
+					extra_field: 'should be stripped',
+				},
+			],
+			total: 1,
+		}
+		vi.mocked(client.get).mockResolvedValue({ data: listResponse, status: 200 })
+
+		const { orderCoreTools } = await import('../../src/tools/orders-core.js')
+		const tools = orderCoreTools(client)
+		const orderList = tools.find((t) => t.name === 'fluentcart_order_list')!
+
+		const result = await orderList.handler({})
+		const parsed = JSON.parse(result.content[0].text)
+
+		expect(parsed.data[0]).toEqual({
+			id: 1,
+			receipt_number: 'ORD-001',
+			status: 'completed',
+			payment_status: 'paid',
+			payment_method: 'stripe',
+			total_amount: 5000,
+			customer_id: 5,
+			created_at: '2025-01-01',
+		})
+		expect(parsed.data[0]).not.toHaveProperty('items')
+		expect(parsed.data[0]).not.toHaveProperty('customer')
+		expect(parsed.data[0]).not.toHaveProperty('extra_field')
+	})
+
+	it('product_get transform strips post_content and variant pricing_table', async () => {
+		const client = mockClient()
+		const fullProduct = {
+			id: 42,
+			post_title: 'Widget',
+			post_content: '<p>Long description</p>',
+			variants: [{ id: 1, title: 'Default', pricing_table: { rows: [] } }],
+			integrations: [{ id: 1, provider: 'mailchimp' }],
+		}
+		vi.mocked(client.get).mockResolvedValue({ data: fullProduct, status: 200 })
+
+		const { productCoreTools } = await import('../../src/tools/products-core.js')
+		const tools = productCoreTools(client)
+		const productGet = tools.find((t) => t.name === 'fluentcart_product_get')!
+
+		const result = await productGet.handler({ product_id: 42 })
+		const parsed = JSON.parse(result.content[0].text)
+
+		expect(parsed).not.toHaveProperty('post_content')
+		expect(parsed.variants[0]).not.toHaveProperty('pricing_table')
+		expect(parsed.variants[0].title).toBe('Default')
+		expect(parsed).not.toHaveProperty('integrations')
+	})
+
+	it('product_list transform returns only summary fields', async () => {
+		const client = mockClient()
+		const listResponse = {
+			data: [
+				{
+					ID: 42,
+					post_title: 'Widget',
+					post_status: 'publish',
+					post_name: 'widget',
+					post_date: '2025-01-01',
+					post_content: '<p>Should be stripped</p>',
+					variants: [{ id: 1 }],
+				},
+			],
+			total: 1,
+		}
+		vi.mocked(client.get).mockResolvedValue({ data: listResponse, status: 200 })
+
+		const { productCoreTools } = await import('../../src/tools/products-core.js')
+		const tools = productCoreTools(client)
+		const productList = tools.find((t) => t.name === 'fluentcart_product_list')!
+
+		const result = await productList.handler({})
+		const parsed = JSON.parse(result.content[0].text)
+
+		expect(parsed.data[0]).toEqual({
+			ID: 42,
+			post_title: 'Widget',
+			post_status: 'publish',
+			post_name: 'widget',
+			post_date: '2025-01-01',
+		})
+		expect(parsed.data[0]).not.toHaveProperty('post_content')
+		expect(parsed.data[0]).not.toHaveProperty('variants')
+	})
+
+	it('customer_get transform replaces addresses with address_count', async () => {
+		const client = mockClient()
+		const fullCustomer = {
+			id: 5,
+			email: 'john@test.com',
+			addresses: [
+				{ id: 1, city: 'London' },
+				{ id: 2, city: 'Paris' },
+			],
+		}
+		vi.mocked(client.get).mockResolvedValue({ data: fullCustomer, status: 200 })
+
+		const { customerTools } = await import('../../src/tools/customers.js')
+		const tools = customerTools(client)
+		const customerGet = tools.find((t) => t.name === 'fluentcart_customer_get')!
+
+		const result = await customerGet.handler({ customer_id: 5 })
+		const parsed = JSON.parse(result.content[0].text)
+
+		expect(parsed.address_count).toBe(2)
+	})
+
+	it('customer_list transform returns only summary fields', async () => {
+		const client = mockClient()
+		const listResponse = {
+			data: [
+				{
+					id: 5,
+					first_name: 'John',
+					last_name: 'Doe',
+					email: 'john@test.com',
+					full_name: 'John Doe',
+					order_count: 3,
+					total_spend: 15000,
+					created_at: '2025-01-01',
+					addresses: [{ id: 1 }],
+					labels: [{ id: 1, name: 'VIP' }],
+				},
+			],
+			total: 1,
+		}
+		vi.mocked(client.get).mockResolvedValue({ data: listResponse, status: 200 })
+
+		const { customerTools } = await import('../../src/tools/customers.js')
+		const tools = customerTools(client)
+		const customerList = tools.find((t) => t.name === 'fluentcart_customer_list')!
+
+		const result = await customerList.handler({})
+		const parsed = JSON.parse(result.content[0].text)
+
+		expect(parsed.data[0]).toEqual({
+			id: 5,
+			first_name: 'John',
+			last_name: 'Doe',
+			email: 'john@test.com',
+			full_name: 'John Doe',
+			order_count: 3,
+			total_spend: 15000,
+			created_at: '2025-01-01',
+		})
+		expect(parsed.data[0]).not.toHaveProperty('addresses')
+		expect(parsed.data[0]).not.toHaveProperty('labels')
+	})
+})
+
 describe('truncateResponse', () => {
 	it('returns data unchanged when under size limit', () => {
 		const data = { id: 1, name: 'test' }

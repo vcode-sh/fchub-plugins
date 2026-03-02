@@ -39,7 +39,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_downloadable_url',
 			title: 'Get Downloadable URL',
-			description: 'Retrieve the download URL for a downloadable file.',
+			description: 'Get the download URL for a downloadable file.',
 			schema: z.object({
 				downloadable_id: z.number().describe('Downloadable file ID'),
 			}),
@@ -49,7 +49,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_upgrade_settings',
 			title: 'Get Upgrade Settings',
-			description: 'Retrieve upgrade path settings for a product.',
+			description: 'Get upgrade path settings for a product.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),
@@ -59,7 +59,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_upgrade_path_save',
 			title: 'Save Upgrade Path',
-			description: 'Create a new upgrade path setting for a product.',
+			description: 'Create a new upgrade path for a product.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),
@@ -89,7 +89,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_terms',
 			title: 'Get Product Terms',
-			description: 'Retrieve product terms (categories, tags) list.',
+			description: 'Get product terms (categories, tags) list.',
 			schema: z.object({}),
 			endpoint: '/products/fetch-term',
 		}),
@@ -97,7 +97,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_terms_by_parent',
 			title: 'Get Product Terms by Parent',
-			description: 'Retrieve product terms filtered by parent term.',
+			description: 'Get product terms filtered by parent term.',
 			schema: z.object({
 				parent_id: z.number().optional().describe('Parent term ID'),
 				taxonomy: z.string().optional().describe('Taxonomy name'),
@@ -120,7 +120,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_taxonomy_sync',
 			title: 'Sync Taxonomy Terms',
-			description: 'Synchronise taxonomy terms for a product (replaces existing).',
+			description: 'Sync taxonomy terms for a product (replaces existing).',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 				term_ids: z.array(z.number()).optional().describe('Term IDs to sync'),
@@ -144,7 +144,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_integrations',
 			title: 'Get Product Integrations',
-			description: 'Retrieve integration feeds configured for a product.',
+			description: 'Get integration feeds configured for a product.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),
@@ -154,7 +154,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_integration_settings',
 			title: 'Get Product Integration Settings',
-			description: 'Retrieve settings for a specific integration on a product.',
+			description: 'Get settings for a specific integration on a product.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 				integration_name: z.string().describe('Integration provider name'),

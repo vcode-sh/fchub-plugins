@@ -8,9 +8,7 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_subscription_list',
 			title: 'List Subscriptions',
 			description:
-				'Retrieve a paginated list of subscriptions with optional filtering. ' +
-				'Returns subscription summaries with status, billing interval, and amounts. ' +
-				'Monetary values in smallest currency unit (cents). ' +
+				'List subscriptions with optional filtering. ' +
 				'Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
@@ -24,9 +22,7 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_subscription_get',
 			title: 'Get Subscription',
 			description:
-				'Retrieve detailed information about a specific subscription including billing dates, ' +
-				'gateway info, and payment history. Monetary values in smallest currency unit (cents). ' +
-				'Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed.',
+				'Get subscription details including billing dates, gateway info, and payment history. Amounts in cents.',
 			schema: z.object({
 				subscription_id: z.number().describe('Subscription ID'),
 			}),
@@ -37,8 +33,7 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_subscription_cancel',
 			title: 'Cancel Subscription',
 			description:
-				'Cancel a subscription associated with an order. Can cancel immediately or at end of billing period. ' +
-				'Side effect: may trigger refund depending on gateway and cancel_immediately flag.',
+				'Cancel a subscription. Can cancel immediately or at end of billing period. May trigger refund.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID that owns the subscription'),
 				subscription_id: z.number().describe('Subscription ID to cancel'),
@@ -55,8 +50,7 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_subscription_fetch',
 			title: 'Fetch Subscription from Gateway',
 			description:
-				'Fetch and synchronise subscription data from the payment gateway. ' +
-				'Use when subscription state may be out of sync with the gateway (e.g. after manual gateway changes).',
+				'Sync subscription data from the payment gateway. Use when state may be out of sync.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID that owns the subscription'),
 				subscription_id: z.number().describe('Subscription ID to sync'),
@@ -67,9 +61,7 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_subscription_pause',
 			title: 'Pause Subscription',
-			description:
-				'Pause an active subscription. Optionally set a date to auto-resume. ' +
-				'Only active subscriptions can be paused.',
+			description: 'Pause an active subscription. Optionally set a date to auto-resume.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID that owns the subscription'),
 				subscription_id: z.number().describe('Subscription ID to pause'),
@@ -85,9 +77,7 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_subscription_reactivate',
 			title: 'Reactivate Subscription',
-			description:
-				'Reactivate a cancelled or expired subscription. ' +
-				'Creates a new billing cycle from the reactivation date.',
+			description: 'Reactivate a cancelled or expired subscription. Creates a new billing cycle.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID that owns the subscription'),
 				subscription_id: z.number().describe('Subscription ID to reactivate'),

@@ -8,9 +8,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_list_addons',
 			title: 'List Integration Addons',
 			description:
-				'Retrieve all available integration addons and their status. ' +
-				'Returns addon metadata including name, description, logo, category, ' +
-				'whether the required plugin is installed, and current configuration status.',
+				'Get all integration addons with metadata: name, category, install status, and config state.',
 			schema: z.object({}),
 			endpoint: '/integration/addons',
 		}),
@@ -19,9 +17,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_global_settings',
 			title: 'Get Integration Global Settings',
 			description:
-				'Retrieve global settings for a specific integration by its settings key. ' +
-				'Returns current configuration values and field definitions (type, label, tips). ' +
-				'Field types: text, password, select, link, authenticate-button.',
+				'Get global settings for an integration by key. Field types: text, password, select, link, authenticate-button.',
 			schema: z.object({
 				settings_key: z
 					.string()
@@ -34,9 +30,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_save_global_settings',
 			title: 'Save Integration Global Settings',
 			description:
-				'Update global settings for a specific integration. ' +
-				'Pass settings_key plus integration-specific fields as top-level properties. ' +
-				'Field names vary per integration — use get_global_settings first to discover them.',
+				'Update global settings for an integration. Use get_global_settings first to discover fields.',
 			schema: z.object({
 				settings_key: z.string().describe('Integration key (e.g. "fakturownia")'),
 				settings: z
@@ -51,9 +45,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_global_feeds',
 			title: 'Get Global Integration Feeds',
 			description:
-				'Retrieve all global-level integration feeds. ' +
-				'Global feeds run on order-level events (e.g. order_paid_done, order_refunded) ' +
-				'unlike product feeds which are scoped to specific products.',
+				'Get all global-level integration feeds. Global feeds run on order events, not product-scoped.',
 			schema: z.object({}),
 			endpoint: '/integration/global-feeds',
 		}),
@@ -62,9 +54,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_feed_settings',
 			title: 'Get Integration Feed Settings',
 			description:
-				'Retrieve settings and field definitions for a specific integration feed. ' +
-				'Pass integration_name to get a blank template for creating a new feed, ' +
-				'or additionally pass integration_id to load an existing feed for editing.',
+				'Get feed settings/template. Pass integration_name for blank template, add integration_id for existing feed.',
 			schema: z.object({
 				integration_name: z
 					.string()
@@ -81,10 +71,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_integration_save_feed_settings',
 			title: 'Save Integration Feed Settings',
-			description:
-				'Create or update an integration feed configuration. ' +
-				'Use get_feed_settings first to discover available fields for the integration provider. ' +
-				'Include integration_id in the body to update an existing feed, omit to create new.',
+			description: 'Create or update a feed. Include integration_id to update, omit to create new.',
 			schema: z.object({
 				integration_id: z.number().optional().describe('Feed ID (omit to create new feed)'),
 				integration_name: z.string().optional().describe('Integration provider name'),
@@ -111,7 +98,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 		deleteTool(client, {
 			name: 'fluentcart_integration_delete_feed',
 			title: 'Delete Integration Feed',
-			description: 'Permanently delete a global integration feed. This action cannot be undone.',
+			description: 'Permanently delete a global integration feed. Cannot be undone.',
 			schema: z.object({
 				integration_id: z.number().describe('Integration feed ID to delete'),
 			}),
@@ -122,9 +109,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_feed_lists',
 			title: 'Get Feed Lists',
 			description:
-				'Retrieve available lists for a specific integration provider. ' +
-				'Returns mailing lists, contact groups, tags, or similar collections ' +
-				'depending on the provider (e.g. FluentCRM lists, Mailchimp audiences).',
+				'Get available lists for a provider (e.g. FluentCRM lists, Mailchimp audiences).',
 			schema: z.object({
 				provider: z.string().describe('Integration provider name (e.g. "fluent-crm")'),
 			}),
@@ -135,9 +120,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_dynamic_options',
 			title: 'Get Dynamic Options',
 			description:
-				'Retrieve dynamic select options for integration feed fields. ' +
-				'Used when a feed field depends on a remote data source ' +
-				'(e.g. fetching CRM tags, membership levels, or course lists).',
+				'Get dynamic select options for feed fields that depend on remote data (e.g. CRM tags, courses).',
 			schema: z.object({
 				option_key: z.string().optional().describe('The option key to fetch values for'),
 				search: z.string().optional().describe('Search term to filter options'),
@@ -150,9 +133,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_chained_data',
 			title: 'Get Chained Data',
 			description:
-				'Retrieve chained/dependent data for integration feed fields. ' +
-				'Used when selecting a value in one field determines the options in another ' +
-				'(e.g. selecting a list then loading its fields or segments).',
+				'Get dependent data for feed fields where one selection determines another (e.g. list then segments).',
 			schema: z.object({
 				data: z
 					.record(z.string(), z.unknown())
@@ -166,8 +147,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_install_plugin',
 			title: 'Install Integration Plugin',
 			description:
-				'Install a required integration plugin from WordPress.org. ' +
-				'Requires super admin permissions. Use list_addons first to find the addon_key.',
+				'Install a required plugin from WordPress.org. Requires super admin. Use list_addons to find addon_key.',
 			schema: z.object({
 				addon_key: z.string().describe('Plugin key to install (from addon metadata)'),
 			}),

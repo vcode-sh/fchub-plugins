@@ -1,0 +1,181 @@
+---
+title: Cart & Checkout Filters
+description: Filters for the checkout funnel — totals, address fields, and page styling. Where browsing becomes buying (or abandoning).
+icon: CreditCard
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+The checkout is the narrowest part of the funnel and the most sensitive. These filters let you tamper with cart totals, address form fields, and page-level CSS classes. Every modification here sits directly between the customer's intention to pay and the actual payment. Mess it up and you get cart abandonment. Get it right and nobody notices — which is the highest compliment checkout UX can receive.
+
+## estimated_total
+
+`fluent_cart/cart/estimated_total` — Modify the cart's calculated total.
+
+**Runs when:** The cart total is being calculated, after subtotals, taxes, and discounts have been applied. This is the final number the customer sees before they hit "Pay". You're modifying cents, not formatted strings.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$total` | `int` | The cart total in cents |
+| `$data` | `array` | Context including the cart object |
+
+**Returns:** `int` — The modified total in cents. Return a negative number if you fancy paying your customers. Return a float and watch PHP silently truncate it, which is exactly the kind of precision you want in financial calculations.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'cart' => [
+        'id'       => 123,
+        'subtotal' => 10000,  // $100.00
+        'tax'      => 1000,   // $10.00
+        'discount' => 500,    // $5.00
+    ],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/cart/estimated_total', function (int $total, array $data): int {
+    // Add a flat processing fee
+    $processingFee = 250; // $2.50
+
+    // Only apply the fee for totals under $50 — reward bigger spenders
+    if ($total < 5000) {
+        $total += $processingFee;
+    }
+
+    return $total;
+}, 10, 2);
+```
+
+This is one of the more dangerous filters in the entire system. You're directly modifying the amount the customer pays. Test this obsessively. If your filter throws an exception, the cart total might end up as zero, which is a genuinely terrible way to run a business.
+
+**Always return an integer.** The value is in cents. `$total = 100` means one dollar, not one hundred dollars. Get this wrong and either your customers get a very good deal or you get a very angry one.
+
+---
+
+## checkout_address_fields
+
+`fluent_cart/checkout_address_fields` — Modify the address fields shown during checkout.
+
+**Runs when:** The checkout form is being rendered. You receive the full set of address field definitions and can add, remove, reorder, or modify them. This controls what the customer fills in — and by extension, what address data you collect.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$fields` | `array` | Associative array of field definitions keyed by field name |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified fields. Remove `email` and you won't be able to send order confirmations. Remove `first_name` and your shipping labels will be delightfully impersonal.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$fields = [
+    'first_name' => [
+        'label'    => 'First Name',
+        'type'     => 'text',
+        'required' => true,
+    ],
+    'last_name' => [
+        'label'    => 'Last Name',
+        'type'     => 'text',
+        'required' => true,
+    ],
+    'email' => [
+        'label'    => 'Email',
+        'type'     => 'email',
+        'required' => true,
+    ],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/checkout_address_fields', function (array $fields, array $data): array {
+    // Add a company name field
+    $fields['company'] = [
+        'label'    => 'Company Name',
+        'type'     => 'text',
+        'required' => false,
+    ];
+
+    // Add a tax ID field for B2B customers
+    $fields['tax_id'] = [
+        'label'    => 'Tax ID / VAT Number',
+        'type'     => 'text',
+        'required' => false,
+    ];
+
+    // Make the phone field mandatory
+    if (isset($fields['phone'])) {
+        $fields['phone']['required'] = true;
+    }
+
+    return $fields;
+}, 10, 2);
+```
+
+Be mindful of the order — array key order determines field display order in most implementations. If you want your company field to appear after last_name, insert it after that key using array manipulation rather than just appending.
+
+---
+
+## checkout_page_css_classes
+
+`fluent_cart/checkout_page_css_classes` — Add or remove CSS classes on the checkout page container.
+
+**Runs when:** The checkout page is rendered. The classes are applied to the outermost checkout wrapper element. Useful for theme-specific styling, conditional layouts, or A/B testing different checkout designs.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$classes` | `array` | Array of CSS class strings |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified CSS classes. Not a string — an array. Each element is a single class name. Return a string and the template will probably just toString it into something useless.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$classes = [
+    'fluent-cart-checkout',
+    'checkout-page',
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/checkout_page_css_classes', function (array $classes, array $data): array {
+    // Add theme-specific class
+    $classes[] = 'theme-dark-checkout';
+
+    // Add a seasonal class for holiday styling
+    $month = (int) date('n');
+    if ($month === 12) {
+        $classes[] = 'checkout-festive';
+    }
+
+    // A/B test variant class
+    if (isset($_COOKIE['checkout_variant']) && $_COOKIE['checkout_variant'] === 'b') {
+        $classes[] = 'checkout-variant-b';
+    }
+
+    return $classes;
+}, 10, 2);
+```
+
+The least dangerous filter on this page. The worst that happens is your checkout looks slightly different. Compared to accidentally zeroing out the cart total, that's practically relaxing.

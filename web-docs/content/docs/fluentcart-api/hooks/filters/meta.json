@@ -1,0 +1,12 @@
+{
+  "title": "Filter Hooks",
+  "icon": "ListFilter",
+  "pages": [
+    "settings-configuration",
+    "orders-payments",
+    "products-pricing",
+    "cart-checkout",
+    "customers-subscriptions",
+    "integrations-advanced"
+  ]
+}

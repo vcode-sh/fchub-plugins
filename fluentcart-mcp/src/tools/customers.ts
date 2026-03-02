@@ -7,10 +7,7 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_customer_list',
 			title: 'List Customers',
-			description:
-				'Retrieve a paginated list of customers with optional filtering. ' +
-				'Returns customer summary with name, email, order count, and total spend. ' +
-				'Monetary values in smallest currency unit (cents).',
+			description: 'List customers with optional filtering by name, email, or keyword.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
@@ -19,6 +16,23 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 				order_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
 			}),
 			endpoint: '/customers',
+			transform: (data: unknown) => {
+				const resp = data as Record<string, unknown>
+				const wrapper = (resp?.customers ?? resp) as Record<string, unknown>
+				if (wrapper && Array.isArray(wrapper.data)) {
+					wrapper.data = (wrapper.data as Record<string, unknown>[]).map((item) => ({
+						id: item.id,
+						first_name: item.first_name,
+						last_name: item.last_name,
+						email: item.email,
+						full_name: item.full_name,
+						order_count: item.order_count,
+						total_spend: item.total_spend,
+						created_at: item.created_at,
+					}))
+				}
+				return resp
+			},
 		}),
 
 		postTool(client, {
@@ -46,13 +60,20 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_customer_get',
 			title: 'Get Customer',
-			description:
-				'Retrieve detailed customer information including addresses, labels, and stats. ' +
-				'LTV and monetary values in smallest currency unit (cents).',
+			description: 'Get detailed customer information including labels and stats.',
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 			}),
 			endpoint: '/customers/:customer_id',
+			transform: (data: unknown) => {
+				const resp = data as Record<string, unknown>
+				const customer = (resp?.customer ?? resp) as Record<string, unknown>
+				const { addresses, ...rest } = customer
+				const shaped = Array.isArray(addresses)
+					? { ...rest, address_count: (addresses as unknown[]).length }
+					: rest
+				return resp?.customer ? { ...resp, customer: shaped } : shaped
+			},
 		}),
 
 		putTool(client, {
@@ -81,25 +102,9 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 		}),
 
 		getTool(client, {
-			name: 'fluentcart_customer_orders_simple',
-			title: 'Get Customer Orders (Simple)',
-			description:
-				'Retrieve customer orders in a simplified format. ' +
-				'Use page/per_page to control result size.',
-			schema: z.object({
-				customer_id: z.number().describe('Customer ID'),
-				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
-			}),
-			endpoint: '/customers/:customer_id/order',
-		}),
-
-		getTool(client, {
 			name: 'fluentcart_customer_stats',
 			title: 'Get Customer Stats',
-			description:
-				'Retrieve statistics for a customer including order count and total spend. ' +
-				'Monetary values in smallest currency unit (cents).',
+			description: 'Get customer statistics including order count and total spend (in cents).',
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 			}),
@@ -109,9 +114,7 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_customer_recalculate_ltv',
 			title: 'Recalculate Customer LTV',
-			description:
-				'Recalculate the lifetime value for a customer. ' +
-				'LTV is stored in smallest currency unit (cents).',
+			description: 'Recalculate lifetime value for a customer. LTV stored in cents.',
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 			}),
@@ -158,28 +161,6 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 				country: z.string().optional().describe('ISO 3166-1 alpha-2 country code'),
 			}),
 			endpoint: '/customers/:customer_id/address',
-		}),
-
-		postTool(client, {
-			name: 'fluentcart_customer_address_add',
-			title: 'Add Customer Address (Alternative)',
-			description: 'Alternative endpoint to add a new address to a customer.',
-			schema: z.object({
-				customer_id: z.number().optional().describe('Customer ID'),
-				type: z.string().optional().describe('Address type: billing, shipping'),
-				name: z.string().describe('Full name (required)'),
-				email: z.string().describe('Email address (required)'),
-				label: z.string().optional().describe('Address label (e.g. Home, Office)'),
-				company_name: z.string().optional().describe('Company name'),
-				phone: z.string().optional().describe('Phone number'),
-				address_1: z.string().optional().describe('Address line 1'),
-				address_2: z.string().optional().describe('Address line 2'),
-				city: z.string().optional().describe('City'),
-				state: z.string().optional().describe('State/province'),
-				postcode: z.string().optional().describe('Postal code'),
-				country: z.string().optional().describe('ISO 3166-1 alpha-2 country code'),
-			}),
-			endpoint: '/customers/add-address',
 		}),
 
 		putTool(client, {
@@ -261,7 +242,7 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_customer_bulk_action',
 			title: 'Bulk Customer Actions',
 			description:
-				'Perform bulk actions on multiple customers. ' + 'Actions: update_status, delete, export.',
+				'Perform bulk actions on multiple customers. Actions: update_status, delete, export.',
 			schema: z.object({
 				action: z.string().describe('Bulk action: update_status, delete, export'),
 				customer_ids: z.array(z.number()).describe('Array of customer IDs'),

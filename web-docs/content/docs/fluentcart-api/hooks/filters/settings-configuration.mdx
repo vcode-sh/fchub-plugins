@@ -1,0 +1,240 @@
+---
+title: Settings & Configuration Filters
+description: Filters for bending admin settings, store config, and module management to your will.
+icon: Settings
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+Every application has a settings page. Most of them are boring. FluentCart's is no exception — but at least they had the decency to make it filterable. These hooks let you tamper with admin data, store defaults, settings fields, menu labels, and module options before they reach the UI. Think of it as interior decorating for your admin panel.
+
+## admin_app_data
+
+`fluent_cart/admin_app_data` — Modify the data blob passed to the admin Vue app on load.
+
+**Runs when:** The admin panel initialises. FluentCart serialises a big chunk of settings, currencies, user info, and permissions into a JavaScript object and hands it to the Vue app. This filter lets you intercept that handoff.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$adminLocalizeData` | `array` | The entire localisation payload heading to the admin JS app |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified admin app data. Whatever you return here gets `wp_localize_script`-ed into the page, so keep it serialisable.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$adminLocalizeData = [
+    'settings'    => [],
+    'currencies'  => [],
+    'user'        => [],
+    'permissions' => [],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/admin_app_data', function (array $adminLocalizeData, array $data): array {
+    // Inject a feature flag for your custom admin module
+    $adminLocalizeData['my_plugin'] = [
+        'enabled'   => true,
+        'api_base'  => rest_url('my-plugin/v1'),
+        'version'   => '1.2.0',
+    ];
+
+    return $adminLocalizeData;
+}, 10, 2);
+```
+
+Forget to return here and the entire admin app loads with no data. That's not a feature flag — that's a fire.
+
+---
+
+## store_settings/values
+
+`fluent_cart/store_settings/values` — Modify the default store settings values.
+
+**Runs when:** Store settings are retrieved — whether for display in the admin or for internal use. This is your chance to override defaults before they reach anything that cares about them.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$defaultSettings` | `array` | The store's current settings |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified settings. Must be the same shape or things will quietly break in ways you won't enjoy debugging.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$defaultSettings = [
+    'store_name'  => 'My Store',
+    'store_email' => '[email protected]',
+    'currency'    => 'USD',
+    'tax_enabled' => false,
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/store_settings/values', function (array $defaultSettings, array $data): array {
+    // Force a specific currency based on the visitor's locale
+    $locale = get_locale();
+
+    if (str_starts_with($locale, 'de_')) {
+        $defaultSettings['currency'] = 'EUR';
+    } elseif (str_starts_with($locale, 'en_GB')) {
+        $defaultSettings['currency'] = 'GBP';
+    }
+
+    return $defaultSettings;
+}, 10, 2);
+```
+
+Useful for multi-region setups, environment-based overrides, or that one client who insists on calling their store "The Emporium of Digital Wonders" only on Tuesdays.
+
+---
+
+## store_settings/fields
+
+`fluent_cart/store_settings/fields` — Add, remove, or modify settings fields in the admin UI.
+
+**Runs when:** The store settings form is rendered. Each field definition tells the Vue admin what inputs to display, so this is where you add your own settings sections or inject fields into existing ones.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$fields` | `array` | Grouped settings field definitions |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified fields array. Return something malformed and the settings page will render with the enthusiasm of a blank wall.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$fields = [
+    'general' => [
+        'title'  => 'General Settings',
+        'fields' => [
+            // Individual field definitions
+        ],
+    ],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/store_settings/fields', function (array $fields, array $data): array {
+    // Add an entire custom section with fields
+    $fields['analytics'] = [
+        'title'  => 'Analytics',
+        'fields' => [
+            [
+                'key'   => 'ga_tracking_id',
+                'label' => 'GA4 Measurement ID',
+                'type'  => 'text',
+                'tips'  => 'Starts with G-. You do have one of these, right?',
+            ],
+            [
+                'key'     => 'track_conversions',
+                'label'   => 'Track Conversions',
+                'type'    => 'select',
+                'options' => ['yes' => 'Yes', 'no' => 'No'],
+            ],
+        ],
+    ];
+
+    return $fields;
+}, 10, 2);
+```
+
+Remember: the Vue template only supports `text`, `password`, `select`, `link`, and `authenticate-button` field types. No checkboxes. Use a `select` with yes/no options instead. It's not elegant, but it works.
+
+---
+
+## admin_menu_title
+
+`fluent_cart/admin_menu_title` — Change the WordPress admin sidebar menu label.
+
+**Runs when:** The admin menu is registered. If "FluentCart" doesn't match your brand, your client's expectations, or your aesthetic sensibilities, this is where you fix it.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$menuTitle` | `string` | The default menu title (`'FluentCart'`) |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `string` — The new menu title. Returning an empty string is technically valid but spiritually questionable.
+
+**Example:**
+
+```php
+add_filter('fluent_cart/admin_menu_title', function (string $menuTitle, array $data): string {
+    // White-label the admin menu for a client
+    return 'Store Manager';
+}, 10, 2);
+```
+
+Short, sweet, harmless. The rare filter where forgetting to return merely leaves a blank menu item instead of destroying civilisation.
+
+---
+
+## module_setting/fields
+
+`fluent_cart/module_setting/fields` — Modify the fields displayed in module settings.
+
+**Runs when:** Module settings are rendered in the admin. Modules are FluentCart's internal feature toggles — licensing, subscriptions, shipping, and so on. This filter lets you bolt on extra configuration options.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$fields` | `array` | Array of module field definitions |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified fields array. Same field-type constraints as store settings apply here.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$fields = [
+    [
+        'key'   => 'module_enabled',
+        'label' => 'Enable Module',
+        'type'  => 'checkbox',
+    ],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/module_setting/fields', function (array $fields, array $data): array {
+    // Add a debug toggle to module settings
+    $fields[] = [
+        'key'     => 'verbose_logging',
+        'label'   => 'Verbose Logging',
+        'type'    => 'select',
+        'options' => ['no' => 'Disabled', 'yes' => 'Enabled'],
+        'tips'    => 'Logs everything. Useful for debugging, terrible for your disk space.',
+    ];
+
+    return $fields;
+}, 10, 2);
+```

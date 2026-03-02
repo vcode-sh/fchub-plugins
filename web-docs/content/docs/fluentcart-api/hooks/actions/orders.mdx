@@ -1,0 +1,563 @@
+---
+title: Order Hooks
+description: Every hook that fires during the beautiful chaos of an order's lifecycle — from birth to refund.
+icon: ShoppingBag
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+Orders are the beating heart of your store — or the source of most of your support tickets, depending on your outlook. These action hooks fire at every meaningful moment in an order's lifecycle: creation, payment, status changes, refunds, and the inevitable deletion when someone decides they didn't actually want that thing after all.
+
+All hooks receive a single `$data` array parameter. Amounts are in the smallest currency unit (cents, pence, whatever your currency calls its smallest denomination).
+
+---
+
+## order_created
+
+`fluent_cart/order_created` — A fresh order enters the world
+
+**Fires when:** A new order record is inserted into the database, **before** any payment processing kicks off. The order exists, but nobody's paid for anything yet. Think of it as the "intent to purchase" moment — optimistic, but unproven.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order, customer, and transaction data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'customer_id' => 456,
+        'status' => 'processing',
+        'payment_status' => 'pending',
+        'total' => 10000,          // in cents
+        'currency' => 'USD',
+        'customer' => [],           // Customer model
+        'shipping_address' => [],   // Address model
+        'billing_address' => []     // Address model
+    ],
+    'customer' => [],               // Customer model
+    'transaction' => []             // Transaction model
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/order_created', function ($data) {
+    $order = $data['order'];
+
+    // Push to an external warehouse/ERP system for pre-allocation
+    wp_remote_post('https://erp.example.com/api/orders', [
+        'body' => json_encode([
+            'external_id' => $order->id,
+            'customer_id' => $order->customer_id,
+            'total'       => $order->total,
+            'currency'    => $order->currency,
+        ]),
+        'headers' => ['Content-Type' => 'application/json'],
+    ]);
+}, 10, 1);
+```
+
+This fires for *every* order, including ones that will never get paid. Don't trigger fulfilment here — that's what `order_paid_done` is for.
+
+---
+
+## order_paid_done
+
+`fluent_cart/order_paid_done` — Money has actually changed hands
+
+**Fires when:** The order's payment status flips to `paid` and payment processing is complete. This is the real deal — the customer's card has been charged, the bank transfer landed, or whatever your gateway considers "done." For subscriptions, this fires on the initial payment and on each renewal.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order with items, customer, and transaction data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'customer_id' => 456,
+        'payment_status' => 'paid',
+        'total' => 10000,
+        'customer' => [],
+        'order_items' => [],        // Array of OrderItem models
+        'shipping_address' => [],
+        'billing_address' => []
+    ],
+    'customer' => [],
+    'transaction' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/order_paid_done', function ($data) {
+    $order = $data['order'];
+
+    // Enrol the customer in an external course platform
+    foreach ($order->order_items as $item) {
+        $courseId = get_post_meta($item->product_id, '_linked_course_id', true);
+        if ($courseId) {
+            enrol_user_in_course($order->customer_id, $courseId);
+        }
+    }
+}, 10, 1);
+```
+
+This is where most integration logic belongs. FluentCart's own integration system (`fluent_cart/integration/run/{provider}`) fires after this hook, so if you're building a proper integration module, use that instead. But for quick custom logic, this is your hook.
+
+---
+
+## order_updated
+
+`fluent_cart/order_updated` — Something changed on an existing order
+
+**Fires when:** Any order data is modified and persisted to the database. Could be a status change, address update, note added — anything. You get both the current and previous state, so you can diff to your heart's content.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Current order and previous order state |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'customer_id' => 456,
+        'status' => 'completed',
+        'updated_at' => '2025-01-15 10:30:00'
+    ],
+    'old_order' => [
+        'id' => 123,
+        'status' => 'processing'
+    ]
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/order_updated', function ($data) {
+    $order    = $data['order'];
+    $oldOrder = $data['old_order'];
+
+    // Sync status changes to an external fulfilment service
+    if ($order->status !== $oldOrder->status) {
+        wp_remote_post('https://fulfilment.example.com/api/status', [
+            'body' => json_encode([
+                'order_id'   => $order->id,
+                'old_status' => $oldOrder->status,
+                'new_status' => $order->status,
+            ]),
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+    }
+}, 10, 1);
+```
+
+This fires on *any* update, not just status changes. If you only care about status transitions, use `order_status_changed` instead — it's more targeted and won't wake up your code every time someone edits a billing address.
+
+---
+
+## order_deleted
+
+`fluent_cart/order_deleted` — An order is being wiped from existence
+
+**Fires when:** An order is about to be permanently deleted from the database. This fires *before* the actual deletion, so the order data is still accessible. Last chance to clean up related records, audit logs, or shed a quiet tear.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order, customer, and connected order IDs |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'customer_id' => 456,
+        'customer' => [],
+        'shipping_address' => [],
+        'billing_address' => []
+    ],
+    'customer' => [],
+    'connected_order_ids' => [124, 125]  // Renewal/related orders
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/order_deleted', function ($data) {
+    $order = $data['order'];
+
+    // Clean up custom meta and external references
+    global $wpdb;
+    $wpdb->delete("{$wpdb->prefix}custom_order_tracking", [
+        'order_id' => $order->id,
+    ]);
+
+    // Notify external systems to purge their records too
+    wp_remote_request('https://erp.example.com/api/orders/' . $order->id, [
+        'method' => 'DELETE',
+    ]);
+}, 10, 1);
+```
+
+Note the `connected_order_ids` — these are renewal or related orders tied to the same subscription/parent. If you're cleaning up, you probably want to handle those too.
+
+---
+
+## order_canceled
+
+`fluent_cart/order_canceled` — The customer (or admin) changed their mind
+
+**Fires when:** An order's status is explicitly set to `canceled`. This is a deliberate action, not a timeout or payment failure — someone actively decided this order shouldn't proceed.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Canceled order and customer data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'customer_id' => 456,
+        'status' => 'canceled',
+        'customer' => [],
+        'shipping_address' => [],
+        'billing_address' => []
+    ],
+    'customer' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/order_canceled', function ($data) {
+    $order = $data['order'];
+
+    // Revoke any access that was provisionally granted
+    $userId = get_user_meta_by_customer_id($order->customer_id);
+    if ($userId) {
+        revoke_provisional_access($userId, $order->id);
+    }
+
+    // Tag in CRM for win-back campaign
+    if (function_exists('fluentcrm')) {
+        $contact = FluentCrm\App\Models\Subscriber::where('email', $order->customer->email)->first();
+        if ($contact) {
+            $contact->attachTags([get_tag_id('order-canceled')]);
+        }
+    }
+}, 10, 1);
+```
+
+---
+
+## order_status_changed
+
+`fluent_cart/order_status_changed` — The order status transition hook
+
+**Fires when:** An order's status changes to any different value. Unlike `order_updated`, this only fires for actual status transitions — not every random field edit. You get old and new status strings, which makes conditional logic clean and simple.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order, status strings, stock flag, and activity log |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'status' => 'completed'
+    ],
+    'old_status' => 'processing',
+    'new_status' => 'completed',
+    'manageStock' => true,       // Whether stock was adjusted
+    'activity' => []             // Activity log entry
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/order_status_changed', function ($data) {
+    $order = $data['order'];
+
+    // Send a Slack notification when orders are completed
+    if ($data['new_status'] === 'completed') {
+        wp_remote_post('https://hooks.slack.com/services/XXX/YYY/ZZZ', [
+            'body' => json_encode([
+                'text' => sprintf(
+                    'Order #%d completed — %s %s',
+                    $order->id,
+                    $order->currency,
+                    number_format($order->total / 100, 2)
+                ),
+            ]),
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+    }
+}, 10, 1);
+```
+
+If you only care about one specific transition (e.g., anything -> completed), check `$data['new_status']` and bail early. No point running logic for every status change if you only care about one.
+
+---
+
+## payment_status_changed
+
+`fluent_cart/payment_status_changed` — The payment status shifted
+
+**Fires when:** An order's payment status changes to a different value. This is the general-purpose payment transition hook — covers every possible status change in one place.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order, status strings, stock flag, and activity |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'payment_status' => 'paid'
+    ],
+    'old_status' => 'pending',
+    'new_status' => 'paid',
+    'manageStock' => true,
+    'activity' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/payment_status_changed', function ($data) {
+    // Log all payment transitions for audit trail
+    $logEntry = sprintf(
+        '[%s] Order #%d payment: %s -> %s',
+        current_time('mysql'),
+        $data['order']->id,
+        $data['old_status'],
+        $data['new_status']
+    );
+
+    file_put_contents(
+        WP_CONTENT_DIR . '/payment-audit.log',
+        $logEntry . PHP_EOL,
+        FILE_APPEND | LOCK_EX
+    );
+}, 10, 1);
+```
+
+---
+
+## payment_status_changed_to_&#123;status&#125;
+
+`fluent_cart/payment_status_changed_to_{status}` — Payment hit a specific status
+
+**Fires when:** The payment status changes to one specific value. This is the targeted version of `payment_status_changed` — subscribe to exactly the transition you care about, skip the `if` statement entirely. A small victory, but victories are victories.
+
+**Available statuses:** `pending`, `paid`, `partially_paid`, `failed`, `refunded`, `partially_refunded`, `authorized`
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order and status transition data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [
+        'id' => 123,
+        'payment_status' => 'paid'
+    ],
+    'old_status' => 'pending',
+    'new_status' => 'paid'
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+// Trigger fulfilment only when payment is confirmed
+add_action('fluent_cart/payment_status_changed_to_paid', function ($data) {
+    $order = $data['order'];
+
+    // Queue async fulfilment job
+    as_enqueue_async_action('process_order_fulfilment', [
+        'order_id' => $order->id,
+    ], 'fulfilment');
+}, 10, 1);
+
+// Alert the team when a payment fails
+add_action('fluent_cart/payment_status_changed_to_failed', function ($data) {
+    wp_mail(
+        get_option('admin_email'),
+        'Payment Failed — Order #' . $data['order']->id,
+        'A payment attempt has failed. Check the gateway logs.'
+    );
+}, 10, 1);
+```
+
+Using the status-specific variant is cleaner than a big `switch` statement inside `payment_status_changed`. Pick the one that matches your use case and move on.
+
+---
+
+## order_fully_refunded
+
+`fluent_cart/order_fully_refunded` — Full refund processed
+
+**Fires when:** An order receives a complete refund — every last penny returned. This is the nuclear option of refunds. If you granted access, sent a licence key, or did anything based on the original payment, this is where you undo all of it.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order, refund details, transaction, and customer |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [],                 // Order model
+    'refunded_items' => [],        // All previously refunded items
+    'new_refunded_items' => [],    // Items refunded in this action
+    'refunded_amount' => 10000,    // Total refunded (cents)
+    'manage_stock' => true,        // Whether to restore stock
+    'transaction' => [],           // Refund transaction
+    'customer' => [],              // Customer model
+    'type' => 'full'               // Always 'full'
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/order_fully_refunded', function ($data) {
+    $order    = $data['order'];
+    $customer = $data['customer'];
+
+    // Revoke all access granted by this order
+    revoke_order_access($order->id);
+
+    // Deactivate any licence keys
+    deactivate_licences_for_order($order->id);
+
+    // Notify the customer
+    wp_mail(
+        $customer->email,
+        'Refund Processed — Order #' . $order->id,
+        sprintf(
+            'Your refund of %s %s has been processed.',
+            $order->currency,
+            number_format($data['refunded_amount'] / 100, 2)
+        )
+    );
+}, 10, 1);
+```
+
+FluentCart's built-in integration system also fires on full refunds, so if you're using integration feeds, your cleanup logic might already be handled. Check before you double-revoke.
+
+---
+
+## order_partially_refunded
+
+`fluent_cart/order_partially_refunded` — Partial refund processed
+
+**Fires when:** An order gets a partial refund — some items or a partial amount returned, but not the full order. The data structure mirrors `order_fully_refunded`, but `type` is `partial` and the refunded amount won't match the order total.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Order, refund details, transaction, and customer |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'order' => [],
+    'refunded_items' => [],
+    'new_refunded_items' => [],
+    'refunded_amount' => 3000,     // Partial amount (cents)
+    'manage_stock' => true,
+    'transaction' => [],
+    'customer' => [],
+    'type' => 'partial'
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/order_partially_refunded', function ($data) {
+    $order = $data['order'];
+
+    // Check which specific items were refunded and revoke only those
+    foreach ($data['new_refunded_items'] as $item) {
+        $courseId = get_post_meta($item->product_id, '_linked_course_id', true);
+        if ($courseId) {
+            unenrol_user_from_course($order->customer_id, $courseId);
+        }
+    }
+
+    // Log for accounting reconciliation
+    as_enqueue_async_action('sync_partial_refund_to_accounting', [
+        'order_id'        => $order->id,
+        'refunded_amount' => $data['refunded_amount'],
+        'items'           => wp_list_pluck($data['new_refunded_items'], 'product_id'),
+    ], 'accounting');
+}, 10, 1);
+```
+
+Partial refunds are trickier than full ones — you need to figure out *what* was refunded and adjust access accordingly. The `new_refunded_items` array tells you exactly which items were part of this specific refund action, while `refunded_items` contains the cumulative history.

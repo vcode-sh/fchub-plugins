@@ -1,0 +1,278 @@
+---
+title: Products & Pricing Filters
+description: Filters for currency, cart buttons, stock availability, downloads, and coupon validation. The catalogue's control panel.
+icon: Tag
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+The product catalogue is the storefront's raison d'etre, and these filters let you fiddle with nearly every aspect of it. Currency formatting, button labels, stock messages, download permissions, coupon validation — all the things that sit between "browsing" and "buying". If you're building a store that does anything slightly non-standard (so, every store), you'll be here a lot.
+
+## global_currency_setting
+
+`fluent_cart/global_currency_setting` — Override the store's currency formatting settings.
+
+**Runs when:** Currency settings are retrieved for formatting prices. This affects every price display across the entire store — product pages, cart, checkout, invoices, admin panels. Change it and everything changes.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$settings` | `array` | The complete currency configuration |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified currency settings. Get the `currency_position` wrong and you'll have customers seeing `00.50$` which is technically valid in some locales but aesthetically offensive in most.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$settings = [
+    'currency'            => 'USD',
+    'currency_sign'       => '$',
+    'currency_position'   => 'left',  // 'left', 'right', 'left_space', 'right_space'
+    'decimal_separator'   => '.',
+    'thousand_separator'  => ',',
+    'number_of_decimals'  => 2,
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/global_currency_setting', function (array $settings, array $data): array {
+    // Switch to euros with continental formatting
+    $settings['currency']           = 'EUR';
+    $settings['currency_sign']      = "\u{20AC}"; // Euro sign
+    $settings['currency_position']  = 'right_space';
+    $settings['decimal_separator']  = ',';
+    $settings['thousand_separator'] = '.';
+
+    return $settings;
+}, 10, 2);
+```
+
+This is a global override. If you need per-user or per-product currency switching, you'll want to hook this conditionally rather than blanket-replacing everything. Multi-currency is a rabbit hole — bring a torch.
+
+---
+
+## product/add_to_cart_text
+
+`fluent_cart/product/add_to_cart_text` — Change the "Add to Cart" button label.
+
+**Runs when:** The add-to-cart button is rendered on product pages. The product data is available in context, so you can vary the text per product.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$text` | `string` | The current button text |
+| `$data` | `array` | Context including the product |
+
+**Returns:** `string` — The new button text. Return an empty string if you want a mysterious, unlabelled button. Bold design choice.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'product' => [
+        'id'    => 123,
+        'title' => 'Product Name',
+        'price' => 5000,  // in cents
+    ],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/product/add_to_cart_text', function (string $text, array $data): string {
+    $product = $data['product'];
+
+    // Free products get a different CTA
+    if (($product['price'] ?? 0) === 0) {
+        return 'Get it Free';
+    }
+
+    // Subscriptions get subscription language
+    if (!empty($product['is_subscription'])) {
+        return 'Subscribe Now';
+    }
+
+    return 'Add to Basket';
+}, 10, 2);
+```
+
+British English users will silently thank you for "Basket" instead of "Cart". Everyone else won't notice. Such is localisation.
+
+---
+
+## product_stock_availability
+
+`fluent_cart/product_stock_availability` — Modify stock availability data for a product.
+
+**Runs when:** Stock availability is checked — on product pages, in the cart, and during checkout validation. You can override the availability flag, change the displayed message, or adjust the reported quantity.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$availability` | `array` | Stock availability data |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified availability. Setting `is_available` to `false` prevents the product from being purchased. Setting it to `true` when there's no stock is between you and your fulfilment team.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$availability = [
+    'is_available' => true,
+    'message'      => 'In Stock',
+    'quantity'     => 10,
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/product_stock_availability', function (array $availability, array $data): array {
+    $qty = $availability['quantity'];
+
+    if ($qty <= 0) {
+        $availability['is_available'] = false;
+        $availability['message']      = 'Sold out. Naturally.';
+    } elseif ($qty <= 3) {
+        $availability['message'] = "Only {$qty} left — tick tock.";
+    } elseif ($qty <= 10) {
+        $availability['message'] = 'Low stock';
+    } else {
+        $availability['message'] = 'In Stock';
+    }
+
+    return $availability;
+}, 10, 2);
+```
+
+Urgency messaging is an art form. "Only 2 left" converts better than "In Stock", but "Only 847 left" just looks desperate.
+
+---
+
+## product_download/can_be_downloaded
+
+`fluent_cart/product_download/can_be_downloaded` — Control whether a product file can be downloaded.
+
+**Runs when:** A customer (or admin) attempts to download a file attached to an order. This is the gatekeeper — return `false` and the download is blocked, no matter what.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$canBeDownloaded` | `bool` | Whether the download is currently allowed |
+| `$data` | `array` | Context with download, order, and customer info |
+
+**Returns:** `bool` — `true` to allow, `false` to block. Forgetting to return here means returning `null`, which PHP will coerce to `false`, which means nobody can download anything. That's not DRM — that's a bug.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'download' => [
+        'id'   => 1,
+        'name' => 'file.pdf',
+    ],
+    'order' => [
+        'id'             => 123,
+        'payment_status' => 'paid',
+    ],
+    'customer' => [],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/product_download/can_be_downloaded', function (bool $canBeDownloaded, array $data): bool {
+    // Block downloads for refunded orders
+    if (($data['order']['payment_status'] ?? '') === 'refunded') {
+        return false;
+    }
+
+    // Time-limit downloads to 30 days after purchase
+    $orderDate = strtotime($data['order']['created_at'] ?? 'now');
+    if (time() - $orderDate > 30 * DAY_IN_SECONDS) {
+        return false;
+    }
+
+    return $canBeDownloaded;
+}, 10, 2);
+```
+
+This is one of those filters where **you must return the value**. The implicit `null` return from a function without a return statement will silently disable all downloads. Ask me how I know.
+
+---
+
+## coupon/validating_coupon
+
+`fluent_cart/coupon/validating_coupon` — Add custom validation logic when a coupon is applied.
+
+**Runs when:** A coupon code is being validated before it's applied to the cart. FluentCart has already done its built-in checks (expiry, usage limits, etc.) — this filter runs after those, letting you add extra conditions.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$isValid` | `bool` | Whether the coupon passed built-in validation |
+| `$data` | `array` | The coupon object and current cart state |
+
+**Returns:** `bool` — `true` to accept, `false` to reject. Returning `false` when FluentCart said `true` overrides the built-in validation. Returning `true` when FluentCart said `false` also overrides it — so be careful about unconditionally returning `true`.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'coupon' => [
+        'id'             => 999,
+        'code'           => 'SAVE20',
+        'discount_type'  => 'percentage',
+        'discount_value' => 20,
+    ],
+    'cart' => [],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/coupon/validating_coupon', function (bool $isValid, array $data): bool {
+    // Don't override if FluentCart already rejected it
+    if (!$isValid) {
+        return false;
+    }
+
+    $coupon = $data['coupon'];
+    $cart   = $data['cart'];
+
+    // Enforce a minimum order value of $50 for percentage discounts
+    if ($coupon['discount_type'] === 'percentage' && ($cart['total'] ?? 0) < 5000) {
+        return false;
+    }
+
+    // Restrict certain coupons to logged-in users
+    if (str_starts_with($coupon['code'], 'VIP') && !is_user_logged_in()) {
+        return false;
+    }
+
+    return $isValid;
+}, 10, 2);
+```
+
+Note the pattern: check `$isValid` first. If FluentCart already rejected the coupon, respect that decision unless you have a very good reason not to. Overriding a rejection means you're also overriding expiry dates, usage limits, and every other built-in safeguard.

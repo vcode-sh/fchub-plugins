@@ -1,0 +1,13 @@
+{
+  "title": "Action Hooks",
+  "icon": "Zap",
+  "pages": [
+    "orders",
+    "subscriptions-licenses",
+    "cart-checkout",
+    "customers-users",
+    "products-coupons",
+    "payments-integrations",
+    "admin-templates"
+  ]
+}

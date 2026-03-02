@@ -1,0 +1,6 @@
+{
+  "title": "Hooks",
+  "icon": "Webhook",
+  "defaultOpen": true,
+  "pages": ["index", "actions", "filters"]
+}

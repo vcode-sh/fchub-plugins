@@ -1,17 +1,19 @@
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import type { Express } from 'express'
-import { createServer } from '../server.js'
+import type { ToolsetMode } from '../server.js'
+import { createServerFromContext, resolveServerContext } from '../server.js'
 import { createBearerAuth } from './auth.js'
 
-export function createApp(host: string): Express {
+export function createApp(host: string, mode: ToolsetMode = 'static'): Express {
 	const app = createMcpExpressApp({ host })
+	const ctx = resolveServerContext()
 
 	const auth = createBearerAuth()
 	app.use('/mcp', auth)
 
 	app.post('/mcp', async (req, res) => {
-		const server = createServer()
+		const server = createServerFromContext(ctx, mode)
 		const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
 
 		res.on('close', () => {
@@ -24,7 +26,7 @@ export function createApp(host: string): Express {
 	})
 
 	app.get('/mcp', async (req, res) => {
-		const server = createServer()
+		const server = createServerFromContext(ctx, mode)
 		const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
 
 		res.on('close', () => {
@@ -47,8 +49,12 @@ export function createApp(host: string): Express {
 	return app
 }
 
-export async function startHttpServer(port: number, host: string): Promise<void> {
-	const app = createApp(host)
+export async function startHttpServer(
+	port: number,
+	host: string,
+	mode: ToolsetMode = 'static',
+): Promise<void> {
+	const app = createApp(host, mode)
 
 	return new Promise((resolve) => {
 		app.listen(port, host, () => {

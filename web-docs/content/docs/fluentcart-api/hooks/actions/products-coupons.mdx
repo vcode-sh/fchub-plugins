@@ -1,0 +1,190 @@
+---
+title: Product & Coupon Hooks
+description: Hooks for catalogue changes — product updates, stock movements, and the birth of discount codes.
+icon: Package
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+The catalogue side of things. These hooks fire when products are updated, stock levels change, and coupons are created. Not the most glamorous group — they don't involve money changing hands — but they're essential for keeping external systems in sync, managing inventory alerts, and tracking promotional activity.
+
+---
+
+## product_updated
+
+`fluent_cart/product_updated` — A product's data has been modified
+
+**Fires when:** Any product data is changed and saved to the database. This could be a title change, price update, description edit, or status toggle. It fires on *any* modification, so if you only care about specific fields, you'll need to compare values yourself.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Updated product data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'product' => [
+        'id' => 123,
+        'title' => 'Product Name',
+        'price' => 5000,          // in cents
+        'status' => 'published'
+    ]
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/product_updated', function ($data) {
+    $product = $data['product'];
+
+    // Invalidate any cached product data
+    wp_cache_delete('fct_product_' . $product->id, 'fluentcart');
+
+    // Sync product changes to an external storefront or marketplace
+    wp_remote_post('https://storefront.example.com/api/products/' . $product->id, [
+        'method'  => 'PUT',
+        'body'    => json_encode([
+            'title'  => $product->title,
+            'price'  => $product->price,
+            'status' => $product->status,
+        ]),
+        'headers' => [
+            'Content-Type'  => 'application/json',
+            'Authorization' => 'Bearer ' . STOREFRONT_API_KEY,
+        ],
+    ]);
+}, 10, 1);
+```
+
+This fires for admin-initiated edits, API updates, and programmatic changes alike. If you're making product changes in your own code, be aware that this hook will fire — avoid infinite loops by checking `doing_action('fluent_cart/product_updated')` or using a static flag.
+
+---
+
+## product_stock_changed
+
+`fluent_cart/product_stock_changed` — Stock levels have shifted
+
+**Fires when:** A product's stock quantity changes. This covers sales (stock decreases), restocks (stock increases), manual adjustments, and refund-related stock restorations. You get the before, after, and delta — everything you need to make decisions about inventory.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Product, stock values, and change delta |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'product' => [
+        'id' => 123,
+        'stock_quantity' => 50
+    ],
+    'old_stock' => 100,
+    'new_stock' => 50,
+    'change' => -50               // Negative = decrease, positive = increase
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/product_stock_changed', function ($data) {
+    $product  = $data['product'];
+    $newStock = $data['new_stock'];
+
+    // Low stock alert — different thresholds for different urgencies
+    if ($newStock <= 0) {
+        wp_mail(
+            get_option('admin_email'),
+            'OUT OF STOCK: ' . $product->title,
+            sprintf('Product #%d (%s) is now out of stock.', $product->id, $product->title)
+        );
+    } elseif ($newStock < 10) {
+        wp_mail(
+            get_option('admin_email'),
+            'Low Stock Warning: ' . $product->title,
+            sprintf(
+                'Product #%d (%s) has %d units remaining.',
+                $product->id,
+                $product->title,
+                $newStock
+            )
+        );
+    }
+
+    // Sync stock to external warehouse management system
+    wp_remote_post('https://wms.example.com/api/inventory', [
+        'body' => json_encode([
+            'sku'      => $product->sku ?? 'product-' . $product->id,
+            'quantity' => $newStock,
+            'delta'    => $data['change'],
+        ]),
+        'headers' => ['Content-Type' => 'application/json'],
+    ]);
+}, 10, 1);
+```
+
+The `change` field is your friend — negative means stock decreased (sale or manual reduction), positive means it increased (restock or refund). Use it to distinguish between "we sold some" and "we added more" without comparing old and new values.
+
+---
+
+## coupon_created
+
+`fluent_cart/coupon_created` — A new discount code enters the arena
+
+**Fires when:** A new coupon is created in FluentCart. This covers admin-created coupons, API-generated codes, and programmatically created ones. The coupon is fully persisted to the database by the time this fires.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Coupon data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'coupon' => [
+        'id' => 999,
+        'code' => 'SAVE20',
+        'discount_type' => 'percentage',    // 'percentage' or 'fixed'
+        'discount_value' => 20              // 20% or 20 cents, depending on type
+    ]
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/coupon_created', function ($data) {
+    $coupon = $data['coupon'];
+
+    // Audit trail for promotional activity
+    as_enqueue_async_action('log_coupon_creation', [
+        'coupon_id'      => $coupon->id,
+        'code'           => $coupon->code,
+        'discount_type'  => $coupon->discount_type,
+        'discount_value' => $coupon->discount_value,
+        'created_by'     => get_current_user_id(),
+    ], 'audit');
+
+    // Auto-distribute to affiliates if it's a partner code
+    if (str_starts_with($coupon->code, 'PARTNER-')) {
+        $affiliateId = extract_affiliate_id($coupon->code);
+        notify_affiliate_of_new_code($affiliateId, $coupon->code);
+    }
+}, 10, 1);
+```
+
+There's no `coupon_updated` or `coupon_deleted` hook documented here — if you need those, you'll have to watch the database more directly or petition the FluentCart team. For now, creation is the only coupon lifecycle event that gets a hook.

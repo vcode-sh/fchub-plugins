@@ -8,8 +8,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 			name: 'fluentcart_order_transactions',
 			title: 'Get Order Transactions',
 			description:
-				'Retrieve all transactions for a specific order. ' +
-				'Transaction types: charge, refund. ' +
+				'Get all transactions for an order. Types: charge, refund. ' +
 				'Statuses: succeeded, pending, failed, refunded, disputed.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
@@ -20,7 +19,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 		getTool(client, {
 			name: 'fluentcart_order_transaction_get',
 			title: 'Get Transaction Details',
-			description: 'Retrieve details of a specific transaction on an order.',
+			description: 'Get details of a specific transaction on an order.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 				transaction_id: z.number().describe('Transaction ID'),
@@ -32,8 +31,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 			name: 'fluentcart_order_transaction_update_status',
 			title: 'Update Transaction Status',
 			description:
-				'Update the status of a specific transaction. ' +
-				'Statuses: succeeded, pending, failed, refunded, disputed.',
+				'Update transaction status. Statuses: succeeded, pending, failed, refunded, disputed.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 				transaction_id: z.number().describe('Transaction ID'),
@@ -57,7 +55,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 			name: 'fluentcart_order_bulk_action',
 			title: 'Bulk Order Actions',
 			description:
-				'Perform bulk actions on multiple orders. ' + 'Actions: update_status, delete, export.',
+				'Perform bulk actions on multiple orders. Actions: update_status, delete, export.',
 			schema: z.object({
 				action: z.string().describe('Bulk action: update_status, delete, export'),
 				order_ids: z.array(z.number()).describe('Array of order IDs'),
@@ -72,7 +70,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 		postTool(client, {
 			name: 'fluentcart_order_calculate_shipping',
 			title: 'Calculate Shipping',
-			description: 'Calculate shipping costs for an order based on items and shipping address.',
+			description: 'Calculate shipping costs for an order based on items and address.',
 			schema: z.object({
 				items: z.array(z.record(z.string(), z.unknown())).optional().describe('Cart items'),
 				shipping_address: z
@@ -86,7 +84,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 		getTool(client, {
 			name: 'fluentcart_order_shipping_methods',
 			title: 'Get Shipping Methods',
-			description: 'Retrieve available shipping methods for order creation.',
+			description: 'Get available shipping methods for order creation.',
 			schema: z.object({}),
 			endpoint: '/orders/shipping_methods',
 		}),
@@ -94,9 +92,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 		getTool(client, {
 			name: 'fluentcart_order_customer_orders',
 			title: 'Get Customer Orders (Paginated)',
-			description:
-				'Retrieve paginated orders for a specific customer with filtering. ' +
-				'Monetary values in smallest currency unit (cents).',
+			description: 'Get paginated orders for a specific customer with filtering.',
 			schema: z.object({
 				customerId: z.number().describe('Customer ID'),
 				page: z.number().optional().describe('Page number'),

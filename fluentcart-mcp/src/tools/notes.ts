@@ -7,9 +7,7 @@ export function noteTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_note_attach',
 			title: 'Attach Note to Order',
-			description:
-				'Attach or update a note on an order. ' +
-				'Use for adding admin comments, internal memos, or status updates to an order.',
+			description: 'Attach or update a note on an order (admin comments, memos, status updates).',
 			schema: z.object({
 				order_id: z.number().describe('Order ID to attach the note to'),
 				note: z.string().describe('Note content'),

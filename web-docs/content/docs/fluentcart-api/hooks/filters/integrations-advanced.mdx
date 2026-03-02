@@ -1,0 +1,167 @@
+---
+title: Integrations & Advanced Filters
+description: Filters for third-party integrations, smartcode fallbacks, and storage drivers. The plumbing behind the plumbing.
+icon: Plug
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+These are the filters that live in the back rooms of FluentCart — integration registries, template fallbacks, and storage drivers. Most developers won't touch these unless they're building an integration plugin, extending the template engine, or replacing the file storage layer. If you're here, you're either building something interesting or debugging something unpleasant. Possibly both.
+
+## integration/get_global_integration_actions
+
+`fluent_cart/integration/get_global_integration_actions` — Modify the list of available integration actions.
+
+**Runs when:** The system retrieves the registry of global integration actions — typically when rendering the integrations settings page or when processing an order event that needs to fire integration feeds. This is how FluentCart knows which integrations exist and whether they're active.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$actions` | `array` | Associative array of integration actions keyed by provider slug |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified integration actions. If your integration disappears from this list, its feeds will silently stop processing. No errors, no warnings — just silence. Lovely.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$actions = [
+    'mailchimp' => [
+        'title'   => 'MailChimp',
+        'enabled' => true,
+    ],
+    'zapier' => [
+        'title'   => 'Zapier',
+        'enabled' => true,
+    ],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/integration/get_global_integration_actions', function (array $actions, array $data): array {
+    // Register a custom CRM integration
+    $actions['custom_crm'] = [
+        'title'   => 'Acme CRM',
+        'enabled' => true,
+    ];
+
+    // Disable an integration without removing it entirely
+    if (isset($actions['zapier'])) {
+        $actions['zapier']['enabled'] = false;
+    }
+
+    return $actions;
+}, 10, 2);
+```
+
+If you're building a full integration plugin, this filter is just one piece of the puzzle. You'll also need to hook into `fluent_cart/integration/order_integrations` (for backend processing) and `fluent_cart/integration/addons` (for the admin UI). Two registration systems for one integration — because why make it simple when you can make it robust.
+
+---
+
+## smartcode_fallback
+
+`fluent_cart/smartcode_fallback` — Provide fallback values for unresolvable smartcodes.
+
+**Runs when:** The template engine encounters a smartcode (placeholder variable) that it can't resolve. Rather than leaving a raw `{{smartcode}}` in the output — or worse, an empty string — this filter lets you intercept the failure and return something useful.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$fallback` | `string` | The current fallback value (usually empty) |
+| `$data` | `array` | Context including the smartcode identifier |
+
+**Returns:** `string` — The fallback value to use in place of the unresolved smartcode. Return the original `$fallback` if you don't recognise the code — don't break other plugins' fallback chains.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'code'    => 'custom_code',
+    'context' => [],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/smartcode_fallback', function (string $fallback, array $data): string {
+    // Handle your custom smartcodes
+    switch ($data['code']) {
+        case 'customer_tier':
+            return 'Standard'; // sensible default
+
+        case 'next_renewal':
+            return 'N/A';
+
+        case 'loyalty_balance':
+            return '0';
+    }
+
+    // Not ours — pass it along
+    return $fallback;
+}, 10, 2);
+```
+
+This is a rescue hook, not a registration hook. If you're creating custom smartcodes, register them properly through FluentCart's smartcode system. This filter is for when things go wrong — a safety net, not a trampoline.
+
+---
+
+## register_storage_drivers
+
+`fluent_cart/register_storage_drivers` — Register custom file storage backends.
+
+**Runs when:** The storage system initialises and builds its list of available drivers. By default, FluentCart stores files locally. This filter lets you add alternative backends — S3, Google Cloud Storage, DigitalOcean Spaces, or whatever other object store you've committed to.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$drivers` | `array` | Associative array of storage drivers keyed by identifier |
+| `$data` | `array` | Additional context (empty array) |
+
+**Returns:** `array` — The modified drivers array. Each driver needs at minimum a `title` and a `handler` class reference. The handler class needs to implement the storage interface, but that's between you and your code.
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$drivers = [
+    'local' => [
+        'title'   => 'Local Storage',
+        'handler' => 'LocalStorageHandler',
+    ],
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_filter('fluent_cart/register_storage_drivers', function (array $drivers, array $data): array {
+    // Add an S3-compatible storage driver
+    $drivers['s3'] = [
+        'title'   => 'Amazon S3',
+        'handler' => \MyPlugin\Storage\S3Handler::class,
+    ];
+
+    // Add a Cloudflare R2 driver
+    $drivers['r2'] = [
+        'title'   => 'Cloudflare R2',
+        'handler' => \MyPlugin\Storage\R2Handler::class,
+    ];
+
+    return $drivers;
+}, 10, 2);
+```
+
+This is the kind of filter you set up once and then forget about for years — until the day your S3 bucket gets misconfigured and every download link 403s. At which point you'll be very grateful you remembered where this code lives.
+
+Don't remove the `local` driver unless you're absolutely certain nothing references it. Existing files stored locally won't magically migrate themselves to your shiny new S3 backend.

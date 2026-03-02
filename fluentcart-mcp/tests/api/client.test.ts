@@ -260,6 +260,41 @@ describe('createClient', () => {
 		})
 	})
 
+	describe('X-Request-Id header', () => {
+		it('includes X-Request-Id header on GET requests', async () => {
+			const client = createClient(testConfig)
+			await client.get('/products')
+
+			const calledOptions = mockFetch.mock.calls[0][1] as RequestInit
+			const headers = calledOptions.headers as Record<string, string>
+			expect(headers).toHaveProperty('X-Request-Id')
+			expect(headers['X-Request-Id']).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+			)
+		})
+
+		it('includes X-Request-Id header on POST requests', async () => {
+			const client = createClient(testConfig)
+			await client.post('/products', { title: 'Test' })
+
+			const calledOptions = mockFetch.mock.calls[0][1] as RequestInit
+			const headers = calledOptions.headers as Record<string, string>
+			expect(headers['X-Request-Id']).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+			)
+		})
+
+		it('generates a unique X-Request-Id per request', async () => {
+			const client = createClient(testConfig)
+			await client.get('/products')
+			await client.get('/orders')
+
+			const headers1 = (mockFetch.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+			const headers2 = (mockFetch.mock.calls[1][1] as RequestInit).headers as Record<string, string>
+			expect(headers1['X-Request-Id']).not.toBe(headers2['X-Request-Id'])
+		})
+	})
+
 	describe('isPublic flag', () => {
 		it('uses publicBase URL when isPublic is true', async () => {
 			const client = createClient(testConfig)

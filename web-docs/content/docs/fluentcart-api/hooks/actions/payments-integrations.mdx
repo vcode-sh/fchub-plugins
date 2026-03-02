@@ -1,0 +1,132 @@
+---
+title: Payment & Integration Hooks
+description: Where custom payment gateways are born and third-party integrations get their marching orders.
+icon: CreditCard
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+Two hooks, but arguably the two most important ones if you're extending FluentCart beyond its built-in capabilities. The first lets you register entirely new payment gateways. The second powers the entire integration feed system — the mechanism through which FluentCart talks to external services after an order event.
+
+If you're building a FluentCart plugin (and not just hooking into order events), these are the hooks you'll live in.
+
+---
+
+## register_payment_methods
+
+`fluent_cart/register_payment_methods` — Time to register your payment gateway
+
+**Fires when:** FluentCart initialises its payment system and asks all registered gateways to identify themselves. This fires early in the request lifecycle, during `init`. If your gateway isn't registered here, it doesn't exist as far as FluentCart is concerned — it won't appear in settings, won't be available at checkout, and won't process any payments.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Empty array (registration context) |
+
+**Example:**
+
+```php
+add_action('fluent_cart/register_payment_methods', function ($data) {
+    // Register a custom payment gateway
+    $gateway = new \MyPlugin\Gateway\CustomGateway();
+
+    // The gateway class should extend AbstractPaymentGateway
+    // and implement all required methods:
+    // - getPaymentMethodKey()
+    // - getPaymentMethodTitle()
+    // - handlePayment()
+    // - handleIpn()
+    // - processRefund()
+
+    \FluentCart\App\Services\PaymentGateway\PaymentGatewayManager::register(
+        $gateway->getPaymentMethodKey(),
+        $gateway
+    );
+}, 10, 1);
+```
+
+Your gateway class needs to extend `AbstractPaymentGateway` and implement the full payment lifecycle: initialisation, payment handling, IPN/webhook callbacks, and refunds. It's not a trivial amount of code, but the interface is well-defined. Check the FluentCart source for `StripeGateway` or `PayPalGateway` as reference implementations — they cover every edge case you'll encounter.
+
+A common pattern is to register at a specific priority to control the order gateways appear in the admin UI and checkout:
+
+```php
+// Register after built-in gateways (priority 10) but before others
+add_action('fluent_cart/register_payment_methods', [$this, 'register'], 15, 1);
+```
+
+---
+
+## integration/run/&#123;provider&#125;
+
+`fluent_cart/integration/run/{provider}` — Execute an integration feed
+
+**Fires when:** FluentCart triggers a specific integration provider's feed. This is the core of the integration system — when an order event occurs (payment, refund, cancellation, etc.) and the customer's order matches a configured integration feed, FluentCart fires this action with all the context your integration needs.
+
+The `{'{provider}'}` part is your integration's unique identifier. If your provider key is `mailchimp`, the hook is `fluent_cart/integration/run/mailchimp`. If it's `fakturownia`, it's `fluent_cart/integration/run/fakturownia`. You get the idea.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Feed configuration, order, customer, and provider key |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'feed' => [],          // Integration feed settings (field mappings, config)
+    'order' => [],         // Order model with items, addresses, etc.
+    'customer' => [],      // Customer model
+    'provider' => 'your_provider_key'
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/integration/run/my_crm', function ($data) {
+    $feed     = $data['feed'];
+    $order    = $data['order'];
+    $customer = $data['customer'];
+
+    // The feed contains your integration's configured settings
+    $apiKey  = $feed['settings']['api_key'] ?? '';
+    $listId  = $feed['settings']['list_id'] ?? '';
+
+    if (!$apiKey || !$listId) {
+        return; // Misconfigured feed, bail quietly
+    }
+
+    // Push order data to CRM
+    $response = wp_remote_post('https://api.my-crm.com/v1/contacts', [
+        'body' => json_encode([
+            'email'      => $customer->email,
+            'first_name' => $customer->first_name,
+            'last_name'  => $customer->last_name,
+            'list_id'    => $listId,
+            'tags'       => ['fluentcart-customer'],
+            'custom_fields' => [
+                'last_order_id'    => $order->id,
+                'lifetime_value'   => $customer->total_spent ?? $order->total,
+                'last_order_total' => $order->total,
+            ],
+        ]),
+        'headers' => [
+            'Content-Type'  => 'application/json',
+            'Authorization' => 'Bearer ' . $apiKey,
+        ],
+    ]);
+
+    // Log the result for debugging
+    if (is_wp_error($response)) {
+        error_log('CRM sync failed for order #' . $order->id . ': ' . $response->get_error_message());
+    }
+}, 10, 1);
+```
+
+Building a proper integration module means you also need to register with `fluent_cart/integration/order_integrations` (for backend processing) and `fluent_cart/integration/addons` (for the admin UI). The `run/{provider}` hook is where the actual work happens, but without those two registrations, FluentCart won't know your integration exists and won't fire this hook.
+
+If you're building a full integration plugin, extend `BaseIntegrationManager` — it handles the dual registration, settings UI, and feed lifecycle for you. Using this hook directly is fine for quick one-off integrations, but for anything production-grade, the base class saves you from reinventing a fair amount of wheel.

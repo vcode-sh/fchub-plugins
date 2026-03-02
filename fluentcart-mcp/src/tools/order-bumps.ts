@@ -55,9 +55,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_order_bump_list',
 			title: 'List Order Bumps',
 			description:
-				'Retrieve a paginated list of order bump configurations. ' +
-				'Returns bump summaries with title, status, and associated product variant. ' +
-				'Statuses: active, draft.',
+				'List order bump configurations with status and variant info. Statuses: active, draft.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 15, max: 50)'),
@@ -74,9 +72,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_order_bump_get',
 			title: 'Get Order Bump',
-			description:
-				'Retrieve detailed information about a specific order bump including its config, ' +
-				'discount settings, display conditions, and associated product variant.',
+			description: 'Get order bump details: config, discount, conditions, and variant.',
 			schema: z.object({
 				id: z.number().describe('Order bump ID'),
 			}),
@@ -86,9 +82,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_order_bump_create',
 			title: 'Create Order Bump',
-			description:
-				'Create a new order bump configuration. Requires a title and a product variation ID ' +
-				'(src_object_id) for the promotional product. Returns the created bump with its new ID.',
+			description: 'Create an order bump. Requires title and src_object_id (product variation ID).',
 			schema: z.object({
 				title: z.string().describe('Bump offer title shown to customers at checkout'),
 				src_object_id: z.number().describe('Product variation ID to use as the bump offer product'),
@@ -107,9 +101,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_order_bump_update',
 			title: 'Update Order Bump',
-			description:
-				'Update an existing order bump configuration. Only provided fields are changed. ' +
-				'Use this to modify title, description, status, discount, conditions, or priority.',
+			description: 'Update an order bump. Only provided fields are changed.',
 			schema: z.object({
 				id: z.number().describe('Order bump ID to update'),
 				title: z.string().optional().describe('Bump offer title shown to customers'),
@@ -126,7 +118,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 		deleteTool(client, {
 			name: 'fluentcart_order_bump_delete',
 			title: 'Delete Order Bump',
-			description: 'Permanently delete an order bump configuration. This cannot be undone.',
+			description: 'Permanently delete an order bump. Cannot be undone.',
 			schema: z.object({
 				id: z.number().describe('Order bump ID to delete'),
 			}),

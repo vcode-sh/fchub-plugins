@@ -1,6 +1,7 @@
 import type { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
+import { cached } from '../cache.js'
 
 export interface ToolAnnotations {
 	readOnlyHint?: boolean
@@ -33,6 +34,7 @@ interface EndpointToolConfig extends BaseToolConfig {
 	endpoint: string
 	isPublic?: boolean
 	transform?: (data: unknown) => unknown
+	cache?: { key: string; ttlMs: number }
 }
 
 interface CustomToolConfig extends BaseToolConfig {
@@ -149,23 +151,53 @@ export function createTool(client: FluentCartClient, config: CustomToolConfig): 
 	}
 }
 
-export function getTool(client: FluentCartClient, config: EndpointToolConfig): ToolDefinition {
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
+const METHOD_ANNOTATIONS: Record<HttpMethod, ToolAnnotations> = {
+	GET: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+	POST: { openWorldHint: true },
+	PUT: { idempotentHint: true, openWorldHint: true },
+	DELETE: { destructiveHint: true, openWorldHint: true },
+}
+
+function createEndpointTool(
+	client: FluentCartClient,
+	method: HttpMethod,
+	config: EndpointToolConfig,
+): ToolDefinition {
 	return {
 		name: config.name,
 		title: config.title,
 		description: config.description,
 		schema: config.schema,
 		annotations: {
-			readOnlyHint: true,
-			idempotentHint: true,
-			openWorldHint: true,
+			...METHOD_ANNOTATIONS[method],
 			...config.annotations,
 		},
 		handler: async (input) => {
 			try {
 				const { path, rest } = resolveEndpoint(config.endpoint, input)
-				const response = await client.get(path, rest, config.isPublic)
-				const data = config.transform ? config.transform(response.data) : response.data
+				const fetcher = async () => {
+					let response: { data: unknown }
+					switch (method) {
+						case 'GET':
+							response = await client.get(path, rest, config.isPublic)
+							break
+						case 'POST':
+							response = await client.post(path, rest, config.isPublic)
+							break
+						case 'PUT':
+							response = await client.put(path, rest)
+							break
+						case 'DELETE':
+							response = await client.delete(path, rest)
+							break
+					}
+					return config.transform ? config.transform(response.data) : response.data
+				}
+				const data = config.cache
+					? await cached(config.cache.key, config.cache.ttlMs, fetcher)
+					: await fetcher()
 				return formatSuccess(data)
 			} catch (error) {
 				return formatError(error)
@@ -174,73 +206,14 @@ export function getTool(client: FluentCartClient, config: EndpointToolConfig): T
 	}
 }
 
-export function postTool(client: FluentCartClient, config: EndpointToolConfig): ToolDefinition {
-	return {
-		name: config.name,
-		title: config.title,
-		description: config.description,
-		schema: config.schema,
-		annotations: {
-			openWorldHint: true,
-			...config.annotations,
-		},
-		handler: async (input) => {
-			try {
-				const { path, rest } = resolveEndpoint(config.endpoint, input)
-				const response = await client.post(path, rest, config.isPublic)
-				const data = config.transform ? config.transform(response.data) : response.data
-				return formatSuccess(data)
-			} catch (error) {
-				return formatError(error)
-			}
-		},
-	}
-}
+export const getTool = (client: FluentCartClient, config: EndpointToolConfig): ToolDefinition =>
+	createEndpointTool(client, 'GET', config)
 
-export function putTool(client: FluentCartClient, config: EndpointToolConfig): ToolDefinition {
-	return {
-		name: config.name,
-		title: config.title,
-		description: config.description,
-		schema: config.schema,
-		annotations: {
-			idempotentHint: true,
-			openWorldHint: true,
-			...config.annotations,
-		},
-		handler: async (input) => {
-			try {
-				const { path, rest } = resolveEndpoint(config.endpoint, input)
-				const response = await client.put(path, rest)
-				const data = config.transform ? config.transform(response.data) : response.data
-				return formatSuccess(data)
-			} catch (error) {
-				return formatError(error)
-			}
-		},
-	}
-}
+export const postTool = (client: FluentCartClient, config: EndpointToolConfig): ToolDefinition =>
+	createEndpointTool(client, 'POST', config)
 
-export function deleteTool(client: FluentCartClient, config: EndpointToolConfig): ToolDefinition {
-	return {
-		name: config.name,
-		title: config.title,
-		description: config.description,
-		schema: config.schema,
-		annotations: {
-			destructiveHint: true,
-			openWorldHint: true,
-			...config.annotations,
-		},
-		handler: async (input) => {
-			try {
-				const { path, rest } = resolveEndpoint(config.endpoint, input)
-				const response = await client.delete(path, rest)
-				const data = config.transform ? config.transform(response.data) : response.data
-				return formatSuccess(data)
-			} catch (error) {
-				return formatError(error)
-			}
-		},
-	}
-}
+export const putTool = (client: FluentCartClient, config: EndpointToolConfig): ToolDefinition =>
+	createEndpointTool(client, 'PUT', config)
+
+export const deleteTool = (client: FluentCartClient, config: EndpointToolConfig): ToolDefinition =>
+	createEndpointTool(client, 'DELETE', config)

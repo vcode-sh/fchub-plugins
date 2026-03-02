@@ -1,0 +1,197 @@
+---
+title: Customer & User Hooks
+description: Hooks for when humans do human things — register, change emails, and update their status.
+icon: Users
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+FluentCart maintains its own customer records separate from WordPress users, though the two are linked. These hooks fire when customers register, change their email, or have their status updated. A modest collection, but each one covers a surprisingly common integration need.
+
+---
+
+## after_register
+
+`fluent_cart/user/after_register` — A new user has been created
+
+**Fires when:** A new WordPress user is registered through FluentCart's checkout or registration flow. The user account exists, the FluentCart customer record is linked, and both are saved to the database. This fires *after* everything is persisted — you're not racing against the database here.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | WordPress user and FluentCart customer data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'user' => [
+        'ID' => 789,
+        'user_email' => '[email protected]',
+        'user_login' => 'johndoe'
+    ],
+    'customer' => []     // FluentCart customer model
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/user/after_register', function ($data) {
+    $user     = $data['user'];
+    $customer = $data['customer'];
+
+    // Add to FluentCRM with source tracking
+    if (function_exists('fluentcrm')) {
+        $contact = FluentCrm\App\Models\Subscriber::updateOrCreate(
+            ['email' => $user->user_email],
+            [
+                'first_name' => $customer->first_name ?? '',
+                'last_name'  => $customer->last_name ?? '',
+                'status'     => 'subscribed',
+                'source'     => 'fluentcart_registration',
+            ]
+        );
+        $contact->attachLists([get_list_id('customers')]);
+    }
+
+    // Set default user meta
+    update_user_meta($user->ID, '_registered_via', 'fluentcart');
+    update_user_meta($user->ID, '_customer_id', $customer->id);
+}, 10, 1);
+```
+
+This is distinct from WordPress's native `user_register` hook. The FluentCart version guarantees that both the WP user *and* the FluentCart customer record exist and are linked. If you're using `user_register` and wondering why the customer record doesn't exist yet — this is the hook you actually want.
+
+---
+
+## customer_email_changed
+
+`fluent_cart/customer_email_changed` — The customer updated their email
+
+**Fires when:** A customer's email address is changed in FluentCart. You get both the old and new email, making it straightforward to update external systems, CRM records, mailing lists, and anywhere else the email is stored.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Customer, old email, and new email |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'customer' => [
+        'id' => 456,
+        'email' => '[email protected]'
+    ],
+    'old_email' => '[email protected]',
+    'new_email' => '[email protected]'
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/customer_email_changed', function ($data) {
+    $customer = $data['customer'];
+    $oldEmail = $data['old_email'];
+    $newEmail = $data['new_email'];
+
+    // Update the CRM contact
+    if (function_exists('fluentcrm')) {
+        $contact = FluentCrm\App\Models\Subscriber::where('email', $oldEmail)->first();
+        if ($contact) {
+            $contact->update(['email' => $newEmail]);
+        }
+    }
+
+    // Sync to external billing system
+    wp_remote_post('https://billing.example.com/api/customers/' . $customer->id, [
+        'method'  => 'PATCH',
+        'body'    => json_encode(['email' => $newEmail]),
+        'headers' => ['Content-Type' => 'application/json'],
+    ]);
+
+    // Audit trail
+    do_action('audit_log', 'customer_email_changed', [
+        'customer_id' => $customer->id,
+        'from'        => $oldEmail,
+        'to'          => $newEmail,
+    ]);
+}, 10, 1);
+```
+
+Email changes can break things if your external systems are keyed on email rather than customer ID. This hook is your chance to keep everything in sync. If you're not handling it and a customer changes their email... well, enjoy debugging why their CRM record doesn't match.
+
+---
+
+## customer_status_updated
+
+`fluent_cart/customer_status_updated` — Customer status has changed
+
+**Fires when:** A FluentCart customer's status is updated — typically between `active` and `inactive`. This might happen automatically (e.g., all subscriptions expire) or manually (admin action). You get both old and new status values.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Customer, old status, and new status |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'customer' => [
+        'id' => 456,
+        'status' => 'active'
+    ],
+    'old_status' => 'inactive',
+    'new_status' => 'active'
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/customer_status_updated', function ($data) {
+    $customer = $data['customer'];
+
+    // Adjust WordPress user capabilities based on customer status
+    $userId = get_user_meta_key_customer($customer->id);
+    if (!$userId) {
+        return;
+    }
+
+    $wpUser = new WP_User($userId);
+
+    if ($data['new_status'] === 'active') {
+        $wpUser->add_cap('access_premium_content');
+    } else {
+        $wpUser->remove_cap('access_premium_content');
+    }
+
+    // Update CRM segment
+    if (function_exists('fluentcrm')) {
+        $contact = FluentCrm\App\Models\Subscriber::where('email', $customer->email)->first();
+        if ($contact) {
+            if ($data['new_status'] === 'active') {
+                $contact->attachTags([get_tag_id('active-customer')]);
+                $contact->detachTags([get_tag_id('inactive-customer')]);
+            } else {
+                $contact->detachTags([get_tag_id('active-customer')]);
+                $contact->attachTags([get_tag_id('inactive-customer')]);
+            }
+        }
+    }
+}, 10, 1);
+```
+
+This is a high-level status for the customer *account*, not for individual orders or subscriptions. A customer can have active subscriptions but be marked inactive at the account level (admin override, fraud suspicion, etc.). Keep that distinction in mind when writing your logic.

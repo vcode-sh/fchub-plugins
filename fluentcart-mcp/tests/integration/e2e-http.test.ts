@@ -59,9 +59,9 @@ describe.skipIf(!hasCredentials)('E2E: MCP Protocol over HTTP', () => {
 		expect(caps!.tools).toBeDefined()
 	})
 
-	it('lists 200+ tools', async () => {
+	it('lists 190+ tools', async () => {
 		const result = await mcpClient.listTools()
-		expect(result.tools.length).toBeGreaterThanOrEqual(200)
+		expect(result.tools.length).toBeGreaterThanOrEqual(190)
 
 		const names = result.tools.map((t) => t.name)
 		expect(names).toContain('fluentcart_dashboard_overview')

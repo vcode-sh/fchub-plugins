@@ -7,9 +7,7 @@ export function publicTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_public_product_views',
 			title: 'Get Public Product Views',
-			description:
-				'Retrieve product view data for the storefront. No authentication required. ' +
-				'Returns publicly visible product information for frontend display.',
+			description: 'Get product view data for the storefront. No auth required.',
 			schema: z.object({}),
 			endpoint: '/public/product-views',
 			isPublic: true,
@@ -18,9 +16,7 @@ export function publicTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_public_product_search',
 			title: 'Search Public Products',
-			description:
-				'Search published products by name. No authentication required. ' +
-				'Returns matching products visible on the storefront.',
+			description: 'Search published products by name. No auth required.',
 			schema: z.object({
 				search: z.string().optional().describe('Search query to filter products by name'),
 			}),
@@ -31,10 +27,7 @@ export function publicTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_public_products',
 			title: 'List Public Products',
-			description:
-				'Retrieve publicly available products. No authentication required. ' +
-				'Returns the public product catalogue for storefront display. ' +
-				'Use page/per_page to control result size.',
+			description: 'Get public product catalogue for storefront. No auth required.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
@@ -47,8 +40,7 @@ export function publicTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_public_user_login',
 			title: 'User Login',
 			description:
-				'Frontend login endpoint. Authenticates a user by email and password, ' +
-				'returning customer data with an authentication token.',
+				'Frontend login: authenticate by email/password, returns customer data with token.',
 			schema: z.object({
 				email: z.string().describe('User email address'),
 				password: z.string().describe('User password'),

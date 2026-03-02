@@ -1,0 +1,306 @@
+---
+title: Subscription & Licence Hooks
+description: Hooks for the recurring revenue lifecycle — activations, renewals, cancellations, and the quiet dignity of expiration.
+icon: RefreshCw
+---
+
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+
+Subscriptions are where the real money lives. One-time purchases are nice, but recurring revenue is what keeps the lights on and the investors happy. These hooks cover every meaningful moment in a subscription's lifecycle, plus licence key renewals for the software licensing crowd.
+
+FluentCart fires subscription events at priority 10. If you're building an integration module (extending `BaseIntegrationManager`), your listeners should hook at priority 11 or later to ensure the core has finished its work before you start yours.
+
+---
+
+## subscription_activated
+
+`fluent_cart/subscription_activated` — A subscription springs to life
+
+**Fires when:** A subscription's status transitions to `active`. This happens on initial purchase (after successful payment) and when a previously paused or suspended subscription is reactivated. It's the green light — the customer is paying and expects access.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Subscription, customer, and order data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'subscription' => [
+        'id' => 789,
+        'customer_id' => 456,
+        'status' => 'active',
+        'plan_id' => 123,
+        'billing_interval' => 'month',
+        'next_payment_date' => '2025-02-15'
+    ],
+    'customer' => [],    // Customer model
+    'order' => []        // Originating order
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/subscription_activated', function ($data) {
+    $subscription = $data['subscription'];
+    $customer     = $data['customer'];
+
+    // Grant access to a members-only area
+    $userId = get_user_by('email', $customer->email)?->ID;
+    if ($userId) {
+        update_user_meta($userId, '_membership_level', 'premium');
+        update_user_meta($userId, '_membership_subscription_id', $subscription->id);
+    }
+
+    // Add to a FluentCRM tag for segmented email campaigns
+    if (function_exists('fluentcrm')) {
+        $contact = FluentCrm\App\Models\Subscriber::where('email', $customer->email)->first();
+        if ($contact) {
+            $contact->attachTags([get_tag_id('active-subscriber')]);
+        }
+    }
+}, 11, 1);
+```
+
+This fires for both new activations *and* reactivations. If you need to distinguish between the two, check whether the subscription has previous renewal history or compare `created_at` with `updated_at`.
+
+---
+
+## subscription_renewed
+
+`fluent_cart/subscription_renewed` — Another billing cycle, another payment
+
+**Fires when:** A subscription renewal payment is successfully processed. The subscription remains active, the `next_payment_date` has been bumped forward, and the transaction record exists. This is the recurring revenue moment — the one that makes SaaS founders weep with joy.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Subscription, customer, order, and transaction |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'subscription' => [
+        'id' => 789,
+        'customer_id' => 456,
+        'status' => 'active',
+        'next_payment_date' => '2025-02-15'
+    ],
+    'customer' => [],
+    'order' => [],
+    'transaction' => []    // The renewal transaction
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/subscription_renewed', function ($data) {
+    $subscription = $data['subscription'];
+    $transaction  = $data['transaction'];
+
+    // Extend access expiry to match new billing period
+    $userId = get_user_by_customer_id($subscription->customer_id);
+    if ($userId) {
+        update_user_meta(
+            $userId,
+            '_access_expires',
+            $subscription->next_payment_date
+        );
+    }
+
+    // Sync renewal to accounting
+    as_enqueue_async_action('sync_renewal_to_xero', [
+        'subscription_id' => $subscription->id,
+        'transaction_id'  => $transaction->id,
+        'amount'          => $transaction->total,
+    ], 'accounting');
+}, 11, 1);
+```
+
+---
+
+## subscription_canceled
+
+`fluent_cart/subscription_canceled` — The customer has opted out
+
+**Fires when:** A subscription's status changes to `canceled`. This is a deliberate action — someone (customer or admin) has explicitly cancelled. The subscription won't renew, but depending on your business model, the customer might retain access until the current period ends.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Subscription, customer, and order data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'subscription' => [
+        'id' => 789,
+        'customer_id' => 456,
+        'status' => 'canceled',
+        'canceled_at' => '2025-01-15 10:30:00'
+    ],
+    'customer' => [],
+    'order' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/subscription_canceled', function ($data) {
+    $subscription = $data['subscription'];
+    $customer     = $data['customer'];
+
+    // Don't revoke access immediately — let them keep it until period ends.
+    // Instead, schedule revocation for the end of the billing period.
+    as_schedule_single_action(
+        strtotime($subscription->next_payment_date ?? $subscription->canceled_at),
+        'revoke_subscription_access',
+        ['subscription_id' => $subscription->id],
+        'access-management'
+    );
+
+    // Trigger a win-back automation
+    if (function_exists('fluentcrm')) {
+        $contact = FluentCrm\App\Models\Subscriber::where('email', $customer->email)->first();
+        if ($contact) {
+            $contact->attachTags([get_tag_id('churned')]);
+            $contact->detachTags([get_tag_id('active-subscriber')]);
+        }
+    }
+}, 11, 1);
+```
+
+Whether you revoke access immediately or at period end is a business decision. Many SaaS products let the customer keep access until their paid period expires — it's nicer and reduces angry support tickets.
+
+---
+
+## subscription_eot
+
+`fluent_cart/subscription_eot` — End of term reached
+
+**Fires when:** A subscription reaches its end-of-term date. This is different from cancellation — EOT means the subscription has completed its natural lifecycle. Think of a "12 months for the price of 10" deal where `bill_times` is set to 12 and the subscription has been renewed 12 times. It's done. Finished. Complete.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Subscription and customer data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'subscription' => [
+        'id' => 789,
+        'customer_id' => 456,
+        'status' => 'expired',
+        'eot_date' => '2025-01-15'
+    ],
+    'customer' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/subscription_eot', function ($data) {
+    $subscription = $data['subscription'];
+    $customer     = $data['customer'];
+
+    // Downgrade user role
+    $userId = get_user_by('email', $customer->email)?->ID;
+    if ($userId) {
+        $user = new WP_User($userId);
+        $user->set_role('subscriber');
+        delete_user_meta($userId, '_membership_level');
+    }
+
+    // Offer a renewal discount
+    $coupon = create_personal_coupon($customer->email, [
+        'discount_type'  => 'percentage',
+        'discount_value' => 15,
+        'expires_at'     => date('Y-m-d', strtotime('+30 days')),
+    ]);
+
+    wp_mail(
+        $customer->email,
+        'Your subscription has ended',
+        'We\'d love to have you back. Use code ' . $coupon->code . ' for 15% off.'
+    );
+}, 11, 1);
+```
+
+EOT is less dramatic than cancellation but equally important for access management. If your system doesn't handle this hook, expired subscribers might retain access indefinitely — which is generous, but probably not intentional.
+
+---
+
+## license_renewed
+
+`fluent_cart/license_renewed` — A software licence gets another year of life
+
+**Fires when:** A licence key is renewed, typically as part of a subscription renewal. The licence's `expires_at` date has been extended. If you're running a licence server or need to sync activation limits, this is your moment.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$data` | `array` | Licence, customer, and order data |
+
+<Accordions>
+<Accordion title="Parameter structure">
+```php
+$data = [
+    'license' => [
+        'id' => 999,
+        'license_key' => 'XXXX-XXXX-XXXX-XXXX',
+        'product_id' => 123,
+        'customer_id' => 456,
+        'expires_at' => '2026-01-15'
+    ],
+    'customer' => [],
+    'order' => []
+];
+```
+</Accordion>
+</Accordions>
+
+**Example:**
+
+```php
+add_action('fluent_cart/license_renewed', function ($data) {
+    $licence = $data['license'];
+
+    // Sync new expiry to your external licence validation server
+    wp_remote_post('https://licence-api.example.com/v1/update', [
+        'body' => json_encode([
+            'key'        => $licence->license_key,
+            'product_id' => $licence->product_id,
+            'expires_at' => $licence->expires_at,
+            'status'     => 'active',
+        ]),
+        'headers' => [
+            'Content-Type'  => 'application/json',
+            'Authorization' => 'Bearer ' . LICENCE_API_TOKEN,
+        ],
+    ]);
+}, 10, 1);
+```
+
+If you're using FluentCart's built-in licence system for plugin/theme distribution, this hook keeps your remote validation server in sync. No more "my licence expired but I just renewed" support tickets — assuming you handle this properly.
