@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+vendor/
+.phpunit.cache/
+
+# Build output - memberships assets/dist/ IS tracked
+# (assets/dist/ is committed so plugin works without build step locally)
+
+# IDE/OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.*
+
+# Local build output
+/dist/
+
+# Debug
+*.log

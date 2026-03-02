@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
+  <rect width="200" height="40" rx="6" fill="#fff"/>
+  <text x="10" y="28" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="#d13239">Przelewy</text>
+  <text x="130" y="28" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="#1a1a1a">24</text>
+</svg>

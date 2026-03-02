@@ -1,0 +1,13 @@
+{
+    "name": "vcode-sh/fchub-fakturownia",
+    "description": "Fakturownia + KSeF 2.0 invoice integration for FluentCart",
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "FChubFakturownia\\": "app/"
+        }
+    }
+}

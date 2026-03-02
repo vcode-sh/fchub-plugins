@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/**'
+
+jobs:
+  phpunit:
+    name: PHPUnit (${{ matrix.plugin }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - plugin: fchub-p24
+            has_tests: true
+          - plugin: fchub-memberships
+            has_tests: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for changes
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/${{ matrix.plugin }}/ | wc -l)
+          echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Setup PHP
+        if: steps.changes.outputs.count > 0
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/${{ matrix.plugin }}
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPUnit
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/${{ matrix.plugin }}
+        run: ./vendor/bin/phpunit
+
+  vite-build:
+    name: Vite Build (fchub-memberships)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for changes
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/fchub-memberships/ | wc -l)
+          echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.count > 0
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: plugins/fchub-memberships/package-lock.json
+
+      - name: Install and build
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-memberships
+        run: |
+          npm ci
+          npm run build
+
+      - name: Validate build output
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-memberships
+        run: |
+          if [ ! -d "assets/dist" ] || [ -z "$(ls -A assets/dist)" ]; then
+            echo "::error::Build produced no output in assets/dist/"
+            exit 1
+          fi
+
+          JS_COUNT=$(find assets/dist -name "*.js" | wc -l)
+          if [ "$JS_COUNT" -eq 0 ]; then
+            echo "::error::No JS files found in assets/dist/"
+            exit 1
+          fi
+
+          echo "Build validation passed: $JS_COUNT JS file(s) in assets/dist/"

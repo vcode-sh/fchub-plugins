@@ -1,0 +1,355 @@
+/* Global overrides scoped to #fchub-memberships-app */
+
+#fchub-memberships-app {
+  font-family: var(--fchub-font-family);
+  color: var(--fchub-text-primary);
+}
+
+/* WordPress admin CSS reset — strip WP borders/shadows from form elements.
+   Element Plus uses wrapper elements (.el-input__wrapper) for borders,
+   so inner <input>/<textarea>/<select> must be visually bare. */
+#fchub-memberships-app input,
+#fchub-memberships-app textarea,
+#fchub-memberships-app select {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  outline: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  line-height: inherit;
+  min-height: 0;
+}
+
+#fchub-memberships-app input:focus,
+#fchub-memberships-app textarea:focus,
+#fchub-memberships-app select:focus {
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+
+/* Restore Element Plus component-specific padding/bg stripped by the reset above */
+#fchub-memberships-app .el-textarea__inner {
+  padding: 5px 11px;
+}
+
+#fchub-memberships-app .el-input-group__prepend,
+#fchub-memberships-app .el-input-group__append {
+  background: var(--el-fill-color-light, #f5f7fa);
+  color: var(--fchub-text-secondary);
+  padding: 0 20px;
+  border: none;
+}
+
+#fchub-memberships-app .el-input-group__prepend select,
+#fchub-memberships-app .el-input-group__append select {
+  background: transparent;
+}
+
+/* El-tabs plain style — match FC underlined tabs */
+#fchub-memberships-app .el-tabs--border-card {
+  border: none;
+  box-shadow: none;
+  background: var(--fchub-card-bg);
+  border-radius: var(--fchub-radius-card);
+}
+
+#fchub-memberships-app .el-tabs--border-card > .el-tabs__header {
+  background: transparent;
+  border-bottom: 1px solid var(--fchub-border-color);
+  margin: 0;
+}
+
+#fchub-memberships-app .el-tabs--border-card > .el-tabs__header .el-tabs__item {
+  border: none;
+  color: var(--fchub-text-secondary);
+  font-weight: 400;
+}
+
+#fchub-memberships-app .el-tabs--border-card > .el-tabs__header .el-tabs__item.is-active {
+  color: var(--el-color-primary);
+  border-bottom: 2px solid var(--el-color-primary);
+  background: transparent;
+}
+
+#fchub-memberships-app .el-tabs__content {
+  padding: 24px;
+}
+
+/* Form item overrides */
+#fchub-memberships-app .el-form-item__label {
+  font-weight: 500;
+  color: var(--fchub-text-primary);
+  font-size: 14px;
+}
+
+/* Card overrides */
+#fchub-memberships-app .el-card {
+  border: none;
+  border-radius: var(--fchub-radius-card);
+  box-shadow: none;
+}
+
+#fchub-memberships-app .el-card__header {
+  border-bottom: 1px solid var(--fchub-border-color);
+}
+
+/* Table overrides */
+#fchub-memberships-app .el-table {
+  --el-table-border-color: var(--fchub-border-color);
+  --el-table-text-color: var(--fchub-text-primary);
+  --el-table-header-text-color: var(--fchub-text-secondary);
+  --el-table-row-hover-bg-color: #f8f9fc;
+}
+
+body.dark #fchub-memberships-app .el-table {
+  --el-table-row-hover-bg-color: #2a2e37;
+}
+
+#fchub-memberships-app .el-table th.el-table__cell {
+  background: transparent;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--fchub-text-secondary);
+}
+
+/* Form/input overrides — fix focus, double-nested, spacing */
+#fchub-memberships-app .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--fchub-border-color) inset;
+  border-radius: 6px;
+}
+
+#fchub-memberships-app .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #c0c4cc inset;
+}
+
+body.dark #fchub-memberships-app .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #555a65 inset;
+}
+
+#fchub-memberships-app .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+
+#fchub-memberships-app .el-textarea__inner {
+  box-shadow: 0 0 0 1px var(--fchub-border-color) inset;
+  border-radius: 6px;
+}
+
+#fchub-memberships-app .el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+
+#fchub-memberships-app .el-select .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--fchub-border-color) inset;
+}
+
+#fchub-memberships-app .el-input-number {
+  --el-input-border-color: var(--fchub-border-color);
+}
+
+/* Tag overrides */
+#fchub-memberships-app .el-tag {
+  border-radius: 6px;
+}
+
+/* Dialog overrides */
+#fchub-memberships-app .el-dialog {
+  border-radius: var(--fchub-radius-dialog);
+}
+
+/* Switch override */
+#fchub-memberships-app .el-switch.is-checked .el-switch__core {
+  border-color: var(--el-color-primary);
+  background-color: var(--el-color-primary);
+}
+
+/* Divider override — cleaner section headers */
+#fchub-memberships-app .el-divider__text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fchub-text-primary);
+}
+
+/* Stat widget pattern — shared by Dashboard, Drip, Reports */
+.fchub-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.fchub-stat-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.fchub-stat-widget {
+  background: var(--fchub-card-bg);
+  border-radius: var(--fchub-radius-stat);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.fchub-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--fchub-radius-stat-icon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+}
+
+.fchub-stat-icon.blue {
+  background: var(--fchub-stat-blue-bg);
+  color: var(--fchub-stat-blue);
+}
+
+.fchub-stat-icon.orange {
+  background: var(--fchub-stat-orange-bg);
+  color: var(--fchub-stat-orange);
+}
+
+.fchub-stat-icon.pink {
+  background: var(--fchub-stat-pink-bg);
+  color: var(--fchub-stat-pink);
+}
+
+.fchub-stat-icon.purple {
+  background: var(--fchub-stat-purple-bg);
+  color: var(--fchub-stat-purple);
+}
+
+.fchub-stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.fchub-stat-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fchub-text-secondary);
+  margin-bottom: 4px;
+}
+
+.fchub-stat-value {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--fchub-text-primary);
+  line-height: 1.2;
+}
+
+/* Page title pattern */
+.fchub-page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--fchub-text-primary);
+  margin: 0 0 20px 0;
+}
+
+/* Settings form pattern — matches FC two-column settings layout */
+.fchub-settings-body {
+  background: var(--fchub-card-bg);
+  border-radius: var(--fchub-radius-card);
+  padding: 0;
+}
+
+.fchub-settings-section {
+  padding: 24px 32px 8px;
+}
+
+.fchub-settings-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fchub-text-primary);
+  margin: 0 0 20px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--fchub-border-color);
+}
+
+.fchub-setting-row {
+  display: flex;
+  gap: 32px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--fchub-border-color);
+}
+
+.fchub-setting-row:last-child {
+  border-bottom: none;
+}
+
+.fchub-setting-label {
+  flex: 0 0 280px;
+  padding-top: 4px;
+}
+
+.fchub-setting-label h4 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fchub-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.fchub-setting-label p {
+  font-size: 13px;
+  color: var(--fchub-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.fchub-setting-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.fchub-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 20px 32px;
+  border-top: 1px solid var(--fchub-border-color);
+}
+
+/* ───── Dark mode: Element Plus variable overrides ───── */
+body.dark #fchub-memberships-app {
+  --el-bg-color: #23272f;
+  --el-bg-color-overlay: #2a2e37;
+  --el-bg-color-page: #1a1d23;
+  --el-fill-color: #363b44;
+  --el-fill-color-light: #2a2e37;
+  --el-fill-color-lighter: #2f333c;
+  --el-fill-color-blank: #23272f;
+  --el-text-color-primary: #e4e6eb;
+  --el-text-color-regular: #cfd2d8;
+  --el-text-color-secondary: #9da3ae;
+  --el-text-color-placeholder: #6b7280;
+  --el-border-color: #363b44;
+  --el-border-color-light: #2f333c;
+  --el-border-color-lighter: #2a2e37;
+  --el-border-color-dark: #444950;
+  --el-color-white: #23272f;
+  --el-disabled-bg-color: #2a2e37;
+  --el-disabled-text-color: #6b7280;
+  --el-disabled-border-color: #363b44;
+  --el-mask-color: rgba(0, 0, 0, 0.6);
+  --el-box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.4);
+  --el-box-shadow-light: 0 2px 8px 0 rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+}
+
+body.dark #fchub-memberships-app .el-input-group__prepend,
+body.dark #fchub-memberships-app .el-input-group__append {
+  background: var(--el-fill-color-light);
+}
+
+body.dark #fchub-memberships-app .el-loading-mask {
+  background-color: rgba(26, 29, 35, 0.8);
+}
