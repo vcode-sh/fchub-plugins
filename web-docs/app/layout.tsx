@@ -17,6 +17,17 @@ export const metadata: Metadata = {
   },
   description:
     "Payments, invoicing, memberships, video streaming, and migration plugins for FluentCart and FluentCommunity. Open source, GPLv2.",
+  openGraph: {
+    type: "website",
+    siteName: "FCHub",
+    title: "FCHub — WordPress Plugins for FluentCart & FluentCommunity",
+    description:
+      "Payments, invoicing, memberships, video streaming, and migration plugins for FluentCart and FluentCommunity. Open source, GPLv2.",
+  },
+  twitter: {
+    card: "summary",
+    creator: "@vcode_sh",
+  },
   icons: {
     icon: "/fchub-icon.webp",
     apple: "/fchub-icon.webp",
