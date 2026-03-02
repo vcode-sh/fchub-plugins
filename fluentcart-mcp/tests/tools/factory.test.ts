@@ -526,6 +526,9 @@ describe('P1.2 response transforms', () => {
 					status: 'completed',
 					payment_status: 'paid',
 					payment_method: 'stripe',
+					payment_method_title: 'Stripe',
+					shipping_status: 'shipped',
+					currency: 'USD',
 					total_amount: 5000,
 					customer_id: 5,
 					created_at: '2025-01-01',
@@ -550,7 +553,9 @@ describe('P1.2 response transforms', () => {
 			receipt_number: 'ORD-001',
 			status: 'completed',
 			payment_status: 'paid',
-			payment_method: 'stripe',
+			payment_method_title: 'Stripe',
+			shipping_status: 'shipped',
+			currency: 'USD',
 			total_amount: 5000,
 			customer_id: 5,
 			created_at: '2025-01-01',
@@ -558,6 +563,7 @@ describe('P1.2 response transforms', () => {
 		expect(parsed.data[0]).not.toHaveProperty('items')
 		expect(parsed.data[0]).not.toHaveProperty('customer')
 		expect(parsed.data[0]).not.toHaveProperty('extra_field')
+		expect(parsed.data[0]).not.toHaveProperty('payment_method')
 	})
 
 	it('product_get transform strips post_content and variant pricing_table', async () => {

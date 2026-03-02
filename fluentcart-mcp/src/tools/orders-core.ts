@@ -8,13 +8,15 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_order_list',
 			title: 'List Orders',
 			description:
-				'List orders with optional filtering. ' +
+				'List orders with optional filtering by date range and status. ' +
 				'Statuses: pending, processing, completed, canceled. ' +
 				'Payment: pending, paid, partially_refunded, refunded, failed.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				search: z.string().optional().describe('Search orders by keyword'),
+				date_from: z.string().optional().describe('Filter from date (YYYY-MM-DD)'),
+				date_to: z.string().optional().describe('Filter to date (YYYY-MM-DD)'),
 				order_by: z.string().optional().describe('Sort field (default: id)'),
 				order_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
 			}),
@@ -28,7 +30,9 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 						receipt_number: item.receipt_number,
 						status: item.status,
 						payment_status: item.payment_status,
-						payment_method: item.payment_method,
+						payment_method_title: item.payment_method_title,
+						shipping_status: item.shipping_status,
+						currency: item.currency,
 						total_amount: item.total_amount,
 						customer_id: item.customer_id,
 						created_at: item.created_at,
