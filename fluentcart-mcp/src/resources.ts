@@ -19,19 +19,19 @@ const RESOURCES: ResourceDef[] = [
 	{
 		name: 'store-countries',
 		uri: 'fluentcart://store/countries',
-		endpoint: '/misc/countries',
+		endpoint: '/address-info/countries',
 		description: 'Supported countries and their details',
 	},
 	{
 		name: 'store-payment-methods',
 		uri: 'fluentcart://store/payment-methods',
-		endpoint: '/payment-methods',
+		endpoint: '/settings/payment-methods/all',
 		description: 'Configured payment methods',
 	},
 	{
 		name: 'store-filter-options',
 		uri: 'fluentcart://store/filter-options',
-		endpoint: '/misc/filter-options',
+		endpoint: '/advance_filter/get-filter-options',
 		description: 'Available filter options for orders, products, and customers',
 	},
 ]
