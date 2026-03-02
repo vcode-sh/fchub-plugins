@@ -8,8 +8,10 @@ import {
 import {
   ArrowRightLeft,
   CreditCard,
+  GitPullRequest,
   Heart,
   Home,
+  Mail,
   MessageSquare,
   Receipt,
   Smartphone,
@@ -71,6 +73,16 @@ export default function Layout({ children }: LayoutProps<"/">) {
               </NavbarMenuContent>
             </NavbarMenu>
           ),
+        },
+        {
+          text: "Contribute",
+          url: "/contribute",
+          icon: <GitPullRequest size={18} />,
+        },
+        {
+          text: "Contact",
+          url: "/contact",
+          icon: <Mail size={18} />,
         },
         {
           text: "Support Projects",

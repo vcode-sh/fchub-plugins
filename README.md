@@ -103,6 +103,14 @@ web-docs/                 fchub.co documentation site
 build.sh                  Local ZIP builder
 ```
 
+## Contributing
+
+Plugin submissions, bug fixes, translations — all welcome. If you've built something for FluentCart or FluentCommunity, it probably belongs here.
+
+- **[fchub.co/contribute](https://fchub.co/contribute)** — full contributor guide and plugin submission process
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — code contribution guidelines
+- Plugin submissions accepted via [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues/new?title=Plugin+submission:+&labels=plugin-submission)
+
 ## License
 
 GPLv2 or later. Built by [Vibe Code](https://x.com/vcode_sh).
