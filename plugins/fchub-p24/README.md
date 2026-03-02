@@ -1,60 +1,59 @@
 # FCHub - Przelewy24
 
-Przelewy24 payment gateway for [FluentCart](https://fluentcart.com). Because your Polish customers deserve better than "bank transfer, please wait 3 business days."
+Przelewy24 payment gateway for [FluentCart](https://fluentcart.com). I built this because FluentCart ships with Stripe and PayPal, and if you're selling in Poland that's about as useful as a chocolate teapot.
 
-## What it does
+## What it actually does
 
-Plugs Przelewy24 into FluentCart so you can actually accept payments in Poland like a civilised online store. One-time payments, recurring subscriptions, refunds — the full stack of "taking people's money professionally."
+Lets your FluentCart store accept payments through Przelewy24. Cards, bank transfers, BLIK — the whole Polish payment buffet. One-time purchases, recurring subscriptions, refunds. The boring stuff that makes money move.
 
-### Features
-
-- **One-time & recurring payments** via Przelewy24
-- **Subscription billing** with automatic renewals (card-on-file)
-- **IPN (Instant Payment Notification)** handling — because polling is for amateurs
-- **Refund support** — for when your product doesn't spark joy
-- **Sandbox mode** — break things safely before you break things in production
-- **Multi-currency** — PLN obviously, but P24 supports more
+- **One-time & recurring payments** — cards, BLIK, bank transfers via P24
+- **Subscription billing** — automatic renewals with card-on-file, because chasing invoices is not a business model
+- **IPN handling** — P24 pings your site, I process it, order gets marked paid. You were probably asleep
+- **Refunds** — hit the button, money goes back. I don't judge
+- **Sandbox mode** — test everything before real money is involved. Use it. Seriously
+- **Multi-currency** — PLN obviously, but P24 supports others if you're feeling continental
 
 ## Requirements
 
 - WordPress 6.0+
 - PHP 7.4+
-- [FluentCart](https://fluentcart.com) plugin (active)
-- Przelewy24 merchant account
+- [FluentCart](https://fluentcart.com) installed and active
+- A Przelewy24 merchant account (the one thing I can't automate for you)
 
 ## Installation
 
-1. Download the latest release ZIP from [Releases](../../releases)
-2. WordPress Admin → Plugins → Add New → Upload Plugin
+1. Grab the ZIP from [Releases](../../releases)
+2. Plugins → Add New → Upload Plugin
 3. Activate
 4. FluentCart → Settings → Payment Methods → Przelewy24
-5. Enter your Merchant ID, CRC Key, and API Key
-6. Toggle sandbox mode off when you're feeling brave
+5. Paste your credentials
+6. Turn off sandbox when you trust yourself
 
 ## Configuration
 
-You'll need from your Przelewy24 panel:
+From your [Przelewy24 panel](https://panel.przelewy24.pl):
 
-| Setting | Where to find it |
-|---------|-----------------|
-| Merchant ID | P24 Panel → My data |
-| CRC Key | P24 Panel → My data → Configuration |
-| Reports Key | P24 Panel → My data → Configuration |
+| Setting | Where |
+|---------|-------|
+| Merchant ID | My data |
+| CRC Key | My data → Configuration |
+| Reports Key | My data → Configuration |
 
-Set your IPN URL in P24 panel to:
+Set your IPN URL in the P24 panel:
 ```
 https://yoursite.com/?fluent-cart=fct_payment_listener_ipn&method=przelewy24
 ```
 
-### wp-config.php (optional)
+### wp-config.php (optional, arguably paranoid)
 
-Hardcode credentials instead of storing in DB:
+Hardcode credentials so they're not sitting in the database:
 
 ```php
 define('FCHUB_P24_LIVE_MERCHANT_ID', '123456');
 define('FCHUB_P24_LIVE_CRC_KEY', 'your_crc_key');
 define('FCHUB_P24_LIVE_REPORTS_KEY', 'your_reports_key');
 
+// Sandbox
 define('FCHUB_P24_TEST_MERCHANT_ID', '123456');
 define('FCHUB_P24_TEST_CRC_KEY', 'your_test_crc_key');
 define('FCHUB_P24_TEST_REPORTS_KEY', 'your_test_reports_key');
@@ -63,11 +62,12 @@ define('FCHUB_P24_TEST_REPORTS_KEY', 'your_test_reports_key');
 ## Development
 
 ```bash
-# Run tests
 composer install
 ./vendor/bin/phpunit
 ```
 
+Tests cover IPN validation, refund notifications, subscription renewals, and the kind of edge cases that only surface at 2am on a Friday.
+
 ## License
 
-GPLv2 or later. The "or later" is doing a lot of heavy lifting there.
+GPLv2 or later. Built by [Vibe Code](https://x.com/vcode_sh).

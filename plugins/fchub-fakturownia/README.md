@@ -1,46 +1,43 @@
 # FCHub - Fakturownia
 
-Fakturownia invoice integration with KSeF 2.0 support for [FluentCart](https://fluentcart.com). Because the Polish tax office won't accept "vibes" as a valid invoice format.
+Fakturownia invoice integration with KSeF 2.0 support for [FluentCart](https://fluentcart.com). I built this because the Polish tax office doesn't accept "I'll send the invoice later, promise" as a valid accounting strategy.
 
-## What it does
+## What it actually does
 
-Auto-generates invoices on Fakturownia when orders come through FluentCart. Handles the full lifecycle — issue on payment, correct on refund, and ship to KSeF so the government is happy. Or at least, less angry.
+Order comes in, invoice goes out. Automatically. To [Fakturownia](https://fakturownia.pl). If KSeF is enabled, it ships the invoice straight to Poland's national e-invoicing system too. Refund happens — correction invoice, done. No spreadsheets. No copy-paste. No existential dread at tax time.
 
-### Features
-
-- **Auto-invoice on order payment** — no manual copy-paste from spreadsheets
-- **Correction invoices on refund** — because mistakes happen and so do chargebacks
-- **KSeF 2.0 integration** — auto-submit invoices to Poland's national e-invoicing system
-- **KSeF status tracking** — cron job monitors submission status, stores KSeF ID
-- **NIP checkout field** — "Chce fakture na firme" toggle with NIP validation
-- **Per-order invoice data** — stored in order meta, viewable in admin
+- **Auto-invoice on payment** — order paid, invoice created. I don't wait for you to remember
+- **Correction invoices on refund** — because the tax office likes symmetry
+- **KSeF 2.0** — auto-submit to the national system. It's mandatory anyway, might as well automate it
+- **KSeF status tracking** — cron monitors submission, stores the KSeF ID when it lands
+- **NIP at checkout** — "Chce fakture na firme" toggle + NIP field. The B2B customer experience nobody asked for but everyone needs
+- **Order meta** — invoice ID, KSeF status, KSeF number — all stored, all visible in admin
 
 ## Requirements
 
 - WordPress 6.0+
 - PHP 7.4+
-- [FluentCart](https://fluentcart.com) plugin (active)
+- [FluentCart](https://fluentcart.com) installed and active
 - [Fakturownia](https://fakturownia.pl) account
 
 ## Installation
 
-1. Download the latest release ZIP from [Releases](../../releases)
-2. WordPress Admin → Plugins → Add New → Upload Plugin
+1. ZIP from [Releases](../../releases)
+2. Plugins → Add New → Upload Plugin
 3. Activate
 4. FluentCart → Settings → Integrations → Fakturownia
-5. Enter your Fakturownia domain and API token
-6. Select your department
-7. Toggle KSeF if you're ready for the future (it's mandatory anyway)
+5. Paste domain, API token, pick department
+6. Toggle KSeF. Or don't. The government will make you eventually
 
 ## Configuration
 
-You'll need from your Fakturownia account:
+From your Fakturownia account:
 
-| Setting | Where to find it |
-|---------|-----------------|
+| Setting | Where |
+|---------|-------|
 | Domain | Your `{name}.fakturownia.pl` subdomain |
 | API Token | Settings → API → Authorization tokens |
-| Department ID | Settings → Company/department → select department |
+| Department ID | Settings → Company/department |
 
 ### wp-config.php (optional)
 
@@ -52,14 +49,14 @@ define('FCHUB_FAKTUROWNIA_DEPARTMENT_ID', '123456');
 
 ## How it works
 
-1. Customer places order, optionally ticks "Chce fakture na firme" and enters NIP
-2. Order gets paid → plugin fires invoice creation on Fakturownia
-3. If KSeF enabled → invoice auto-submitted to national system
-4. Cron checks KSeF status → stores KSeF ID in order meta
-5. Refund happens → correction invoice issued automatically
+1. Customer orders. Optionally ticks "Chce fakture na firme" and enters NIP
+2. Payment confirmed → invoice created on Fakturownia
+3. KSeF enabled → invoice auto-submitted to the national system
+4. Cron checks back → stores KSeF ID in order meta
+5. Refund → correction invoice. Automatically. Like magic, but with tax implications
 
-NIP is stored in `fct_order_addresses.meta` as `other_data.nip`. You're welcome, GDPR auditors.
+NIP lives in `fct_order_addresses.meta` as `other_data.nip`. GDPR auditors, you're welcome.
 
 ## License
 
-GPLv2 or later. Much like KSeF compliance — technically optional until it very much isn't.
+GPLv2 or later. Much like KSeF compliance — technically optional until it very suddenly isn't. Built by [Vibe Code](https://x.com/vcode_sh).

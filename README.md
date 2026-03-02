@@ -1,105 +1,95 @@
 # fchub-plugins
 
-Monorepo for FCHub WordPress plugins — the FluentCart ecosystem extensions that actually do things.
+I got tired of having my FluentCart plugins scattered across a dev repo like socks after laundry day. So here they are. One monorepo. Four plugins. Zero excuses.
 
 ## Plugins
 
-| Plugin | What it does | Version |
-|--------|-------------|---------|
-| [fchub-p24](plugins/fchub-p24/) | Przelewy24 payment gateway | 1.0.0 |
-| [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 | 1.0.0 |
-| [fchub-memberships](plugins/fchub-memberships/) | Membership system, content gating, drip | 1.0.0 |
-| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator | 1.0.0 |
+| Plugin | The pitch | Version |
+|--------|-----------|---------|
+| [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway — take money from Polish people, professionally | 1.0.0 |
+| [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 — keep the tax office off your back | 1.0.0 |
+| [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip — the full "pay me to read" stack | 1.0.0 |
+| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — your escape plan | 1.0.0 |
 
-All plugins require [FluentCart](https://fluentcart.com) and WordPress 6.0+ / PHP 7.4+.
+All require [FluentCart](https://fluentcart.com). WordPress 6.0+. PHP 7.4+. A functioning will to live (optional).
 
 ## Translations
 
 | Language | Status | Path |
 |----------|--------|------|
-| [Polish (pl_PL)](translations/fluent-cart/) | ~96% translated | `translations/fluent-cart/` |
+| [Polish (pl_PL)](translations/fluent-cart/) | ~96% | `translations/fluent-cart/` |
 
-Community translations for FluentCart. PRs welcome — see the [translation README](translations/fluent-cart/README.md) for how to contribute.
+I translated FluentCart into Polish because nobody else was going to. PRs welcome if you fancy finishing the last 4%.
 
 ## Build
 
 ```bash
-# Build all plugin ZIPs
-./build.sh
-
-# Build a single plugin
-./build.sh fchub-p24
+./build.sh                    # all plugins
+./build.sh fchub-p24          # just one
 ```
 
-ZIPs land in `dist/`. Each ZIP has the correct directory structure for WordPress plugin upload.
+ZIPs land in `dist/`. Correct directory structure, ready for WordPress upload. No magic required.
 
 ## Release
 
-Push a tag, get a GitHub Release with a ZIP attached. That's it.
+Tag it. Push it. GitHub Actions does the rest.
 
 ```bash
-# Tag format: {plugin-slug}/v{version}
 git tag fchub-p24/v1.0.0
 git push origin fchub-p24/v1.0.0
 ```
 
-The release workflow validates the version in the plugin header matches the tag, builds assets if needed (memberships), and creates the release. If the versions don't match, it yells at you.
+The workflow checks that the version in your plugin header matches the tag. If they don't match, it fails loudly. You deserve it.
 
 ## CI
 
-Pull requests touching `plugins/` trigger:
+PRs touching `plugins/` get:
 
-- **PHPUnit** for fchub-p24 and fchub-memberships
-- **Vite build check** for fchub-memberships (makes sure the Vue app still compiles)
+- **PHPUnit** — fchub-p24 and fchub-memberships
+- **Vite build** — fchub-memberships (making sure the Vue app didn't spontaneously combust)
 
 ## Development
 
-Each plugin lives in `plugins/{slug}/`. Edit files there, they're the source of truth.
+Everything lives in `plugins/{slug}/`. That's the source of truth. Edit there.
 
-### Local dev with Docker
+### Docker
 
-If you're using the companion dev environment repo, volume mounts point here:
+I use a companion dev repo with volume mounts pointing here:
 
 ```yaml
-# docker-compose.yml in your dev repo
 volumes:
   - ../fchub-plugins/plugins/fchub-p24:/var/www/html/wp-content/plugins/fchub-p24
-  # ... etc
+  # ... you get the idea
 ```
 
-Edit a file in this repo → refresh browser → see changes. The dream.
+Edit file. Refresh browser. See change. Revolutionary, I know.
 
-### Plugin-specific dev
+### Tests & builds
 
 ```bash
-# fchub-p24 / fchub-memberships — PHP tests
-cd plugins/fchub-p24
-composer install
-./vendor/bin/phpunit
+# PHP tests
+cd plugins/fchub-p24 && composer install && ./vendor/bin/phpunit
 
-# fchub-memberships — Vue admin app
-cd plugins/fchub-memberships
-npm install
-npm run dev     # HMR dev server
-npm run build   # production build → assets/dist/
+# Vue admin app (memberships)
+cd plugins/fchub-memberships && npm install && npm run dev
 ```
 
 ## Repo structure
 
 ```
 plugins/
-  fchub-p24/              Payment gateway
-  fchub-fakturownia/      Invoice integration
-  fchub-memberships/      Membership system (Vue admin, 15k+ LOC)
+  fchub-p24/              Przelewy24 gateway
+  fchub-fakturownia/      Fakturownia invoices
+  fchub-memberships/      Membership system (15k+ LOC of questionable decisions)
   wc-fc/                  WooCommerce migrator
 translations/
-  fluent-cart/            Polish translation (.po/.mo/.pot)
+  fluent-cart/            Polish translation
 .github/workflows/
   release.yml             Tag → ZIP → GitHub Release
-  ci.yml                  PR checks (PHPUnit + Vite)
+  ci.yml                  PR checks
 build.sh                  Local ZIP builder
 ```
 
 ## License
 
-All plugins are GPLv2 or later. Built by [Vibe Code](https://vcode.sh).
+GPLv2 or later. Built by me — [Vibe Code](https://x.com/vcode_sh)
