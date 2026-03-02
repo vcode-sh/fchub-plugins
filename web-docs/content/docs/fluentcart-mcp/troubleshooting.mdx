@@ -40,7 +40,7 @@ Replace `username` and `application_password` with your actual values. What you 
    ```bash
    node --version
    ```
-   I need `v22.0.0` or higher. If you don't have Node at all, get it from [nodejs.org](https://nodejs.org). If you have an older version, upgrade. I won't apologise for requiring modern JavaScript.
+   The MCP server needs `v22.0.0` or higher. If you don't have Node at all, get it from [nodejs.org](https://nodejs.org). If you have an older version, upgrade. I won't apologise for requiring modern JavaScript.
 
 2. **npx not found**
    It comes with Node.js. If `which npx` returns nothing, your Node installation is broken. Reinstall.
@@ -100,7 +100,7 @@ Replace `username` and `application_password` with your actual values. What you 
 **What's actually wrong:**
 
 1. **FluentCart not installed**
-   Check **Plugins** in WordPress admin. FluentCart must be installed and activated. My server talks to FluentCart endpoints — if FluentCart isn't there, those endpoints don't exist.
+   Check **Plugins** in WordPress admin. FluentCart must be installed and activated. The MCP server talks to FluentCart endpoints — if FluentCart isn't there, those endpoints don't exist.
 
 2. **Wrong URL**
    The URL should be the root of your WordPress site:
@@ -134,7 +134,7 @@ Replace `username` and `application_password` with your actual values. What you 
    ```
 
 2. **Check your server**
-   Run `curl https://your-store.com/wp-json/`. If curl also hangs, that's a network or server problem. Not something I can fix from my end.
+   Run `curl https://your-store.com/wp-json/`. If curl also hangs, that's a network or server problem. Not something the MCP server can fix.
 
 3. **Ask for less data**
    Listing 10,000 orders in one request will be slow on any server. Use pagination — "Show me the last 10 orders" instead of "Show me all orders." I designed every list tool to support `per_page` and `page` parameters for exactly this reason.

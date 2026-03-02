@@ -17,7 +17,7 @@ This takes about 5 minutes. You'll generate a password in WordPress, paste a con
 <Step>
 ### Install Node.js 22+
 
-My server needs Node.js 22 or higher. Check what you've got:
+The MCP server needs Node.js 22 or higher. Check what you've got:
 
 ```bash
 node --version
@@ -38,7 +38,7 @@ I use native fetch and top-level await. These aren't optional — they're baked 
 <Step>
 ### Generate a WordPress Application Password
 
-Application Passwords have been built into WordPress since version 5.6. They let my server talk to your site's REST API without you handing over your actual login password. Sensible, that.
+Application Passwords have been built into WordPress since version 5.6. They let the MCP server talk to your site's REST API without you handing over your actual login password. Sensible, that.
 
 1. Log in to your WordPress admin
 2. Go to **Users → Profile** (or click your username in the top-right)
@@ -54,7 +54,7 @@ I mean it. WordPress shows the password exactly once. Close that page without co
 </Callout>
 
 <Callout type="info" title="Which Account?">
-Use an **Administrator** account. My server needs admin access to do useful things. A limited-permission user will get 403 errors on nearly everything, which rather defeats the purpose.
+Use an **Administrator** account. The MCP server needs admin-level access to manage orders, products, and settings. A limited-permission user will get 403 errors on nearly everything, which rather defeats the purpose.
 </Callout>
 
 </Step>
@@ -379,7 +379,7 @@ Start a Codex session and ask about your store. The server starts automatically.
 
 ## Alternative: Shared Config File
 
-If you use multiple AI clients (or just hate repeating yourself), you can create one config file that my server reads automatically. Then your AI client configs don't need any credentials at all.
+If you use multiple AI clients (or just hate repeating yourself), you can create one config file that the MCP server reads automatically. Then your AI client configs don't need any credentials at all.
 
 **macOS / Linux:**
 
@@ -470,6 +470,6 @@ If you see errors, I've catalogued every failure mode on the [Troubleshooting](/
     Now that you're connected — what do you actually say to it? Example prompts for every category.
   </Card>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    The full inventory of 200+ tools. Everything my server can do, listed by module.
+    The full inventory of 200+ tools. Everything the MCP server can do, listed by module.
   </Card>
 </Cards>

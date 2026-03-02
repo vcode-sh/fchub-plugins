@@ -18,11 +18,11 @@ You don't need to know my tool names or API parameters. The AI translates your i
 
 | Don't say this | Say this instead |
 |----------------|------------------|
-| "Call fluentcart_orders_list with per_page=10" | "Show me the latest 10 orders" |
+| "Call fluentcart_order_list with per_page=10" | "Show me the latest 10 orders" |
 | "Use fluentcart_product_create with type digital" | "Create a new digital product called Pro License" |
 | "Execute fluentcart_coupon_create" | "Make a 20% off coupon code" |
 
-The AI picks the right tool, fills in the parameters, and calls my server. You'll see it working — most clients show which tools are being called in real time.
+The AI picks the right tool, fills in the parameters, and calls the MCP server. You'll see it working — most clients show which tools are being called in real time.
 
 <Callout type="info" title="Specificity Wins">
 "Show me orders" works. "Show me pending orders from the last 7 days sorted by total, highest first" works better. The more context you give, the more precise the results. I designed every tool schema to accept useful filters — help the AI use them.
@@ -226,7 +226,6 @@ This is where it gets genuinely useful. Instead of staring at charts in the admi
 
 **Public endpoints:**
 - "Search public products for 'starter'"
-- "Get the store welcome message"
 
 **Lookup data:**
 - "List all countries"
@@ -274,13 +273,13 @@ I built a lot of tools, but I'm not delusional. There are limits:
 
 | Can't Do | Why |
 |----------|-----|
-| **Charge credit cards** | Payments require customer interaction (redirects, card forms). My server can mark orders as paid, but it can't process payments. |
+| **Charge credit cards** | Payments require customer interaction (redirects, card forms). The MCP server can mark orders as paid, but it can't process payments. |
 | **Send emails** | Email templates live in FluentCart's UI. Not an API surface I can reach. |
 | **Edit checkout pages** | That's frontend work — HTML/CSS/JS. Not API territory. |
 | **Upload product images** | File uploads aren't part of the current API surface. Use WordPress admin for media. |
 | **Configure shipping zones** | One-time setup work. I'm adding this in v1.1. |
 | **Manage tax rates** | Complex and legally sensitive. Coming in v1.1. |
-| **Touch other WordPress data** | My server only talks to FluentCart endpoints. It can't read your blog posts, other plugins, or WordPress users. |
+| **Touch other WordPress data** | The MCP server only talks to FluentCart endpoints. It can't read your blog posts, other plugins, or WordPress users. |
 
 ## A Note About Money
 

@@ -1,13 +1,13 @@
 ---
 title: Tool Reference
-description: Every tool I built into FluentCart MCP, listed by module. 200+ tools covering orders, products, customers, subscriptions, reports, and more.
+description: Every tool I built into FluentCart MCP, listed by module. 200 tools covering orders, products, customers, subscriptions, reports, and more.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-This is the complete inventory. Every tool, every module, every HTTP method. I organised over 200 tools into 17 modules so the AI (and you) can find what it needs.
+This is the complete inventory. Every tool, every module, every HTTP method. I organised 200 tools into 17 modules so the AI (and you) can find what it needs.
 
 You'll never need to call these yourself — the AI picks the right tool based on what you ask. But if you want to know exactly what's possible, or you want to verify that a specific capability exists before asking for it, this is your reference.
 
@@ -37,21 +37,21 @@ The bread and butter. Every support interaction starts with orders.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_orders_list` | GET | List orders with pagination, filtering by status, date, customer |
-| `fluentcart_orders_get` | GET | Get a single order by ID with full details |
-| `fluentcart_orders_create` | POST | Create a new order |
-| `fluentcart_orders_update` | PUT | Update order fields (status, notes, custom fields) |
-| `fluentcart_orders_delete` | DELETE | Delete an order permanently |
-| `fluentcart_orders_mark_paid` | POST | Mark an order as paid (manual payment confirmation) |
-| `fluentcart_orders_refund` | POST | Process a refund on an order |
-| `fluentcart_orders_change_customer` | POST | Reassign an order to a different customer |
-| `fluentcart_orders_create_and_change_customer` | POST | Create a new customer and assign an order to them in one go |
-| `fluentcart_orders_create_custom` | POST | Create a custom order with manual line items |
-| `fluentcart_orders_update_statuses` | PUT | Bulk-update order statuses |
-| `fluentcart_orders_sync_statuses` | POST | Sync order statuses with the payment gateway |
-| `fluentcart_orders_update_address` | PUT | Update an order's billing or shipping address |
-| `fluentcart_orders_update_address_id` | PUT | Swap which saved address is linked to an order |
-| `fluentcart_orders_generate_licenses` | POST | Generate missing licence keys for an order |
+| `fluentcart_order_list` | GET | List orders with pagination, filtering by status, date, customer |
+| `fluentcart_order_get` | GET | Get a single order by ID with full details |
+| `fluentcart_order_create` | POST | Create a new order |
+| `fluentcart_order_update` | PUT | Update order fields (status, notes, custom fields) |
+| `fluentcart_order_delete` | DELETE | Delete an order permanently |
+| `fluentcart_order_mark_paid` | POST | Mark an order as paid (manual payment confirmation) |
+| `fluentcart_order_refund` | POST | Process a refund on an order |
+| `fluentcart_order_change_customer` | POST | Reassign an order to a different customer |
+| `fluentcart_order_create_and_change_customer` | POST | Create a new customer and assign an order to them in one go |
+| `fluentcart_order_create_custom` | POST | Create a custom order with manual line items |
+| `fluentcart_order_update_statuses` | PUT | Bulk-update order statuses |
+| `fluentcart_order_sync_statuses` | POST | Sync order statuses with the payment gateway |
+| `fluentcart_order_update_address` | PUT | Update an order's billing or shipping address |
+| `fluentcart_order_update_address_id` | PUT | Swap which saved address is linked to an order |
+| `fluentcart_order_generate_licenses` | POST | Generate missing licence keys for an order |
 
 </Accordion>
 <Accordion title="Orders — Transactions (8 tools)">
@@ -60,14 +60,14 @@ Transaction-level stuff. Payments, disputes, shipping calculations.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_orders_transactions` | GET | List transactions for an order |
-| `fluentcart_orders_transaction_details` | GET | Get detailed transaction info |
-| `fluentcart_orders_update_transaction_status` | PUT | Update a transaction's status |
-| `fluentcart_orders_accept_dispute` | POST | Accept a payment dispute |
-| `fluentcart_orders_calculate_shipping` | POST | Calculate shipping costs for an order |
-| `fluentcart_orders_shipping_methods` | GET | Get available shipping methods |
-| `fluentcart_orders_bulk_action` | POST | Bulk actions on multiple orders |
-| `fluentcart_orders_customer_paginated` | GET | Get paginated orders for a specific customer |
+| `fluentcart_order_transactions` | GET | List transactions for an order |
+| `fluentcart_order_transaction_get` | GET | Get detailed transaction info |
+| `fluentcart_order_transaction_update_status` | PUT | Update a transaction's status |
+| `fluentcart_order_accept_dispute` | POST | Accept a payment dispute |
+| `fluentcart_order_bulk_action` | POST | Bulk actions on multiple orders |
+| `fluentcart_order_calculate_shipping` | POST | Calculate shipping costs for an order |
+| `fluentcart_order_shipping_methods` | GET | Get available shipping methods |
+| `fluentcart_order_customer_orders` | GET | Get orders for a specific customer |
 
 </Accordion>
 <Accordion title="Products — Core (13 tools)">
@@ -76,39 +76,39 @@ Product CRUD, search, and bulk operations.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_products_list` | GET | List products with pagination and filtering |
-| `fluentcart_products_get` | GET | Get a single product by ID |
-| `fluentcart_products_create` | POST | Create a new product |
-| `fluentcart_products_delete` | DELETE | Delete a product |
-| `fluentcart_products_duplicate` | POST | Duplicate an existing product |
-| `fluentcart_products_bulk_action` | POST | Bulk actions on multiple products |
-| `fluentcart_products_search_by_name` | GET | Search products by name |
-| `fluentcart_products_search_variant_by_name` | GET | Search product variants by name |
-| `fluentcart_products_search_variant_options` | GET | Search variant options |
-| `fluentcart_products_suggest_sku` | GET | Generate a SKU suggestion |
-| `fluentcart_products_fetch_by_ids` | POST | Fetch multiple products by ID |
-| `fluentcart_products_fetch_variations_by_ids` | POST | Fetch multiple variations by ID |
-| `fluentcart_products_find_subscription_variants` | GET | Find subscription-enabled variants |
+| `fluentcart_product_list` | GET | List products with pagination and filtering |
+| `fluentcart_product_get` | GET | Get a single product by ID |
+| `fluentcart_product_create` | POST | Create a new product |
+| `fluentcart_product_delete` | DELETE | Delete a product |
+| `fluentcart_product_duplicate` | POST | Duplicate an existing product |
+| `fluentcart_product_bulk_action` | POST | Bulk actions on multiple products |
+| `fluentcart_product_update_detail` | PUT | Update product detail fields |
+| `fluentcart_product_search_by_name` | GET | Search products by name |
+| `fluentcart_product_search_variant_by_name` | GET | Search product variants by name |
+| `fluentcart_product_search_variant_options` | GET | Search variant options |
+| `fluentcart_product_suggest_sku` | GET | Generate a SKU suggestion |
+| `fluentcart_product_fetch_by_ids` | POST | Fetch multiple products by ID |
+| `fluentcart_product_find_subscription_variants` | GET | Find subscription-enabled variants |
 
 </Accordion>
 <Accordion title="Products — Pricing (12 tools)">
 
-Pricing, bundles, tax classes, shipping classes.
+Pricing, bundles, tax classes, shipping classes, stock management.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_products_pricing_get` | GET | Get pricing details for a product |
-| `fluentcart_products_pricing_update` | PUT | Update product pricing |
-| `fluentcart_products_pricing_widgets` | GET | Get pricing widget configuration |
-| `fluentcart_products_related` | GET | Get related products |
-| `fluentcart_products_bundle_info` | GET | Get bundle composition |
-| `fluentcart_products_bundle_save` | POST | Save bundle configuration |
-| `fluentcart_products_update_detail` | PUT | Update product detail fields |
-| `fluentcart_products_update_inventory` | PUT | Update stock levels |
-| `fluentcart_products_update_manage_stock` | PUT | Toggle inventory management on/off |
-| `fluentcart_products_update_tax_class` | PUT | Assign a tax class |
-| `fluentcart_products_remove_tax_class` | DELETE | Remove tax class |
-| `fluentcart_products_update_shipping_class` | PUT | Assign a shipping class |
+| `fluentcart_product_pricing_get` | GET | Get pricing details for a product |
+| `fluentcart_product_pricing_update` | PUT | Update product pricing |
+| `fluentcart_product_pricing_widgets` | GET | Get pricing widget configuration |
+| `fluentcart_product_related` | GET | Get related products |
+| `fluentcart_product_bundle_info` | GET | Get bundle composition |
+| `fluentcart_product_bundle_save` | POST | Save bundle configuration |
+| `fluentcart_product_tax_class_update` | PUT | Assign a tax class |
+| `fluentcart_product_tax_class_remove` | DELETE | Remove tax class |
+| `fluentcart_product_shipping_class_update` | PUT | Assign a shipping class |
+| `fluentcart_product_shipping_class_remove` | DELETE | Remove shipping class from a product |
+| `fluentcart_product_manage_stock_update` | PUT | Toggle inventory management on/off |
+| `fluentcart_product_inventory_update` | PUT | Update stock levels |
 
 </Accordion>
 <Accordion title="Products — Variants (10 tools)">
@@ -117,16 +117,16 @@ Variation management for variable products.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_products_variants_list_all` | GET | List all variants across products |
-| `fluentcart_products_variations_list` | GET | List variations for a specific product |
-| `fluentcart_products_variations_create` | POST | Create a new variation |
-| `fluentcart_products_variations_update` | PUT | Update a variation |
-| `fluentcart_products_variations_delete` | DELETE | Delete a variation |
-| `fluentcart_products_variations_set_media` | PUT | Set media/images for a variation |
-| `fluentcart_products_variations_update_pricing_table` | PUT | Update variation pricing tiers |
-| `fluentcart_products_variant_option_update` | PUT | Update a variant option |
-| `fluentcart_products_remove_shipping_class` | DELETE | Remove shipping class from a product |
-| `fluentcart_products_shipping_class_update` | PUT | Update shipping class assignment |
+| `fluentcart_variant_list_all` | GET | List all variants across products |
+| `fluentcart_variant_list` | GET | List variants for a specific product |
+| `fluentcart_variant_create` | POST | Create a new variant |
+| `fluentcart_variant_update` | PUT | Update a variant |
+| `fluentcart_variant_delete` | DELETE | Delete a variant |
+| `fluentcart_variant_set_media` | PUT | Set media/images for a variant |
+| `fluentcart_variant_pricing_table_update` | PUT | Update variant pricing tiers |
+| `fluentcart_product_variant_option_update` | PUT | Update a variant option |
+| `fluentcart_variant_fetch_by_ids` | POST | Fetch multiple variants by ID |
+| `fluentcart_variant_upgrade_paths` | GET | Get upgrade paths for a variant |
 
 </Accordion>
 <Accordion title="Products — Catalogue (18 tools)">
@@ -135,24 +135,24 @@ Downloads, upgrade paths, taxonomies, product-level integrations.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_products_sync_downloadable_files` | POST | Sync downloadable file list |
-| `fluentcart_products_update_downloadable_file` | PUT | Update a downloadable file |
-| `fluentcart_products_delete_downloadable_file` | DELETE | Remove a downloadable file |
-| `fluentcart_products_get_downloadable_url` | GET | Generate a download URL |
-| `fluentcart_products_variation_upgrade_paths` | GET | Get upgrade paths for a variation |
-| `fluentcart_products_upgrade_settings` | GET | Get upgrade settings |
-| `fluentcart_products_save_upgrade_setting` | POST | Save an upgrade path setting |
-| `fluentcart_products_update_upgrade_path` | PUT | Update an existing upgrade path |
-| `fluentcart_products_delete_upgrade_path` | DELETE | Delete an upgrade path |
-| `fluentcart_products_sync_taxonomy_terms` | POST | Sync taxonomy terms |
-| `fluentcart_products_delete_taxonomy_terms` | DELETE | Remove taxonomy terms |
-| `fluentcart_products_add_terms` | POST | Add terms to a product |
-| `fluentcart_products_fetch_terms` | GET | Fetch available taxonomy terms |
-| `fluentcart_products_fetch_term_by_parent` | GET | Get child terms of a parent |
-| `fluentcart_products_integrations` | GET | Get product-level integration settings |
-| `fluentcart_products_integration_settings` | GET | Get specific integration settings |
-| `fluentcart_products_save_integration` | POST | Save product integration config |
-| `fluentcart_products_delete_integration` | DELETE | Remove a product integration |
+| `fluentcart_product_sync_downloadable_files` | POST | Sync downloadable file list |
+| `fluentcart_product_downloadable_update` | PUT | Update a downloadable file |
+| `fluentcart_product_downloadable_delete` | DELETE | Remove a downloadable file |
+| `fluentcart_product_downloadable_url` | GET | Generate a download URL |
+| `fluentcart_product_upgrade_settings` | GET | Get upgrade settings |
+| `fluentcart_product_upgrade_path_save` | POST | Save an upgrade path |
+| `fluentcart_product_upgrade_path_update` | PUT | Update an existing upgrade path |
+| `fluentcart_product_upgrade_path_delete` | DELETE | Delete an upgrade path |
+| `fluentcart_product_terms` | GET | Fetch available taxonomy terms |
+| `fluentcart_product_terms_by_parent` | GET | Get child terms of a parent |
+| `fluentcart_product_terms_add` | POST | Add terms to a product |
+| `fluentcart_product_taxonomy_sync` | POST | Sync taxonomy terms |
+| `fluentcart_product_taxonomy_delete` | DELETE | Remove taxonomy terms |
+| `fluentcart_product_integrations` | GET | Get product-level integration settings |
+| `fluentcart_product_integration_settings` | GET | Get specific integration settings |
+| `fluentcart_product_integration_save` | POST | Save product integration config |
+| `fluentcart_product_integration_delete` | DELETE | Remove a product integration |
+| `fluentcart_product_integration_feed_status` | POST | Toggle product integration feed status |
 
 </Accordion>
 <Accordion title="Customers (19 tools)">
@@ -161,25 +161,25 @@ Profiles, addresses, stats, user linking.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_customers_list` | GET | List customers with search and pagination |
-| `fluentcart_customers_get` | GET | Get customer profile by ID |
-| `fluentcart_customers_create` | POST | Create a new customer |
-| `fluentcart_customers_update` | PUT | Update customer info |
-| `fluentcart_customers_update_additional` | PUT | Update additional customer fields |
-| `fluentcart_customers_orders_simple` | GET | Get customer's order list |
-| `fluentcart_customers_stats` | GET | Get customer statistics |
-| `fluentcart_customers_recalculate_ltv` | POST | Recalculate lifetime value |
-| `fluentcart_customers_addresses` | GET | List customer addresses |
-| `fluentcart_customers_address_select` | GET | Get address dropdown data |
-| `fluentcart_customers_address_create` | POST | Create a new address |
-| `fluentcart_customers_address_add` | POST | Add an existing address to a customer |
-| `fluentcart_customers_address_update` | PUT | Update an address |
-| `fluentcart_customers_address_delete` | DELETE | Delete an address |
-| `fluentcart_customers_address_make_primary` | POST | Set an address as primary |
-| `fluentcart_customers_attachable_users` | GET | Find WordPress users that can be linked |
-| `fluentcart_customers_attach_user` | POST | Link a WordPress user to a customer |
-| `fluentcart_customers_detach_user` | POST | Unlink a WordPress user |
-| `fluentcart_customers_bulk_action` | POST | Bulk customer operations |
+| `fluentcart_customer_list` | GET | List customers with search and pagination |
+| `fluentcart_customer_get` | GET | Get customer profile by ID |
+| `fluentcart_customer_create` | POST | Create a new customer |
+| `fluentcart_customer_update` | PUT | Update customer info |
+| `fluentcart_customer_update_additional_info` | PUT | Update additional customer fields |
+| `fluentcart_customer_orders_simple` | GET | Get customer's order list |
+| `fluentcart_customer_stats` | GET | Get customer statistics |
+| `fluentcart_customer_recalculate_ltv` | POST | Recalculate lifetime value |
+| `fluentcart_customer_addresses` | GET | List customer addresses |
+| `fluentcart_customer_address_select` | GET | Get address dropdown data |
+| `fluentcart_customer_address_create` | POST | Create a new address |
+| `fluentcart_customer_address_add` | POST | Add an existing address to a customer |
+| `fluentcart_customer_address_update` | PUT | Update an address |
+| `fluentcart_customer_address_delete` | DELETE | Delete an address |
+| `fluentcart_customer_address_make_primary` | POST | Set an address as primary |
+| `fluentcart_customer_attachable_users` | GET | Find WordPress users that can be linked |
+| `fluentcart_customer_attach_user` | POST | Link a WordPress user to a customer |
+| `fluentcart_customer_detach_user` | POST | Unlink a WordPress user |
+| `fluentcart_customer_bulk_action` | POST | Bulk customer operations |
 
 </Accordion>
 <Accordion title="Subscriptions (7 tools)">
@@ -188,13 +188,13 @@ The full subscription lifecycle. List, inspect, pause, resume, cancel, reactivat
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_subscriptions_list` | GET | List subscriptions with filtering |
-| `fluentcart_subscriptions_get` | GET | Get subscription by ID |
-| `fluentcart_subscriptions_fetch` | GET | Fetch subscription with gateway sync |
-| `fluentcart_subscriptions_cancel` | POST | Cancel a subscription |
-| `fluentcart_subscriptions_pause` | POST | Pause a subscription |
-| `fluentcart_subscriptions_resume` | POST | Resume a paused subscription |
-| `fluentcart_subscriptions_reactivate` | POST | Reactivate an expired/cancelled subscription |
+| `fluentcart_subscription_list` | GET | List subscriptions with filtering |
+| `fluentcart_subscription_get` | GET | Get subscription by ID |
+| `fluentcart_subscription_fetch` | GET | Fetch subscription with gateway sync |
+| `fluentcart_subscription_cancel` | POST | Cancel a subscription |
+| `fluentcart_subscription_pause` | POST | Pause a subscription |
+| `fluentcart_subscription_resume` | POST | Resume a paused subscription |
+| `fluentcart_subscription_reactivate` | POST | Reactivate an expired/cancelled subscription |
 
 **Statuses:** `active`, `trialing`, `paused`, `failing`, `past_due`, `expiring`, `canceled`, `expired`, `completed`
 
@@ -205,43 +205,42 @@ Creation, application, and eligibility checks.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_coupons_list` | GET | List coupons with pagination |
-| `fluentcart_coupons_list_alt` | GET | Alternative coupon listing |
-| `fluentcart_coupons_get` | GET | Get coupon by ID |
-| `fluentcart_coupons_create` | POST | Create a new coupon |
-| `fluentcart_coupons_update` | PUT | Update a coupon |
-| `fluentcart_coupons_delete` | DELETE | Delete a coupon |
-| `fluentcart_coupons_apply` | POST | Apply a coupon to an order |
-| `fluentcart_coupons_cancel` | POST | Remove a coupon from an order |
-| `fluentcart_coupons_reapply` | POST | Re-apply a previously removed coupon |
-| `fluentcart_coupons_check_eligibility` | POST | Check if a product qualifies |
-| `fluentcart_coupons_settings_get` | GET | Get coupon system settings |
-| `fluentcart_coupons_settings_save` | POST | Update coupon system settings |
+| `fluentcart_coupon_list` | GET | List coupons with pagination |
+| `fluentcart_coupon_list_alt` | GET | Alternative coupon listing |
+| `fluentcart_coupon_get` | GET | Get coupon by ID |
+| `fluentcart_coupon_create` | POST | Create a new coupon |
+| `fluentcart_coupon_update` | PUT | Update a coupon |
+| `fluentcart_coupon_delete` | DELETE | Delete a coupon |
+| `fluentcart_coupon_apply` | POST | Apply a coupon to an order |
+| `fluentcart_coupon_cancel` | POST | Remove a coupon from an order |
+| `fluentcart_coupon_reapply` | POST | Re-apply a previously removed coupon |
+| `fluentcart_coupon_check_eligibility` | POST | Check if a product qualifies |
+| `fluentcart_coupon_settings_get` | GET | Get coupon system settings |
+| `fluentcart_coupon_settings_save` | POST | Update coupon system settings |
 
 </Accordion>
-<Accordion title="Reports — Core (17 tools)">
+<Accordion title="Reports — Core (16 tools)">
 
 Revenue, sales, orders, and dashboard metrics.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_reports_overview` | GET | Full reports overview |
-| `fluentcart_reports_overview_single` | GET | Single report by type |
-| `fluentcart_reports_meta` | GET | Report metadata and filters |
-| `fluentcart_reports_dashboard_stats` | GET | Dashboard statistics |
-| `fluentcart_reports_revenue` | GET | Revenue report with date range |
-| `fluentcart_reports_revenue_by_group` | GET | Revenue by day/week/month |
-| `fluentcart_reports_sales` | GET | Sales report |
-| `fluentcart_reports_sales_growth` | GET | Sales growth metrics |
-| `fluentcart_reports_sales_growth_chart` | GET | Sales growth chart data |
-| `fluentcart_reports_order_chart` | GET | Order volume chart |
-| `fluentcart_reports_orders_by_group` | GET | Orders by time period |
-| `fluentcart_reports_quick_order_stats` | GET | Quick order summary |
-| `fluentcart_reports_recent_orders` | GET | Most recent orders |
-| `fluentcart_reports_unfulfilled_orders` | GET | Orders awaiting fulfilment |
-| `fluentcart_reports_license_summary` | GET | Licence key summary |
-| `fluentcart_reports_dashboard_summary` | GET | Dashboard summary widget |
-| `fluentcart_reports_recent_activities` | GET | Recent store activities |
+| `fluentcart_report_overview` | GET | Full reports overview |
+| `fluentcart_report_summary` | GET | Report summary by type |
+| `fluentcart_report_meta` | GET | Report metadata and filters |
+| `fluentcart_report_dashboard_stats` | GET | Dashboard statistics |
+| `fluentcart_report_revenue` | GET | Revenue report with date range |
+| `fluentcart_report_revenue_by_group` | GET | Revenue by day/week/month |
+| `fluentcart_report_sales` | GET | Sales report |
+| `fluentcart_report_sales_growth` | GET | Sales growth metrics |
+| `fluentcart_report_sales_growth_chart` | GET | Sales growth chart data |
+| `fluentcart_report_order_chart` | GET | Order volume chart |
+| `fluentcart_report_orders_by_group` | GET | Orders by time period |
+| `fluentcart_report_quick_order_stats` | GET | Quick order summary |
+| `fluentcart_report_recent_orders` | GET | Most recent orders |
+| `fluentcart_report_unfulfilled_orders` | GET | Orders awaiting fulfilment |
+| `fluentcart_report_dashboard_summary` | GET | Dashboard summary widget |
+| `fluentcart_report_recent_activities` | GET | Recent store activities |
 
 </Accordion>
 <Accordion title="Reports — Insights (14 tools)">
@@ -250,20 +249,20 @@ Product performance, customer behaviour, subscription trends, refund analysis.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_reports_product` | GET | Product-level report |
-| `fluentcart_reports_product_performance` | GET | Detailed product performance |
-| `fluentcart_reports_top_products_sold` | GET | Top-selling products |
-| `fluentcart_reports_top_sold_products` | GET | Alternative top products view |
-| `fluentcart_reports_top_sold_variants` | GET | Top-selling variants |
-| `fluentcart_reports_customer` | GET | Customer analytics |
-| `fluentcart_reports_new_vs_returning` | GET | New vs returning breakdown |
-| `fluentcart_reports_daily_signups` | GET | Daily signups |
-| `fluentcart_reports_repeat_customers` | GET | Repeat buyers |
-| `fluentcart_reports_refund_chart` | GET | Refund trends |
-| `fluentcart_reports_refund_by_group` | GET | Refunds by period |
-| `fluentcart_reports_subscription_chart` | GET | Subscription trends |
-| `fluentcart_reports_future_renewals` | GET | Upcoming renewals |
-| `fluentcart_reports_change_feed_status` | POST | Toggle integration feed status |
+| `fluentcart_report_product` | GET | Product-level report |
+| `fluentcart_report_product_performance` | GET | Detailed product performance |
+| `fluentcart_report_top_products_sold` | GET | Top-selling products |
+| `fluentcart_report_top_sold_products` | GET | Alternative top products view |
+| `fluentcart_report_top_sold_variants` | GET | Top-selling variants |
+| `fluentcart_report_customer` | GET | Customer analytics |
+| `fluentcart_report_new_vs_returning` | GET | New vs returning breakdown |
+| `fluentcart_report_daily_signups` | GET | Daily signups |
+| `fluentcart_report_repeat_customers` | GET | Repeat buyers |
+| `fluentcart_report_refund_chart` | GET | Refund trends |
+| `fluentcart_report_refund_by_group` | GET | Refunds by period |
+| `fluentcart_report_subscription_chart` | GET | Subscription trends |
+| `fluentcart_report_future_renewals` | GET | Upcoming renewals |
+| `fluentcart_report_license_summary` | GET | Licence key summary |
 
 </Accordion>
 <Accordion title="Order Bumps (5 tools)">
@@ -272,11 +271,11 @@ Post-purchase upsell offers.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_order_bumps_list` | GET | List all order bumps |
-| `fluentcart_order_bumps_get` | GET | Get order bump by ID |
-| `fluentcart_order_bumps_create` | POST | Create an order bump |
-| `fluentcart_order_bumps_update` | PUT | Update an order bump |
-| `fluentcart_order_bumps_delete` | DELETE | Delete an order bump |
+| `fluentcart_order_bump_list` | GET | List all order bumps |
+| `fluentcart_order_bump_get` | GET | Get order bump by ID |
+| `fluentcart_order_bump_create` | POST | Create an order bump |
+| `fluentcart_order_bump_update` | PUT | Update an order bump |
+| `fluentcart_order_bump_delete` | DELETE | Delete an order bump |
 
 </Accordion>
 <Accordion title="Product Options (10 tools)">
@@ -285,16 +284,16 @@ Attribute groups and terms — the building blocks of product variations.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_attribute_groups_list` | GET | List attribute groups (Size, Colour, etc.) |
-| `fluentcart_attribute_groups_get` | GET | Get an attribute group by ID |
-| `fluentcart_attribute_groups_create` | POST | Create a new attribute group |
-| `fluentcart_attribute_groups_update` | PUT | Update an attribute group |
-| `fluentcart_attribute_groups_delete` | DELETE | Delete an attribute group |
-| `fluentcart_attribute_terms_list` | GET | List terms in a group |
-| `fluentcart_attribute_terms_create` | POST | Create a term (e.g. "Large") |
-| `fluentcart_attribute_terms_update` | PUT | Update a term |
-| `fluentcart_attribute_terms_delete` | DELETE | Delete a term |
-| `fluentcart_attribute_terms_reorder` | PUT | Reorder terms |
+| `fluentcart_attribute_group_list` | GET | List attribute groups (Size, Colour, etc.) |
+| `fluentcart_attribute_group_get` | GET | Get an attribute group by ID |
+| `fluentcart_attribute_group_create` | POST | Create a new attribute group |
+| `fluentcart_attribute_group_update` | PUT | Update an attribute group |
+| `fluentcart_attribute_group_delete` | DELETE | Delete an attribute group |
+| `fluentcart_attribute_term_list` | GET | List terms in a group |
+| `fluentcart_attribute_term_create` | POST | Create a term (e.g. "Large") |
+| `fluentcart_attribute_term_update` | PUT | Update a term |
+| `fluentcart_attribute_term_delete` | DELETE | Delete a term |
+| `fluentcart_attribute_term_reorder` | PUT | Reorder terms |
 
 </Accordion>
 <Accordion title="Integrations (12 tools)">
@@ -303,18 +302,18 @@ Third-party addon and feed management.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_integrations_addons_list` | GET | List installed addons |
-| `fluentcart_integrations_global_settings_get` | GET | Get global integration settings |
-| `fluentcart_integrations_global_settings_save` | POST | Save global integration settings |
-| `fluentcart_integrations_global_feeds` | GET | List all integration feeds |
-| `fluentcart_integrations_feed_settings_get` | GET | Get feed settings |
-| `fluentcart_integrations_feed_settings_save` | POST | Save feed settings |
-| `fluentcart_integrations_feed_status_change` | POST | Enable/disable a feed |
-| `fluentcart_integrations_feed_delete` | DELETE | Delete a feed |
-| `fluentcart_integrations_feed_lists` | GET | Get available list options |
-| `fluentcart_integrations_dynamic_options` | GET | Get dynamic option values |
-| `fluentcart_integrations_chained_data` | GET | Get chained/dependent options |
-| `fluentcart_integrations_install_plugin` | POST | Install an integration plugin |
+| `fluentcart_integration_list_addons` | GET | List installed addons |
+| `fluentcart_integration_get_global_settings` | GET | Get global integration settings |
+| `fluentcart_integration_save_global_settings` | POST | Save global integration settings |
+| `fluentcart_integration_get_global_feeds` | GET | List all integration feeds |
+| `fluentcart_integration_get_feed_settings` | GET | Get feed settings |
+| `fluentcart_integration_save_feed_settings` | POST | Save feed settings |
+| `fluentcart_integration_change_feed_status` | POST | Enable/disable a feed |
+| `fluentcart_integration_delete_feed` | DELETE | Delete a feed |
+| `fluentcart_integration_get_feed_lists` | GET | Get available list options |
+| `fluentcart_integration_get_dynamic_options` | GET | Get dynamic option values |
+| `fluentcart_integration_get_chained_data` | GET | Get chained/dependent options |
+| `fluentcart_integration_install_plugin` | POST | Install an integration plugin |
 
 </Accordion>
 <Accordion title="Settings (8 tools)">
@@ -323,14 +322,14 @@ Store config, payment methods, permissions.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_settings_store_get` | GET | Get store settings |
-| `fluentcart_settings_store_save` | POST | Save store settings |
-| `fluentcart_settings_payment_methods` | GET | List all payment methods |
-| `fluentcart_settings_payment_method` | GET | Get a specific payment method's settings |
-| `fluentcart_settings_module` | GET | Get module settings |
-| `fluentcart_settings_permissions_get` | GET | Get permissions |
-| `fluentcart_settings_permissions_save` | POST | Save permissions |
-| `fluentcart_settings_confirmation_shortcodes` | GET | Get confirmation page shortcodes |
+| `fluentcart_settings_get_store` | GET | Get store settings |
+| `fluentcart_settings_save_store` | POST | Save store settings |
+| `fluentcart_payment_get_all` | GET | List all payment methods |
+| `fluentcart_payment_get_settings` | GET | Get a specific payment method's settings |
+| `fluentcart_settings_get_modules` | GET | Get module settings |
+| `fluentcart_settings_get_permissions` | GET | Get permissions |
+| `fluentcart_settings_save_permissions` | POST | Save permissions |
+| `fluentcart_settings_get_confirmation_shortcodes` | GET | Get confirmation page shortcodes |
 
 </Accordion>
 <Accordion title="Labels (3 tools)">
@@ -339,9 +338,9 @@ Order tagging and organisation.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_labels_list` | GET | List all labels |
-| `fluentcart_labels_create` | POST | Create a new label |
-| `fluentcart_labels_update_selections` | PUT | Update label assignments on orders |
+| `fluentcart_label_list` | GET | List all labels |
+| `fluentcart_label_create` | POST | Create a new label |
+| `fluentcart_label_update_selections` | PUT | Update label assignments on orders |
 
 </Accordion>
 <Accordion title="Activity (3 tools)">
@@ -361,7 +360,7 @@ Exactly what it sounds like.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
-| `fluentcart_notes_attach` | POST | Add a note to an order |
+| `fluentcart_note_attach` | POST | Add a note to an order |
 
 </Accordion>
 <Accordion title="Dashboard (2 tools)">
@@ -371,7 +370,7 @@ Store overview.
 | Tool | Method | What It Does |
 |------|--------|--------------|
 | `fluentcart_dashboard_onboarding` | GET | Get onboarding status |
-| `fluentcart_dashboard_stats` | GET | Get dashboard summary stats |
+| `fluentcart_dashboard_overview` | GET | Get dashboard overview stats |
 
 </Accordion>
 <Accordion title="Application (4 tools)">
@@ -381,9 +380,9 @@ App init and widgets.
 | Tool | Method | What It Does |
 |------|--------|--------------|
 | `fluentcart_app_init` | GET | Initialise the app (doubles as a connection test) |
-| `fluentcart_app_attachments` | GET | List attachments |
-| `fluentcart_app_upload_attachments` | POST | Upload attachments |
-| `fluentcart_app_widgets` | GET | Get dashboard widget data |
+| `fluentcart_app_get_attachments` | GET | List attachments |
+| `fluentcart_app_upload_attachment` | POST | Upload an attachment |
+| `fluentcart_app_get_widgets` | GET | Get dashboard widget data |
 
 </Accordion>
 <Accordion title="Public (4 tools)">
@@ -393,9 +392,9 @@ Unauthenticated endpoints. For storefronts and bots.
 | Tool | Method | What It Does |
 |------|--------|--------------|
 | `fluentcart_public_product_views` | GET | Get public product listing |
-| `fluentcart_public_search_products` | GET | Search products publicly |
-| `fluentcart_public_login` | POST | Customer login |
-| `fluentcart_public_welcome` | GET | Get store welcome message |
+| `fluentcart_public_product_search` | GET | Search products publicly |
+| `fluentcart_public_products` | GET | Get public product catalogue |
+| `fluentcart_public_user_login` | POST | Customer login |
 
 </Accordion>
 <Accordion title="Miscellaneous (4 tools)">
@@ -407,7 +406,7 @@ Lookup data that other tools depend on.
 | `fluentcart_misc_countries` | GET | List all countries |
 | `fluentcart_misc_country_info` | GET | Get states/provinces for a country |
 | `fluentcart_misc_filter_options` | GET | Get available filter options |
-| `fluentcart_misc_search_form_options` | GET | Search form field options |
+| `fluentcart_misc_form_search_options` | GET | Search form field options |
 
 </Accordion>
 </Accordions>
@@ -423,7 +422,7 @@ Lookup data that other tools depend on.
 | Customers | 19 | Profiles, addresses, stats |
 | Subscriptions | 7 | Lifecycle management |
 | Coupons | 12 | Discounts and promotions |
-| Reports (Core + Insights) | 31 | Analytics and metrics |
+| Reports (Core + Insights) | 30 | Analytics and metrics |
 | Order Bumps | 5 | Upsell offers |
 | Product Options | 10 | Attributes and terms |
 | Integrations | 12 | Third-party addons |
@@ -435,6 +434,6 @@ Lookup data that other tools depend on.
 | Application | 4 | App info |
 | Public | 4 | Public-facing |
 | Miscellaneous | 4 | Utilities |
-| **Total** | **~201** | |
+| **Total** | **200** | |
 
 And there's about 130 more coming in v1.1 — shipping, taxes, email templates, customer portal, checkout, and the niche analytics nobody asked for but I built anyway.

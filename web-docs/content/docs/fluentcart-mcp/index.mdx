@@ -52,15 +52,15 @@ I crammed over 200 tools into this thing, covering everything a store owner, sup
 Dead simple:
 
 1. **You ask** your AI something about your store — "Show me today's orders" or "Create a 20% off coupon"
-2. **The AI picks** the right tool and calls my MCP server
-3. **My server** makes an authenticated API call to your WordPress site
+2. **The AI picks** the right tool and calls the MCP server
+3. **The MCP server** makes an authenticated API call to your WordPress site
 4. **FluentCart** does the work and returns the data
 5. **The AI reads** the response and tells you what happened, in plain English
 
 You never touch the API. You never write JSON. You just talk to the thing like a normal person.
 
 <Callout type="warn" title="Your Store, Your Data">
-My server connects directly to **your** WordPress site using your credentials. Nothing passes through me, my servers, or any third party. I don't even have analytics. I built this thing and I have no idea how many people use it.
+The MCP server connects directly to **your** WordPress site using your credentials. Nothing passes through me, my servers, or any third party. I don't even have analytics. I built this thing and I have no idea how many people use it.
 </Callout>
 
 ## What You Need
@@ -70,7 +70,7 @@ Three things. That's it.
 | Requirement | Details |
 |-------------|---------|
 | **Node.js** | Version 22 or higher ([download](https://nodejs.org)) |
-| **WordPress** | Version 6.5+ with FluentCart installed |
+| **WordPress** | Version 5.6+ with FluentCart installed |
 | **Application Password** | A WordPress Application Password for API access |
 
 No extra plugins. No external API keys. WordPress Application Passwords have been built in since version 5.6 — if you're running something older than that, we need to have a different conversation entirely.
