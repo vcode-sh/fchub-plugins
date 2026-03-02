@@ -469,6 +469,41 @@ Then your AI client config simplifies to:
 Environment variables beat the config file. If you set `FLUENTCART_URL` as an env var and also have `url` in the config file, the env var wins. I check env vars first — deliberately.
 </Callout>
 
+## Interactive Setup Wizard
+
+Don't fancy editing JSON files by hand? Fair enough. The setup wizard walks you through it:
+
+```bash
+npx fluentcart-mcp setup
+```
+
+It asks three questions — your WordPress URL, username, and Application Password — then tests the connection against your site before saving anything. If the credentials are wrong, it tells you why and offers to retry. If they work, it writes the config file automatically.
+
+```
+┌  fluentcart-mcp setup
+│
+◇  WordPress URL
+│  https://your-store.com
+│
+◇  WordPress username
+│  admin
+│
+◇  Application Password
+│  ••••••••••••••••••••••••
+│
+◇  Connected to Your Store Name
+│
+◇  Config written to ~/.config/fluentcart-mcp/config.json
+│
+└  You're all set. Run fluentcart-mcp to start the server.
+```
+
+After that, your AI client configs don't need any credentials — the MCP server reads them from the config file. One wizard run, every client covered.
+
+<Callout type="info" title="When to use the wizard">
+The wizard creates the same `~/.config/fluentcart-mcp/config.json` file described above. The only difference is that it validates your credentials before saving, so you find out immediately if something's wrong — rather than discovering it mid-conversation when your AI tries to list orders and gets a 401 instead.
+</Callout>
+
 ## Multiple Stores
 
 Managing more than one store? Create separate MCP server entries:
