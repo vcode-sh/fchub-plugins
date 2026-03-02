@@ -1,0 +1,69 @@
+{
+  "name": "fluentcart-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the FluentCart REST API — AI-agent-friendly tools for managing orders, products, customers, subscriptions, and more.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "fluentcart-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "fluentcart",
+    "wordpress",
+    "ecommerce",
+    "ai",
+    "agent",
+    "orders",
+    "products",
+    "subscriptions"
+  ],
+  "author": "Vibe Code <hello@vcode.sh>",
+  "license": "MIT",
+  "homepage": "https://github.com/vcode-sh/fluentcart-mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vcode-sh/fluentcart-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vcode-sh/fluentcart-mcp/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.5",
+    "@types/node": "^25.3.3",
+    "@vitest/coverage-v8": "^4.0.18",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
