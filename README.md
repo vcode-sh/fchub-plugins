@@ -13,6 +13,14 @@ Monorepo for FCHub WordPress plugins — the FluentCart ecosystem extensions tha
 
 All plugins require [FluentCart](https://fluentcart.com) and WordPress 6.0+ / PHP 7.4+.
 
+## Translations
+
+| Language | Status | Path |
+|----------|--------|------|
+| [Polish (pl_PL)](translations/fluent-cart/) | ~96% translated | `translations/fluent-cart/` |
+
+Community translations for FluentCart. PRs welcome — see the [translation README](translations/fluent-cart/README.md) for how to contribute.
+
 ## Build
 
 ```bash
@@ -84,6 +92,8 @@ plugins/
   fchub-fakturownia/      Invoice integration
   fchub-memberships/      Membership system (Vue admin, 15k+ LOC)
   wc-fc/                  WooCommerce migrator
+translations/
+  fluent-cart/            Polish translation (.po/.mo/.pot)
 .github/workflows/
   release.yml             Tag → ZIP → GitHub Release
   ci.yml                  PR checks (PHPUnit + Vite)
