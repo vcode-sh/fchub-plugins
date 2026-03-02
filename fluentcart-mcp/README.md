@@ -1,8 +1,8 @@
 # fluentcart-mcp
 
-I built an MCP server for [FluentCart](https://fluentcart.com). It gives AI assistants direct access to your store — orders, products, customers, subscriptions, coupons, reports, the lot. 200+ tools, open source, MIT licensed.
+I built an MCP server for [FluentCart](https://fluentcart.com). It gives AI assistants direct access to your store — orders, products, customers, subscriptions, coupons, reports, the lot. 200 tools, open source, MIT licensed.
 
-Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Codex CLI, and anything else that speaks MCP.
+Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Codex CLI, ChatGPT, and anything else that speaks MCP.
 
 ## Quick Start
 
@@ -39,6 +39,26 @@ claude mcp add fluentcart \
 ### Cursor / VS Code / Windsurf
 
 Same JSON config as Claude Desktop — paste into your MCP settings file. [Full setup guide](https://fchub.co/docs/fluentcart-mcp/setup) has platform-specific paths.
+
+### Docker
+
+For remote access, ChatGPT, or always-on deployments — run the HTTP transport in Docker:
+
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -e FLUENTCART_URL=https://your-store.com \
+  -e FLUENTCART_USERNAME=admin \
+  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
+  -e FLUENTCART_MCP_API_KEY=your-secret-key \
+  vcodesh/fluentcart-mcp
+```
+
+Your MCP endpoint is now at `http://localhost:3000/mcp`. Point ChatGPT or any HTTP-capable MCP client at it.
+
+The `FLUENTCART_MCP_API_KEY` is optional but recommended — if set, every request needs `Authorization: Bearer your-secret-key`. Without it, anyone who finds your endpoint can talk to your store. Your call.
+
+Also available on GitHub Container Registry: `ghcr.io/vcode-sh/fluentcart-mcp`.
 
 ## Authentication
 
@@ -78,9 +98,18 @@ FLUENTCART_APP_PASSWORD=aBcD eFgH iJkL mNoP qRsT uVwX
 npx fluentcart-mcp setup
 ```
 
+## Transports
+
+| Transport | Flag | Use Case |
+|-----------|------|----------|
+| **stdio** (default) | — | Local clients: Claude Desktop, Cursor, VS Code |
+| **HTTP** | `--transport http` | Remote clients: ChatGPT, VPS deployments, Docker |
+
+HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and `--host`). Stateless — each request creates a fresh server instance.
+
 ## What's Inside
 
-I built 200+ tools across 17 modules:
+200 tools across 17 modules:
 
 | Module | Tools | What It Covers |
 |--------|-------|----------------|
@@ -118,13 +147,14 @@ Once connected, just talk:
 
 ## Requirements
 
-- **Node.js** >= 22.0.0
+- **Node.js** >= 22.0.0 (for npx/stdio mode)
+- **Docker** (for HTTP/container mode — no Node.js needed)
 - **WordPress** >= 5.6 with FluentCart installed
 - **Administrator** WordPress account
 
 ## Documentation
 
-Full docs with setup guides for every platform, usage examples, and troubleshooting:
+Full docs with setup guides for every platform, usage examples, deployment guides, and troubleshooting:
 
 **[fchub.co/docs/fluentcart-mcp](https://fchub.co/docs/fluentcart-mcp)**
 

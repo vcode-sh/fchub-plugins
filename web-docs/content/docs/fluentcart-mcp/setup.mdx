@@ -80,7 +80,7 @@ The URL is the root of your WordPress site. No trailing slash. No `/wp-admin/`. 
 
 Pick your weapon. Each one takes about 60 seconds.
 
-<Tabs items={['Claude Desktop', 'Claude Code', 'Cursor', 'VS Code + Copilot', 'Windsurf', 'Codex CLI']}>
+<Tabs items={['Claude Desktop', 'Claude Code', 'Cursor', 'VS Code + Copilot', 'Windsurf', 'Codex CLI', 'Docker (Remote)']}>
 <Tab value="Claude Desktop">
 
 ### Claude Desktop
@@ -371,6 +371,53 @@ In `~/.codex/config.json`:
 Start a Codex session and ask about your store. The server starts automatically.
 </Step>
 </Steps>
+
+</Tab>
+<Tab value="Docker (Remote)">
+
+### Docker — Remote / VPS / ChatGPT
+
+If you want a persistent MCP endpoint that remote clients (ChatGPT, custom agents, other machines) can reach — run the Docker image. No Node.js install needed.
+
+<Steps>
+<Step>
+### Pull and run
+
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -e FLUENTCART_URL=https://your-store.com \
+  -e FLUENTCART_USERNAME=admin \
+  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
+  -e FLUENTCART_MCP_API_KEY=pick-a-strong-secret \
+  --name fluentcart-mcp \
+  vcodesh/fluentcart-mcp
+```
+
+That's it. The image runs the HTTP transport on port 3000 automatically.
+
+</Step>
+<Step>
+### Verify
+
+```bash
+curl http://localhost:3000/health
+```
+
+Should return `{"status":"ok"}`. If it does, your MCP endpoint is live at `http://localhost:3000/mcp`.
+
+</Step>
+<Step>
+### Connect your AI client
+
+Point any HTTP-capable MCP client at your endpoint. For ChatGPT, paste the URL into the MCP server configuration. For remote access, put it behind a reverse proxy or Cloudflare Tunnel — the [Deployment Guide](/docs/fluentcart-mcp/deployment) walks you through it.
+
+</Step>
+</Steps>
+
+<Callout type="warn" title="Set FLUENTCART_MCP_API_KEY">
+The `FLUENTCART_MCP_API_KEY` protects the MCP endpoint with a bearer token. Without it, anyone who finds your URL gets full access to your store. I'm not your mum, but I am telling you to set it.
+</Callout>
 
 </Tab>
 </Tabs>

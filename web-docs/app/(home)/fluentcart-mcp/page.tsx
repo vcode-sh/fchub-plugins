@@ -7,13 +7,16 @@ import {
 	Bot,
 	Check,
 	ClipboardCopy,
+	Container,
 	CreditCard,
+	Globe,
 	LayoutDashboard,
 	Package,
 	Receipt,
 	RefreshCw,
 	ShoppingCart,
 	Tag,
+	Terminal,
 	TrendingUp,
 	Users,
 } from "lucide-react";
@@ -100,7 +103,7 @@ const capabilities = [
 	{
 		icon: TrendingUp,
 		title: "Reports",
-		count: 31,
+		count: 30,
 		description: "Revenue, sales, top products, customer insights",
 	},
 ];
@@ -123,6 +126,27 @@ const prompts = [
 	"Which products sold the most this week?",
 	"Refund order #1234",
 	"Create a digital product at $99",
+];
+
+const installMethods = [
+	{
+		icon: Terminal,
+		title: "npx",
+		command: "npx -y fluentcart-mcp",
+		description: "Zero install. Runs locally via stdio.",
+	},
+	{
+		icon: Container,
+		title: "Docker",
+		command: "docker pull vcodesh/fluentcart-mcp",
+		description: "HTTP transport on port 3000. For VPS and remote clients.",
+	},
+	{
+		icon: Globe,
+		title: "Smithery",
+		command: "npx -y @smithery/cli install fluentcart-mcp",
+		description: "One-click from the Smithery directory.",
+	},
 ];
 
 const QUICK_START_CMD = "claude mcp add fluentcart -- npx -y fluentcart-mcp";
@@ -366,6 +390,63 @@ export default function FluentCartMcpPage() {
 							</div>
 						))}
 					</div>
+				</motion.div>
+			</motion.div>
+
+			{/* Install Methods */}
+			<motion.div
+				initial="hidden"
+				animate="visible"
+				variants={containerVariants}
+				className="max-w-4xl w-full mb-16"
+			>
+				<motion.div variants={itemVariants} className="mb-6">
+					<h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+						Install Your Way
+					</h2>
+				</motion.div>
+				<motion.div
+					variants={containerVariants}
+					className="grid grid-cols-1 md:grid-cols-3 gap-4"
+				>
+					{installMethods.map((method) => {
+						const Icon = method.icon;
+						return (
+							<motion.div key={method.title} variants={itemVariants}>
+								<Card className="h-full gap-0 py-0">
+									<CardHeader className="py-3">
+										<div className="flex items-center gap-2">
+											<Icon className="size-4 text-muted-foreground" />
+											<CardTitle className="text-sm">{method.title}</CardTitle>
+										</div>
+									</CardHeader>
+									<CardContent className="pb-4 space-y-2">
+										<code className="block bg-muted rounded px-3 py-2 text-xs font-mono overflow-x-auto">
+											{method.command}
+										</code>
+										<CardDescription className="text-xs">
+											{method.description}
+										</CardDescription>
+									</CardContent>
+								</Card>
+							</motion.div>
+						);
+					})}
+				</motion.div>
+				<motion.div variants={itemVariants} className="mt-4">
+					<Link href="/docs/fluentcart-mcp/deployment" className="group">
+						<Card className="gap-0 py-0 transition-colors hover:border-primary/30">
+							<CardContent className="flex items-center gap-3 py-3">
+								<Globe className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
+								<div className="flex-1">
+									<CardTitle className="text-sm">
+										VPS deployment guide — Docker, Dokploy, Cloudflare Tunnel
+									</CardTitle>
+								</div>
+								<ArrowRight className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
+							</CardContent>
+						</Card>
+					</Link>
 				</motion.div>
 			</motion.div>
 
