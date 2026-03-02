@@ -21,3 +21,7 @@ Thumbs.db
 
 # Debug
 *.log
+
+# Local
+.claude/
+voice-tone.md
