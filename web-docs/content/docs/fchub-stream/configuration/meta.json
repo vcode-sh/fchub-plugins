@@ -1,0 +1,4 @@
+{
+  "title": "Configuration",
+  "pages": ["cloudflare-stream", "bunny-net"]
+}

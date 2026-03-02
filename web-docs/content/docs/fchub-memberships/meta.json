@@ -1,0 +1,29 @@
+{
+  "title": "Memberships",
+  "root": true,
+  "description": "Complete membership system for FluentCart.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "quick-start",
+    "---Core Features---",
+    "plans",
+    "content-protection",
+    "drip",
+    "trials",
+    "---Communication---",
+    "emails",
+    "shortcodes",
+    "---Integrations---",
+    "fluentcrm",
+    "fluentcommunity",
+    "---Analytics & Admin---",
+    "reports",
+    "---Developer---",
+    "developer-reference",
+    "---Reference---",
+    "troubleshooting",
+    "changelog"
+  ]
+}

@@ -1,0 +1,65 @@
+---
+title: How it works?
+description: Upload flow explained. Direct to streaming CDN. WordPress server never touches the file. Configure once, works forever.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Upload, Zap, Webhook, MessageSquare, Shield } from 'lucide-react';
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
+
+## How It Works
+
+The short version: videos upload directly to Cloudflare Stream or Bunny.net. Your WordPress server never touches the file. No media library gymnastics. No manual conversion. Just works.
+
+### Upload Flow
+
+Here's what happens when someone uploads a video (spoiler: it's simpler than WordPress media library):
+
+1. **User creates post/comment** in FluentCommunity (normal stuff)
+2. **Clicks video upload** button or drags & drops (desktop users get the luxury)
+3. **File validation** runs (format check, size check, permission check - the boring but necessary part)
+4. **Direct upload** starts to streaming provider (your WordPress server? Never heard of it. Files go straight to Cloudflare/Bunny)
+5. **Provider processes** video (transcoding, optimization, all the magic that makes videos actually play)
+6. **Status polling** checks every 10s (or webhook callback if you configured it - webhooks are cooler but polling works fine)
+7. **Video player** embeds automatically when ready (no refresh needed, no manual iframe copy-paste)
+
+<div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+  <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: '8px', overflow: 'hidden' }}>
+    <iframe
+      src="https://player.mediadelivery.net/embed/527650/c98729bf-d379-4fd9-998f-a69e570143b7?autoplay=false&loop=false&muted=false&preload=true&responsive=true"
+      loading="lazy"
+      style={{ border: 0, position: 'absolute', top: 0, height: '100%', width: '100%' }}
+      allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;"
+      allowFullScreen={true}
+    />
+  </div>
+</div>
+
+### Admin Experience
+
+Setup takes 5 minutes. Maybe 10 if provider dashboards confuse you (they will). Here's the drill:
+
+1. **Install plugin** (download from [GitHub Releases](https://github.com/vcode-sh/fchub-plugins/releases), standard WordPress install - you've done this before)
+2. **Choose provider** (Cloudflare Stream or Bunny.net - pick one, both work, don't overthink it)
+3. **Add API credentials** (copy-paste from provider dashboard - yes, finding API keys is tedious, I know)
+4. **Configure upload settings** (max size, allowed formats, who can upload - set it once, forget it)
+5. **Enable video in posts and/or comments** (checkbox, save - revolutionary UX, I know)
+6. **Done**
+
+Configure once. Works forever. Or until WordPress updates break something unrelated (it happens, I'm not responsible for WordPress being WordPress).
+
+### User Experience
+
+For end users, it's stupidly simple (which is the point):
+
+1. **Create post or comment** (like normal - nothing changes here)
+2. **Upload video** (drag & drop or click button - same as images, different file type)
+3. **Wait for processing** (1-5 minutes, depends on video length - yes, encoding takes time, that's how video works)
+4. **Video plays automatically** (player embeds when ready - no refresh, no manual steps, just works)
+
+No training needed. If they can upload an image, they can upload video. Same experience, different file type. Revolutionary? No. Functional? Yes. That's the bar I'm clearing here.
+
+<Separator className="my-8" />

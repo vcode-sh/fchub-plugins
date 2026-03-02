@@ -1,0 +1,221 @@
+---
+title: Shortcodes & Blocks
+description: Frontend shortcodes and Gutenberg blocks for restricting content, showing membership status, displaying drip progress, and building member account pages.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Memberships provides 4 shortcodes and 2 Gutenberg blocks for adding membership-aware functionality to your frontend pages.
+
+## Shortcodes
+
+<Tabs items={['fchub_restrict', 'fchub_membership_status', 'fchub_drip_progress', 'fchub_my_memberships']}>
+<Tab value="fchub_restrict">
+
+### `[fchub_restrict]` — Content Restriction
+
+A wrapping shortcode that shows or hides its inner content based on membership access.
+
+**Usage:**
+```
+[fchub_restrict plan="pro"]
+This content is only visible to Pro members.
+[/fchub_restrict]
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `plan` | string | `''` | Comma-separated list of plan slugs. Member must have at least one of these plans |
+| `resource_type` | string | `''` | WordPress resource type to check (e.g., `post`, `page`). Defaults to current post's type |
+| `resource_id` | string | `''` | Resource ID to check. Defaults to current post ID |
+| `message` | string | `''` | Custom restriction message for non-members. Falls back to the global default |
+| `show_login` | string | `'yes'` | Show a login button for logged-out visitors (`yes` or `no`) |
+| `drip_message` | string | `''` | Custom message for drip-locked content. Supports `{date}` placeholder |
+
+**Behavior:**
+
+1. **Not logged in** — Shows the restriction message with an optional login button
+2. **Logged in, no access** — Shows the restriction message
+3. **Logged in, drip locked** — Shows the drip message with the unlock date
+4. **Logged in, has access** — Shows the wrapped content
+
+**Examples:**
+
+Restrict by plan:
+```
+[fchub_restrict plan="pro,enterprise"]
+Premium content here.
+[/fchub_restrict]
+```
+
+Restrict with custom messages:
+```
+[fchub_restrict plan="pro" message="Upgrade to Pro to read this." drip_message="This lesson opens on {date}."]
+Lesson content here.
+[/fchub_restrict]
+```
+
+Restrict by specific resource:
+```
+[fchub_restrict resource_type="page" resource_id="42"]
+Content protected by page 42's membership rules.
+[/fchub_restrict]
+```
+
+<Callout type="info" title="Post Context">
+When `resource_type` and `resource_id` are not specified, the shortcode defaults to checking the current post. This means you can use `[fchub_restrict plan="pro"]` inside any post and it will check if the current user has the Pro plan.
+</Callout>
+
+</Tab>
+<Tab value="fchub_membership_status">
+
+### `[fchub_membership_status]` — Status Display
+
+Shows the current user's active membership plans as badges.
+
+**Usage:**
+```
+[fchub_membership_status]
+[fchub_membership_status display="full"]
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `display` | string | `'compact'` | Display mode: `compact` (plan names only) or `full` (names + expiry + drip progress) |
+
+**Compact mode** shows just the plan name badges:
+```
+Pro Membership | Video Add-on
+```
+
+**Full mode** shows plan names with additional details:
+- Expiration date (or "Lifetime access")
+- Drip progress bar (if the plan has drip rules)
+
+If the user has no active memberships, it shows "You do not have any active memberships."
+
+Returns nothing if the user is not logged in.
+
+</Tab>
+<Tab value="fchub_drip_progress">
+
+### `[fchub_drip_progress]` — Drip Progress Bar
+
+Shows a visual progress bar for a specific plan's drip content.
+
+**Usage:**
+```
+[fchub_drip_progress plan="pro"]
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `plan` | string | `''` | **Required.** The plan slug to show progress for |
+
+**Output:**
+
+A progress bar showing "X of Y items unlocked (Z%)" with a visual track and fill bar.
+
+Returns nothing if:
+- The user is not logged in
+- The plan slug is not specified or doesn't exist
+- The user doesn't have any active grants for this plan
+
+</Tab>
+<Tab value="fchub_my_memberships">
+
+### `[fchub_my_memberships]` — Full Account Page
+
+A comprehensive membership account page showing all active plans, content libraries, drip progress, and history.
+
+**Usage:**
+```
+[fchub_my_memberships]
+```
+
+**No parameters** — this shortcode renders the complete account experience.
+
+**Sections:**
+
+1. **Active Memberships** — Each plan shows:
+   - Plan name badge
+   - Expiration date or "Lifetime access"
+   - Drip progress bar (if applicable)
+   - Content library with links to unlocked items and unlock dates for locked items
+
+2. **History** — Past membership activity:
+   - Plan name
+   - Status (expired, revoked, etc.)
+   - Date
+
+For logged-out users, it shows a login prompt. For users with no memberships, it shows an empty state message.
+
+<Callout type="info" title="Account Page Setup">
+Create a WordPress page, add `[fchub_my_memberships]` as the only content, and set it as your account page in **Memberships > Settings** (via the `account_page_id` setting). This page is referenced in email templates via the `{account_url}` smart code.
+</Callout>
+
+</Tab>
+</Tabs>
+
+<Separator />
+
+## Gutenberg Blocks
+
+FCHub Memberships registers two Gutenberg blocks that provide the same functionality as the shortcodes but with a visual editor interface.
+
+### fchub-memberships/restrict <Badge>Block</Badge>
+
+The content restriction block wraps inner blocks and restricts visibility based on membership.
+
+**Block Attributes:**
+
+| Attribute | Type | Description |
+|---|---|---|
+| `plan_slugs` | string | Comma-separated plan slugs |
+| `resource_type` | string | Resource type to check |
+| `resource_id` | string | Resource ID to check |
+| `restriction_message` | string | Custom message for non-members |
+
+This block uses server-side rendering — it calls the same `Shortcodes::renderRestrict()` method as the shortcode. In the block editor, you see a visual wrapper around the inner content with plan configuration in the sidebar inspector.
+
+### fchub-memberships/membership-status <Badge>Block</Badge>
+
+Displays the membership status, equivalent to the `[fchub_membership_status]` shortcode.
+
+**Block Attributes:**
+
+| Attribute | Type | Description |
+|---|---|---|
+| `display` | string | `compact` or `full` |
+
+Also uses server-side rendering via `Shortcodes::renderMembershipStatus()`.
+
+## Editor Assets
+
+The block editor loads:
+- `assets/js/blocks.js` — block registration scripts (depends on `wp-blocks`, `wp-element`, `wp-block-editor`, `wp-components`, `wp-i18n`)
+- `assets/css/frontend.css` — shared frontend and editor styles
+
+## Frontend CSS
+
+All shortcodes and blocks enqueue `fchub-memberships-frontend` stylesheet (`assets/css/frontend.css`). This provides styling for:
+
+- `.fchub-membership-restricted` — restriction message container
+- `.fchub-plan-badge` — plan name badges
+- `.fchub-drip-progress` — progress bar track and fill
+- `.fchub-content-library` — content list in account page
+- `.fchub-content-locked` — locked content items with dates
+- `.fchub-btn` — button styling (login, CTA)
+- `.fchub-membership-account` — account page layout
+- `.fchub-membership-history` — history section
+
+The CSS uses neutral colors and clean layout. You can override any styles in your theme's stylesheet since the plugin styles use standard specificity.

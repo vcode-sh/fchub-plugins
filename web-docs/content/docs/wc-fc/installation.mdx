@@ -1,0 +1,89 @@
+---
+title: Installation
+description: Install and activate the WC-FC Migrator plugin. Both WooCommerce and FluentCart must be active before the migrator will load.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+## Requirements
+
+Before installing, make sure your site meets these requirements:
+
+| Requirement | Details |
+|---|---|
+| WordPress | 6.0 or higher |
+| PHP | 7.4 or higher |
+| WooCommerce | Installed and active |
+| FluentCart | Installed and active |
+| WC Subscriptions | Optional — only needed if you want to migrate subscriptions |
+| PHP Memory | 256 MB recommended (128 MB minimum) |
+
+<Callout type="warn" title="Both plugins must be active">
+WC-FC Migrator requires both WooCommerce **and** FluentCart to be active at the same time. If either plugin is deactivated, the migrator will show an admin notice and will not load its migration interface or REST endpoints.
+</Callout>
+
+## Install the Plugin
+
+<Steps>
+  <Step>
+    ### Download the plugin
+
+    Download the `wc-fc.zip` file from the [GitHub releases page](https://github.com/vcode-sh/fchub-plugins/releases).
+  </Step>
+  <Step>
+    ### Upload to WordPress
+
+    Go to **Plugins > Add New > Upload Plugin** in your WordPress admin. Select the `wc-fc.zip` file and click **Install Now**.
+
+    Alternatively, extract the zip and upload the `wc-fc` folder to `/wp-content/plugins/` via FTP or your hosting file manager.
+  </Step>
+  <Step>
+    ### Activate the plugin
+
+    Go to **Plugins** and click **Activate** on "FCHub - WC Migrator".
+
+    On activation, the plugin creates two database tables:
+
+    - **`wp_wc_fc_id_map`** — Stores the mapping between WooCommerce IDs and FluentCart IDs for every migrated record
+    - **`wp_wc_fc_migration_log`** — Stores detailed log entries for every record processed during migration
+
+    These tables use your WordPress table prefix (shown as `wp_` above).
+  </Step>
+  <Step>
+    ### Access the migrator
+
+    After activation, go to **Tools > WC-FC Migrator** in the WordPress admin sidebar. This is where you will run preflight checks, start the migration, and monitor progress.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Verifying the Installation
+
+After activation, confirm everything is working:
+
+1. Navigate to **Tools > WC-FC Migrator** — you should see the migration interface
+2. If you see an error notice saying "FCHub - WC Migrator requires WooCommerce and FluentCart to be active", check that both plugins are activated
+3. The [preflight check](/docs/wc-fc/preflight) will verify your environment in detail before you start any migration
+
+<Callout type="info" title="Database tables">
+If you need to verify the tables were created, check your database for `wp_wc_fc_id_map` and `wp_wc_fc_migration_log` (with your actual table prefix). These are created using WordPress `dbDelta()` on activation and will not overwrite existing tables.
+</Callout>
+
+## After Migration
+
+WC-FC Migrator is a one-time tool. Once you have completed and verified your migration:
+
+1. Go to **Plugins** and **Deactivate** "FCHub - WC Migrator"
+2. You can safely delete the plugin — uninstalling will drop the `wc_fc_id_map` and `wc_fc_migration_log` tables and remove the `wcfc_migration_state` option
+3. If you want to keep the migration log and ID map for reference, deactivate without deleting
+
+<Callout type="warn" title="Keep the plugin until you are sure">
+Do not uninstall (delete) the plugin until you have fully verified your migrated data in FluentCart. The ID mapping table and migration log are deleted on uninstall. If you need to rollback, you need the plugin active with its tables intact.
+</Callout>
+
+## Next Steps
+
+With the plugin installed and active, proceed to [Preflight Checks](/docs/wc-fc/preflight) to validate your environment before starting the migration.

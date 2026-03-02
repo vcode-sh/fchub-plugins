@@ -1,0 +1,93 @@
+---
+title: Installation
+description: How to install and activate FCHub Fakturownia on your WordPress site with FluentCart.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Getting FCHub Fakturownia up and running takes a few minutes. The plugin installs like any standard WordPress plugin and activates as a FluentCart integration module.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- **WordPress 6.0+** installed and running
+- **PHP 7.4+** on your server
+- **FluentCart** installed and activated (the plugin won't work without it)
+- A **Fakturownia account** with API access enabled
+
+<Callout type="warn" title="FluentCart Is Required">
+FCHub Fakturownia is a FluentCart integration plugin. If FluentCart is not active when you activate the plugin, you'll see an admin notice reminding you to install it. The plugin will remain dormant until FluentCart is available.
+</Callout>
+
+<Separator className="my-8" />
+
+## Installation Steps
+
+<Steps>
+  <Step>
+    ### Download the Plugin
+
+    Download the latest `fchub-fakturownia.zip` file from the [GitHub releases page](https://github.com/vcode-sh/fchub-plugins/releases). The zip file contains everything you need -- no additional dependencies or Composer steps required.
+  </Step>
+  <Step>
+    ### Upload to WordPress
+
+    Go to **Plugins > Add New > Upload Plugin** in your WordPress admin. Choose the zip file you downloaded and click **Install Now**.
+
+    Alternatively, you can extract the zip and upload the `fchub-fakturownia` folder to `/wp-content/plugins/` via FTP or your hosting file manager.
+  </Step>
+  <Step>
+    ### Activate the Plugin
+
+    After installation, click **Activate Plugin**. If FluentCart is active, the plugin will register itself as an integration module immediately.
+
+    You should see "FCHub - Fakturownia" in your **Plugins** list with the description: *"Fakturownia invoice integration with KSeF 2.0 support for FluentCart."*
+  </Step>
+  <Step>
+    ### Verify in FluentCart
+
+    Navigate to **FluentCart > Settings > Integrations**. You should see a **Fakturownia** card in the integration modules list. The card will show as disabled until you configure your API credentials.
+
+    Click the Fakturownia card to open the settings page, or navigate directly to **FluentCart > Settings > Integrations > Fakturownia**.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Where Settings Appear
+
+Once activated, the Fakturownia integration settings are available at:
+
+**FluentCart > Settings > Integrations > Fakturownia**
+
+This is where you'll enter your Fakturownia domain, API token, department ID, and configure invoice preferences. The settings page is part of FluentCart's built-in integration management system.
+
+<Callout type="info" title="Direct URL">
+You can also access the settings directly via the WordPress admin URL:
+`/wp-admin/admin.php?page=fluent-cart#/integrations/fakturownia`
+</Callout>
+
+<Separator className="my-8" />
+
+## After Installation
+
+With the plugin activated, your next step is to [configure your Fakturownia connection](/docs/fchub-fakturownia/configuration). You'll need your Fakturownia subdomain and API token to get started.
+
+<Separator className="my-8" />
+
+## Uninstallation
+
+If you deactivate the plugin, the scheduled KSeF status check cron job is automatically cleared. Your existing invoice data (stored as FluentCart order metadata) remains intact.
+
+If you fully delete the plugin through WordPress, the uninstaller will:
+
+1. Remove the Fakturownia integration settings from the database
+2. Clean up all Fakturownia-related order metadata from the `fct_order_meta` table
+
+<Callout type="warn" title="Data Removal on Delete">
+Deleting the plugin (not just deactivating) permanently removes all stored invoice metadata from your orders. This includes invoice numbers, PDF links, and KSeF IDs. Your invoices in Fakturownia itself are not affected -- only the local references are removed.
+</Callout>

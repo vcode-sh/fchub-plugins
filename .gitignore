@@ -19,6 +19,10 @@ Thumbs.db
 # Local build output
 /dist/
 
+# Next.js / Fumadocs (web-docs)
+.next/
+.source/
+
 # Debug
 *.log
 

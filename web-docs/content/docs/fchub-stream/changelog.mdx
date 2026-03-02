@@ -1,0 +1,592 @@
+---
+title: Changelog
+description: Version history. What broke. What got fixed. What's new. Built out of media library trauma. Documented out of necessity.
+---
+
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Package, Bug, Sparkles, Wrench, AlertTriangle } from 'lucide-react';
+
+All notable changes to FCHub Stream. Check here before updating. See what's new, what's fixed, what broke.
+
+If you're the type who reads changelogs before clicking "Update," you're the minority. But you're also the one who won't break production. Good choice.
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v1.0.0 <Badge variant="default" className="ml-2">Latest</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-12-01</span>
+
+Open source release. Free. GPLv2. No license required. Ever.
+
+### <Sparkles className="size-4 inline mr-2" />Added
+
+<div className="space-y-4 mt-4">
+
+**Open Source Release**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- FCHub Stream is now free and open source under GPLv2. No license keys. No paywalls. No telemetry. Just video uploads.
+- Both Cloudflare Stream and Bunny.net Stream fully supported out of the box.
+- Comment video uploads. Post video uploads. Both work. No restrictions.
+- Floating video player with drag & resize.
+- Webhook integration for real-time encoding status (Cloudflare).
+- Upload settings: max duration, file size, allowed formats. All configurable.
+- Part of the [fchub-plugins monorepo](https://github.com/vcode-sh/fchub-plugins) alongside fchub-p24, fchub-fakturownia, fchub-memberships, and wc-fc.
+</div>
+
+</div>
+
+### <Wrench className="size-4 inline mr-2" />Changed
+
+<div className="space-y-4 mt-4">
+
+**Removed Proprietary Code**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Removed license system entirely. No license keys, no activation, no gates. Settings work immediately.
+- Removed all telemetry (Sentry, PostHog). Zero tracking. Zero phone-home. Your data stays yours.
+- Removed tamper detection. Open source means you can modify it. That's the point.
+- Removed plugin update checker. Updates come from GitHub Releases now.
+- Admin app reduced from 322KB to 197KB. Less code. Same features. Faster load.
+</div>
+
+</div>
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.9.3 <Badge variant="outline" className="ml-2">Previous</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-19</span>
+
+Videos no longer vanish after editing posts. Video deletion actually works. Upload modal respects dark mode. Code passes WordPress standards.
+
+### <Wrench className="size-4 inline mr-2" />Changed
+
+<div className="space-y-4 mt-4">
+
+**Upload Modal Now Supports Dark Mode**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Upload modal now inherits FluentCommunity's dark mode. Replaced hardcoded light colors with theme CSS variables.
+- Because uploading videos at 2am in blinding white wasn't the vibe. Auto-detects light/dark theme and matches it.
+</div>
+
+</div>
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+<div className="space-y-4 mt-4">
+
+**Videos No Longer Disappear When Editing Posts**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed videos vanishing after editing posts. Turns out `isset()` and `null` aren't the same thing. PHP 101 but easy to forget.
+- Used `array_key_exists()` instead of `isset()` to differentiate between "user didn't touch media" and "user explicitly deleted it". Revolutionary? No. Correct? Finally.
+- Built because losing your video after fixing a typo in your post is not a feature. It's a bug.
+</div>
+
+**Video Deletion Actually Works Now**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed videos refusing to delete when you removed them from posts. Two hooks were fighting over the same video. Hook #1 deleted it. Hook #2 restored it. Classic.
+- Added global flag for hooks to communicate. Now they work together instead of against each other.
+- Videos delete from post AND Cloudflare when you remove them. No leftovers. Clean slate.
+</div>
+
+**Code Quality Improvements**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed WordPress Coding Standards violations. Added proper comments, aligned variables, ignored debug warnings correctly.
+- Code now passes `phpcs` without errors. Does this make it better? Debatable. Does it make WordPress happy? Apparently.
+</div>
+
+</div>
+
+### <AlertTriangle className="size-4 inline mr-2" />Technical Details
+
+<Callout type="info">
+**Bug Discovery:**
+
+Reported by [Jacob Windham](https://github.com/vcode-sh/fchub-plugins/issues). Videos disappearing after editing posts. Thank you for actually testing this and reporting it instead of silently suffering.
+
+**What Was Broken:**
+
+- Edit post with video → save → video disappeared. `isset($var)` when `$var = null` returns false. We thought user didn't send media. They sent null.
+- Remove video from post → save → video stayed in post AND Cloudflare. Hook #1 deleted it. Hook #2 saw "no media in request" and restored existing video. Teamwork at its finest.
+
+**The Fix:**
+
+- `array_key_exists()` checks if key exists regardless of value. `null` is a value. Not the same as missing key.
+- Global flag between hooks: "Hey Hook #2, Hook #1 already deleted this video. Don't restore it." Communication works.
+- Cloudflare API cleanup verified. DELETE returns 200. Video gone. Database updated. Works as intended.
+
+**Testing Results:**
+
+- Test 1 (Edit without changing video): ✅ Video stays
+- Test 2 (Replace video): ⏸️ Skipped (frontend issue, not backend)
+- Test 3 (Delete video): ✅ Video deletes from post + Cloudflare
+- Test 4 (Create new post): ✅ Works
+- Test 5 (Edit post without video): ✅ No errors
+- Test 6 (Multiple edits): ✅ Video survives 3+ edits
+
+Built because editing posts shouldn't require sacrificing videos to the WordPress gods.
+</Callout>
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.9.2 <Badge variant="outline" className="ml-2">Previous</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-18</span>
+
+Bunny.net autoplay disabled. Vendor directory finally included in releases. Analytics performance improved.
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+<div className="space-y-4 mt-4">
+
+**Bunny.net Video Autoplay Disabled**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Disabled autoplay for Bunny.net video players. Videos now require user interaction to start. Because surprise audio is annoying.
+- Added `?autoplay=false` parameter to all Bunny.net iframe embed URLs. Consistent behavior across all player generation methods.
+</div>
+
+**Release Package Now Includes All Dependencies**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed missing `vendor/` directory in release ZIPs. Users don't need composer. Plugin just works. As intended.
+- GitHub Actions now properly packages all dependencies. No more "Class not found" errors. Revolutionary? No. Expected? Yes.
+</div>
+
+</div>
+
+### <Wrench className="size-4 inline mr-2" />Changed
+
+**Performance**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
+- Reduced unnecessary API calls.
+- Optimized data processing.
+</div>
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.9.1 <Badge variant="outline" className="ml-2">Archive</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-10</span>
+
+WordPress compatibility warning fixed. Because testing on 6.8.3 and 6.9 beta counts as testing.
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+**WordPress Compatibility Warning**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
+- Fixed annoying "plugin not tested with your WordPress version" warning. Because testing on 6.8.3 and 6.9 beta counts as testing.
+- Updated "Tested up to" from 6.7 to 6.9. WordPress 6.8.3 works. WordPress 6.9 beta works. Warning gone. Simple fix.
+</div>
+
+<Separator className="my-8" />
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.2.0 <Badge variant="outline" className="ml-2">Beta</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-06</span>
+
+Floating video player. Drag it. Resize it. It remembers where you put it.
+
+### <Sparkles className="size-4 inline mr-2" />Added
+
+**Floating Video Player (Picture-in-Picture for People Who Scroll)**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
+- Playing video follows you when you scroll past it. Like YouTube but WordPress.
+- Only one video plays at a time (starting second video auto-pauses first one. Revolutionary crowd control.)
+- Close button actually works. Stops video too. No phantom floating players haunting your feed.
+- **Drag & drop** - Grab the top bar (you'll see it), drag anywhere. Your video, your corner, your rules.
+- **Resize from corners** - 4 invisible corner handles (16px). Drag any corner to resize. Always maintains 16:9 aspect ratio. Can't escape viewport boundaries.
+- **Persistent memory** - Position and size saved to localStorage. Scroll away, scroll back, video reappears exactly where you put it.
+- Built because watching 3 seconds of video then scrolling away is basically content consumption in 2025.
+</div>
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+**Video Controls Actually Visible Now**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
+- Fixed videos appearing zoomed in with play/pause buttons cut off
+- Was extending video 40px beyond container. FluentCommunity's overflow:hidden said no.
+- Built because seeing half a play button isn't minimalist design. It's broken.
+</div>
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.1.0 <Badge variant="outline" className="ml-2">Beta</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-05</span>
+
+Videos work after encoding. No 404 mystery. No refresh gymnastics.
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+**Videos Actually Work After Encoding (No More 404 Mystery)**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
+- Fixed "Video not found" errors after encoding finished
+- Fixed encoding screen flashing on every page refresh
+- Cloudflare said "ready!" at 40% encoding. We believed them. Mistake.
+- Now we verify videos are 100% done AND files accessible before showing player
+- Encoding → video works automatically. Zero refresh. Zero 404 errors.
+</div>
+
+**What Was Broken:**
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-2">
+- Cloudflare webhook: `pctComplete: 40%` → we rendered iframe → manifest 404
+- Webhooks "best effort" → many never arrived → database stuck at pending forever
+- Every refresh: encoding flash → polling → iframe (annoying)
+</div>
+
+**The Fix:**
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-2">
+- Wait for `pctComplete: 100%` (not 40%)
+- Probe manifest URLs before rendering (HEAD request, only render on HTTP 200)
+- Update database when video ready (no more encoding flash on refresh)
+</div>
+
+Built because "just refresh the page" isn't user experience. It's surrender.
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.0.5 <Badge variant="outline" className="ml-2">Beta</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-05</span>
+
+Videos work after encoding. No refresh gymnastics. No trust issues with CDN providers.
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+**Videos Actually Work After Encoding (Without Refreshing Like It's 2010)**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
+- Fixed that annoying thing where encoding screen disappeared, "Video not found" appeared, you refreshed the page, and suddenly video worked
+- Cloudflare was lying. Said video was ready. Wasn't ready. Classic.
+- Now we wait for Cloudflare to actually finish (not just pretend to finish) before showing player
+- Encoding screen → video works automatically. Zero refresh. Zero 404 errors. Zero trust issues with CDN providers.
+</div>
+
+**Page Refresh No Longer Shows Encoding Screen For Already-Ready Videos**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
+- Fixed that thing where you refresh and encoding screen flashes before video player appears
+- Video is ready. Database knows it. Browser shows it immediately now.
+- Like loading a webpage but without the unnecessary suspense.
+</div>
+
+### <AlertTriangle className="size-4 inline mr-2" />Important Note
+
+<Callout type="info">
+**What Actually Happened:**
+
+- Cloudflare sends "ready!" webhook when video is 40% done encoding
+- We believed it (mistake)
+- Rendered video player immediately
+- Player tried loading video that wasn't actually done encoding yet
+- 404 errors. User confusion. Page refreshes. Sadness.
+
+**What Happens Now:**
+
+- We don't trust Cloudflare's "ready!" until it's actually 100% done
+- Then we check if video files are actually accessible (not just "ready")
+- Then we render player
+- Video works. First try. No refresh needed.
+
+Built because "just refresh the page" is not a feature. It's giving up.
+</Callout>
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.0.4 <Badge variant="outline" className="ml-2">Beta</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-05</span>
+
+Bunny.net works. Videos show up. Feed reloads don't lie about encoding. Provider switching doesn't crash.
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+<div className="space-y-4 mt-4">
+
+**Feed Reload No Longer Shows Encoding Screen When Video is Ready**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed feed reloads showing encoding overlay even when video is already ready
+- Frontend now checks if video is ready before polling (no more unnecessary waiting)
+- Videos show player immediately on reload instead of pretending to encode for 10-20 seconds
+</div>
+
+**Provider Switch Actually Works**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed 500 error when switching providers in admin settings (was throwing fatal error like it's 2015)
+- Provider switching now works without crashing the admin panel
+</div>
+
+**Bunny.net Videos Actually Showing Up**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed videos going MIA after posting (was showing "Video player not available" like some kind of tease)
+- Videos now display. Revolutionary? No. Functional? Finally.
+</div>
+
+</div>
+
+### <Sparkles className="size-4 inline mr-2" />Added
+
+<div className="space-y-4 mt-4">
+
+**Bunny.net Stream Ready for Testing**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Bunny.net Stream is now enabled. Two providers. That's basically an ecosystem, right?
+- Upload videos → they show up → delete post → video deletes too. It works.
+- Works in posts and comments because why not.
+</div>
+
+</div>
+
+### <AlertTriangle className="size-4 inline mr-2" />Important Note
+
+<Callout type="info">
+**Bunny.net Testing**
+
+Bunny.net Stream is ready for testing. Everything works: upload, display, delete. Switch from Cloudflare to Bunny.net in admin settings if you want to test it. Built because two providers > one provider. Math checks out.
+</Callout>
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.0.3 <Badge variant="outline" className="ml-2">Beta</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-05</span>
+
+Authentication fixes. Long polling that actually works. Videos that finish encoding don't get stuck.
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+<div className="space-y-4 mt-4">
+
+**Long Polling Authentication Issues**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed 401 Unauthorized errors during long video encoding (15+ minutes)
+- Made nonce verification flexible for status checks: invalid nonce no longer blocks polling if user is logged in
+- Status check endpoint now allows requests with expired/invalid nonce during long polling sessions
+- Logs warnings for monitoring instead of blocking requests
+</div>
+
+**Frontend Polling Improvements**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Polling now continues after 401/403 errors instead of stopping immediately
+- Frontend automatically refreshes nonce from window settings on each API call
+- Added retry logic: stops polling only after 5 consecutive errors (was stopping on first error)
+- Improved error handling: logs errors but continues polling unless too many failures occur
+- Better error messages for debugging authentication issues
+</div>
+
+</div>
+
+### <AlertTriangle className="size-4 inline mr-2" />Important Note
+
+<Callout type="info">
+**Nonce Expiration During Long Polling**
+
+WordPress nonces can expire during long encoding sessions (15+ minutes). The plugin now handles this gracefully by allowing requests with expired nonce if user is still logged in. Warnings are logged for monitoring but don't block functionality. This ensures videos aren't stuck in "encoding" state when Cloudflare finishes encoding.
+</Callout>
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.0.2 <Badge variant="outline" className="ml-2">Beta</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-05</span>
+
+Bug fixes and improvements. Settings that actually save. Duration controls that make sense.
+
+### <Bug className="size-4 inline mr-2" />Fixed
+
+<div className="space-y-4 mt-4">
+
+**Upload Settings Save Issue**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed browser warning when saving upload settings after setting Maximum File Size
+- Fixed race condition where success message showed before API call completed
+- Fixed false negative error when saving comment video settings (when value hadn't changed)
+- Improved error handling: errors now display in UI instead of just browser alerts
+- Improved error handling for 400-level validation errors
+</div>
+
+**Duration Settings UI**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed duration slider: changed step from 60 seconds to 15 seconds (allows setting durations like 30 seconds, 45 seconds, etc.)
+- Reduced maximum duration limit from 24 hours to 6 hours (21600 seconds) - more reasonable for most use cases
+- Added note that duration validation is not yet implemented (coming soon)
+</div>
+
+**Backend Fixes**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Fixed `StreamConfig::save()` false negative: now correctly distinguishes between "no change" and actual save failures
+- Properly handles WordPress `update_option()` returning false when value hasn't changed
+- Updated duration validation: maximum changed from 86400 seconds (24h) to 21600 seconds (6h)
+</div>
+
+**Frontend Improvements**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Upload settings now wait for actual API response before showing success/error
+- Error messages display inline in the UI instead of browser alerts
+- Better error propagation from parent to child components
+- Success/error states properly managed via props
+</div>
+
+</div>
+
+### <AlertTriangle className="size-4 inline mr-2" />Important Note
+
+<Callout type="warn">
+**Duration Validation Not Yet Implemented**
+
+The "Maximum Video Duration" setting is saved and can be configured, but it is **not currently enforced** during video uploads. Videos longer than the configured limit will still be accepted. Duration validation will be implemented in a future release.
+</Callout>
+
+<Separator className="my-8" />
+
+## <Package className="size-4 inline mr-2" />v0.0.1 <Badge variant="outline" className="ml-2">Beta</Badge><span className="ml-2 text-sm text-fd-muted-foreground">2025-11-05</span>
+
+First release. Beta testing. Video streaming for FluentCommunity because WordPress media library and video don't mix.
+
+### <Sparkles className="size-4 inline mr-2" />What Works
+
+<div className="space-y-4 mt-4">
+
+**Video Uploads**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Drag & drop videos → upload to Cloudflare Stream → done
+- No WordPress media library involved (that's the whole point)
+- Real-time progress bar with speed estimates
+- Delete post? Video deletes too. Automatic cleanup.
+- Bunny.net option exists but Phase 2 (not tested yet)
+</div>
+
+**In Your FluentCommunity Portal**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Upload button appears in post composer
+- Videos show up in posts with embedded player
+- Actually works. Revolutionary? No. Functional? Yes.
+</div>
+
+**Admin Settings**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Connect Cloudflare Stream (Account ID, API Token, subdomain)
+- Set upload limits (how big, which formats, how long)
+- Credentials encrypted (because security matters)
+- Bunny.net config there but don't touch it yet
+</div>
+
+
+</div>
+
+### <AlertTriangle className="size-4 inline mr-2" />What Doesn't Work Yet
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2 mt-4">
+- Bunny.net (in code, Phase 2, untested)
+- Comment video uploads (coming)
+- Video analytics (maybe later)
+- Whatever else you'll ask for in GitHub issues
+</div>
+
+### <Wrench className="size-4 inline mr-2" />Requirements
+
+<div className="grid grid-cols-2 gap-4 mt-4">
+  <div className="p-4 border-1 border-fd-border rounded-lg">
+    <div className="font-semibold mb-2">System</div>
+    <div className="text-sm space-y-1">
+      <div>WordPress 6.7+</div>
+      <div>PHP 8.3+</div>
+      <div>FluentCommunity (must be active)</div>
+    </div>
+  </div>
+  <div className="p-4 border-1 border-fd-border rounded-lg">
+    <div className="font-semibold mb-2">Provider</div>
+    <div className="text-sm space-y-1">
+      <div>Cloudflare Stream account</div>
+      <div>Valid API credentials</div>
+      <div>HTTPS enabled (for webhooks)</div>
+    </div>
+  </div>
+</div>
+
+**Supported formats:** MP4, MOV, AVI, WebM. Cloudflare handles conversion.
+
+### <Bug className="size-4 inline mr-2" />Known Issues
+
+<Callout type="warn">
+This is beta. Bugs exist. That's why you're testing.
+</Callout>
+
+Found something broken? [Open a GitHub Issue](https://github.com/vcode-sh/fchub-plugins/issues). I fix bugs faster than I create them. Usually.
+
+### Credits
+
+Built by [Vibe Code](https://x.com/vcode_sh). One dev. Zero corporate BS.
+
+<Separator className="my-8" />
+
+## About This Changelog
+
+### Understanding Versions
+
+FCHub Stream uses semantic versioning. Sort of.
+
+<div className="grid grid-cols-3 gap-4 my-6">
+  <div className="p-4 border-1 border-fd-border rounded-lg">
+    <div className="text-2xl font-bold mb-2">1.0.0</div>
+    <div className="text-sm font-semibold mb-1">Major</div>
+    <div className="text-sm text-fd-muted-foreground">Big changes. Might break stuff. Backup first.</div>
+  </div>
+  <div className="p-4 border-1 border-fd-border rounded-lg">
+    <div className="text-2xl font-bold mb-2">0.1.0</div>
+    <div className="text-sm font-semibold mb-1">Minor</div>
+    <div className="text-sm text-fd-muted-foreground">New features. Backwards compatible. Should be safe.</div>
+  </div>
+  <div className="p-4 border-1 border-fd-border rounded-lg">
+    <div className="text-2xl font-bold mb-2">0.0.1</div>
+    <div className="text-sm font-semibold mb-1">Patch</div>
+    <div className="text-sm text-fd-muted-foreground">Bug fixes. No new features. Definitely safe.</div>
+  </div>
+</div>
+
+### Before updating
+- Read the changelog (you're already here, good)
+- Check "What Broke" section (if it exists)
+- Backup database if it's a major version
+- Test on staging if you have one (you should)
+
+### How updates work
+1. New version released on [GitHub Releases](https://github.com/vcode-sh/fchub-plugins/releases)
+2. Download latest `fchub-stream.zip`
+3. Deactivate old version, delete it
+4. Upload new version, activate
+
+### After updating
+- Test video uploads
+- Check existing videos still play
+- Verify settings didn't reset
+- Report bugs if something broke
+
+<Separator className="my-8" />
+
+<Separator className="my-8" />
+
+### Support
+
+**Documentation:** You're reading it. [Full docs →](/docs/fchub-stream)
+
+**Bug Reports:** [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues)
+
+**Releases:** [GitHub Releases](https://github.com/vcode-sh/fchub-plugins/releases)
+
+**Source Code:** [GitHub](https://github.com/vcode-sh/fchub-plugins) — open source, GPLv2
+
+**Built by:** [Vibe Code](https://x.com/vcode_sh) (@vcode_sh)
+
+<Separator className="my-8" />
+
+Built out of media library trauma. Documented out of necessity.
+
+[Back to Documentation →](/docs/fchub-stream)

@@ -1,0 +1,122 @@
+---
+title: FluentCommunity Integration
+description: Sync membership access with FluentCommunity spaces, groups, and badges automatically.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+When FluentCommunity is active (`FLUENT_COMMUNITY_PLUGIN_VERSION` defined), FCHub Memberships can automatically sync membership access with community spaces, groups, and badges. Members get added to the right community areas when their membership is granted and removed when it's revoked.
+
+## How It Works
+
+The integration has two components:
+
+1. **FluentCommunityAdapter** — an adapter class implementing `AccessAdapterInterface` that handles grant/revoke operations for community resources
+2. **FluentCommunitySync** — a sync service that listens to membership lifecycle hooks and calls the adapter
+
+When a membership plan includes FluentCommunity resources (spaces or groups), the adapter is called automatically during grant and revoke operations.
+
+## Resource Types
+
+FCHub Memberships registers two FluentCommunity resource types in the `ResourceTypeRegistry`:
+
+| Resource Type | Key | Description |
+|---|---|---|
+| Community Spaces | `fc_space` | FluentCommunity spaces — member-only discussion areas |
+| Community Courses | `fc_course` | FluentCommunity courses (when available) |
+
+These resource types are only registered when FluentCommunity is active. They appear in the plan content rules editor alongside WordPress post types and taxonomies.
+
+## Space and Group Membership
+
+### Granting Access
+
+When a membership is granted and the plan includes FluentCommunity space or group rules:
+
+1. The `FluentCommunityAdapter::grant()` method is called
+2. The user is added to the space or group with the `member` role
+3. If a badge mapping exists for this plan, the badge is assigned
+
+### Revoking Access
+
+When a membership is revoked:
+
+1. The `FluentCommunityAdapter::revoke()` method is called
+2. The user is removed from the space or group
+3. If badge revocation is enabled, the mapped badge is removed
+
+<Callout type="info" title="Graceful Degradation">
+If FluentCommunity is not active when a grant or revoke fires, the adapter returns a success result with a note that the operation was recorded in membership grants only. When FluentCommunity is reactivated, the membership data is still accurate — you can run a manual sync to bring community state in line.
+</Callout>
+
+## Badge Assignment
+
+Badges add a visual indicator to a member's community profile. The badge system works through plan-to-badge mappings configured in **Memberships > Settings**.
+
+### Configuration
+
+In the membership settings, under the FluentCommunity section:
+
+- **Badge Mappings** (`fc_badge_mappings`) — a mapping of plan IDs to badge IDs. When a member is granted a plan, the corresponding badge is assigned automatically
+- **Remove Badge on Revoke** (`fc_remove_badge_on_revoke`) — when enabled, badges are removed when the membership is revoked
+
+### How It Works
+
+<Steps>
+<Step>
+
+### Badge assigned on grant
+
+When the `FluentCommunityAdapter::grant()` method runs, it calls `maybeAssignBadge()`. This checks if a badge mapping exists for the granted plan and assigns the badge via `Badge::assignToUser()`.
+
+</Step>
+<Step>
+
+### Badge revoked on membership end
+
+When the `FluentCommunityAdapter::revoke()` method runs and `fc_remove_badge_on_revoke` is set to `yes`, it calls `maybeRevokeBadge()`. This removes the mapped badge via `Badge::removeFromUser()`.
+
+</Step>
+</Steps>
+
+## Access Checking
+
+The adapter also supports access checking via `FluentCommunityAdapter::check()`. This verifies whether a user is currently a member of a specific space or group by querying the FluentCommunity membership relationship.
+
+## Resource Search
+
+When adding content rules to a plan, you can search for FluentCommunity resources:
+
+- `searchResources($query, 'fc_space')` — searches spaces by title
+- `searchResources($query, 'fc_group')` — searches groups by title
+
+Results are returned as `[{id, label}]` arrays for the admin resource selector dropdown.
+
+## Sync Service
+
+The `FluentCommunitySync` class registers hooks to keep community membership in sync with the membership system:
+
+| Membership Event | Community Action |
+|---|---|
+| Grant created | Add user to mapped spaces/groups, assign badge |
+| Grant revoked | Remove user from spaces/groups, revoke badge (if enabled) |
+| Grant paused | No immediate community change (membership data preserved) |
+| Grant resumed | No immediate community change (user retains community access) |
+
+<Callout type="warn" title="Pause Behavior">
+When a membership is paused, the user retains their FluentCommunity space/group membership. Only an explicit revocation removes them from the community. This is intentional — pausing should be a temporary state, and removing someone from community discussions on pause would be disruptive.
+</Callout>
+
+## Manual Sync
+
+If you need to bring community state in line with membership data (e.g., after installing FluentCommunity on an existing membership site), you can use WP-CLI:
+
+```bash
+wp fchub-membership sync --dry-run
+wp fchub-membership sync
+```
+
+The sync command checks all active grants with FluentCommunity resource types and ensures the corresponding space/group memberships and badges are correctly applied.

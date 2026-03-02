@@ -1,0 +1,197 @@
+---
+title: Installation
+description: Three ways to install FCHub Stream. Pick one. They all end with video uploads working or your WordPress installation being broken already.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Download, Upload, Terminal, AlertTriangle, CheckCircle2 } from 'lucide-react';
+
+Standard WordPress plugin installation. You've done this before. If you haven't, this is about to get educational.
+
+Pick your preferred method below. They all achieve the same result: FCHub Stream installed and ready for configuration. Or broken. Depends on your WordPress setup, really.
+
+<Accordions type="single">
+<Accordion title="Method 1: WordPress Admin Upload (Recommended)" icon={<Upload className="size-4" />}>
+
+The path of least resistance. Works unless your WordPress is already broken.
+
+**Requirements:**
+- Access to WordPress admin panel (shocking, I know)
+- PHP upload limits that don't make you cry (check `post_max_size` and `upload_max_filesize`)
+- Permission to install plugins (some hosts disable this for "security")
+
+**Steps:**
+
+1. Download the latest `fchub-stream.zip` from the [GitHub releases page](https://github.com/vcode-sh/fchub-plugins/releases)
+2. Navigate to **WordPress Admin → Plugins → Add New**
+3. Click **Upload Plugin** button (top of page, can't miss it)
+4. Click **Choose File** and select your ZIP
+5. Click **Install Now**
+6. Wait while WordPress unpacks the plugin (5-30 seconds depending on hosting speed)
+7. Click **Activate**
+
+**What happens behind the scenes:**
+
+When you click "Install Now", WordPress:
+- Uploads ZIP to temporary directory (`/wp-content/uploads/` usually)
+- Validates ZIP structure (checks for valid plugin headers)
+- Extracts to `/wp-content/plugins/fchub-stream/`
+- Removes temporary ZIP file
+- Registers plugin with WordPress core
+
+On activation:
+- Database tables get created (`wp_fchub_stream_videos`, `wp_fchub_stream_settings`)
+- REST API endpoints register (`/wp-json/fchub-stream/v1/*`)
+- Admin menu items appear in sidebar
+- FluentCommunity integration hooks activate
+
+**If this fails:**
+
+<Callout type="warn">
+**"The uploaded file exceeds the upload_max_filesize directive"**
+
+Your PHP upload limit is too small. FCHub Stream ZIP is ~2-5MB. If your limit is 2MB, you're going to have a bad time.
+
+Fix: Ask your host to increase `upload_max_filesize` in `php.ini`. Or use Method 2/3 below.
+</Callout>
+
+<Callout type="error">
+**"Could not create directory"**
+
+WordPress can't write to `/wp-content/plugins/`. Permission issue.
+
+Fix: Set directory permissions to `755` or `775`. If that doesn't work, your hosting has bigger problems than FCHub Stream.
+</Callout>
+
+</Accordion>
+
+<Accordion title="Method 2: FTP/SFTP Upload" icon={<Download className="size-4" />}>
+
+For when WordPress admin upload fails or you enjoy the nostalgic pain of FTP clients.
+
+**Requirements:**
+- FTP/SFTP credentials (host, username, password/key)
+- FTP client (FileZilla, Cyberduck, Transmit, or terminal if you're hardcore)
+- Ability to unzip files locally
+- Basic understanding that uploading 500+ files takes time
+
+**Steps:**
+
+1. Download the latest `fchub-stream.zip` from the [GitHub releases page](https://github.com/vcode-sh/fchub-plugins/releases)
+2. Unzip it locally (you'll get a `fchub-stream` folder)
+3. Connect to your server via FTP/SFTP
+4. Navigate to `/wp-content/plugins/` directory
+5. Upload the entire `fchub-stream` folder (not the ZIP, the folder)
+6. Wait while 500+ files transfer (grab coffee, this takes a while)
+7. Go to **WordPress Admin → Plugins**
+8. Find **FCHub Stream** in the list
+9. Click **Activate**
+
+**What happens during upload:**
+
+FTP/SFTP transfers every file individually. That's:
+- ~500 PHP files
+- Asset files (CSS, JS)
+- Vendor dependencies (because modern PHP isn't amateur hour)
+- README, license files
+
+Total transfer time depends on:
+- Your internet upload speed
+- Server location (US East → European server = slower)
+- Hosting server load (shared hosting at peak hours = pain)
+
+**Pro tip:** Use SFTP instead of FTP. FTP is unencrypted. It's 2025. Stop using unencrypted protocols.
+
+**If this fails:**
+
+<Callout type="warn">
+**Files upload but plugin doesn't appear**
+
+You uploaded to the wrong directory. Check you uploaded to `/wp-content/plugins/fchub-stream/`, not `/wp-content/plugins/fchub-stream/fchub-stream/` (nested folder mistake).
+
+The `fchub-stream.php` file should be at `/wp-content/plugins/fchub-stream/fchub-stream.php`.
+</Callout>
+
+<Callout type="error">
+**"Permission denied" during upload**
+
+Your FTP user doesn't have write permissions. Contact your host. Or check if you're accidentally trying to upload to a read-only directory.
+</Callout>
+
+</Accordion>
+
+<Accordion title="Method 3: WP-CLI (Terminal)" icon={<Terminal className="size-4" />}>
+
+For developers who live in the terminal and think GUIs are for amateurs.
+
+**Requirements:**
+- WP-CLI installed on server ([get it here](https://wp-cli.org/) if you don't have it)
+- SSH access to your server
+- Basic command line competence
+- Willingness to debug cryptic error messages
+
+**Steps:**
+
+SSH into your server and run:
+
+```bash
+# Navigate to WordPress root directory
+cd /path/to/wordpress
+
+# Install and activate in one command
+wp plugin install /path/to/fchub-stream.zip --activate
+```
+
+Or if you prefer doing things in stages:
+
+```bash
+# Install only
+wp plugin install /path/to/fchub-stream.zip
+
+# Verify it installed
+wp plugin list | grep fchub-stream
+
+# Activate separately
+wp plugin activate fchub-stream
+```
+
+**What WP-CLI does:**
+
+Behind the scenes, `wp plugin install` runs the same WordPress functions as admin upload. But faster. And without browser timeouts. And without clicking through five confirmation screens.
+
+**Advantages:**
+- No PHP upload limits (bypasses web server entirely)
+- No browser timeouts for large plugins
+- Scriptable (useful if installing on multiple sites)
+- Feels professional (even if you're just copying commands from documentation)
+
+**If this fails:**
+
+<Callout type="error">
+**"Error: This does not seem to be a WP CLI 'plugin install' command"**
+
+You're not in the WordPress root directory. WP-CLI needs to find `wp-config.php` to work.
+
+Run `wp --info` to check if WP-CLI can find your WordPress installation.
+</Callout>
+
+<Callout type="warn">
+**"Warning: Could not create directory"**
+
+Permission issues again. The user running WP-CLI (probably your SSH user) doesn't have write access to `/wp-content/plugins/`.
+
+Fix: Run with `sudo` (if you have access) or fix directory permissions:
+
+```bash
+sudo chown -R www-data:www-data /path/to/wordpress/wp-content/plugins/
+```
+
+Replace `www-data` with whatever user your web server runs as (might be `apache`, `nginx`, `www`, etc.).
+</Callout>
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />

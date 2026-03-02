@@ -1,0 +1,568 @@
+---
+title: Developer Reference
+description: REST API endpoints, WP-CLI commands, action hooks, webhooks, adapter system, database schema, CSV import, and cron jobs.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+This is the comprehensive developer reference for FCHub Memberships. It covers everything you need to extend, integrate with, or debug the plugin.
+
+## Action Hooks
+
+The plugin fires these WordPress action hooks during the membership lifecycle. All hooks are prefixed with `fchub_memberships/`.
+
+| Hook | Arguments | When |
+|---|---|---|
+| `grant_created` | `int $userId, int $planId, array $context` | New membership access granted |
+| `grant_revoked` | `array $grants, int $planId, int $userId, string $reason` | Access revoked |
+| `grant_expired` | `array $grant` | Access expired naturally |
+| `grant_paused` | `array $grant, string $reason` | Membership paused |
+| `grant_resumed` | `array $grant` | Paused membership resumed |
+| `grant_renewed` | `array $grant` | Subscription renewed |
+| `trial_converted` | `array $grant, int $planId, int $userId` | Trial converted to paid |
+| `trial_expired` | `array $grant` | Trial expired without payment |
+| `trial_expiring_soon` | `array $grant, int $daysLeft` | Trial approaching end |
+| `drip_unlocked` | `array $notification, array $grant, int $userId` | Drip content unlocked |
+| `drip_milestone_reached` | `array $grant, int $milestone, int $userId` | Drip completion milestone (25/50/75/100%) |
+| `access_expiring` | `array $grant` | Access approaching expiration |
+| `grant_anniversary` | `array $grant` | Annual anniversary of grant date |
+| `payment_failed` | `array $grant` | Subscription payment failed |
+
+### Filter Hooks
+
+| Filter | Arguments | Purpose |
+|---|---|---|
+| `fchub_memberships/resource_types` | `ResourceTypeRegistry $registry` | Register custom resource types |
+
+### Listening to Hooks
+
+```php
+add_action('fchub_memberships/grant_created', function (int $userId, int $planId, array $context) {
+    // Your custom logic when a membership is granted
+    $sourceType = $context['source_type'] ?? 'manual';
+    error_log("User {$userId} granted plan {$planId} via {$sourceType}");
+}, 10, 3);
+```
+
+<Separator />
+
+## REST API
+
+All endpoints are under the `fchub-memberships/v1` namespace. Unless noted, endpoints require `manage_options` capability (administrator).
+
+<Tabs items={['Plans', 'Members', 'Content', 'Drip', 'Reports', 'Settings', 'Import']}>
+<Tab value="Plans">
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/plans` | List all plans with optional filtering |
+| POST | `/plans` | Create a new plan |
+| GET | `/plans/{id}` | Get a single plan with rules |
+| PUT | `/plans/{id}` | Update a plan |
+| DELETE | `/plans/{id}` | Delete a plan (cascades to rules) |
+| POST | `/plans/{id}/duplicate` | Duplicate a plan |
+
+**Plan fields:** `title`, `slug`, `description`, `status`, `level`, `includes_plan_ids`, `restriction_message`, `redirect_url`, `duration_type`, `duration_days`, `trial_days`, `grace_period_days`, `settings`, `meta`, `scheduled_status`, `scheduled_at`
+
+</Tab>
+<Tab value="Members">
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/members` | List members with grants (paginated) |
+| GET | `/members/{user_id}` | Get a member's grants and details |
+| POST | `/members/grant` | Manually grant a plan to a user |
+| POST | `/members/revoke` | Revoke a plan from a user |
+| POST | `/members/pause/{grant_id}` | Pause a specific grant |
+| POST | `/members/resume/{grant_id}` | Resume a paused grant |
+| POST | `/members/extend/{grant_id}` | Extend a grant by X days |
+
+</Tab>
+<Tab value="Content">
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/content/rules` | List protection rules (paginated, filterable) |
+| POST | `/content/rules` | Create a protection rule |
+| PUT | `/content/rules/{id}` | Update a protection rule |
+| DELETE | `/content/rules/{id}` | Delete a protection rule |
+| GET | `/content/search` | Search resources by type and query |
+
+</Tab>
+<Tab value="Drip">
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/drip/overview` | Drip overview data for all plans |
+| GET | `/drip/calendar` | Calendar data for a date range |
+| GET | `/drip/queue` | Notification queue (filterable by status) |
+| GET | `/drip/queue/stats` | Queue stats (pending/sent counts) |
+| POST | `/drip/retry/{id}` | Retry a failed notification |
+
+</Tab>
+<Tab value="Reports">
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/reports/overview` | Dashboard overview metrics |
+| GET | `/reports/members-over-time` | Time-series member count |
+| GET | `/reports/plan-distribution` | Active members by plan |
+| GET | `/reports/churn` | Churn analysis |
+| GET | `/reports/revenue` | Revenue by plan |
+| GET | `/reports/content-popularity` | Most accessed protected content |
+
+</Tab>
+<Tab value="Settings">
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/settings` | Get all plugin settings |
+| PUT | `/settings` | Update plugin settings |
+| POST | `/settings/webhook-test` | Send a test webhook |
+
+</Tab>
+<Tab value="Import">
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/import/upload` | Upload a CSV file for import |
+| POST | `/import/preview` | Preview import results before committing |
+| POST | `/import/execute` | Execute the import |
+
+</Tab>
+</Tabs>
+
+### Frontend API
+
+These endpoints are available to authenticated users (no admin requirement):
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/access/check` | Check if current user can access a resource |
+| GET | `/account/data` | Get current user's membership data for the account page |
+
+### Dynamic Options
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/options/resource-types` | Get available resource types for dropdowns |
+| GET | `/options/search/{resource_type}` | Search resources by type and query string |
+
+<Separator />
+
+## WP-CLI Commands
+
+All commands are under the `wp fchub-membership` namespace.
+
+<Accordions type="single">
+<Accordion title="list-grants — List user grants">
+
+```bash
+wp fchub-membership list-grants --member=<id|email> [--status=<status>] [--plan=<slug>]
+```
+
+Lists grants for a user. Outputs a table with grant ID, plan, resource, status, and dates.
+
+| Flag | Description |
+|---|---|
+| `--member` | Required. User ID or email address |
+| `--status` | Filter by status: active, expired, revoked, paused |
+| `--plan` | Filter by plan slug |
+
+</Accordion>
+<Accordion title="grant — Grant a plan to a user">
+
+```bash
+wp fchub-membership grant --member=<id|email> --plan=<slug>
+```
+
+Grants a full plan to a user, creating individual grants for every content rule in the plan.
+
+| Flag | Description |
+|---|---|
+| `--member` | Required. User ID or email address |
+| `--plan` | Required. Plan slug |
+
+</Accordion>
+<Accordion title="revoke — Revoke a user's plan">
+
+```bash
+wp fchub-membership revoke --member=<id|email> --plan=<slug> [--reason=<text>]
+```
+
+Revokes all grants for a plan from a user.
+
+| Flag | Description |
+|---|---|
+| `--member` | Required. User ID or email |
+| `--plan` | Required. Plan slug |
+| `--reason` | Revocation reason (recorded in audit log) |
+
+</Accordion>
+<Accordion title="revoke-by-order — Revoke grants by order ID">
+
+```bash
+wp fchub-membership revoke-by-order --order=<id> [--reason=<text>]
+```
+
+Revokes all grants associated with a specific FluentCart order.
+
+</Accordion>
+<Accordion title="check — Check user access">
+
+```bash
+wp fchub-membership check --member=<id|email> --plan=<slug>
+```
+
+Checks whether a user has active access to a plan. Outputs yes/no with details.
+
+</Accordion>
+<Accordion title="backfill — Backfill grants from FluentCart orders">
+
+```bash
+wp fchub-membership backfill [--dry-run] [--limit=<n>]
+```
+
+Scans FluentCart orders and creates missing membership grants. Useful after initial plugin installation on an existing store.
+
+</Accordion>
+<Accordion title="sync — Sync external systems">
+
+```bash
+wp fchub-membership sync [--dry-run]
+```
+
+Syncs membership grants with FluentCommunity (spaces/groups/badges) and other adapters.
+
+</Accordion>
+<Accordion title="expire-check — Run expiration check">
+
+```bash
+wp fchub-membership expire-check
+```
+
+Manually triggers the subscription validity check (same as the 5-minute cron).
+
+</Accordion>
+<Accordion title="drip-process — Process drip notifications">
+
+```bash
+wp fchub-membership drip-process [--limit=<n>]
+```
+
+Manually processes pending drip notifications (same as the hourly cron).
+
+</Accordion>
+<Accordion title="purge-expired — Purge old expired grants">
+
+```bash
+wp fchub-membership purge-expired [--days=<n>] [--dry-run]
+```
+
+Removes expired/revoked grants older than N days.
+
+</Accordion>
+<Accordion title="debug — Debug information">
+
+```bash
+wp fchub-membership debug --member=<id|email>
+```
+
+Outputs detailed debug information about a user's membership state, grants, subscriptions, and access evaluation results.
+
+</Accordion>
+<Accordion title="stats — View statistics">
+
+```bash
+wp fchub-membership stats [--period=<period>] [--aggregate]
+```
+
+Shows overview statistics. Pass `--aggregate` to force daily stats aggregation.
+
+</Accordion>
+<Accordion title="export-members — Export member data">
+
+```bash
+wp fchub-membership export-members [--plan=<slug>] [--status=<status>] [--format=<csv|json|table>]
+```
+
+Exports member data. Supports CSV, JSON, and WP-CLI table formats.
+
+</Accordion>
+</Accordions>
+
+<Separator />
+
+## Webhooks
+
+Webhooks send membership events to external services as HTTP POST requests with JSON payloads.
+
+### Configuration
+
+In **Memberships > Settings**:
+- **Webhook Enabled** (`webhook_enabled`) — master switch for webhooks
+- **Webhook URLs** (`webhook_urls`) — newline-separated list of endpoint URLs. Multiple URLs are supported
+- **Webhook Secret** (`webhook_secret`) — shared secret for HMAC-SHA256 signature verification
+
+### Events
+
+| Event | When |
+|---|---|
+| `grant_created` | New membership access granted |
+| `grant_revoked` | Access revoked |
+| `grant_expired` | Access expired |
+| `grant_paused` | Membership paused |
+| `grant_resumed` | Membership resumed |
+
+### Payload Format
+
+```json
+{
+  "event_type": "grant_created",
+  "timestamp": "2025-01-15T10:30:00+00:00",
+  "site_url": "https://example.com",
+  "data": {
+    "user": {
+      "id": 42,
+      "email": "member@example.com",
+      "display_name": "Jane Doe"
+    },
+    "plan": {
+      "id": 1,
+      "title": "Pro Membership",
+      "slug": "pro"
+    },
+    "context": {
+      "source_type": "order",
+      "source_id": 156
+    }
+  }
+}
+```
+
+### Signature Verification
+
+Every webhook includes an `X-FCHub-Signature` header containing the HMAC-SHA256 signature of the request body:
+
+```
+signature = HMAC-SHA256(request_body, webhook_secret)
+```
+
+Verify the signature on your receiving end:
+
+```php
+$payload = file_get_contents('php://input');
+$signature = $_SERVER['HTTP_X_FCHUB_SIGNATURE'] ?? '';
+$expected = hash_hmac('sha256', $payload, $your_shared_secret);
+
+if (!hash_equals($expected, $signature)) {
+    http_response_code(403);
+    exit('Invalid signature');
+}
+```
+
+The `X-FCHub-Event` header contains the event type string.
+
+### Delivery
+
+Webhooks are delivered asynchronously via Action Scheduler when available. The `fchub_memberships_dispatch_webhook` hook fires with the URL, body, and headers. If Action Scheduler is not available, delivery falls back to synchronous `wp_remote_post()` with a 15-second timeout.
+
+Failed deliveries are logged via the `Logger` class.
+
+### Test Webhook
+
+Send a test event from **Memberships > Settings** or via the REST API:
+
+```bash
+curl -X POST https://example.com/wp-json/fchub-memberships/v1/settings/webhook-test \
+  -H "X-WP-Nonce: <nonce>"
+```
+
+<Separator />
+
+## Adapter System
+
+The adapter system provides a uniform interface for granting and revoking access across different content providers.
+
+### AccessAdapterInterface
+
+```php
+interface AccessAdapterInterface
+{
+    public function supports(string $resourceType): bool;
+    public function grant(int $userId, string $resourceType, string $resourceId, array $context = []): array;
+    public function revoke(int $userId, string $resourceType, string $resourceId, array $context = []): array;
+    public function check(int $userId, string $resourceType, string $resourceId): bool;
+    public function getResourceLabel(string $resourceType, string $resourceId): string;
+}
+```
+
+### Built-in Adapters
+
+| Adapter | Provider | Resource Types |
+|---|---|---|
+| `WordPressContentAdapter` | `wordpress_core` | Posts, pages, custom post types, taxonomies, menus, URLs, comments, special pages |
+| `FluentCommunityAdapter` | `fluent_community` | `fc_space`, `fc_group` |
+| `FluentCrmAdapter` | N/A | Contact tags and lists |
+| `LearnDashAdapter` | `learndash` | `sfwd-courses`, `sfwd-lessons` |
+
+### Registering Custom Adapters
+
+Adapters are resolved by provider string. You can register custom resource types through the `fchub_memberships/resource_types` action:
+
+```php
+add_action('fchub_memberships/resource_types', function ($registry) {
+    $registry->register('my_resource', [
+        'label'     => 'My Custom Resource',
+        'group'     => 'content',
+        'provider'  => 'my_plugin',
+        'searchable' => true,
+    ]);
+});
+```
+
+<Separator />
+
+## Database Tables
+
+All tables are prefixed with `{wp_prefix}fchub_membership_`.
+
+<Accordions type="single">
+<Accordion title="plans — Membership plan definitions">
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | BIGINT | Primary key |
+| `title` | VARCHAR(255) | Plan name |
+| `slug` | VARCHAR(100) | URL-safe slug (unique) |
+| `description` | TEXT | Plan description |
+| `status` | VARCHAR(20) | active, draft, inactive |
+| `level` | INT | Hierarchy level (0 = lowest) |
+| `includes_plan_ids` | LONGTEXT | JSON array of included plan IDs |
+| `restriction_message` | TEXT | Custom restriction message |
+| `redirect_url` | VARCHAR(500) | Redirect URL for non-members |
+| `duration_type` | VARCHAR(30) | lifetime, fixed_days |
+| `duration_days` | INT | Days for fixed duration |
+| `trial_days` | INT | Trial period in days |
+| `grace_period_days` | INT | Grace period in days |
+| `settings` | LONGTEXT | JSON settings blob |
+| `meta` | LONGTEXT | JSON metadata |
+| `scheduled_status` | VARCHAR(20) | Future status change |
+| `scheduled_at` | DATETIME | When to apply the status change |
+| `created_at` | TIMESTAMP | Created timestamp |
+| `updated_at` | TIMESTAMP | Updated timestamp |
+
+</Accordion>
+<Accordion title="plan_rules — Content rules for plans">
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | BIGINT | Primary key |
+| `plan_id` | BIGINT | FK to plans (CASCADE delete) |
+| `provider` | VARCHAR(50) | wordpress_core, learndash, fluent_community |
+| `resource_type` | VARCHAR(50) | post, page, category, fc_space, etc. |
+| `resource_id` | VARCHAR(100) | Specific resource ID or * for wildcard |
+| `drip_delay_days` | INT | Days to delay (for delayed drip type) |
+| `drip_type` | VARCHAR(20) | immediate, delayed, fixed_date |
+| `drip_date` | DATETIME | Fixed unlock date |
+| `sort_order` | INT | Display order |
+| `meta` | LONGTEXT | JSON metadata |
+
+</Accordion>
+<Accordion title="grants — Individual access grants">
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | BIGINT | Primary key |
+| `user_id` | BIGINT | WordPress user ID |
+| `plan_id` | BIGINT | FK to plans (SET NULL on delete) |
+| `provider` | VARCHAR(50) | Content provider |
+| `resource_type` | VARCHAR(50) | Resource type |
+| `resource_id` | VARCHAR(100) | Resource ID |
+| `source_type` | VARCHAR(30) | order, subscription, automation, manual, import |
+| `source_id` | BIGINT | FluentCart order/subscription ID |
+| `feed_id` | BIGINT | Integration feed ID |
+| `grant_key` | VARCHAR(64) | Unique idempotency key |
+| `status` | VARCHAR(20) | active, paused, revoked, expired |
+| `starts_at` | DATETIME | When access starts |
+| `expires_at` | DATETIME | When access expires (null = lifetime) |
+| `drip_available_at` | DATETIME | When drip content unlocks |
+| `trial_ends_at` | DATETIME | Trial end date |
+| `source_ids` | LONGTEXT | JSON array of all source IDs |
+| `cancellation_requested_at` | DATETIME | When cancellation was requested |
+| `cancellation_effective_at` | DATETIME | When cancellation takes effect |
+| `cancellation_reason` | VARCHAR(500) | Cancellation reason |
+| `renewal_count` | INT | Number of subscription renewals |
+| `meta` | LONGTEXT | JSON metadata |
+
+</Accordion>
+<Accordion title="audit_log — Change audit trail">
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | BIGINT | Primary key |
+| `entity_type` | VARCHAR(30) | grant, plan, rule |
+| `entity_id` | BIGINT | ID of the affected entity |
+| `action` | VARCHAR(30) | created, updated, revoked, expired, etc. |
+| `actor_id` | BIGINT | User ID who performed the action (0 = system) |
+| `actor_type` | VARCHAR(20) | user, system, cron, automation |
+| `old_value` | LONGTEXT | JSON of previous state |
+| `new_value` | LONGTEXT | JSON of new state |
+| `context` | VARCHAR(255) | Additional context string |
+| `created_at` | TIMESTAMP | When the action occurred |
+
+Entries older than 90 days are cleaned up weekly by the `fchub_memberships_audit_cleanup` cron.
+
+</Accordion>
+</Accordions>
+
+<Separator />
+
+## CSV Import
+
+The import system supports multiple CSV formats through parser classes implementing `CsvParserInterface`.
+
+### Built-in Parsers
+
+| Parser | Description |
+|---|---|
+| `GenericCsvParser` | Standard CSV with columns: `email`, `plan_slug`, `status`, `starts_at`, `expires_at` |
+| `PmproCsvParser` | Compatible with Paid Memberships Pro exports. Maps PMPro fields to membership fields |
+
+### Import Flow
+
+1. **Upload** — CSV file is uploaded and validated
+2. **Preview** — The parser processes the CSV and returns a preview of what will be imported (users matched, plans matched, conflicts detected)
+3. **Execute** — Grants are created for each valid row. Existing grants are updated if found
+
+### Custom Parsers
+
+Implement `CsvParserInterface` and register your parser via a hook to support additional CSV formats from other membership plugins.
+
+<Separator />
+
+## Cron Jobs
+
+### WP-Cron Events
+
+| Event | Interval | Handler |
+|---|---|---|
+| `fchub_memberships_validity_check` | 5 minutes | `SubscriptionValidityWatcher::check()` |
+| `fchub_memberships_drip_process` | Hourly | `DripScheduleService::processNotifications()` |
+| `fchub_memberships_expiry_notify` | Daily | `AccessExpiringEmail::sendPendingNotifications()` |
+| `fchub_memberships_daily_stats` | Daily | `MemberStatsReport::aggregateDaily()` + anniversary check |
+| `fchub_memberships_trial_check` | Daily | `TrialLifecycleService::sendTrialExpiringNotifications()` + `checkTrialExpirations()` |
+| `fchub_memberships_plan_schedule` | Hourly | `PlanService::processScheduledStatuses()` |
+| `fchub_memberships_audit_cleanup` | Weekly | `AuditLogRepository::cleanup(90)` |
+
+### Action Scheduler Hooks
+
+| Hook | Handler |
+|---|---|
+| `fchub_memberships_send_email` | `wp_mail($to, $subject, $body, $headers)` |
+| `fchub_memberships_dispatch_webhook` | `wp_remote_post($url, ...)` with error logging |
+
+All cron handlers check for `FLUENTCART_VERSION` before executing to avoid errors when FluentCart is temporarily deactivated.

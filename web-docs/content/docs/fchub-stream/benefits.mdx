@@ -1,0 +1,96 @@
+---
+title: Benefits
+description: Why FCHub Stream beats YouTube embeds and WordPress media library. Real uploads, real streaming, real simple.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Upload, Zap, Webhook, MessageSquare, Shield } from 'lucide-react';
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
+
+## Why This Exists
+
+I built fchub-stream because WordPress media library and video don't mix. After one too many "video too large" errors and watching uploads fail for reasons that made no sense, I gave up waiting for it to improve. This is what happened instead.
+
+Direct uploads to Cloudflare Stream or Bunny.net. No media library gymnastics. No manual conversion. Videos just work. That's the pitch.
+
+### For Admins
+
+Here's what you're avoiding:
+
+- **No storage headaches** - Videos live on streaming CDN. Your server stays breathing. I've seen shared hosting die from video uploads. This prevents that.
+- **No transcoding setup** - Provider handles video processing. You handle literally nothing. I don't handle it either. That's the point.
+- **No mobile compatibility issues** - Adaptive streaming works everywhere. Even on ancient iPhones. Tested on my old iPhone 6. Still works.
+- **No "video too large" tickets** - Upload limits go up to 500MB+. Configure once. Forget forever. Until someone uploads a 600MB file. Then you adjust. Still easier than media library.
+- **Minimal server load** - Uploads bypass WordPress entirely. PHP upload limits? Not your problem anymore. Not mine either. That's why I built it this way.
+
+### For Community Members
+
+For end users, it's stupidly simple (which is the point):
+
+- **Drag and drop upload** - No complicated workflows. Works like uploading an image. Because it should. Revolutionary? No. Functional? Yes.
+- **Fast processing** - Videos ready in minutes. Not hours. Not days. Depends on video length, but faster than manual conversion.
+- **Mobile-friendly** - Upload from phone, tablet, potato. Desktop works too. I tested on actual potato. Just kidding. But mobile works.
+- **No manual conversion** - Upload MP4, MOV, WebM, AVI. Provider handles the rest. I don't convert anything. That's their job.
+- **Reliable playback** - Streaming CDN delivers video. Not your overloaded shared hosting. Your hosting thanks you. Your users thank you. I get satisfaction.
+- **Adaptive bitrate** - Quality adjusts to connection speed. 5G? 1080p. Hotel WiFi? Potato quality. Automatic. I didn't build this. Providers did. I just use it.
+- **Mobile player** - Responsive. Portrait. Landscape. Upside down if you're into that. Not tested upside down. But probably works.
+- **Global CDN** - Video loads from nearest server. Physics still applies, but optimized physics. I can't fix physics. But CDN helps.
+- **No buffering** - Quality drops instead of stopping. Keep watching, just blurrier. Better than stopping. That's my bar.
+- **Seek previews** - Hover over timeline. See video sections. Skip to the good parts. Provider feature. I just enable it.
+
+<Separator className="my-8" />
+
+## Common Use Cases
+
+Here's where fchub-stream actually helps (real scenarios, not marketing fluff):
+
+### Course Platform
+
+**Problem:** Course creators need video lessons. WordPress media library sees a 2GB file and dies. I've seen it happen. Multiple times.
+
+**Solution:** Direct upload to streaming CDN. Videos transcode automatically. Students watch on any device. Server storage limits? Not relevant anymore. I don't handle storage. That's Cloudflare/Bunny's problem.
+
+### Product Review Community
+
+**Problem:** Members want video reviews. Current workflow: upload to YouTube → copy link → paste link → hope it works. Extra steps nobody asked for. I asked. Nobody answered.
+
+**Solution:** Upload video directly in post. No YouTube middleman. Auto-embeds. Users stay on your site instead of wandering to Google. I keep users on your platform. Google keeps users on theirs. Math checks out.
+
+### Support Forum
+
+**Problem:** Explaining technical issues with text is painful. Video would help. Asking users to upload to YouTube first? That's asking too much. I've been there. It's annoying.
+
+**Solution:** Enable video in comments. Users record screen → upload → done. Problems get solved faster. Support ticket volume drops. I've seen it happen. Not scientific. But it works.
+
+### Creator Community
+
+**Problem:** Creators want to share work-in-progress videos. WordPress media library is slow. Uploads take forever. Patience runs out. Mine did. That's why I built this.
+
+**Solution:** Direct uploads to streaming provider. Fast upload. Fast processing. Fast playback. Creators happy. Admins not drowning in "why is this so slow" messages. I don't get those messages anymore. That's success.
+
+<Separator className="my-8" />
+
+## What's Different About FCHub Stream
+
+### Not Another YouTube Embed Plugin
+
+Most "video plugins" for WordPress are glorified `<iframe>` wrappers. They embed YouTube links. Congrats, you invented the copy-paste button. I didn't build that.
+
+fchub-stream actually **uploads videos**. Direct to your streaming provider. No external accounts. No sending your users to Google. Videos stay on your platform. I built it this way because YouTube embeds are lazy. This isn't lazy.
+
+### Not a Media Library Replacement
+
+This doesn't replace WordPress media library. It **bypasses** it for video. Images still use media library. Videos use streaming CDN.
+
+Because each tool should do what it's good at. WordPress media library? Good for images. Not good for video. Accept and move on. I did. That's why this exists.
+
+### Built for FluentCommunity ❤️ 
+
+Works exclusively with FluentCommunity. Not a generic WordPress video plugin. Integrates with spaces, feeds, permissions, and comment system.
+
+If you're not using FluentCommunity, this plugin won't help you. If you are, it solves video upload permanently. I built it for FluentCommunity because that's what I use. Generic plugins are harder. I took the easy route.
+
+<Separator className="my-8" />

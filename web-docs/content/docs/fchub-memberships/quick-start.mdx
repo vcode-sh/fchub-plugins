@@ -1,0 +1,158 @@
+---
+title: Quick Start
+description: Create your first membership plan, link it to a FluentCart product, protect content, and verify the full purchase-to-access flow.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+
+This guide walks you through the basic flow: create a plan, connect it to a FluentCart product, set up content protection, and test a purchase. You will have a working membership site in under 10 minutes.
+
+## The Basic Flow
+
+<Steps>
+<Step>
+
+### Create a Membership Plan
+
+Go to **Memberships > Plans** and click **Create Plan**.
+
+Fill in the basics:
+- **Title** — the name members will see (e.g., "Pro Membership")
+- **Slug** — auto-generated from the title, used in shortcodes and URLs
+- **Description** — shown in the admin and optionally on the frontend
+- **Status** — set to "Active" to make it available immediately
+
+For duration, you have three options:
+- **Lifetime** — access never expires
+- **Fixed Days** — access expires after a set number of days (e.g., 365)
+- **Subscription Mirror** — access duration follows the FluentCart subscription billing cycle
+
+Leave trial days at 0 for now. You can configure trials later.
+
+Click **Save Plan**.
+
+</Step>
+<Step>
+
+### Add Content Rules to the Plan
+
+Still on the plan edit page, switch to the **Content Rules** tab.
+
+Click **Add Rule** and select the content you want this plan to include:
+- Choose a resource type (posts, pages, or any custom post type)
+- Search for and select the specific content
+- Set the drip type to "Immediate" for instant access
+
+Add as many rules as you need. Each rule defines one piece of content that members of this plan can access. You can also protect entire categories or tags by choosing a taxonomy resource type.
+
+Click **Save** after adding your rules.
+
+</Step>
+<Step>
+
+### Link the Plan to a FluentCart Product
+
+Go to your FluentCart product editor. Under the **Integrations** tab, click **Add Integration Feed** and select **Memberships**.
+
+Configure the feed:
+- **Feed Title** — a label for this feed (e.g., "Grant Pro Membership")
+- **Membership Plan** — select the plan you just created
+- **Validity Mode** — choose "Lifetime", "Fixed Duration", or "Mirror Subscription" depending on your pricing model
+- **Event Trigger** — leave as "Order Paid" (the default)
+
+Save the feed. When a customer purchases this product and payment is confirmed, the membership plan will be granted automatically.
+
+</Step>
+<Step>
+
+### Set Up Content Protection
+
+There are two ways to protect content:
+
+**Option A: Plan Rules (already done)**
+If you added content rules to your plan in Step 2, that content is already implicitly protected. Anyone without the plan will see a restriction message.
+
+**Option B: Per-Post Protection**
+Edit any post or page and look for the **Membership Protection** meta box in the sidebar. Check "Protect this content", select which plans grant access, and optionally customize the restriction message and teaser settings.
+
+<Callout type="info" title="Both Methods Work Together">
+Plan rules and per-post protection are complementary. A post can be protected by plan rules, by explicit protection settings on the post, or both. The access evaluator checks all sources when deciding whether to grant access.
+</Callout>
+
+</Step>
+<Step>
+
+### Test a Purchase
+
+Create a test order in FluentCart for the product you configured:
+
+1. Place an order (you can use a test payment method)
+2. Mark the order as paid
+3. Check **Memberships > Members** — your test user should appear with an active grant
+4. Log in as the test user and visit the protected content — it should be fully visible
+5. Log out or use a different browser — the restriction message should appear
+
+</Step>
+<Step>
+
+### Verify Access
+
+To confirm everything is working:
+
+1. **Admin view** — Go to **Memberships > Members** and find your test user. You should see their active grants, the plan name, and the source order.
+
+2. **Frontend view** — As the member, visit a protected page. The full content should display. You can also use the `[fchub_membership_status]` shortcode on any page to show the user their active plans.
+
+3. **WP-CLI check** (optional) — Run:
+```bash
+wp fchub-membership check --member=<user-email> --plan=<plan-slug>
+```
+This outputs whether the user has active access to the specified plan.
+
+</Step>
+</Steps>
+
+## What's Next
+
+<Accordions type="single">
+<Accordion title="Add drip scheduling">
+
+Go back to your plan's content rules and change some items from "Immediate" to "Delayed" with a day count. For example, set Module 2 to unlock 7 days after purchase, Module 3 at 14 days, and so on. Members will see a progress bar and receive email notifications as content unlocks.
+
+See [Drip Content](/docs/fchub-memberships/drip) for full details.
+
+</Accordion>
+<Accordion title="Set up trial periods">
+
+Edit your plan and set a **Trial Days** value (e.g., 7 or 14). New members will get full access during the trial. If their subscription payment is confirmed before the trial ends, they convert to paid. If not, access expires automatically.
+
+See [Trial Periods](/docs/fchub-memberships/trials) for the full configuration.
+
+</Accordion>
+<Accordion title="Configure email notifications">
+
+The plugin sends 8 types of email notifications by default. Go to **Memberships > Settings > Emails** to customize templates, enable/disable specific emails, and configure the sender details.
+
+See [Email Notifications](/docs/fchub-memberships/emails) for all email types and their smart codes.
+
+</Accordion>
+<Accordion title="Build FluentCRM automations">
+
+If FluentCRM is active, you have 15 triggers available for building automations — send onboarding sequences when membership is granted, win-back campaigns when memberships expire, upgrade offers at drip milestones, and more.
+
+See [FluentCRM Integration](/docs/fchub-memberships/fluentcrm) for the full list of triggers, actions, benchmarks, and smart codes.
+
+</Accordion>
+<Accordion title="Use shortcodes and Gutenberg blocks">
+
+Add membership-aware content to any page:
+- `[fchub_restrict plan="pro"]...[/fchub_restrict]` — show/hide content based on plan
+- `[fchub_membership_status display="full"]` — show the user's active plans
+- `[fchub_drip_progress plan="pro"]` — show a drip progress bar
+- `[fchub_my_memberships]` — full account page with content library
+
+See [Shortcodes & Blocks](/docs/fchub-memberships/shortcodes) for all options.
+
+</Accordion>
+</Accordions>

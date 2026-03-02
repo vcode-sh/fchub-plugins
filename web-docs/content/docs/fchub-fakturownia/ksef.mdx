@@ -1,0 +1,186 @@
+---
+title: KSeF 2.0 Integration
+description: How FCHub Fakturownia submits invoices to Poland's national e-invoicing system (Krajowy System e-Faktur) and tracks submission status.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+KSeF (Krajowy System e-Faktur) is Poland's national electronic invoicing system operated by the Ministry of Finance. FCHub Fakturownia integrates with KSeF through Fakturownia's built-in KSeF support, allowing invoices to be submitted directly from your FluentCart store.
+
+## What Is KSeF?
+
+KSeF is Poland's centralized platform for issuing, receiving, and storing structured electronic invoices. It's part of a broader push across the EU to standardize e-invoicing and improve tax compliance.
+
+Key points about KSeF:
+
+- **Structured format** -- invoices are submitted in a standardized XML schema defined by the Ministry of Finance
+- **Unique KSeF ID** -- every submitted invoice receives a unique identification number from the system
+- **Verification** -- both the seller and buyer can verify invoices through the KSeF platform
+- **Legal compliance** -- KSeF invoices are considered the official tax document
+
+<Callout type="info" title="KSeF Timeline">
+KSeF has been available for voluntary use and is being phased in as mandatory for Polish businesses. Check the current requirements at the [Ministry of Finance KSeF portal](https://www.podatki.gov.pl/ksef/) for the latest timeline and obligations.
+</Callout>
+
+<Separator className="my-8" />
+
+## How It Works
+
+FCHub Fakturownia does not communicate with KSeF directly. Instead, it leverages Fakturownia's own KSeF integration. When you enable KSeF auto-send in the plugin settings, the flow is:
+
+<Steps>
+  <Step>
+    ### Invoice Created with KSeF Flag
+
+    When an order is paid and the invoice is created, the plugin sends the `gov_save_and_send: true` parameter to Fakturownia's API. This tells Fakturownia to create the invoice **and** immediately submit it to KSeF.
+  </Step>
+  <Step>
+    ### Fakturownia Submits to KSeF
+
+    Fakturownia handles the XML conversion and submission to KSeF. This happens asynchronously on Fakturownia's servers -- the initial API response returns before KSeF confirms receipt.
+  </Step>
+  <Step>
+    ### Status Polling via Cron
+
+    Since KSeF processing is asynchronous, the plugin schedules a WordPress cron event (`fchub_fakturownia_check_ksef_status`) to check back after 60 seconds. The cron job fetches the invoice from Fakturownia's API and reads the `gov_status` field.
+  </Step>
+  <Step>
+    ### Status Updates
+
+    The cron job updates the order metadata with the latest KSeF status, KSeF ID, and verification link. If the status is still `processing`, it schedules another check in 2 minutes.
+  </Step>
+  <Step>
+    ### Completion
+
+    Once KSeF returns a final status (`ok` or `send_error`), the polling stops and a log entry is added to the order.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## KSeF Status Values
+
+The plugin tracks the following KSeF statuses, as reported by Fakturownia:
+
+| Status | Meaning | What Happens |
+|---|---|---|
+| `ok` | Invoice accepted by KSeF | KSeF ID and verification link stored. Success log added. Polling stops. |
+| `processing` | Submitted, waiting for KSeF confirmation | Another status check is scheduled in 2 minutes. |
+| `send_error` | KSeF rejected the invoice | Error messages from KSeF are logged on the order. Polling stops. |
+| `server_error` | KSeF service error | Displayed as "Server Error" in admin. |
+| `not_applicable` | KSeF submission not applicable | Displayed as "N/A" in admin. |
+| `not_connected` | Fakturownia account not connected to KSeF | Displayed as "Not Connected" in admin. |
+
+<Separator className="my-8" />
+
+## The Cron Job
+
+The plugin uses a single-event WordPress cron (`wp_schedule_single_event`) for KSeF status polling. Here's the technical detail:
+
+### Event Name
+
+```
+fchub_fakturownia_check_ksef_status
+```
+
+### Parameters
+
+The cron event receives two arguments:
+1. `$orderId` -- the FluentCart order ID
+2. `$fakturowniaInvoiceId` -- the Fakturownia invoice ID to check
+
+### Timing
+
+- **First check**: 60 seconds after invoice creation
+- **Subsequent checks**: every 120 seconds (2 minutes) while the status is `processing`
+- **Stops when**: the status changes to any value other than `processing` (e.g., `ok`, `send_error`)
+
+### What It Does
+
+Each cron execution:
+1. Fetches the invoice from Fakturownia's API
+2. Updates `_fakturownia_ksef_status` on the order
+3. Stores `_fakturownia_ksef_id` if available (the official KSeF number)
+4. Stores `_fakturownia_ksef_link` if available (the verification URL)
+5. If status is `ok` -- logs a success message with the KSeF number
+6. If status is `send_error` -- logs the error messages from KSeF
+7. If status is `processing` -- schedules another check in 2 minutes
+
+<Callout type="warn" title="WordPress Cron Dependency">
+KSeF status polling depends on WordPress cron (`wp-cron.php`). If your site has low traffic or cron is disabled, status updates may be delayed. For reliable cron execution, consider setting up a system-level cron job that hits `wp-cron.php` regularly:
+
+```bash
+*/2 * * * * curl -s https://yoursite.com/wp-cron.php > /dev/null 2>&1
+```
+</Callout>
+
+<Separator className="my-8" />
+
+## Correction Invoices and KSeF
+
+When a refund triggers a correction invoice, the correction is also submitted to KSeF if auto-send is enabled.
+
+The correction flow differs slightly from regular invoices:
+
+1. The correction invoice is created first via the standard `/invoices.json` endpoint
+2. After successful creation, the plugin calls the `send_to_ksef` endpoint on the correction invoice
+3. The correction's KSeF status is stored separately as `_fakturownia_correction_ksef_status`
+
+This two-step process is necessary because correction invoices reference the original invoice and need to be created before they can be submitted to KSeF.
+
+<Separator className="my-8" />
+
+## Order Metadata
+
+The following KSeF-related metadata is stored on FluentCart orders:
+
+| Meta Key | Description | Example Value |
+|---|---|---|
+| `_fakturownia_ksef_status` | Current KSeF status | `ok`, `processing`, `send_error` |
+| `_fakturownia_ksef_id` | KSeF invoice number | `1234567890-20250115-ABC123DEF456` |
+| `_fakturownia_ksef_link` | KSeF verification URL | `https://ksef.mf.gov.pl/...` |
+| `_fakturownia_correction_ksef_status` | Correction invoice KSeF status | `ok`, `processing` |
+
+<Separator className="my-8" />
+
+## Requirements for KSeF
+
+To use KSeF auto-send through FCHub Fakturownia, you need:
+
+<Cards>
+  <Card title="Fakturownia KSeF Connection">
+    Your Fakturownia account must be connected to KSeF. This is done within Fakturownia's settings, not in the plugin. Log in to Fakturownia and follow their KSeF setup guide.
+  </Card>
+  <Card title="KSeF Authorization">
+    You need proper authorization in KSeF for your company. This typically involves an electronic signature or trusted profile (profil zaufany) to authorize Fakturownia to submit invoices on your behalf.
+  </Card>
+  <Card title="Valid Invoice Data">
+    KSeF has strict validation rules. Invoices must have valid buyer data, proper VAT rates, and correctly formatted fields. The plugin handles most of this automatically, but edge cases (like missing addresses) may cause rejections.
+  </Card>
+  <Card title="Plugin KSeF Setting Enabled">
+    In the plugin settings, set **KSeF Auto Send** to **Yes**. This activates the KSeF flag during invoice creation and enables status polling.
+  </Card>
+</Cards>
+
+<Separator className="my-8" />
+
+## Deactivation Cleanup
+
+When the plugin is deactivated, the KSeF status check cron job is automatically cleared:
+
+```php
+register_deactivation_hook(__FILE__, function () {
+    wp_clear_scheduled_hook('fchub_fakturownia_check_ksef_status');
+});
+```
+
+This ensures no orphaned cron events remain after deactivation. Any pending KSeF status checks will not execute.
+
+<Callout type="info" title="Re-activation">
+If you deactivate and re-activate the plugin, any invoices that were in `processing` status will not be automatically re-polled. You can check their KSeF status manually in Fakturownia.
+</Callout>

@@ -1,0 +1,158 @@
+---
+title: Trial Periods
+description: Configure free trial periods on membership plans with automatic conversion or expiration.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Trial periods let potential members experience your content before committing to a paid subscription. When a trial is active, the member has full access to the plan's content. When the trial ends, access either converts to paid (if a subscription payment was confirmed) or expires automatically.
+
+## Configuring Trials
+
+Trials are configured at the plan level. Edit a plan in **Memberships > Plans** and set the **Trial Days** field to a positive number (e.g., 7 or 14).
+
+| Field | Description |
+|---|---|
+| **Trial Days** | Number of days for the free trial. Set to 0 to disable trials for this plan |
+| **Trial Expiry Notice Days** | How many days before trial end to send the expiring notification (configured in global settings, default: 3) |
+
+When a membership is granted for a plan with trial days configured, the `trial_ends_at` field on the grant is set to the current date plus the trial days. The `AccessEvaluator` treats grants with a future `trial_ends_at` as active — the member has full access during the trial.
+
+<Callout type="info" title="Trials Work With Any Validity Mode">
+Trials are independent of the plan's duration settings. You can have a 7-day trial on a lifetime plan, a 14-day trial on a yearly subscription, or any other combination. The trial period always starts when the membership is granted.
+</Callout>
+
+## Trial Lifecycle
+
+The `TrialLifecycleService` manages the complete trial lifecycle through the `fchub_memberships_trial_check` daily cron job.
+
+<Steps>
+<Step>
+
+### Trial starts
+
+When a membership with trial days is granted, the grant's `trial_ends_at` is set. The member gets immediate access to all plan content (including drip-scheduled content that has unlocked).
+
+If FluentCRM is active, the `TrialStartedTrigger` fires, allowing you to start an onboarding automation for trial members.
+
+</Step>
+<Step>
+
+### Trial expiring notification
+
+A configurable number of days before the trial ends (default: 3), the `TrialLifecycleService::sendTrialExpiringNotifications()` method sends a notification email.
+
+The email includes:
+- Plan name
+- Trial end date
+- An upgrade URL (linking to the plan's page)
+
+The hook `fchub_memberships/trial_expiring_soon` fires with the grant data and days remaining, regardless of whether the email is enabled. This allows FluentCRM's `TrialExpiringSoonTrigger` to fire automations.
+
+Each grant is only notified once — the method sets `trial_expiry_notified` in the grant's meta to prevent duplicates.
+
+</Step>
+<Step>
+
+### Trial ends — conversion check
+
+The daily cron calls `TrialLifecycleService::checkTrialExpirations()` to find active grants where `trial_ends_at` has passed. For each expired trial:
+
+**If a subscription payment exists:**
+- The grant's `source_type` is updated to `subscription`
+- The `trial_ends_at` is cleared
+- The `expires_at` is calculated from the plan's duration settings
+- A `TrialConvertedEmail` is sent to the member
+- The `fchub_memberships/trial_converted` hook fires
+- An audit log entry is created
+
+**If no subscription payment exists:**
+- The grant's status is changed to `expired`
+- The `fchub_memberships/trial_expired` hook fires
+- An audit log entry is created
+- The member loses access to all plan content
+
+</Step>
+</Steps>
+
+## Payment Detection
+
+The `TrialLifecycleService` checks for subscription payments by looking at the grant's `source_ids` array. For each source ID, it queries FluentCart's `Subscription` model and checks if the subscription status is `active` or `completed`.
+
+This means conversion happens when:
+1. The trial period ends (checked by daily cron)
+2. The member's FluentCart subscription has received at least one successful payment
+
+If the subscription exists but is in a failed or pending state, the trial expires rather than converts.
+
+<Separator />
+
+## Trial Emails
+
+Two email types are specific to trials:
+
+### TrialExpiringEmail
+
+Sent a few days before the trial ends (configurable via `trial_expiry_notice_days` setting).
+
+| Data | Description |
+|---|---|
+| `plan_title` | Name of the membership plan |
+| `trial_ends_at` | The exact trial end date |
+| `upgrade_url` | URL to the plan's page for upgrading |
+
+### TrialConvertedEmail
+
+Sent when a trial successfully converts to a paid membership.
+
+| Data | Description |
+|---|---|
+| `plan_title` | Name of the membership plan |
+| `expires_at` | The new expiration date (null for lifetime plans) |
+
+Both emails are dispatched via Action Scheduler for async delivery.
+
+## FluentCRM Integration
+
+If FluentCRM is active, trials integrate deeply with automation:
+
+### Triggers
+
+| Trigger | When It Fires |
+|---|---|
+| `TrialStartedTrigger` | When a membership with trial days is granted |
+| `TrialConvertedTrigger` | When a trial converts to paid |
+| `TrialExpiredTrigger` | When a trial expires without payment |
+| `TrialExpiringSoonTrigger` | X days before trial end (fires with days remaining) |
+
+### Smart Codes
+
+| Smart Code | Value |
+|---|---|
+| `{{membership.trial_ends_at}}` | Trial end date formatted with site date format |
+| `{{membership.trial_days_remaining}}` | Number of days left in the trial |
+
+### Benchmarks
+
+| Benchmark | Description |
+|---|---|
+| `TrialConvertedBenchmark` | Contact has converted from trial to paid membership |
+
+## Example: Trial-to-Paid Automation
+
+A common FluentCRM automation flow for trials:
+
+1. **Trigger:** TrialStarted
+2. **Action:** Tag contact as "Trial Member"
+3. **Wait:** 2 days
+4. **Action:** Send "Getting the most from your trial" email
+5. **Wait:** Until 2 days before trial ends
+6. **Benchmark:** TrialExpiringSoon
+7. **Action:** Send "Your trial ends soon — upgrade now" email with `{{membership.checkout_url}}`
+8. **Wait:** Trial end date
+9. **Decision:** TrialConverted benchmark
+   - **Yes:** Send "Welcome to paid membership" email, remove "Trial Member" tag, add "Paid Member" tag
+   - **No:** Send "We miss you — here's 20% off" email with coupon via CreateFluentCartCoupon action

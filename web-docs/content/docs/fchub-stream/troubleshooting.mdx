@@ -1,0 +1,1116 @@
+---
+title: Troubleshooting
+description: Videos not uploading? Player broken? Webhook signature failed? Welcome to the troubleshooting page nobody wanted to write but everyone needs.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { AlertCircle, CheckCircle, XCircle, Wifi, Upload, Video, Key, Webhook, Database, Shield } from 'lucide-react';
+
+Things break. APIs time out. Users upload corrupted files. Webhooks fail signature verification. That's software.
+
+This page documents the common ways FCHub Stream fails and how to fix them. Organized by what's broken, not by philosophical musings about video streaming architecture.
+
+If you're here because "it doesn't work," start with [Connection Issues](#connection-issues). If uploads fail, check [Upload Failures](#upload-failures). If videos upload but won't play, see [Playback Issues](#playback-issues).
+
+Or just read the whole thing. It's not that long. Unlike your video processing queue.
+
+<Separator className="my-8" />
+
+## Connection Issues
+
+### Test Connection Fails
+
+**Symptom:** Click "Test Connection" in settings. Get red error. Plugin can't reach streaming provider.
+
+**Common causes:**
+- Typo in API credentials (happens more than you'd think)
+- Wrong permissions on API token
+- Firewall blocking outbound HTTPS
+- Copy-paste added invisible spaces
+- API key expired or revoked
+
+**How to fix:**
+
+<Accordions type="single">
+<Accordion title="Cloudflare Stream: Invalid Account ID" icon={<Key className="size-4" />}>
+
+**Error Code:** `401 Unauthorized` or `403 Forbidden`
+
+Account ID format must be a hex string (letters and numbers). Usually 32 characters long.
+
+**Where to find it:**
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. Click **Stream** in sidebar
+3. Account ID displayed at top of page
+4. Copy the entire string (no spaces before or after)
+
+**Common mistakes:**
+- Copying Customer Subdomain instead of Account ID
+- Including "Account ID:" label text
+- Trailing spaces from copy-paste
+
+**Test:** Account ID should look like `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6`
+
+If test still fails with correct Account ID, your API token is the problem.
+
+</Accordion>
+
+<Accordion title="Cloudflare Stream: Invalid API Token" icon={<Shield className="size-4" />}>
+
+**Error Code:** `401 Unauthorized`
+
+API token needs specific permissions to work with Stream API.
+
+**Required permissions:**
+- `Account.Cloudflare Stream:Read`
+- `Account.Cloudflare Stream:Edit`
+
+**How to fix:**
+1. Go to [Cloudflare Dashboard → My Profile → API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+2. Find your Stream token (or create new one)
+3. Use template: **Edit Cloudflare Stream**
+4. Verify permissions include both Read and Edit for Stream
+5. Copy token (Cloudflare shows it once)
+6. Paste into FCHub Stream settings
+7. Save and test connection
+
+<Callout type="warn">
+If you lost your API token, you can't retrieve it. Generate a new one. Save it somewhere safe this time. Password managers exist for a reason.
+</Callout>
+
+**Token format:** Starts with capital letters followed by numbers and lowercase. Example: `AbCdEfGhIjKlMnOpQrStUvWxYz1234567890abcdefghijklmnopqrs`
+
+If token looks correct but test fails, check account has Stream enabled (paid Cloudflare plan required).
+
+</Accordion>
+
+<Accordion title="Bunny.net: Invalid API Key" icon={<Key className="size-4" />}>
+
+**Error Code:** `401 Unauthorized`
+
+Bunny.net has **two different API keys**. You need the right one for the right operation.
+
+**Account API Key:**
+- Used for: Listing video libraries, library management
+- Where: Account Settings → API → Account API Key
+- Permissions: Account-level operations
+
+**Stream API Key (Library-specific):**
+- Used for: Video upload, deletion, metadata
+- Where: Stream → Your Library → API Key
+- Permissions: Library-level operations
+
+**Common mistake:** Using Account API Key when Stream API Key is needed (or vice versa).
+
+**Which one to use in FCHub Stream?**
+- **Account API Key** field: Account-level key (for listing libraries)
+- Video operations automatically use library credentials
+
+**How to fix:**
+1. Go to [Bunny.net Dashboard](https://dash.bunny.net/)
+2. Click profile → **Account Settings** → **API**
+3. Copy **Account API Key** (not Stream API Key)
+4. Paste into FCHub Stream settings → **Account API Key** field
+5. Save and test connection
+
+If test still fails, verify your library exists and Account API Key has access to it.
+
+</Accordion>
+
+<Accordion title="Bunny.net: Library Not Found" icon={<Database className="size-4" />}>
+
+**Error Code:** `404 Not Found`
+
+Library ID doesn't exist, or Account API Key doesn't have access to it.
+
+**How to fix:**
+1. Go to [Bunny.net Dashboard → Stream](https://dash.bunny.net/stream)
+2. Open your Stream library
+3. Library ID is shown on library page (it's a number like `12345`)
+4. Copy it (numbers only, no spaces)
+5. Paste into FCHub Stream settings → **Library ID** field
+6. Save and test connection
+
+**Common mistakes:**
+- Using Video GUID instead of Library ID
+- Copying library name instead of ID
+- Wrong library (you have multiple, picked the wrong one)
+
+**Test:** Library ID should be purely numeric. If it has letters or dashes, that's not a Library ID.
+
+</Accordion>
+
+<Accordion title="Firewall Blocking Provider API" icon={<Wifi className="size-4" />}>
+
+**Symptom:** Connection test times out. No error code. Just... nothing.
+
+Your server firewall might be blocking outbound HTTPS requests to streaming provider APIs.
+
+**Endpoints that need access:**
+
+**Cloudflare Stream:**
+- `https://api.cloudflare.com/client/v4/accounts/{account_id}/stream/*`
+
+**Bunny.net:**
+- `https://api.bunny.net/videolibrary`
+- `https://{library-hostname}/library/{library-id}/videos/*`
+
+**How to test:**
+
+SSH into your server and run:
+
+```bash
+# Test Cloudflare API
+curl -I https://api.cloudflare.com
+
+# Test Bunny.net API
+curl -I https://api.bunny.net
+```
+
+**If curl fails:** Firewall is blocking outbound HTTPS. Contact hosting support to whitelist streaming provider domains.
+
+**If curl succeeds but plugin test fails:** API credentials are wrong, not a firewall issue.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Upload Failures
+
+### Upload Fails Immediately
+
+**Symptom:** Click upload button. Select video. Upload fails instantly with error message.
+
+<Accordions type="single">
+<Accordion title="File Too Large" icon={<Upload className="size-4" />}>
+
+**Error Code:** `file_too_large` (HTTP 413)
+
+Video file exceeds configured maximum file size.
+
+**Default limit:** 500 MB
+
+**Provider limits:**
+- **Cloudflare Stream:** 30 GB maximum
+- **Bunny.net:** 20 GB maximum
+
+**How to fix:**
+
+**Option 1: Compress the video**
+- Use [HandBrake](https://handbrake.fr/) or similar
+- H.264 codec, CRF 23 (good quality, reasonable size)
+- 1080p max resolution for most use cases
+
+**Option 2: Increase plugin limit**
+1. Go to **FCHub Stream → Settings → Upload Settings**
+2. Find **Max File Size** slider
+3. Increase limit (up to provider maximum)
+4. Save settings
+5. Try upload again
+
+<Callout type="warn">
+Increasing limit doesn't magically make uploads faster. Large files still take time. Physics exists. So does user patience.
+</Callout>
+
+**Check current limit:**
+- Admin can see limit in Upload Settings
+- Users see limit displayed below upload button
+
+</Accordion>
+
+<Accordion title="Invalid File Format" icon={<Video className="size-4" />}>
+
+**Error Code:** `invalid_format` (HTTP 400)
+
+Video file extension not in allowed formats list.
+
+**Allowed formats by default:**
+- MP4 (H.264, H.265)
+- MOV
+- WebM
+- AVI
+
+**How to fix:**
+
+**Option 1: Convert video to MP4**
+- MP4 is most universally supported
+- Use [CloudConvert](https://cloudconvert.com/), HandBrake, or FFmpeg
+- H.264 codec recommended
+
+**Option 2: Enable format in settings**
+1. Go to **FCHub Stream → Settings → Upload Settings**
+2. Check **Allowed Formats** section
+3. Enable checkbox for needed format
+4. Save settings
+
+**Common user mistake:** Uploading screen recording as .mov but MOV disabled in settings.
+
+</Accordion>
+
+<Accordion title="Invalid MIME Type" icon={<AlertCircle className="size-4" />}>
+
+**Error Code:** `invalid_mime_type` (HTTP 400)
+
+File extension says "video" but MIME type detection disagrees. Usually means corrupted file or file renamed from non-video format.
+
+**Detected MIME types that pass validation:**
+- `video/mp4`
+- `video/quicktime`
+- `video/webm`
+- `video/x-msvideo`
+
+**How to fix:**
+
+**User side:**
+- Try uploading a different video
+- Re-export video from editing software
+- Don't rename `.txt` files to `.mp4` and expect magic
+
+**Admin side:**
+- This validation protects against fake video files
+- If legitimate videos fail, check `finfo_file()` is working on server
+- Contact hosting if MIME detection is broken
+
+</Accordion>
+
+<Accordion title="File Not Found / Temporary File Deleted" icon={<XCircle className="size-4" />}>
+
+**Error Code:** `file_not_found` (HTTP 400)
+
+Uploaded file disappeared before processing started. Usually a server configuration issue.
+
+**Common causes:**
+- PHP temp directory auto-cleanup too aggressive
+- Insufficient disk space for temp files
+- Antivirus deleting uploaded files (yes, really)
+- Server-level security software intercepting uploads
+
+**How to fix:**
+1. Check server disk space: `df -h`
+2. Check PHP temp directory permissions
+3. Verify `upload_tmp_dir` in `php.ini` is writable
+4. Check server logs for antivirus or security software interference
+5. Increase `max_execution_time` in `php.ini` (if upload processing times out)
+
+**Test:** Try uploading a small video (under 10 MB). If small files work but large files fail, it's a timeout or temp storage issue.
+
+</Accordion>
+</Accordions>
+
+### Upload Starts But Fails Mid-Upload
+
+**Symptom:** Progress bar starts moving. Gets to 15%. Fails. Or 47%. Or 89%. Never 100%.
+
+<Accordions type="single">
+<Accordion title="Network Timeout" icon={<Wifi className="size-4" />}>
+
+**Symptom:** Upload fails after X seconds. Same time every attempt.
+
+**Default timeout:** 300 seconds (5 minutes)
+
+Large video files can exceed timeout on slow connections.
+
+**How to fix:**
+
+**Server-side:**
+1. Edit `php.ini`:
+   ```ini
+   max_execution_time = 600
+   upload_max_filesize = 2G
+   post_max_size = 2G
+   ```
+2. Restart PHP-FPM or Apache
+3. Test again
+
+**User-side:**
+- Compress video before upload
+- Use faster internet connection
+- Upload during off-peak hours (if shared connection)
+
+**Check timeout in WordPress debug log:** Look for "timeout" errors with timestamp matching upload failure.
+
+</Accordion>
+
+<Accordion title="Provider API Rate Limiting" icon={<AlertCircle className="size-4" />}>
+
+**Symptom:** Multiple uploads work. Suddenly all fail. Wait 5 minutes. Work again.
+
+Provider's API rate limit exceeded.
+
+**Cloudflare Stream rate limits:**
+- 1,200 requests per 5 minutes
+- Uploads count as 1 request each
+- Status checks count as requests too
+
+**Bunny.net rate limits:**
+- Variable based on plan
+- Usually generous for video uploads
+
+**How to fix:**
+- Wait a few minutes and try again
+- Don't spam status check requests
+- Reduce simultaneous upload attempts
+- If persistent, contact provider support
+
+**Plugin doesn't cause this.** Rate limits are provider-side. FCHub Stream respects standard rate limits.
+
+</Accordion>
+</Accordions>
+
+### Upload Completes But Video Shows "Processing" Forever
+
+**Symptom:** Upload progress bar reaches 100%. Says "Processing video..." for eternity. Or at least 30 minutes. Which feels like eternity.
+
+<Accordions type="single">
+<Accordion title="Provider Processing Delay" icon={<Video className="size-4" />}>
+
+**Normal processing times:**
+- **Short videos (under 2 min):** 30 seconds - 2 minutes
+- **Medium videos (2-10 min):** 2-5 minutes
+- **Long videos (10-60 min):** 5-15 minutes
+- **Very long videos (60+ min):** 15-30+ minutes
+
+**Provider transcodes multiple resolutions:** 4K, 1080p, 720p, 480p, 360p, 240p. This takes time.
+
+**How to check status:**
+
+**Cloudflare Stream:**
+1. Go to [Cloudflare Dashboard → Stream](https://dash.cloudflare.com/)
+2. Find video in list
+3. Check "Status" column
+4. If "Ready," transcoding complete (plugin should update soon)
+5. If "In Progress," wait longer
+6. If "Error," video transcoding failed (see error message)
+
+**Bunny.net:**
+1. Go to [Bunny.net Dashboard → Stream → Your Library](https://dash.bunny.net/stream)
+2. Find video in list
+3. Check status icon
+4. Green checkmark = ready
+5. Yellow clock = processing
+6. Red X = failed
+
+**If video is "Ready" on provider but plugin still shows "Processing":**
+- Webhook might not have fired (if configured)
+- Status polling interval hasn't checked yet
+- Check browser console for JavaScript errors
+- Refresh page and check again
+
+</Accordion>
+
+<Accordion title="Webhook Not Configured (Cloudflare Only)" icon={<Webhook className="size-4" />}>
+
+**Symptom:** Videos take 30+ seconds to show as "ready" even though Cloudflare dashboard shows them ready immediately.
+
+Without webhooks, plugin polls provider API every 10-30 seconds to check status. With webhooks, provider notifies plugin instantly when ready.
+
+**How to enable webhooks:**
+
+1. Go to **FCHub Stream → Settings → Stream Configuration**
+2. Open **Cloudflare Stream** section
+3. Click **Activate Webhook** button
+4. System automatically:
+   - Generates webhook URL (your site's URL + `/wp-json/fluent-community/v2/stream/webhook`)
+   - Registers webhook with Cloudflare
+   - Saves webhook secret for signature verification
+5. Test: Upload a video, watch status update in ~5 seconds instead of 30+
+
+**Requirements:**
+- SSL/HTTPS enabled on your site (webhooks require secure connection)
+- Webhook URL must be publicly accessible (not localhost, not behind firewall)
+
+<Callout>
+Bunny.net webhook support coming soon. Currently uses polling for status updates.
+</Callout>
+
+**If webhook activation fails:**
+- Check site has valid SSL certificate
+- Verify webhook URL is publicly reachable
+- Check Cloudflare can reach your server (not blocked by firewall)
+- Look at WordPress debug log for webhook-related errors
+
+</Accordion>
+
+<Accordion title="Webhook Signature Verification Failed" icon={<Shield className="size-4" />}>
+
+**Error in logs:** `webhook_verification_failed` or `invalid_signature`
+
+Cloudflare webhook fired. Plugin received it. Signature verification failed. Webhook rejected.
+
+**Why this happens:**
+- Webhook secret mismatch (plugin has different secret than Cloudflare expects)
+- Timestamp too old (webhook delivery delayed >5 minutes)
+- Request body modified in transit (proxy/firewall interference)
+
+**How to fix:**
+
+**Option 1: Re-activate webhook**
+1. Go to **FCHub Stream → Settings → Stream Configuration**
+2. Click **Activate Webhook** again
+3. This generates new secret and re-registers with Cloudflare
+4. Test with new video upload
+
+**Option 2: Check webhook secret in database**
+1. Open database in phpMyAdmin
+2. Find table: `wp_options` (prefix may vary)
+3. Search for option: `fchub_stream_cloudflare_webhook_secret`
+4. Verify it matches what Cloudflare has (you can't see Cloudflare's secret, but re-activation syncs them)
+
+**Option 3: Check server time**
+- Webhook signature includes timestamp
+- If server clock is wrong, signatures fail
+- Run: `date` on server, verify it matches real time
+- If wrong, sync server clock: `ntpdate -u time.nist.gov` (requires root)
+
+**Debug webhook issues:**
+1. Enable WordPress debug logging
+2. Add to `wp-config.php`:
+   ```php
+   define('WP_DEBUG', true);
+   define('WP_DEBUG_LOG', true);
+   define('WP_DEBUG_DISPLAY', false);
+   ```
+3. Upload video
+4. Check `wp-content/debug.log` for webhook errors
+5. Look for `[FCHub Stream]` prefix in logs
+
+</Accordion>
+
+<Accordion title="Video Encoding Failed (Provider Side)" icon={<XCircle className="size-4" />}>
+
+**Symptom:** Video stuck processing forever. Check provider dashboard. Status shows "Error" or "Failed."
+
+**Common causes:**
+- Video file corrupted
+- Unsupported codec (rare, but happens)
+- Provider's transcoding service had an issue
+- Video too long or resolution too high
+
+**How to fix:**
+
+1. **Check error message in provider dashboard:**
+   - Cloudflare Stream shows error reason
+   - Bunny.net shows status with error details
+
+2. **Common errors and fixes:**
+   - **"Invalid input file"** → Video file corrupted, re-export and upload
+   - **"Unsupported codec"** → Convert to H.264 MP4
+   - **"Processing timeout"** → Video too long, split into parts or compress
+   - **"Unknown error"** → Provider issue, retry or contact provider support
+
+3. **Delete failed video and re-upload:**
+   - Failed videos stay in your library consuming storage
+   - Delete from provider dashboard
+   - Delete post/comment in FluentCommunity (or edit to remove video)
+   - Re-upload with fixed file
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Playback Issues
+
+### Video Won't Play
+
+**Symptom:** Video player appears. Click play. Nothing happens. Or player shows error message.
+
+<Accordions type="single">
+<Accordion title="Video Still Processing" icon={<Video className="size-4" />}>
+
+**Symptom:** Player shows spinner or "Processing video" message.
+
+Video upload completed but transcoding not finished yet. Player can't play a video that doesn't exist yet.
+
+**How to fix:** Wait. Check provider dashboard to verify processing status.
+
+**Typical processing times:**
+- 1 min video: ~1-2 min processing
+- 5 min video: ~3-5 min processing
+- 30 min video: ~10-15 min processing
+
+If stuck processing >30 minutes, check provider dashboard for errors.
+
+</Accordion>
+
+<Accordion title="Browser Console Shows CORS Error" icon={<AlertCircle className="size-4" />}>
+
+**Error in console:** `Access to video at 'https://...' from origin 'https://yoursite.com' has been blocked by CORS policy`
+
+Your streaming provider's CORS settings are blocking your site domain.
+
+**How to fix:**
+
+**Cloudflare Stream:**
+- Cloudflare Stream allows all origins by default
+- If you restricted allowed origins, add your site domain
+- Go to Cloudflare Dashboard → Stream → Settings → Allowed Origins
+
+**Bunny.net:**
+1. Go to [Bunny.net Dashboard → Stream → Your Library](https://dash.bunny.net/stream)
+2. Click **Settings** tab
+3. Find **Allowed Referrers** section
+4. If enabled, add your site domain: `yoursite.com`
+5. Save changes
+6. Clear browser cache and test again
+
+</Accordion>
+
+<Accordion title="Player Shows 403 Forbidden" icon={<Shield className="size-4" />}>
+
+**Symptom:** Video player loads. Shows "403 Forbidden" error.
+
+**Bunny.net only:** Hostname is wrong or referrer restrictions blocking your site.
+
+**How to fix:**
+
+1. **Check hostname in settings:**
+   - Go to **FCHub Stream → Settings → Stream Configuration**
+   - Verify **Hostname** matches your Bunny.net library hostname
+   - Should be like `video.bunnycdn.com` or your custom domain
+   - Save if changed
+
+2. **Check referrer restrictions:**
+   - Go to Bunny.net Dashboard → Your Library → Settings
+   - Find **Allowed Referrers**
+   - If enabled, add your site domain
+   - Leave blank to allow all referrers (least restrictive)
+
+3. **Check allowed countries (if restricted):**
+   - Some Bunny.net plans allow geographic restrictions
+   - If enabled, verify user's country is allowed
+   - Or disable geo-restrictions for testing
+
+</Accordion>
+
+<Accordion title="Player Shows 404 Not Found" icon={<XCircle className="size-4" />}>
+
+**Symptom:** Video player tries to load. Returns 404 error.
+
+Video was deleted from provider but WordPress post still references it.
+
+**How to fix:**
+
+**Option 1: Re-upload video**
+1. Edit post/comment in FluentCommunity
+2. Remove broken video embed
+3. Upload video again
+4. Save
+
+**Option 2: Remove video from post**
+1. Edit post in FluentCommunity
+2. Remove video embed/reference
+3. Save
+
+**Prevention:** Don't delete videos directly from provider dashboard. Delete the post/comment first (plugin auto-deletes video from provider).
+
+</Accordion>
+</Accordions>
+
+### Video Plays But Quality Is Terrible
+
+**Symptom:** Video loads. Plays. Looks like it was filmed on a potato in 2008.
+
+**Likely cause:** Source video quality is terrible. Streaming providers can't improve quality that isn't there.
+
+**How to fix:**
+
+1. **Check source video quality:**
+   - Play original video file on your computer
+   - If it looks bad there, that's the problem
+   - Re-record or re-export at higher quality
+
+2. **Check player quality settings:**
+   - Most players have quality selector (240p, 360p, 480p, 720p, 1080p)
+   - Manually select higher quality
+   - Or set to "Auto" (adaptive bitrate)
+
+3. **User's internet connection:**
+   - Slow connection = player auto-selects lower quality
+   - That's intentional (prevents buffering)
+   - User can manually select higher quality if connection allows
+
+<Callout>
+Streaming providers don't magically improve video quality. If you upload 480p, users get 480p. Upload 1080p to get 1080p playback options.
+</Callout>
+
+### Video Loads Slowly or Buffers Constantly
+
+**Symptom:** Video starts playing. Buffers. Plays 2 seconds. Buffers again. Repeat until user rage-quits.
+
+**Causes:**
+- User's internet connection is slow
+- Streaming provider having issues
+- CDN routing inefficiency (rare)
+
+**How to fix:**
+
+**User-side:**
+- Lower video quality manually (select 360p or 480p)
+- Check internet speed: [fast.com](https://fast.com)
+- Try different network (mobile data vs WiFi)
+
+**Admin-side:**
+- Check provider status page:
+  - [Cloudflare Status](https://www.cloudflarestatus.com/)
+  - [Bunny.net Status](https://status.bunny.net/)
+- If provider is degraded, that's why
+- Wait for them to fix it
+
+**Plugin can't fix:**
+- User's slow internet
+- Provider's infrastructure issues
+- Physics
+
+<Separator className="my-8" />
+
+## Permission Issues
+
+### Users Can't See Upload Button
+
+**Symptom:** User creates post. No video upload button appears.
+
+<Accordions type="single">
+<Accordion title="Upload Disabled in Settings" icon={<Upload className="size-4" />}>
+
+**How to fix:**
+
+1. Go to **FCHub Stream → Settings → Upload Settings**
+2. Find **Enable Upload from Portal** toggle
+3. Turn it ON
+4. Save settings
+5. Refresh FluentCommunity page
+6. Upload button should appear
+
+</Accordion>
+
+<Accordion title="User Role Not Allowed" icon={<Shield className="size-4" />}>
+
+**Symptom:** Some users see upload button. Others don't.
+
+FCHub Stream respects FluentCommunity permissions. Users need permission to create posts with media.
+
+**How to fix:**
+
+1. Go to **FluentCommunity → Settings → Permissions**
+2. Check user role permissions (Member, Moderator, etc.)
+3. Verify role can "Create Posts" and "Upload Media"
+4. Save if changed
+5. Test with user account
+
+**Admin always sees upload button** (if upload enabled in FCHub Stream settings).
+
+</Accordion>
+
+<Accordion title="Video Upload for Comments Disabled" icon={<AlertCircle className="size-4" />}>
+
+**Symptom:** Upload works in posts. Not in comments.
+
+Comment video upload is optional setting.
+
+**How to fix:**
+
+1. Go to **FCHub Stream → Settings → Upload Settings**
+2. Find **Allow Video in Comments** toggle
+3. Turn it ON
+4. Save settings
+5. Users can now upload videos in comments too
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## API & Database Issues
+
+### Database Errors
+
+<Accordions type="single">
+<Accordion title="Video Metadata Not Saving" icon={<Database className="size-4" />}>
+
+**Symptom:** Video uploads. Plays. But post doesn't save video reference. After refresh, video gone.
+
+Database write failing or meta storage issue.
+
+**How to fix:**
+
+1. **Check WordPress debug log** for database errors
+2. **Verify database tables exist:**
+   - Video metadata stored in `wp_postmeta` and `wp_commentmeta`
+   - Check with phpMyAdmin or WP-CLI
+3. **Check post meta storage:**
+   ```sql
+   SELECT * FROM wp_postmeta WHERE meta_key LIKE '%media_preview%';
+   ```
+   - Should show video_id, provider, status
+4. **If empty:** Meta not saving, check FluentCommunity compatibility
+5. **Deactivate and reactivate plugin** to reset hooks
+
+</Accordion>
+
+<Accordion title="Encrypted Credentials Can't Be Decrypted" icon={<Key className="size-4" />}>
+
+**Symptom:** API credentials saved. Test connection fails with "decryption error."
+
+Plugin encrypts API credentials before storing in database. Decryption requires consistent encryption key.
+
+**Common cause:** `NONCE_KEY` or `AUTH_KEY` in `wp-config.php` changed after credentials were saved.
+
+**How to fix:**
+
+**Option 1: Re-enter credentials**
+1. Go to **FCHub Stream → Settings → Stream Configuration**
+2. Re-enter API credentials
+3. Save (this encrypts with current keys)
+4. Test connection
+
+**Option 2: Verify wp-config.php keys unchanged**
+- If you recently changed security keys, that broke decryption
+- Restore old keys temporarily
+- Re-enter credentials in plugin
+- Then change keys again (plugin will re-encrypt)
+
+</Accordion>
+</Accordions>
+
+### SSL/HTTPS Issues
+
+<Accordions type="single">
+<Accordion title="Webhooks Require HTTPS" icon={<Webhook className="size-4" />}>
+
+**Symptom:** Webhook activation fails with error about HTTPS.
+
+Streaming providers require webhook URLs use HTTPS (secure connection).
+
+**How to fix:**
+
+1. **Install SSL certificate:**
+   - Most hosts provide free Let's Encrypt SSL
+   - cPanel: SSL/TLS Status → AutoSSL
+   - Or use Cloudflare for free SSL
+
+2. **Force HTTPS in WordPress:**
+   Add to `wp-config.php`:
+   ```php
+   define('FORCE_SSL_ADMIN', true);
+   ```
+
+3. **Verify site URL uses HTTPS:**
+   - Go to Settings → General
+   - WordPress Address and Site Address should start with `https://`
+   - Save if changed
+
+4. **Try webhook activation again**
+
+<Callout type="warn">
+It's 2025. If your site doesn't have HTTPS, fix that first. Then worry about video uploads. Priorities.
+</Callout>
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Plugin Conflicts
+
+### FCHub Stream Stopped Working After Installing Another Plugin
+
+**Symptom:** Everything worked. Installed unrelated plugin. Video uploads broke.
+
+**Common conflicts:**
+- **Caching plugins** (WP Rocket, W3 Total Cache, etc.) - Cache breaks REST API
+- **Security plugins** (Wordfence, Sucuri, etc.) - Block video uploads as "suspicious"
+- **Media plugins** - Interfere with upload handling
+- **Performance plugins** - Minify/combine JavaScript, break Vue app
+
+**How to debug:**
+
+1. **Deactivate suspect plugin**
+2. **Test video upload**
+3. **If works:** That plugin is the conflict
+4. **If still broken:** Try next plugin
+
+**Common fixes:**
+
+**Caching plugin conflicts:**
+- Exclude REST API from cache: `/wp-json/fluent-community/*`
+- Exclude admin pages: `/wp-admin/admin.php?page=fchub-stream*`
+- Clear cache after changes
+
+**Security plugin conflicts:**
+- Whitelist FCHub Stream uploads in security rules
+- Check firewall logs for blocked requests
+- Temporarily disable to test (then re-enable with exclusions)
+
+**JavaScript minification conflicts:**
+- Exclude FCHub Stream admin scripts from minification
+- Or disable JS minification entirely (it rarely helps anyway)
+
+<Separator className="my-8" />
+
+## Provider-Specific Issues
+
+### Cloudflare Stream Issues
+
+<Accordions type="single">
+<Accordion title="Customer Subdomain Invalid" icon={<AlertCircle className="size-4" />}>
+
+**Symptom:** API credentials work. Test connection passes. But video embed players don't load.
+
+Customer subdomain is wrong. Video player URLs are broken.
+
+**How to fix:**
+
+1. Go to [Cloudflare Dashboard → Stream](https://dash.cloudflare.com/)
+2. Customer Subdomain displayed at top (looks like `customer-abc123xyz`)
+3. Copy it exactly (no extra spaces)
+4. Go to **FCHub Stream → Settings → Stream Configuration**
+5. Paste into **Customer Subdomain** field
+6. Save settings
+7. Re-embed video or refresh page
+
+**Player URL should look like:**
+`https://customer-abc123xyz.cloudflarestream.com/{video-uid}/manifest/video.m3u8`
+
+If subdomain is wrong, URL 404s.
+
+</Accordion>
+
+<Accordion title="Webhook Deliveries Failing" icon={<Webhook className="size-4" />}>
+
+**Symptom:** Webhook activated. Videos upload. But status never updates automatically.
+
+Cloudflare trying to deliver webhooks but your server rejecting them.
+
+**How to check webhook deliveries:**
+
+1. Go to [Cloudflare Dashboard → Stream → Webhooks](https://dash.cloudflare.com/)
+2. View webhook delivery history
+3. Look for failed deliveries (red X)
+4. Click failed delivery to see error details
+
+**Common errors:**
+
+**SSL certificate error:**
+- Your site's SSL cert is invalid or expired
+- Fix SSL, then webhooks will work
+
+**Connection timeout:**
+- Server slow to respond
+- Increase PHP execution time
+- Check server isn't overloaded
+
+**403 Forbidden:**
+- Firewall blocking Cloudflare IPs
+- Whitelist Cloudflare IP ranges in firewall
+
+**Signature verification failed:**
+- Webhook secret mismatch
+- Re-activate webhook to sync secret
+
+</Accordion>
+</Accordions>
+
+### Bunny.net Issues
+
+<Accordions type="single">
+<Accordion title="Collection/Category Errors" icon={<Database className="size-4" />}>
+
+**Symptom:** Upload fails with "collection not found" or similar.
+
+Bunny.net Stream uses "Collections" to organize videos. If specified collection doesn't exist, upload fails.
+
+**How to fix:**
+
+1. Go to [Bunny.net Dashboard → Stream → Your Library](https://dash.bunny.net/stream)
+2. Click **Collections** tab
+3. Create collection if needed
+4. Note collection ID (it's a GUID like `a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6`)
+5. In FCHub Stream: Don't specify collection for default uploads
+6. Or pass correct collection ID if using custom integration
+
+**Default behavior:** FCHub Stream uploads to library root (no collection). That works fine.
+
+</Accordion>
+
+<Accordion title="Hostname Configuration Wrong" icon={<Wifi className="size-4" />}>
+
+**Symptom:** Videos upload. Playback fails with 404.
+
+Hostname in settings doesn't match your Bunny.net Stream library hostname.
+
+**How to fix:**
+
+1. Go to [Bunny.net Dashboard → Stream → Your Library](https://dash.bunny.net/stream)
+2. Find **Video CDN Hostname** (usually on Overview or Settings tab)
+3. Copy it exactly (like `vz-abc12345.b-cdn.net` or custom domain)
+4. Go to **FCHub Stream → Settings → Stream Configuration**
+5. Paste into **Hostname** field
+6. Save settings
+7. Test video playback
+
+**If you have custom domain:** Use that instead of default `.b-cdn.net` hostname.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Debug Mode & Logging
+
+### Enable WordPress Debug Logging
+
+Useful for diagnosing API errors, upload failures, webhook issues.
+
+**Add to wp-config.php:**
+
+```php
+// Enable debug logging
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+@ini_set('display_errors', 0);
+```
+
+**Log location:** `wp-content/debug.log`
+
+**FCHub Stream log entries** start with `[FCHub Stream]` prefix.
+
+**What to look for:**
+- API request failures (HTTP status codes)
+- Webhook signature errors
+- File validation failures
+- Database query errors
+
+**Disable debug mode** after troubleshooting (prevents log file from growing forever).
+
+### Check Browser Console
+
+Frontend errors (upload UI, JavaScript issues) show in browser console.
+
+**How to open console:**
+- **Chrome/Edge:** F12 or Right-click → Inspect → Console tab
+- **Firefox:** F12 or Right-click → Inspect Element → Console tab
+- **Safari:** Develop → Show JavaScript Console (enable Develop menu in Preferences first)
+
+**What to look for:**
+- Network errors (failed API requests)
+- JavaScript errors (Vue app crashes)
+- CORS errors (provider blocking your domain)
+
+**Take screenshot** of errors when asking for help.
+
+<Separator className="my-8" />
+
+## Still Broken?
+
+If none of these solutions fixed your issue:
+
+### 1. Verify Requirements
+
+- **WordPress:** 6.7+ installed
+- **PHP:** 8.3+ active
+- **FluentCommunity:** Latest version installed and activated
+- **SSL:** HTTPS enabled on site
+- **Provider account:** Active with valid API credentials
+
+### 2. Test Systematically
+
+**Step 1:** Test with admin account (rules out permissions)
+
+**Step 2:** Test with small video file under 10 MB (rules out file size/format)
+
+**Step 3:** Test connection in settings (rules out API credentials)
+
+**Step 4:** Check provider dashboard (rules out provider outage)
+
+**Step 5:** Check browser console and WordPress debug log (rules out JavaScript or PHP errors)
+
+### 3. Gather Information
+
+When asking for help, include:
+
+**Environment:**
+- WordPress version
+- PHP version
+- FluentCommunity version
+- FCHub Stream version
+- Hosting provider
+
+**Problem details:**
+- What you tried to do
+- What actually happened
+- Error messages (exact text, screenshots)
+- When it started happening
+- What changed before it broke
+
+**Logs:**
+- Browser console output (F12)
+- WordPress debug log (`wp-content/debug.log`)
+- Server error logs (if accessible)
+
+**Provider:**
+- Which one (Cloudflare or Bunny.net)
+- Video status in provider dashboard
+
+### 4. Get Help
+
+**GitHub Issues:** [Report bugs or request features](https://github.com/vcode-sh/fchub-plugins/issues)
+
+**Support:** GitHub issues are the fastest way to get help.
+
+**Provider support:**
+- Cloudflare Stream issues: [Cloudflare Community](https://community.cloudflare.com/)
+- Bunny.net issues: [Bunny.net Support](https://support.bunny.net/)
+
+<Callout type="info">
+The more details you provide, the faster issues get resolved. "It doesn't work" isn't actionable. "Upload fails at 47% with error X in console and Y in debug log" is.
+</Callout>
+
+<Separator className="my-8" />
+
+## Known Limitations
+
+Not bugs. Features. Or missing features. Depends on perspective.
+
+**Current limitations:**
+- One streaming provider active at a time (can't use Cloudflare and Bunny.net simultaneously)
+- No batch upload UI (upload videos one at a time)
+- Bunny.net webhook support not implemented yet (uses polling instead)
+- No automatic provider migration tool (manual re-upload required)
+- Subtitle/caption upload requires provider dashboard (not in plugin UI yet)
+
+**Coming eventually:**
+- Batch upload interface
+- Bunny.net webhook support
+- Video analytics dashboard
+- Custom player controls
+
+**Not coming:**
+- Built-in video editor (use professional video editing software)
+- Automatic transcription (providers offer this, not reinventing it)
+- Video hosting on WordPress server (that's the entire point of NOT doing this)
+
+<Separator className="my-8" />
+
+## Provider Status Pages
+
+Before assuming plugin is broken, check if streaming provider is having issues:
+
+- **Cloudflare Status:** [www.cloudflarestatus.com](https://www.cloudflarestatus.com/)
+- **Bunny.net Status:** [status.bunny.net](https://status.bunny.net/)
+
+If provider is degraded or down, uploads and playback will fail. Wait for them to fix it. That's not a plugin issue.
+
+<Separator className="my-8" />
+
+Videos not uploading? Fixed now? Good.
+
+Still broken? Check debug logs. Read error messages. Test systematically. Report issues with details.
+
+Or just use YouTube embeds like it's 2015. Your choice.
+
+[Back to Documentation →](/docs/fchub-stream)

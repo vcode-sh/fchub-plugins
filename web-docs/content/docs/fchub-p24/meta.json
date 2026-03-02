@@ -1,0 +1,17 @@
+{
+  "title": "Przelewy24",
+  "root": true,
+  "description": "Przelewy24 payment gateway for FluentCart.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "configuration",
+    "---Features---",
+    "payments",
+    "subscriptions",
+    "---Reference---",
+    "troubleshooting",
+    "changelog"
+  ]
+}

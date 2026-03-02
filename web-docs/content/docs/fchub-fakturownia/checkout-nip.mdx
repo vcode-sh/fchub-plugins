@@ -1,0 +1,217 @@
+---
+title: NIP at Checkout
+description: How the "I want a company invoice" toggle and NIP field work at FluentCart checkout, including Polish NIP validation and data storage.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Fakturownia adds an optional "I want a company invoice" checkbox to the FluentCart checkout. When customers check it, a NIP (tax identification number) field appears. This is how Polish businesses provide their tax ID for a proper B2B VAT invoice.
+
+## How It Works
+
+When the **Checkout NIP Field** setting is enabled (it is by default), the plugin adds two fields to the FluentCart checkout personal information section:
+
+1. **Checkbox** -- "I want a company invoice" (`billing_wants_company_invoice`)
+2. **NIP input** -- a text field for the Polish tax ID (`billing_nip`), hidden by default
+
+<Steps>
+  <Step>
+    ### Customer Sees the Toggle
+
+    During checkout, a "I want a company invoice" checkbox appears in the billing section. By default, it's unchecked and the NIP field is hidden.
+  </Step>
+  <Step>
+    ### Customer Checks the Box
+
+    When the customer checks the toggle, the NIP field slides into view. If they uncheck it, the NIP field disappears and its value is cleared.
+  </Step>
+  <Step>
+    ### Customer Enters NIP
+
+    The customer types their 10-digit Polish NIP. The field accepts the NIP in any common format -- with or without dashes.
+  </Step>
+  <Step>
+    ### Order Submitted
+
+    When the order is placed, the NIP and the "wants company invoice" flag are stored in the billing address metadata. The invoice handler picks up this data when creating the Fakturownia invoice.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Dynamic Rendering with MutationObserver
+
+FluentCart renders its checkout form dynamically using JavaScript (Vue.js). This means the checkout fields don't exist in the DOM when the page first loads -- they're injected by FluentCart's JavaScript after initialization.
+
+The plugin handles this by using a `MutationObserver` to watch for DOM changes:
+
+```javascript
+var observer = new MutationObserver(function(mutations) {
+    for (var i = 0; i < mutations.length; i++) {
+        if (mutations[i].addedNodes.length) {
+            initNipToggle();
+            break;
+        }
+    }
+});
+observer.observe(document.body, { childList: true, subtree: true });
+```
+
+Every time FluentCart adds new nodes to the DOM (such as rendering or re-rendering the checkout form), the plugin re-initializes the NIP toggle behavior. This ensures the toggle/show functionality works regardless of when or how FluentCart renders the form.
+
+The `initNipToggle()` function:
+1. Finds the checkbox by its ID (`billing_wants_company_invoice`)
+2. Finds the NIP wrapper using the `[data-nip-field]` attribute
+3. Attaches a `change` event listener to show/hide the NIP field
+4. Clears the NIP value when the toggle is unchecked
+
+<Separator className="my-8" />
+
+## NIP Validation
+
+The plugin includes a server-side Polish NIP checksum validation algorithm. Polish NIP numbers are 10 digits with a built-in checksum.
+
+### The Algorithm
+
+<Accordions>
+<Accordion title="Polish NIP Checksum Validation">
+  The NIP validation works as follows:
+
+  1. **Strip non-digits** -- remove all characters except 0-9 (handles formats like `123-456-78-90`)
+  2. **Check length** -- must be exactly 10 digits
+  3. **Calculate checksum** -- multiply the first 9 digits by their respective weights and sum the results
+  4. **Verify** -- the sum modulo 11 must equal the 10th digit
+
+  The weight array is: `[6, 5, 7, 2, 3, 4, 5, 6, 7]`
+
+  ```php
+  public static function validateNip(string $nip): bool
+  {
+      $nip = preg_replace('/[^0-9]/', '', $nip);
+
+      if (strlen($nip) !== 10) {
+          return false;
+      }
+
+      $weights = [6, 5, 7, 2, 3, 4, 5, 6, 7];
+      $sum = 0;
+
+      for ($i = 0; $i < 9; $i++) {
+          $sum += (int) $nip[$i] * $weights[$i];
+      }
+
+      return ($sum % 11) === (int) $nip[9];
+  }
+  ```
+
+  **Example**: NIP `1234563218`
+  - Sum = (1x6) + (2x5) + (3x7) + (4x2) + (5x3) + (6x4) + (3x5) + (2x6) + (1x7) = 6 + 10 + 21 + 8 + 15 + 24 + 15 + 12 + 7 = 118
+  - 118 mod 11 = 8
+  - Check digit (10th digit) = 8 -- valid
+</Accordion>
+</Accordions>
+
+<Callout type="info" title="Validation Scope">
+The `validateNip()` method is available as a static method on the `CheckoutFields` class. It validates the checksum format only -- it does not verify whether the NIP is currently registered with the Polish tax office (GUS/VIES lookup is not included).
+</Callout>
+
+<Separator className="my-8" />
+
+## Data Storage
+
+The NIP and company invoice preference are stored in the billing address metadata within FluentCart's order system.
+
+### Storage Location
+
+The data is stored in the `fct_order_addresses` table, specifically in the `meta` JSON column under `other_data`:
+
+```json
+{
+  "other_data": {
+    "wants_company_invoice": true,
+    "nip": "1234563218"
+  }
+}
+```
+
+### How the Invoice Handler Reads It
+
+When creating an invoice, the `InvoiceHandler` reads these values from the billing address:
+
+```php
+$wantsCompanyInvoice = Arr::get(
+    $billingAddress->meta ?? [],
+    'other_data.wants_company_invoice',
+    false
+);
+
+$nip = Arr::get(
+    $billingAddress->meta ?? [],
+    'other_data.nip',
+    ''
+);
+```
+
+If both `wants_company_invoice` is truthy and `nip` is non-empty, a B2B invoice is created. Otherwise, it's a B2C invoice.
+
+<Separator className="my-8" />
+
+## Checkout Field Schema
+
+The plugin registers two fields through FluentCart's checkout field schema system.
+
+<Tabs items={['Toggle Checkbox', 'NIP Input']}>
+  <Tab value="Toggle Checkbox">
+    | Property | Value |
+    |---|---|
+    | `name` | `billing_wants_company_invoice` |
+    | `type` | `checkbox` |
+    | `label` | "I want a company invoice" |
+    | `required` | No |
+    | `wrapper_class` | `fchub-nip-toggle-wrapper` |
+  </Tab>
+  <Tab value="NIP Input">
+    | Property | Value |
+    |---|---|
+    | `name` | `billing_nip` |
+    | `type` | `text` |
+    | `placeholder` | "NIP (Tax ID)" |
+    | `required` | No |
+    | `wrapper_class` | `fchub-nip-field-wrapper` |
+    | `wrapper_atts` | `style: display:none`, `data-nip-field: 1` |
+    | `autocomplete` | `off` |
+  </Tab>
+</Tabs>
+
+The NIP field is also registered in FluentCart's address field system (`fluent_cart/fields/address_base_fields`) so it appears correctly in saved address displays. This registration is limited to billing addresses only.
+
+<Separator className="my-8" />
+
+## GDPR Considerations
+
+<Callout type="warn" title="Personal Data">
+The NIP (tax identification number) is considered personal data under GDPR when it can identify a natural person. If you collect NIP numbers, make sure your privacy policy covers this data processing.
+</Callout>
+
+Key points for GDPR compliance:
+
+- **Purpose** -- NIP is collected specifically for invoice generation as required by Polish tax law. This is a legitimate interest / legal obligation basis.
+- **Storage** -- NIP is stored in FluentCart's order address metadata. It persists as long as the order record exists.
+- **Deletion** -- when you delete an order in FluentCart, the associated address metadata (including NIP) is deleted. Uninstalling the plugin also removes Fakturownia-related order metadata.
+- **Disclosure** -- inform customers in your privacy policy that their NIP may be shared with Fakturownia for invoice generation and (if applicable) submitted to KSeF.
+
+<Separator className="my-8" />
+
+## Disabling the NIP Field
+
+If you don't need the NIP checkout field (for example, if you only sell to consumers or handle NIP collection through other means), you can disable it:
+
+1. Go to **FluentCart > Settings > Integrations > Fakturownia**
+2. Set **Checkout NIP Field** to **No**
+3. Save settings
+
+When disabled, the `CheckoutFields::register()` method returns early without registering any hooks. No checkbox or NIP field will appear at checkout, and all invoices will be created as B2C.

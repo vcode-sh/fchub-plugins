@@ -1,0 +1,221 @@
+---
+title: Email Notifications
+description: The eight transactional emails FCHub Memberships sends across the membership lifecycle, with smart codes, templates, and delivery details.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Memberships sends 8 transactional emails that cover the full membership lifecycle. Each email can be individually enabled or disabled, and templates are customizable with smart code placeholders.
+
+## Delivery Method
+
+All emails are dispatched through **Action Scheduler** when available (which FluentCart includes). This means emails are sent asynchronously — they don't block the main request. If Action Scheduler is not available, emails fall back to synchronous `wp_mail()`.
+
+The async hook is `fchub_memberships_send_email`, which receives the recipient email, subject, body, and headers as arguments.
+
+Every email is sent as HTML with a responsive template wrapper. The wrapper includes a branded header (using your site name), a content area, and a footer with copyright notice.
+
+<Separator />
+
+## Email Types
+
+<Tabs items={['Welcome', 'Expiring', 'Revoked', 'Drip Unlocked', 'Paused', 'Resumed', 'Trial Converted', 'Trial Expiring']}>
+<Tab value="Welcome">
+
+### AccessGrantedEmail <Badge>access_granted</Badge>
+
+Sent when a membership is first granted to a user. This is the welcome email.
+
+**When it fires:** On `fchub_memberships/grant_created` event
+
+**Data included:**
+
+| Field | Description |
+|---|---|
+| `plan_id` | The membership plan ID |
+| `plan_title` | The plan name |
+| `resources` | Array of immediately accessible resources with title and URL |
+| `drip_items` | Array of upcoming drip-scheduled items with title and unlock date |
+
+**Default subject:** "Welcome to \{plan_name\}!"
+
+**Smart codes:**
+
+| Code | Value |
+|---|---|
+| `{user_name}` | Member's display name |
+| `{user_email}` | Member's email address |
+| `{plan_name}` | Membership plan title |
+| `{site_name}` | WordPress site name |
+| `{account_url}` | Account page URL |
+| `{resources_list}` | HTML list of immediately accessible resources with links |
+| `{drip_schedule}` | HTML list of upcoming drip content with unlock dates |
+
+</Tab>
+<Tab value="Expiring">
+
+### AccessExpiringEmail <Badge>access_expiring</Badge>
+
+Sent when a membership is approaching its expiration date. The notification window is configurable in settings.
+
+**When it fires:** Via the `fchub_memberships_expiry_notify` daily cron
+
+**Data included:**
+
+| Field | Description |
+|---|---|
+| `plan_title` | The plan name |
+| `expires_at` | Expiration date |
+| `renewal_url` | URL to renew the membership |
+
+This email gives members advance warning so they can renew before losing access.
+
+</Tab>
+<Tab value="Revoked">
+
+### AccessRevokedEmail <Badge>access_revoked</Badge>
+
+Sent when a membership is revoked — whether by cancellation, refund, or manual admin action.
+
+**When it fires:** On `fchub_memberships/grant_revoked` event
+
+**Data included:**
+
+| Field | Description |
+|---|---|
+| `plan_title` | The plan name |
+| `reason` | The revocation reason (e.g., "Order #123 refunded") |
+| `resubscribe_url` | URL to resubscribe |
+
+</Tab>
+<Tab value="Drip Unlocked">
+
+### DripContentUnlockedEmail <Badge>drip_unlocked</Badge>
+
+Sent when a drip-scheduled piece of content becomes available to a member.
+
+**When it fires:** Via the `fchub_memberships_drip_process` hourly cron
+
+**Data included:**
+
+| Field | Description |
+|---|---|
+| `resource_title` | Title of the newly unlocked content |
+| `resource_url` | Direct URL to the content |
+| `plan_title` | The plan name |
+| `next_drip_item` | Title of the next item in the drip sequence (if any) |
+| `progress` | Drip progress data: `{total, unlocked, percentage, next_unlock}` |
+
+This email keeps members engaged by notifying them when new content is ready to consume.
+
+<Callout type="info" title="Disabling Drip Emails">
+Set `email_drip_unlocked` to "No" in settings to disable drip unlock emails. The drip schedule processing and milestone tracking will still run — only the email is suppressed.
+</Callout>
+
+</Tab>
+<Tab value="Paused">
+
+### MembershipPausedEmail <Badge>membership_paused</Badge>
+
+Sent when a membership is paused (e.g., due to subscription pause or manual admin action).
+
+**When it fires:** On `fchub_memberships/grant_paused` event
+
+**Data included:**
+
+| Field | Description |
+|---|---|
+| `plan_title` | The plan name |
+| `reason` | The pause reason |
+| `resume_url` | URL to resume the membership |
+
+While paused, the member retains their grant but cannot access protected content. The `AccessEvaluator` returns a `membership_paused` reason with a specific message.
+
+</Tab>
+<Tab value="Resumed">
+
+### MembershipResumedEmail <Badge>membership_resumed</Badge>
+
+Sent when a paused membership is resumed.
+
+**When it fires:** On `fchub_memberships/grant_resumed` event
+
+**Data included:**
+
+| Field | Description |
+|---|---|
+| `plan_title` | The plan name |
+| `account_url` | Account page URL |
+
+</Tab>
+<Tab value="Trial Converted">
+
+### TrialConvertedEmail <Badge>trial_converted</Badge>
+
+Sent when a trial period ends and the member's subscription payment has been confirmed, converting to a paid membership.
+
+**When it fires:** Via `TrialLifecycleService::convertTrial()` during the daily cron
+
+**Data included:**
+
+| Field | Description |
+|---|---|
+| `plan_title` | The plan name |
+| `expires_at` | New expiration date (null for lifetime plans) |
+
+</Tab>
+<Tab value="Trial Expiring">
+
+### TrialExpiringEmail <Badge>trial_expiring</Badge>
+
+Sent a configurable number of days before a trial period ends (default: 3 days).
+
+**When it fires:** Via `TrialLifecycleService::sendTrialExpiringNotifications()` during the daily cron
+
+**Data included:**
+
+| Field | Description |
+|---|---|
+| `plan_title` | The plan name |
+| `trial_ends_at` | The trial end date |
+| `upgrade_url` | URL to upgrade to a paid plan |
+
+</Tab>
+</Tabs>
+
+<Separator />
+
+## Email Settings
+
+All email settings are managed in **Memberships > Settings**:
+
+| Setting | Description |
+|---|---|
+| `email_access_granted` | Enable/disable the welcome email (default: yes) |
+| `email_access_expiring` | Enable/disable the expiring notification (default: yes) |
+| `email_access_revoked` | Enable/disable the revocation email (default: yes) |
+| `email_drip_unlocked` | Enable/disable drip unlock notifications (default: yes) |
+| `email_membership_paused` | Enable/disable the pause notification (default: yes) |
+| `email_membership_resumed` | Enable/disable the resume notification (default: yes) |
+| `email_trial_converted` | Enable/disable the trial conversion email (default: yes) |
+| `email_trial_expiring` | Enable/disable the trial expiring email (default: yes) |
+
+### Custom Templates
+
+Each email type has a customizable template stored in the `email_templates` setting. Templates use the smart codes listed above and support full HTML. If no custom template is set, the plugin uses a default template.
+
+### From Address
+
+Emails are sent from your WordPress admin email (`get_option('admin_email')`) with your site name as the sender name. Headers include `Content-Type: text/html; charset=UTF-8`.
+
+## Troubleshooting Emails
+
+If emails are not being delivered:
+
+1. **Check Action Scheduler** — Go to **Tools > Scheduled Actions** and look for pending or failed `fchub_memberships_send_email` actions
+2. **Check the setting** — Make sure the specific email type is not disabled in settings
+3. **Check wp_mail** — Test basic WordPress email delivery with a plugin like WP Mail SMTP
+4. **Check the logs** — Failed email dispatches are logged via the `Logger` class

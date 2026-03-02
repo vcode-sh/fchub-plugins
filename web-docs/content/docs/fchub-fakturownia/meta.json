@@ -1,0 +1,18 @@
+{
+  "title": "Fakturownia",
+  "root": true,
+  "description": "Fakturownia invoice integration with KSeF 2.0 for FluentCart.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "configuration",
+    "---Features---",
+    "invoices",
+    "ksef",
+    "checkout-nip",
+    "---Reference---",
+    "troubleshooting",
+    "changelog"
+  ]
+}

@@ -1,0 +1,173 @@
+---
+title: Drip Content
+description: Schedule content to unlock over time after purchase using delay-based or fixed-date drip rules.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Drip content lets you release membership content on a schedule rather than all at once. Instead of dumping everything into a member's lap on day one, you can spread content out over days, weeks, or months — keeping members engaged and building anticipation.
+
+## How Drip Works
+
+Every plan content rule has a **drip type** that controls when that content becomes available:
+
+| Drip Type | Behavior |
+|---|---|
+| **Immediate** | Content is available as soon as the membership is granted |
+| **Delayed** | Content unlocks X days after the membership is granted |
+| **Fixed Date** | Content unlocks on a specific calendar date |
+
+When a membership is granted, the `AccessGrantService` creates individual grants for each content rule. For delayed drip rules, the `drip_available_at` field is set to the grant date plus the delay days. For fixed-date rules, it's set to the specified date.
+
+The `AccessEvaluator` checks the `drip_available_at` field during every access check. If the date is in the future, the user sees a "drip locked" message instead of the content.
+
+## Setting Up Drip Rules
+
+<Steps>
+<Step>
+
+### Edit your plan's content rules
+
+Go to **Memberships > Plans**, edit your plan, and switch to the **Content Rules** tab.
+
+</Step>
+<Step>
+
+### Configure drip timing
+
+For each content rule, set the drip type:
+
+- **Immediate** — available right away (day 0)
+- **Delayed** — enter the number of days after purchase. For example, 7 means the content unlocks 7 days after the member joins
+- **Fixed Date** — pick a specific calendar date when the content should unlock
+
+</Step>
+<Step>
+
+### Set the sort order
+
+Arrange your content rules in the order you want them to appear in the drip timeline. The sort order determines the display sequence in the admin calendar and the member's progress view.
+
+</Step>
+</Steps>
+
+### Example Drip Schedule
+
+Here's a typical 4-week course drip:
+
+| Content | Drip Type | Delay | Available |
+|---|---|---|---|
+| Welcome & Orientation | Immediate | 0 | Day 0 |
+| Module 1: Basics | Immediate | 0 | Day 0 |
+| Module 2: Intermediate | Delayed | 7 | Day 7 |
+| Module 3: Advanced | Delayed | 14 | Day 14 |
+| Module 4: Expert | Delayed | 21 | Day 21 |
+| Final Assessment | Delayed | 28 | Day 28 |
+
+<Separator />
+
+## Drip Evaluation
+
+The `DripEvaluator` class handles drip-specific access checks. It provides:
+
+### Single Item Check
+
+```
+DripEvaluator::isAvailable($userId, $provider, $resourceType, $resourceId)
+```
+
+Returns an array with:
+- `available` — boolean, whether the content is unlocked
+- `reason` — `no_grant`, `immediate`, `unlocked`, or `drip_locked`
+- `available_at` — the unlock date (if drip locked)
+- `days_left` — days until unlock (if drip locked)
+
+### Full Timeline
+
+```
+DripEvaluator::getTimeline($userId, $planId)
+```
+
+Returns the complete drip timeline for a user's plan, with each item marked as:
+- **unlocked** — content is available
+- **upcoming** — content will unlock soon (date is set)
+- **locked** — content is not yet accessible
+
+Items are sorted with unlocked first, then by sort order.
+
+### Plan Schedule Overview
+
+```
+DripEvaluator::getPlanDripSchedule($planId)
+```
+
+Returns the drip schedule for a plan without user context. This is used in the admin calendar view to show the overall content release schedule.
+
+## Email Notifications
+
+When drip content unlocks, the plugin can send an email notification to the member. The `DripScheduleService` processes pending notifications via the hourly cron job `fchub_memberships_drip_process`.
+
+Each notification includes:
+- The title of the unlocked content
+- A direct link to access it
+- The plan name
+- The next item in the drip sequence (if any)
+- The member's overall drip progress
+
+Notifications are created when a membership is granted. The `DripScheduleService::scheduleForGrant()` method creates a notification row for each delayed or fixed-date rule, with `notify_at` set to the unlock date.
+
+### Retry Logic
+
+If a notification fails to send, it's marked as `failed` with a retry count. The service retries up to 3 times before marking the notification as permanently failed and logging an error. The retry schedule is tracked via the `retry_count` and `next_retry_at` columns.
+
+### Disabling Drip Emails
+
+You can disable drip unlock emails in **Memberships > Settings** by setting `email_drip_unlocked` to "No". The notifications will still be processed (for milestone tracking) but no emails will be sent.
+
+<Separator />
+
+## Drip Milestones
+
+The `DripScheduleService` tracks completion milestones at 25%, 50%, 75%, and 100%. When a member reaches a milestone, the plugin fires the `fchub_memberships/drip_milestone_reached` hook with the grant data, milestone percentage, and user ID.
+
+Milestones are tracked per-grant in the grant's `meta` field under `drip_milestones_fired`. Each milestone fires only once per grant.
+
+If FluentCRM is active, the `DripMilestoneTrigger` listens for this hook and can start automations — for example, sending a congratulations email at 50% or an upgrade offer at 100%.
+
+## Admin Calendar
+
+The drip admin page shows a calendar view of upcoming content unlocks. This pulls data from the `DripScheduleService::getCalendar()` method, which queries the `drip_notifications` table for upcoming unlocks within a date range.
+
+The calendar view shows:
+- Pending notifications grouped by date
+- The content title and resource type for each unlock
+- The notification status (pending, sent, failed)
+
+You can also view the notification queue with filtering by status and retry failed notifications individually.
+
+## Drip Progress Frontend
+
+Members can see their drip progress through:
+
+1. **`[fchub_drip_progress]` shortcode** — shows a progress bar with "X of Y items unlocked (Z%)"
+2. **`[fchub_my_memberships]` shortcode** — the full account page includes a content library with locked/unlocked status and unlock dates
+3. **`[fchub_membership_status display="full"]` shortcode** — includes drip progress for each plan
+
+The progress calculation is:
+```
+percentage = (unlocked items / total items) * 100
+```
+
+Where an "unlocked" item has either no `drip_available_at` set or a `drip_available_at` in the past.
+
+## FluentCRM Smart Codes
+
+Two FluentCRM smart codes relate to drip progress:
+- `{{membership.drip_progress}}` — text like "5 of 10 items unlocked"
+- `{{membership.drip_percentage}}` — number like "50"
+
+These are useful in automation emails to show members how far along they are in their content journey.

@@ -1,0 +1,288 @@
+---
+title: Subscription Billing
+description: How FCHub Przelewy24 handles recurring payments, card-on-file tokenization, renewal scheduling, and retry logic.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+## Overview
+
+FCHub Przelewy24 supports recurring subscription billing through Przelewy24's card-on-file system. After a customer completes their initial payment with a credit or debit card, the plugin stores a card reference ID and uses it to charge the card automatically on each renewal date.
+
+<Callout type="warn" title="Card Payments Only">
+Subscriptions require card payments. BLIK, bank transfers, and wallets cannot be used for recurring billing because they don't support tokenization. When a customer purchases a subscription, the checkout automatically restricts to the cards channel only.
+</Callout>
+
+## How Recurring Billing Works
+
+The subscription lifecycle has two phases: the initial payment (customer-present) and subsequent renewals (automated background charges).
+
+### Initial Payment
+
+<Steps>
+<Step>
+### Customer Starts a Subscription
+
+The customer adds a subscription product to their cart in FluentCart and proceeds to checkout. When they select Przelewy24, the checkout UI shows only card payment methods with a notice:
+
+> Subscription requires card payment.
+
+</Step>
+
+<Step>
+### Transaction Registration with Card Channel
+
+The plugin registers the transaction with Przelewy24 using `channel: 1` (cards only). This ensures the customer pays with a card that can be tokenized for future charges.
+</Step>
+
+<Step>
+### Payment and Card Tokenization
+
+The customer is redirected to Przelewy24's payment page, enters their card details, and completes the payment. Przelewy24 processes the charge and sends the IPN notification back to your site.
+</Step>
+
+<Step>
+### Card Info Retrieval
+
+After the IPN confirms a successful payment, the plugin calls the Przelewy24 card info endpoint (`GET /api/v1/card/info/{orderId}`) to retrieve:
+
+- **refId** — the card reference ID used for future charges (the tokenized card identifier)
+- **mask** — the masked card number (e.g., `4444****4444`)
+- **cardType** — the card brand (Visa, Mastercard, etc.)
+- **cardDate** — the card expiration date
+
+These values are stored as subscription meta:
+
+| Meta Key | Description |
+|----------|-------------|
+| `_p24_card_ref_id` | Card reference ID for recurring charges |
+| `_p24_card_trace_order_id` | The P24 order ID from the initial payment |
+| `_p24_card_mask` | Masked card number |
+| `_p24_card_type` | Card brand |
+| `_p24_card_expiry` | Card expiration date |
+
+</Step>
+
+<Step>
+### First Renewal Scheduled
+
+The plugin sets the subscription's `vendor_subscription_id` to `p24_sub_{id}` and schedules the first renewal using Action Scheduler, based on FluentCart's billing interval.
+</Step>
+</Steps>
+
+<Separator className="my-8" />
+
+### Automated Renewals
+
+Renewal charges happen in the background via WordPress Action Scheduler. The plugin registers the `fchub_p24_process_renewal` hook, which fires on each subscription's renewal date.
+
+<Steps>
+<Step>
+### Action Scheduler Fires
+
+At the scheduled time, Action Scheduler runs the `fchub_p24_process_renewal` hook with the subscription ID. The plugin loads the subscription and validates it:
+
+- Subscription must exist
+- Status must be `active`, `trialing`, or `failing`
+- There must be remaining bill times (not end-of-term)
+- A card `refId` must be stored on the subscription
+</Step>
+
+<Step>
+### Transaction Registration with methodRefId
+
+The plugin registers a new transaction with Przelewy24, this time including the `methodRefId` parameter — the stored card reference ID from the initial payment. This tells P24 to charge the previously tokenized card.
+
+```
+POST /api/v1/transaction/register
+{
+  "sessionId": "new-uuid-for-this-renewal",
+  "amount": 10000,
+  "currency": "PLN",
+  "methodRefId": "stored-card-ref-id",
+  "channel": 1,
+  ...
+}
+```
+
+A pending renewal session ID is stored on the subscription meta (`_p24_pending_renewal_session`) so the IPN handler can route the notification correctly.
+</Step>
+
+<Step>
+### Card Charge
+
+The plugin calls the card charge endpoint (`POST /api/v1/card/charge`) with the token received from the registration. This initiates the charge asynchronously — the actual result comes via IPN.
+</Step>
+
+<Step>
+### IPN Confirms Renewal
+
+When the charge succeeds, Przelewy24 sends an IPN notification. The plugin's IPN handler detects that the session belongs to a pending renewal (by matching `_p24_pending_renewal_session`), verifies the payment, and records it through FluentCart's `SubscriptionService::recordRenewalPayment()`.
+</Step>
+
+<Step>
+### Next Renewal Scheduled
+
+After a successful renewal, the plugin:
+
+1. Resets the retry counter to 0
+2. Calculates the next billing date using FluentCart's `guessNextBillingDate()`
+3. Schedules the next renewal via Action Scheduler
+
+If the subscription has reached its end-of-term (no more required bill times), no further renewal is scheduled.
+</Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Retry Logic
+
+When a renewal charge fails, the plugin doesn't give up immediately. It uses a graduated retry schedule to attempt the charge again before expiring the subscription.
+
+### Retry Schedule
+
+| Attempt | Delay | Total Time from First Failure |
+|---------|-------|-------------------------------|
+| 1st retry | 4 hours | 4 hours |
+| 2nd retry | 24 hours | ~28 hours |
+| 3rd retry | 72 hours | ~100 hours (~4 days) |
+
+After the 3rd retry fails, the subscription is expired.
+
+### Status Transitions
+
+```
+active → (charge fails) → failing → (retries exhausted) → expired
+                              ↓
+                    (retry succeeds) → active
+```
+
+When a renewal fails:
+
+1. The subscription status changes to **failing** (if not already)
+2. The retry counter (`_p24_retry_count`) is incremented
+3. A new renewal is scheduled with the appropriate delay
+
+When a retry succeeds:
+
+1. The retry counter is reset to 0
+2. The subscription stays active (or returns to active from failing)
+3. The next regular renewal is scheduled
+
+<Callout type="info" title="Why These Delays?">
+The retry schedule gives time for common transient issues to resolve: the 4-hour delay handles temporary bank outages, the 24-hour delay covers daily card limits resetting, and the 72-hour delay gives the customer time to add funds or resolve an expired card.
+</Callout>
+
+### Common Failure Reasons
+
+| Reason | What Happens |
+|--------|-------------|
+| Card expired | Charge fails, retry scheduled |
+| Insufficient funds | Charge fails, retry scheduled |
+| Card blocked by bank | Charge fails, retry scheduled |
+| No refId stored | Subscription fails immediately (no retry) |
+| P24 API error | Charge fails, retry scheduled |
+| Registration failed | Charge fails, retry scheduled |
+
+<Separator className="my-8" />
+
+## Subscription Operations
+
+FluentCart provides several subscription management actions. FCHub Przelewy24 implements all of them:
+
+<Accordions type="single">
+<Accordion title="Cancel Subscription">
+
+Canceling a subscription immediately:
+
+1. Unschedules all pending renewal actions from Action Scheduler
+2. Sets the subscription status to `canceled`
+3. Records the cancellation timestamp
+
+The subscription is terminated immediately — no further charges will be attempted.
+
+</Accordion>
+<Accordion title="Pause Subscription">
+
+Pausing a subscription:
+
+1. Unschedules all pending renewal actions
+2. Sets the subscription status to `paused`
+
+No charges are attempted while the subscription is paused.
+
+</Accordion>
+<Accordion title="Resume Subscription">
+
+Resuming a paused subscription:
+
+1. Calculates the next billing date based on the subscription's billing cycle
+2. Schedules a renewal action at that date (if in the future)
+3. Sets the subscription status back to `active`
+
+</Accordion>
+<Accordion title="Cancel Auto-Renewal">
+
+Canceling auto-renewal keeps the subscription active until the end of the current billing period, but prevents future renewals:
+
+1. Unschedules all pending renewal actions
+2. The subscription remains active but will not renew
+
+The subscription expires naturally at the end of its current term.
+
+</Accordion>
+<Accordion title="Plan Change">
+
+When a subscription's plan changes, the plugin:
+
+1. Unschedules all pending renewal actions for the old subscription
+2. FluentCart handles creating the new subscription with the updated plan
+
+</Accordion>
+</Accordions>
+
+## Card Update
+
+<Callout type="warn" title="Not Supported in Phase 1">
+Card update is **not currently supported**. If a customer's card expires or they want to change their payment card, they will need to cancel their subscription and resubscribe with a new card.
+
+Attempting to update a card will display:
+
+> Card update is not supported for Przelewy24 subscriptions. Please cancel and resubscribe with a new card.
+
+Card update support is planned for a future release.
+</Callout>
+
+## Action Scheduler Hook
+
+The plugin uses a single Action Scheduler hook for all renewal processing:
+
+```
+Hook: fchub_p24_process_renewal
+Group: fchub-p24
+Args: [subscriptionId]
+```
+
+You can view and manage scheduled renewals in the Action Scheduler admin interface (**Tools > Scheduled Actions** or **WooCommerce > Status > Scheduled Actions**). Filter by the `fchub-p24` group to see all pending and completed renewal actions.
+
+When the plugin is **deactivated**, all `fchub_p24_process_renewal` actions are unscheduled. When the plugin is **deleted**, Action Scheduler entries are cleaned up in the uninstall routine.
+
+## Re-Sync from Remote
+
+Przelewy24 does not have a remote subscription state — subscriptions are managed entirely on your WordPress site via Action Scheduler. The `reSyncSubscriptionFromRemote` method returns the subscription model unchanged, as there is no remote system to sync with.
+
+## Next Steps
+
+<Cards>
+  <Card title="Troubleshooting" href="/docs/fchub-p24/troubleshooting">
+    Common subscription issues and how to resolve them.
+  </Card>
+  <Card title="Configuration" href="/docs/fchub-p24/configuration">
+    Review payment channel and recurring billing settings.
+  </Card>
+</Cards>

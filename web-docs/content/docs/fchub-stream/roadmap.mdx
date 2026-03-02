@@ -1,0 +1,58 @@
+---
+title: Roadmap
+description: What's coming next. Planned features. Future releases. In no particular order, no promises.
+---
+
+import { Separator } from '@/components/ui/separator';
+import { Sparkles } from 'lucide-react';
+
+What's coming (in no particular order, no promises):
+
+<div className="space-y-3 my-6">
+  <div className="flex items-start gap-3 p-4 border-1 border-fd-border rounded-lg">
+    <div className="mt-1"><Sparkles className="size-5 text-fd-primary" /></div>
+    <div>
+      <div className="font-semibold">Video Upload Limits</div>
+      <div className="text-sm text-fd-muted-foreground">Code exists. Testing doesn't. When it's ready you will have some extra features to limit users on upload, promote more upload allowance depend on Leaderboard rank etc.</div>
+    </div>
+  </div>
+  <div className="flex items-start gap-3 p-4 border-1 border-fd-border rounded-lg">
+    <div className="mt-1"><Sparkles className="size-5 text-fd-primary" /></div>
+    <div>
+      <div className="font-semibold">Bunny.net Stream Webhooks</div>
+      <div className="text-sm text-fd-muted-foreground">Behind the scenes change of how plugin will be notified when bunny completes encoding</div>
+    </div>
+  </div>
+  <div className="flex items-start gap-3 p-4 border-1 border-fd-border rounded-lg">
+    <div className="mt-1"><Sparkles className="size-5 text-fd-primary" /></div>
+    <div>
+      <div className="font-semibold">Video Analytics</div>
+      <div className="text-sm text-fd-muted-foreground">View counts, watch time, engagement. Maybe later.</div>
+    </div>
+  </div>
+</div>
+
+## Requesting features
+
+[Open a GitHub Issue](https://github.com/vcode-sh/fchub-plugins/issues) with:
+- What you want
+- Why you want it
+- How often you'd use it
+
+## What gets built
+
+- Features multiple people request
+- Features that solve real problems
+- Features that don't require rewriting everything
+- Features that don't break existing functionality
+
+## What doesn't
+
+- "Make it like YouTube" (then use YouTube)
+- Features only one person wants
+- Features that violate provider terms
+- Features requiring server-side video hosting (that's the entire point of NOT doing this)
+
+<Separator className="my-8" />
+
+

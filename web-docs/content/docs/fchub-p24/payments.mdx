@@ -1,0 +1,302 @@
+---
+title: One-Time Payments
+description: How FCHub Przelewy24 processes one-time payments, verifies IPN webhooks, and handles refunds through the Przelewy24 API.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+## Payment Flow
+
+Every Przelewy24 payment follows the same redirect-based flow. The customer never enters payment details on your site — they are redirected to Przelewy24's hosted payment page.
+
+<Steps>
+<Step>
+### Customer Selects Przelewy24
+
+At the FluentCart checkout, the customer selects Przelewy24 as their payment method. The checkout UI loads available payment methods from the P24 API and displays them grouped by type (BLIK, cards, bank transfers, wallets).
+
+The customer can optionally select a specific payment method (e.g., a particular bank) before placing the order.
+</Step>
+
+<Step>
+### Transaction Registration
+
+When the customer clicks "Place Order," the plugin registers the transaction with the Przelewy24 API (`/api/v1/transaction/register`). This call includes:
+
+- **sessionId** — the FluentCart transaction UUID
+- **amount** — the order total in the lowest currency unit (grosz for PLN)
+- **currency** — the transaction currency (default: PLN)
+- **email** — the customer's email address
+- **urlReturn** — where to redirect after payment
+- **urlStatus** — the IPN webhook URL for payment confirmation
+- **channel** — the bitmask of enabled payment channels
+- **sign** — SHA-384 signature computed from the session, merchant, amount, currency, and CRC key
+
+The API returns a payment **token** that the plugin stores in the transaction meta.
+</Step>
+
+<Step>
+### Redirect to Przelewy24
+
+The customer is redirected to:
+
+```
+https://secure.przelewy24.pl/trnRequest/{token}
+```
+
+(or `sandbox.przelewy24.pl` in test mode)
+
+On this page, the customer completes payment using their chosen method — entering a BLIK code, logging into their bank, entering card details, etc.
+</Step>
+
+<Step>
+### IPN Callback
+
+After the customer completes (or fails) the payment, Przelewy24 sends a POST request to your site's IPN URL:
+
+```
+https://yoursite.com/?fluent-cart=fct_payment_listener_ipn&method=przelewy24
+```
+
+The plugin processes this notification (see [IPN Processing](#ipn-processing) below).
+</Step>
+
+<Step>
+### Customer Returns to Your Site
+
+Regardless of the IPN result, the customer is redirected back to your FluentCart receipt page. The return URL includes the transaction hash so FluentCart can display the order confirmation.
+</Step>
+</Steps>
+
+## Available Payment Methods
+
+The payment methods shown at checkout come directly from the Przelewy24 API. The plugin calls `/api/v1/payment/methods/{lang}` and filters the results based on your [channel configuration](/docs/fchub-p24/configuration#payment-channels).
+
+Payment methods are cached for one hour using WordPress transients to reduce API calls. The cache is cleared whenever you save the Przelewy24 settings.
+
+<Accordions type="single">
+<Accordion title="Payment Method Groups">
+
+Przelewy24 organizes payment methods into groups. The plugin maps these groups to your channel settings:
+
+| P24 Group | Plugin Channel Setting |
+|-----------|----------------------|
+| Credit Card | `channel_cards` |
+| FastTransfers | `channel_transfers` |
+| eTransfer | `channel_transfers` |
+| TraditionalTransfer | `channel_traditional` |
+| Blik | `channel_blik` |
+| Wallet | `channel_wallets` |
+| Installments | `channel_installments` |
+
+If a channel is disabled in your settings, all payment methods in that group are filtered out before being sent to the checkout UI.
+
+</Accordion>
+<Accordion title="Checkout UI">
+
+The checkout JavaScript (`przelewy24-checkout.js`) renders the available payment methods in a grouped layout. The customer sees:
+
+- **BLIK** — the BLIK payment option
+- **Fast transfers** — online bank transfers
+- **Wallets** — PayPal, SkyCash, etc.
+- **e-Transfers** — additional electronic transfer options
+- **Traditional transfer** — manual bank wire
+- **Cards** — Visa, Mastercard, and other card payments
+
+Each method displays the bank/provider name and logo from the P24 API. The customer clicks to select, and the selected method ID is sent with the order submission.
+
+</Accordion>
+<Accordion title="Language Support">
+
+The payment method names and labels are returned in the customer's language. The plugin detects the WordPress locale and sends `pl` for Polish sites or `en` for all other locales.
+
+Przelewy24 supports these languages for the payment page: `bg`, `cs`, `de`, `en`, `es`, `fr`, `hr`, `hu`, `it`, `nl`, `pl`, `pt`, `se`, `sk`, `ro`.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## IPN Processing
+
+IPN (Instant Payment Notification) is how Przelewy24 tells your site that a payment has been completed. The plugin performs thorough validation before marking any order as paid.
+
+### Validation Steps
+
+<Steps>
+<Step>
+### HTTP Method Check
+
+The plugin only accepts POST requests. Any other method returns a `405 Method Not Allowed` response.
+</Step>
+
+<Step>
+### Payload Validation
+
+The JSON payload must contain all required fields:
+
+`merchantId`, `posId`, `sessionId`, `amount`, `originAmount`, `currency`, `orderId`, `methodId`, `statement`, `sign`
+
+Missing fields result in a `400 Bad Request` response.
+</Step>
+
+<Step>
+### Signature Verification
+
+The plugin computes a SHA-384 hash from the notification data combined with your CRC key and compares it to the `sign` field in the payload. The hash input is a JSON string containing:
+
+```json
+{
+  "merchantId": 123456,
+  "posId": 123456,
+  "sessionId": "transaction-uuid",
+  "amount": 10000,
+  "originAmount": 10000,
+  "currency": "PLN",
+  "orderId": 789,
+  "methodId": 25,
+  "statement": "payment statement",
+  "crc": "your-crc-key"
+}
+```
+
+The comparison uses `hash_equals()` for timing-safe comparison, preventing timing attacks.
+</Step>
+
+<Step>
+### Transaction Lookup
+
+The plugin finds the matching FluentCart transaction by `sessionId` (which is the transaction UUID). If the transaction is not found by UUID directly, the plugin falls back to searching recent orders for a matching `p24_session_id` in the order config — this handles the edge case where FluentCart regenerated the transaction UUID during a checkout retry.
+</Step>
+
+<Step>
+### Idempotency Check
+
+If the transaction has already been marked as succeeded, the plugin returns `200 OK` without re-processing. This prevents duplicate processing if Przelewy24 sends the same notification multiple times.
+</Step>
+
+<Step>
+### Amount and Currency Verification
+
+The plugin verifies that the amount and currency in the IPN match what was originally registered. Any mismatch is logged and rejected with a `400` response.
+</Step>
+
+<Step>
+### Transaction Verification with P24
+
+The plugin calls Przelewy24's verification endpoint (`PUT /api/v1/transaction/verify`) with the session ID, order ID, amount, and currency. This is a server-to-server confirmation that the payment is genuine.
+
+The verification request includes its own SHA-384 signature, ensuring the call is authenticated on both ends.
+</Step>
+
+<Step>
+### Order Update
+
+If everything checks out, the plugin updates the FluentCart order:
+
+- Transaction status is set to **succeeded**
+- The P24 `orderId` is stored as the `vendor_charge_id` (used later for refunds and panel links)
+- FluentCart's standard order completion logic runs
+</Step>
+</Steps>
+
+### Transaction Panel Link
+
+After a successful payment, the admin can view the transaction in the Przelewy24 panel. The plugin generates a direct link:
+
+- **Live:** `https://panel.przelewy24.pl/panel/transakcja-{orderId}`
+- **Sandbox:** `https://sandbox.przelewy24.pl/panel/transakcja-{orderId}`
+
+This link is available in the FluentCart transaction details view.
+
+<Separator className="my-8" />
+
+## Refund Processing
+
+FCHub Przelewy24 supports refunds initiated from the FluentCart admin panel. The refund flow involves two steps: submitting the refund request and processing the confirmation callback.
+
+### Submitting a Refund
+
+<Steps>
+<Step>
+### Admin Initiates Refund
+
+In the FluentCart order details, the admin clicks the refund button and enters the refund amount and reason.
+</Step>
+
+<Step>
+### API Request to P24
+
+The plugin calls the Przelewy24 refund endpoint (`POST /api/v1/transaction/refund`) with:
+
+- **requestId** — a unique identifier for idempotency
+- **refundsUuid** — a generated UUID for tracking this specific refund
+- **urlStatus** — the IPN webhook URL for the refund notification
+- **orderId** — the P24 order ID (from the original payment's `vendor_charge_id`)
+- **sessionId** — the original transaction UUID
+- **amount** — the refund amount in the lowest currency unit
+- **description** — the refund reason (truncated to 35 characters per P24's API limit)
+
+</Step>
+
+<Step>
+### Refund Confirmation
+
+The refund is not instant. Przelewy24 processes it and sends a refund notification to your IPN URL. The plugin handles this callback separately from payment notifications.
+</Step>
+</Steps>
+
+### Refund Notification Processing
+
+When Przelewy24 sends a refund notification, the plugin:
+
+1. **Validates required fields** — `orderId`, `sessionId`, `refundsUuid`, `merchantId`, `amount`, `currency`, `status`, `sign`
+2. **Verifies the signature** — uses a separate SHA-384 hash format specific to refund notifications:
+
+```json
+{
+  "orderId": 789,
+  "sessionId": "transaction-uuid",
+  "refundsUuid": "refund-uuid",
+  "merchantId": 123456,
+  "amount": 5000,
+  "currency": "PLN",
+  "status": 0,
+  "crc": "your-crc-key"
+}
+```
+
+3. **Processes the result** based on the `status` field:
+   - **Status 0** — Refund completed. The plugin records the refund in FluentCart using the `Refund::createOrRecordRefund()` service
+   - **Status 1** — Refund rejected by Przelewy24. The rejection is logged for admin review
+
+<Callout type="info" title="Partial Refunds">
+You can submit partial refunds. The refund amount does not need to match the full transaction amount. Each refund request is tracked independently by its `refundsUuid`.
+</Callout>
+
+## Transaction Data
+
+The plugin stores the following data during payment processing:
+
+| Data | Location | Purpose |
+|------|----------|---------|
+| P24 token | Transaction meta (`p24_token`) | Payment page redirect token |
+| Session ID | Transaction meta (`p24_session_id`) | Links IPN notifications to transactions |
+| Session ID | Order config (`p24_session_id`) | Fallback lookup when transaction UUID changes |
+| P24 Order ID | Transaction `vendor_charge_id` | Used for refunds and panel links |
+
+## Next Steps
+
+<Cards>
+  <Card title="Subscriptions" href="/docs/fchub-p24/subscriptions">
+    Learn how recurring billing and automatic renewal charges work.
+  </Card>
+  <Card title="Troubleshooting" href="/docs/fchub-p24/troubleshooting">
+    Common payment issues and how to resolve them.
+  </Card>
+</Cards>

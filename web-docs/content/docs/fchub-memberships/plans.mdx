@@ -1,0 +1,206 @@
+---
+title: Plan Management
+description: Create and configure membership plans with levels, durations, trial periods, content rules, hierarchy, and integration with FluentCart products.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Plans are the core building block of FCHub Memberships. A plan defines what content a member can access, when they can access it, and how long their access lasts. Every membership grant is tied to a plan.
+
+## Creating a Plan
+
+Go to **Memberships > Plans** and click **Create Plan**. Each plan has these fields:
+
+### Basic Fields
+
+| Field | Description |
+|---|---|
+| **Title** | The display name of the plan (e.g., "Pro Membership", "Gold Tier") |
+| **Slug** | URL-safe identifier, auto-generated from title. Used in shortcodes like `[fchub_restrict plan="pro"]` |
+| **Description** | Internal description. Shown in admin and optionally on the frontend |
+| **Status** | `active`, `draft`, or `inactive`. Only active plans can accept new members |
+| **Level** | Numeric hierarchy level (0 = lowest). Higher-level plans can include lower-level plans |
+
+### Duration Settings
+
+| Field | Description |
+|---|---|
+| **Duration Type** | `lifetime` (never expires), `fixed_days` (expires after X days), or subscription mirror |
+| **Duration Days** | Number of days for fixed duration. Only used when duration type is `fixed_days` |
+| **Trial Days** | Free trial period in days. 0 = no trial |
+| **Grace Period Days** | Days to keep access after cancellation or failed renewal. 0 = immediate revocation |
+
+### Restriction Settings
+
+| Field | Description |
+|---|---|
+| **Restriction Message** | Custom message shown when non-members try to access protected content |
+| **Redirect URL** | Where to send non-members instead of showing a restriction message |
+
+<Callout type="info" title="Plan vs. Feed Settings">
+Duration settings can be configured both on the plan and on the FluentCart integration feed. The plan is the primary source of truth — if a plan has `duration_type` set to `fixed_days` with a `duration_days` value, that takes precedence over the feed's validity mode. The feed's settings act as a fallback for subscription mirror mode.
+</Callout>
+
+## Plan Hierarchy
+
+Plans support hierarchical inclusion through the `includes_plan_ids` field. This means a higher-tier plan can automatically include all content from lower-tier plans.
+
+For example, with this setup:
+- **Basic** (level 0) — includes 10 articles
+- **Pro** (level 1, includes Basic) — includes 10 articles + 20 exclusive articles
+- **Enterprise** (level 2, includes Pro, Basic) — includes everything + priority support content
+
+A member with the Enterprise plan gets access to all content across all three plans. The `AccessEvaluator` resolves this by checking the member's plan, then checking all plans included via `includes_plan_ids`.
+
+Set up hierarchy in the plan editor by selecting included plans from the multi-select dropdown.
+
+## Content Rules
+
+Each plan has a set of content rules that define which resources members can access. Rules are managed in the **Content Rules** tab of the plan editor.
+
+### Resource Types
+
+FCHub Memberships supports a wide range of resource types through its `ResourceTypeRegistry`:
+
+<Tabs items={['Content', 'Taxonomy', 'Navigation', 'Advanced']}>
+<Tab value="Content">
+
+| Resource Type | Description |
+|---|---|
+| Posts | WordPress blog posts |
+| Pages | WordPress pages |
+| Custom Post Types | Any public CPT registered on your site (auto-detected) |
+| LearnDash Courses | `sfwd-courses` (when LearnDash is active) |
+| LearnDash Lessons | `sfwd-lessons` (when LearnDash is active) |
+| FluentCommunity Spaces | Community spaces (when FluentCommunity is active) |
+| FluentCommunity Courses | Community courses (when FluentCommunity is active) |
+
+</Tab>
+<Tab value="Taxonomy">
+
+| Resource Type | Description |
+|---|---|
+| Categories | WordPress post categories — protects all posts in the category |
+| Tags | WordPress post tags |
+| Custom Taxonomies | Any public taxonomy (auto-detected, e.g., WooCommerce product categories) |
+
+When you protect a taxonomy term, all posts assigned to that term inherit the protection through taxonomy inheritance. The `AccessEvaluator` checks both direct post protection and taxonomy-level rules.
+
+</Tab>
+<Tab value="Navigation">
+
+| Resource Type | Description |
+|---|---|
+| Menu Items | Individual WordPress navigation menu items. Non-members won't see protected menu items |
+
+</Tab>
+<Tab value="Advanced">
+
+| Resource Type | Description |
+|---|---|
+| URL Patterns | Protect URLs by exact match, prefix, or regex pattern |
+| Special Pages | Blog page, front page, search results, 404 page, author archives, date archives |
+| Comments | Restrict comment viewing and posting to members only |
+| More Tag Content | Content after the `<!--more-->` tag in posts |
+
+</Tab>
+</Tabs>
+
+### Adding Rules
+
+Each content rule specifies:
+- **Provider** — the system that owns the resource (`wordpress_core`, `learndash`, `fluent_community`)
+- **Resource Type** — the type of content (e.g., `post`, `page`, `category`)
+- **Resource ID** — the specific item (e.g., post ID 42, category ID 5). Use `*` for wildcard (all items of that type)
+- **Drip Type** — when the content becomes available (see [Drip Content](/docs/fchub-memberships/drip))
+- **Sort Order** — display order in the admin and drip timeline
+
+### Wildcard Rules
+
+Setting `resource_id` to `*` creates a wildcard rule. For example, a rule with `resource_type: post` and `resource_id: *` grants access to all posts. This is useful for "all-access" plans.
+
+<Separator />
+
+## Linking Plans to FluentCart Products
+
+Plans are connected to FluentCart products through integration feeds. This is what makes the purchase-to-access flow work automatically.
+
+<Steps>
+<Step>
+
+### Open the product editor
+
+In FluentCart, edit the product you want to sell as a membership.
+
+</Step>
+<Step>
+
+### Add a Memberships feed
+
+Under the **Integrations** tab, add a new feed and select **Memberships**.
+
+</Step>
+<Step>
+
+### Configure the feed
+
+- **Membership Plan** — select your plan from the dropdown (populated via the `fluent_cart/integration/integration_options_plan_id` filter)
+- **Validity Mode** — lifetime, fixed duration (with days), or mirror subscription
+- **Grace Period** — days to keep access after cancellation
+- **Cancellation Behavior** — revoke immediately or wait until validity expires
+- **Auto-Create User** — create a WordPress user from the order email if one doesn't exist
+- **Access Revocation** — enable to revoke access on cancel/refund events
+
+</Step>
+<Step>
+
+### Set the event trigger
+
+The default trigger is `order_paid_done`, which fires when payment is confirmed. For subscriptions, the feed also handles renewal events through the `SubscriptionValidityWatcher`.
+
+</Step>
+</Steps>
+
+<Callout type="warn" title="One Plan Per Feed">
+Each integration feed grants one plan. If a product should grant multiple plans (e.g., a bundle), create multiple feeds on the same product — one for each plan.
+</Callout>
+
+## Plan Duplication
+
+You can duplicate an existing plan from the plans list. Duplicating a plan copies all settings and content rules to a new draft plan. This is useful when creating plan tiers that share most of their configuration.
+
+## Scheduled Status Changes
+
+Plans support scheduled status transitions. You can set a plan to automatically change status at a future date and time. For example:
+- Set a plan to become `active` at midnight on a launch date
+- Set a plan to become `inactive` when a promotional period ends
+
+Configure this through the `scheduled_status` and `scheduled_at` fields. The `fchub_memberships_plan_schedule` cron (hourly) processes these transitions automatically.
+
+## Import and Export
+
+### CSV Import
+
+You can import members into plans from CSV files. Go to **Memberships > Import** to upload a CSV. The plugin supports two parser formats:
+
+- **Generic CSV** — standard format with columns for email, plan, status, dates
+- **PMPro CSV** — compatible with Paid Memberships Pro exports for migration
+
+See [Developer Reference](/docs/fchub-memberships/developer-reference) for the CSV format specification.
+
+### Plan Data Export
+
+Member data can be exported via WP-CLI:
+```bash
+wp fchub-membership export-members --plan=pro --format=csv
+```
+
+## Multi-Membership Mode
+
+By default, a user can hold multiple active plans simultaneously. The `AccessEvaluator` checks all active grants when evaluating access, so a user with both "Basic" and "Video Add-on" plans gets access to content from both.
+
+The `AccessGrantService` handles the grant lifecycle consistently — when a plan is granted, it creates individual grants for each content rule in the plan, fires lifecycle hooks, sends emails, logs audit entries, and triggers adapter calls for FluentCommunity and LearnDash.

@@ -1,0 +1,234 @@
+---
+title: FluentCRM Integration
+description: Deep integration with FluentCRM — 15 automation triggers, 7 actions, 7 benchmarks, 25+ smart codes, profile sections, and segment filters.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Memberships integrates deeply with FluentCRM to give you full automation control over the membership lifecycle. When FluentCRM is active (`FLUENTCRM` constant defined), the automation module boots at `init` priority 30 — after both FluentCart (priority 2) and the membership system (priority 3) have initialized.
+
+<Callout type="warn" title="Priority 30 Boot">
+FluentCRM automation components register at `init` priority 30. If you're hooking into membership CRM events from your own code, make sure your hooks run after priority 30 to ensure all triggers and actions are available.
+</Callout>
+
+## Triggers
+
+Triggers start FluentCRM automations when membership events occur. Each trigger listens to a specific WordPress action hook fired by the membership system.
+
+<Tabs items={['Lifecycle', 'Trial', 'Drip', 'Engagement']}>
+<Tab value="Lifecycle">
+
+| Trigger | Hook | When It Fires |
+|---|---|---|
+| **MembershipGranted** | `fchub_memberships/grant_created` | New membership access is granted (purchase, manual, import) |
+| **MembershipRevoked** | `fchub_memberships/grant_revoked` | Membership access is revoked (cancel, refund, admin action) |
+| **MembershipExpired** | `fchub_memberships/grant_expired` | Membership expires naturally (validity period ends) |
+| **MembershipPaused** | `fchub_memberships/grant_paused` | Membership is paused (subscription pause, admin action) |
+| **MembershipResumed** | `fchub_memberships/grant_resumed` | Paused membership is resumed |
+| **MembershipRenewed** | `fchub_memberships/grant_renewed` | Subscription is renewed (recurring payment confirmed) |
+| **PaymentFailed** | `fchub_memberships/payment_failed` | Subscription payment fails |
+
+The `MembershipPaused` trigger includes the pause reason in its context data, so you can filter automations based on whether the pause was manual, subscription-related, or system-initiated.
+
+</Tab>
+<Tab value="Trial">
+
+| Trigger | Hook | When It Fires |
+|---|---|---|
+| **TrialStarted** | `fchub_memberships/grant_created` (with trial) | Membership granted with active trial period |
+| **TrialConverted** | `fchub_memberships/trial_converted` | Trial converts to paid membership |
+| **TrialExpired** | `fchub_memberships/trial_expired` | Trial expires without payment |
+| **TrialExpiringSoon** | `fchub_memberships/trial_expiring_soon` | X days before trial ends (configurable) |
+
+The `TrialExpiringSoon` trigger includes the number of days remaining, letting you create time-sensitive urgency in your upgrade emails.
+
+</Tab>
+<Tab value="Drip">
+
+| Trigger | Hook | When It Fires |
+|---|---|---|
+| **DripContentUnlocked** | `fchub_memberships/drip_unlocked` | Drip-scheduled content becomes available |
+| **DripMilestone** | `fchub_memberships/drip_milestone_reached` | Member reaches 25%, 50%, 75%, or 100% drip completion |
+
+The `DripMilestone` trigger passes the milestone percentage (25, 50, 75, or 100), so you can set up different automations for each milestone — a congratulations at 50%, a completion certificate at 100%, etc.
+
+</Tab>
+<Tab value="Engagement">
+
+| Trigger | Hook | When It Fires |
+|---|---|---|
+| **MembershipExpiringSoon** | `fchub_memberships/access_expiring` | Membership approaching expiration (daily cron) |
+| **MembershipAnniversary** | `fchub_memberships/grant_anniversary` | Annual anniversary of membership grant date |
+
+The `MembershipAnniversary` trigger is checked during the daily stats cron. It fires on the exact anniversary date of the original grant, making it perfect for loyalty rewards, renewal reminders, or celebration emails.
+
+</Tab>
+</Tabs>
+
+<Separator />
+
+## Actions
+
+Actions are steps you can add to FluentCRM automations to modify membership state. Each action calls the appropriate method on `AccessGrantService`.
+
+| Action | What It Does |
+|---|---|
+| **GrantMembership** | Grant a specific plan to the contact's WordPress user. Creates grants for all plan content rules |
+| **RevokeMembership** | Revoke a specific plan from the contact. Removes all grants for that plan |
+| **PauseMembership** | Pause the contact's membership (access suspended, grant preserved) |
+| **ResumeMembership** | Resume a paused membership |
+| **ExtendMembership** | Extend the contact's membership by X days. Adds to the current `expires_at` date |
+| **ChangeMembershipPlan** | Move the contact from one plan to another. Revokes the old plan and grants the new one |
+| **CreateFluentCartCoupon** | Generate a FluentCart coupon for the contact. Stores the coupon code on the subscriber meta for use in smart codes |
+
+### GrantMembership Details
+
+The grant action creates a full membership grant including all plan content rules, drip schedules, trial configuration, and adapter calls. It's the same flow as a purchase — the only difference is the `source_type` is set to `automation` instead of `order`.
+
+### CreateFluentCartCoupon Details
+
+This action creates a coupon in FluentCart and stores it on the FluentCRM subscriber for use in emails. After creating the coupon:
+
+- `_fchub_last_coupon_code` — the generated coupon code
+- `_fchub_last_coupon_amount` — the discount amount
+- `_fchub_last_coupon_type` — `percentage` or `fixed`
+- `_fchub_last_coupon_expires` — expiry date
+
+These are accessible via the `{{membership.coupon_code}}`, `{{membership.coupon_amount}}`, and `{{membership.coupon_expires}}` smart codes in your automation emails.
+
+<Separator />
+
+## Benchmarks
+
+Benchmarks are automation steps that wait for a condition to be met before proceeding. They function as "wait until" gates in your automation flows.
+
+| Benchmark | Condition |
+|---|---|
+| **HasActiveMembership** | Contact has an active membership for a specific plan |
+| **MembershipExpired** | Contact's membership has expired |
+| **TrialConverted** | Contact's trial has converted to paid |
+| **PaymentRecovered** | A previously failed payment has been recovered (subscription reactivated) |
+| **MembershipResumed** | Contact's paused membership has been resumed |
+| **MembershipPaused** | Contact's membership has been paused |
+| **MembershipRevoked** | Contact's membership has been revoked |
+
+### Example: Win-Back Automation
+
+1. **Trigger:** MembershipExpired
+2. **Wait:** 3 days
+3. **Action:** Send "We miss you" email with `{{membership.checkout_url}}`
+4. **Wait:** 7 days
+5. **Benchmark:** HasActiveMembership (check if they resubscribed)
+   - **If met:** End automation
+   - **If not met:** Continue
+6. **Action:** CreateFluentCartCoupon (20% off)
+7. **Action:** Send "Special offer just for you" email with `{{membership.coupon_code}}`
+8. **Wait:** 14 days
+9. **Benchmark:** HasActiveMembership
+   - **If met:** End automation
+   - **If not met:** Tag as "Churned"
+
+<Separator />
+
+## Smart Codes
+
+The `MembershipSmartCodes` class registers 25+ smart codes under the `membership` group. Use these in any FluentCRM email template or automation message.
+
+<Tabs items={['Plan & Status', 'Dates & Duration', 'Commerce', 'Engagement']}>
+<Tab value="Plan & Status">
+
+| Smart Code | Value |
+|---|---|
+| `{{membership.plan_name}}` | Active plan name |
+| `{{membership.plan_slug}}` | Active plan slug |
+| `{{membership.status}}` | Current grant status (active, paused, expired, revoked) |
+| `{{membership.all_plans}}` | Comma-separated list of all active plan names |
+| `{{membership.cancellation_reason}}` | Cancellation or revocation reason |
+
+</Tab>
+<Tab value="Dates & Duration">
+
+| Smart Code | Value |
+|---|---|
+| `{{membership.expires_at}}` | Expiration date (formatted with site date format) |
+| `{{membership.days_remaining}}` | Days until expiry |
+| `{{membership.trial_ends_at}}` | Trial end date |
+| `{{membership.trial_days_remaining}}` | Days left in trial |
+| `{{membership.granted_at}}` | Grant creation date |
+| `{{membership.renewal_count}}` | Number of renewals |
+| `{{membership.days_as_member}}` | Total days since first membership |
+| `{{membership.member_since}}` | Date of first-ever membership grant |
+| `{{membership.days_since_expired}}` | Days since membership expired (empty if active) |
+| `{{membership.next_billing_date}}` | Next subscription billing date |
+
+</Tab>
+<Tab value="Commerce">
+
+| Smart Code | Value |
+|---|---|
+| `{{membership.checkout_url}}` | Checkout URL for the current plan |
+| `{{membership.upgrade_url}}` | Upgrade URL for the next tier plan |
+| `{{membership.payment_update_url}}` | URL to update payment method for active subscription |
+| `{{membership.coupon_code}}` | Last generated coupon code (from CreateFluentCartCoupon action) |
+| `{{membership.coupon_amount}}` | Coupon discount amount (with % suffix for percentage type) |
+| `{{membership.coupon_expires}}` | Coupon expiry date |
+
+</Tab>
+<Tab value="Engagement">
+
+| Smart Code | Value |
+|---|---|
+| `{{membership.resources_count}}` | Number of accessible resources in the plan |
+| `{{membership.account_url}}` | Account page URL |
+| `{{membership.drip_progress}}` | Text like "5 of 10 items unlocked" |
+| `{{membership.drip_percentage}}` | Drip completion percentage (number) |
+
+</Tab>
+</Tabs>
+
+Smart codes pull data from the contact's latest active grant. For per-request performance, grant and plan data is cached in static arrays.
+
+<Separator />
+
+## Profile Section
+
+The `MembershipProfileSection` adds a "Membership" section to the FluentCRM contact profile page. This shows:
+
+- Active plans with status badges
+- Grant dates and expiration dates
+- Trial status and days remaining
+- Drip progress
+- Subscription source details
+
+This gives your support team instant visibility into a contact's membership status without leaving FluentCRM.
+
+## Segment Filters
+
+The `MembershipFilters` class registers segment filters that let you create FluentCRM contact segments based on membership data:
+
+| Filter | Options |
+|---|---|
+| **Membership Status** | Filter contacts by grant status: active, paused, expired, revoked |
+| **Membership Plan** | Filter contacts by specific plan membership |
+| **Membership Duration** | Filter contacts by how long they've been a member (e.g., more than 30 days) |
+
+These filters are available in FluentCRM's contact list filtering, segment creation, and automation trigger conditions. You can combine them to create targeted segments like "Active Pro members for more than 90 days" or "Expired members who had the Basic plan."
+
+## Helpers
+
+### CheckoutUrlHelper
+
+The `CheckoutUrlHelper` class generates FluentCart URLs for use in smart codes:
+
+- `getCheckoutUrl($planId)` — returns the checkout URL for a plan's linked product
+- `getUpgradeUrl($planId)` — returns the checkout URL for the next-tier plan
+- `getSubscriptionIdFromGrant($grant)` — extracts the subscription ID from a grant's source data
+- `getNextBillingDate($subscriptionId)` — returns the next billing date from FluentCart
+- `getPaymentUpdateUrl($subscriptionId)` — returns the payment method update URL
+
+### MembershipFunnelHelper
+
+The `MembershipFunnelHelper` class provides utility methods for FluentCRM funnel (automation) context, helping to resolve membership data for the current contact in automation flows.

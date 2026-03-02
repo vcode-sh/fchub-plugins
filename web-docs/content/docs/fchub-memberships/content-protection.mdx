@@ -1,0 +1,221 @@
+---
+title: Content Protection
+description: How FCHub Memberships protects content across your WordPress site — posts, pages, custom post types, taxonomies, menus, URLs, comments, and special pages.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Content protection is how FCHub Memberships controls who sees what on your site. The plugin hooks into WordPress at multiple levels — from individual post content to URL routing — to enforce membership access rules.
+
+## How Protection Works
+
+When a visitor requests a page, the plugin evaluates whether that content is protected and whether the visitor has access. This evaluation happens through the `AccessEvaluator` class, which checks:
+
+1. **Is the resource protected?** — Check explicit protection rules and plan-based rules
+2. **Is the user an admin?** — Admins bypass all protection by default (configurable)
+3. **Does the user have a paused membership?** — Paused members see a specific message
+4. **Does the user have a direct grant?** — Check for an active grant matching this resource
+5. **Does the user have plan-based access?** — Check if any of the user's plans include this resource
+6. **Is the content drip-locked?** — The user may have access but the drip date hasn't arrived yet
+7. **Does the user have a wildcard grant?** — Check for `resource_id: *` grants
+8. **Taxonomy inheritance** — Does the user have access to a taxonomy term that covers this post?
+
+If all checks fail, the user sees a restriction message, is redirected, or sees teaser content, depending on your configuration.
+
+## Protection Modes
+
+You can configure how restricted content appears to non-members:
+
+| Mode | Behavior |
+|---|---|
+| **Restriction Message** | The original content is replaced with a customizable message, plan names, and optional CTA button |
+| **Redirect** | The visitor is redirected to a URL you specify (pricing page, login page, etc.) |
+| **Teaser** | Part of the content is shown as a teaser, followed by the restriction message |
+
+### Teaser Options
+
+When teaser mode is enabled, you can choose how much content to reveal:
+
+| Teaser Mode | Description |
+|---|---|
+| `none` | No teaser — show restriction message only |
+| `excerpt` | Show the post excerpt |
+| `more_tag` | Show content before the `<!--more-->` tag |
+| `words` | Show the first N words (configurable, 1-500) |
+| `custom` | Show custom teaser text that you write |
+
+Each post can have its own teaser configuration through the **Membership Protection** meta box, or you can set a site-wide default in Memberships settings.
+
+<Separator />
+
+## Protection by Resource Type
+
+<Tabs items={['Posts & Pages', 'Taxonomies', 'Menus', 'URLs', 'Comments', 'Special Pages']}>
+<Tab value="Posts & Pages">
+
+### ContentProtection
+
+The `ContentProtection` class is the primary protection handler for posts, pages, and custom post types. It hooks into:
+
+- `the_content` (priority 999) — replaces content with restriction message
+- `get_the_excerpt` (priority 999) — filters excerpts for protected content
+- `template_redirect` — handles full-page redirects when protection mode is set to redirect
+- `pre_get_posts` — excludes protected posts from archive queries (when enabled in settings)
+- `rest_prepare_{post_type}` — filters content in REST API responses
+
+**Per-Post Protection:**
+Edit any post or page and look for the **Membership Protection** meta box in the sidebar. Here you can:
+- Toggle protection on/off
+- Select which plans grant access
+- Choose a teaser mode and configure it
+- Write a custom restriction message (supports `{plan_names}`, `{login_url}`, `{pricing_url}`, `{user_name}` placeholders)
+- Set a CTA button with text and URL
+
+**Bulk Protection:**
+Select multiple posts in the post list and use the bulk actions dropdown to "Protect with Membership" or "Remove Membership Protection". This creates or removes protection rules in bulk.
+
+**Implicit Protection:**
+Posts that appear in any plan's content rules are automatically protected — you don't need to set per-post protection for them. The `AccessEvaluator.isProtected()` method checks both explicit protection rules and plan rule membership.
+
+**Archive Filtering:**
+When "Hide protected content in archives" is enabled in settings, protected posts are excluded from archive pages, the blog index, and search results for non-members. Members still see protected posts in these listings. This uses the `pre_get_posts` hook to add `post__not_in` exclusions.
+
+</Tab>
+<Tab value="Taxonomies">
+
+### TaxonomyProtection
+
+The `TaxonomyProtection` class handles taxonomy term protection. When you protect a category or tag:
+
+- All posts assigned to that term inherit the protection
+- The inheritance mode can be set to `all_posts` (protect every post with this term) or `none`
+- The `AccessEvaluator` checks taxonomy inheritance when evaluating post access
+
+This is powerful for content libraries — protect a category like "Premium Articles" and every post in that category is automatically protected without individual configuration.
+
+Taxonomy protection rules are managed through the plan content rules or through the **Memberships > Content** admin page.
+
+<Callout type="info" title="Taxonomy Protection is Admin-Only">
+The `TaxonomyProtection` class only registers its hooks inside `is_admin()`. Frontend taxonomy evaluation is handled by the `AccessEvaluator` through its `isProtectedViaTaxonomy()` and `planHasTaxonomyAccessForResource()` methods.
+</Callout>
+
+</Tab>
+<Tab value="Menus">
+
+### MenuProtection
+
+The `MenuProtection` class hides navigation menu items from non-members. When a menu item is associated with protected content:
+
+- Non-members don't see the menu item at all
+- Members see the menu item normally
+- The check runs against the `wp_nav_menu_objects` filter
+
+This prevents non-members from discovering URLs for content they can't access. Particularly useful for member-only sections that should be invisible to visitors.
+
+</Tab>
+<Tab value="URLs">
+
+### UrlProtection
+
+The `UrlProtection` class protects arbitrary URLs using pattern matching. It hooks into `template_redirect` at priority 5 (before content protection) and checks the current URL against configured rules.
+
+**Match Modes:**
+
+| Mode | Example | Description |
+|---|---|---|
+| `exact` | `/members-area/` | Must match the exact path |
+| `prefix` | `/members-area/*` | Matches the path and all sub-paths |
+| `regex` | `#^/courses/\d+#` | Full regex pattern matching against the URL path |
+
+**URL rules support:**
+- **Exclusion patterns** — URLs that should be excluded even if they match the rule (e.g., `/members-area/pricing` remains public)
+- **Match specificity** — rules are sorted by specificity (exact > prefix > regex) before evaluation
+
+**Restriction actions for URL rules:**
+
+| Action | Behavior |
+|---|---|
+| `redirect` | Redirect to a configured URL (or the default redirect URL) |
+| `login` | Redirect to the WordPress login page with a return URL |
+| `message` | Show a `wp_die()` message with 403 status |
+
+URL rules are cached via WordPress transients for 5 minutes. The cache is cleared when rules are modified.
+
+</Tab>
+<Tab value="Comments">
+
+### CommentProtection
+
+The `CommentProtection` class restricts comment access on protected content:
+
+- Non-members cannot view existing comments on protected posts
+- Non-members cannot post new comments on protected posts
+- Members interact with comments normally
+
+This ensures that member discussions remain private and non-members cannot read conversations happening in protected content.
+
+</Tab>
+<Tab value="Special Pages">
+
+### SpecialPageProtection
+
+The `SpecialPageProtection` class protects WordPress special pages that are not regular posts:
+
+| Special Page | Description |
+|---|---|
+| Blog Page | The main blog index (set in Settings > Reading) |
+| Front Page | The static front page (if set) |
+| Search Results | WordPress search results page |
+| 404 Page | The not-found page |
+| Author Archives | Author archive pages |
+| Date Archives | Date-based archive pages |
+
+These are configured through the protection rules with `resource_type: special_page` and a `resource_id` identifying the page type.
+
+</Tab>
+</Tabs>
+
+<Separator />
+
+## Admin Bypass
+
+By default, administrators (users with `manage_options` capability) bypass all content protection. They always see full content regardless of membership status. This is configurable in **Memberships > Settings** via the `admin_bypass` setting.
+
+## Restriction Message Placeholders
+
+Custom restriction messages support these placeholders:
+
+| Placeholder | Replaced With |
+|---|---|
+| `{plan_names}` | Comma-separated list of active plans that grant access to this content |
+| `{login_url}` | WordPress login URL with return to the current page |
+| `{pricing_url}` | Your pricing page URL (configured in settings) |
+| `{user_name}` | The current user's display name, or "Guest" for logged-out visitors |
+| `{unlock_date}` | The drip unlock date (only in drip-locked context) |
+
+## REST API Content Filtering
+
+Protected content is also filtered in WordPress REST API responses. When a non-member requests a post through the REST API:
+
+- The `content.rendered` field is replaced with the restriction message
+- A `content.protected` flag is set to `true`
+- Excerpts are filtered based on teaser settings
+
+This ensures that headless WordPress setups and third-party apps respect membership protection.
+
+## Cache Invalidation
+
+The `AccessEvaluator` maintains two levels of caching:
+
+1. **Per-request cache** — static array cache cleared at the end of each request
+2. **Transient cache** — WordPress transients with 5-minute TTL for batch access checks
+
+Cache is automatically invalidated when:
+- A grant is created, revoked, paused, resumed, or renewed
+- Protection rules are modified
+- The `AccessEvaluator::clearUserCache()` or `AccessEvaluator::clearCache()` methods are called
+
+The `ContentProtection` class listens to all grant lifecycle hooks and clears the relevant user's cache when their membership status changes.

@@ -1,0 +1,337 @@
+---
+title: Troubleshooting
+description: Common issues during WooCommerce to FluentCart migration and how to resolve them. Preflight failures, stuck migrations, batch errors, and more.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+## Preflight Failures
+
+<Accordions>
+  <Accordion title="WooCommerce is not active">
+    **Error:** *"WooCommerce is not active. Please activate it before migrating."*
+
+    **Fix:** Go to **Plugins** and activate WooCommerce. The migrator requires WooCommerce to be active because it reads data directly from WC functions like `wc_get_products()` and `wc_get_orders()`.
+
+    If WooCommerce is active but the check still fails, verify that WooCommerce loaded correctly. Check for fatal errors in your PHP error log — a broken WooCommerce installation may prevent the `WooCommerce` class from being registered.
+  </Accordion>
+
+  <Accordion title="FluentCart is not active">
+    **Error:** *"FluentCart is not active. Please activate it before migrating."*
+
+    **Fix:** Go to **Plugins** and activate FluentCart. The migrator checks for the `FLUENTCART_PLUGIN_PATH` constant, which is defined when FluentCart loads.
+
+    If FluentCart is active but the check still fails, make sure FluentCart is fully installed and initialized. The migrator hooks into `rest_api_init` at priority 10 — if FluentCart loads later, the constant may not be defined yet. Try deactivating and reactivating FluentCart.
+  </Accordion>
+
+  <Accordion title="PHP memory limit too low">
+    **Warning:** *"PHP memory limit is 128M. Consider increasing to at least 256M for large migrations."*
+
+    **Fix:** This is a warning, not a blocker. For stores with fewer than 1,000 total records, 128 MB is usually sufficient thanks to the batch size of 50 records.
+
+    For larger stores, increase the memory limit:
+
+    ```php title="wp-config.php"
+    define('WP_MEMORY_LIMIT', '512M');
+    ```
+
+    Or in your PHP configuration:
+
+    ```ini title="php.ini"
+    memory_limit = 512M
+    ```
+
+    Some hosts require you to change this through their control panel. Contact your host if `wp-config.php` changes have no effect.
+  </Accordion>
+
+  <Accordion title="FluentCart already contains data">
+    **Warning:** *"FluentCart already contains data. Migration will add new records alongside existing ones."*
+
+    **What it means:** FluentCart already has products, customers, orders, subscriptions, or coupons. The migration will add new records without deleting existing ones.
+
+    **Options:**
+    - Proceed with migration — new records will be added alongside existing ones. Duplicate emails will be detected and linked. Duplicate SKUs will get a `-wc{id}` suffix.
+    - Manually clear FluentCart data first if you want a clean migration.
+    - After migration, use [rollback](/docs/wc-fc/rollback) to remove only the migrated records if the result is not what you expected.
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Migration Issues
+
+<Accordions>
+  <Accordion title="Migration appears stuck">
+    **Symptom:** The progress endpoint returns `status: "running"` but the numbers are not changing.
+
+    **Diagnosis:** Check the migration state directly in the database:
+
+    ```sql
+    SELECT option_value FROM wp_options WHERE option_name = 'wcfc_migration_state';
+    ```
+
+    Look at which entity is in `running` status and what the processed count is.
+
+    **Common causes:**
+
+    - **PHP timeout** — The migration request timed out before completing. This is common on shared hosting with a 30-second `max_execution_time`. Increase the PHP timeout:
+      ```ini
+      max_execution_time = 300
+      ```
+      Or add to `.htaccess`:
+      ```
+      php_value max_execution_time 300
+      ```
+
+    - **Memory exhaustion** — PHP ran out of memory mid-batch. Check your PHP error log for "Allowed memory size exhausted" errors. Increase `memory_limit`.
+
+    - **Database lock** — A long-running query may be blocking. Check for MySQL slow queries or locks.
+
+    **Recovery:**
+
+    1. Cancel the migration: `POST /wc-fc/v1/cancel`
+    2. If cancel does not work (the request may time out too), manually update the option:
+       ```sql
+       DELETE FROM wp_options WHERE option_name = 'wcfc_migration_state';
+       ```
+    3. Rollback any partially migrated data
+    4. Fix the underlying timeout or memory issue
+    5. Start the migration again
+  </Accordion>
+
+  <Accordion title="A migration is already running">
+    **Error:** *"A migration is already running."* (HTTP 409)
+
+    **What it means:** The `wcfc_migration_state` option still has a migration with `status: "running"`. This can happen if a previous migration was interrupted by a timeout or crash.
+
+    **Fix:**
+
+    1. Try cancelling: `POST /wc-fc/v1/cancel`
+    2. If that does not work, manually clear the state:
+       ```sql
+       DELETE FROM wp_options WHERE option_name = 'wcfc_migration_state';
+       ```
+    3. Rollback any partial data if needed, then start fresh
+  </Accordion>
+
+  <Accordion title="Batch errors in the migration log">
+    **Symptom:** The migration completes but the error count is higher than expected.
+
+    **Diagnosis:** Check the migration log for error entries:
+
+    ```bash
+    curl -X GET "https://yoursite.com/wp-json/wc-fc/v1/log?per_page=100" \
+      -H "X-WP-Nonce: YOUR_NONCE"
+    ```
+
+    Look for entries with `status: "error"`. The `message` field describes what went wrong.
+
+    **Common error messages:**
+
+    - **"Failed to create category: A term with the name already exists"** — A category naming conflict. The slug-based deduplication missed this case. Usually happens with categories that have the same name but different slugs.
+
+    - **Database insert errors** — Usually caused by data that violates FluentCart's database constraints. Check the error message for the specific constraint.
+
+    - **"Unsupported product type: grouped/external"** — Expected. These product types are logged as skipped, not errors. Check that the skipped count matches the number of grouped/external products you have.
+  </Accordion>
+
+  <Accordion title="SKU conflicts">
+    **Symptom:** Products migrate but SKUs have `-wc{id}` suffixes.
+
+    **What happened:** The SKU already existed in FluentCart's `fct_product_variations` table. The migrator appends `-wc{WooCommerce_ID}` to create a unique SKU.
+
+    **The log will show:** *"SKU "ABC123" already exists in FluentCart. Using "ABC123-wc42" instead."*
+
+    **If this is unexpected:**
+    - Check if you ran the migration twice without rolling back first
+    - Check if FluentCart had existing products with matching SKUs
+    - After rollback, re-running the migration will use the original SKUs since the conflicting records were deleted
+  </Accordion>
+
+  <Accordion title="Subscription migration skipped entirely">
+    **Symptom:** Subscriptions show 0 total and 0 processed, even though you have WC Subscriptions data.
+
+    **Cause:** WC Subscriptions is not active. The `SubscriptionMigrator` checks for the `WC_Subscriptions` class and returns `null` if not found. The migrator factory in `AdminController::getMigrator()` returns `null` for subscriptions when the class is missing.
+
+    **Fix:** Activate the WC Subscriptions plugin and run the migration again. Already-migrated entities (products, customers, etc.) will be skipped, and only subscriptions will be processed.
+  </Accordion>
+
+  <Accordion title="Orders missing customer references">
+    **Symptom:** Orders migrate but `customer_id` is `null` in FluentCart.
+
+    **Cause:** The customer was not migrated before the order, or the customer migration was not included in `entity_types`.
+
+    **Why:** The migrator resolves customer IDs via the ID map. If `customers` was not in the `entity_types` array, the ID map has no customer entries and orders cannot resolve their customer references.
+
+    **Fix:** Always include `customers` when migrating `orders`. The migrator enforces the order `products > customers > coupons > orders > subscriptions` regardless of the array order you provide, but you still need to include the entity types you want migrated.
+
+    If you already migrated orders without customers, rollback the orders, run customers, then run orders again.
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## ID Mapping Issues
+
+<Accordions>
+  <Accordion title="Checking the ID map">
+    You can query the ID map table directly to verify mappings:
+
+    ```sql
+    -- Count mappings by entity type
+    SELECT entity_type, COUNT(*) as count
+    FROM wp_wc_fc_id_map
+    GROUP BY entity_type;
+
+    -- Find a specific product mapping
+    SELECT * FROM wp_wc_fc_id_map
+    WHERE entity_type = 'product' AND wc_id = 42;
+
+    -- Find all mappings for a WC order
+    SELECT * FROM wp_wc_fc_id_map
+    WHERE wc_id = 1234;
+    ```
+  </Accordion>
+
+  <Accordion title="Missing ID mappings">
+    If records exist in FluentCart but not in the ID map, they were either:
+
+    - Created manually in FluentCart (not by the migrator)
+    - Created by a previous migration that was interrupted before the ID map entry was written
+
+    Missing mappings mean rollback will not touch those records. If you need to remove them, you will need to do it manually in FluentCart.
+  </Accordion>
+
+  <Accordion title="Guest customer ID mapping">
+    Guest customers use `crc32(email)` as the WC ID in the ID map (since they do not have a WordPress user ID). This is stored under the `guest_customer` entity type.
+
+    If you need to look up a guest customer mapping:
+
+    ```sql
+    SELECT * FROM wp_wc_fc_id_map
+    WHERE entity_type = 'guest_customer'
+    AND wc_id = CRC32('customer@example.com');
+    ```
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Performance Issues
+
+<Accordions>
+  <Accordion title="Migration times out on shared hosting">
+    **Symptom:** The migration request returns a 504 Gateway Timeout or the connection drops.
+
+    **Cause:** Shared hosting typically has a 30-60 second PHP execution limit and may also have web server timeouts (nginx/Apache).
+
+    **Solutions:**
+
+    1. **Increase PHP timeout:**
+       ```php title="wp-config.php"
+       set_time_limit(600); // 10 minutes
+       ```
+       Or in PHP configuration:
+       ```ini
+       max_execution_time = 600
+       ```
+
+    2. **Migrate entity types separately:** Instead of migrating everything at once, run smaller migrations:
+       ```json
+       { "entity_types": ["products"] }
+       ```
+       Then:
+       ```json
+       { "entity_types": ["customers"] }
+       ```
+       And so on. Already-migrated records are skipped, so this is safe.
+
+    3. **Use WP-CLI or SSH:** If you have SSH access, run the REST request from the command line where PHP timeout limits are usually higher:
+       ```bash
+       wp eval 'do_action("rest_api_init"); $r = new WP_REST_Request("POST", "/wc-fc/v1/migrate"); $r->set_param("entity_types", ["products","customers","coupons","orders","subscriptions"]); rest_do_request($r);'
+       ```
+
+    4. **Upgrade hosting:** For stores with thousands of orders, a VPS or dedicated server with higher limits will handle the migration more reliably.
+  </Accordion>
+
+  <Accordion title="High memory usage">
+    **Symptom:** PHP "Allowed memory size exhausted" errors during migration.
+
+    **Cause:** Even with batch processing (50 records per batch), some records may consume more memory than expected — especially variable products with many variations or orders with many line items.
+
+    **Solutions:**
+
+    1. Increase PHP memory limit to 512 MB or higher
+    2. The batch size is fixed at 50 records — this is a safe default for most environments
+    3. Check for plugins that hook into WooCommerce data retrieval and may be loading additional data into memory
+  </Accordion>
+
+  <Accordion title="Migration is slow">
+    **Symptom:** The migration works but takes a long time (over 30 minutes for a few thousand records).
+
+    **Common causes:**
+
+    - **Slow database** — Each record involves multiple database reads and writes. Slow disk I/O or MySQL configuration can bottleneck the process.
+    - **Object caching disabled** — WordPress object caching reduces repeated database queries. Consider enabling a persistent object cache (Redis, Memcached) for the duration of the migration.
+    - **Heavy plugins** — Other plugins hooking into `wp_insert_post`, `save_post`, or WooCommerce actions can slow down record creation. Consider temporarily deactivating non-essential plugins during migration.
+
+    **Realistic expectations:**
+    - 100 products: under 1 minute
+    - 1,000 customers: 1-3 minutes
+    - 5,000 orders: 5-15 minutes
+    - 10,000+ orders: 15-60 minutes depending on hosting
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Data Integrity
+
+<Accordions>
+  <Accordion title="Prices look wrong in FluentCart">
+    **Cause:** FluentCart stores prices as integers in cents. A product priced at $29.99 in WooCommerce is stored as `2999` in FluentCart.
+
+    The `ProductMapper::toCents()` method converts: `intval(round(floatval($price) * 100))`.
+
+    **Verify:** Compare a few products manually. If WooCommerce shows $29.99, FluentCart's `item_price` should be `2999`. If FluentCart's UI shows $29.99, the conversion worked correctly — the display layer handles the cent-to-dollar conversion.
+  </Accordion>
+
+  <Accordion title="Product images missing">
+    **What the migrator does:** It copies the featured image reference using `set_post_thumbnail()`. The actual image file is not duplicated — both the WC product and FC product reference the same attachment ID in the WordPress media library.
+
+    **If images are missing:** The original WC product's featured image ID may not exist in the media library. Check the WooCommerce product to see if it has a featured image set.
+
+    **Gallery images:** The migrator copies only the featured image. Product gallery images are not migrated.
+  </Accordion>
+
+  <Accordion title="Guest customers duplicated">
+    **Cause:** Guest customers are identified by billing email. If the same person placed orders with different email addresses, they will appear as separate customers in FluentCart.
+
+    **The migrator deduplicates by:**
+    - Tracking processed guest emails during the migration run
+    - Checking if FluentCart already has a customer with the same email
+
+    This matches WooCommerce's behavior — guest customers are inherently identified by email.
+  </Accordion>
+</Accordions>
+
+## Getting Help
+
+If you encounter an issue not covered here:
+
+1. Check the migration log (`GET /wc-fc/v1/log`) for specific error messages
+2. Check your PHP error log for uncaught exceptions or fatal errors
+3. Query the `wc_fc_id_map` table to verify record mappings
+4. Review the `wcfc_migration_state` option for the current migration status
+
+When [reporting issues](https://github.com/vcode-sh/fchub-plugins/issues), include:
+
+- WooCommerce version
+- FluentCart version
+- PHP version and memory limit
+- Entity counts from `GET /wc-fc/v1/counts`
+- Relevant entries from the migration log
+- PHP error log entries from the time of the failure

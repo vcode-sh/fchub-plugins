@@ -1,0 +1,287 @@
+---
+title: Troubleshooting
+description: Common issues with FCHub Przelewy24 and how to resolve them, including IPN failures, payment errors, refund issues, and subscription renewal problems.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+## IPN (Webhook) Issues
+
+<Accordions type="single">
+<Accordion title="IPN not received — orders stay pending">
+
+If payments complete on the Przelewy24 side but orders remain pending in FluentCart, the IPN notification is not reaching your site.
+
+**Check these:**
+
+1. **SSL Certificate** — Przelewy24 requires your site to be served over HTTPS. Verify that your SSL certificate is valid and not expired.
+
+2. **Firewall / Security Plugin** — Some security plugins or server firewalls block incoming POST requests from unknown IPs. Przelewy24's servers need to reach:
+   ```
+   https://yoursite.com/?fluent-cart=fct_payment_listener_ipn&method=przelewy24
+   ```
+   Whitelist Przelewy24's IP ranges if your firewall blocks them.
+
+3. **WordPress Permalink Structure** — The IPN URL uses query parameters (`?fluent-cart=...`). This works with any permalink structure, but some aggressive caching or URL rewrite rules may interfere. Test the URL directly in your browser — you should get a JSON response (even if it's an error), not a 404 or redirect.
+
+4. **Maintenance Mode** — If your site is in maintenance mode, incoming webhooks will be blocked. Ensure your site is accessible when processing payments.
+
+5. **Plugin Conflicts** — Some security or optimization plugins may strip query parameters or block POST requests. Temporarily deactivate suspicious plugins to isolate the issue.
+
+</Accordion>
+<Accordion title="IPN returns 'Invalid signature'">
+
+The signature verification is failing. This means the CRC key used to sign the transaction doesn't match the one used to verify the notification.
+
+**Common causes:**
+
+- **Wrong CRC Key** — Double-check that your CRC key matches exactly what's in the Przelewy24 panel. Copy-paste carefully — no leading/trailing spaces.
+- **Sandbox vs Live mismatch** — If FluentCart is in test mode but you're using live credentials (or vice versa), the CRC key won't match the one P24 used to sign the notification.
+- **wp-config.php constant overrides** — If you defined CRC key constants in `wp-config.php`, those take priority over database values. Verify the constant values are correct for your current mode.
+
+</Accordion>
+<Accordion title="IPN returns 'Transaction not found'">
+
+The plugin can't match the incoming notification to a FluentCart transaction.
+
+**What's happening:**
+
+The `sessionId` in the IPN is the transaction UUID that was sent during registration. The plugin first looks up the transaction by UUID, then falls back to searching recent orders for a matching `p24_session_id` in the order config.
+
+**Possible causes:**
+
+- The transaction was deleted from FluentCart
+- The order was deleted or the database was modified
+- The IPN arrived for a transaction from a different site (check your Merchant ID matches)
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Payment Failures
+
+<Accordions type="single">
+<Accordion title="'Payment registration failed. Please try again.'">
+
+The transaction registration with Przelewy24's API failed. The plugin logs the error details in FluentCart's error log.
+
+**Check these:**
+
+1. **Credentials** — Verify your Merchant ID, Shop ID, CRC Key, and API Key are correct for the current mode (test or live).
+
+2. **API Connection** — Go to FluentCart > Settings > Payment Methods > Przelewy24 and save the settings. The plugin tests the connection on save — look for either "Przelewy24 connection verified!" or an error message.
+
+3. **Account Status** — Your Przelewy24 merchant account may not be fully activated. Contact P24 support to confirm your account is ready for transactions.
+
+4. **Amount** — Przelewy24 requires the amount in the lowest currency unit (grosz for PLN, cents for EUR). An amount of `0` will be rejected.
+
+5. **Email** — A valid customer email is required. If no email is found in the order's customer data or billing/shipping addresses, registration will fail with: "Customer email is required to process Przelewy24 payment."
+
+</Accordion>
+<Accordion title="'Przelewy24 payment is not activated'">
+
+The gateway is disabled in FluentCart settings. Go to FluentCart > Settings > Payment Methods > Przelewy24 and ensure the gateway is active.
+
+</Accordion>
+<Accordion title="Payment page shows wrong or no payment methods">
+
+The payment methods displayed come from the Przelewy24 API and are filtered by your channel settings.
+
+**Check these:**
+
+1. **Channel settings** — Make sure the desired payment channels are enabled in the configuration.
+
+2. **Cache** — Payment methods are cached for one hour. Save your Przelewy24 settings to clear the cache and fetch fresh data from the API.
+
+3. **Merchant account** — Some payment methods require additional agreements with Przelewy24 (e.g., installments, card recurring). Check with your P24 account manager.
+
+4. **Currency** — Some payment methods are only available for specific currencies. BLIK and Polish bank transfers are only available for PLN transactions.
+
+</Accordion>
+<Accordion title="Customer stuck on payment page / payment times out">
+
+The payment time limit may be too short. Check the **Payment time limit** setting in your configuration — the default is 15 minutes. For slower payment methods (like traditional bank transfers), you may want to increase this.
+
+If the customer's bank is down or the BLIK code expires, they can retry on the P24 page. The transaction registration remains valid until the time limit.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Refund Issues
+
+<Accordions type="single">
+<Accordion title="'Payment has not been confirmed yet. Cannot refund.'">
+
+The transaction's `vendor_charge_id` is empty, which means the payment IPN hasn't been processed yet (or the payment failed). You can only refund transactions that have been confirmed by the IPN handler.
+
+Wait for the IPN to arrive, or check the [IPN Issues](#ipn-webhook-issues) section above.
+
+</Accordion>
+<Accordion title="'Refund rejected by Przelewy24'">
+
+Przelewy24 rejected the refund request. This can happen for several reasons:
+
+- **Duplicate refund** — The refund was already processed. P24 returns a `409 Conflict` for duplicate refund requests.
+- **Insufficient balance** — Your P24 merchant account balance is too low to cover the refund.
+- **Refund window expired** — Some payment methods have a limited refund window.
+- **API key permissions** — Your API key may not have refund permissions. Check in the P24 panel under API configuration.
+
+</Accordion>
+<Accordion title="Refund submitted but not recorded in FluentCart">
+
+The refund was sent to P24 but the confirmation notification hasn't arrived yet.
+
+Refunds in Przelewy24 are asynchronous — the API call submits the request, and P24 sends a refund notification back to your IPN URL when the refund is processed. If the refund notification doesn't arrive:
+
+1. Check the IPN URL is reachable (same troubleshooting as for payment IPNs)
+2. Log into the P24 panel to check the refund status manually
+3. Check FluentCart's error log for any refund notification processing errors
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Subscription / Renewal Issues
+
+<Accordions type="single">
+<Accordion title="Renewal charge fails — 'No card refId stored'">
+
+The subscription doesn't have a stored card reference ID. This means the card info retrieval after the initial payment failed.
+
+**Possible causes:**
+
+- The initial payment was not made with a card (shouldn't happen since subscriptions force card-only channel)
+- The P24 card info API returned an error or no `refId`
+- The subscription was created manually or imported without card data
+
+**Resolution:** The customer needs to cancel and resubscribe, paying with a card. This will trigger fresh card tokenization and store the `refId`.
+
+</Accordion>
+<Accordion title="Renewal charge fails — 'Registration failed' or 'Card charge failed'">
+
+The automated renewal charge was rejected by Przelewy24.
+
+**Common causes:**
+
+- **Card expired** — The customer's card has passed its expiration date
+- **Insufficient funds** — Not enough balance on the card
+- **Card blocked** — The issuing bank blocked the transaction
+- **P24 API issue** — Temporary API outage
+
+The plugin's retry logic will attempt the charge again (3 retries with escalating delays: 4h, 24h, 72h). If all retries fail, the subscription status changes to `expired`.
+
+Check the FluentCart error log for detailed failure messages.
+
+</Accordion>
+<Accordion title="Subscription stuck in 'failing' status">
+
+A `failing` status means at least one renewal attempt has failed, and retries are in progress. Check:
+
+1. **Pending actions** — Look in Action Scheduler (Tools > Scheduled Actions) for pending `fchub_p24_process_renewal` actions. If a retry is scheduled, it will appear there.
+
+2. **Retry count** — The subscription's `_p24_retry_count` meta shows how many retries have been attempted (max 3).
+
+3. **Error log** — Each failure is logged with the reason. Check FluentCart's error log for entries mentioning the subscription ID.
+
+After 3 failed retries, the subscription will be automatically expired.
+
+</Accordion>
+<Accordion title="'Card update is not supported'">
+
+Card update is not available in the current version. If a customer needs to change their payment card, they should:
+
+1. Cancel their current subscription
+2. Create a new subscription and pay with the new card
+
+This limitation is planned to be addressed in a future release.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Receipt Page Issues
+
+<Accordions type="single">
+<Accordion title="Customer sees a blank or error page after payment">
+
+After payment, Przelewy24 redirects the customer back to your FluentCart receipt page with the transaction hash. If the page doesn't load correctly:
+
+1. **Check receipt page** — Verify that FluentCart's receipt page is configured and published in FluentCart > Settings.
+
+2. **UUID mismatch** — FluentCart may regenerate the transaction UUID when a customer retries checkout. The plugin includes a `template_redirect` hook that catches this case. When the original UUID (sent to P24) no longer matches the current transaction, the plugin searches recent orders by `p24_session_id` and redirects to the correct receipt URL.
+
+   If this redirect isn't working, check that the plugin is active and the `template_redirect` hook is firing.
+
+3. **Trailing slash issue** — The plugin explicitly removes trailing slashes from the return URL before adding query parameters, preventing malformed URLs like `page_id=78%2F`. If you see encoded slashes in URLs, this handling may have been bypassed by another plugin.
+
+</Accordion>
+<Accordion title="Customer gets redirected to homepage instead of receipt page">
+
+The receipt page ID may not be configured in FluentCart. The plugin reads the receipt page from `StoreSettings::getReceiptPageId()`. If no page is set, it falls back to the site URL.
+
+Go to FluentCart > Settings and ensure a receipt page is configured.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Debug Tips
+
+<Accordions type="single">
+<Accordion title="Checking FluentCart error logs">
+
+The plugin logs errors and important events using `fluent_cart_error_log()`. All log entries include the module name (`Order` or `Subscription`) and the relevant module ID for easy filtering.
+
+Look for entries containing:
+
+- `P24 IPN Error` — IPN validation failures
+- `P24 Verification Error` — Transaction verification failures
+- `P24 Registration Error` — Transaction registration failures
+- `P24 Renewal Failure` — Subscription renewal failures
+- `P24 Renewal Success` — Successful renewal charges
+- `P24 Refund Notification` — Refund status updates
+- `P24 Card Info Error` — Card tokenization failures
+
+</Accordion>
+<Accordion title="Testing with Przelewy24 Sandbox">
+
+Always test in sandbox mode first. The sandbox environment at `sandbox.przelewy24.pl` provides:
+
+- Test merchant accounts with sandbox credentials
+- Simulated payment methods that don't charge real money
+- Full IPN callback support (same as production)
+
+Set FluentCart to **Test** mode and use your sandbox credentials. All transactions will go through the sandbox API.
+
+</Accordion>
+<Accordion title="Verifying Action Scheduler is working">
+
+If subscription renewals aren't firing, check Action Scheduler:
+
+1. Go to **Tools > Scheduled Actions** (or **WooCommerce > Status > Scheduled Actions**)
+2. Filter by group: `fchub-p24`
+3. Look for pending `fchub_p24_process_renewal` actions
+4. Check the "Failed" tab for any actions that errored out
+
+If no actions are scheduled, the renewal scheduling may have failed — check that the subscription has a valid `_p24_card_ref_id` meta value and that Action Scheduler is running (it requires WP-Cron or an alternative cron trigger).
+
+</Accordion>
+</Accordions>
+
+## Still Stuck?
+
+If you've worked through these troubleshooting steps and the issue persists:
+
+1. Check the FluentCart error logs for detailed error messages
+2. Verify your Przelewy24 panel for the transaction status
+3. Open an issue on the [GitHub repository](https://github.com/vcode-sh/fchub-plugins/issues) with the error details

@@ -1,0 +1,175 @@
+---
+title: FCHub Memberships
+description: Complete membership system for FluentCart with plan management, content protection, drip scheduling, trial periods, email notifications, analytics, and deep FluentCRM and FluentCommunity integrations.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Memberships adds a full membership system to FluentCart. I built it to handle everything from simple "pay once, access forever" setups to complex multi-tier subscriptions with drip-fed content, trial periods, and automated lifecycle management through FluentCRM.
+
+The plugin integrates directly into FluentCart's integration feed system. When a customer purchases a product, the feed fires and grants membership access — no custom code required. From there, content protection, drip scheduling, email notifications, and CRM automation all work together automatically.
+
+## What It Does
+
+<Cards>
+  <Card title="Membership Plans">
+    Create unlimited plans with configurable levels, durations, trial periods, and hierarchical includes. Plans link to FluentCart products through integration feeds.
+  </Card>
+  <Card title="Content Protection">
+    Protect posts, pages, custom post types, taxonomies, menu items, URLs, comments, and special pages. Choose between restriction messages, redirects, or teaser content.
+  </Card>
+  <Card title="Drip Scheduling">
+    Release content on a schedule — delay by days after purchase or set fixed unlock dates. Members see a progress bar and receive email notifications when new content becomes available.
+  </Card>
+  <Card title="Trial Periods">
+    Offer free trials with automatic conversion to paid when a subscription payment is confirmed, or automatic expiration when no payment arrives.
+  </Card>
+  <Card title="Email Notifications">
+    Eight transactional emails cover the full membership lifecycle: welcome, expiring, revoked, drip unlocked, paused, resumed, trial converting, and trial expiring.
+  </Card>
+  <Card title="FluentCRM Automation">
+    15 triggers, 7 actions, 7 benchmarks, 25+ smart codes, contact profile sections, and segment filters. Automate every aspect of the membership lifecycle.
+  </Card>
+  <Card title="FluentCommunity Sync">
+    Automatically add members to community spaces and groups. Assign and revoke badges based on plan membership.
+  </Card>
+  <Card title="LearnDash Integration">
+    Protect LearnDash courses and lessons with membership plans. Grant and revoke course enrollment automatically.
+  </Card>
+  <Card title="Analytics & Reports">
+    Dashboard with active members, plan distribution, churn analysis, revenue tracking, and content popularity. Daily stats aggregation with historical data.
+  </Card>
+  <Card title="CSV Import">
+    Import members from CSV files. Includes a dedicated PMPro parser for migrating from Paid Memberships Pro.
+  </Card>
+  <Card title="Webhooks">
+    Send membership events to external services via HMAC-SHA256 signed webhooks. Supports multiple URLs with async delivery through Action Scheduler.
+  </Card>
+  <Card title="WP-CLI Commands">
+    Full command-line interface for managing grants, checking access, running stats, processing drip schedules, and exporting member data.
+  </Card>
+</Cards>
+
+## Architecture Overview
+
+<Accordions type="single">
+<Accordion title="Event-Driven Design">
+
+FCHub Memberships follows an event-driven architecture built around WordPress hooks. Every membership state change — grant, revoke, pause, resume, expire, renew — fires a WordPress action. Emails, FluentCRM triggers, FluentCommunity sync, webhooks, and audit logging all listen to these events independently.
+
+The core event hooks are:
+
+- `fchub_memberships/grant_created` — new membership access granted
+- `fchub_memberships/grant_revoked` — access revoked (cancel, refund, or manual)
+- `fchub_memberships/grant_expired` — access expired naturally
+- `fchub_memberships/grant_paused` — membership paused
+- `fchub_memberships/grant_resumed` — membership resumed
+- `fchub_memberships/grant_renewed` — subscription renewed
+- `fchub_memberships/trial_converted` — trial converted to paid
+- `fchub_memberships/trial_expired` — trial expired without payment
+- `fchub_memberships/drip_unlocked` — drip content became available
+
+</Accordion>
+<Accordion title="FluentCart Integration">
+
+The plugin registers as a FluentCart integration module through `BaseIntegrationManager`. This means it appears in the FluentCart integration feeds editor alongside other integrations. You create a feed, select a membership plan, choose a validity mode (lifetime, fixed duration, or mirror subscription), and the feed handles granting access when orders are paid.
+
+Revocation works the same way — when an order is cancelled or refunded, the feed can automatically revoke access immediately or defer to the subscription validity watcher.
+
+</Accordion>
+<Accordion title="Adapter System">
+
+Content access is managed through a provider/adapter system. Each integration target implements `AccessAdapterInterface`:
+
+- **WordPressContentAdapter** — posts, pages, custom post types, taxonomies
+- **FluentCommunityAdapter** — spaces, groups, badges
+- **FluentCrmAdapter** — contact tags and lists
+- **LearnDashAdapter** — courses, lessons, enrollment
+
+This means the same grant/revoke logic works uniformly across WordPress content, community spaces, and LMS courses.
+
+</Accordion>
+<Accordion title="Access Evaluation">
+
+The `AccessEvaluator` class is the central authority for all access decisions. It checks direct grants, plan-based grants (via plan rules), wildcard grants, taxonomy inheritance, and drip locks. Results are cached per-request and via WordPress transients to minimize database queries.
+
+The evaluation order is: admin bypass check, paused grant check, direct grant, plan-based grants with drip evaluation, wildcard grants, and finally no-access denial.
+
+</Accordion>
+</Accordions>
+
+## Database Tables
+
+The plugin creates 10 custom database tables (prefixed with `wp_fchub_membership_`):
+
+| Table | Purpose |
+|---|---|
+| `plans` | Membership plan definitions with levels, durations, and settings |
+| `plan_rules` | Content rules linking plans to resources with drip configuration |
+| `grants` | Individual access grants connecting users to plans and resources |
+| `grant_sources` | Junction table tracking order/subscription sources for each grant |
+| `event_locks` | Idempotency table preventing duplicate grant processing |
+| `protection_rules` | Per-resource protection configuration (messages, teasers, CTAs) |
+| `validity_log` | Subscription validity tracking for expiration detection |
+| `drip_notifications` | Scheduled drip unlock notification queue |
+| `stats_daily` | Daily aggregated statistics for reporting |
+| `audit_log` | Full audit trail of membership changes |
+
+<Separator />
+
+## Requirements
+
+| Requirement | Version |
+|---|---|
+| WordPress | 6.0+ |
+| PHP | 7.4+ |
+| FluentCart | Required (any version) |
+| FluentCRM | Optional — enables automation triggers, actions, benchmarks, smart codes |
+| FluentCommunity | Optional — enables space/group sync and badge assignment |
+| LearnDash | Optional — enables course/lesson protection |
+| Node.js | 20+ (development only, not needed for production) |
+
+<Callout type="info" title="FluentCart Dependency">
+FCHub Memberships requires FluentCart to be installed and activated. The plugin checks for `FLUENTCART_VERSION` at initialization and shows an admin notice if FluentCart is missing. All features depend on FluentCart's order and subscription system.
+</Callout>
+
+## Cron Jobs
+
+The plugin registers 7 WP-Cron events and 2 Action Scheduler hooks:
+
+| Cron Event | Interval | Purpose |
+|---|---|---|
+| `fchub_memberships_validity_check` | Every 5 minutes | Check subscription validity and fire expiration events |
+| `fchub_memberships_drip_process` | Hourly | Process pending drip notifications |
+| `fchub_memberships_expiry_notify` | Daily | Send access expiring soon emails |
+| `fchub_memberships_daily_stats` | Daily | Aggregate daily statistics and check grant anniversaries |
+| `fchub_memberships_trial_check` | Daily | Check trial expirations and send trial expiring notifications |
+| `fchub_memberships_plan_schedule` | Hourly | Process scheduled plan status changes |
+| `fchub_memberships_audit_cleanup` | Weekly | Clean up audit log entries older than 90 days |
+
+Action Scheduler hooks:
+
+| Hook | Purpose |
+|---|---|
+| `fchub_memberships_send_email` | Async email delivery |
+| `fchub_memberships_dispatch_webhook` | Async webhook dispatch |
+
+## What's Next
+
+<Cards>
+  <Card title="Installation" href="/docs/fchub-memberships/installation">
+    Download, install, and verify the plugin is running.
+  </Card>
+  <Card title="Quick Start" href="/docs/fchub-memberships/quick-start">
+    Create your first plan, link it to a product, and protect content in under 10 minutes.
+  </Card>
+  <Card title="Plans" href="/docs/fchub-memberships/plans">
+    Deep dive into plan configuration, hierarchy, durations, and linking to FluentCart.
+  </Card>
+  <Card title="Developer Reference" href="/docs/fchub-memberships/developer-reference">
+    REST API, WP-CLI, hooks, webhooks, and database schema.
+  </Card>
+</Cards>

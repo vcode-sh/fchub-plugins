@@ -1,0 +1,136 @@
+---
+title: Installation
+description: How to download, install, and activate the FCHub Przelewy24 plugin on your WordPress site.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+
+## Requirements Checklist
+
+Before you begin, confirm that your site meets these requirements:
+
+| Requirement | Details |
+|-------------|---------|
+| **WordPress** | Version 6.0 or higher |
+| **PHP** | Version 7.4 or higher |
+| **FluentCart** | Installed and activated |
+| **SSL** | Your site must be served over HTTPS |
+| **Przelewy24 Account** | You need a merchant account at [przelewy24.pl](https://www.przelewy24.pl) |
+
+<Callout type="warn" title="FluentCart Must Be Active">
+FCHub Przelewy24 is a payment gateway extension for FluentCart. If FluentCart is not installed and activated, the plugin will display an admin error notice and the gateway will not register. Install FluentCart first.
+</Callout>
+
+## Download
+
+FCHub Przelewy24 is distributed as a WordPress plugin ZIP file. Download the latest release from the GitHub Releases page:
+
+<Cards>
+  <Card title="GitHub Releases" href="https://github.com/vcode-sh/fchub-plugins/releases">
+    Download the latest `fchub-p24.zip` from the Releases page.
+  </Card>
+</Cards>
+
+Look for the asset named `fchub-p24.zip` in the latest release. Download it to your computer.
+
+## Installation Steps
+
+<Steps>
+<Step>
+### Upload the Plugin
+
+Navigate to **Plugins > Add New Plugin** in your WordPress admin dashboard. Click the **Upload Plugin** button at the top of the page.
+
+Choose the `fchub-p24.zip` file you downloaded and click **Install Now**.
+</Step>
+
+<Step>
+### Activate the Plugin
+
+After the upload completes, click **Activate Plugin**. WordPress will activate FCHub Przelewy24.
+
+If FluentCart is not active at this point, you will see an admin notice:
+
+> FCHub - Przelewy24 requires FluentCart to be installed and activated.
+
+Activate FluentCart first, then return to this step.
+</Step>
+
+<Step>
+### Verify Registration
+
+Once both FluentCart and FCHub Przelewy24 are active, the gateway registers itself automatically. Navigate to **FluentCart > Settings > Payment Methods** and you should see **Przelewy24** listed as an available payment gateway.
+
+No additional steps are needed — the plugin hooks into FluentCart's `fluent_cart/register_payment_methods` action and registers itself during the normal payment method loading process.
+</Step>
+</Steps>
+
+## What Happens on Activation
+
+When the plugin activates, it:
+
+1. **Registers the Przelewy24 gateway** with FluentCart's gateway manager
+2. **Sets up the IPN listener** at `?fluent-cart=fct_payment_listener_ipn&method=przelewy24`
+3. **Registers the Action Scheduler hook** (`fchub_p24_process_renewal`) for subscription renewals
+4. **Enqueues the checkout JavaScript** (`przelewy24-checkout.js`) that renders payment method selection on the FluentCart checkout page
+
+All of this happens automatically through FluentCart's payment method registration system. You do not need to configure webhooks, create pages, or modify any code.
+
+## What Happens on Deactivation
+
+When you deactivate the plugin:
+
+- All scheduled subscription renewals are unscheduled (the `fchub_p24_process_renewal` actions are removed from Action Scheduler)
+- Cached payment method lists are cleared
+- The gateway is no longer available at checkout
+
+<Callout type="info" title="Settings Are Preserved">
+Deactivating the plugin does not delete your settings. If you reactivate, your Przelewy24 credentials and configuration will still be there.
+</Callout>
+
+## What Happens on Uninstall (Deletion)
+
+If you delete the plugin through the WordPress admin, the uninstall routine runs and cleans up:
+
+- Gateway settings are removed from FluentCart's `fct_meta` table
+- Cached payment method transients are deleted
+- Action Scheduler entries for `fchub_p24_process_renewal` are removed
+- Order meta keys with the `_p24_` prefix are cleaned up
+
+This is a full cleanup — no orphaned data is left behind.
+
+<Tabs items={['Manual Upload', 'WP-CLI']}>
+<Tab value="Manual Upload">
+
+If you prefer uploading via FTP/SFTP:
+
+1. Extract `fchub-p24.zip` on your local machine
+2. Upload the `fchub-p24` folder to `/wp-content/plugins/`
+3. Go to **Plugins** in WordPress admin and activate **FCHub - Przelewy24**
+
+</Tab>
+<Tab value="WP-CLI">
+
+If you have WP-CLI access:
+
+```bash
+# Install from a local ZIP file
+wp plugin install /path/to/fchub-p24.zip --activate
+
+# Verify it's active
+wp plugin list --name=fchub-p24 --fields=name,status,version
+```
+
+</Tab>
+</Tabs>
+
+## Next Steps
+
+<Cards>
+  <Card title="Configuration" href="/docs/fchub-p24/configuration">
+    Connect your Przelewy24 merchant credentials and configure payment channels.
+  </Card>
+</Cards>

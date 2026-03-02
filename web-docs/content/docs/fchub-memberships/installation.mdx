@@ -1,0 +1,133 @@
+---
+title: Installation
+description: How to install and activate FCHub Memberships on your WordPress site.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+## Requirements
+
+Before installing, make sure your environment meets these requirements:
+
+| Requirement | Minimum Version |
+|---|---|
+| WordPress | 6.0+ |
+| PHP | 7.4+ |
+| FluentCart | Installed and activated |
+
+<Callout type="warn" title="FluentCart Must Be Active">
+FCHub Memberships depends on FluentCart for order processing, subscription management, and the integration feed system. If FluentCart is not active, the plugin will show an admin notice and all features will be disabled.
+</Callout>
+
+## Install the Plugin
+
+<Tabs items={['Upload via Admin', 'Upload via FTP/SSH']}>
+<Tab value="Upload via Admin">
+
+<Steps>
+<Step>
+
+### Download the plugin
+
+Download the `fchub-memberships.zip` file from the [GitHub releases page](https://github.com/vcode-sh/fchub-plugins/releases).
+
+</Step>
+<Step>
+
+### Upload in WordPress
+
+Go to **Plugins > Add New > Upload Plugin** in your WordPress admin. Choose the zip file and click **Install Now**.
+
+</Step>
+<Step>
+
+### Activate
+
+Click **Activate Plugin** after the upload completes.
+
+</Step>
+</Steps>
+
+</Tab>
+<Tab value="Upload via FTP/SSH">
+
+<Steps>
+<Step>
+
+### Extract the zip
+
+Extract the `fchub-memberships.zip` file on your local machine. You should have a folder called `fchub-memberships`.
+
+</Step>
+<Step>
+
+### Upload to wp-content/plugins
+
+Upload the entire `fchub-memberships` folder to `/wp-content/plugins/` on your server using FTP, SFTP, or SSH.
+
+</Step>
+<Step>
+
+### Activate in WordPress
+
+Go to **Plugins** in your WordPress admin and activate **FCHub - Memberships**.
+
+</Step>
+</Steps>
+
+</Tab>
+</Tabs>
+
+## What Happens on Activation
+
+When you activate the plugin, several things happen automatically:
+
+1. **Database tables are created** — The plugin creates 10 custom tables for plans, grants, protection rules, drip notifications, audit logs, and stats. This uses WordPress `dbDelta()` so it is safe to run multiple times.
+
+2. **Cron jobs are registered** — Seven recurring cron events are scheduled for validity checking, drip processing, expiry notifications, daily stats, audit cleanup, trial checks, and plan schedule processing.
+
+3. **Admin menu appears** — A "Memberships" menu item appears in your WordPress admin sidebar (under the FluentCart section). This loads the single-page admin application where you manage plans, members, content rules, drip schedules, and settings.
+
+4. **FluentCart integration module registers** — The "Memberships" integration appears in FluentCart's integration modules list. You can create integration feeds on any product to grant membership access on purchase.
+
+<Callout type="info" title="No Configuration Required to Start">
+The plugin works out of the box with sensible defaults. You can start creating plans and protecting content immediately. Settings like restriction messages, protection modes, and email templates can be customized later from the Memberships settings page.
+</Callout>
+
+## Verify the Installation
+
+After activation, confirm everything is working:
+
+1. Go to **Memberships** in your admin sidebar — the admin SPA should load
+2. Go to **FluentCart > Modules** — "Memberships" should appear as an active integration
+3. Create a test plan from the Plans page to verify database connectivity
+
+## Optional Integrations
+
+These plugins are not required but enable additional features when active:
+
+| Plugin | What It Enables |
+|---|---|
+| **FluentCRM** | 15 automation triggers, 7 actions, 7 benchmarks, 25+ smart codes, contact profile section, segment filters |
+| **FluentCommunity** | Automatic space/group membership sync, badge assignment and revocation |
+| **LearnDash** | Course and lesson protection through membership plans |
+
+FluentCRM automation boots at `init` priority 30 (after FluentCart registers at priority 2 and memberships register at priority 3). This ensures all systems are available when automation triggers are evaluated.
+
+## Development Setup
+
+If you are contributing to the plugin or building custom extensions, the admin SPA requires Node.js for asset compilation:
+
+| Tool | Version |
+|---|---|
+| Node.js | 20+ |
+| npm | Included with Node.js |
+
+Run `npm install` and `npm run dev` from the plugin root to start the Vite development server for the admin interface. This is only needed for development — the production plugin ships with pre-built assets in `assets/dist/`.
+
+## Uninstalling
+
+Deactivating the plugin removes all cron jobs but preserves your database tables and data. This is by design — you can deactivate and reactivate without losing anything.
+
+To completely remove all data, enable the "Delete data on uninstall" option in **Memberships > Settings** before uninstalling. This will drop all 10 database tables and remove all plugin options from the `wp_options` table.

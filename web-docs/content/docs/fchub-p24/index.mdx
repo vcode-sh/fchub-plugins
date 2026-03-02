@@ -1,0 +1,135 @@
+---
+title: FCHub Przelewy24
+description: Przelewy24 integration for FluentCart. Accept BLIK, card, and bank transfer payments from Polish customers with full subscription billing support.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Przelewy24 brings Poland's most popular payment gateway to FluentCart. Your customers can pay with BLIK, credit and debit cards, bank transfers, digital wallets, and more — all through the Przelewy24 payment platform that handles over 80% of online payments in Poland.
+
+## Why Przelewy24?
+
+If you sell to Polish customers, Przelewy24 is not optional — it's expected. Polish buyers overwhelmingly prefer local payment methods like BLIK and direct bank transfers over international options. FCHub Przelewy24 connects FluentCart directly to the Przelewy24 API, giving your customers the payment experience they already trust.
+
+<Callout type="info" title="Built for FluentCart">
+This plugin extends FluentCart with a native Przelewy24 gateway. It registers itself automatically when FluentCart loads payment methods — no manual wiring required.
+</Callout>
+
+## What It Does
+
+<Cards>
+  <Card title="BLIK Payments">
+    Poland's favorite mobile payment method. Customers enter a 6-digit code from their banking app to confirm payment instantly.
+  </Card>
+  <Card title="Card Payments">
+    Visa, Mastercard, and other card networks processed through Przelewy24. Supports both one-time and recurring card-on-file charges.
+  </Card>
+  <Card title="Bank Transfers">
+    Direct online transfers from all major Polish banks. Fast transfers, e-transfers, and traditional bank wire options.
+  </Card>
+  <Card title="Digital Wallets">
+    PayPal, SkyCash, and other wallet providers available through the Przelewy24 platform.
+  </Card>
+  <Card title="Subscription Billing">
+    Recurring card payments with automatic renewal scheduling via Action Scheduler. Retry logic handles failed charges gracefully.
+  </Card>
+  <Card title="Refund Processing">
+    Initiate refunds from the FluentCart admin panel. The plugin calls the Przelewy24 refund API and processes the confirmation callback.
+  </Card>
+</Cards>
+
+## Feature Highlights
+
+<Accordions type="single">
+<Accordion title="Full Payment Channel Control">
+
+You decide which payment methods appear at checkout. Enable or disable individual channels:
+
+| Channel | Description |
+|---------|-------------|
+| **Cards** | Visa, Mastercard, Apple Pay, Google Pay |
+| **BLIK** | Poland's mobile payment standard |
+| **Online transfers** | Fast bank transfers (mTransfer, Pekao24, iPKO, etc.) |
+| **Wallets** | PayPal, SkyCash, and other digital wallets |
+| **Traditional transfer** | Manual bank wire with payment details |
+| **Installments** | Pay-later options (requires separate P24 agreement) |
+| **24/7 payments** | Filter to show only payment methods available around the clock |
+
+Each channel maps to a Przelewy24 channel bitmask flag, so the gateway sends exactly the right configuration with every transaction.
+
+</Accordion>
+<Accordion title="Sandbox and Live Modes">
+
+Separate credential sets for sandbox and live environments. FluentCart's store mode controls which set is active — you never accidentally charge real cards during testing. The plugin connects to `sandbox.przelewy24.pl` in test mode and `secure.przelewy24.pl` in production.
+
+</Accordion>
+<Accordion title="IPN Webhook Processing">
+
+Przelewy24 sends Instant Payment Notifications (IPN) to your site after every transaction event. The plugin verifies each notification using SHA-384 signature validation before processing. This covers:
+
+- Payment confirmations
+- Refund status updates
+- Renewal charge results
+
+</Accordion>
+<Accordion title="Secure Credential Management">
+
+Credentials can be stored in the FluentCart settings UI or hardcoded via `wp-config.php` constants. Constants take priority, making it easy to manage credentials across staging and production environments without touching the database.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Requirements
+
+Before installing FCHub Przelewy24, make sure your environment meets these requirements:
+
+| Requirement | Minimum Version |
+|-------------|----------------|
+| WordPress | 6.0+ |
+| PHP | 7.4+ |
+| FluentCart | Latest version |
+| SSL Certificate | Required (HTTPS) |
+| Przelewy24 Account | Merchant account with API credentials |
+
+<Callout type="warn" title="FluentCart is Required">
+FCHub Przelewy24 is a FluentCart payment gateway extension. It will not function without FluentCart installed and activated. The plugin displays an admin notice if FluentCart is missing.
+</Callout>
+
+For subscription billing, you also need:
+
+- **Card recurring agreement** with Przelewy24 (contact your P24 account manager)
+- **Action Scheduler** — included with WooCommerce, or installed automatically by FluentCart
+
+## How It Works (Overview)
+
+The payment flow is straightforward:
+
+1. Customer selects Przelewy24 at checkout and picks their preferred payment method (BLIK, bank, card, etc.)
+2. The plugin registers a transaction with the Przelewy24 API and receives a payment token
+3. Customer is redirected to the Przelewy24 payment page to complete payment
+4. Przelewy24 sends an IPN callback to your site confirming the payment
+5. The plugin verifies the signature, confirms the transaction with P24's verify endpoint, and marks the order as paid
+
+For subscriptions, the initial payment captures a card reference ID. Future renewals charge the stored card automatically via Action Scheduler.
+
+## Next Steps
+
+<Cards>
+  <Card title="Installation" href="/docs/fchub-p24/installation">
+    Download and install the plugin on your WordPress site.
+  </Card>
+  <Card title="Configuration" href="/docs/fchub-p24/configuration">
+    Connect your Przelewy24 merchant account and configure payment channels.
+  </Card>
+  <Card title="Payments" href="/docs/fchub-p24/payments">
+    Understand the one-time payment flow, IPN processing, and refunds.
+  </Card>
+  <Card title="Subscriptions" href="/docs/fchub-p24/subscriptions">
+    Learn how recurring billing, retry logic, and renewal scheduling work.
+  </Card>
+</Cards>

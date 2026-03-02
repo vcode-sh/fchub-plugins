@@ -1,0 +1,456 @@
+---
+title: Cloudflare Stream Setup
+description: Cloudflare Stream configuration guide. Account IDs, API tokens, webhook secrets. The works. More steps than Bunny.net, but it works.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+
+Cloudflare Stream is the streaming provider for people who already use Cloudflare for everything else. Or for people who want globally distributed CDN by default and don't mind API token configuration that feels like solving a puzzle.
+
+Here's what you're signing up for: Copy Account ID from one page. Generate API token from another. Paste both into FCHub Stream. Test connection. Hope it works. It usually does.
+
+Not as cheap as Bunny.net. Not as simple either. But if you're already in Cloudflare's ecosystem, this makes sense. If you're not, maybe reconsider.
+
+## Before You Start
+
+<Callout type="info" title="Prerequisites">
+- **Cloudflare account** with Stream enabled (not all plans have it)
+- **Payment method** on file (Stream isn't free, shockingly)
+- **WordPress admin access** to configure FCHub Stream
+- **15 minutes** of your life you won't get back
+</Callout>
+
+Don't have a Cloudflare account? [Sign up here](https://dash.cloudflare.com/sign-up). Already have one but Stream isn't showing up? Check your plan. Stream isn't available on every tier.
+
+<Separator className="my-8" />
+
+## What You're Getting
+
+**Pricing (as of 2025):**
+- $5 per 1,000 minutes stored
+- $1 per 1,000 minutes delivered
+
+**Translation for normal humans:**
+- 100 videos at 5 minutes each = 500 minutes = $2.50/month storage
+- 1,000 views of those videos = 500 minutes delivered = $0.50/month delivery
+- **Total: ~$3/month** for small community
+
+Scales up from there. Do your own math. Cloudflare has a pricing calculator if you want precision.
+
+**What makes Cloudflare worth the extra cost:**
+- Global CDN included (videos load fast everywhere)
+- Webhook callbacks that actually work (instant status updates)
+- Enterprise-grade infrastructure (doesn't go down when traffic spikes)
+- Direct Creator Uploads if you need that (you probably don't)
+
+**What makes Cloudflare annoying:**
+- More expensive than Bunny.net for most use cases
+- API token creation requires patience
+- Customer subdomain is shown but not actually used (thanks for the confusion, Cloudflare)
+
+Pick Cloudflare if: you're already using them, you value reliability over cost, or someone else is paying.
+
+<Separator className="my-8" />
+
+<Steps>
+<Step>
+
+## Find Your Account ID
+
+Cloudflare makes this surprisingly easy. For once.
+
+1. Log into [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. Click **Stream** in the left sidebar
+3. Pick your plan & pay
+4. Look at the top-right corner under "Account details"
+5. Copy your **Account ID** and **Customer subdomain**
+
+<ImageZoom
+  src="/stream/cf-data1.webp"
+  alt="Cloudflare Stream dashboard showing Account ID and Customer subdomain in top-right corner"
+  width={1920}
+  height={1080}
+  style={{ aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px', marginTop: '1.5rem', marginBottom: '1.5rem' }}
+/>
+
+**What is Account ID?**
+
+It's a hexadecimal string that looks like `a20dcaa5104t8a211b0edd6519e53260`. That's your Cloudflare account identifier. Not your Stream-specific ID. Your entire account. Because Cloudflare believes in reusing identifiers.
+
+**Customer subdomain:**
+
+You'll see this too. It looks like `customer-xxxxxx.cloudflarestream.com`. You don't need it for FCHub Stream. We use Account ID instead. Cloudflare shows it anyway. Ignore it.
+
+Save your these somewhere. Text file. Password manager. Sticky note. Whatever works. You'll paste it into FCHub Stream settings in a minute.
+
+</Step>
+
+<Step>
+
+## Create API Token
+
+This is where Cloudflare's love for security theater begins. You need an API token with Stream permissions. Not your Global API Key (that's too powerful). Not a generic token (that won't work). A Stream-specific token with exactly the right permissions.
+
+Cloudflare doesn't have a template for Stream (shocking, I know). You'll create a custom token. It's not hard. Just tedious.
+
+### Generate the Token
+
+Time to create an API token. Cloudflare's dashboard is confusing. I know. But you need to do this. Here's how:
+
+<div style={{ position: 'relative', paddingTop: '56.25%', marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+  <iframe
+    src="https://player.mediadelivery.net/embed/527650/48b8629b-224a-4ad5-85d7-a8ad8f449674?autoplay=false&loop=false&muted=true&preload=true&responsive=true"
+    loading="lazy"
+    style={{ border: 0, position: 'absolute', top: 0, height: '100%', width: '100%', borderRadius: '8px' }}
+    allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;"
+    allowFullScreen={true}
+  />
+</div>
+
+1. In Cloudflare dashboard, go to **My Profile** (click your profile icon or find in the left sidebar)
+2. Navigate to **API Tokens** tab
+3. Click **Create Token** button
+4. Find the **Create Custom Token** 
+5. Click **Get Started**
+6. Give a Token name (call it whatever you want - "fchub-stream" works, "my-video-plugin" also works, I don't care)
+7. Permissions - you need to add two permissions for Account (this is where Cloudflare's UI gets confusing, but stick with me):
+   - Click the permission dropdown, select **Account** → **Stream** → **Read** (this lets plugin check video status)
+   - Add another permission: **Account** → **Stream** → **Edit** (this lets plugin upload videos)
+   - Yes, you need both. No, I can't make Cloudflare's permission system simpler. Just add both.
+8. Then click Continue to summary
+9. Verify if all is ok (or don't, I'm not your boss)
+10. Click Create Token
+
+<Callout>
+Make sure you add both permissions (Read AND Edit). Missing one means uploads fail or status checks fail. I've seen this happen. Don't skip permissions. Cloudflare's UI makes it easy to miss one. Be thorough.
+</Callout>
+
+11. **Copy your API token immediately**
+
+<Callout type="warn">
+Cloudflare shows the token exactly once. If you close this page without copying it, you're generating a new one. Copy it. Paste it somewhere safe. Don't trust your memory.
+</Callout>
+
+Your token looks like a long string of random characters: `AbCd1234_EfGh5678-IjKl9012`. Save it. You'll paste it into FCHub Stream next.
+
+</Step>
+
+<Step>
+
+## Configure FCHub Stream
+
+Time to connect everything. You have Account ID. You have API token. Now paste them into WordPress.
+
+### Open FCHub Stream Settings
+
+1. Go to **WordPress Admin** → **FCHub Stream** → **Settings**
+2. Click **Stream Configuration** card (or tab)
+3. Select **Cloudflare Stream** provider
+
+<ImageZoom
+  src="https://files.vcode.sh/fchub/plugins/stream/docs/stream-cf.webp"
+  alt="FCHub Stream settings showing Cloudflare Stream configuration form with Account ID and API Token fields"
+  width={1920}
+  height={1080}
+  style={{ aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px', marginTop: '1.5rem', marginBottom: '1.5rem' }}
+/>
+
+### Enter Your Credentials
+
+**Account ID field:**
+- Paste the Account ID you copied from Cloudflare Stream dashboard
+- Format: 32-character hexadecimal string
+- Example: `a20dcaa9104e8a411b0edd6519e53260`
+
+**API Token field:**
+- Paste the API token you just created
+- Format: Random alphanumeric string with underscores and hyphens
+- Shows as masked characters (`••••••••`) after you enter it
+- Don't worry, that's normal security behavior
+
+<Callout>
+If you paste and see your token in plain text initially, that's fine. It gets masked after you move to another field or save. FCHub Stream encrypts API credentials in the database. Not stored in plain text like it's 2010.
+</Callout>
+
+**Customer Subdomain field:**
+- Paste the Customer Subdomain you copied from Cloudflare Stream dashboard
+- Format: `customer-xxxxxx.cloudflarestream.com`
+- This is required for Cloudflare Stream API calls
+- You copied this earlier when getting Account ID
+
+### Save & Test
+
+After entering all credentials:
+
+1. Click **Save & Test** button
+2. This saves your credentials and tests the connection automatically
+3. If test succeeds, you'll see a green success message
+4. If test fails, check the error message and fix your credentials
+
+**What the test checks:**
+- Account ID is valid
+- API token works
+- Customer Subdomain is correct
+- Token has necessary permissions (Read and Edit)
+- Your server can reach Cloudflare's API
+
+### Activate Webhook
+
+After **Save & Test** succeeds:
+
+1. Click **Activate Webhook** button
+2. This sets up webhook endpoint for Cloudflare Stream
+3. Webhooks notify your site when video processing completes (faster than polling)
+4. If webhook activation succeeds, you'll see a confirmation message
+
+**What webhooks do:**
+- Cloudflare sends notifications when videos finish encoding
+- Status updates happen instantly (no 30-second polling delay)
+- Reduces API calls (saves rate limits)
+- Better user experience (videos appear ready faster)
+
+<Callout>
+Webhooks require SSL/HTTPS on your site. If your site doesn't have SSL, webhook activation will fail. Most hosting has SSL by default. If yours doesn't, fix that first. It's 2025.
+</Callout>
+
+</Step>
+
+<Step>
+
+## Enable Provider
+
+After **Save & Test** succeeds, you need to enable Cloudflare Stream as your active provider:
+
+1. Toggle the **Status** switch to **Enabled**
+2. This activates Cloudflare Stream as your active provider
+3. If you had another provider enabled, it gets disabled automatically
+4. Only one provider can be active at a time (by design, not limitation)
+
+
+Once enabled, Cloudflare Stream is your active provider. Video uploads will go to Cloudflare Stream. That's it.
+
+### If Save & Test Fails
+
+You'll see a red error message. Common causes:
+
+**"Invalid Account ID"**
+- You copied the wrong string (maybe Customer subdomain instead?)
+- Extra spaces before/after the ID (copy-paste strikes again)
+- Check Cloudflare dashboard, copy Account ID again
+
+**"Invalid API Token"**
+- Token was copied wrong (missing characters)
+- Token was revoked or expired
+- Go back to Cloudflare, generate new token
+
+**"Insufficient permissions"**
+- Token doesn't have Stream:Read and Stream:Edit permissions
+- Delete token, create new custom token with both permissions (Read AND Edit)
+
+**"Connection timeout" or "Could not reach Cloudflare API"**
+- Your server's firewall blocks outbound HTTPS requests
+- DNS resolution issues (rare but possible)
+- Check with your hosting provider
+
+**"Account not found"**
+- Account ID belongs to different Cloudflare account than your API token
+- Verify you're using credentials from the same account
+
+<Callout type="warn">
+If connection test keeps failing after fixing credentials, check if your hosting provider blocks outbound API requests. Some shared hosting does this. Contact support. If they can't help, switch hosting or switch to Bunny.net (Bunny's API is more lenient).
+</Callout>
+
+</Step>
+
+<Step>
+
+## Test Video Upload
+
+Configuration is done. Now verify it actually works by uploading a test video.
+
+### Upload Test Video
+
+1. Go to your **FluentCommunity** (frontend, not admin)
+2. Create a new post
+3. Click the **video upload button** (should appear in post editor)
+4. Select a short test video (under 50MB recommended for first test)
+5. Upload starts immediately
+
+**What should happen:**
+- Progress bar shows upload percentage
+- Upload completes (file goes to Cloudflare, not WordPress server)
+- Status changes to "Processing..." (Cloudflare is transcoding)
+- After 30-60 seconds, status changes to from "Encoding" to "Ready"
+- Video player appears in post preview
+
+### If Upload Works
+
+Congratulations. Cloudflare Stream is configured correctly. Videos upload. Videos transcode. Videos play. You're done.
+
+### If Upload Fails
+
+Something's misconfigured. Common issues:
+
+**Upload button doesn't appear:**
+- FCHub Stream isn't enabled in Settings → Upload Settings
+- FluentCommunity isn't active
+- User doesn't have permission to upload videos
+- JavaScript error (check browser console with F12)
+
+**Upload fails immediately:**
+- API credentials are wrong (test connection again)
+- File exceeds max size limit (check Upload Settings)
+- File format not allowed (check allowed formats)
+
+**Upload completes but stays "Processing" forever:**
+- Webhook isn't configured and polling isn't working
+- Cloudflare processing actually failed (check Cloudflare Stream dashboard)
+- Network issue between WordPress and Cloudflare API
+
+**Video player shows error:**
+- Video processing failed on Cloudflare's side (check their status page)
+- Embed URL is malformed (rare, but report if it happens)
+
+Check [Troubleshooting](/docs/fchub-stream/troubleshooting) if you're stuck.
+
+</Step>
+</Steps>
+
+<Separator className="my-8" />
+
+
+## When to Choose Cloudflare Stream
+
+### Choose Cloudflare If:
+
+**You're already using Cloudflare**
+- Already have account, billing set up, familiar with dashboard
+- Adding Stream is one more service in ecosystem you already use
+
+**You want global CDN by default**
+- Videos load fast everywhere (Cloudflare has edge locations worldwide)
+- Adaptive bitrate streaming optimized for every region
+
+**You value webhook reliability**
+- Cloudflare's webhooks work consistently
+- Instant status updates when processing completes
+
+**You need enterprise reliability**
+- Uptime is critical for your community
+- Can't tolerate streaming provider outages
+
+**Budget isn't primary concern**
+- Cloudflare costs more than Bunny.net
+- But infrastructure quality and CDN performance justify cost
+
+### Skip Cloudflare If:
+
+**You want cheaper pricing**
+- Bunny.net is significantly cheaper for most use cases
+- Unless you're delivering huge volumes, Bunny wins on cost
+
+**You don't want complex setup**
+- Cloudflare requires Account ID + API token creation
+- Bunny.net is simpler (just API key + Library ID)
+
+**You're not already in Cloudflare ecosystem**
+- Creating Cloudflare account just for Stream is overkill
+- Bunny.net is standalone service, no ecosystem lock-in
+
+**You need regional pricing**
+- Cloudflare has flat global pricing
+- Bunny.net has regional pricing (cheaper in some regions)
+
+<Separator className="my-8" />
+
+## Cost Breakdown
+
+### Real-World Pricing Examples
+
+**Small community (50 videos/month, 5 min average, 1000 total views):**
+- Storage: 250 minutes = $1.25/month
+- Delivery: 5,000 minutes watched = $5/month
+- **Total: $6.25/month**
+
+**Medium community (200 videos/month, 7 min average, 5000 total views):**
+- Storage: 1,400 minutes = $7/month
+- Delivery: 35,000 minutes watched = $35/month
+- **Total: $42/month**
+
+**Large community (500 videos/month, 10 min average, 20,000 total views):**
+- Storage: 5,000 minutes = $25/month
+- Delivery: 200,000 minutes watched = $200/month
+- **Total: $225/month**
+
+**Compare to hosting video yourself:**
+- Server storage: $50-200/month (depends on volume)
+- CDN bandwidth: $100-500/month
+- Transcoding infrastructure: $200-1000/month
+- Your time maintaining it: priceless (and annoying)
+
+Cloudflare Stream costs more than Bunny.net. But costs way less than self-hosting. And you don't spend weekends maintaining FFmpeg clusters.
+
+Math checks out if you value time and reliability.
+
+<Separator className="my-8" />
+
+## Common Issues
+
+### Connection Test Fails
+
+**Check:**
+- Account ID is exactly 32 characters (no spaces before/after)
+- API token copied correctly (Cloudflare shows it only once)
+- Token has Stream:Read and Stream:Edit permissions
+- Your server's firewall allows outbound HTTPS to Cloudflare
+
+### Webhook Not Working
+
+**Check:**
+- Your site uses HTTPS (SSL certificate valid)
+- Webhook URL is correct: `https://yourdomain.com/wp-json/fchub-stream/v1/webhooks/cloudflare`
+- Webhook secret matches in both FCHub Stream and Cloudflare dashboard
+- Cloudflare can reach your server (no IP whitelist blocking them)
+
+### Video Stuck Processing
+
+**Check:**
+- Cloudflare status page (maybe they're having issues)
+- Video actually processing in Cloudflare dashboard (Stream → Videos)
+- Webhook configured or polling enabled
+- Not a 4K 60fps 2-hour video (those take time to transcode)
+
+### Upload Fails with "Forbidden"
+
+**Check:**
+- API token hasn't expired
+- Token wasn't revoked in Cloudflare dashboard
+- Account still has Stream enabled (some Cloudflare plans don't include it)
+
+<Separator className="my-8" />
+
+## Still Stuck?
+
+If this guide didn't solve your problem:
+
+1. **Check troubleshooting guide** → [Common Issues](/docs/fchub-stream/troubleshooting)
+2. **Verify Cloudflare status** → [status.cloudflare.com](https://www.cloudflarestatus.com/)
+3. **Test API credentials manually** → Use Cloudflare's API docs to verify token works
+4. **Check browser console** → F12 → Console tab (JavaScript errors show here)
+5. **Review WordPress error logs** → See if PHP errors explain upload failures
+
+**Need help?**
+- [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues)
+
+Include in your report:
+- WordPress version
+- FluentCommunity version
+- FCHub Stream version
+- Exact error message
+- Screenshots if relevant
+- What you've already tried
+
+The more details you provide, the faster it gets fixed. Or the faster you get told it's a Cloudflare issue, not an FCHub issue. Either way, clarity helps.

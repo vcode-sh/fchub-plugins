@@ -1,0 +1,244 @@
+---
+title: Configuration
+description: Connect your Przelewy24 merchant account, configure payment channels, and set up credentials for FluentCart.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+## Where to Find Settings
+
+The Przelewy24 configuration lives inside FluentCart's payment settings:
+
+**FluentCart > Settings > Payment Methods > Przelewy24**
+
+Click the Przelewy24 card to open the configuration panel. All settings are saved through FluentCart's standard settings interface.
+
+## Credentials
+
+Przelewy24 requires four credentials to process payments. You will need separate sets for sandbox (test) and live (production) environments.
+
+<Tabs items={['Live Credentials', 'Test / Sandbox Credentials']}>
+<Tab value="Live Credentials">
+
+These are your production credentials from the [Przelewy24 merchant panel](https://panel.przelewy24.pl):
+
+| Field | Description |
+|-------|-------------|
+| **Merchant ID** | Your Przelewy24 merchant identifier |
+| **Shop ID / POS ID** | Your point-of-sale identifier. Leave empty if it's the same as your Merchant ID |
+| **CRC Key** | The CRC checksum key used for signing transactions |
+| **API Key** | Also called the "Report Key" in the P24 panel. Used for API authentication |
+
+</Tab>
+<Tab value="Test / Sandbox Credentials">
+
+These are your sandbox credentials from the [Przelewy24 sandbox panel](https://sandbox.przelewy24.pl/panel):
+
+| Field | Description |
+|-------|-------------|
+| **Merchant ID** | Your sandbox merchant identifier |
+| **Shop ID / POS ID** | Your sandbox POS identifier. Leave empty if same as Merchant ID |
+| **CRC Key** | The sandbox CRC key |
+| **API Key** | The sandbox API / Report Key |
+
+<Callout type="info" title="Sandbox Registration">
+You need a separate account on `sandbox.przelewy24.pl` for testing. It is not the same as your production account. Register at the sandbox panel to get test credentials.
+</Callout>
+
+</Tab>
+</Tabs>
+
+### Finding Your Credentials in the P24 Panel
+
+<Steps>
+<Step>
+### Log in to the Przelewy24 Panel
+
+Go to [panel.przelewy24.pl](https://panel.przelewy24.pl) (production) or [sandbox.przelewy24.pl/panel](https://sandbox.przelewy24.pl/panel) (sandbox).
+</Step>
+
+<Step>
+### Navigate to My Data > API Configuration
+
+Your **Merchant ID** is displayed at the top of the dashboard. The **CRC Key** and **API Key** (Report Key) are found under the API configuration section.
+</Step>
+
+<Step>
+### Copy Credentials to FluentCart
+
+Paste each value into the corresponding field in FluentCart's Przelewy24 settings. Save the settings — the plugin will test the API connection and confirm if the credentials are valid.
+</Step>
+</Steps>
+
+### Connection Verification
+
+When you save the settings, the plugin automatically calls the Przelewy24 `testAccess` API endpoint. If the connection succeeds, you will see:
+
+> Przelewy24 connection verified!
+
+If it fails, you will see the specific error from the API. Common causes:
+
+- Incorrect API Key or CRC Key
+- Using sandbox credentials with FluentCart in live mode (or vice versa)
+- Merchant account not fully activated on the P24 side
+
+<Separator className="my-8" />
+
+## Store Mode
+
+<Callout type="warn" title="FluentCart Controls the Mode">
+The sandbox/live mode is controlled by FluentCart's global **Store Mode** setting, not by a toggle inside the Przelewy24 configuration. The plugin reads `order_mode` from FluentCart's store settings and uses the corresponding credential set.
+
+If FluentCart is in **Test** mode, the plugin uses your sandbox credentials and connects to `sandbox.przelewy24.pl`. In **Live** mode, it uses your production credentials and connects to `secure.przelewy24.pl`.
+</Callout>
+
+## Payment Channels
+
+Payment channels control which payment methods are offered to your customers. Each channel is a toggle that maps to a Przelewy24 channel bitmask flag:
+
+| Channel | Bitmask | Default | Description |
+|---------|---------|---------|-------------|
+| **Credit/debit cards** | 1 | Enabled | Visa, Mastercard, Apple Pay, Google Pay |
+| **Online transfers** | 2 | Enabled | Fast bank transfers (mTransfer, iPKO, Pekao24, etc.) |
+| **Traditional transfer** | 4 | Disabled | Manual bank wire with provided payment details |
+| **BLIK** | 8192 | Enabled | Mobile payment via 6-digit code |
+| **24/7 payments** | 16 | Disabled | Restricts to methods available around the clock |
+| **Installments** | 128 | Disabled | Pay-later installment options |
+| **Wallets** | 256 | Enabled | PayPal, SkyCash, and other digital wallets |
+
+The plugin combines the enabled channels into a single bitmask integer and sends it with each transaction registration. If no channels are explicitly enabled, the plugin defaults to bitmask `63` (all basic channels).
+
+<Callout type="info" title="Installments Agreement">
+The installments channel requires a separate agreement with Przelewy24. Contact your P24 account manager to enable installment payments on your merchant account before enabling this channel.
+</Callout>
+
+## Payment Time Limit
+
+The **Payment time limit** setting controls how long a customer has to complete their payment on the Przelewy24 page before the session expires. Available options:
+
+- No limit (0)
+- 5 minutes
+- 10 minutes
+- **15 minutes** (default)
+- 30 minutes
+- 60 minutes
+
+This value is sent as `timeLimit` in the transaction registration request.
+
+## Card Recurring Payments
+
+The **Card recurring payments** toggle enables subscription billing via card-on-file. When enabled:
+
+- The subscription module registers with FluentCart
+- Initial subscription payments force the `cards` channel (bitmask `1`) so Przelewy24 tokenizes the card
+- After successful payment, the plugin fetches and stores the card reference ID (`refId`) for future charges
+
+When disabled, the subscription module is not loaded, and FluentCart won't offer recurring billing through Przelewy24.
+
+<Callout type="warn" title="Recurring Requires P24 Agreement">
+Card recurring payments require a separate agreement with Przelewy24 for card-on-file transactions. Contact your P24 account manager to enable this feature on your merchant account.
+</Callout>
+
+<Separator className="my-8" />
+
+## Webhook URL (IPN)
+
+The plugin automatically sends the webhook URL with every transaction registration. The URL follows this format:
+
+```
+https://yoursite.com/?fluent-cart=fct_payment_listener_ipn&method=przelewy24
+```
+
+This URL is generated by FluentCart's `PaymentHelper` class and sent as the `urlStatus` parameter. You do **not** need to configure this URL manually in the Przelewy24 panel — the plugin includes it in every API call.
+
+The webhook URL is displayed in the Przelewy24 settings panel in FluentCart for your reference.
+
+<Callout type="info" title="No Manual IPN Configuration">
+Unlike some payment gateways, FCHub Przelewy24 does not require you to set a global IPN URL in the Przelewy24 merchant panel. The URL is sent per-transaction, so the gateway always knows where to send notifications.
+</Callout>
+
+## Hardcoding Credentials via wp-config.php
+
+For security or deployment automation, you can define credentials as PHP constants in your `wp-config.php` file. When constants are defined, they take priority over database-stored values.
+
+<Tabs items={['Live Constants', 'Sandbox Constants']}>
+<Tab value="Live Constants">
+
+```php title="wp-config.php"
+define('FCHUB_P24_LIVE_MERCHANT_ID', '123456');
+define('FCHUB_P24_LIVE_SHOP_ID', '123456');
+define('FCHUB_P24_LIVE_CRC_KEY', 'your-live-crc-key');
+define('FCHUB_P24_LIVE_API_KEY', 'your-live-api-key');
+```
+
+</Tab>
+<Tab value="Sandbox Constants">
+
+```php title="wp-config.php"
+define('FCHUB_P24_TEST_MERCHANT_ID', '123456');
+define('FCHUB_P24_TEST_SHOP_ID', '123456');
+define('FCHUB_P24_TEST_CRC_KEY', 'your-test-crc-key');
+define('FCHUB_P24_TEST_API_KEY', 'your-test-api-key');
+```
+
+</Tab>
+</Tabs>
+
+<Accordions type="single">
+<Accordion title="How Constant Priority Works">
+
+The settings class checks for constants first. For example, the Merchant ID resolution logic:
+
+1. Check if `FCHUB_P24_LIVE_MERCHANT_ID` (or `FCHUB_P24_TEST_MERCHANT_ID` in test mode) is defined
+2. If defined, use the constant value
+3. If not defined, use the value stored in FluentCart's settings database
+
+This applies to all four credential fields for both live and test modes. The Shop ID has an additional fallback — if not set, it defaults to the Merchant ID value.
+
+</Accordion>
+<Accordion title="When to Use Constants">
+
+Using `wp-config.php` constants is recommended when:
+
+- You manage multiple environments (staging, production) with different credentials
+- You use deployment tools that inject environment-specific configuration
+- You want to keep sensitive API keys out of the database
+- Your team uses version-controlled `wp-config.php` templates with environment variables
+
+```php title="wp-config.php (environment variable example)"
+define('FCHUB_P24_LIVE_MERCHANT_ID', getenv('P24_MERCHANT_ID'));
+define('FCHUB_P24_LIVE_CRC_KEY', getenv('P24_CRC_KEY'));
+define('FCHUB_P24_LIVE_API_KEY', getenv('P24_API_KEY'));
+```
+
+</Accordion>
+</Accordions>
+
+## Full Constants Reference
+
+| Constant | Mode | Credential |
+|----------|------|------------|
+| `FCHUB_P24_LIVE_MERCHANT_ID` | Live | Merchant ID |
+| `FCHUB_P24_LIVE_SHOP_ID` | Live | Shop ID / POS ID |
+| `FCHUB_P24_LIVE_CRC_KEY` | Live | CRC Key |
+| `FCHUB_P24_LIVE_API_KEY` | Live | API Key |
+| `FCHUB_P24_TEST_MERCHANT_ID` | Test | Merchant ID |
+| `FCHUB_P24_TEST_SHOP_ID` | Test | Shop ID / POS ID |
+| `FCHUB_P24_TEST_CRC_KEY` | Test | CRC Key |
+| `FCHUB_P24_TEST_API_KEY` | Test | API Key |
+
+## Next Steps
+
+<Cards>
+  <Card title="Payments" href="/docs/fchub-p24/payments">
+    Learn how one-time payments, IPN verification, and refunds work.
+  </Card>
+  <Card title="Subscriptions" href="/docs/fchub-p24/subscriptions">
+    Set up recurring billing with card-on-file payments.
+  </Card>
+</Cards>

@@ -1,0 +1,89 @@
+---
+title: Changelog
+description: Version history for FCHub Fakturownia. All notable changes, new features, and fixes.
+---
+
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+All notable changes to FCHub Fakturownia are documented here.
+
+<Separator className="my-8" />
+
+## v1.0.0 <Badge variant="default" className="ml-2">Latest</Badge>
+
+Initial release of FCHub Fakturownia.
+
+### Features
+
+<div className="space-y-4 mt-4">
+
+**Automatic Invoice Creation**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Invoices created automatically in Fakturownia when FluentCart orders are paid
+- Support for VAT, proforma, and bill (rachunek) invoice types
+- B2B invoices with NIP (tax ID) and B2C consumer invoices
+- Polish VAT rate detection and normalization (0%, 5%, 8%, 23%, exempt)
+- Price conversion from FluentCart cents to Fakturownia decimal format
+- Configurable invoice language (Polish, English, German, French, bilingual PL/EN)
+- Payment type mapping from FluentCart gateways to Fakturownia values
+- Duplicate invoice prevention
+</div>
+
+**KSeF 2.0 Integration**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Automatic invoice submission to Poland's national e-invoicing system
+- Asynchronous KSeF status polling via WordPress cron
+- KSeF ID and verification link storage on orders
+- KSeF status display in admin order view
+</div>
+
+**Correction Invoices**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Automatic correction invoice creation on order refund
+- Correction invoices linked to original invoice in Fakturownia
+- KSeF submission for correction invoices when auto-send is enabled
+- Duplicate correction prevention
+</div>
+
+**NIP at Checkout**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- "I want a company invoice" toggle at FluentCart checkout
+- NIP input field with show/hide behavior
+- Polish NIP checksum validation
+- MutationObserver-based initialization for FluentCart's dynamic rendering
+</div>
+
+**Configuration**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Full integration with FluentCart's settings panel
+- API connection testing and validation on save
+- wp-config.php constant overrides for domain, API token, and department ID
+- Configurable invoice type, payment method, language, KSeF, and NIP settings
+</div>
+
+**Admin Experience**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Invoice information displayed on order receipt in FluentCart admin
+- Invoice number with direct link to Fakturownia
+- PDF download link
+- KSeF status with color-coded labels
+- Correction invoice details
+- Clickable integration card on FluentCart integrations page
+- Order log entries for all invoice operations
+</div>
+
+**Clean Uninstall**
+
+<div className="pl-4 border-l-2 border-fd-border space-y-2">
+- Cron jobs cleared on deactivation
+- All plugin options and order metadata removed on deletion
+</div>
+
+</div>

@@ -1,0 +1,174 @@
+---
+title: Limitations + Q&A
+description: Honest limitations. Real answers. No marketing fluff. Yes, you can self-host. No, you shouldn't.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Upload, Zap, Webhook, MessageSquare, Shield } from 'lucide-react';
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
+
+## Limitations (Honest Section)
+
+Here's what fchub-stream doesn't do. These aren't bugs. These are **design decisions** I made to keep the plugin simple and maintainable. Scope creep is how plugins die. I've seen it happen. I'm avoiding it.
+
+- **One provider at a time** - Can't use both Cloudflare and Bunny.net simultaneously. Pick one. Switch later if needed. I could add dual-provider support. I won't. It's complicated. Not worth it.
+- **No batch upload UI** - Upload one video at a time. Batch uploads coming eventually. Maybe. Depends on demand and my motivation levels. GitHub issues help.
+- **No built-in video editor** - This uploads and embeds video. Trimming/editing happens before upload or in provider dashboard. I'm not building a video editor. That's a different product. Use DaVinci Resolve or whatever.
+- **Subtitles require provider** - Closed captions work if your provider supports them. Configure in provider dashboard. I don't handle subtitles. That's their job.
+- **FluentCommunity only** - Doesn't work with other WordPress community plugins. Built specifically for FluentCommunity. I use FluentCommunity. I built this for me. You can use it too if you use FluentCommunity.
+
+<Callout>
+These aren't bugs. These are **design decisions** that keep the plugin simple and maintainable. Scope creep is how plugins die. I've seen it happen. I'm avoiding it.
+</Callout>
+
+<Separator className="my-8" />
+
+## How This Compares to Presto Player
+
+People ask about Presto Player. It's a good plugin. For different things. Let me explain.
+
+**Presto Player** is excellent if you're:
+- Creating course content (LMS integration, chapters, progress tracking)
+- An admin uploading videos yourself (you control everything)
+- Building a course platform (LearnDash integration, private videos)
+- Wanting advanced player features (focus mode, analytics, customization)
+
+**fchub-stream** is better if you're:
+- Running a community where **users upload videos** (not just admins)
+- Wanting users to upload without YouTube accounts (no external dependencies)
+- Using FluentCommunity (built specifically for it)
+- Needing direct uploads to streaming CDN (no server storage headaches)
+
+### The Key Difference
+
+Presto Player = **Admin uploads videos**. Users watch them. Great for courses. Not great for community members who want to share their own videos.
+
+fchub-stream = **Community members upload videos**. Direct to streaming provider. No YouTube account needed. No server storage. Just works.
+
+### When to Use What
+
+**Use Presto Player if:**
+- You're a course creator uploading your own content
+- You need LMS integration and progress tracking
+- You want advanced player features (chapters, focus mode, analytics)
+- You're okay with users needing YouTube/Vimeo accounts or hosting videos yourself
+
+**Use fchub-stream if:**
+- You're running a FluentCommunity site
+- Community members need to upload videos themselves
+- You want direct uploads without YouTube/Vimeo accounts
+- You want videos on streaming CDN (not your server)
+
+### The Honest Truth
+
+Presto Player is a better **player**. More features. More customization. More integrations. It's $79-399/year and worth it if you're building courses.
+
+fchub-stream is a better **upload solution** for communities. Simpler. Focused. Built for FluentCommunity. Free and open source (GPLv2). You pay your streaming provider (Cloudflare or Bunny.net), not me.
+
+They solve different problems. Presto Player solves "how do I make my videos look professional?" fchub-stream solves "how do I let my community upload videos without YouTube accounts?"
+
+If you're building courses, use Presto Player. If you're running a community, use fchub-stream. Or use both. I don't care. They don't conflict.
+
+<Separator className="my-8" />
+
+## Next Steps
+
+Ready to ditch WordPress media library for video? Here's where to start:
+
+<Cards>
+  <Card
+    href="/docs/fchub-stream/quick-start"
+    title="Quick Start Guide"
+  >
+    Get video uploads working in 5 minutes. Maybe 10 if you've never set up API credentials. I've timed it. It's accurate.
+  </Card>
+  <Card
+    href="/docs/fchub-stream/installation/requirements"
+    title="Requirements"
+  >
+    What you need before installing. Spoiler: not much. FluentCommunity and a streaming provider account. That's it.
+  </Card>
+  <Card
+    href="/docs/fchub-stream/configuration/cloudflare-stream"
+    title="Configure Cloudflare"
+  >
+    Step-by-step Cloudflare Stream setup. API tokens, account IDs, the works. I wrote this guide. It's accurate. Mostly.
+  </Card>
+  <Card
+    href="/docs/fchub-stream/configuration/bunny-net"
+    title="Configure Bunny.net"
+  >
+    Step-by-step Bunny.net setup. Library creation, API keys, hostnames explained. Same deal. Accurate. Mostly.
+  </Card>
+</Cards>
+
+<Separator className="my-8" />
+
+## Questions Nobody Asks But Should
+
+### "Why not just use YouTube embeds?"
+
+You can. Then your community becomes a YouTube middleman. Free marketing for Google. How generous.
+
+YouTube embeds = users need accounts, clicks go to YouTube, analytics go to YouTube, content goes to YouTube. You get a video player and the satisfaction of promoting someone else's platform.
+
+fchub-stream = your platform, your videos, your analytics, your users don't leave. Math checks out. I built it this way because YouTube embeds are lazy. This isn't lazy.
+
+### "Is this expensive?"
+
+Depends on video volume. Typical costs:
+
+**Small community** (50 videos/month, 1000 views):
+- Cloudflare: ~$5-10/month
+- Bunny.net: ~$3-8/month
+
+**Medium community** (200 videos/month, 5000 views):
+- Cloudflare: ~$30-50/month
+- Bunny.net: ~$20-40/month
+
+Compare to:
+- Hosting storage overages: $20-100/month (I've seen it)
+- Server CPU overload: priceless (and annoying)
+- Your time manually converting videos: also priceless (and annoying)
+
+I don't control provider pricing. I just use their APIs. Check their dashboards for exact costs.
+
+### "What happens if I switch providers?"
+
+Old videos stay on old provider. They still work. New uploads go to new provider. You run a mixed setup until you migrate or delete old content.
+
+Automated migration tool? Doesn't exist yet. Manual re-upload is the current solution. Not ideal. Building it eventually. Maybe. Depends on coffee levels and GitHub issue activity. Open an issue if you need it. I'll prioritize based on demand.
+
+### "Can I self-host video streaming?"
+
+Technically? Yes. Practically? Unless you enjoy pain.
+
+Self-hosted video streaming needs:
+- Transcoding infrastructure (FFmpeg clusters, fun times)
+- CDN or edge caching (global distribution isn't cheap)
+- Storage that scales (your hosting plan doesn't)
+- Adaptive bitrate encoding (complex)
+- Mobile optimization (painful)
+- Constant maintenance (weekends? gone)
+
+Or: Pay Cloudflare $5/month. They handle everything. You keep your sanity and weekends.
+
+I tried self-hosting once. It didn't go well. That's why I use Cloudflare/Bunny. Your call.
+
+<Separator className="my-8" />
+
+<div className="mt-8 mb-8 p-6 pb-2 pt-2 bg-fd-card border border-fd-border rounded-lg">
+
+**Ready to start?**
+
+[Get Started →](/docs/fchub-stream/quick-start)
+
+Or jump straight to:
+- [Cloudflare Stream Setup](/docs/fchub-stream/configuration/cloudflare-stream)
+- [Bunny.net Setup](/docs/fchub-stream/configuration/bunny-net)
+- [Installation Guide](/docs/fchub-stream/installation/setup)
+
+</div>

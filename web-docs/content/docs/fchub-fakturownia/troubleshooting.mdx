@@ -1,0 +1,205 @@
+---
+title: Troubleshooting
+description: Common issues with FCHub Fakturownia and how to resolve them. Covers API connection problems, missing invoices, KSeF failures, NIP field issues, and VAT rate errors.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+This page covers the most common issues you might encounter with FCHub Fakturownia and how to resolve them.
+
+## Invoice Not Created
+
+<Accordions>
+  <Accordion title="Check API Credentials">
+    The most common cause is invalid or missing API credentials.
+
+    **Steps to verify:**
+    1. Go to **FluentCart > Settings > Integrations > Fakturownia**
+    2. Confirm your domain and API token are entered correctly
+    3. Click **Save Settings** -- this triggers an automatic connection test
+    4. If the connection fails, double-check your API token in Fakturownia: **Settings > Account Settings > Integration > API Authorization Code**
+
+    If you're using `wp-config.php` constants, make sure the constant values are correct and the constants are defined before WordPress loads.
+  </Accordion>
+  <Accordion title="Check the Integration Status">
+    The Fakturownia integration must show as "enabled" in FluentCart for invoices to be created.
+
+    The integration status (`status` field) is set to `true` only when both the domain and API token are provided **and** the API connection test passes. If your credentials are correct but the Fakturownia API was temporarily down when you saved, the status may be `false`.
+
+    **Fix:** Simply re-save the settings when Fakturownia's API is available.
+  </Accordion>
+  <Accordion title="Check the Event Trigger">
+    The plugin creates invoices on the `order_paid_done` event. If payment processing doesn't trigger this event, no invoice will be created.
+
+    **Verify:** Check the FluentCart order logs for any entries from "Fakturownia". If there are no log entries at all, the event may not be firing.
+  </Accordion>
+  <Accordion title="Duplicate Invoice Prevention">
+    If an invoice was already created for the order (the `_fakturownia_invoice_id` meta exists), the plugin won't create another one. This is by design to prevent duplicates.
+
+    **Check:** Look at the order metadata for `_fakturownia_invoice_id`. If it exists, an invoice was already created. If the invoice was created incorrectly and you need to recreate it, you'll need to remove this meta key from the order.
+  </Accordion>
+  <Accordion title="Check Order Logs">
+    Every invoice creation attempt (successful or failed) is logged on the FluentCart order with the source "Fakturownia".
+
+    **Common error messages in logs:**
+    - *"Invoice already exists for this order"* -- duplicate prevention kicked in
+    - *"buyer_tax_no: is invalid"* -- the NIP number failed Fakturownia's validation
+    - *"Unknown error"* -- the API returned an unexpected response
+    - Connection error messages from `wp_remote_get`/`wp_remote_post`
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## KSeF Submission Issues
+
+<Accordions>
+  <Accordion title="KSeF Status Stuck on 'Processing'">
+    The plugin polls Fakturownia for KSeF status updates via WordPress cron. If the status remains "Processing" for an extended period, check:
+
+    1. **WordPress cron is running** -- visit your site or set up a system cron:
+       ```bash
+       */2 * * * * curl -s https://yoursite.com/wp-cron.php > /dev/null 2>&1
+       ```
+    2. **Fakturownia KSeF connection** -- log in to Fakturownia and check if the invoice shows a KSeF status there. The issue may be on Fakturownia's side.
+    3. **KSeF service availability** -- the KSeF platform may be experiencing downtime. Check the [Ministry of Finance KSeF status page](https://www.podatki.gov.pl/ksef/).
+  </Accordion>
+  <Accordion title="KSeF Status Shows 'send_error'">
+    This means KSeF rejected the invoice. The error messages from KSeF are logged on the order.
+
+    **Common causes:**
+    - Invalid buyer data (missing required fields like address or postal code)
+    - Invalid NIP format or checksum
+    - Invoice data doesn't meet KSeF schema requirements
+    - Phone number exceeds the 16-character KSeF limit (the plugin truncates automatically, but very long prefixed numbers could still cause issues)
+
+    **Fix:** Check the error log on the order, fix the underlying data issue, and create a new invoice in Fakturownia manually if needed.
+  </Accordion>
+  <Accordion title="KSeF Status Shows 'Not Connected'">
+    Your Fakturownia account is not connected to KSeF.
+
+    **Fix:** Log in to Fakturownia and complete the KSeF connection setup. This involves authorizing Fakturownia to submit invoices to KSeF on your behalf, typically using an electronic signature or trusted profile (profil zaufany).
+  </Accordion>
+  <Accordion title="No KSeF Status at All">
+    If no KSeF status appears on the order:
+
+    1. Make sure **KSeF Auto Send** is set to **Yes** in the plugin settings
+    2. Check that the invoice was created successfully (look for `_fakturownia_invoice_id` in order meta)
+    3. Verify the cron event was scheduled -- the plugin uses `wp_schedule_single_event` with the hook `fchub_fakturownia_check_ksef_status`
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## NIP Field Issues
+
+<Accordions>
+  <Accordion title="NIP Field Not Showing at Checkout">
+    **Check the setting:** Go to **FluentCart > Settings > Integrations > Fakturownia** and make sure **Checkout NIP Field** is set to **Yes**.
+
+    **JavaScript conflicts:** The NIP toggle uses a `MutationObserver` to detect when FluentCart renders the checkout form. JavaScript errors from other plugins or themes could prevent this from initializing.
+
+    **Debug steps:**
+    1. Open browser developer tools (F12)
+    2. Check the Console tab for JavaScript errors
+    3. Look for the `billing_wants_company_invoice` element in the DOM -- if it exists but the toggle doesn't work, there's a JS conflict
+    4. Try disabling other plugins temporarily to isolate the conflict
+  </Accordion>
+  <Accordion title="NIP Field Shows but Toggle Doesn't Work">
+    If the checkbox and NIP field are both visible but checking/unchecking the box doesn't show/hide the NIP field:
+
+    1. The toggle script may not have initialized -- check for JS errors in the browser console
+    2. Another plugin may be interfering with the checkbox's `change` event
+    3. The `[data-nip-field]` wrapper attribute may be missing from the DOM
+
+    **Quick test:** In the browser console, run:
+    ```javascript
+    document.getElementById('billing_wants_company_invoice')
+    ```
+    If this returns `null`, FluentCart hasn't rendered the field yet or the field schema didn't register.
+  </Accordion>
+  <Accordion title="NIP Not Saved with Order">
+    If the NIP is entered at checkout but doesn't appear on the invoice:
+
+    1. Check the order's billing address metadata in FluentCart -- look for `other_data.nip` and `other_data.wants_company_invoice`
+    2. Make sure the checkout form is submitting the `billing_nip` and `billing_wants_company_invoice` values
+    3. FluentCart needs to pass these values through to the order address metadata -- this depends on FluentCart's form handling
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## VAT Rate Issues
+
+<Accordions>
+  <Accordion title="Wrong VAT Rate on Invoice">
+    The plugin calculates VAT rates from FluentCart's order item tax data. If the rate on the invoice is wrong:
+
+    1. **Check FluentCart tax settings** -- the tax rate in FluentCart must match Polish VAT rates (0%, 5%, 8%, or 23%)
+    2. **Rate normalization** -- the plugin maps calculated rates to the nearest standard rate. A 22% tax in FluentCart will map to 23% on the invoice.
+    3. **Exempt items** -- items with zero tax amount are marked as `zw` (exempt). If an item should have a VAT rate but shows as exempt, check that tax is configured correctly in FluentCart.
+  </Accordion>
+  <Accordion title="All Items Show 23% VAT">
+    If every item defaults to 23%, it likely means the tax calculation is returning zero for the subtotal, making the rate calculation impossible. The plugin defaults to 23% when it can't determine the rate.
+
+    **Check:** Verify that FluentCart is correctly calculating and storing `tax_amount` and `subtotal` for each order item.
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## API Connection Issues
+
+<Accordions>
+  <Accordion title="Connection Timeout">
+    The plugin uses a 30-second timeout for API requests. If Fakturownia's API is slow:
+
+    - Check your server's outbound HTTPS connectivity
+    - Verify that your hosting provider doesn't block outbound connections to `fakturownia.pl`
+    - Check if a firewall or security plugin is blocking the request
+  </Accordion>
+  <Accordion title="SSL Certificate Errors">
+    If you see SSL-related errors in the order logs, your server may have outdated CA certificates.
+
+    **Fix:** Update your server's CA certificate bundle. On most hosts, this is handled automatically. Contact your hosting provider if you're unsure.
+  </Accordion>
+  <Accordion title="HTTP 401 or 403 Errors">
+    These indicate authentication or authorization problems:
+
+    - **401** -- your API token is invalid or expired. Generate a new one in Fakturownia.
+    - **403** -- your Fakturownia plan may not include API access, or the token doesn't have the required permissions.
+  </Accordion>
+  <Accordion title="HTTP 422 Validation Errors">
+    Fakturownia returns 422 when the invoice data fails validation. The specific field errors are logged on the order.
+
+    **Common validation errors:**
+    - Missing required buyer fields
+    - Invalid tax number format
+    - Invalid department ID
+    - Empty positions (no line items)
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Debug Tips
+
+<Callout type="info" title="Where to Look">
+The best starting point for any issue is the **FluentCart order logs**. Every action the plugin takes is logged with the source "Fakturownia". Failed operations include the specific error message from the API.
+</Callout>
+
+**General debugging steps:**
+
+1. **Check order logs** -- FluentCart order detail page, look for "Fakturownia" entries
+2. **Check order metadata** -- look for `_fakturownia_*` meta keys on the order
+3. **Verify API connection** -- re-save Fakturownia settings to trigger a connection test
+4. **Check WordPress error log** -- `wp-content/debug.log` if `WP_DEBUG_LOG` is enabled
+5. **Test API manually** -- use the Fakturownia API test endpoint to verify your credentials work outside of WordPress
+
+If you need to [report an issue](https://github.com/vcode-sh/fchub-plugins/issues), include:
+- The FluentCart order log entries
+- Your WordPress and PHP versions
+- Whether you're using `wp-config.php` constants
+- Any relevant error messages from the browser console or server logs

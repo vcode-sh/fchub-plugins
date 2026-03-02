@@ -1,0 +1,286 @@
+---
+title: Invoice Generation
+description: How FCHub Fakturownia creates invoices from FluentCart orders, maps buyer data, handles B2B and B2C invoices, calculates VAT rates, and processes correction invoices on refund.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Fakturownia automatically creates invoices in Fakturownia when FluentCart orders are paid. This page covers the complete invoice creation flow, data mapping, VAT rate handling, and correction invoices.
+
+## Invoice Creation Flow
+
+The end-to-end process from payment to invoice:
+
+<Steps>
+  <Step>
+    ### Order Payment Confirmed
+
+    FluentCart fires the `order_paid_done` event when a payment is successfully processed. This is the trigger for the Fakturownia integration.
+  </Step>
+  <Step>
+    ### Duplicate Check
+
+    Before creating anything, the plugin checks if an invoice already exists for this order by looking for the `_fakturownia_invoice_id` meta key. If it finds one, the process stops. This prevents duplicate invoices if the event fires more than once.
+  </Step>
+  <Step>
+    ### Data Mapping
+
+    The `InvoiceHandler` maps the FluentCart order data into Fakturownia's invoice format. This includes buyer information, line items, VAT rates, payment method, and seller department.
+  </Step>
+  <Step>
+    ### API Request
+
+    The mapped data is sent to Fakturownia's `/invoices.json` endpoint. If KSeF auto-send is enabled, the `gov_save_and_send` flag is included to trigger simultaneous KSeF submission.
+  </Step>
+  <Step>
+    ### Metadata Storage
+
+    On success, the plugin stores the invoice ID, invoice number, invoice URL, client ID, and (if applicable) KSeF status as order metadata. All of this is visible in the FluentCart admin.
+  </Step>
+  <Step>
+    ### Order Log Entry
+
+    A log entry is added to the order: *"Fakturownia: Invoice created -- Invoice [number] created in Fakturownia (ID: [id])"*. If the creation fails, an error log is recorded instead.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## B2B vs B2C Invoices
+
+The plugin automatically determines whether to create a business (B2B) or consumer (B2C) invoice based on the checkout data.
+
+<Tabs items={['B2B Invoice', 'B2C Invoice']}>
+  <Tab value="B2B Invoice">
+    A B2B invoice is created when the customer checks "I want a company invoice" at checkout **and** provides a valid NIP (tax ID).
+
+    **Buyer data on the invoice:**
+    - `buyer_company` is set to `true`
+    - `buyer_tax_no` contains the NIP
+    - `buyer_name` uses the company name from the billing address, or falls back to the customer's full name
+
+    B2B invoices are the standard for Polish inter-company transactions. The NIP on the invoice allows both parties to use it for VAT deductions.
+  </Tab>
+  <Tab value="B2C Invoice">
+    A B2C invoice is created when no NIP is provided (or the "company invoice" toggle is not checked).
+
+    **Buyer data on the invoice:**
+    - `buyer_company` is set to `false`
+    - `buyer_first_name` and `buyer_last_name` are populated from the billing address or customer profile
+    - If only a single name field is available (no separate first/last), the plugin splits it at the first space
+
+    If neither first name nor last name can be determined, a dash (`-`) is used as a fallback to satisfy Fakturownia's required field validation.
+  </Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## Data Mapping Reference
+
+Here's exactly how FluentCart order data maps to Fakturownia invoice fields.
+
+### Invoice Header
+
+| Fakturownia Field | Source | Notes |
+|---|---|---|
+| `kind` | Settings: Invoice Type | `vat`, `proforma`, or `bill` |
+| `payment_type` | Order payment method or Settings fallback | See payment type mapping below |
+| `lang` | Settings: Invoice Language | `pl`, `en`, `de`, `fr`, `pl/en` |
+| `status` | Hardcoded | Always `paid` |
+| `paid_date` | Current date | `Y-m-d` format |
+| `oid` | Order invoice number | Falls back to `FC-{order_id}` |
+| `oid_unique` | Hardcoded | Always `yes` (prevents duplicates in Fakturownia) |
+| `department_id` | Settings: Department ID | If set, seller data is pulled from this department |
+| `seller_name` | WordPress site name | Only used if no department ID is configured |
+
+### Buyer Information
+
+| Fakturownia Field | Source |
+|---|---|
+| `buyer_company` | `true` if NIP provided, `false` otherwise |
+| `buyer_tax_no` | NIP from billing address meta |
+| `buyer_name` | Company name (B2B) |
+| `buyer_first_name` | First name (B2C) |
+| `buyer_last_name` | Last name (B2C) |
+| `buyer_street` | Address line 1 + line 2 |
+| `buyer_city` | Billing city |
+| `buyer_post_code` | Billing postcode |
+| `buyer_country` | Billing country code |
+| `buyer_email` | Customer email |
+| `buyer_phone` | Phone from billing meta (truncated to 16 chars for KSeF) |
+
+### Line Items (Positions)
+
+Each order item becomes a position on the invoice:
+
+| Fakturownia Field | Source | Notes |
+|---|---|---|
+| `name` | Item title | Truncated to 256 characters |
+| `quantity` | Item quantity | Integer value |
+| `quantity_unit` | Hardcoded | `szt` (Polish for "pieces") |
+| `total_price_gross` | Item line total | Converted from cents to decimal |
+| `tax` | Calculated from item tax data | Mapped to standard Polish VAT rate |
+
+If the order has shipping charges, a separate line item is added for shipping with its own VAT rate.
+
+<Separator className="my-8" />
+
+## Polish VAT Rates
+
+The plugin calculates the VAT rate for each line item from the order's tax data and maps it to the closest standard Polish rate.
+
+### Calculation
+
+For each order item:
+1. The tax amount and subtotal are extracted
+2. The effective rate is calculated: `(tax_amount / subtotal) * 100`
+3. The result is rounded and mapped to the nearest standard rate
+
+### Standard Rates
+
+| Rate | Description |
+|---|---|
+| **23%** | Standard rate. Applied to most goods and services. |
+| **8%** | Reduced rate. Applied to certain food products, construction services, etc. |
+| **5%** | Reduced rate. Applied to basic food products, books, periodicals. |
+| **0%** | Zero rate. Applied to intra-EU supplies and certain exports. |
+| **zw** | Exempt (zwolniony). Applied when the item has zero tax and zero tax amount. |
+
+If the tax amount is zero, the item is marked as exempt (`zw`). If a rate cannot be determined, the default is 23%.
+
+<Callout type="info" title="Rate Normalization">
+The plugin maps calculated rates to the nearest standard Polish rate. For example, if the effective rate calculates to 22.8% or 23.2%, it will be normalized to 23%. This handles rounding differences between FluentCart's tax calculation and Polish standard rates.
+</Callout>
+
+<Separator className="my-8" />
+
+## Price Conversion
+
+FluentCart stores prices in **cents** (integer values). Fakturownia expects prices in **decimal** format. The plugin converts automatically:
+
+```
+FluentCart: 9900 (cents) → Fakturownia: 99.00 (decimal)
+FluentCart: 1550 (cents) → Fakturownia: 15.50 (decimal)
+```
+
+The conversion uses `round($cents / 100, 2)` to ensure precision to two decimal places.
+
+<Separator className="my-8" />
+
+## Payment Type Mapping
+
+The plugin maps FluentCart payment gateway slugs to Fakturownia payment type values. If the order's payment method matches a known gateway, the mapped value is used. Otherwise, the default from settings is applied.
+
+### Default Mapping
+
+| FluentCart Gateway | Fakturownia Payment Type |
+|---|---|
+| `przelewy24` | `transfer` |
+| `stripe` | `card` |
+| `paypal` | `paypal` |
+| `bacs` | `transfer` |
+| `cod` | `cash` |
+
+### Custom Mapping
+
+You can customize the mapping using the `fchub_fakturownia/payment_type_map` filter:
+
+```php title="functions.php or custom plugin"
+add_filter('fchub_fakturownia/payment_type_map', function ($map) {
+    // Add a custom gateway mapping
+    $map['my_custom_gateway'] = 'transfer';
+
+    // Override an existing mapping
+    $map['stripe'] = 'transfer';
+
+    return $map;
+});
+```
+
+<Separator className="my-8" />
+
+## Correction Invoices (Refunds)
+
+When an order is fully refunded, the plugin automatically creates a correction invoice in Fakturownia.
+
+### Correction Flow
+
+<Steps>
+  <Step>
+    ### Refund Triggered
+
+    FluentCart fires the `order_fully_refunded` event or the integration's revoke hook. The `RefundHandler` takes over.
+  </Step>
+  <Step>
+    ### Original Invoice Check
+
+    The handler checks for `_fakturownia_invoice_id` on the order. If no original invoice exists, a warning log is added and the process stops -- you can't correct an invoice that doesn't exist.
+  </Step>
+  <Step>
+    ### Duplicate Prevention
+
+    The handler checks for `_fakturownia_correction_id`. If a correction already exists, the process stops to prevent duplicate corrections.
+  </Step>
+  <Step>
+    ### Correction Created
+
+    A correction invoice is created via the `/invoices.json` endpoint with `kind: correction` and a reference to the original invoice ID. The reason is set to "Refund -- Order #[order_number]".
+  </Step>
+  <Step>
+    ### KSeF Submission (If Enabled)
+
+    If KSeF auto-send is active, the correction invoice is also submitted to KSeF using Fakturownia's `send_to_ksef` API endpoint. The correction KSeF status is stored separately.
+  </Step>
+  <Step>
+    ### Metadata and Log
+
+    The correction invoice ID and number are stored as order metadata. A log entry is added: *"Fakturownia: Correction invoice created -- Correction [number] created for invoice [original_number]"*.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Admin Order View
+
+When an order has a Fakturownia invoice, the plugin displays invoice information in the FluentCart admin order receipt view. This section appears below the standard order details and includes:
+
+<Accordions>
+  <Accordion title="Invoice Information">
+    - **Invoice number** -- displayed as a clickable link to the invoice in Fakturownia
+    - **PDF link** -- a direct link to download the invoice PDF from Fakturownia
+  </Accordion>
+  <Accordion title="KSeF Status">
+    If KSeF submission was attempted, the current status is shown with a color-coded label:
+
+    | Status | Color | Meaning |
+    |---|---|---|
+    | Sent | Green | Successfully submitted and accepted by KSeF |
+    | Processing... | Yellow | Submitted to KSeF, waiting for confirmation |
+    | Error | Red | KSeF submission failed |
+    | Server Error | Red | KSeF service error |
+    | N/A | Gray | Not applicable |
+    | Not Connected | Gray | Fakturownia not connected to KSeF |
+
+    When a KSeF ID is available, it's displayed alongside the status. If a verification link is available, a "Verify" link is shown.
+  </Accordion>
+  <Accordion title="Correction Invoice">
+    If a correction invoice exists for the order, its number is displayed below the original invoice information.
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Error Handling
+
+Invoice creation can fail for several reasons. The plugin handles errors gracefully:
+
+- **API connection failure** -- logged as an error on the order. The invoice can be retried by re-triggering the payment event.
+- **Validation errors** -- Fakturownia returns field-level validation errors. These are formatted into a readable string and logged on the order (e.g., "buyer_tax_no: is invalid").
+- **Duplicate invoice** -- if an invoice already exists for the order, the creation is silently skipped with an error return.
+
+All errors are recorded in the FluentCart order logs with the source "Fakturownia" for easy filtering.

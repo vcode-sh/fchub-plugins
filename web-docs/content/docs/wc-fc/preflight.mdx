@@ -1,0 +1,188 @@
+---
+title: Preflight Checks
+description: Validate your environment before migration. The preflight system checks WooCommerce, FluentCart, PHP memory, WC Subscriptions availability, and existing FluentCart data.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Before migrating any data, the preflight system validates your environment to catch problems early. Run preflight checks every time before starting a migration — even if you have run them before.
+
+## What Gets Checked
+
+The `PreflightCheck` validator runs five checks:
+
+<Accordions>
+  <Accordion title="WooCommerce (required)">
+    Verifies that WooCommerce is active and reports its version. This check must pass for the migration to proceed.
+
+    **Passes when:** The `WooCommerce` class exists and WooCommerce is loaded.
+
+    **Fails when:** WooCommerce is deactivated or not installed. You will see: *"WooCommerce is not active. Please activate it before migrating."*
+  </Accordion>
+  <Accordion title="FluentCart (required)">
+    Verifies that FluentCart is active by checking for the `FLUENTCART_PLUGIN_PATH` constant. Reports the FluentCart version.
+
+    **Passes when:** FluentCart is active and its constants are defined.
+
+    **Fails when:** FluentCart is deactivated or not installed. You will see: *"FluentCart is not active. Please activate it before migrating."*
+  </Accordion>
+  <Accordion title="WC Subscriptions (optional)">
+    Checks whether WooCommerce Subscriptions is active. This check always passes — it is informational only.
+
+    **When active:** Reports the WCS version and confirms subscription migration will be available.
+
+    **When not active:** Reports that subscription migration will be skipped. You can still migrate products, customers, orders, and coupons without it.
+  </Accordion>
+  <Accordion title="PHP Memory">
+    Checks your PHP memory limit against the recommended minimum of 256 MB.
+
+    **Passes when:** Memory limit is 256 MB or higher, or is set to `-1` (unlimited).
+
+    **Fails when:** Memory limit is below 256 MB. The migration may still work — batch processing uses only 50 records at a time — but large stores with complex products may need more memory.
+  </Accordion>
+  <Accordion title="Existing FluentCart Data">
+    Counts existing records in FluentCart tables (products, customers, orders, subscriptions, coupons). This check always passes but warns you if FluentCart already contains data.
+
+    **No data:** *"FluentCart database is empty. Ready for clean migration."*
+
+    **Has data:** *"FluentCart already contains data. Migration will add new records alongside existing ones."* The migrator does not overwrite existing FluentCart records. If a product with the same SKU exists, the SKU gets a `-wc{id}` suffix to ensure uniqueness.
+  </Accordion>
+</Accordions>
+
+<Callout type="info" title="Ready status">
+The preflight result includes a `ready` flag. It is `true` only when both the WooCommerce and FluentCart checks pass. PHP memory and existing data are advisory — they will not block the migration.
+</Callout>
+
+<Separator className="my-8" />
+
+## Running Preflight via REST API
+
+<Tabs items={['Preflight', 'Entity Counts']}>
+  <Tab value="Preflight">
+    ```bash title="GET /wc-fc/v1/preflight"
+    curl -X GET "https://yoursite.com/wp-json/wc-fc/v1/preflight" \
+      -H "X-WP-Nonce: YOUR_NONCE" \
+      -b "wordpress_logged_in_COOKIE=VALUE"
+    ```
+
+    **Response:**
+
+    ```json
+    {
+      "checks": {
+        "woocommerce": {
+          "label": "WooCommerce",
+          "pass": true,
+          "version": "9.5.1",
+          "message": "WooCommerce 9.5.1 is active."
+        },
+        "fluentcart": {
+          "label": "FluentCart",
+          "pass": true,
+          "version": "1.0.0",
+          "message": "FluentCart 1.0.0 is active."
+        },
+        "wc_subscriptions": {
+          "label": "WooCommerce Subscriptions",
+          "pass": true,
+          "optional": true,
+          "active": true,
+          "version": "6.9.0",
+          "message": "WC Subscriptions 6.9.0 detected. Subscription migration will be available."
+        },
+        "php_memory": {
+          "label": "PHP Memory",
+          "pass": true,
+          "value": "512M",
+          "message": "PHP memory limit is 512M (recommended: 256M+)."
+        },
+        "fc_data": {
+          "label": "Existing FluentCart Data",
+          "pass": true,
+          "warning": false,
+          "counts": {
+            "products": 0,
+            "customers": 0,
+            "orders": 0,
+            "subscriptions": 0,
+            "coupons": 0
+          },
+          "message": "FluentCart database is empty. Ready for clean migration."
+        }
+      },
+      "ready": true
+    }
+    ```
+  </Tab>
+  <Tab value="Entity Counts">
+    ```bash title="GET /wc-fc/v1/counts"
+    curl -X GET "https://yoursite.com/wp-json/wc-fc/v1/counts" \
+      -H "X-WP-Nonce: YOUR_NONCE" \
+      -b "wordpress_logged_in_COOKIE=VALUE"
+    ```
+
+    **Response:**
+
+    ```json
+    {
+      "products": 142,
+      "categories": 12,
+      "customers": 856,
+      "orders": 3241,
+      "subscriptions": 94,
+      "coupons": 27
+    }
+    ```
+
+    The counts endpoint tells you exactly how many records will be migrated for each entity type:
+
+    - **Products** — Simple and variable products (publish, draft, private statuses)
+    - **Categories** — Product categories excluding "Uncategorized"
+    - **Customers** — Registered customer users plus unique guest emails from orders
+    - **Orders** — All orders with any status
+    - **Subscriptions** — All WC Subscriptions (returns 0 if WC Subscriptions is not active)
+    - **Coupons** — Published and draft coupons
+  </Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## Interpreting Results
+
+### All checks pass
+
+If `ready` is `true` and no warnings appear, you are good to proceed with the migration. Review the entity counts to understand the scope of your migration.
+
+### Required check fails
+
+If WooCommerce or FluentCart fails, the `ready` flag will be `false`. Activate the missing plugin and run preflight again. Do not attempt to start a migration when `ready` is `false`.
+
+### PHP memory warning
+
+If your memory limit is below 256 MB, consider increasing it before migrating a large store. For smaller stores (under 1,000 total records), 128 MB is usually fine. The batch size of 50 records helps keep peak memory usage manageable.
+
+To increase PHP memory, add this to your `wp-config.php`:
+
+```php
+define('WP_MEMORY_LIMIT', '512M');
+```
+
+Or set it in your PHP configuration (`php.ini`):
+
+```ini
+memory_limit = 512M
+```
+
+### Existing FluentCart data warning
+
+If FluentCart already has data, the migration will add new records alongside it. Duplicate SKUs get a suffix to maintain uniqueness. Customers with the same email address are detected and linked rather than duplicated.
+
+If you want a clean migration, consider removing existing FluentCart data first — or use the [rollback feature](/docs/wc-fc/rollback) after migration if the results are not what you expected.
+
+## Next Steps
+
+Once all preflight checks pass and you have reviewed entity counts, proceed to the [Migration Guide](/docs/wc-fc/migration-guide) to start your migration.

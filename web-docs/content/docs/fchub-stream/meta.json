@@ -1,0 +1,20 @@
+{
+  "title": "FCHub Stream",
+  "root": true,
+  "description": "Direct video uploads for FluentCommunity.",
+  "pages": [
+    "---Introduction---",
+    "index",
+    "how-it-works",
+    "benefits",
+    "limitations",
+    "quick-start",
+    "---Setup---",
+    "installation",
+    "configuration",
+    "---Other---",
+    "troubleshooting",
+    "roadmap",
+    "changelog"
+  ]
+}

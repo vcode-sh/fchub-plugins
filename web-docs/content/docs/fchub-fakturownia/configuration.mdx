@@ -1,0 +1,221 @@
+---
+title: Configuration
+description: Connect your Fakturownia account and configure invoice settings, KSeF auto-send, NIP checkout fields, and wp-config.php overrides.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+All settings for FCHub Fakturownia are managed through FluentCart's integration settings panel. You can also override the core credentials using `wp-config.php` constants for environments where you don't want secrets stored in the database.
+
+## Settings Location
+
+Navigate to: **FluentCart > Settings > Integrations > Fakturownia**
+
+Or go directly to:
+```
+/wp-admin/admin.php?page=fluent-cart#/integrations/fakturownia
+```
+
+<Separator className="my-8" />
+
+## Connection Settings
+
+These are the required fields to connect your Fakturownia account.
+
+### Fakturownia Domain
+
+Your Fakturownia subdomain. If your Fakturownia URL is `https://mojafirma.fakturownia.pl`, enter `mojafirma`.
+
+You can also enter the full domain (e.g., `mojafirma.fakturownia.pl`). The plugin handles both formats -- if a dot is detected, it uses the value as-is. If there's no dot, it appends `.fakturownia.pl` automatically.
+
+| Field | Example |
+|---|---|
+| Subdomain only | `mojafirma` |
+| Full domain | `mojafirma.fakturownia.pl` |
+
+### API Token
+
+Your Fakturownia API authorization token. This is used to authenticate all API requests.
+
+<Steps>
+  <Step>
+    ### Find Your API Token in Fakturownia
+
+    Log in to your Fakturownia account and go to:
+
+    **Settings > Account Settings > Integration > API Authorization Code**
+
+    Copy the API token displayed there. If you don't see one, you may need to generate a new token.
+  </Step>
+</Steps>
+
+<Callout type="warn" title="Keep Your API Token Secure">
+The API token provides full access to your Fakturownia account's invoicing capabilities. Do not share it publicly. If you need to restrict access in production, consider using the `wp-config.php` constant approach described below.
+</Callout>
+
+### Department ID
+
+The Fakturownia department ID is optional but recommended. When set, the plugin pulls seller information (company name, address, bank account, tax ID) from the specified department in Fakturownia.
+
+To find your department ID:
+
+1. Go to **Settings > Company/Department** in Fakturownia
+2. Click on the department you want to use
+3. The department ID is visible in the URL: `https://app.fakturownia.pl/departments/XXXXX`
+
+If no department ID is provided, the plugin falls back to using your WordPress site name as the seller name.
+
+<Separator className="my-8" />
+
+## Invoice Settings
+
+These settings control how invoices are generated.
+
+### Invoice Type (Kind)
+
+The type of document to create in Fakturownia.
+
+| Value | Description |
+|---|---|
+| **VAT** | Standard VAT invoice (faktura VAT). The default and most common choice for Polish businesses. |
+| **Proforma** | Proforma invoice. Useful if you need a preliminary invoice before payment is confirmed. |
+| **Bill (Rachunek)** | A simplified bill. Used in specific cases where a full VAT invoice is not required. |
+
+### Payment Type
+
+The payment method shown on the invoice. This is the **default** value. The plugin also supports automatic mapping from FluentCart payment gateways -- see the [payment type mapping](/docs/fchub-fakturownia/invoices#payment-type-mapping) section.
+
+| Value | Description |
+|---|---|
+| **Bank Transfer** | `transfer` -- the default. |
+| **Card** | `card` |
+| **Cash** | `cash` |
+| **PayPal** | `paypal` |
+
+### Invoice Language
+
+The language used for invoice labels, headers, and text.
+
+| Value | Description |
+|---|---|
+| **Polski** | `pl` -- Polish. The default. |
+| **English** | `en` |
+| **Deutsch** | `de` -- German. |
+| **Francais** | `fr` -- French. |
+| **Polski / English** | `pl/en` -- Bilingual Polish/English invoice. |
+
+<Separator className="my-8" />
+
+## KSeF Auto Send
+
+When enabled, every invoice created through the plugin is automatically submitted to KSeF (Krajowy System e-Faktur) via Fakturownia's built-in KSeF integration.
+
+| Value | Behavior |
+|---|---|
+| **No** | Invoices are created in Fakturownia but not submitted to KSeF. Default. |
+| **Yes** | Invoices are created and simultaneously submitted to KSeF. A background cron job polls for the KSeF status. |
+
+<Callout type="info" title="KSeF Requirements">
+To use KSeF auto-send, your Fakturownia account must be connected to KSeF. This is configured within Fakturownia itself, not in the plugin. See the [KSeF integration guide](/docs/fchub-fakturownia/ksef) for details.
+</Callout>
+
+<Separator className="my-8" />
+
+## Checkout NIP Field
+
+Controls whether the "I want a company invoice" checkbox appears at checkout.
+
+| Value | Behavior |
+|---|---|
+| **Yes** | A checkbox and NIP field are added to the FluentCart checkout. Default. |
+| **No** | No NIP field at checkout. All invoices will be B2C (consumer) invoices. |
+
+When enabled, customers see a "I want a company invoice" checkbox during checkout. Checking it reveals a NIP (tax ID) input field. The NIP is stored with the order and used to create a B2B invoice with the customer's company details.
+
+See the [NIP at Checkout](/docs/fchub-fakturownia/checkout-nip) page for full details on how this works.
+
+<Separator className="my-8" />
+
+## wp-config.php Constants
+
+For production environments, staging/production parity, or CI/CD workflows, you can define the core credentials as PHP constants in your `wp-config.php` file. These constants **override** any values stored in the database.
+
+```php title="wp-config.php"
+// Fakturownia domain (subdomain or full domain)
+define('FCHUB_FAKTUROWNIA_DOMAIN', 'mojafirma');
+
+// Fakturownia API authorization token
+define('FCHUB_FAKTUROWNIA_API_TOKEN', 'your-api-token-here');
+
+// Department ID (optional)
+define('FCHUB_FAKTUROWNIA_DEPARTMENT_ID', '12345');
+```
+
+<Callout type="info" title="Override Priority">
+When a `wp-config.php` constant is defined and non-empty, it takes precedence over the value saved in the FluentCart integration settings. The settings UI will still show the database value, but the plugin will use the constant at runtime.
+</Callout>
+
+This approach is recommended if you:
+
+- Use different credentials for staging and production environments
+- Want to keep API tokens out of the database for security
+- Deploy with environment-specific configuration files
+- Use a secrets manager that populates `wp-config.php`
+
+<Separator className="my-8" />
+
+## Saving and Validating
+
+When you click **Save Settings** in the FluentCart integration panel, the plugin automatically validates your API connection by making a test request to Fakturownia. If the connection is successful, the integration status is set to active and you'll see a confirmation message.
+
+If the API test fails, your settings are still saved, but the integration status remains inactive. You'll see an error message indicating what went wrong -- typically an invalid domain or API token.
+
+<Callout type="warn" title="Connection Validation">
+The plugin validates your credentials every time you save settings. If Fakturownia's API is temporarily unavailable when you save, the status may show as disconnected even if your credentials are correct. Simply save again when the API is back.
+</Callout>
+
+<Separator className="my-8" />
+
+## Complete Settings Reference
+
+<Accordions>
+  <Accordion title="All Configuration Fields">
+    | Field | Type | Default | Description |
+    |---|---|---|---|
+    | Domain | Text | *(empty)* | Fakturownia subdomain or full domain |
+    | API Token | Password | *(empty)* | API authorization token from Fakturownia |
+    | Department ID | Text | *(empty)* | Fakturownia department ID for seller data |
+    | Invoice Type | Select | `vat` | Invoice kind: vat, proforma, or bill |
+    | Payment Type | Select | `transfer` | Default payment method on invoices |
+    | Invoice Language | Select | `pl` | Language for invoice labels |
+    | KSeF Auto Send | Select | `no` | Auto-submit invoices to KSeF |
+    | Checkout NIP Field | Select | `yes` | Show NIP toggle at checkout |
+  </Accordion>
+  <Accordion title="wp-config.php Constants">
+    | Constant | Overrides |
+    |---|---|
+    | `FCHUB_FAKTUROWNIA_DOMAIN` | Domain field |
+    | `FCHUB_FAKTUROWNIA_API_TOKEN` | API Token field |
+    | `FCHUB_FAKTUROWNIA_DEPARTMENT_ID` | Department ID field |
+  </Accordion>
+  <Accordion title="Order Metadata Keys">
+    These meta keys are stored on FluentCart orders by the plugin:
+
+    | Meta Key | Description |
+    |---|---|
+    | `_fakturownia_invoice_id` | Fakturownia invoice ID |
+    | `_fakturownia_invoice_number` | Human-readable invoice number |
+    | `_fakturownia_invoice_url` | Direct URL to invoice in Fakturownia |
+    | `_fakturownia_client_id` | Fakturownia client ID |
+    | `_fakturownia_ksef_status` | KSeF submission status |
+    | `_fakturownia_ksef_id` | KSeF invoice number |
+    | `_fakturownia_ksef_link` | KSeF verification link |
+    | `_fakturownia_correction_id` | Correction invoice ID |
+    | `_fakturownia_correction_number` | Correction invoice number |
+    | `_fakturownia_correction_ksef_status` | Correction KSeF status |
+  </Accordion>
+</Accordions>

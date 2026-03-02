@@ -1,0 +1,235 @@
+---
+title: Requirements
+description: Server prerequisites for FCHub Stream. PHP 8.3+ is mandatory. WordPress media library's limitations are not our problem.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Before you install FCHub Stream, verify your environment meets these prerequisites. Most are standard. One isn't negotiable.
+
+## WordPress Core
+
+**Minimum:** WordPress 6.7+
+
+Tested on WordPress 6.7. Might work on earlier versions. Won't test. Life's too short. If you're still on WordPress 5.x in 2025, video uploads are the least of your concerns.
+
+<Callout type="info">
+Running WordPress 6.5 or older? Update WordPress first. Then come back. This plugin isn't designed for legacy environments.
+</Callout>
+
+<Separator className="my-8" />
+
+## PHP Version (Non-Negotiable)
+
+**Required:** PHP 8.3 or higher
+
+Not PHP 7.4. Not PHP 8.0. Not PHP 8.2. **PHP 8.3+**.
+
+Modern PHP features enable clean code. Typed properties. Enums. Match expressions. The kind of stuff that makes video upload security actually work instead of pretending to work.
+
+<Callout type="warn" title="PHP 8.3+ Required">
+If your WordPress is running PHP 7.x, it's time to upgrade anyway. FCHub Stream won't install on outdated PHP. This is a feature, not a bug. Security matters.
+</Callout>
+
+**Why PHP 8.3?**
+- Better type safety (so your API credentials don't leak)
+- Improved error handling (fewer cryptic failures)
+- Performance improvements (faster API calls to streaming providers)
+- Enum support (cleaner provider switching)
+- Readonly properties (config values that can't get accidentally overwritten)
+
+Your host stuck on PHP 7.4? Find a better host. It's 2025. Running outdated PHP is how sites get compromised.
+
+<Separator className="my-8" />
+
+## FluentCommunity
+
+**Required:** FluentCommunity plugin installed and active
+
+FCHub Stream is built exclusively for FluentCommunity. Not BuddyPress. Not bbPress. Not generic WordPress forums. **FluentCommunity only.**
+
+If FluentCommunity isn't installed, FCHub Stream won't activate. Plugin dependency checks exist for a reason.
+
+**Where to get it:**
+- [FluentCommunity on WordPress.org](https://wordpress.org/plugins/fluent-community/)
+- [FluentCommunity official site](https://fluentcommunity.co/)
+
+Install FluentCommunity first. Configure it. Get your community working. Then add video uploads.
+
+<Separator className="my-8" />
+
+## Streaming Provider Account
+
+Pick **one** streaming provider. Both work. Neither is perfect. Both cost money. Video streaming isn't free. Physics still applies.
+
+### Cloudflare Stream
+
+<div className="p-6 pt-2 pb-2 bg-muted/50 border-1 border-fd-border rounded-lg my-4">
+
+**What you need:**
+- Cloudflare account with billing enabled
+- Stream product activated
+- API token with Stream permissions
+- Account ID (found in Cloudflare dashboard)
+- Customer subdomain (assigned when you enable Stream)
+
+**Pricing (as of 2025):**
+- $5 per 1,000 minutes stored
+- $1 per 1,000 minutes delivered
+
+**Good if:**
+- You're already using Cloudflare
+- You value webhook reliability
+- You want global CDN by default
+
+[Cloudflare Stream Setup Guide →](/docs/fchub-stream/configuration/cloudflare-stream)
+
+</div>
+
+### Bunny.net Stream
+
+<div className="p-6 pt-2 pb-2 bg-muted/50 border-1 border-fd-border rounded-lg my-4">
+
+**What you need:**
+- Bunny.net account with billing configured
+- Stream library created
+- Account API key
+- Library ID (numeric identifier for your stream library)
+- Hostname (usually `video.bunnycdn.com` or custom domain)
+
+**Pricing (as of 2025):**
+- $0.01 per GB stored ($10 per TB)
+- $0.005 per GB delivered ($5 per TB for high-volume)
+- Regional pricing varies: $0.01/GB (EU/NA) to $0.06/GB (Africa/ME)
+
+Generally cheaper for most communities. Do your own math.
+
+**Good if:**
+- You want lower costs
+- You're not already invested in Cloudflare
+- You prefer simpler API setup
+
+[Bunny.net Setup Guide →](/docs/fchub-stream/configuration/bunny-net)
+
+</div>
+
+<Callout>
+Can't decide? Start with Bunny.net. It's cheaper for most use cases. You can switch providers later if needed. The plugin stores configuration for both separately.
+</Callout>
+
+<Separator className="my-8" />
+
+## SSL/HTTPS (Mandatory)
+
+Your WordPress site **must** use HTTPS. Webhooks require SSL. Secure uploads require SSL. It's 2025. HTTP-only sites shouldn't exist.
+
+**Check your site:**
+- Does your WordPress URL start with `https://`? Good.
+- Does it start with `http://`? Fix that before installing.
+
+Most hosting provides free SSL via Let's Encrypt. If yours doesn't, that's a red flag about your host.
+
+<Callout type="warn">
+Webhooks won't work on HTTP-only sites. Status polling will work, but you'll wait longer for video processing updates. Just use HTTPS.
+</Callout>
+
+<Separator className="my-8" />
+
+## What You Don't Need
+
+WordPress media library wasn't built for video in 2025. FCHub Stream bypasses it entirely. Here's what you don't need:
+
+- **Extra storage space** — Videos live on streaming CDN, not your WordPress server
+- **Special PHP extensions** — No FFmpeg, no GD Library video modules, no ImageMagick video codecs
+- **Server-side transcoding tools** — Your streaming provider handles all video processing
+- **Video encoding knowledge** — Users upload MP4/MOV/WebM/AVI, provider transcodes automatically
+- **Patience for manual video conversion** — That's the provider's job now
+- **Tolerance for WordPress upload limits** — Uploads bypass PHP entirely
+
+Your WordPress server only stores:
+- Plugin settings (encrypted in database)
+- Video metadata (title, user, timestamp, provider reference)
+- Processing status (ready/encoding/failed)
+
+Total database footprint per video: approximately 1KB. Your hosting will survive.
+
+<Separator className="my-8" />
+
+## Server Capabilities (Standard Stuff)
+
+Nothing exotic. Standard WordPress hosting requirements apply.
+
+**Your server needs to:**
+- Make outbound HTTPS requests (to streaming provider APIs)
+- Store plugin settings in MySQL database
+- Serve WordPress admin interface (for FCHub Stream settings)
+- Handle REST API endpoints (for portal integration)
+
+**Your server does NOT need to:**
+- Upload video files (uploads go directly from user browser to streaming CDN)
+- Process video (transcoding happens on streaming provider infrastructure)
+- Store video files (they live on CDN, not your server)
+- Serve video streams (CDN handles delivery)
+
+FCHub Stream is designed to minimize server load. Videos bypass WordPress entirely during upload. No temporary files. No PHP upload limits. No server storage concerns.
+
+<Separator className="my-8" />
+
+## Pre-Installation Checklist
+
+Before proceeding to installation, verify:
+
+<div className="not-prose my-6 space-y-4">
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="shrink-0">1</Badge>
+    <span className="text-sm"><strong>WordPress 6.7+</strong> installed and running</span>
+  </div>
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="shrink-0">2</Badge>
+    <span className="text-sm"><strong>PHP 8.3+</strong> confirmed (check in WordPress Admin → Site Health)</span>
+  </div>
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="shrink-0">3</Badge>
+    <span className="text-sm"><strong>FluentCommunity</strong> plugin installed and active</span>
+  </div>
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="shrink-0">4</Badge>
+    <span className="text-sm"><strong>Streaming provider account</strong> created (Cloudflare Stream OR Bunny.net)</span>
+  </div>
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="shrink-0">5</Badge>
+    <span className="text-sm"><strong>API credentials</strong> ready (API token for Cloudflare, or API key + Library ID for Bunny.net)</span>
+  </div>
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="shrink-0">6</Badge>
+    <span className="text-sm"><strong>HTTPS enabled</strong> on your WordPress site (webhooks require SSL)</span>
+  </div>
+</div>
+
+<Separator className="my-8" />
+
+## Common Environment Issues
+
+### "My host only supports PHP 7.4"
+
+Find a new host. It's 2025. PHP 7.4 reached end-of-life in November 2022. Running unsupported PHP is a security risk. Good hosts offer PHP 8.3+ as standard.
+
+### "Do I need to upgrade FluentCommunity to Pro?"
+
+No. FCHub Stream works with FluentCommunity free version. Streaming provider costs apply (Cloudflare or Bunny.net), but FluentCommunity Pro isn't required.
+
+### "Can I use my existing WordPress media library for some videos?"
+
+You can still use WordPress media library for images and other files. FCHub Stream only handles **video** uploads. Everything else works normally.
+
+### "My site runs on shared hosting. Will this work?"
+
+Yes, if your shared hosting meets PHP 8.3+ requirement and allows outbound HTTPS requests (most do). Videos upload directly to streaming CDN, so server load is minimal.
+
+### "Does this work with WordPress multisite?"
+
+Not tested. Probably works. No guarantees. If you try it on multisite and it explodes, that's on you.
+
+<Separator className="my-8" />

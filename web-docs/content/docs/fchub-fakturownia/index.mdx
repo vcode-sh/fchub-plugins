@@ -1,0 +1,133 @@
+---
+title: FCHub Fakturownia
+description: Fakturownia invoice integration with KSeF 2.0 support for FluentCart. Automatic invoicing on payment, correction invoices on refund, and direct submission to Poland's national e-invoicing system.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Fakturownia connects your FluentCart store to [Fakturownia](https://fakturownia.pl) -- Poland's popular online invoicing platform. When a customer pays for an order, the plugin automatically creates a proper invoice in Fakturownia and optionally submits it to KSeF, Poland's national e-invoicing system.
+
+No manual invoice creation. No copy-pasting order data. No worrying about tax compliance deadlines.
+
+## Why This Plugin Exists
+
+If you sell to Polish customers, you need proper invoices. Polish tax law requires VAT invoices for B2B transactions and makes them available on request for B2C sales. Starting with KSeF 2.0, structured e-invoices are becoming the standard for doing business in Poland.
+
+FCHub Fakturownia handles this for you. Every paid order automatically gets a Fakturownia invoice. If a customer provides their NIP (Polish tax ID) at checkout, they get a proper B2B invoice with their company details. If they don't, they get a B2C invoice. Refunds generate correction invoices automatically.
+
+The entire flow is hands-off once configured.
+
+<Separator className="my-8" />
+
+## Feature Overview
+
+<Cards>
+  <Card title="Automatic Invoicing">
+    Invoices are created in Fakturownia the moment an order is marked as paid. No manual steps, no delays. Each invoice includes full buyer details, line items, proper VAT rates, and payment information.
+  </Card>
+  <Card title="KSeF 2.0 Submission">
+    Optionally submit invoices directly to Poland's national e-invoicing system (Krajowy System e-Faktur). The plugin handles the entire flow: creation, submission, status polling, and KSeF ID storage.
+  </Card>
+  <Card title="Correction Invoices">
+    When you refund an order, a correction invoice is automatically created in Fakturownia. If KSeF auto-send is enabled, the correction is submitted to KSeF as well. Duplicate prevention is built in.
+  </Card>
+  <Card title="NIP at Checkout">
+    A "I want a company invoice" toggle appears on the FluentCart checkout. When a customer checks it, a NIP field appears. The NIP is validated using the official Polish checksum algorithm before submission.
+  </Card>
+  <Card title="B2B and B2C Support">
+    The plugin automatically distinguishes between business and consumer invoices based on whether a NIP was provided. B2B invoices include the company name and tax ID. B2C invoices use the customer's personal name.
+  </Card>
+  <Card title="Polish VAT Rates">
+    Line items are mapped to standard Polish VAT rates (0%, 5%, 8%, 23%, or exempt). The plugin calculates the rate from order item tax data and maps it to the closest standard rate.
+  </Card>
+</Cards>
+
+<Separator className="my-8" />
+
+## How It Works
+
+Here's the high-level flow from order to invoice:
+
+<Steps>
+  <Step>
+    ### Customer Completes Checkout
+
+    The customer places an order in your FluentCart store. If they want a company invoice, they check the "I want a company invoice" box and enter their NIP.
+  </Step>
+  <Step>
+    ### Payment Confirmed
+
+    FluentCart processes the payment and fires the `order_paid_done` event. This is the trigger that starts the invoicing process.
+  </Step>
+  <Step>
+    ### Invoice Created in Fakturownia
+
+    The plugin maps the order data (buyer info, line items, VAT rates, payment method) to Fakturownia's invoice format and sends it via the API. The invoice is created with a "paid" status.
+  </Step>
+  <Step>
+    ### KSeF Submission (Optional)
+
+    If KSeF auto-send is enabled, the invoice is submitted to Poland's e-invoicing system at the same time. A background cron job polls Fakturownia for the KSeF status and stores the KSeF ID once confirmed.
+  </Step>
+  <Step>
+    ### Invoice Data Stored on Order
+
+    The invoice number, PDF link, and KSeF status are stored as order metadata. This information is visible in the FluentCart admin order view.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Integration with Fakturownia
+
+The plugin communicates with Fakturownia through their [REST API](https://app.fakturownia.pl/api). All invoice operations -- creation, correction, KSeF submission, status checking, and PDF retrieval -- go through this API.
+
+You'll need:
+- A Fakturownia account (any plan that includes API access)
+- An API authorization token
+- Optionally, a department ID if you want seller data pulled from a specific department
+
+The plugin uses WordPress HTTP API (`wp_remote_get` / `wp_remote_post`) for all requests, so it works with any hosting environment that supports outbound HTTPS connections.
+
+<Separator className="my-8" />
+
+## Requirements
+
+<Callout type="info" title="System Requirements">
+Before installing FCHub Fakturownia, make sure your environment meets these requirements.
+</Callout>
+
+| Requirement | Minimum Version |
+|---|---|
+| WordPress | 6.0+ |
+| PHP | 7.4+ |
+| FluentCart | Latest version |
+| Fakturownia Account | Any plan with API access |
+
+<Callout type="warn" title="FluentCart Required">
+FCHub Fakturownia is a FluentCart integration plugin. It requires FluentCart to be installed and active. Without FluentCart, the plugin will display an admin notice and remain inactive.
+</Callout>
+
+<Separator className="my-8" />
+
+## What's Next
+
+<Cards>
+  <Card title="Installation" href="/docs/fchub-fakturownia/installation">
+    Download, install, and activate the plugin.
+  </Card>
+  <Card title="Configuration" href="/docs/fchub-fakturownia/configuration">
+    Connect your Fakturownia account and configure invoice settings.
+  </Card>
+  <Card title="Invoice Generation" href="/docs/fchub-fakturownia/invoices">
+    Learn how invoices are created and what data is mapped.
+  </Card>
+  <Card title="KSeF 2.0" href="/docs/fchub-fakturownia/ksef">
+    Understand the KSeF submission flow and status tracking.
+  </Card>
+</Cards>

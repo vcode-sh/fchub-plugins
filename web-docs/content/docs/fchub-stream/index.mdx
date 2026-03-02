@@ -1,0 +1,340 @@
+---
+title: What is FCHub Stream?
+description: Direct video uploads for FluentCommunity. Cloudflare Stream or Bunny.net. No YouTube detours. No WordPress media library gymnastics.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Upload, Zap, Webhook, MessageSquare, Shield } from 'lucide-react';
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
+
+WordPress media library wasn't built for video in 2025. You know it. I know it. Your users uploading 2GB files definitely know it.
+
+FCHub Stream fixes this. Users upload videos directly to streaming CDNs (Cloudflare Stream or Bunny.net). Videos get transcoded, optimized, and embedded automatically. You configure it once. It works. Forever. Or until WordPress breaks something unrelated again.
+
+<img
+  src="https://files.vcode.sh/fchub/plugins/stream/fchub-stream-cover.webp"
+  alt="FCHub Stream in action - video upload interface"
+  width="1200"
+  height="675"
+  style={{ aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px', marginTop: '2rem', marginBottom: '2rem' }}
+/>
+
+## Why This Exists
+
+Since FluentCommunity launched, the [official roadmap](https://community.wpmanageninja.com/fluentcommunity-roadmp/#/all-ideas/) has been flooded with requests for direct video upload. Not YouTube embeds. Not Vimeo links. **Direct video upload.**
+
+Here's the problem: it's 2025. [82% of internet traffic is video](https://www.synthesia.io/post/video-statistics). [User-generated video gets 4x higher engagement](https://www.keevee.com/user-generated-content-statistics) than anything else. Communities without video upload are like restaurants without WiFi in 2025. Technically functional. Practically embarrassing.
+
+But FluentCommunity's current solution? Upload your video to YouTube first. Copy the link. Paste it into your community post. Hope your users have YouTube accounts. Hope they don't mind the extra steps. Hope nobody questions why they're promoting Google instead of your community.
+
+Convenient for exactly nobody.
+
+WPManageNinja (the FluentCommunity developers) didn't have time to build this. Fair. They're busy. So I built it instead. Direct uploads to Cloudflare Stream or Bunny.net. No YouTube detour. No media library gymnastics. No manual video conversion.
+
+And that's how FCHub Stream exists.
+
+<Callout type="warn" title="The YouTube Detour Tax">
+Your users shouldn't need a YouTube account to participate in **your** community. They shouldn't upload to Google's platform to share on yours. FCHub Stream fixes this. Direct uploads. Your streaming provider. Your community stays yours.
+</Callout>
+
+## What It Does
+
+<Cards>
+  <Card
+    title="Direct Video Upload"
+  >
+    Users upload videos via your FluentCommunity straight to Cloudflare Stream or Bunny.net. No WordPress server bottleneck. No storage limits.
+  </Card>
+  <Card
+    title="Automatic Transcoding"
+  >
+    Your streaming provider handles all video processing. Multiple formats. Multiple resolutions. Adaptive bitrate streaming. You don't touch any of it.
+  </Card>
+  <Card
+    title="Seamless Embedding"
+  >
+    Videos embed automatically in FluentCommunity posts and comments. Responsive player. Mobile-friendly. Works on desktop. No manual embed codes.
+  </Card>
+  <Card
+    title="Two Providers. Zero Regrets."
+  >
+    Choose Cloudflare Stream or Bunny.net. Both work. Switch between them if needed. One provider at a time (because complications are for enterprise software).
+  </Card>
+</Cards>
+
+## Feature Highlights
+
+<Accordions type="single">
+<Accordion title="Direct Upload to Streaming CDN" icon={<Upload className="size-4" />}>
+
+Videos go straight from user's browser to your streaming provider. WordPress server never touches the file. No PHP upload limits. No temporary file drama.
+
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+  <div>
+    <a href="https://www.cloudflare.com/products/cloudflare-stream/" target="_blank" rel="noopener noreferrer">
+      <img
+        src="/stream/cf-stream.webp"
+        alt="Cloudflare Stream direct upload interface"
+        width="1200"
+        height="675"
+        loading="lazy"
+        style={{ aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px', marginBottom: '0.5rem' }}
+      />
+    </a>
+    <div style={{ textAlign: 'center', fontSize: '0.875rem', color: 'var(--fd-muted-foreground)' }}>
+      <a href="https://www.cloudflare.com/products/cloudflare-stream/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+        Cloudflare Stream
+      </a>
+    </div>
+  </div>
+  <div>
+    <a href="https://bunny.net/stream/" target="_blank" rel="noopener noreferrer">
+      <img
+        src="/stream/bunny-stream.webp"
+        alt="Bunny.net Stream direct upload interface"
+        width="1200"
+        height="675"
+        loading="lazy"
+        style={{ aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px', marginBottom: '0.5rem' }}
+      />
+    </a>
+    <div style={{ textAlign: 'center', fontSize: '0.875rem', color: 'var(--fd-muted-foreground)' }}>
+      <a href="https://bunny.net/stream/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+        Bunny.net Stream
+      </a>
+    </div>
+  </div>
+</div>
+
+**Supported formats:**
+
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem', marginBottom: '1rem' }}>
+  <Badge variant="secondary">MP4 (H.264, H.265)</Badge>
+  <Badge variant="secondary">MOV</Badge>
+  <Badge variant="secondary">WebM</Badge>
+  <Badge variant="secondary">AVI</Badge>
+</div>
+
+**Default file size limit:** 500MB (configurable up to provider limits)
+
+Your streaming provider transcodes everything to web-optimized formats. Users upload whatever they have. Provider handles the rest.
+
+</Accordion>
+
+<Accordion title="Automatic Video Processing" icon={<Zap className="size-4" />}>
+
+Once uploaded, your streaming provider:
+
+- Transcodes to multiple resolutions (4K, 1080p, 720p, 480p, 360p, 240p)
+- Generates adaptive bitrate streams
+- Creates video thumbnails
+- Enables seek previews
+- Handles mobile/desktop optimization
+
+You configure it once. It works forever. Or until your provider has API downtime. But that's their problem.
+
+</Accordion>
+
+<Accordion title="Webhook Integration" icon={<Webhook className="size-4" />}>
+
+FCHub Stream listens for webhook callbacks from your streaming provider. When video processing completes:
+
+- Video status updates automatically
+- Player embeds refresh with ready-to-stream content
+- Users get notified (if notifications enabled)
+- No manual "check if video is ready" polling
+
+<Callout>
+Webhooks require SSL/HTTPS on your site. Most hosting has this by default. If yours doesn't, fix that first. It's 2025.
+</Callout>
+
+</Accordion>
+
+<Accordion title={<>Video in Posts AND Comments <Badge>New</Badge></>} icon={<MessageSquare className="size-4" />}>
+
+Users can upload videos in:
+
+- **Posts** - Standard feed posts with video content
+- **Comments** - Reply with video instead of just text
+
+Admins control where video uploads are allowed. Enable for posts only, or allow comments too. Your community, your rules.
+
+<ImageZoom
+  src="/stream/stream-settings.webp"
+  alt="Video in FluentCommunity post with comments showing video replies"
+  width={1200}
+  height={1200}
+  style={{ aspectRatio: '1/1', objectFit: 'cover', borderRadius: '8px', marginTop: '1.5rem', marginBottom: '1.5rem' }}
+/>
+
+</Accordion>
+
+<Accordion title="Security Built In" icon={<Shield className="size-4" />}>
+
+- **CSRF Protection** - WordPress nonce verification on all uploads
+- **File Validation** - Format and size checks before upload starts
+- **Permission Checks** - Only logged-in users with post permissions can upload
+- **Webhook Verification** - HMAC-SHA256 signature validation for Cloudflare webhooks
+- **API Key Encryption** - Sensitive credentials encrypted in database
+
+Because unsecured file uploads are how you end up on security blogs.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Pick Your Streaming Provider
+
+FCHub Stream supports two streaming providers. Pick one. Both work. Neither is sponsored (unfortunately).
+
+### Cloudflare Stream
+
+<img
+  src="/stream/cf-stream-1.webp"
+  alt="Cloudflare Stream dashboard"
+  width="1200"
+  height="675"
+  style={{ aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px', marginTop: '1rem', marginBottom: '1.5rem' }}
+/>
+
+**Good if:**
+- You're already using Cloudflare
+- You want global CDN by default
+- You value webhook reliability
+
+**Pricing:**
+- $5 per 1,000 minutes stored
+- $1 per 1,000 minutes delivered
+
+**Setup complexity:** Medium (requires API token creation)
+
+[Configure Cloudflare Stream →](/docs/fchub-stream/configuration/cloudflare-stream)
+
+### Bunny.net Stream
+
+<img
+  src="/stream/bunny-stream-1.webp"
+  alt="Bunny.net Stream dashboard"
+  width="1200"
+  height="675"
+  style={{ aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px', marginTop: '1rem', marginBottom: '1.5rem' }}
+/>
+
+**Good if:**
+- You want cheaper pricing
+- You're not using Cloudflare
+- You prefer simpler setup
+
+**Pricing:**
+- $0.01 per GB stored ($10 per TB)
+- $0.005 per GB delivered ($5 per TB for high-volume)
+- Regional pricing: $0.01/GB (EU/NA) to $0.06/GB (Africa/ME)
+
+Generally cheaper for most use cases. Math not guaranteed.
+
+**Setup complexity:** Medium (requires library creation)
+
+[Configure Bunny.net →](/docs/fchub-stream/configuration/bunny-net)
+
+<Callout type="info">
+Can't decide? Start with Bunny.net. It's cheaper for most communities. Switch later if needed. Configuration is stored separately for both providers.
+</Callout>
+
+<Separator className="my-8" />
+
+## Technical Specs
+
+Built this properly. Modern PHP 8.3+. WordPress Coding Standards compliant. PSR-12. Modular architecture. Not the kind of plugin where you open the code and immediately regret your life choices.
+
+**What that means in practice:**
+- Clean separation of concerns (controllers, services, models)
+- REST API endpoints that follow WordPress conventions
+- Encrypted credentials in database (not plaintext like it's 2010)
+- CSRF protection on all uploads (nonce verification)
+- Automated linting via PHPCS (enforced before commits)
+- Vue.js admin interface (not jQuery spaghetti)
+- Composer for dependencies (modern PHP practices)
+
+Legacy code is for legacy plugins. This isn't one of them.
+
+### Requirements
+
+- **WordPress:** 6.7 or higher
+- **PHP:** 8.3 or higher
+- **FluentCommunity:** Must be installed and active
+- **Streaming Provider:** Cloudflare Stream OR Bunny.net account with API access
+- **SSL/HTTPS:** Required for webhooks and secure uploads
+
+<Callout type="warn">
+PHP 8.3+ is required. If your WordPress is still on PHP 7.x, it's time to upgrade anyway. This is a feature, not a bug.
+</Callout>
+
+### Performance
+
+- **Upload Speed:** Depends on user's internet and provider infrastructure
+- **Processing Time:** 1-5 minutes for most videos (provider-dependent)
+- **Server Load:** Minimal (uploads bypass WordPress server)
+- **Database Impact:** Lightweight (stores video metadata only)
+
+### Architecture
+
+- **Modular Design** - Separation of concerns, single responsibility
+- **REST API Endpoints** - Clean API for portal integration
+- **Service Layer** - Business logic isolated from controllers
+- **Vue.js Admin Interface** - Modern admin panel for settings
+- **PSR-12 Compliant** - WordPress coding standards + modern PHP practices
+
+### Storage
+
+Videos are stored by your streaming provider. WordPress database stores:
+- Video ID and provider reference
+- Upload metadata (user, timestamp, title)
+- Processing status
+- Player embed data
+
+Total database footprint per video: ~1KB. Your hosting will survive.
+
+<Separator className="my-8" />
+
+## What You Don't Need
+
+- Extra storage space on your WordPress server
+- Special PHP extensions for video processing
+- Server-side transcoding tools (FFmpeg, etc.)
+- A degree in video encoding
+- Patience to manually convert videos
+- Tolerance for WordPress media library limitations
+
+<Separator className="my-8" />
+
+## Built Out of Necessity
+
+FCHub Stream exists because WordPress media library and video streaming have irreconcilable differences. After watching enough uploads fail for reasons that made no sense, waiting for them to get along stopped being a viable strategy.
+
+So it got built. Direct uploads to streaming providers. No media library gymnastics. No manual transcoding. Video streaming that actually works.
+
+Two providers supported. Not revolutionary. Just functional. Which, surprisingly, is better than most WordPress video solutions.
+
+Pick your provider. Upload videos. Move on with your life.
+
+<div className="mt-6 p-8 pt-2 pb-2 bg-fd-muted rounded-lg">
+
+**Ready to start?**
+
+1. **Download** `fchub-stream.zip` from [GitHub Releases](https://github.com/vcode-sh/fchub-plugins/releases)
+2. **Install** on WordPress
+3. **Configure** your streaming provider
+4. **Upload videos**
+
+[Get Started →](/docs/fchub-stream/quick-start)
+
+Or jump straight to:
+- [Cloudflare Stream Setup](/docs/fchub-stream/configuration/cloudflare-stream)
+- [Bunny.net Setup](/docs/fchub-stream/configuration/bunny-net)
+- [Installation Guide](/docs/fchub-stream/installation/setup)
+
+</div>
