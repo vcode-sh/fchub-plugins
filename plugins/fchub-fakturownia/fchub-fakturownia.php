@@ -3,21 +3,21 @@
  * Plugin Name: FCHub - Fakturownia
  * Plugin URI: https://fchub.co
  * Description: Fakturownia invoice integration with KSeF 2.0 support for FluentCart
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: fchub-fakturownia
  * Domain Path: /languages
- * Requires at least: 6.0
- * Requires PHP: 7.4
+ * Requires at least: 6.4
+ * Requires PHP: 8.1
  * Tested up to:    6.7
  */
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_FAKTUROWNIA_VERSION', '1.0.1');
+define('FCHUB_FAKTUROWNIA_VERSION', '1.0.2');
 define('FCHUB_FAKTUROWNIA_FILE', __FILE__);
 define('FCHUB_FAKTUROWNIA_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_FAKTUROWNIA_URL', plugin_dir_url(__FILE__));

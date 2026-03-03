@@ -3,21 +3,21 @@
  * Plugin Name: FCHub - Przelewy24
  * Plugin URI: https://fchub.co
  * Description: Przelewy24 payment gateway for FluentCart
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: fchub-p24
  * Domain Path: /languages
- * Requires at least: 6.0
+ * Requires at least: 6.4
  * Tested up to:    6.7
- * Requires PHP: 7.4
+ * Requires PHP: 8.1
  */
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_P24_VERSION', '1.0.1');
+define('FCHUB_P24_VERSION', '1.0.2');
 define('FCHUB_P24_FILE', __FILE__);
 define('FCHUB_P24_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_P24_URL', plugin_dir_url(__FILE__));

@@ -7,27 +7,27 @@
       "mcpbFilename": "fluentcart-mcp.mcpb"
     },
     "fchub-p24": {
-      "version": "1.0.1",
-      "tagName": "fchub-p24/v1.0.1",
-      "zipFilename": "fchub-p24-1.0.1.zip",
+      "version": "1.0.2",
+      "tagName": "fchub-p24/v1.0.2",
+      "zipFilename": "fchub-p24-1.0.2.zip",
       "mcpbFilename": null
     },
     "fchub-fakturownia": {
-      "version": "1.0.1",
-      "tagName": "fchub-fakturownia/v1.0.1",
-      "zipFilename": "fchub-fakturownia-1.0.1.zip",
+      "version": "1.0.2",
+      "tagName": "fchub-fakturownia/v1.0.2",
+      "zipFilename": "fchub-fakturownia-1.0.2.zip",
       "mcpbFilename": null
     },
     "fchub-memberships": {
-      "version": "1.0.1",
-      "tagName": "fchub-memberships/v1.0.1",
-      "zipFilename": "fchub-memberships-1.0.1.zip",
+      "version": "1.0.2",
+      "tagName": "fchub-memberships/v1.0.2",
+      "zipFilename": "fchub-memberships-1.0.2.zip",
       "mcpbFilename": null
     },
     "fchub-portal-extender": {
-      "version": "1.0.1",
-      "tagName": "fchub-portal-extender/v1.0.1",
-      "zipFilename": "fchub-portal-extender-1.0.1.zip",
+      "version": "1.0.2",
+      "tagName": "fchub-portal-extender/v1.0.2",
+      "zipFilename": "fchub-portal-extender-1.0.2.zip",
       "mcpbFilename": null
     },
     "fchub-stream": {
@@ -37,9 +37,9 @@
       "mcpbFilename": null
     },
     "wc-fc": {
-      "version": "1.0.1",
-      "tagName": "wc-fc/v1.0.1",
-      "zipFilename": "wc-fc-1.0.1.zip",
+      "version": "1.0.2",
+      "tagName": "wc-fc/v1.0.2",
+      "zipFilename": "wc-fc-1.0.2.zip",
       "mcpbFilename": null
     }
   },

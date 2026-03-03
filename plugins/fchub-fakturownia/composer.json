@@ -3,7 +3,7 @@
     "description": "Fakturownia + KSeF 2.0 invoice integration for FluentCart",
     "type": "wordpress-plugin",
     "require": {
-        "php": ">=7.4"
+        "php": ">=8.1"
     },
     "autoload": {
         "psr-4": {
