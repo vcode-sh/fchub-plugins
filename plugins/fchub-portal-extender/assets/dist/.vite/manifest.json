@@ -4,7 +4,7 @@
     "name": "_plugin-vue_export-helper"
   },
   "resources/admin/main.js": {
-    "file": "fchub-portal-extender-admin-C454nM0s.js",
+    "file": "fchub-portal-extender-admin-vN8ki_iz.js",
     "name": "main",
     "src": "resources/admin/main.js",
     "isEntry": true,
@@ -15,7 +15,7 @@
     ]
   },
   "resources/admin/pages/EndpointEditor.vue": {
-    "file": "chunks/EndpointEditor-BwfVWjZ-.js",
+    "file": "chunks/EndpointEditor-BcTCgSlA.js",
     "name": "EndpointEditor",
     "src": "resources/admin/pages/EndpointEditor.vue",
     "isDynamicEntry": true,
@@ -25,7 +25,7 @@
     ]
   },
   "resources/admin/pages/EndpointList.vue": {
-    "file": "chunks/EndpointList-DsAn8BDu.js",
+    "file": "chunks/EndpointList-BZlrIRnT.js",
     "name": "EndpointList",
     "src": "resources/admin/pages/EndpointList.vue",
     "isDynamicEntry": true,
@@ -35,7 +35,7 @@
     ]
   },
   "style.css": {
-    "file": "assets/style-Dx2J5Vf3.css",
+    "file": "assets/style-D_HxrHcv.css",
     "src": "style.css"
   }
 }

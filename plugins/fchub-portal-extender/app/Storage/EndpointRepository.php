@@ -289,8 +289,12 @@ class EndpointRepository
             return sanitize_text_field($value);
         }
 
-        // SVG — allow through with basic sanitisation (strip script tags)
+        // SVG — strip script tags, event handlers, and dangerous attributes
         $value = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $value);
+        $value = preg_replace('/\bon\w+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]*)/i', '', $value);
+        $value = preg_replace('/xlink:href\s*=\s*(?:"[^"]*"|\'[^\']*\')/i', '', $value);
+        $value = preg_replace('/href\s*=\s*["\']?\s*javascript:/i', '', $value);
+        $value = preg_replace('/<foreignObject\b[^>]*>.*?<\/foreignObject>/is', '', $value);
 
         return $value;
     }

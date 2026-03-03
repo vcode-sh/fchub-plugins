@@ -183,8 +183,10 @@ async function confirmDelete(row) {
     await endpointsApi.remove(row.id)
     endpointList.value = endpointList.value.filter(ep => ep.id !== row.id)
     ElMessage.success('Endpoint deleted')
-  } catch {
-    // User cancelled
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || 'Failed to delete endpoint')
+    }
   }
 }
 

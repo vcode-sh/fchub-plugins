@@ -61,6 +61,7 @@ function extractId(data: unknown, ...keys: string[]): number | null {
 	return null
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sequential integration flow test
 async function run() {
 	console.log('╔══════════════════════════════════════════════════════════╗')
 	console.log('║  SCENARIO: "Add Tiger Pants with colour variations"     ║')
@@ -148,7 +149,7 @@ async function run() {
 					console.log(`  → ${colour} already exists (ID ${id})`)
 					continue
 				}
-				// NOTE: slug is required by FluentCart API validation (AttrTermRequest)
+				// slug is required by FluentCart API validation (AttrTermRequest)
 				const term = await call('fluentcart_attribute_term_create', {
 					group_id: colorGroupId,
 					title: colour,
@@ -160,9 +161,7 @@ async function run() {
 					console.log(`  → Created ${colour}: ID ${id}`)
 				} else {
 					console.log(`  → ❌ Failed to create ${colour}: ${term.raw}`)
-					console.log(
-						'     ⚠️  Known FluentCart bug: AttrTermResource::create() uses',
-					)
+					console.log('     ⚠️  Known FluentCart bug: AttrTermResource::create() uses')
 					console.log(
 						'        AttributeTerm::query()->find($groupId) instead of AttributeGroup::query()',
 					)
@@ -176,38 +175,23 @@ async function run() {
 			}
 		}
 
-		// ── STEP 4: Check if "Pants" category exists ────────────────
-		log('4. Check product categories', 'Look for "Pants" category')
-		const terms = await call('fluentcart_product_terms')
-		show(terms, 500)
+		// ── STEP 4: Create "Pants" category ─────────────────────────
+		log('4. Create "Pants" category', 'fluentcart_product_terms_add (creates taxonomy terms)')
+		const createCat = await call('fluentcart_product_terms_add', {
+			names: 'Pants',
+			taxonomy: 'product-categories',
+		})
+		show(createCat)
 
 		let pantsCategoryId: number | null = null
-		if (!terms.isError) {
-			const termData = terms.data as Record<string, unknown>
-			const taxonomies = (termData?.taxonomies ?? termData) as Record<string, unknown>
-			console.log(`  → Taxonomy keys: ${Object.keys(taxonomies).join(', ')}`)
-
-			// Search in product-categories taxonomy
-			for (const [key, val] of Object.entries(taxonomies)) {
-				const taxonomy = val as Record<string, unknown>
-				const termList = taxonomy?.terms as Array<Record<string, unknown>> | undefined
-				if (Array.isArray(termList)) {
-					const found = termList.find(
-						(t) =>
-							(t.label as string)?.toLowerCase() === 'pants' ||
-							(t.name as string)?.toLowerCase() === 'pants',
-					)
-					if (found) {
-						pantsCategoryId = Number(found.value ?? found.term_id ?? found.id)
-						console.log(`  → Found "Pants" in ${key}: ID ${pantsCategoryId}`)
-					}
-				}
+		if (!createCat.isError) {
+			// Response shape: { term_ids: [37], names: ["Pants"] }
+			const catData = createCat.data as Record<string, unknown>
+			const termIds = catData?.term_ids as number[] | undefined
+			if (Array.isArray(termIds) && termIds.length > 0) {
+				pantsCategoryId = termIds[0]
 			}
-			if (!pantsCategoryId) {
-				console.log('  → "Pants" category NOT found.')
-				console.log('  → ⚠️  MCP has NO tool to CREATE categories!')
-				console.log('  → Agent would need to TELL USER to create it manually.')
-			}
+			console.log(`  → Pants category ID: ${pantsCategoryId}`)
 		}
 
 		// ── STEP 5: Create the product ──────────────────────────────
@@ -241,28 +225,15 @@ async function run() {
 			const pd = productDetail.data as Record<string, unknown>
 			const p = (pd?.product ?? pd) as Record<string, unknown>
 			if (Array.isArray(p.variants) && p.variants.length > 0) {
-				defaultVariantId = ((p.variants as Record<string, unknown>[])[0].id) as number
+				defaultVariantId = (p.variants as Record<string, unknown>[])[0].id as number
 				console.log(`  → Default variant ID: ${defaultVariantId}`)
 			}
 			const detail = p.detail as Record<string, unknown> | undefined
 			console.log(`  → detail_id: ${detail?.id}`)
 		}
 
-		// ── STEP 7: Set variant option (Color attribute) ────────────
-		if (colorGroupId) {
-			log('7. Assign Color attribute to product', 'fluentcart_product_variant_option_update')
-			const setOption = await call('fluentcart_product_variant_option_update', {
-				product_id: productId,
-				option_name: 'Color',
-				option_values: colours.map((c) => c.toLowerCase()),
-			})
-			show(setOption)
-		} else {
-			log('7. Assign Color attribute', '⚠️  SKIPPED — no Color group created')
-		}
-
-		// ── STEP 8: Create colour variants with pricing ─────────────
-		log('8. Create colour variations', 'One variant per colour, 1000 groszy = 10 PLN')
+		// ── STEP 7: Create colour variants (nested structure) ───────
+		log('7. Create colour variations', 'One variant per colour, 1000 groszy = 10 PLN (nested body)')
 		const variantIds: number[] = []
 
 		for (const colour of colours) {
@@ -282,16 +253,16 @@ async function run() {
 			}
 		}
 
-		// ── STEP 9: Enable stock management ─────────────────────────
-		log('9. Enable stock management', 'fluentcart_product_manage_stock_update')
+		// ── STEP 8: Enable stock management ─────────────────────────
+		log('8. Enable stock management', 'fluentcart_product_manage_stock_update')
 		const stockMgmt = await call('fluentcart_product_manage_stock_update', {
 			product_id: productId,
 			manage_stock: '1',
 		})
 		show(stockMgmt)
 
-		// ── STEP 10: Set inventory for each variant ─────────────────
-		log('10. Set inventory (25 each)', 'fluentcart_product_inventory_update per variant')
+		// ── STEP 9: Set inventory for each variant ──────────────────
+		log('9. Set inventory (25 each)', 'fluentcart_product_inventory_update per variant')
 		for (let i = 0; i < variantIds.length; i++) {
 			const inv = await call('fluentcart_product_inventory_update', {
 				product_id: productId,
@@ -299,23 +270,29 @@ async function run() {
 				total_stock: 25,
 			})
 			const label = colours[i] ?? `variant ${variantIds[i]}`
-			console.log(
-				`  → ${label}: ${inv.isError ? `❌ ${inv.raw.slice(0, 100)}` : '✅ stock=25'}`,
-			)
+			console.log(`  → ${label}: ${inv.isError ? `❌ ${inv.raw.slice(0, 100)}` : '✅ stock=25'}`)
 		}
 
-		// ── STEP 11: Assign category ────────────────────────────────
+		// ── STEP 10: Assign category ────────────────────────────────
 		if (pantsCategoryId) {
-			log('11. Assign "Pants" category', 'fluentcart_product_taxonomy_sync')
+			log('10. Assign "Pants" category', 'fluentcart_product_taxonomy_sync')
 			const catSync = await call('fluentcart_product_taxonomy_sync', {
 				product_id: productId,
 				term_ids: [pantsCategoryId],
-				taxonomy: 'product_cat',
+				taxonomy: 'product-categories',
 			})
 			show(catSync)
 		} else {
-			log('11. Category assignment', '⚠️  SKIPPED — no "Pants" category found, no create tool')
+			log('10. Category assignment', '⚠️  SKIPPED — no "Pants" category ID extracted')
 		}
+
+		// ── STEP 11: Publish product via pricing_update ─────────────
+		log('11. Publish product', 'fluentcart_product_pricing_update (sets post_status to publish)')
+		const publish = await call('fluentcart_product_pricing_update', {
+			product_id: productId,
+			post_status: 'publish',
+		})
+		show(publish)
 
 		// ── STEP 12: Verify final product ───────────────────────────
 		log('12. Verify final product', 'fluentcart_product_get')
@@ -344,18 +321,16 @@ async function run() {
 2. Create "Color" attribute group   → ✅ tool exists
 3. Create colour terms (5x)         → ⛔ BROKEN — FluentCart bug in AttrTermResource::create()
                                        Uses AttributeTerm::query() instead of AttributeGroup::query()
-                                       to validate group existence. Also: slug is required but MCP
-                                       marks it optional.
-4. Check categories for "Pants"     → ✅ tool exists
-5. Create "Pants" category          → ❌ NO TOOL (agent must ask user)
-6. Create product                   → ✅ tool exists
-7. Set variant options (Color)      → ✅ tool exists
-8. Create 5 colour variants         → ✅ tool exists
-9. Enable stock management          → ✅ tool exists
-10. Set inventory per variant       → ✅ tool exists
-11. Assign category                 → ✅ tool exists (if category exists)
+                                       to validate group existence. Also: slug is now required in schema.
+4. Create "Pants" category          → ✅ FIXED — fluentcart_product_terms_add now creates categories
+5. Create product                   → ✅ tool exists
+6. Get product details              → ✅ tool exists
+7. Create 5 colour variants         → ✅ FIXED — variant_create now uses nested body structure
+8. Enable stock management          → ✅ tool exists
+9. Set inventory per variant        → ✅ tool exists
+10. Assign category                 → ✅ tool exists (if category exists)
+11. Publish product                 → ✅ FIXED — pricing_update fetches current state + merges changes
 12. Upload product images           → ❌ NO TOOL (MCP can't upload media)
-13. Publish product                 → ✅ via product_pricing_update
 
 BUGS FOUND:
 - ⛔ FluentCart bug: AttrTermResource::create() line 105 uses
@@ -363,13 +338,18 @@ BUGS FOUND:
      instead of fct_atts_groups. Term creation fails with 404 for any
      group_id that doesn't match an existing term_id.
 
-MCP GAPS:
-- ❌ No category/taxonomy CREATE tool
+FIXES APPLIED:
+- ✅ variant_create: now sends nested {variants: {...}} structure matching API expectation
+- ✅ variant_update: now sends nested {variants: {...}} structure with partial updates
+- ✅ product_variant_option_update: REMOVED (requires admin UI matrix, unusable by LLM)
+- ✅ attribute_term_create: slug is now required in schema
+- ✅ product_terms_add: now CREATES categories (was broken schema for wrong operation)
+- ✅ product_pricing_update: now fetches current state + merges changes (LLM-friendly)
+
+REMAINING GAPS:
 - ❌ No media upload capability (images)
-- ⚠️  slug should be required on attribute_term_create (API requires it)
+- ⛔ FluentCart upstream bug blocks attribute term creation
 - ⚠️  Agent must know prices are in GROSZY (cents), not PLN
-- ⚠️  Product created as DRAFT — agent would need extra step to publish
-- ⚠️  ~12+ API calls minimum for this simple request
 `)
 }
 

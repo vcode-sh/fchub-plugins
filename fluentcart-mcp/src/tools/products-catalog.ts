@@ -1,6 +1,13 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import {
+	createTool,
+	deleteTool,
+	getTool,
+	postTool,
+	putTool,
+	type ToolDefinition,
+} from './_factory.js'
 
 export function productCatalogTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -105,16 +112,28 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 			endpoint: '/products/fetch-term-by-parent',
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_product_terms_add',
-			title: 'Add Product Terms',
-			description: 'Add terms (categories, tags) to a product.',
+			title: 'Create Taxonomy Terms',
+			description:
+				'Create new taxonomy terms (categories or brands). Returns created term IDs. ' +
+				'Comma-separate multiple names. Existing terms are returned without duplication.',
 			schema: z.object({
-				product_id: z.number().optional().describe('Product ID'),
-				term_ids: z.array(z.number()).optional().describe('Term IDs to add'),
-				taxonomy: z.string().optional().describe('Taxonomy name'),
+				names: z.string().describe('Term names to create, comma-separated (e.g. "Pants,Shoes")'),
+				taxonomy: z.string().describe('Taxonomy: product-categories or product-brands'),
+				parent: z.number().optional().describe('Parent term ID for nested categories'),
 			}),
-			endpoint: '/products/add-product-terms',
+			handler: async (client, input) => {
+				const body = {
+					term: {
+						name: input.names as string,
+						taxonomy: input.taxonomy as string,
+						parent: input.parent != null ? String(input.parent) : '',
+					},
+				}
+				const response = await client.post('/products/add-product-terms', body)
+				return response.data
+			},
 		}),
 
 		postTool(client, {

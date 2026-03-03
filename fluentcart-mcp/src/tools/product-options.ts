@@ -73,14 +73,14 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_attribute_term_create',
 			title: 'Create Attribute Term',
-			description: 'Create a term within an attribute group (e.g. add "Red" to Color).',
+			description:
+				'Create a term within an attribute group (e.g. add "Red" to Color). ' +
+				'Note: slug is required. May fail on some FluentCart versions due to a known ' +
+				'validation bug — if so, terms must be created via the admin UI.',
 			schema: z.object({
 				group_id: z.number().describe('Parent attribute group ID'),
 				title: z.string().describe('Term display name (e.g. "Red", "Large")'),
-				slug: z
-					.string()
-					.optional()
-					.describe('URL-friendly identifier (auto-generated from title if omitted)'),
+				slug: z.string().describe('URL-friendly identifier (required, e.g. "red", "large")'),
 			}),
 			endpoint: '/options/attr/group/:group_id/term',
 		}),

@@ -12,9 +12,9 @@ const mockClient = {
 const tools = createAllTools(mockClient)
 
 describe('tool definitions', () => {
-	it('should register between 190 and 200 tools (6 removed in Phase 7)', () => {
+	it('should register between 189 and 200 tools (7 removed: 6 Phase 7 + variant_option_update)', () => {
 		console.log(`Total tools registered: ${tools.length}`)
-		expect(tools.length).toBeGreaterThanOrEqual(190)
+		expect(tools.length).toBeGreaterThanOrEqual(189)
 		expect(tools.length).toBeLessThanOrEqual(200)
 	})
 
@@ -27,6 +27,7 @@ describe('tool definitions', () => {
 			'fluentcart_report_top_sold_products',
 			'fluentcart_report_dashboard_summary',
 			'fluentcart_report_summary',
+			'fluentcart_product_variant_option_update',
 		]
 		for (const removed of removedTools) {
 			expect(names, `${removed} should have been removed`).not.toContain(removed)

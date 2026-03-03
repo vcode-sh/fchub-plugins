@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
 
 export function productPricingTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -14,40 +14,98 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 			endpoint: '/products/:product_id/pricing',
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_product_pricing_update',
 			title: 'Update Product Pricing',
 			description:
-				'Save product pricing via full product update (NOT a surgical price patch). ' +
-				'Requires complete payload: title, detail, variants. Prices in cents. Use pricing_get first.',
+				'Update product pricing, status, and variants in one call. Use to publish a product ' +
+				'or update its variants. All prices in cents. Variants require at least title and price. ' +
+				'Fetches current product state first, then merges your changes.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				post_title: z.string().describe('Product title'),
-				post_status: z.string().optional().describe('Product status: publish, draft'),
-				detail: z
-					.object({
-						fulfillment_type: z.string().describe('Fulfillment: digital, physical'),
-						variation_type: z.string().optional().describe('Variation type: simple, variable'),
-					})
-					.describe('Product detail object'),
+				post_title: z.string().optional().describe('Product title'),
+				post_status: z.string().optional().describe('Product status: draft, publish, future'),
+				post_excerpt: z.string().optional().describe('Short description'),
+				fulfillment_type: z
+					.string()
+					.optional()
+					.describe('Fulfilment: physical or digital (default: physical)'),
 				variants: z
 					.array(
 						z.object({
-							id: z.number().optional().describe('Variant ID (required for existing variants)'),
-							post_id: z.number().describe('Parent product ID'),
-							variation_title: z.string().describe('Variant display title'),
-							item_price: z.number().describe('Price in cents'),
-							compare_price: z.number().optional().describe('Compare-at/original price in cents'),
+							id: z.number().optional().describe('Variant ID (for updating existing variants)'),
+							title: z.string().describe('Variant title'),
+							price: z.number().describe('Price in cents'),
 							sku: z.string().optional().describe('SKU'),
-							payment_type: z.string().optional().describe('Payment type: onetime, subscription'),
-							stock_status: z.string().optional().describe('Stock status: in-stock, out-of-stock'),
-							fulfillment_type: z.string().optional().describe('Variant fulfillment type'),
-							item_status: z.string().optional().describe('Variant status: active, inactive'),
+							total_stock: z.number().optional().describe('Total stock quantity'),
 						}),
 					)
-					.describe('Product variants with pricing'),
+					.optional()
+					.describe('Product variants to save (creates/updates)'),
 			}),
-			endpoint: '/products/:product_id/pricing',
+			handler: async (client, input) => {
+				const productId = input.product_id as number
+
+				// Fetch current product state — response is { product: {...}, taxonomies: {...} }
+				const current = await client.get(`/products/${productId}/pricing`)
+				const wrapper = current.data as Record<string, unknown>
+				const product = (wrapper.product ?? wrapper) as Record<string, unknown>
+
+				// Merge detail — preserve variation_type and fulfillment_type (both required by API)
+				const existingDetail = (product.detail ?? {}) as Record<string, unknown>
+				const detail = {
+					...existingDetail,
+					...(input.fulfillment_type ? { fulfillment_type: input.fulfillment_type } : {}),
+				}
+
+				// Build variants array
+				let variants: Record<string, unknown>[]
+				if (input.variants) {
+					const inputVariants = input.variants as Array<Record<string, unknown>>
+					const ft =
+						(input.fulfillment_type as string) ||
+						(existingDetail.fulfillment_type as string) ||
+						'physical'
+					variants = inputVariants.map((v) => ({
+						...(v.id ? { id: v.id } : {}),
+						post_id: productId,
+						variation_title: v.title as string,
+						item_price: v.price as number,
+						sku: (v.sku as string) || '',
+						fulfillment_type: ft,
+						stock_status: 'in-stock',
+						item_status: 'active',
+						other_info: {
+							payment_type: 'onetime',
+							times: '',
+							repeat_interval: '',
+							trial_days: '',
+							billing_summary: '',
+							manage_setup_fee: 'no',
+							signup_fee_name: '',
+							signup_fee: '',
+							setup_fee_per_item: 'no',
+						},
+						...(v.total_stock !== undefined
+							? { total_stock: v.total_stock, available: v.total_stock }
+							: {}),
+					}))
+				} else {
+					// Preserve existing variants as-is (they already have full structure)
+					variants = (product.variants ?? []) as Record<string, unknown>[]
+				}
+
+				const body: Record<string, unknown> = {
+					post_title: (input.post_title as string) ?? product.post_title,
+					post_status: (input.post_status as string) ?? product.post_status,
+					detail,
+					variants,
+				}
+				if (input.post_excerpt !== undefined) body.post_excerpt = input.post_excerpt
+
+				const response = await client.post(`/products/${productId}/pricing`, body)
+				return response.data
+			},
 		}),
 
 		getTool(client, {

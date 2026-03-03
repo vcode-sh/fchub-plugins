@@ -31,7 +31,7 @@
           </el-form-item>
 
           <el-form-item label="Slug" prop="slug">
-            <el-input v-model="form.slug" placeholder="e.g. support-tickets">
+            <el-input v-model="form.slug" placeholder="e.g. support-tickets" @input="slugManuallyEdited = true">
               <template #prepend>/</template>
             </el-input>
             <div class="field-tip">URL path in the Customer Portal. Lowercase, hyphens only.</div>
@@ -274,7 +274,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'

@@ -1,6 +1,13 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import {
+	createTool,
+	deleteTool,
+	getTool,
+	postTool,
+	putTool,
+	type ToolDefinition,
+} from './_factory.js'
 
 export function productVariantTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -27,24 +34,60 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 			endpoint: '/products/variants',
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_variant_create',
 			title: 'Create Variation',
-			description: 'Create a new product variation. Price in cents.',
+			description:
+				'Create a new product variation. Price in cents. ' +
+				'Stock is set directly via total_stock (no separate inventory call needed).',
 			schema: z.object({
-				product_id: z.number().optional().describe('Parent product ID'),
-				title: z.string().optional().describe('Variation title'),
-				price: z.number().optional().describe('Price in cents'),
+				product_id: z.number().describe('Parent product ID'),
+				title: z.string().optional().describe('Variation title (e.g. "Tiger Pants - White")'),
+				price: z.number().optional().describe('Price in cents (e.g. 1000 = 10.00)'),
 				sku: z.string().optional().describe('Stock keeping unit'),
 				stock_quantity: z.number().optional().describe('Stock quantity'),
+				fulfillment_type: z
+					.string()
+					.optional()
+					.describe('Fulfilment type: physical or digital (default: physical)'),
 			}),
-			endpoint: '/products/variants',
+			handler: async (client, input) => {
+				const productId = input.product_id as number
+				const body = {
+					product_id: productId,
+					variants: {
+						post_id: productId,
+						variation_title: (input.title as string) || '',
+						item_price: (input.price as number) ?? 0,
+						sku: (input.sku as string) || '',
+						fulfillment_type: (input.fulfillment_type as string) || 'physical',
+						total_stock: (input.stock_quantity as number) ?? 0,
+						available: (input.stock_quantity as number) ?? 0,
+						committed: 0,
+						on_hold: 0,
+						stock_status: 'in-stock',
+						other_info: {
+							payment_type: 'onetime',
+							times: '',
+							repeat_interval: '',
+							trial_days: '',
+							billing_summary: '',
+							manage_setup_fee: 'no',
+							signup_fee_name: '',
+							signup_fee: '',
+							setup_fee_per_item: 'no',
+						},
+					},
+				}
+				const response = await client.post('/products/variants', body)
+				return response.data
+			},
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_variant_update',
 			title: 'Update Variation',
-			description: 'Update an existing product variation.',
+			description: 'Update an existing product variation. Only provided fields are changed.',
 			schema: z.object({
 				variant_id: z.number().describe('Variant ID'),
 				title: z.string().optional().describe('Variation title'),
@@ -52,7 +95,20 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				sku: z.string().optional().describe('Stock keeping unit'),
 				stock_quantity: z.number().optional().describe('Stock quantity'),
 			}),
-			endpoint: '/products/variants/:variant_id',
+			handler: async (client, input) => {
+				const variantId = input.variant_id as number
+				const variants: Record<string, unknown> = {}
+				if (input.title !== undefined) variants.variation_title = input.title
+				if (input.price !== undefined) variants.item_price = input.price
+				if (input.sku !== undefined) variants.sku = input.sku
+				if (input.stock_quantity !== undefined) {
+					variants.total_stock = input.stock_quantity
+					variants.available = input.stock_quantity
+				}
+				const body = { variants }
+				const response = await client.post(`/products/variants/${variantId}`, body)
+				return response.data
+			},
 		}),
 
 		deleteTool(client, {
@@ -86,18 +142,6 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				compare_price: z.number().optional().describe('Compare-at price in cents'),
 			}),
 			endpoint: '/products/variants/:variant_id/pricing-table',
-		}),
-
-		postTool(client, {
-			name: 'fluentcart_product_variant_option_update',
-			title: 'Update Variant Option',
-			description: 'Update a product variant option (attribute configuration).',
-			schema: z.object({
-				product_id: z.number().describe('Product ID'),
-				option_name: z.string().optional().describe('Option/attribute name'),
-				option_values: z.array(z.string()).optional().describe('Option values'),
-			}),
-			endpoint: '/products/:product_id/update-variant-option',
 		}),
 
 		getTool(client, {

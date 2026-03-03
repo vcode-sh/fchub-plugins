@@ -63,11 +63,11 @@ class EndpointRegistrar
                 $htmlContent = $endpoint['html_content'];
                 if ($scrollEnabled) {
                     $args['render_callback'] = function () use ($htmlContent, $scrollMode, $scrollHeight) {
-                        self::renderScrollWrapper($htmlContent, $scrollMode, $scrollHeight);
+                        self::renderScrollWrapper(do_shortcode($htmlContent), $scrollMode, $scrollHeight);
                     };
                 } else {
                     $args['render_callback'] = function () use ($htmlContent) {
-                        echo $htmlContent;
+                        echo do_shortcode($htmlContent);
                     };
                 }
             } elseif ($endpoint['type'] === 'iframe' && !empty($endpoint['iframe_url'])) {
@@ -157,7 +157,7 @@ class EndpointRegistrar
                 $maxHeight
             );
         } else {
-            echo '<p>' . esc_html__('No content found!', 'fluent-cart') . '</p>';
+            echo '<p>' . esc_html__('No content found!', 'fchub-portal-extender') . '</p>';
         }
     }
 
@@ -220,7 +220,7 @@ class EndpointRegistrar
                 echo $wrapped;
             }
         } else {
-            echo '<p>' . esc_html__('No content found!', 'fluent-cart') . '</p>';
+            echo '<p>' . esc_html__('No content found!', 'fchub-portal-extender') . '</p>';
         }
     }
 
