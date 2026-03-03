@@ -68,14 +68,14 @@ In the membership settings, under the FluentCommunity section:
 <Steps>
 <Step>
 
-### Badge assigned on grant
+**Badge assigned on grant**
 
 When the `FluentCommunityAdapter::grant()` method runs, it calls `maybeAssignBadge()`. This checks if a badge mapping exists for the granted plan and assigns the badge via `Badge::assignToUser()`.
 
 </Step>
 <Step>
 
-### Badge revoked on membership end
+**Badge revoked on membership end**
 
 When the `FluentCommunityAdapter::revoke()` method runs and `fc_remove_badge_on_revoke` is set to `yes`, it calls `maybeRevokeBadge()`. This removes the mapped badge via `Badge::removeFromUser()`.
 

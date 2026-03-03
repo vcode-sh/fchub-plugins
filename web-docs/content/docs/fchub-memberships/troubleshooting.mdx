@@ -22,7 +22,7 @@ This page covers the most common issues you might encounter with FCHub Membershi
 <Steps>
 <Step>
 
-### Check if the resource is protected
+**Check if the resource is protected**
 
 Go to **Memberships > Content** and verify the resource has a protection rule. Alternatively, edit the post and check the **Membership Protection** meta box.
 
@@ -31,21 +31,21 @@ If the post is protected through plan rules (not explicit protection), verify th
 </Step>
 <Step>
 
-### Check the plan status
+**Check the plan status**
 
 Go to **Memberships > Plans** and make sure the plan status is `active`. Draft or inactive plans don't enforce protection.
 
 </Step>
 <Step>
 
-### Check admin bypass
+**Check admin bypass**
 
 By default, administrators bypass all protection. Log in as a non-admin user to test, or temporarily disable admin bypass in **Memberships > Settings** (`admin_bypass` = "No").
 
 </Step>
 <Step>
 
-### Check caching
+**Check caching**
 
 If you use a page caching plugin (WP Super Cache, W3 Total Cache, LiteSpeed Cache, etc.), cached pages will serve the same content to all visitors. You need to:
 - Exclude protected pages from the cache, or
@@ -54,7 +54,7 @@ If you use a page caching plugin (WP Super Cache, W3 Total Cache, LiteSpeed Cach
 </Step>
 <Step>
 
-### Verify the hook priority
+**Verify the hook priority**
 
 `ContentProtection` hooks into `the_content` at priority 999. If another plugin removes or overrides content at a later priority, protection may be bypassed. Check for plugins that modify `the_content` at priority 1000+.
 
@@ -88,7 +88,7 @@ The plugin filters REST API responses via `rest_prepare_{post_type}` hooks. Make
 <Steps>
 <Step>
 
-### Check the integration feed
+**Check the integration feed**
 
 Go to the FluentCart product editor and verify the **Memberships** integration feed is present and enabled. Check that:
 - A plan is selected
@@ -98,28 +98,28 @@ Go to the FluentCart product editor and verify the **Memberships** integration f
 </Step>
 <Step>
 
-### Check event locks
+**Check event locks**
 
 The plugin uses an event lock table to prevent duplicate processing. If a feed fired but encountered an error, it may have created a lock that prevents re-processing. Check the `fchub_membership_event_locks` table for entries with `result = 'error'`.
 
 </Step>
 <Step>
 
-### Check the order status
+**Check the order status**
 
 The integration feed only fires on paid orders. Make sure the FluentCart order status is "Paid" or "Completed". Pending or failed orders do not trigger membership grants.
 
 </Step>
 <Step>
 
-### Check the order log
+**Check the order log**
 
 In the FluentCart order detail page, look at the order notes/log. The membership integration logs messages like "Membership access granted" or "Membership grant skipped" with details about what happened.
 
 </Step>
 <Step>
 
-### Check for user mismatch
+**Check for user mismatch**
 
 The integration resolves the user from the order. If the order has no `user_id` and no matching email account exists, the user might not be found. Check if "Auto-Create User" is enabled in the feed settings.
 

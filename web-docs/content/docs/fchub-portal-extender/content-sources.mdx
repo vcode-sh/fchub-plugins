@@ -17,8 +17,6 @@ Every portal endpoint needs a content source — the actual stuff that appears w
 <Tabs items={['WordPress Page', 'Shortcode', 'HTML / Custom Code', 'External URL (iframe)', 'Redirect / Link', 'Post / CPT']}>
 <Tab value="WordPress Page">
 
-### WordPress Page <Badge>page_id</Badge>
-
 The path of least resistance. Select any published WordPress page from a searchable dropdown and its content gets rendered directly inside the portal layout. No copying, no pasting, no reinventing the wheel.
 
 The plugin fetches the page via `get_post()` and renders it through WordPress's `the_content()` filter pipeline. The output is wrapped in a `<div class="fluent-cart-custom-page-content">` container, which means it inherits the portal's styling context rather than your theme's single-page template.
@@ -39,8 +37,6 @@ The page's assigned template is irrelevant here. The plugin renders the page *co
 </Tab>
 <Tab value="Shortcode">
 
-### Shortcode <Badge>shortcode</Badge>
-
 Enter any WordPress shortcode string and it gets executed inside the portal. That's it. No ceremony.
 
 ```
@@ -57,8 +53,6 @@ The shortcode's parent plugin must be active. If you enter `[gravity_form id="3"
 
 </Tab>
 <Tab value="HTML / Custom Code">
-
-### HTML / Custom Code <Badge>html</Badge>
 
 A free-form textarea where you can write whatever HTML you fancy. Inline CSS, structural markup, embedded widgets — go wild. Well, within reason.
 
@@ -83,8 +77,6 @@ Shortcodes embedded in the HTML are processed before the final output, so mixing
 
 </Tab>
 <Tab value="External URL (iframe)">
-
-### External URL / iframe <Badge>iframe</Badge>
 
 Embed any external URL inside the portal via an iframe. For when your content lives somewhere else entirely and you'd rather not migrate it.
 
@@ -112,8 +104,6 @@ The target website must allow iframe embedding. If the site sends `X-Frame-Optio
 </Tab>
 <Tab value="Redirect / Link">
 
-### Redirect / Link <Badge>redirect</Badge>
-
 This one doesn't render content at all. When a customer clicks the sidebar item, they're sent to a URL of your choosing. Simple, effective, occasionally sneaky.
 
 **Two targeting options:**
@@ -134,8 +124,6 @@ Since redirects don't render content inside the portal, the scrollable container
 </Tab>
 <Tab value="Post / CPT">
 
-### Post / Custom Post Type <Badge>custom_post</Badge>
-
 A two-step cascading selector: first pick a post type, then pick a specific post. The plugin auto-detects all registered public post types on your site, so custom post types from other plugins show up automatically.
 
 The content rendering is identical to the WordPress Page source — `get_post()` followed by `the_content()`, wrapped in `<div class="fluent-cart-custom-page-content">`. The only difference is the selection interface, which gives you access to posts, knowledge base articles, documentation entries, portfolio items, or whatever custom post types your site has registered.
@@ -144,12 +132,12 @@ The content rendering is identical to the WordPress Page source — `get_post()`
 
 <Steps>
   <Step>
-    ### Choose a Post Type
+    **Choose a Post Type**
 
     A dropdown lists all public post types registered on your site. This includes WordPress defaults (`post`, `page`) and any custom post types from plugins or themes.
   </Step>
   <Step>
-    ### Choose a Specific Post
+    **Choose a Specific Post**
 
     Once a post type is selected, a second dropdown loads all published entries of that type. Pick the one you want to display in the portal.
   </Step>

@@ -1,18 +1,30 @@
-# fluentcart-mcp
+# FluentCart MCP Server
 
-I built an MCP server for [FluentCart](https://fluentcart.com). It gives AI assistants direct access to your store — orders, products, customers, subscriptions, coupons, reports, the lot. 194 tools (or 3, if you're feeling dynamic), open source, MIT licensed.
+[![npm](https://img.shields.io/npm/v/fluentcart-mcp)](https://www.npmjs.com/package/fluentcart-mcp)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Codex CLI, ChatGPT, and anything else that speaks MCP.
+An MCP server that gives AI assistants full access to your [FluentCart](https://fluentcart.com) store. 276 tools across 27 modules — orders, products, customers, subscriptions, coupons, reports, shipping, tax, email notifications, and more. Open source, MIT licensed.
+
+Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Codex CLI, ChatGPT, and anything else that speaks [MCP](https://modelcontextprotocol.io).
 
 ## Quick Start
 
-### Claude Desktop — One Click (Recommended)
+### Claude Desktop — One Click
 
-Download the extension — no Node.js required:
+Download the extension — no Node.js, no JSON, no terminal:
 
 **[Download fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases/download/fluentcart-mcp/v1.0.0/fluentcart-mcp.mcpb)**
 
 Double-click the file. Claude Desktop prompts for your WordPress URL, username, and Application Password. Fill those in. Done.
+
+### Setup Wizard
+
+```bash
+npx fluentcart-mcp setup
+```
+
+Asks three questions, tests the connection, saves the config. Your AI client reads the saved credentials automatically.
 
 ### Claude Desktop — Manual Config
 
@@ -50,7 +62,7 @@ Same JSON config as Claude Desktop — paste into your MCP settings file. [Full 
 
 ### Docker
 
-For remote access, ChatGPT, or always-on deployments — run the HTTP transport in Docker:
+For remote access, ChatGPT, or always-on deployments:
 
 ```bash
 docker run -d \
@@ -62,20 +74,18 @@ docker run -d \
   vcodesh/fluentcart-mcp
 ```
 
-Your MCP endpoint is now at `http://localhost:3000/mcp`. Point ChatGPT or any HTTP-capable MCP client at it.
-
-The `FLUENTCART_MCP_API_KEY` is optional but recommended — if set, every request needs `Authorization: Bearer your-secret-key`. Without it, anyone who finds your endpoint can talk to your store. Your call.
-
-Also available on GitHub Container Registry: `ghcr.io/vcode-sh/fluentcart-mcp`.
+Your MCP endpoint is at `http://localhost:3000/mcp`. Also available on GHCR: `ghcr.io/vcode-sh/fluentcart-mcp`.
 
 ## Authentication
 
-Uses **WordPress Application Passwords** (built into WordPress 5.6+). Zero plugin dependencies.
+Uses **WordPress Application Passwords** (built into WordPress 5.6+). No extra plugins needed.
 
 1. WordPress admin → **Users → Profile**
 2. Scroll to **Application Passwords**
 3. Enter a name, click **Add New Application Password**
-4. Copy the password (WordPress shows it exactly once)
+4. Copy the password (WordPress shows it once)
+
+Use an **Administrator** account — FluentCart's API requires admin capabilities.
 
 ## Configuration
 
@@ -92,7 +102,8 @@ FLUENTCART_APP_PASSWORD=aBcD eFgH iJkL mNoP qRsT uVwX
 ### 2. Config File
 
 ```json
-// ~/.config/fluentcart-mcp/config.json
+// ~/.config/fluentcart-mcp/config.json (macOS/Linux)
+// %APPDATA%\fluentcart-mcp\config.json (Windows)
 {
   "url": "https://your-store.com",
   "username": "admin",
@@ -100,7 +111,7 @@ FLUENTCART_APP_PASSWORD=aBcD eFgH iJkL mNoP qRsT uVwX
 }
 ```
 
-### 3. Interactive Setup
+### 3. Setup Wizard
 
 ```bash
 npx fluentcart-mcp setup
@@ -115,40 +126,44 @@ npx fluentcart-mcp setup
 
 HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and `--host`).
 
-### Toolset Modes
+## Toolset Modes
 
 | Mode | Flag | Tools | Token Cost |
 |------|------|-------|------------|
-| **static** (default) | — | 194 tools registered upfront | ~20K tokens |
+| **static** (default) | — | All 276 tools registered upfront | ~30K tokens |
 | **dynamic** | `--mode dynamic` | 3 meta-tools (search, describe, execute) | ~1.5K tokens |
 
-Dynamic mode gives the AI 3 tools to discover and execute any of the 194 tools on demand. Same capabilities, ~96% fewer tokens in context. Trade-off: 2-3 extra tool calls per workflow.
+Dynamic mode gives the AI 3 tools to discover and execute any of the 276 tools on demand. Same capabilities, ~96% fewer tokens in context.
 
 ## What's Inside
 
-194 tools across 17 modules:
+276 tools across 27 modules:
 
 | Module | Tools | What It Covers |
 |--------|-------|----------------|
 | **Orders** | 23 | List, create, update, refund, disputes, bulk actions |
-| **Products** | 53 | CRUD, pricing, variants, downloads, categories |
-| **Customers** | 17 | Profiles, addresses, stats, lifetime value |
+| **Products** | 52 | CRUD, pricing, variants, downloads, categories |
+| **Customers** | 19 | Profiles, addresses, stats, lifetime value |
 | **Subscriptions** | 7 | List, pause, resume, cancel, reactivate |
-| **Coupons** | 11 | Create, apply, eligibility, settings |
-| **Reports** | 27 | Revenue, sales, top products, customer insights |
+| **Coupons** | 12 | Create, apply, eligibility, settings |
+| **Reports (Core)** | 24 | Revenue, sales, dashboard, order charts |
+| **Reports (Insights)** | 21 | Growth, retention, cohorts, heatmaps |
+| **Shipping** | 15 | Zones, methods, classes |
+| **Tax** | 22 | Classes, rates, EU VAT, records |
+| **Email Notifications** | 8 | Templates, settings, toggles |
+| **Roles** | 7 | Role management, user lists |
 | **Order Bumps** | 5 | Upsell management |
 | **Product Options** | 10 | Attribute groups and terms |
 | **Integrations** | 12 | Addon and feed management |
-| **Settings** | 8 | Store config, payment methods, permissions |
+| **Settings** | 14 | Store config, payment methods, modules |
+| **Files** | 4 | Upload, list, delete |
 | **Labels** | 3 | Order organisation |
 | **Activity** | 3 | Audit log |
 | **Notes** | 1 | Order annotations |
 | **Dashboard** | 2 | Overview stats |
-| **Application** | 4 | App init, widgets |
+| **Application** | 4 | App init, widgets, attachments |
 | **Public** | 4 | Unauthenticated product views |
 | **Miscellaneous** | 4 | Country/form lookups |
-
-Every tool has rich descriptions with business context, validated parameters via Zod, and AI-friendly annotations (read-only, destructive, idempotent hints).
 
 Plus: **4 MCP Resources** (store config, countries, payment methods, filter options), **5 MCP Prompts** (store analysis, order investigation, customer overview, catalog summary, subscription health), and in-memory caching for static data.
 
@@ -163,19 +178,32 @@ Once connected, just talk:
 - "Pause subscription #42"
 - "Which products sold the most this week?"
 - "Refund order #1234"
+- "Set up 23% VAT for Poland"
+- "Create a shipping zone for Europe at €5 flat rate"
+- "Show me all email notification templates"
 
 ## Requirements
 
 - **Node.js** >= 22.0.0 (for npx/stdio mode)
 - **Docker** (for HTTP/container mode — no Node.js needed)
-- **WordPress** >= 5.6 with FluentCart installed
-- **Administrator** WordPress account
+- **WordPress** >= 5.6 with [FluentCart](https://fluentcart.com) installed
+- **Administrator** WordPress account with an Application Password
 
 ## Documentation
 
-Full docs with setup guides for every platform, usage examples, deployment guides, and troubleshooting:
+Full docs with setup guides, usage examples, tool reference, deployment guide, and troubleshooting:
 
 **[fchub.co/docs/fluentcart-mcp](https://fchub.co/docs/fluentcart-mcp)**
+
+## Links
+
+- [Documentation](https://fchub.co/docs/fluentcart-mcp)
+- [Setup Guide](https://fchub.co/docs/fluentcart-mcp/setup)
+- [Tool Reference](https://fchub.co/docs/fluentcart-mcp/tools)
+- [Troubleshooting](https://fchub.co/docs/fluentcart-mcp/troubleshooting)
+- [npm Package](https://www.npmjs.com/package/fluentcart-mcp)
+- [Docker Hub](https://hub.docker.com/r/vcodesh/fluentcart-mcp)
+- [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues)
 
 ## License
 

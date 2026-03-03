@@ -96,7 +96,7 @@ This is where Cloudflare's love for security theater begins. You need an API tok
 
 Cloudflare doesn't have a template for Stream (shocking, I know). You'll create a custom token. It's not hard. Just tedious.
 
-### Generate the Token
+**Generate the Token**
 
 Time to create an API token. Cloudflare's dashboard is confusing. I know. But you need to do this. Here's how:
 
@@ -144,7 +144,7 @@ Your token looks like a long string of random characters: `AbCd1234_EfGh5678-IjK
 
 Time to connect everything. You have Account ID. You have API token. Now paste them into WordPress.
 
-### Open FCHub Stream Settings
+**Open FCHub Stream Settings**
 
 1. Go to **WordPress Admin** → **FCHub Stream** → **Settings**
 2. Click **Stream Configuration** card (or tab)
@@ -158,7 +158,7 @@ Time to connect everything. You have Account ID. You have API token. Now paste t
   style={{ aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px', marginTop: '1.5rem', marginBottom: '1.5rem' }}
 />
 
-### Enter Your Credentials
+**Enter Your Credentials**
 
 **Account ID field:**
 - Paste the Account ID you copied from Cloudflare Stream dashboard
@@ -181,7 +181,7 @@ If you paste and see your token in plain text initially, that's fine. It gets ma
 - This is required for Cloudflare Stream API calls
 - You copied this earlier when getting Account ID
 
-### Save & Test
+**Save & Test**
 
 After entering all credentials:
 
@@ -197,7 +197,7 @@ After entering all credentials:
 - Token has necessary permissions (Read and Edit)
 - Your server can reach Cloudflare's API
 
-### Activate Webhook
+**Activate Webhook**
 
 After **Save & Test** succeeds:
 
@@ -232,7 +232,7 @@ After **Save & Test** succeeds, you need to enable Cloudflare Stream as your act
 
 Once enabled, Cloudflare Stream is your active provider. Video uploads will go to Cloudflare Stream. That's it.
 
-### If Save & Test Fails
+**If Save & Test Fails**
 
 You'll see a red error message. Common causes:
 
@@ -271,7 +271,7 @@ If connection test keeps failing after fixing credentials, check if your hosting
 
 Configuration is done. Now verify it actually works by uploading a test video.
 
-### Upload Test Video
+**Upload Test Video**
 
 1. Go to your **FluentCommunity** (frontend, not admin)
 2. Create a new post
@@ -286,11 +286,11 @@ Configuration is done. Now verify it actually works by uploading a test video.
 - After 30-60 seconds, status changes to from "Encoding" to "Ready"
 - Video player appears in post preview
 
-### If Upload Works
+**If Upload Works**
 
 Congratulations. Cloudflare Stream is configured correctly. Videos upload. Videos transcode. Videos play. You're done.
 
-### If Upload Fails
+**If Upload Fails**
 
 Something's misconfigured. Common issues:
 

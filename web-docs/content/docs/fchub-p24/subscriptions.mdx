@@ -26,7 +26,7 @@ The subscription lifecycle has two phases: the initial payment (customer-present
 
 <Steps>
 <Step>
-### Customer Starts a Subscription
+**Customer Starts a Subscription**
 
 The customer adds a subscription product to their cart in FluentCart and proceeds to checkout. When they select Przelewy24, the checkout UI shows only card payment methods with a notice:
 
@@ -35,19 +35,19 @@ The customer adds a subscription product to their cart in FluentCart and proceed
 </Step>
 
 <Step>
-### Transaction Registration with Card Channel
+**Transaction Registration with Card Channel**
 
 The plugin registers the transaction with Przelewy24 using `channel: 1` (cards only). This ensures the customer pays with a card that can be tokenized for future charges.
 </Step>
 
 <Step>
-### Payment and Card Tokenization
+**Payment and Card Tokenization**
 
 The customer is redirected to Przelewy24's payment page, enters their card details, and completes the payment. Przelewy24 processes the charge and sends the IPN notification back to your site.
 </Step>
 
 <Step>
-### Card Info Retrieval
+**Card Info Retrieval**
 
 After the IPN confirms a successful payment, the plugin calls the Przelewy24 card info endpoint (`GET /api/v1/card/info/{orderId}`) to retrieve:
 
@@ -69,7 +69,7 @@ These values are stored as subscription meta:
 </Step>
 
 <Step>
-### First Renewal Scheduled
+**First Renewal Scheduled**
 
 The plugin sets the subscription's `vendor_subscription_id` to `p24_sub_{id}` and schedules the first renewal using Action Scheduler, based on FluentCart's billing interval.
 </Step>
@@ -83,7 +83,7 @@ Renewal charges happen in the background via WordPress Action Scheduler. The plu
 
 <Steps>
 <Step>
-### Action Scheduler Fires
+**Action Scheduler Fires**
 
 At the scheduled time, Action Scheduler runs the `fchub_p24_process_renewal` hook with the subscription ID. The plugin loads the subscription and validates it:
 
@@ -94,7 +94,7 @@ At the scheduled time, Action Scheduler runs the `fchub_p24_process_renewal` hoo
 </Step>
 
 <Step>
-### Transaction Registration with methodRefId
+**Transaction Registration with methodRefId**
 
 The plugin registers a new transaction with Przelewy24, this time including the `methodRefId` parameter — the stored card reference ID from the initial payment. This tells P24 to charge the previously tokenized card.
 
@@ -114,19 +114,19 @@ A pending renewal session ID is stored on the subscription meta (`_p24_pending_r
 </Step>
 
 <Step>
-### Card Charge
+**Card Charge**
 
 The plugin calls the card charge endpoint (`POST /api/v1/card/charge`) with the token received from the registration. This initiates the charge asynchronously — the actual result comes via IPN.
 </Step>
 
 <Step>
-### IPN Confirms Renewal
+**IPN Confirms Renewal**
 
 When the charge succeeds, Przelewy24 sends an IPN notification. The plugin's IPN handler detects that the session belongs to a pending renewal (by matching `_p24_pending_renewal_session`), verifies the payment, and records it through FluentCart's `SubscriptionService::recordRenewalPayment()`.
 </Step>
 
 <Step>
-### Next Renewal Scheduled
+**Next Renewal Scheduled**
 
 After a successful renewal, the plugin:
 

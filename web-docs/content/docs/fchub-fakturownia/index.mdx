@@ -55,27 +55,27 @@ Here's the high-level flow from order to invoice:
 
 <Steps>
   <Step>
-    ### Customer Completes Checkout
+    **Customer Completes Checkout**
 
     The customer places an order in your FluentCart store. If they want a company invoice, they check the "I want a company invoice" box and enter their NIP.
   </Step>
   <Step>
-    ### Payment Confirmed
+    **Payment Confirmed**
 
     FluentCart processes the payment and fires the `order_paid_done` event. This is the trigger that starts the invoicing process.
   </Step>
   <Step>
-    ### Invoice Created in Fakturownia
+    **Invoice Created in Fakturownia**
 
     The plugin maps the order data (buyer info, line items, VAT rates, payment method) to Fakturownia's invoice format and sends it via the API. The invoice is created with a "paid" status.
   </Step>
   <Step>
-    ### KSeF Submission (Optional)
+    **KSeF Submission (Optional)**
 
     If KSeF auto-send is enabled, the invoice is submitted to Poland's e-invoicing system at the same time. A background cron job polls Fakturownia for the KSeF status and stores the KSeF ID once confirmed.
   </Step>
   <Step>
-    ### Invoice Data Stored on Order
+    **Invoice Data Stored on Order**
 
     The invoice number, PDF link, and KSeF status are stored as order metadata. This information is visible in the FluentCart admin order view.
   </Step>

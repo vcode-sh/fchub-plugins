@@ -1,148 +1,136 @@
 ---
 title: FluentCart MCP Server
-description: I built an MCP server that lets AI assistants manage your FluentCart store. 200+ tools. Orders, products, customers, reports — the lot. Open source.
+description: Let your AI assistant manage your FluentCart store. 276 tools, plain English, open source.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
-import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-I got tired of clicking through FluentCart admin panels, so I built an MCP server that lets AI assistants do it for me. You connect it to Claude, Cursor, Copilot, Codex — whatever speaks MCP — and suddenly your AI can look up orders, create products, pull revenue reports, manage subscriptions, and do basically everything you'd do in the admin panel. Except faster and without the RSI.
+FluentCart admin panels are fine if you enjoy clicking through seventeen screens to refund an order. For everyone else, there's this — an MCP server that lets your AI assistant manage your store. Connect it to Claude, Cursor, Copilot, ChatGPT, Codex — whatever speaks MCP — and suddenly your AI can look up orders, create products, pull revenue reports, manage subscriptions, and do basically everything you'd do in the admin panel. Except faster.
 
-It's open source, it's on npm, and it took me an unreasonable amount of time to build. You're welcome.
-
-## What's MCP?
-
-**Model Context Protocol** is an open standard that lets AI assistants use external tools. Think of it as giving your AI hands — without MCP, it can only talk. With MCP, it can actually *do things*.
-
-Without this server, your AI knows absolutely nothing about your store. With it plugged in, it can fetch orders, check revenue, create coupons, manage subscriptions — anything you'd normally do by clicking through WordPress admin like it's 2008.
+Open source. On [npm](https://www.npmjs.com/package/fluentcart-mcp). On [GitHub](https://github.com/vcode-sh/fchub-plugins).
 
 <Callout type="info" title="No AI Expertise Required">
-You don't need to understand how MCP works. If you can install a Node.js package and paste a config snippet, you're overqualified. I walk you through every step.
+You don't need to understand how MCP works. If you can double-click a file or paste a config snippet, you're overqualified.
 </Callout>
-
-## What I Built
-
-I crammed over 200+ tools into this thing, covering everything a store owner, support agent, or developer would actually ask an AI to do:
-
-<Cards>
-  <Card title="Orders &amp; Support">
-    Look up orders, process refunds, update statuses, change addresses, handle disputes. The daily grind, automated.
-  </Card>
-  <Card title="Products &amp; Catalogue">
-    Create products, update pricing, manage variants, handle downloads and licences. Full catalogue management via conversation.
-  </Card>
-  <Card title="Customers">
-    Find customers, view order history, manage addresses, check lifetime value. Support without the clicking.
-  </Card>
-  <Card title="Subscriptions">
-    List, pause, resume, cancel, reactivate. The full subscription lifecycle, because recurring revenue is the only revenue that matters.
-  </Card>
-  <Card title="Coupons &amp; Promotions">
-    Create discount codes, check eligibility, apply coupons to orders. Marketing at the speed of thought (or at least the speed of your AI).
-  </Card>
-  <Card title="Reports &amp; Analytics">
-    Revenue, sales growth, top products, customer insights, subscription health. Ask questions about your data in English, get answers in English.
-  </Card>
-</Cards>
-
-## How It Actually Works
-
-Dead simple:
-
-1. **You ask** your AI something about your store — "Show me today's orders" or "Create a 20% off coupon"
-2. **The AI picks** the right tool and calls the MCP server
-3. **The MCP server** makes an authenticated API call to your WordPress site
-4. **FluentCart** does the work and returns the data
-5. **The AI reads** the response and tells you what happened, in plain English
-
-You never touch the API. You never write JSON. You just talk to the thing like a normal person.
-
-<Callout type="warn" title="Your Store, Your Data">
-The MCP server connects directly to **your** WordPress site using your credentials. Nothing passes through me, my servers, or any third party. I don't even have analytics. I built this thing and I have no idea how many people use it.
-</Callout>
-
-## What You Need
-
-Three things. That's it.
-
-| Requirement | Details |
-|-------------|---------|
-| **Node.js** | Version 22 or higher ([download](https://nodejs.org)) — *not needed for the Claude Desktop Extension* |
-| **WordPress** | Version 5.6+ with FluentCart installed |
-| **Application Password** | A WordPress Application Password for API access |
-
-No extra plugins. No external API keys. WordPress Application Passwords have been built in since version 5.6 — if you're running something older than that, we need to have a different conversation entirely.
 
 ## Quick Start
 
-### Claude Desktop — One Click
+**Claude Desktop — one click:**
 
 Download [fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases/download/fluentcart-mcp/v1.0.0/fluentcart-mcp.mcpb), double-click, enter your WordPress credentials. Done. No Node.js, no JSON, no terminal.
 
-### Everyone Else
+**Everyone else:**
 
 ```bash
-# Run directly — no global install needed
-npx fluentcart-mcp
+npx fluentcart-mcp setup
 ```
 
-Then configure your AI client with your WordPress URL, username, and Application Password. The [Setup Guide](/docs/fluentcart-mcp/setup) holds your hand through every platform.
+Asks three questions (WordPress URL, username, Application Password), tests the connection, saves the config. Then point your AI client at `npx fluentcart-mcp`. The [Setup Guide](/docs/fluentcart-mcp/setup) covers every platform step by step.
 
 <Separator className="my-8" />
 
-## Supported AI Clients
+## What You Can Do
 
-I tested this with everything that speaks MCP:
-
-| Client | Platform | How Hard? |
-|--------|----------|-----------|
-| **Claude Desktop (Extension)** | macOS, Windows | Download, double-click, done |
-| **Claude Desktop (npx)** | macOS, Windows | Copy-paste some JSON |
-| **Claude Code** | Terminal | One command, done |
-| **Cursor** | macOS, Windows, Linux | Copy-paste some JSON |
-| **VS Code + Copilot** | macOS, Windows, Linux | Add to settings.json |
-| **Windsurf** | macOS, Windows, Linux | Copy-paste some JSON |
-| **Codex CLI** | Terminal | Environment variables |
-
-If your client speaks MCP and isn't on this list, it'll almost certainly work. The config is the same everywhere.
-
-## Things People Actually Say to It
-
-Once you're connected, you just... talk:
+276 tools across 27 modules. You just talk — the AI picks the right tool:
 
 > "Show me all orders from the last 7 days"
-
-> "What's my revenue this month compared to last month?"
 
 > "Create a 15% discount coupon that expires next Friday"
 
 > "Find the customer with email john@example.com and show their order history"
 
-> "Pause subscription #42 — the customer asked for a break"
-
-> "Which products sold the most this week?"
+> "What's my revenue this month compared to last month?"
 
 > "Refund order #1234 — the customer received a damaged item"
 
-> "Create a new digital product called 'Pro License' priced at $99"
+> "Set up a flat-rate shipping zone for Europe at £5.99"
 
-The AI figures out which of my 200+ tools to call and fills in the parameters. You describe what you want like you're talking to a competent colleague. Wild concept, I know.
+<Cards>
+  <Card title="Orders &amp; Support">
+    Look up orders, process refunds, update statuses, handle disputes. The daily grind, automated.
+  </Card>
+  <Card title="Products &amp; Catalogue">
+    Create products, update pricing, manage variants, downloads and licences.
+  </Card>
+  <Card title="Customers &amp; Subscriptions">
+    Find customers, check lifetime value, pause/resume/cancel subscriptions.
+  </Card>
+  <Card title="Reports &amp; Analytics">
+    45 report tools — revenue, sales growth, top products, customer insights. Ask questions, get answers.
+  </Card>
+  <Card title="Shipping, Tax &amp; Email">
+    Shipping zones, tax rates, EU VAT, email templates, notification settings.
+  </Card>
+  <Card title="Store Management">
+    Coupons, roles, permissions, integrations, files, print templates.
+  </Card>
+</Cards>
+
+<Separator className="my-8" />
+
+## How It Works
+
+1. **You ask** your AI something — "Show me today's orders"
+2. **The AI picks** the right tool and calls the MCP server
+3. **The MCP server** makes an authenticated call to your WordPress site
+4. **FluentCart** does the work and returns the data
+5. **The AI** tells you what happened, in plain English
+
+No API calls. No JSON. Just a conversation.
+
+<Callout type="warn" title="Your Store, Your Data">
+The MCP server connects directly to **your** WordPress site. Nothing passes through third-party servers. Your data stays between your AI client and your WordPress installation.
+</Callout>
+
+## What You Need
+
+| Requirement | Details |
+|-------------|---------|
+| **WordPress** | Version 5.6+ with [FluentCart](https://fluentcart.com) installed |
+| **Application Password** | Generated in WordPress admin (Users → Profile) |
+| **Node.js 22+** | [Download](https://nodejs.org) — *not needed for the Claude Desktop Extension* |
+
+## Supported AI Clients
+
+| Client | How Hard? |
+|--------|-----------|
+| [**Claude Desktop (Extension)**](/docs/fluentcart-mcp/setup) | Download, double-click, done |
+| [**Claude Desktop**](/docs/fluentcart-mcp/setup) | Paste some JSON |
+| [**Claude Code**](/docs/fluentcart-mcp/setup) | One command |
+| [**Cursor**](/docs/fluentcart-mcp/setup) | Paste some JSON |
+| [**VS Code + Copilot**](/docs/fluentcart-mcp/setup) | Add to settings |
+| [**Windsurf**](/docs/fluentcart-mcp/setup) | Paste some JSON |
+| [**Codex CLI**](/docs/fluentcart-mcp/setup) | Config file |
+| [**ChatGPT / Docker**](/docs/fluentcart-mcp/setup) | Docker one-liner |
+
+Anything that speaks MCP will work. The config is the same everywhere.
+
+<Separator className="my-8" />
 
 ## Next Steps
 
 <Cards>
   <Card title="Setup Guide" href="/docs/fluentcart-mcp/setup">
-    I walk you through every platform, step by step. Even if you've never heard of MCP before, you'll be running in 5 minutes.
+    Every platform, step by step. Five minutes, even if you've never heard of MCP.
   </Card>
   <Card title="Usage &amp; Examples" href="/docs/fluentcart-mcp/usage">
-    What to ask, how to phrase it, and dozens of example prompts organised by category.
+    What to ask and how to phrase it. Dozens of example prompts by category.
   </Card>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    The full list of 200+ tools, organised by module. Every single thing the AI can do with your store.
+    All 276 tools across 27 modules. The complete inventory.
   </Card>
   <Card title="Troubleshooting" href="/docs/fluentcart-mcp/troubleshooting">
-    Something broken? Auth errors? Timeouts? I've seen them all.
+    Something broken? Every failure mode is covered.
+  </Card>
+</Cards>
+
+<Cards>
+  <Card title="GitHub" href="https://github.com/vcode-sh/fchub-plugins">
+    Source code, issues, and releases.
+  </Card>
+  <Card title="npm" href="https://www.npmjs.com/package/fluentcart-mcp">
+    The package on npm.
   </Card>
 </Cards>

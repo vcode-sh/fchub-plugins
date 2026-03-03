@@ -35,27 +35,27 @@ FCHub Fakturownia does not communicate with KSeF directly. Instead, it leverages
 
 <Steps>
   <Step>
-    ### Invoice Created with KSeF Flag
+    **Invoice Created with KSeF Flag**
 
     When an order is paid and the invoice is created, the plugin sends the `gov_save_and_send: true` parameter to Fakturownia's API. This tells Fakturownia to create the invoice **and** immediately submit it to KSeF.
   </Step>
   <Step>
-    ### Fakturownia Submits to KSeF
+    **Fakturownia Submits to KSeF**
 
     Fakturownia handles the XML conversion and submission to KSeF. This happens asynchronously on Fakturownia's servers -- the initial API response returns before KSeF confirms receipt.
   </Step>
   <Step>
-    ### Status Polling via Cron
+    **Status Polling via Cron**
 
     Since KSeF processing is asynchronous, the plugin schedules a WordPress cron event (`fchub_fakturownia_check_ksef_status`) to check back after 60 seconds. The cron job fetches the invoice from Fakturownia's API and reads the `gov_status` field.
   </Step>
   <Step>
-    ### Status Updates
+    **Status Updates**
 
     The cron job updates the order metadata with the latest KSeF status, KSeF ID, and verification link. If the status is still `processing`, it schedules another check in 2 minutes.
   </Step>
   <Step>
-    ### Completion
+    **Completion**
 
     Once KSeF returns a final status (`ok` or `send_error`), the polling stops and a log entry is added to the order.
   </Step>

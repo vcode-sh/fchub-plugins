@@ -18,8 +18,6 @@ Each endpoint supports three icon formats. Pick whichever suits your aesthetic s
 <Tabs items={['SVG Code', 'Dashicon', 'Image URL']}>
 <Tab value="SVG Code">
 
-### SVG Code <Badge variant="outline">Recommended</Badge>
-
 Paste raw SVG markup into the textarea field. The SVG is rendered inline in the portal sidebar, which means it scales perfectly at any size and supports `currentColor` for theme-aware colouring. If FluentCart switches between light and dark mode, your icon follows along without you lifting a finger.
 
 A live preview appears below the textarea as you type — useful for catching that moment when your hand-crafted SVG turns out to be an invisible 0x0 rectangle.
@@ -55,8 +53,6 @@ Design your SVGs with `stroke="currentColor"` or `fill="currentColor"` so they i
 
 </Tab>
 <Tab value="Dashicon">
-
-### Dashicon
 
 Select from a curated list of 29 WordPress Dashicons via a searchable dropdown. Start typing and the list filters down — no need to memorise the full Dashicon catalogue (all 300+ of them) because the plugin has already picked the ones that make sense for portal navigation.
 
@@ -104,8 +100,6 @@ Good for quick setups where you just need a recognisable icon and can't be bothe
 </Tab>
 <Tab value="Image URL">
 
-### Image URL
-
 Enter any image URL — PNG, SVG, ICO, whatever you've got — and the plugin renders it as an `<img>` tag at 20x20px with `object-fit: contain`. A live preview appears below the input field.
 
 **Good for:**
@@ -142,8 +136,6 @@ All content types except **Redirect** support this option. Redirects don't rende
 <Tabs items={['Auto-fit Viewport', 'Fixed Height']}>
 <Tab value="Auto-fit Viewport">
 
-### Auto-fit Viewport <Badge variant="outline">Default when enabled</Badge>
-
 The container automatically fills the remaining viewport height, minus a 24px bottom margin for breathing room. No magic numbers to guess, no CSS to write — it measures the container's offset from the top of the viewport and sets `max-height` dynamically.
 
 **How it works:**
@@ -162,8 +154,6 @@ This mode is ideal when you don't know how tall the content will be — which, l
 
 </Tab>
 <Tab value="Fixed Height">
-
-### Fixed Height
 
 Set a specific pixel height and call it a day. Content taller than the specified value shows a vertical scrollbar. Content shorter just sits there with empty space below it. Simple, predictable, and requires zero JavaScript — it's pure CSS `max-height` plus `overflow-y: auto`.
 

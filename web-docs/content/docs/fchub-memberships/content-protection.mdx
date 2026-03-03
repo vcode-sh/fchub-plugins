@@ -56,8 +56,6 @@ Each post can have its own teaser configuration through the **Membership Protect
 <Tabs items={['Posts & Pages', 'Taxonomies', 'Menus', 'URLs', 'Comments', 'Special Pages']}>
 <Tab value="Posts & Pages">
 
-### ContentProtection
-
 The `ContentProtection` class is the primary protection handler for posts, pages, and custom post types. It hooks into:
 
 - `the_content` (priority 999) — replaces content with restriction message
@@ -86,8 +84,6 @@ When "Hide protected content in archives" is enabled in settings, protected post
 </Tab>
 <Tab value="Taxonomies">
 
-### TaxonomyProtection
-
 The `TaxonomyProtection` class handles taxonomy term protection. When you protect a category or tag:
 
 - All posts assigned to that term inherit the protection
@@ -105,8 +101,6 @@ The `TaxonomyProtection` class only registers its hooks inside `is_admin()`. Fro
 </Tab>
 <Tab value="Menus">
 
-### MenuProtection
-
 The `MenuProtection` class hides navigation menu items from non-members. When a menu item is associated with protected content:
 
 - Non-members don't see the menu item at all
@@ -117,8 +111,6 @@ This prevents non-members from discovering URLs for content they can't access. P
 
 </Tab>
 <Tab value="URLs">
-
-### UrlProtection
 
 The `UrlProtection` class protects arbitrary URLs using pattern matching. It hooks into `template_redirect` at priority 5 (before content protection) and checks the current URL against configured rules.
 
@@ -147,8 +139,6 @@ URL rules are cached via WordPress transients for 5 minutes. The cache is cleare
 </Tab>
 <Tab value="Comments">
 
-### CommentProtection
-
 The `CommentProtection` class restricts comment access on protected content:
 
 - Non-members cannot view existing comments on protected posts
@@ -159,8 +149,6 @@ This ensures that member discussions remain private and non-members cannot read 
 
 </Tab>
 <Tab value="Special Pages">
-
-### SpecialPageProtection
 
 The `SpecialPageProtection` class protects WordPress special pages that are not regular posts:
 

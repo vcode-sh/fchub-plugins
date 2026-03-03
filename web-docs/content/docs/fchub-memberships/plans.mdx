@@ -132,21 +132,21 @@ Plans are connected to FluentCart products through integration feeds. This is wh
 <Steps>
 <Step>
 
-### Open the product editor
+**Open the product editor**
 
 In FluentCart, edit the product you want to sell as a membership.
 
 </Step>
 <Step>
 
-### Add a Memberships feed
+**Add a Memberships feed**
 
 Under the **Integrations** tab, add a new feed and select **Memberships**.
 
 </Step>
 <Step>
 
-### Configure the feed
+**Configure the feed**
 
 - **Membership Plan** — select your plan from the dropdown (populated via the `fluent_cart/integration/integration_options_plan_id` filter)
 - **Validity Mode** — lifetime, fixed duration (with days), or mirror subscription
@@ -158,7 +158,7 @@ Under the **Integrations** tab, add a new feed and select **Memberships**.
 </Step>
 <Step>
 
-### Set the event trigger
+**Set the event trigger**
 
 The default trigger is `order_paid_done`, which fires when payment is confirmed. For subscriptions, the feed also handles renewal events through the `SubscriptionValidityWatcher`.
 

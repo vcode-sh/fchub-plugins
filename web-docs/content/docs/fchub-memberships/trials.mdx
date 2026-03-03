@@ -32,7 +32,7 @@ The `TrialLifecycleService` manages the complete trial lifecycle through the `fc
 <Steps>
 <Step>
 
-### Trial starts
+**Trial starts**
 
 When a membership with trial days is granted, the grant's `trial_ends_at` is set. The member gets immediate access to all plan content (including drip-scheduled content that has unlocked).
 
@@ -41,7 +41,7 @@ If FluentCRM is active, the `TrialStartedTrigger` fires, allowing you to start a
 </Step>
 <Step>
 
-### Trial expiring notification
+**Trial expiring notification**
 
 A configurable number of days before the trial ends (default: 3), the `TrialLifecycleService::sendTrialExpiringNotifications()` method sends a notification email.
 
@@ -57,7 +57,7 @@ Each grant is only notified once — the method sets `trial_expiry_notified` in 
 </Step>
 <Step>
 
-### Trial ends — conversion check
+**Trial ends — conversion check**
 
 The daily cron calls `TrialLifecycleService::checkTrialExpirations()` to find active grants where `trial_ends_at` has passed. For each expired trial:
 

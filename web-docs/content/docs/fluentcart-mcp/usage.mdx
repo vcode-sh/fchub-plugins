@@ -1,6 +1,6 @@
 ---
 title: Usage & Examples
-description: How to talk to your FluentCart store through AI. I show you what to ask, how to ask it, and what to expect back.
+description: How to talk to your FluentCart store through AI. 276 tools, plain English. What to ask, how to ask it, and what to expect back.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
@@ -10,11 +10,11 @@ import { Separator } from '@/components/ui/separator';
 
 You're connected. Now what?
 
-You just... talk. No special syntax. No commands to memorise. No tool names to remember. I built 194 tools with descriptions so rich that any halfway decent AI can figure out which one to use from plain English. Describe what you want and let the AI sort it out.
+You just... talk. No special syntax. No commands to memorise. No tool names to remember. 276 tools with descriptions rich enough that any halfway decent AI can figure out which one to use from plain English. Describe what you want and let the AI sort it out.
 
 ## How to Talk to It
 
-You don't need to know my tool names or API parameters. The AI translates your intent into the right calls:
+You don't need to know tool names or API parameters. The AI translates your intent into the right calls:
 
 | Don't say this | Say this instead |
 |----------------|------------------|
@@ -25,12 +25,12 @@ You don't need to know my tool names or API parameters. The AI translates your i
 The AI picks the right tool, fills in the parameters, and calls the MCP server. You'll see it working — most clients show which tools are being called in real time.
 
 <Callout type="info" title="Specificity Wins">
-"Show me orders" works. "Show me pending orders from the last 7 days sorted by total, highest first" works better. The more context you give, the more precise the results. I designed every tool schema to accept useful filters — help the AI use them.
+"Show me orders" works. "Show me pending orders from the last 7 days sorted by total, highest first" works better. The more context you give, the more precise the results. Every tool schema accepts useful filters — help the AI use them.
 </Callout>
 
 ## Example Prompts by Category
 
-I've organised these by the things people actually ask. Pick a section, steal a prompt, adjust to taste.
+Organised by the things people actually ask. Pick a section, steal a prompt, adjust to taste.
 
 <Accordions type="multiple">
 <Accordion title="Orders & Support">
@@ -193,12 +193,66 @@ This is where it gets genuinely useful. Instead of staring at charts in the admi
 - "What are today's stats?"
 
 </Accordion>
+<Accordion title="Shipping & Fulfilment">
+
+**Zones & methods:**
+- "List all shipping zones"
+- "Create a shipping zone called 'Europe' with countries PL, DE, FR"
+- "Add a flat-rate shipping method at £5.99 to the Europe zone"
+- "Add a free shipping method with £50 minimum order to zone #1"
+- "Delete shipping zone #5"
+- "What shipping methods are available?"
+
+**Shipping classes:**
+- "List all shipping classes"
+- "Create a shipping class called 'Heavy Items' with £3 extra per item"
+
+</Accordion>
+<Accordion title="Tax & VAT">
+
+**Rates & classes:**
+- "List all tax classes"
+- "What's the VAT rate for Poland?"
+- "Create a 23% VAT rate for Poland"
+- "Show me EU VAT rates for all member states"
+- "Delete all tax rates for Germany"
+
+**Settings & records:**
+- "What are the current tax settings?"
+- "Show me tax records for January"
+- "Mark the January tax records as filed"
+
+</Accordion>
+<Accordion title="Email Notifications">
+
+**Templates:**
+- "List all email notification templates"
+- "Show me the order confirmation email template"
+- "Update the order confirmation email subject to 'Thanks for your order!'"
+- "Disable the abandoned cart email notification"
+- "Preview the new order email template"
+
+**Settings:**
+- "What shortcodes can I use in email templates?"
+- "Update the email sender name to 'My Store'"
+
+</Accordion>
+<Accordion title="Roles & Access">
+
+- "List all roles"
+- "Who has store manager access?"
+- "Create a custom role called 'Support Agent' with order management capabilities"
+- "List all users and their roles"
+
+</Accordion>
 <Accordion title="Settings & Configuration">
 
 **Store settings:**
 - "Show me the current store settings"
 - "What payment methods are available?"
 - "What are the current module settings?"
+- "Save the module settings to enable stock management"
+- "Reorder the payment methods — put Stripe first"
 
 **Integrations:**
 - "List all installed addons"
@@ -209,6 +263,11 @@ This is where it gets genuinely useful. Instead of staring at charts in the admi
 - "List all attribute groups"
 - "Create a new attribute group called 'Sizes'"
 - "Add terms Small, Medium, Large to the Sizes attribute group"
+
+**Files & templates:**
+- "Show me the print templates for invoices"
+- "Upload a file to the store"
+- "List all uploaded files"
 
 </Accordion>
 <Accordion title="Everything Else">
@@ -237,7 +296,7 @@ This is where it gets genuinely useful. Instead of staring at charts in the admi
 
 <Separator className="my-8" />
 
-## Tips I've Learned
+## Tips Worth Knowing
 
 ### Give it IDs when you have them
 
@@ -252,12 +311,12 @@ The AI will call multiple tools in sequence. It's surprisingly good at this.
 
 ### Ask for analysis, not just data
 
-My tools return raw data, but the AI can interpret it:
+The tools return raw data, but the AI can interpret it:
 - "Summarise this week's sales performance"
 - "Compare this month's revenue to last month and tell me if we're on track"
 - "Which of my top 10 products had declining sales this month?"
 
-I provide the data. The AI provides the insight. Division of labour.
+The MCP provides the data. The AI provides the insight. Division of labour.
 
 ### Describe support scenarios
 
@@ -267,19 +326,20 @@ Rather than issuing individual commands, describe the whole situation:
 
 The AI will investigate, call the right tools, and report back.
 
+### Don't overthink the setup
+
+Shipping zones and tax rates sound intimidating, but the AI handles the complexity. Just say "set up 23% VAT for Poland" or "add flat-rate shipping for Europe at €5" — the AI maps your intent to the right fields. You're not filling in a tax form, you're having a conversation.
+
 ## What It Can't Do
 
-I built a lot of tools, but I'm not delusional. There are limits:
+276 tools is a lot, but let's not get delusional. There are limits:
 
 | Can't Do | Why |
 |----------|-----|
 | **Charge credit cards** | Payments require customer interaction (redirects, card forms). The MCP server can mark orders as paid, but it can't process payments. |
-| **Send emails** | Email templates live in FluentCart's UI. Not an API surface I can reach. |
+| **Send arbitrary emails** | The MCP manages email templates and notification settings, but can't compose and fire off a one-off email to a customer. That's not what the API does. |
 | **Edit checkout pages** | That's frontend work — HTML/CSS/JS. Not API territory. |
-| **Upload product images** | File uploads aren't part of the current API surface. Use WordPress admin for media. |
-| **Configure shipping zones** | One-time setup work. I'm adding this in v1.1. |
-| **Manage tax rates** | Complex and legally sensitive. Coming in v1.1. |
-| **Touch other WordPress data** | The MCP server only talks to FluentCart endpoints. It can't read your blog posts, other plugins, or WordPress users. |
+| **Touch other WordPress data** | The MCP server only talks to FluentCart endpoints. It can't read your blog posts, other plugins, or WordPress users directly. |
 
 ## A Note About Money
 
@@ -289,97 +349,15 @@ FluentCart stores all monetary values in the **smallest currency unit**. Cents f
 - **€100.00** is stored as **10000**
 - **40.00 PLN** is stored as **4000**
 
-The AI usually converts these when presenting results to you. But if you see numbers that look 100x too large, that's why. When creating products or coupons, just say the human amount — "price it at $49" — and the AI will handle the conversion. I documented the currency format in every tool description precisely so the AI gets this right.
-
-## Dynamic Mode
-
-By default, all 194 tools are registered as static MCP tool definitions. That's ~20K tokens of context the LLM loads on every turn. If your context window budget matters (and it should), start the server with `--mode dynamic`:
-
-```bash
-npx fluentcart-mcp --mode dynamic
-```
-
-Or in your Claude Desktop config:
-
-```json
-{
-  "mcpServers": {
-    "fluentcart": {
-      "command": "npx",
-      "args": ["-y", "fluentcart-mcp", "--mode", "dynamic"],
-      "env": { ... }
-    }
-  }
-}
-```
-
-Instead of 194 tool definitions, the AI gets 3:
-
-1. **`fluentcart_search_tools`** — Find tools by keyword and category
-2. **`fluentcart_describe_tools`** — Get full schemas for specific tools
-3. **`fluentcart_execute_tool`** — Run any tool by name
-
-The AI searches for what it needs, reads the schema, then executes. Same tools, same results — just discovered lazily instead of dumped upfront. ~96% fewer tokens in the initial context.
-
-<Callout type="info" title="When to Use Dynamic Mode">
-If you have a large conversation or use other MCP servers alongside this one, dynamic mode keeps your token budget sane. If you only use FluentCart and value speed over savings, static mode is fine.
-</Callout>
-
-<Separator className="my-8" />
-
-## MCP Resources
-
-Four read-only resources for reference data. These are browsable context the AI can read without calling tools — useful for grounding conversations with store configuration:
-
-| Resource URI | Description |
-|-------------|-------------|
-| `fluentcart://store/config` | Store settings and configuration (currency, locale, modules) |
-| `fluentcart://store/countries` | Supported countries and their details |
-| `fluentcart://store/payment-methods` | Configured payment methods |
-| `fluentcart://store/filter-options` | Available filter options for orders, products, customers |
-
-Resources are application-controlled — the client decides when to read them. Static data is cached in-memory, so repeated reads don't hit the API.
-
-<Separator className="my-8" />
-
-## MCP Prompts
-
-Five pre-built workflows that guide the AI through multi-step operations. Think of them as recipes — the AI knows which tools to call and in what order:
-
-| Prompt | Arguments | What It Does |
-|--------|-----------|-------------|
-| `analyze-store-performance` | `startDate`, `endDate` | Revenue overview, KPIs, and best sellers for a date range |
-| `investigate-order` | `order_id` | Deep-dive into order details, transactions, and activity timeline |
-| `customer-overview` | `customer_id` | Full customer profile with stats, addresses, and spending history |
-| `catalog-summary` | *(none)* | Catalog health report — product count, top sellers, store metrics |
-| `subscription-health` | `startDate`, `endDate` | Subscription churn, renewal success, and revenue forecast |
-
-Not all MCP clients support prompts yet. Claude Desktop and Claude Code do. If yours doesn't, just ask for the same thing in plain English — the AI will figure out the same tool sequence on its own.
-
-<Separator className="my-8" />
-
-## Response Caching
-
-Static reference data is cached in-memory so the AI doesn't re-fetch the same 250-country list every time it needs to validate an address:
-
-| Endpoint | Cache TTL |
-|----------|-----------|
-| Countries list | 1 hour |
-| Filter options | 10 minutes |
-| App init (store config) | 10 minutes |
-| Report metadata | 10 minutes |
-
-The cache lives in the server process. Restart the server to clear it. No external dependencies, no Redis, no drama.
-
-<Separator className="my-8" />
+The AI usually converts these when presenting results to you. But if you see numbers that look 100x too large, that's why. When creating products or coupons, just say the human amount — "price it at $49" — and the AI will handle the conversion. The currency format is documented in every tool description precisely so the AI gets this right.
 
 ## Next Steps
 
 <Cards>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    Every tool I built, listed by module. The complete inventory.
+    All 276 tools, listed by module. The complete inventory.
   </Card>
   <Card title="Troubleshooting" href="/docs/fluentcart-mcp/troubleshooting">
-    Something not working? I've seen every failure mode. Start here.
+    Something not working? Every failure mode is covered. Start here.
   </Card>
 </Cards>

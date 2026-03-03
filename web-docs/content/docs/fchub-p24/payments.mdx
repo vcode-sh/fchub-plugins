@@ -16,7 +16,7 @@ Every Przelewy24 payment follows the same redirect-based flow. The customer neve
 
 <Steps>
 <Step>
-### Customer Selects Przelewy24
+**Customer Selects Przelewy24**
 
 At the FluentCart checkout, the customer selects Przelewy24 as their payment method. The checkout UI loads available payment methods from the P24 API and displays them grouped by type (BLIK, cards, bank transfers, wallets).
 
@@ -24,7 +24,7 @@ The customer can optionally select a specific payment method (e.g., a particular
 </Step>
 
 <Step>
-### Transaction Registration
+**Transaction Registration**
 
 When the customer clicks "Place Order," the plugin registers the transaction with the Przelewy24 API (`/api/v1/transaction/register`). This call includes:
 
@@ -41,7 +41,7 @@ The API returns a payment **token** that the plugin stores in the transaction me
 </Step>
 
 <Step>
-### Redirect to Przelewy24
+**Redirect to Przelewy24**
 
 The customer is redirected to:
 
@@ -55,7 +55,7 @@ On this page, the customer completes payment using their chosen method — enter
 </Step>
 
 <Step>
-### IPN Callback
+**IPN Callback**
 
 After the customer completes (or fails) the payment, Przelewy24 sends a POST request to your site's IPN URL:
 
@@ -67,7 +67,7 @@ The plugin processes this notification (see [IPN Processing](#ipn-processing) be
 </Step>
 
 <Step>
-### Customer Returns to Your Site
+**Customer Returns to Your Site**
 
 Regardless of the IPN result, the customer is redirected back to your FluentCart receipt page. The return URL includes the transaction hash so FluentCart can display the order confirmation.
 </Step>
@@ -130,13 +130,13 @@ IPN (Instant Payment Notification) is how Przelewy24 tells your site that a paym
 
 <Steps>
 <Step>
-### HTTP Method Check
+**HTTP Method Check**
 
 The plugin only accepts POST requests. Any other method returns a `405 Method Not Allowed` response.
 </Step>
 
 <Step>
-### Payload Validation
+**Payload Validation**
 
 The JSON payload must contain all required fields:
 
@@ -146,7 +146,7 @@ Missing fields result in a `400 Bad Request` response.
 </Step>
 
 <Step>
-### Signature Verification
+**Signature Verification**
 
 The plugin computes a SHA-384 hash from the notification data combined with your CRC key and compares it to the `sign` field in the payload. The hash input is a JSON string containing:
 
@@ -169,25 +169,25 @@ The comparison uses `hash_equals()` for timing-safe comparison, preventing timin
 </Step>
 
 <Step>
-### Transaction Lookup
+**Transaction Lookup**
 
 The plugin finds the matching FluentCart transaction by `sessionId` (which is the transaction UUID). If the transaction is not found by UUID directly, the plugin falls back to searching recent orders for a matching `p24_session_id` in the order config — this handles the edge case where FluentCart regenerated the transaction UUID during a checkout retry.
 </Step>
 
 <Step>
-### Idempotency Check
+**Idempotency Check**
 
 If the transaction has already been marked as succeeded, the plugin returns `200 OK` without re-processing. This prevents duplicate processing if Przelewy24 sends the same notification multiple times.
 </Step>
 
 <Step>
-### Amount and Currency Verification
+**Amount and Currency Verification**
 
 The plugin verifies that the amount and currency in the IPN match what was originally registered. Any mismatch is logged and rejected with a `400` response.
 </Step>
 
 <Step>
-### Transaction Verification with P24
+**Transaction Verification with P24**
 
 The plugin calls Przelewy24's verification endpoint (`PUT /api/v1/transaction/verify`) with the session ID, order ID, amount, and currency. This is a server-to-server confirmation that the payment is genuine.
 
@@ -195,7 +195,7 @@ The verification request includes its own SHA-384 signature, ensuring the call i
 </Step>
 
 <Step>
-### Order Update
+**Order Update**
 
 If everything checks out, the plugin updates the FluentCart order:
 
@@ -224,13 +224,13 @@ FCHub Przelewy24 supports refunds initiated from the FluentCart admin panel. The
 
 <Steps>
 <Step>
-### Admin Initiates Refund
+**Admin Initiates Refund**
 
 In the FluentCart order details, the admin clicks the refund button and enters the refund amount and reason.
 </Step>
 
 <Step>
-### API Request to P24
+**API Request to P24**
 
 The plugin calls the Przelewy24 refund endpoint (`POST /api/v1/transaction/refund`) with:
 
@@ -245,7 +245,7 @@ The plugin calls the Przelewy24 refund endpoint (`POST /api/v1/transaction/refun
 </Step>
 
 <Step>
-### Refund Confirmation
+**Refund Confirmation**
 
 The refund is not instant. Przelewy24 processes it and sends a refund notification to your IPN URL. The plugin handles this callback separately from payment notifications.
 </Step>

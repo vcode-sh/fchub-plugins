@@ -1,13 +1,13 @@
 ---
 title: Troubleshooting
-description: Something broke? I've seen every failure mode. Auth errors, timeouts, missing tools — all covered here.
+description: Something broke? Auth errors, timeouts, missing tools — every failure mode is covered here.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Cards, Card } from 'fumadocs-ui/components/card';
 
-Something's not working. It happens. I've catalogued every failure mode I've encountered (and the ones users have reported) so you can fix it without filing an issue. Most problems are one of three things: connection, authentication, or timeouts.
+Something's not working. It happens. Every failure mode encountered (and reported by users) is catalogued here so you can fix it without filing an issue. Most problems are one of three things: connection, authentication, or timeouts.
 
 ## Quick Diagnosis
 
@@ -25,7 +25,7 @@ Replace `username` and `application_password` with your actual values. What you 
 | `401 Unauthorized` | Wrong username or Application Password. |
 | `403 Forbidden` | Your user doesn't have admin permissions. |
 | `404 Not Found` | FluentCart isn't installed, or the URL is wrong. |
-| Connection refused | WordPress is unreachable. Network issue, not mine. |
+| Connection refused | WordPress is unreachable. Network or server issue. |
 
 ## Common Issues
 
@@ -40,13 +40,13 @@ Replace `username` and `application_password` with your actual values. What you 
    ```bash
    node --version
    ```
-   The MCP server needs `v22.0.0` or higher. If you don't have Node at all, get it from [nodejs.org](https://nodejs.org). If you have an older version, upgrade. I won't apologise for requiring modern JavaScript.
+   The MCP server needs `v22.0.0` or higher. If you don't have Node at all, get it from [nodejs.org](https://nodejs.org). If you have an older version, upgrade. No apologies for requiring modern JavaScript.
 
 2. **npx not found**
    It comes with Node.js. If `which npx` returns nothing, your Node installation is broken. Reinstall.
 
 3. **JSON syntax error**
-   The number one cause of "it just doesn't work." A trailing comma, a missing quote, a rogue bracket. Paste your config into [jsonlint.com](https://jsonlint.com) and see what it says. I can't debug your JSON for you.
+   The number one cause of "it just doesn't work." A trailing comma, a missing quote, a rogue bracket. Paste your config into [jsonlint.com](https://jsonlint.com) and see what it says. Nobody can debug your JSON for you.
 
 4. **Wrong config file location**
    - Claude Desktop (macOS): `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -90,7 +90,7 @@ Replace `username` and `application_password` with your actual values. What you 
 
 **What's wrong**: Your WordPress user isn't an Administrator.
 
-**Fix**: Go to **Users** in WordPress admin and check the role. FluentCart's REST API needs admin capabilities for nearly everything. Using an Editor or Subscriber account won't work. I can't lower the permission requirements — that's FluentCart's decision, not mine.
+**Fix**: Go to **Users** in WordPress admin and check the role. FluentCart's REST API needs admin capabilities for nearly everything. Using an Editor or Subscriber account won't work. The permission requirements can't be lowered — that's FluentCart's design decision.
 
 </Accordion>
 <Accordion title="Not Found (404)">
@@ -107,7 +107,7 @@ Replace `username` and `application_password` with your actual values. What you 
    - Correct: `https://shop.example.com`
    - Wrong: `https://shop.example.com/wp-admin/`
    - Wrong: `https://shop.example.com/wp-json/`
-   - Wrong: `https://shop.example.com/` (trailing slash is technically fine, I strip it)
+   - Wrong: `https://shop.example.com/` (trailing slash is technically fine, the server strips it)
 
 3. **Permalinks set to "Plain"**
    WordPress REST API needs pretty permalinks. Go to **Settings → Permalinks** and pick literally anything except "Plain". Hit Save even if you don't change anything — this flushes rewrite rules.
@@ -123,7 +123,7 @@ Replace `username` and `application_password` with your actual values. What you 
 **What to do:**
 
 1. **Increase the timeout**
-   My default is 30 seconds. If your server is slow, bump it up via the `FLUENTCART_TIMEOUT` env var (milliseconds):
+   The default is 30 seconds. If your server is slow, bump it up via the `FLUENTCART_TIMEOUT` env var (milliseconds):
    ```json
    "env": {
      "FLUENTCART_URL": "https://your-store.com",
@@ -137,7 +137,7 @@ Replace `username` and `application_password` with your actual values. What you 
    Run `curl https://your-store.com/wp-json/`. If curl also hangs, that's a network or server problem. Not something the MCP server can fix.
 
 3. **Ask for less data**
-   Listing 10,000 orders in one request will be slow on any server. Use pagination — "Show me the last 10 orders" instead of "Show me all orders." I designed every list tool to support `per_page` and `page` parameters for exactly this reason.
+   Listing 10,000 orders in one request will be slow on any server. Use pagination — "Show me the last 10 orders" instead of "Show me all orders." Every list tool supports `per_page` and `page` parameters for exactly this reason.
 
 </Accordion>
 <Accordion title="AI Ignores FluentCart / Won't Use Tools">
@@ -156,7 +156,7 @@ Replace `username` and `application_password` with your actual values. What you 
    Some clients choke when you have 15 MCP servers connected. Try disabling the ones you're not using right now.
 
 3. **Wrong mode**
-   - VS Code Copilot: You must be in **Agent** mode. Regular Chat won't use MCP tools. That's Microsoft's restriction, not mine.
+   - VS Code Copilot: You must be in **Agent** mode. Regular Chat won't use MCP tools. That's Microsoft's design choice.
    - Some clients have "tool use" toggles — make sure it's on.
 
 4. **The AI just needs a nudge**
@@ -191,18 +191,37 @@ Replace `username` and `application_password` with your actual values. What you 
 
 **That's correct.** FluentCart stores money in the smallest currency unit — cents, pence, grosze. 4999 = $49.99. 10000 = €100.00. 4000 = 40.00 PLN.
 
-The AI usually converts these for you. If it doesn't, tell it: "Show prices in dollars, not cents." I documented the currency format in every tool description so the AI knows to convert, but occasionally it shows the raw value.
+The AI usually converts these for you. If it doesn't, tell it: "Show prices in dollars, not cents." The currency format is documented in every tool description so the AI knows to convert, but occasionally it shows the raw value.
+
+</Accordion>
+<Accordion title="Known FluentCart Bugs (Upstream)">
+
+Some things break because of upstream FluentCart issues, not the MCP server. They're documented here so you don't file a bug report that can't be fixed from the MCP side.
+
+**Attribute Term Creation** — `POST /options/attr/group/:id/term` returns "Information mismatch". FluentCart queries the wrong table when validating. Create terms via the admin UI instead.
+
+**Variant Listing Without Product ID** — Calling `variant_list` without a `product_id` crashes the server. Use `product_pricing_get` to list variants for a specific product instead.
+
+**Price 100x Multiplier** — FluentCart's `Helper::toCent()` multiplies by 100 again internally. When passing prices via MCP, pass them in cents (e.g. 4999 for $49.99) — the API handles the rest. If prices look 100x too large, this is why.
+
+**Some Report Endpoints Missing** — A handful of report endpoints (`cart-report`, `order-value-distribution`, `sales-report`, `license-chart`, `license-pie-chart`) aren't registered in FluentCart 1.3.9. The tools exist in MCP for forward compatibility, but they'll return errors on older FluentCart versions. Use the alternative report tools mentioned in each tool's description.
+
+**Customer Address Select** — The `customer_address_select` endpoint is scoped to frontend sessions (cookie auth), not the REST API. Use `customer_addresses` to get all addresses and filter client-side.
+
+For the full list of 14 documented upstream bugs, check the [GitHub repository](https://github.com/vcode-sh/fchub-plugins/issues).
 
 </Accordion>
 </Accordions>
 
 ## Still Stuck?
 
+Before filing an issue, check the Known FluentCart Bugs section above — your problem might be upstream.
+
 If none of the above helps:
 
 1. Check [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues) — someone might've hit the same problem
 2. Open a new issue with: error message, Node.js version, AI client name, and what you tried
-3. Do not include your Application Password in the issue. I don't want it, and neither does anyone else
+3. Do not include your Application Password in the issue. Nobody wants it
 
 <Cards>
   <Card title="GitHub Issues" href="https://github.com/vcode-sh/fchub-plugins/issues">

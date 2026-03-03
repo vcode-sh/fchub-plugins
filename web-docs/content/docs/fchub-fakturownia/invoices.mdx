@@ -18,32 +18,32 @@ The end-to-end process from payment to invoice:
 
 <Steps>
   <Step>
-    ### Order Payment Confirmed
+    **Order Payment Confirmed**
 
     FluentCart fires the `order_paid_done` event when a payment is successfully processed. This is the trigger for the Fakturownia integration.
   </Step>
   <Step>
-    ### Duplicate Check
+    **Duplicate Check**
 
     Before creating anything, the plugin checks if an invoice already exists for this order by looking for the `_fakturownia_invoice_id` meta key. If it finds one, the process stops. This prevents duplicate invoices if the event fires more than once.
   </Step>
   <Step>
-    ### Data Mapping
+    **Data Mapping**
 
     The `InvoiceHandler` maps the FluentCart order data into Fakturownia's invoice format. This includes buyer information, line items, VAT rates, payment method, and seller department.
   </Step>
   <Step>
-    ### API Request
+    **API Request**
 
     The mapped data is sent to Fakturownia's `/invoices.json` endpoint. If KSeF auto-send is enabled, the `gov_save_and_send` flag is included to trigger simultaneous KSeF submission.
   </Step>
   <Step>
-    ### Metadata Storage
+    **Metadata Storage**
 
     On success, the plugin stores the invoice ID, invoice number, invoice URL, client ID, and (if applicable) KSeF status as order metadata. All of this is visible in the FluentCart admin.
   </Step>
   <Step>
-    ### Order Log Entry
+    **Order Log Entry**
 
     A log entry is added to the order: *"Fakturownia: Invoice created -- Invoice [number] created in Fakturownia (ID: [id])"*. If the creation fails, an error log is recorded instead.
   </Step>
@@ -212,32 +212,32 @@ When an order is fully refunded, the plugin automatically creates a correction i
 
 <Steps>
   <Step>
-    ### Refund Triggered
+    **Refund Triggered**
 
     FluentCart fires the `order_fully_refunded` event or the integration's revoke hook. The `RefundHandler` takes over.
   </Step>
   <Step>
-    ### Original Invoice Check
+    **Original Invoice Check**
 
     The handler checks for `_fakturownia_invoice_id` on the order. If no original invoice exists, a warning log is added and the process stops -- you can't correct an invoice that doesn't exist.
   </Step>
   <Step>
-    ### Duplicate Prevention
+    **Duplicate Prevention**
 
     The handler checks for `_fakturownia_correction_id`. If a correction already exists, the process stops to prevent duplicate corrections.
   </Step>
   <Step>
-    ### Correction Created
+    **Correction Created**
 
     A correction invoice is created via the `/invoices.json` endpoint with `kind: correction` and a reference to the original invoice ID. The reason is set to "Refund -- Order #[order_number]".
   </Step>
   <Step>
-    ### KSeF Submission (If Enabled)
+    **KSeF Submission (If Enabled)**
 
     If KSeF auto-send is active, the correction invoice is also submitted to KSeF using Fakturownia's `send_to_ksef` API endpoint. The correction KSeF status is stored separately.
   </Step>
   <Step>
-    ### Metadata and Log
+    **Metadata and Log**
 
     The correction invoice ID and number are stored as order metadata. A log entry is added: *"Fakturownia: Correction invoice created -- Correction [number] created for invoice [original_number]"*.
   </Step>

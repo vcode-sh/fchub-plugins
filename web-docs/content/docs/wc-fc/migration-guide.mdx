@@ -19,7 +19,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
 
 <Steps>
   <Step>
-    ### Back up your database
+    **Back up your database**
 
     Use your preferred backup method. Some options:
 
@@ -36,7 +36,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
-    ### Run preflight checks
+    **Run preflight checks**
 
     Navigate to **Tools > WC-FC Migrator** or call the preflight endpoint directly:
 
@@ -49,7 +49,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
-    ### Review entity counts
+    **Review entity counts**
 
     Check how many records will be migrated:
 
@@ -77,7 +77,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
-    ### Run a dry run (recommended)
+    **Run a dry run (recommended)**
 
     Before writing any data, run the migration in dry-run mode. Every record is validated, mapped, and logged — but nothing is written to FluentCart.
 
@@ -106,7 +106,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
-    ### Start the migration
+    **Start the migration**
 
     When you are ready, start the real migration:
 
@@ -133,7 +133,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
-    ### Monitor progress
+    **Monitor progress**
 
     While the migration runs, poll the progress endpoint from a separate request:
 
@@ -200,7 +200,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
-    ### Cancel if needed
+    **Cancel if needed**
 
     If something goes wrong during migration, you can cancel it:
 
@@ -213,7 +213,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
-    ### Verify migrated data
+    **Verify migrated data**
 
     After migration completes, verify your data in FluentCart:
 
@@ -233,7 +233,7 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
-    ### Deactivate the plugin
+    **Deactivate the plugin**
 
     Once you have verified everything, deactivate WC-FC Migrator. It has served its purpose.
 

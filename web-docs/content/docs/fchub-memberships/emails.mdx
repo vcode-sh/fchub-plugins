@@ -25,8 +25,6 @@ Every email is sent as HTML with a responsive template wrapper. The wrapper incl
 <Tabs items={['Welcome', 'Expiring', 'Revoked', 'Drip Unlocked', 'Paused', 'Resumed', 'Trial Converted', 'Trial Expiring']}>
 <Tab value="Welcome">
 
-### AccessGrantedEmail <Badge>access_granted</Badge>
-
 Sent when a membership is first granted to a user. This is the welcome email.
 
 **When it fires:** On `fchub_memberships/grant_created` event
@@ -57,8 +55,6 @@ Sent when a membership is first granted to a user. This is the welcome email.
 </Tab>
 <Tab value="Expiring">
 
-### AccessExpiringEmail <Badge>access_expiring</Badge>
-
 Sent when a membership is approaching its expiration date. The notification window is configurable in settings.
 
 **When it fires:** Via the `fchub_memberships_expiry_notify` daily cron
@@ -76,8 +72,6 @@ This email gives members advance warning so they can renew before losing access.
 </Tab>
 <Tab value="Revoked">
 
-### AccessRevokedEmail <Badge>access_revoked</Badge>
-
 Sent when a membership is revoked — whether by cancellation, refund, or manual admin action.
 
 **When it fires:** On `fchub_memberships/grant_revoked` event
@@ -92,8 +86,6 @@ Sent when a membership is revoked — whether by cancellation, refund, or manual
 
 </Tab>
 <Tab value="Drip Unlocked">
-
-### DripContentUnlockedEmail <Badge>drip_unlocked</Badge>
 
 Sent when a drip-scheduled piece of content becomes available to a member.
 
@@ -118,8 +110,6 @@ Set `email_drip_unlocked` to "No" in settings to disable drip unlock emails. The
 </Tab>
 <Tab value="Paused">
 
-### MembershipPausedEmail <Badge>membership_paused</Badge>
-
 Sent when a membership is paused (e.g., due to subscription pause or manual admin action).
 
 **When it fires:** On `fchub_memberships/grant_paused` event
@@ -137,8 +127,6 @@ While paused, the member retains their grant but cannot access protected content
 </Tab>
 <Tab value="Resumed">
 
-### MembershipResumedEmail <Badge>membership_resumed</Badge>
-
 Sent when a paused membership is resumed.
 
 **When it fires:** On `fchub_memberships/grant_resumed` event
@@ -153,8 +141,6 @@ Sent when a paused membership is resumed.
 </Tab>
 <Tab value="Trial Converted">
 
-### TrialConvertedEmail <Badge>trial_converted</Badge>
-
 Sent when a trial period ends and the member's subscription payment has been confirmed, converting to a paid membership.
 
 **When it fires:** Via `TrialLifecycleService::convertTrial()` during the daily cron
@@ -168,8 +154,6 @@ Sent when a trial period ends and the member's subscription payment has been con
 
 </Tab>
 <Tab value="Trial Expiring">
-
-### TrialExpiringEmail <Badge>trial_expiring</Badge>
 
 Sent a configurable number of days before a trial period ends (default: 3 days).
 

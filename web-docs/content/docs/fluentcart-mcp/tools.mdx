@@ -1,13 +1,13 @@
 ---
 title: Tool Reference
-description: Every tool I built into FluentCart MCP, listed by module. 194 tools covering orders, products, customers, subscriptions, reports, and more.
+description: Every tool in FluentCart MCP, listed by module. 276 tools covering orders, products, customers, subscriptions, shipping, tax, reports, and more.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-This is the complete inventory. Every tool, every module, every HTTP method. I organised 194 tools into 17 modules so the AI (and you) can find what it needs.
+The complete inventory. Every tool, every module, every HTTP method. 276 tools organised into 27 modules so the AI (and you) can find what it needs.
 
 You'll never need to call these yourself — the AI picks the right tool based on what you ask. But if you want to know exactly what's possible, or you want to verify that a specific capability exists before asking for it, this is your reference.
 
@@ -19,7 +19,7 @@ This page is a lookup table, not homework. The AI already knows all of this. You
 
 ## Dynamic Mode
 
-Don't fancy loading 194 tool definitions into your LLM context? Fair enough. Start the server with `--mode dynamic` and you get 3 meta-tools instead:
+Don't fancy loading 276 tool definitions into your LLM context? Fair enough. Start the server with `--mode dynamic` and you get 3 meta-tools instead:
 
 | Tool | What It Does |
 |------|-------------|
@@ -27,9 +27,9 @@ Don't fancy loading 194 tool definitions into your LLM context? Fair enough. Sta
 | `fluentcart_describe_tools` | Get full input schemas and annotations for specific tools (max 10 per request). |
 | `fluentcart_execute_tool` | Execute any tool by name with provided input. |
 
-The AI discovers tools on demand instead of loading all 194 upfront. ~96% token reduction (~20K down to ~1.5K). Same tools, same results — just lazily loaded.
+The AI discovers tools on demand instead of loading all 276 upfront. Same tools, same results — just lazily loaded.
 
-Categories for filtering: `product`, `order`, `customer`, `coupon`, `report`, `subscription`, `integration`, `setting`, `label`, `activity`, `note`, `dashboard`, `application`, `public`, `misc`.
+Categories for filtering: `product`, `order`, `customer`, `coupon`, `report`, `subscription`, `integration`, `setting`, `shipping`, `tax`, `email`, `role`, `file`, `label`, `activity`, `note`, `dashboard`, `application`, `public`, `misc`.
 
 <Callout type="info" title="Trade-off">
 Dynamic mode adds 2-3 extra tool calls per workflow (search, describe, then execute). If latency matters more than token budget, stick with the default static mode.
@@ -37,7 +37,7 @@ Dynamic mode adds 2-3 extra tool calls per workflow (search, describe, then exec
 
 ## Tool Annotations
 
-I tag every tool with metadata so the AI knows what it's dealing with:
+Every tool is tagged with metadata so the AI knows what it's dealing with:
 
 | Annotation | What It Means |
 |------------|---------------|
@@ -129,7 +129,7 @@ Pricing, bundles, tax classes, shipping classes, stock management.
 | `fluentcart_product_inventory_update` | PUT | Update stock levels |
 
 </Accordion>
-<Accordion title="Products — Variants (10 tools)">
+<Accordion title="Products — Variants (9 tools)">
 
 Variation management for variable products.
 
@@ -142,7 +142,6 @@ Variation management for variable products.
 | `fluentcart_variant_delete` | DELETE | Delete a variant |
 | `fluentcart_variant_set_media` | PUT | Set media/images for a variant |
 | `fluentcart_variant_pricing_table_update` | PUT | Update variant pricing tiers |
-| `fluentcart_product_variant_option_update` | PUT | Update a variant option |
 | `fluentcart_variant_fetch_by_ids` | POST | Fetch multiple variants by ID |
 | `fluentcart_variant_upgrade_paths` | GET | Get upgrade paths for a variant |
 
@@ -173,7 +172,7 @@ Downloads, upgrade paths, taxonomies, product-level integrations.
 | `fluentcart_product_integration_feed_status` | POST | Toggle product integration feed status |
 
 </Accordion>
-<Accordion title="Customers (17 tools)">
+<Accordion title="Customers (19 tools)">
 
 Profiles, addresses, stats, user linking.
 
@@ -186,9 +185,11 @@ Profiles, addresses, stats, user linking.
 | `fluentcart_customer_update_additional_info` | PUT | Update additional customer fields |
 | `fluentcart_customer_stats` | GET | Get customer statistics |
 | `fluentcart_customer_recalculate_ltv` | POST | Recalculate lifetime value |
+| `fluentcart_customer_orders_simple` | GET | Get a simplified list of customer orders |
 | `fluentcart_customer_addresses` | GET | List customer addresses |
 | `fluentcart_customer_address_select` | GET | Get address dropdown data |
 | `fluentcart_customer_address_create` | POST | Create a new address |
+| `fluentcart_customer_address_add` | POST | Add a new address for a customer |
 | `fluentcart_customer_address_update` | PUT | Update an address |
 | `fluentcart_customer_address_delete` | DELETE | Delete an address |
 | `fluentcart_customer_address_make_primary` | POST | Set an address as primary |
@@ -215,13 +216,14 @@ The full subscription lifecycle. List, inspect, pause, resume, cancel, reactivat
 **Statuses:** `active`, `trialing`, `paused`, `failing`, `past_due`, `expiring`, `canceled`, `expired`, `completed`
 
 </Accordion>
-<Accordion title="Coupons (11 tools)">
+<Accordion title="Coupons (12 tools)">
 
 Creation, application, and eligibility checks.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
 | `fluentcart_coupon_list` | GET | List coupons with pagination |
+| `fluentcart_coupon_list_alt` | GET | List coupons with alternative view/format |
 | `fluentcart_coupon_get` | GET | Get coupon by ID |
 | `fluentcart_coupon_create` | POST | Create a new coupon |
 | `fluentcart_coupon_update` | PUT | Update a coupon |
@@ -234,7 +236,7 @@ Creation, application, and eligibility checks.
 | `fluentcart_coupon_settings_save` | POST | Update coupon system settings |
 
 </Accordion>
-<Accordion title="Reports — Core (14 tools)">
+<Accordion title="Reports — Core (24 tools)">
 
 Revenue, sales, orders, and dashboard metrics.
 
@@ -243,6 +245,8 @@ Revenue, sales, orders, and dashboard metrics.
 | `fluentcart_report_overview` | GET | Full reports overview |
 | `fluentcart_report_meta` | GET | Report metadata and filters |
 | `fluentcart_report_dashboard_stats` | GET | Dashboard statistics |
+| `fluentcart_report_dashboard_summary` | GET | Dashboard summary with key metrics and trends |
+| `fluentcart_report_summary` | GET | Report overview with aggregated metrics |
 | `fluentcart_report_revenue` | GET | Revenue report with date range |
 | `fluentcart_report_revenue_by_group` | GET | Revenue by day/week/month |
 | `fluentcart_report_sales` | GET | Sales report |
@@ -254,11 +258,19 @@ Revenue, sales, orders, and dashboard metrics.
 | `fluentcart_report_recent_orders` | GET | Most recent orders |
 | `fluentcart_report_unfulfilled_orders` | GET | Orders awaiting fulfilment |
 | `fluentcart_report_recent_activities` | GET | Recent store activities |
+| `fluentcart_report_top_sold_products` | GET | Top products by units sold with revenue |
+| `fluentcart_report_country_heat_map` | GET | Order distribution by country |
+| `fluentcart_report_cart` | GET | Cart analytics and conversion funnel |
+| `fluentcart_report_order_value_distribution` | GET | Distribution of orders by value ranges |
+| `fluentcart_report_day_and_hour` | GET | Order volume by day of week and hour |
+| `fluentcart_report_item_count_distribution` | GET | Distribution of orders by item count |
+| `fluentcart_report_order_completion_time` | GET | Average time from order to fulfilment |
+| `fluentcart_report_weeks_between_refund` | GET | Time between purchase and refund |
 
 </Accordion>
-<Accordion title="Reports — Insights (13 tools)">
+<Accordion title="Reports — Insights (21 tools)">
 
-Product performance, customer behaviour, subscription trends, refund analysis.
+Product performance, customer behaviour, subscription trends, refund analysis, retention cohorts, and licence tracking.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
@@ -275,6 +287,14 @@ Product performance, customer behaviour, subscription trends, refund analysis.
 | `fluentcart_report_subscription_chart` | GET | Subscription trends |
 | `fluentcart_report_future_renewals` | GET | Upcoming renewals |
 | `fluentcart_report_license_summary` | GET | Licence key summary |
+| `fluentcart_report_license_chart` | GET | Licence issuance and activation trends |
+| `fluentcart_report_license_pie_chart` | GET | Licence distribution by status |
+| `fluentcart_report_retention_chart` | GET | Customer retention rates over time |
+| `fluentcart_report_subscription_retention` | GET | Subscription-specific retention analysis |
+| `fluentcart_report_subscription_cohorts` | GET | Subscription cohort analysis |
+| `fluentcart_report_retention_snapshots_status` | GET | Check retention snapshot generation status |
+| `fluentcart_report_retention_snapshots_generate` | POST | Trigger retention snapshot generation |
+| `fluentcart_report_sources` | GET | Traffic and attribution sources |
 
 </Accordion>
 <Accordion title="Order Bumps (5 tools)">
@@ -328,9 +348,105 @@ Third-party addon and feed management.
 | `fluentcart_integration_install_plugin` | POST | Install an integration plugin |
 
 </Accordion>
-<Accordion title="Settings (8 tools)">
+<Accordion title="Shipping (15 tools)">
 
-Store config, payment methods, permissions.
+Zones, methods, and classes. The holy trinity of "why does this parcel cost that much."
+
+| Tool | Method | What It Does |
+|------|--------|--------------|
+| `fluentcart_shipping_zone_list` | GET | List all shipping zones with methods and regions |
+| `fluentcart_shipping_zone_get` | GET | Get a specific shipping zone |
+| `fluentcart_shipping_zone_create` | POST | Create a new shipping zone |
+| `fluentcart_shipping_zone_update` | PUT | Update a shipping zone |
+| `fluentcart_shipping_zone_delete` | DELETE | Delete a shipping zone |
+| `fluentcart_shipping_zone_reorder` | POST | Reorder shipping zones by priority |
+| `fluentcart_shipping_zone_states` | GET | Get available states/regions for zones |
+| `fluentcart_shipping_method_create` | POST | Add a shipping method to a zone |
+| `fluentcart_shipping_method_update` | PUT | Update a shipping method |
+| `fluentcart_shipping_method_delete` | DELETE | Delete a shipping method |
+| `fluentcart_shipping_class_list` | GET | List all shipping classes |
+| `fluentcart_shipping_class_get` | GET | Get a specific shipping class |
+| `fluentcart_shipping_class_create` | POST | Create a shipping class |
+| `fluentcart_shipping_class_update` | PUT | Update a shipping class |
+| `fluentcart_shipping_class_delete` | DELETE | Delete a shipping class |
+
+</Accordion>
+<Accordion title="Tax (22 tools)">
+
+Classes, rates, EU VAT, and tax records. Everything your accountant wishes you'd sorted out months ago.
+
+| Tool | Method | What It Does |
+|------|--------|--------------|
+| `fluentcart_tax_class_list` | GET | List all tax classes |
+| `fluentcart_tax_class_create` | POST | Create a new tax class |
+| `fluentcart_tax_class_update` | PUT | Update a tax class |
+| `fluentcart_tax_class_delete` | DELETE | Delete a tax class |
+| `fluentcart_tax_rate_list` | GET | List all tax rates across countries |
+| `fluentcart_tax_rate_country` | GET | Get tax rates for a specific country |
+| `fluentcart_tax_rate_create` | POST | Create a tax rate for a country |
+| `fluentcart_tax_rate_update` | PUT | Update a tax rate |
+| `fluentcart_tax_rate_delete` | DELETE | Delete a tax rate |
+| `fluentcart_tax_country_delete_all` | DELETE | Delete all tax rates for a country |
+| `fluentcart_tax_country_id_get` | GET | Get country tax ID settings (VAT number) |
+| `fluentcart_tax_country_id_save` | POST | Save country tax ID settings |
+| `fluentcart_tax_shipping_override_create` | POST | Create a shipping tax override |
+| `fluentcart_tax_shipping_override_delete` | DELETE | Delete a shipping tax override |
+| `fluentcart_tax_config_rates` | GET | Get tax configuration with rate overviews |
+| `fluentcart_tax_config_countries_save` | POST | Save countries configured for tax |
+| `fluentcart_tax_settings_get` | GET | Get global tax settings |
+| `fluentcart_tax_settings_save` | POST | Save global tax settings |
+| `fluentcart_tax_eu_vat_save` | POST | Save EU VAT configuration |
+| `fluentcart_tax_eu_rates` | GET | Get EU VAT rates for all member states |
+| `fluentcart_tax_records_list` | GET | List tax records for reporting |
+| `fluentcart_tax_records_mark_filed` | POST | Mark tax records as filed |
+
+</Accordion>
+<Accordion title="Email Notifications (8 tools)">
+
+Templates and settings for every transactional email. Customise them, preview them, toggle them off when you've had enough.
+
+| Tool | Method | What It Does |
+|------|--------|--------------|
+| `fluentcart_email_list` | GET | List all email notification templates |
+| `fluentcart_email_get` | GET | Get a specific email template |
+| `fluentcart_email_update` | PUT | Update an email template |
+| `fluentcart_email_toggle` | POST | Enable or disable a notification |
+| `fluentcart_email_shortcodes` | GET | Get available template shortcodes |
+| `fluentcart_email_template_preview` | POST | Preview a rendered email template |
+| `fluentcart_email_settings_get` | GET | Get global email settings |
+| `fluentcart_email_settings_save` | POST | Save global email settings |
+
+</Accordion>
+<Accordion title="Roles & Permissions (7 tools)">
+
+Access control. Decide who gets to touch what — and who absolutely shouldn't.
+
+| Tool | Method | What It Does |
+|------|--------|--------------|
+| `fluentcart_role_list` | GET | List all roles with capabilities |
+| `fluentcart_role_get` | GET | Get a specific role |
+| `fluentcart_role_create` | POST | Create a custom role |
+| `fluentcart_role_update` | POST | Update a role |
+| `fluentcart_role_delete` | DELETE | Delete a custom role |
+| `fluentcart_role_managers` | GET | List users with management roles |
+| `fluentcart_role_user_list` | GET | List all users with their roles |
+
+</Accordion>
+<Accordion title="Files (4 tools)">
+
+Upload, list, and delete files. Riveting stuff.
+
+| Tool | Method | What It Does |
+|------|--------|--------------|
+| `fluentcart_file_list` | GET | List uploaded files |
+| `fluentcart_file_upload` | POST | Upload a file |
+| `fluentcart_file_bucket_list` | GET | List file storage buckets |
+| `fluentcart_file_delete` | DELETE | Delete a file |
+
+</Accordion>
+<Accordion title="Settings (14 tools)">
+
+Store config, payment methods, modules, permissions, and print templates.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
@@ -338,10 +454,16 @@ Store config, payment methods, permissions.
 | `fluentcart_settings_save_store` | POST | Save store settings |
 | `fluentcart_payment_get_all` | GET | List all payment methods |
 | `fluentcart_payment_get_settings` | GET | Get a specific payment method's settings |
+| `fluentcart_settings_save_payment_method` | POST | Save specific payment method settings |
+| `fluentcart_settings_reorder_payment_methods` | POST | Set display order of payment methods |
 | `fluentcart_settings_get_modules` | GET | Get module settings |
+| `fluentcart_settings_save_modules` | POST | Save module activation and configuration |
 | `fluentcart_settings_get_permissions` | GET | Get permissions |
 | `fluentcart_settings_save_permissions` | POST | Save permissions |
 | `fluentcart_settings_get_confirmation_shortcodes` | GET | Get confirmation page shortcodes |
+| `fluentcart_settings_save_confirmation` | POST | Save order confirmation page settings |
+| `fluentcart_settings_print_templates_get` | GET | Get print templates (invoices, packing slips) |
+| `fluentcart_settings_print_templates_save` | PUT | Update print templates |
 
 </Accordion>
 <Accordion title="Labels (3 tools)">
@@ -430,27 +552,76 @@ Lookup data that other tools depend on.
 | Module | Tools | Type |
 |--------|-------|------|
 | Orders (Core + Transactions) | 23 | CRUD + workflows |
-| Products (Core + Pricing + Variants + Catalogue) | 53 | Full catalogue management |
-| Customers | 17 | Profiles, addresses, stats |
+| Products (Core + Pricing + Variants + Catalogue) | 52 | Full catalogue management |
+| Customers | 19 | Profiles, addresses, stats |
 | Subscriptions | 7 | Lifecycle management |
-| Coupons | 11 | Discounts and promotions |
-| Reports (Core + Insights) | 27 | Analytics and metrics |
+| Coupons | 12 | Discounts and promotions |
+| Reports (Core + Insights) | 45 | Analytics and metrics |
+| Shipping | 15 | Zones, methods, classes |
+| Tax | 22 | Rates, EU VAT, records |
+| Email Notifications | 8 | Templates and settings |
 | Order Bumps | 5 | Upsell offers |
 | Product Options | 10 | Attributes and terms |
 | Integrations | 12 | Third-party addons |
-| Settings | 8 | Store configuration |
+| Settings | 14 | Store configuration |
+| Roles & Permissions | 7 | Access control |
 | Labels | 3 | Order tags |
 | Activity | 3 | Audit log |
 | Notes | 1 | Order annotations |
 | Dashboard | 2 | Overview stats |
 | Application | 4 | App info |
+| Files | 4 | File management |
 | Public | 4 | Public-facing |
 | Miscellaneous | 4 | Utilities |
-| **Total (static mode)** | **194** | |
-| **Total (dynamic mode)** | **3** | Meta-tools that proxy to all 194 |
+| **Total (static mode)** | **276** | |
+| **Total (dynamic mode)** | **3** | Meta-tools that proxy to all 276 |
 
 Key endpoints also feature **response transforms** — `order_get`, `product_get`, `customer_get` and all list endpoints strip HTML blobs, embedded objects, and serialised metadata before returning. Less noise, fewer tokens, same useful data.
 
-Static reference data (`countries`, `filter_options`, `app_init`, `report_meta`) is cached in-memory with TTL, so repeated calls don't hit the API again.
+Response transforms and in-memory caching keep token usage tight. Static reference data is cached with TTL, and heavy list responses are trimmed before they reach the AI.
 
-And there's about 130 more coming in v1.1 — shipping, taxes, email templates, customer portal, checkout, and the niche analytics nobody asked for but I built anyway.
+<Separator className="my-8" />
+
+## MCP Resources
+
+Four read-only resources for reference data. These are browsable context the AI can read without calling tools — useful for grounding conversations with store configuration:
+
+| Resource URI | Description |
+|-------------|-------------|
+| `fluentcart://store/config` | Store settings and configuration (currency, locale, modules) |
+| `fluentcart://store/countries` | Supported countries and their details |
+| `fluentcart://store/payment-methods` | Configured payment methods |
+| `fluentcart://store/filter-options` | Available filter options for orders, products, customers |
+
+Resources are application-controlled — the client decides when to read them. Static data is cached in-memory, so repeated reads don't hit the API.
+
+<Separator className="my-8" />
+
+## MCP Prompts
+
+Five pre-built workflows that guide the AI through multi-step operations. Think of them as recipes — the AI knows which tools to call and in what order:
+
+| Prompt | Arguments | What It Does |
+|--------|-----------|-------------|
+| `analyze-store-performance` | `startDate`, `endDate` | Revenue overview, KPIs, and best sellers for a date range |
+| `investigate-order` | `order_id` | Deep-dive into order details, transactions, and activity timeline |
+| `customer-overview` | `customer_id` | Full customer profile with stats, addresses, and spending history |
+| `catalog-summary` | *(none)* | Catalog health report — product count, top sellers, store metrics |
+| `subscription-health` | `startDate`, `endDate` | Subscription churn, renewal success, and revenue forecast |
+
+Not all MCP clients support prompts yet. Claude Desktop and Claude Code do. If yours doesn't, just ask for the same thing in plain English — the AI will figure out the same tool sequence on its own.
+
+<Separator className="my-8" />
+
+## Response Caching
+
+Static reference data is cached in-memory so the AI doesn't re-fetch the same 250-country list every time it needs to validate an address:
+
+| Endpoint | Cache TTL |
+|----------|-----------|
+| Countries list | 1 hour |
+| Filter options | 10 minutes |
+| App init (store config) | 10 minutes |
+| Report metadata | 10 minutes |
+
+The cache lives in the server process. Restart the server to clear it. No external dependencies, no Redis, no drama.

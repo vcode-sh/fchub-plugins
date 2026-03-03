@@ -32,13 +32,13 @@ Rollback is **not** needed when:
 
 <Steps>
   <Step>
-    ### Confirm you have a backup
+    **Confirm you have a backup**
 
     Before rolling back, make sure you have a database backup. While rollback only deletes FluentCart records (not WooCommerce data), having a safety net is always prudent.
   </Step>
 
   <Step>
-    ### Execute the rollback
+    **Execute the rollback**
 
     Call the rollback endpoint:
 
@@ -51,7 +51,7 @@ Rollback is **not** needed when:
   </Step>
 
   <Step>
-    ### Review the response
+    **Review the response**
 
     The rollback returns a summary of what was deleted:
 
@@ -79,7 +79,7 @@ Rollback is **not** needed when:
   </Step>
 
   <Step>
-    ### Verify in FluentCart
+    **Verify in FluentCart**
 
     After rollback, check FluentCart to confirm the migrated records have been removed. If FluentCart had existing data before migration, those records are untouched — rollback only removes records that were tracked in the ID map.
   </Step>

@@ -76,7 +76,7 @@ The container exposes port `3000` and starts with `--transport http` by default.
 | `FLUENTCART_MCP_API_KEY` | No | Bearer token for the MCP endpoint. If set, all requests to `/mcp` must include `Authorization: Bearer <key>`. If not set, the endpoint is wide open. |
 
 <Callout type="warn" title="Set the API key">
-Without `FLUENTCART_MCP_API_KEY`, anyone who discovers your endpoint can query your store, create orders, issue refunds — the full 200-tool experience. Thrilling for you, potentially expensive. Set the key.
+Without `FLUENTCART_MCP_API_KEY`, anyone who discovers your endpoint can query your store, create orders, issue refunds — the full 276-tool experience. Thrilling for you, potentially expensive. Set the key.
 </Callout>
 
 ## Dokploy Setup
@@ -85,21 +85,19 @@ If you're running [Dokploy](https://dokploy.com) (or similar), point it at the i
 
 <Steps>
 <Step>
-### Create a new application
 
-In Dokploy, create a new application. Choose **Docker Image** as the source. Set the image to `vcodesh/fluentcart-mcp:latest`.
+**Create a new application** — choose **Docker Image** as the source and set the image to `vcodesh/fluentcart-mcp:latest`. Or if you prefer building from Git: point it at the repo with build context `fluentcart-mcp/`.
 
-Alternatively, if you prefer building from Git: point it at the repo and set the build context to `fluentcart-mcp/`.
 </Step>
 <Step>
-### Set environment variables
 
-Add all four environment variables from the table above. `FLUENTCART_MCP_API_KEY` is optional but I'll judge you silently if you skip it in production.
+**Set environment variables** — add all four from the table above. `FLUENTCART_MCP_API_KEY` is optional but strongly recommended in production.
+
 </Step>
 <Step>
-### Deploy
 
-Hit deploy. Exposed port is `3000`. The container starts the HTTP transport automatically — no extra config.
+**Deploy** — exposed port is `3000`. The container starts the HTTP transport automatically.
+
 </Step>
 </Steps>
 
@@ -149,7 +147,7 @@ ChatGPT will negotiate the connection via Streamable HTTP. If you've set a beare
 Same deal. Point the client at your `/mcp` endpoint. Set the bearer token if configured. The server speaks standard MCP over Streamable HTTP — no special sauce required.
 
 <Callout type="info" title="Stateless mode">
-The HTTP transport creates a fresh server instance per request. This keeps things simple and works with scale-to-zero deployments, but it means each request resolves config and registers all 200 tools. On a reasonable VPS, this adds maybe 10-20ms overhead. Not exactly a crisis.
+The HTTP transport creates a fresh server instance per request. This keeps things simple and works with scale-to-zero deployments, but it means each request resolves config and registers all 276 tools. On a reasonable VPS, this adds maybe 10-20ms overhead. Not exactly a crisis.
 </Callout>
 
 <Separator className="my-8" />
@@ -176,4 +174,4 @@ services:
 docker compose up -d
 ```
 
-Done. Your MCP server survives reboots and keeps running until you tell it to stop. Which is more than I can say for most things I build.
+Done. Your MCP server survives reboots and keeps running until you tell it to stop.
