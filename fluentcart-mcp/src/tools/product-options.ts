@@ -1,6 +1,14 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { FluentCartApiError } from '../api/errors.js'
+import {
+	createTool,
+	deleteTool,
+	getTool,
+	postTool,
+	putTool,
+	type ToolDefinition,
+} from './_factory.js'
 
 export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -70,19 +78,44 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/options/attr/group/:group_id/terms',
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_attribute_term_create',
 			title: 'Create Attribute Term',
 			description:
 				'Create a term within an attribute group (e.g. add "Red" to Color). ' +
-				'Note: slug is required. May fail on some FluentCart versions due to a known ' +
-				'validation bug — if so, terms must be created via the admin UI.',
+				'Note: slug is required. Known FluentCart bug (<=1.3.9): term creation via API ' +
+				'fails with "Information mismatch" because the server validates against the wrong ' +
+				'database table. If this happens, terms must be created via the admin UI at ' +
+				'/wp-admin/ > FluentCart > Settings > Product Options.',
 			schema: z.object({
 				group_id: z.number().describe('Parent attribute group ID'),
 				title: z.string().describe('Term display name (e.g. "Red", "Large")'),
 				slug: z.string().describe('URL-friendly identifier (required, e.g. "red", "large")'),
 			}),
-			endpoint: '/options/attr/group/:group_id/term',
+			handler: async (client, input) => {
+				const groupId = input.group_id as number
+				const body = { title: input.title, slug: input.slug }
+				try {
+					const resp = await client.post(`/options/attr/group/${groupId}/term`, body)
+					return resp.data
+				} catch (error) {
+					if (
+						error instanceof FluentCartApiError &&
+						error.message.includes('Information mismatch')
+					) {
+						throw new FluentCartApiError(
+							'SERVER_ERROR',
+							`FluentCart bug: attribute term creation fails via API due to a validation ` +
+								`defect in AttrTermResource::create() (queries fct_atts_terms instead of ` +
+								`fct_atts_groups to validate the group). This affects FluentCart <=1.3.9. ` +
+								`Workaround: create terms manually via the admin UI at ` +
+								`FluentCart > Settings > Product Options, or ask the FluentCart team to fix ` +
+								`AttrTermResource.php line 105.`,
+						)
+					}
+					throw error
+				}
+			},
 		}),
 
 		postTool(client, {

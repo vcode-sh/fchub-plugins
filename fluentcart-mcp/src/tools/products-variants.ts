@@ -87,8 +87,11 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		createTool(client, {
 			name: 'fluentcart_variant_update',
 			title: 'Update Variation',
-			description: 'Update an existing product variation. Only provided fields are changed.',
+			description:
+				'Update an existing product variation. Only provided fields are changed. ' +
+				'Fetches current variant state first, then merges your changes.',
 			schema: z.object({
+				product_id: z.number().describe('Parent product ID'),
 				variant_id: z.number().describe('Variant ID'),
 				title: z.string().optional().describe('Variation title'),
 				price: z.number().optional().describe('Price in cents'),
@@ -96,8 +99,43 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				stock_quantity: z.number().optional().describe('Stock quantity'),
 			}),
 			handler: async (client, input) => {
+				const productId = input.product_id as number
 				const variantId = input.variant_id as number
-				const variants: Record<string, unknown> = {}
+
+				// Fetch current product state to get existing variant data
+				const current = await client.get(`/products/${productId}/pricing`)
+				const wrapper = current.data as Record<string, unknown>
+				const product = (wrapper.product ?? wrapper) as Record<string, unknown>
+				const existingVariants = (product.variants ?? []) as Record<string, unknown>[]
+				const existing = existingVariants.find((v) => v.id === variantId)
+
+				// Build full variant body from existing state + changed fields
+				const variants: Record<string, unknown> = {
+					id: variantId,
+					post_id: productId,
+					variation_title: existing?.variation_title ?? '',
+					item_price: existing?.item_price ?? 0,
+					sku: existing?.sku ?? '',
+					fulfillment_type: existing?.fulfillment_type ?? 'physical',
+					stock_status: existing?.stock_status ?? 'in-stock',
+					total_stock: existing?.total_stock ?? 0,
+					available: existing?.available ?? 0,
+					committed: existing?.committed ?? 0,
+					on_hold: existing?.on_hold ?? 0,
+					other_info: existing?.other_info ?? {
+						payment_type: 'onetime',
+						times: '',
+						repeat_interval: '',
+						trial_days: '',
+						billing_summary: '',
+						manage_setup_fee: 'no',
+						signup_fee_name: '',
+						signup_fee: '',
+						setup_fee_per_item: 'no',
+					},
+				}
+
+				// Apply user's changes
 				if (input.title !== undefined) variants.variation_title = input.title
 				if (input.price !== undefined) variants.item_price = input.price
 				if (input.sku !== undefined) variants.sku = input.sku
@@ -105,6 +143,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 					variants.total_stock = input.stock_quantity
 					variants.available = input.stock_quantity
 				}
+
 				const body = { variants }
 				const response = await client.post(`/products/variants/${variantId}`, body)
 				return response.data
