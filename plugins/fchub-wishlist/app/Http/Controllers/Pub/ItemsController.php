@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace FChubWishlist\Http\Controllers\Pub;
 
-use FChubWishlist\Domain\Context\WishlistContextResolver;
-use FChubWishlist\Domain\GuestSession;
 use FChubWishlist\Domain\WishlistService;
 use FChubWishlist\Http\Requests\ItemRequest;
 
@@ -15,12 +13,16 @@ final class ItemsController
 {
     public static function add(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($blocked = WishlistMutationGuard::assertAllowed(__('Guest wishlists are disabled. Please sign in to manage your wishlist.', 'fchub-wishlist'))) {
+            return $blocked;
+        }
+
         $validation = ItemRequest::validate($request);
         if (is_wp_error($validation)) {
             return new \WP_REST_Response(['success' => false, 'message' => $validation->get_error_message()], 400);
         }
 
-        $wishlist = self::resolveWishlist();
+        $wishlist = WishlistMutationGuard::resolveWishlist();
         if (!$wishlist) {
             return new \WP_REST_Response(['success' => false, 'message' => __('Could not resolve wishlist.', 'fchub-wishlist')], 500);
         }
@@ -38,7 +40,7 @@ final class ItemsController
         return new \WP_REST_Response([
             'success' => true,
             'data'    => [
-                'item'  => $result,
+                'item'  => $result['item'] ?? null,
                 'count' => $service->getItemCount($wishlist['id']),
             ],
         ]);
@@ -46,12 +48,16 @@ final class ItemsController
 
     public static function remove(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($blocked = WishlistMutationGuard::assertAllowed(__('Guest wishlists are disabled. Please sign in to manage your wishlist.', 'fchub-wishlist'))) {
+            return $blocked;
+        }
+
         $validation = ItemRequest::validate($request);
         if (is_wp_error($validation)) {
             return new \WP_REST_Response(['success' => false, 'message' => $validation->get_error_message()], 400);
         }
 
-        $wishlist = self::resolveWishlist();
+        $wishlist = WishlistMutationGuard::resolveWishlist();
         if (!$wishlist) {
             return new \WP_REST_Response(['success' => false, 'message' => __('Could not resolve wishlist.', 'fchub-wishlist')], 500);
         }
@@ -73,12 +79,16 @@ final class ItemsController
 
     public static function toggle(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($blocked = WishlistMutationGuard::assertAllowed(__('Guest wishlists are disabled. Please sign in to manage your wishlist.', 'fchub-wishlist'))) {
+            return $blocked;
+        }
+
         $validation = ItemRequest::validate($request);
         if (is_wp_error($validation)) {
             return new \WP_REST_Response(['success' => false, 'message' => $validation->get_error_message()], 400);
         }
 
-        $wishlist = self::resolveWishlist();
+        $wishlist = WishlistMutationGuard::resolveWishlist();
         if (!$wishlist) {
             return new \WP_REST_Response(['success' => false, 'message' => __('Could not resolve wishlist.', 'fchub-wishlist')], 500);
         }
@@ -105,7 +115,11 @@ final class ItemsController
 
     public static function clearAll(\WP_REST_Request $request): \WP_REST_Response
     {
-        $wishlist = self::resolveWishlist();
+        if ($blocked = WishlistMutationGuard::assertAllowed(__('Guest wishlists are disabled. Please sign in to manage your wishlist.', 'fchub-wishlist'))) {
+            return $blocked;
+        }
+
+        $wishlist = WishlistMutationGuard::resolveWishlist();
         if (!$wishlist) {
             return new \WP_REST_Response(['success' => false, 'message' => __('Could not resolve wishlist.', 'fchub-wishlist')], 500);
         }
@@ -120,23 +134,5 @@ final class ItemsController
                 'count'   => 0,
             ],
         ]);
-    }
-
-    private static function resolveWishlist(): ?array
-    {
-        $resolver = WishlistContextResolver::make();
-
-        $userId = get_current_user_id();
-        if ($userId) {
-            return $resolver->getOrCreateForUser($userId);
-        }
-
-        $hash = GuestSession::getHash();
-        if (!$hash) {
-            $hash = GuestSession::generateHash();
-            GuestSession::setHash($hash);
-        }
-
-        return $resolver->getOrCreateForGuest($hash);
     }
 }

@@ -218,6 +218,7 @@ for entry in "${PLUGINS[@]}"; do
     # Create ZIP (from tmp_dir so the root inside the ZIP is the slug directory)
     zip_name="${slug}-${version}.zip"
     zip_path="$DIST_DIR/$zip_name"
+    rm -f "$zip_path"
     (cd "$tmp_dir" && zip -qr "$zip_path" "$slug/")
 
     success "Created $zip_name"

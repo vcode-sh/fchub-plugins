@@ -52,18 +52,7 @@ final class AssetLoader
             true
         );
 
-        wp_localize_script('fchub-wishlist', 'fchubWishlistVars', [
-            'restUrl' => esc_url_raw(rest_url('fchub-wishlist/v1/')),
-            'nonce'   => wp_create_nonce('wp_rest'),
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'i18n'    => [
-                'add'     => __('Add to Wishlist', 'fchub-wishlist'),
-                'remove'  => __('Remove from Wishlist', 'fchub-wishlist'),
-                'added'   => __('Added to wishlist', 'fchub-wishlist'),
-                'removed' => __('Removed from wishlist', 'fchub-wishlist'),
-                'error'   => __('Something went wrong. Please try again.', 'fchub-wishlist'),
-            ],
-        ]);
+        wp_localize_script('fchub-wishlist', 'fchubWishlistVars', ScriptData::build());
     }
 
     private static function shouldLoad(): bool

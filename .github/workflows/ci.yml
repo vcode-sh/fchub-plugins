@@ -34,7 +34,7 @@ jobs:
         if: steps.changes.outputs.count > 0
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: '8.3'
           tools: composer:v2
           coverage: none
 
@@ -47,6 +47,11 @@ jobs:
         if: steps.changes.outputs.count > 0
         working-directory: plugins/${{ matrix.plugin }}
         run: ./vendor/bin/phpunit
+
+      - name: Run LOC budget check (fchub-wishlist)
+        if: steps.changes.outputs.count > 0 && matrix.plugin == 'fchub-wishlist'
+        working-directory: plugins/fchub-wishlist
+        run: bash scripts/check-loc.sh
 
   vite-build-memberships:
     name: Vite Build (fchub-memberships)

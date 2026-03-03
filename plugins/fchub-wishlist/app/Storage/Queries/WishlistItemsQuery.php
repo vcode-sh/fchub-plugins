@@ -140,6 +140,42 @@ class WishlistItemsQuery
         }, $rows ?: []);
     }
 
+    /**
+     * Get wishlist items with joined product and variant data.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getItemsWithProductData(int $wishlistId): array
+    {
+        global $wpdb;
+
+        $postsTable = $wpdb->posts;
+        $variationsTable = $wpdb->prefix . 'fct_product_variations';
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT
+                i.*,
+                p.post_title AS product_title,
+                p.post_status AS product_status,
+                p.post_name AS product_slug,
+                v.variation_title AS variant_title,
+                v.item_price AS current_price,
+                v.item_status AS variant_status,
+                v.sku AS variant_sku
+             FROM {$this->itemsTable} i
+             LEFT JOIN {$postsTable} p ON i.product_id = p.ID
+             LEFT JOIN {$variationsTable} v ON i.variant_id = v.id
+             WHERE i.wishlist_id = %d
+             ORDER BY i.created_at DESC",
+            $wishlistId
+        ), ARRAY_A);
+
+        return array_map(function (array $row): array {
+            $item = $this->hydrateWithProduct($row);
+            return apply_filters('fchub_wishlist/item_data', $item);
+        }, $rows ?: []);
+    }
+
     private function hydrateWithProduct(array $row): array
     {
         $row['id'] = (int) $row['id'];

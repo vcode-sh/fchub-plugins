@@ -29,13 +29,12 @@ class ItemRemovedTriggerTest extends TestCase
     }
 
     #[Test]
-    public function testFunnelConditionDefaultsNoUpdateType(): void
+    public function testFunnelConditionDefaultsIncludeUpdateType(): void
     {
         $funnel = MockBuilder::funnel();
         $defaults = $this->trigger->getFunnelConditionDefaults($funnel);
 
-        // ItemRemovedTrigger does NOT have update_type (unlike ItemAddedTrigger)
-        $this->assertArrayNotHasKey('update_type', $defaults);
+        $this->assertSame('update', $defaults['update_type']);
         $this->assertSame([], $defaults['product_ids']);
         $this->assertSame('no', $defaults['run_multiple']);
     }

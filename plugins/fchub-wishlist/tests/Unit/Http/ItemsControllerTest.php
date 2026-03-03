@@ -11,6 +11,33 @@ use PHPUnit\Framework\Attributes\Test;
 class ItemsControllerTest extends TestCase
 {
     #[Test]
+    public function testAddReturns403WhenWishlistDisabled(): void
+    {
+        $this->setOption('fchub_wishlist_settings', ['enabled' => 'no']);
+
+        $request = new \WP_REST_Request('POST', '/items');
+        $request->set_param('product_id', 100);
+
+        $response = ItemsController::add($request);
+
+        $this->assertSame(403, $response->get_status());
+    }
+
+    #[Test]
+    public function testAddReturns403WhenGuestWishlistDisabled(): void
+    {
+        $this->setCurrentUserId(0);
+        $this->setOption('fchub_wishlist_settings', ['guest_wishlist_enabled' => 'no']);
+
+        $request = new \WP_REST_Request('POST', '/items');
+        $request->set_param('product_id', 100);
+
+        $response = ItemsController::add($request);
+
+        $this->assertSame(403, $response->get_status());
+    }
+
+    #[Test]
     public function testAddReturns400ForMissingProductId(): void
     {
         $request = new \WP_REST_Request('POST', '/items');

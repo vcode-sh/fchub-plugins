@@ -41,6 +41,61 @@ class WishlistStatsQuery
     }
 
     /**
+     * Get wishlist counts for multiple products in a single query.
+     *
+     * @param array<int> $productIds
+     * @return array<int, int>
+     */
+    public function countByProductIds(array $productIds): array
+    {
+        global $wpdb;
+
+        if (empty($productIds)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT product_id, COUNT(*) AS cnt
+             FROM {$this->itemsTable}
+             WHERE product_id IN ({$placeholders})
+             GROUP BY product_id",
+            ...array_map('intval', $productIds)
+        ), ARRAY_A);
+
+        $counts = [];
+        foreach ($rows ?: [] as $row) {
+            $counts[(int) $row['product_id']] = (int) $row['cnt'];
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Get most wishlisted products with count, ordered by popularity.
+     *
+     * @return array<int, array{product_id: int, wishlist_count: int}>
+     */
+    public function getMostWishlisted(int $limit = 20): array
+    {
+        global $wpdb;
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT product_id, COUNT(*) AS wishlist_count
+             FROM {$this->itemsTable}
+             GROUP BY product_id
+             ORDER BY wishlist_count DESC
+             LIMIT %d",
+            $limit
+        ), ARRAY_A);
+
+        return array_map(static fn(array $row): array => [
+            'product_id'     => (int) $row['product_id'],
+            'wishlist_count' => (int) $row['wishlist_count'],
+        ], $rows ?: []);
+    }
+
+    /**
      * Get most wishlisted products with product title.
      *
      * @return array<int, array{product_id: int, product_title: string, wishlist_count: int}>

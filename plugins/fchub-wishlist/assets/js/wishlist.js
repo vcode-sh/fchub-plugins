@@ -66,14 +66,33 @@
                 var btn = buttons[i];
                 var pid = parseInt(btn.getAttribute('data-product-id'), 10);
                 var vid = parseInt(btn.getAttribute('data-variant-id'), 10) || 0;
+                var labels = this._labels(btn);
+                var textEl = btn.querySelector('.fchub-wishlist-add-text');
                 if (this.has(pid, vid)) {
                     btn.classList.add('is-active');
                     btn.setAttribute('aria-pressed', 'true');
+                    btn.setAttribute('aria-label', labels.remove);
+                    btn.setAttribute('title', labels.remove);
+                    if (textEl) {
+                        textEl.textContent = labels.remove;
+                    }
                 } else {
                     btn.classList.remove('is-active');
                     btn.setAttribute('aria-pressed', 'false');
+                    btn.setAttribute('aria-label', labels.add);
+                    btn.setAttribute('title', labels.add);
+                    if (textEl) {
+                        textEl.textContent = labels.add;
+                    }
                 }
             }
+        },
+
+        _labels: function (btn) {
+            var i18n = (window.fchubWishlistVars && window.fchubWishlistVars.i18n) || {};
+            var addLabel = btn.getAttribute('data-label-add') || i18n.add || 'Add to Wishlist';
+            var removeLabel = btn.getAttribute('data-label-remove') || i18n.remove || 'Remove from Wishlist';
+            return { add: addLabel, remove: removeLabel };
         },
 
         _key: function (productId, variantId) {
@@ -282,34 +301,65 @@
         },
 
         _addToCart: function (variantId, btn) {
-            btn.disabled = true;
+            if (!variantId) return;
 
+            btn.disabled = true;
+            PageHandler._pushToCart(variantId)
+                .finally(function () {
+                    btn.disabled = false;
+                });
+        },
+
+        _pushToCart: function (cartItemId) {
             if (window.FluentCartCart && window.FluentCartCart.addProduct) {
-                window.FluentCartCart.addProduct(variantId, 1);
-                setTimeout(function () { btn.disabled = false; }, 1000);
-                return;
+                try {
+                    var result = window.FluentCartCart.addProduct(cartItemId, 1);
+                    return Promise.resolve(result);
+                } catch (e) {
+                    return Promise.reject(e);
+                }
             }
 
             var ajaxUrl = (window.fchubWishlistVars && window.fchubWishlistVars.ajaxUrl) || '/wp-admin/admin-ajax.php';
             var params = new URLSearchParams();
             params.set('action', 'fluent_cart_checkout_routes');
             params.set('fc_checkout_action', 'fluent_cart_cart_update');
-            params.set('item_id', String(variantId));
+            params.set('item_id', String(cartItemId));
             params.set('quantity', '1');
 
-            fetch(ajaxUrl + '?' + params.toString(), {
+            return fetch(ajaxUrl + '?' + params.toString(), {
                 method: 'GET',
                 credentials: 'same-origin'
-            }).finally(function () {
-                btn.disabled = false;
             });
         },
 
         _addAllToCart: function (btn) {
             btn.disabled = true;
             ApiClient.addAllToCart()
-                .then(function () { btn.disabled = false; })
-                .catch(function () { btn.disabled = false; });
+                .then(function (res) {
+                    var data = res.data || res;
+                    var items = Array.isArray(data.items) ? data.items : [];
+                    var queue = Promise.resolve();
+
+                    for (var i = 0; i < items.length; i++) {
+                        var item = items[i];
+                        var cartItemId = parseInt(item.variant_id || item.product_id, 10);
+                        if (!cartItemId) {
+                            continue;
+                        }
+
+                        queue = queue.then(function (id) {
+                            return function () {
+                                return PageHandler._pushToCart(id);
+                            };
+                        }(cartItemId));
+                    }
+
+                    return queue;
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                });
         }
     };
 

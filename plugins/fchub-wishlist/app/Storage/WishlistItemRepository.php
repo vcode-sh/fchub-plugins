@@ -4,16 +4,23 @@ declare(strict_types=1);
 
 namespace FChubWishlist\Storage;
 
+use FChubWishlist\Storage\Queries\WishlistItemsQuery;
+use FChubWishlist\Storage\Queries\WishlistStatsQuery;
+
 defined('ABSPATH') || exit;
 
 class WishlistItemRepository
 {
     private string $table;
+    private WishlistItemsQuery $itemsQuery;
+    private WishlistStatsQuery $statsQuery;
 
     public function __construct()
     {
         global $wpdb;
         $this->table = $wpdb->prefix . 'fchub_wishlist_items';
+        $this->itemsQuery = new WishlistItemsQuery();
+        $this->statsQuery = new WishlistStatsQuery();
     }
 
     public function find(int $id): ?array
@@ -93,24 +100,28 @@ class WishlistItemRepository
             'created_at'       => current_time('mysql'),
         ];
 
-        $wpdb->insert($this->table, $insert);
+        $result = $wpdb->insert($this->table, $insert);
+        if ($result === false) {
+            return 0;
+        }
+
         return (int) $wpdb->insert_id;
     }
 
     public function delete(int $id): bool
     {
         global $wpdb;
-        return $wpdb->delete($this->table, ['id' => $id]) !== false;
+        return (int) $wpdb->delete($this->table, ['id' => $id]) > 0;
     }
 
     public function deleteByProduct(int $wishlistId, int $productId, int $variantId): bool
     {
         global $wpdb;
-        return $wpdb->delete($this->table, [
+        return (int) $wpdb->delete($this->table, [
             'wishlist_id' => $wishlistId,
             'product_id'  => $productId,
             'variant_id'  => $variantId,
-        ]) !== false;
+        ]) > 0;
     }
 
     public function deleteByWishlistId(int $wishlistId): int
@@ -131,104 +142,19 @@ class WishlistItemRepository
         ));
     }
 
-    /**
-     * Get wishlist counts for multiple products in a single query.
-     *
-     * @param array<int> $productIds
-     * @return array<int, int> Map of product_id => count
-     */
     public function countByProductIds(array $productIds): array
     {
-        global $wpdb;
-
-        if (empty($productIds)) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT product_id, COUNT(*) AS cnt
-             FROM {$this->table}
-             WHERE product_id IN ({$placeholders})
-             GROUP BY product_id",
-            ...array_map('intval', $productIds)
-        ), ARRAY_A);
-
-        $counts = [];
-        foreach ($rows ?: [] as $row) {
-            $counts[(int) $row['product_id']] = (int) $row['cnt'];
-        }
-
-        return $counts;
+        return $this->statsQuery->countByProductIds($productIds);
     }
 
-    /**
-     * Get most wishlisted products with count, ordered by popularity.
-     *
-     * @return array<int, array{product_id: int, wishlist_count: int}>
-     */
     public function getMostWishlisted(int $limit = 20): array
     {
-        global $wpdb;
-
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT product_id, COUNT(*) AS wishlist_count
-             FROM {$this->table}
-             GROUP BY product_id
-             ORDER BY wishlist_count DESC
-             LIMIT %d",
-            $limit
-        ), ARRAY_A);
-
-        return array_map(function (array $row): array {
-            return [
-                'product_id'     => (int) $row['product_id'],
-                'wishlist_count' => (int) $row['wishlist_count'],
-            ];
-        }, $rows ?: []);
+        return $this->statsQuery->getMostWishlisted($limit);
     }
 
-    /**
-     * Get wishlist items with joined product and variant data.
-     *
-     * @return array<int, array<string, mixed>>
-     */
     public function getItemsWithProductData(int $wishlistId): array
     {
-        global $wpdb;
-
-        $postsTable = $wpdb->posts;
-        $variationsTable = $wpdb->prefix . 'fct_product_variations';
-
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT
-                i.*,
-                p.post_title AS product_title,
-                p.post_status AS product_status,
-                p.post_name AS product_slug,
-                v.variation_title AS variant_title,
-                v.item_price AS current_price,
-                v.item_status AS variant_status,
-                v.sku AS variant_sku
-             FROM {$this->table} i
-             LEFT JOIN {$postsTable} p ON i.product_id = p.ID
-             LEFT JOIN {$variationsTable} v ON i.variant_id = v.id
-             WHERE i.wishlist_id = %d
-             ORDER BY i.created_at DESC",
-            $wishlistId
-        ), ARRAY_A);
-
-        return array_map(function (array $row): array {
-            $item = $this->hydrate($row);
-            $item['product_title'] = $row['product_title'] ?? '';
-            $item['product_status'] = $row['product_status'] ?? '';
-            $item['product_slug'] = $row['product_slug'] ?? '';
-            $item['variant_title'] = $row['variant_title'] ?? '';
-            $item['current_price'] = isset($row['current_price']) ? (float) $row['current_price'] : 0.0;
-            $item['variant_status'] = $row['variant_status'] ?? '';
-            $item['variant_sku'] = $row['variant_sku'] ?? '';
-            return $item;
-        }, $rows ?: []);
+        return $this->itemsQuery->getItemsWithProductData($wishlistId);
     }
 
     /**

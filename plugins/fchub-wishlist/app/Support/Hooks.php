@@ -42,6 +42,14 @@ final class Hooks
     }
 
     /**
+     * Check whether guest wishlist functionality is enabled.
+     */
+    public static function isGuestEnabled(): bool
+    {
+        return self::getSetting('guest_wishlist_enabled', 'yes') === 'yes';
+    }
+
+    /**
      * Get the current user's FluentCart customer ID if available.
      */
     public static function getCustomerId(int $userId): ?int

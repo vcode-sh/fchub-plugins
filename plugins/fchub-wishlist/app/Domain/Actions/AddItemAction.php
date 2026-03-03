@@ -86,6 +86,14 @@ class AddItemAction
             'price_at_addition' => $price,
         ]);
 
+        if ($itemId <= 0) {
+            if ($this->wishlistRules->isDuplicate($wishlistId, $productId, $variantId)) {
+                return ['success' => false, 'item' => null, 'count' => $wishlist['item_count'], 'error' => 'This item is already in your wishlist.'];
+            }
+
+            return ['success' => false, 'item' => null, 'count' => $wishlist['item_count'], 'error' => 'Could not save wishlist item.'];
+        }
+
         // Increment denormalised count
         $this->wishlists->incrementItemCount($wishlistId);
         $newCount = $wishlist['item_count'] + 1;

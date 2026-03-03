@@ -7,6 +7,7 @@ namespace FChubWishlist\Bootstrap\Modules;
 defined('ABSPATH') || exit;
 
 use FChubWishlist\Bootstrap\ModuleContract;
+use FChubWishlist\FluentCRM\Helpers\WishlistConditionEvaluator;
 use FChubWishlist\FluentCRM\Helpers\WishlistFunnelHelper;
 use FChubWishlist\Integration\FluentCrmSync;
 
@@ -90,69 +91,6 @@ final class FluentCrmModule implements ModuleContract
 
     public function assessAutomationConditions(bool $result, array $condition, $subscriber): bool
     {
-        $property = $condition['property'] ?? '';
-        $operator = $condition['operator'] ?? '';
-        $value = $condition['value'] ?? '';
-
-        $userId = (int) $subscriber->getWpUserId();
-        if (!$userId) {
-            return $operator === 'not_exist';
-        }
-
-        return match ($property) {
-            'wishlist_has_items'       => $this->assessHasItems($userId, $operator),
-            'wishlist_item_count'      => $this->assessItemCount($userId, $operator, $value),
-            'wishlist_contains_products' => $this->assessContainsProducts($userId, $operator, $value),
-            default => $result,
-        };
-    }
-
-    private function assessHasItems(int $userId, string $operator): bool
-    {
-        $count = WishlistFunnelHelper::getUserItemCount($userId);
-        return $operator === 'not_exist' ? $count === 0 : $count > 0;
-    }
-
-    private function assessItemCount(int $userId, string $operator, $value): bool
-    {
-        if ($value === '') {
-            return true;
-        }
-
-        $count = WishlistFunnelHelper::getUserItemCount($userId);
-        $target = (int) $value;
-
-        return match ($operator) {
-            '='  => $count === $target,
-            '!=' => $count !== $target,
-            '>'  => $count > $target,
-            '<'  => $count < $target,
-            '>=' => $count >= $target,
-            '<=' => $count <= $target,
-            default => true,
-        };
-    }
-
-    private function assessContainsProducts(int $userId, string $operator, $value): bool
-    {
-        $productIds = is_array($value) ? array_map('intval', $value) : [intval($value)];
-        $productIds = array_filter($productIds);
-
-        if (empty($productIds)) {
-            return true;
-        }
-
-        $wishlistRepo = new \FChubWishlist\Storage\WishlistRepository();
-        $wishlist = $wishlistRepo->findByUserId($userId);
-        if (!$wishlist) {
-            return $operator === 'not_exist';
-        }
-
-        $itemRepo = new \FChubWishlist\Storage\WishlistItemRepository();
-        $items = $itemRepo->findByWishlistId($wishlist['id']);
-        $wishlistProductIds = array_column($items, 'product_id');
-
-        $hasAll = empty(array_diff($productIds, $wishlistProductIds));
-        return $operator === 'not_exist' ? !$hasAll : $hasAll;
+        return WishlistConditionEvaluator::evaluate($result, $condition, $subscriber);
     }
 }

@@ -46,6 +46,7 @@ spl_autoload_register(function ($class) {
  */
 register_activation_hook(__FILE__, function () {
     FChubWishlist\Support\Migrations::run();
+    update_option('fchub_wishlist_db_version', FCHUB_WISHLIST_DB_VERSION);
 
     if (function_exists('as_schedule_recurring_action')) {
         as_schedule_recurring_action(time(), DAY_IN_SECONDS, 'fchub_wishlist_cleanup_guests', [], 'fchub-wishlist', true);
@@ -88,10 +89,6 @@ add_action('init', function () {
         return;
     }
 
-    if (!defined('FLUENTCRM')) {
-        return;
-    }
-
     // Run migrations if DB version changed
     $currentDbVersion = get_option('fchub_wishlist_db_version', '0');
     if (version_compare($currentDbVersion, FCHUB_WISHLIST_DB_VERSION, '<')) {
@@ -106,7 +103,7 @@ add_action('init', function () {
  * Register FluentCRM automation triggers, actions, and filters.
  */
 add_action('init', function () {
-    if (defined('FLUENTCRM')) {
+    if (defined('FLUENTCART_VERSION') && defined('FLUENTCRM')) {
         FChubWishlist\FluentCRM\WishlistAutomation::boot();
     }
 }, 30);
@@ -171,20 +168,23 @@ add_action('admin_notices', function () {
         return;
     }
 
-    $missing = [];
     if (!defined('FLUENTCART_VERSION')) {
-        $missing[] = 'FluentCart';
+        printf(
+            '<div class="notice notice-error"><p>%s</p></div>',
+            esc_html__('FCHub Wishlist requires FluentCart to be installed and activated.', 'fchub-wishlist')
+        );
+        return;
     }
-    if (!defined('FLUENTCRM')) {
-        $missing[] = 'FluentCRM';
+
+    if (defined('FLUENTCRM')) {
+        return;
     }
 
     printf(
-        '<div class="notice notice-error"><p>%s</p></div>',
-        sprintf(
-            /* translators: %s: comma-separated list of missing plugin names */
-            esc_html__('FCHub Wishlist requires %s to be installed and activated.', 'fchub-wishlist'),
-            esc_html(implode(' and ', $missing))
+        '<div class="notice notice-warning"><p>%s</p></div>',
+        esc_html__(
+            'FCHub Wishlist is running without FluentCRM. Wishlist automation and contact sync features are disabled until FluentCRM is activated.',
+            'fchub-wishlist'
         )
     );
 });

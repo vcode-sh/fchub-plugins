@@ -8,10 +8,7 @@ use FChubWishlist\Domain\Actions\AddAllToCartAction;
 use FChubWishlist\Domain\Actions\AddItemAction;
 use FChubWishlist\Domain\Actions\RemoveItemAction;
 use FChubWishlist\Domain\Actions\ToggleItemAction;
-use FChubWishlist\Domain\Context\VariantResolver;
 use FChubWishlist\Domain\Context\WishlistContextResolver;
-use FChubWishlist\Domain\Rules\ProductRules;
-use FChubWishlist\Domain\Rules\WishlistRules;
 use FChubWishlist\Storage\WishlistItemRepository;
 use FChubWishlist\Storage\WishlistRepository;
 
@@ -52,27 +49,7 @@ class WishlistService
      */
     public static function make(): self
     {
-        $wishlists = new WishlistRepository();
-        $items = new WishlistItemRepository();
-        $context = new WishlistContextResolver($wishlists);
-        $variantResolver = new VariantResolver();
-        $productRules = new ProductRules();
-        $wishlistRules = new WishlistRules($items);
-
-        $addItem = new AddItemAction($items, $wishlists, $productRules, $wishlistRules, $variantResolver);
-        $removeItem = new RemoveItemAction($items, $wishlists);
-        $toggleItem = new ToggleItemAction($addItem, $removeItem, $items);
-        $addAllToCart = new AddAllToCartAction($items, $productRules);
-
-        return new self(
-            $addItem,
-            $removeItem,
-            $toggleItem,
-            $addAllToCart,
-            $context,
-            $wishlists,
-            $items,
-        );
+        return WishlistServiceFactory::make();
     }
 
     /** @return array{success: bool, item: array|null, count: int, error: string} */

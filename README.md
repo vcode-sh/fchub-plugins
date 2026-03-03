@@ -13,6 +13,7 @@ FluentCart and FluentCommunity plugins that actually do things WordPress forgot 
 | [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling — 15k lines of PHP and Vue so people can pay to read your blog |
 | [fchub-portal-extender](plugins/fchub-portal-extender/) | Custom portal pages without writing PHP — because not everyone wants to be a developer |
 | [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net — because the WP media library and video is a war crime |
+| [fchub-wishlist](plugins/fchub-wishlist/) | Wishlist system for FluentCart with guest sessions, customer portal support, and FluentCRM automations |
 | [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — products, orders, subscriptions, customers, coupons. Your escape hatch |
 
 All require [FluentCart](https://fluentcart.com) except fchub-stream which needs [FluentCommunity](https://fluentcommunity.com). WordPress 6.5+. PHP 8.3+.
@@ -53,7 +54,8 @@ Version in the plugin header must match the tag. If they disagree, the build fai
 
 PRs touching `plugins/` get:
 
-- **PHPUnit** — fchub-p24, fchub-memberships, fchub-stream
+- **PHPUnit** — fchub-p24, fchub-memberships, fchub-stream, fchub-wishlist
+- **LOC budget** — fchub-wishlist architecture guard check (`scripts/check-loc.sh`)
 - **Vite build** — fchub-memberships, fchub-portal-extender, and fchub-stream (making sure the Vue apps didn't spontaneously combust)
 
 ## Development

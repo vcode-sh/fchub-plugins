@@ -92,11 +92,16 @@ class AddToWishlistAction extends BaseAction
             return;
         }
 
-        $itemRepo->create([
+        $itemId = $itemRepo->create([
             'wishlist_id' => $wishlist['id'],
             'product_id'  => $productId,
             'variant_id'  => $variantId,
         ]);
+
+        if ($itemId <= 0) {
+            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'failed');
+            return;
+        }
 
         $wishlistRepo = new \FChubWishlist\Storage\WishlistRepository();
         $wishlistRepo->incrementItemCount($wishlist['id']);

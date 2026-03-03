@@ -14,10 +14,6 @@ final class Plugin
             return;
         }
 
-        if (!defined('FLUENTCRM')) {
-            return;
-        }
-
         foreach (ModuleRegistry::classes() as $moduleClass) {
             if (!class_exists($moduleClass)) {
                 continue;

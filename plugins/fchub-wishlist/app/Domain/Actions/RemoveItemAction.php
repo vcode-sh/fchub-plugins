@@ -33,7 +33,11 @@ class RemoveItemAction
             return false;
         }
 
-        $this->items->delete($item['id']);
+        $deleted = $this->items->delete($item['id']);
+        if (!$deleted) {
+            return false;
+        }
+
         $this->wishlists->decrementItemCount($wishlistId);
 
         $userId = $wishlist['user_id'] ?? 0;

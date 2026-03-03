@@ -9,6 +9,7 @@ use FChubWishlist\Domain\Context\WishlistContextResolver;
 use FChubWishlist\Storage\WishlistItemRepository;
 use FChubWishlist\Storage\WishlistRepository;
 use FChubWishlist\Support\Constants;
+use FChubWishlist\Support\Hooks;
 use FChubWishlist\Support\Logger;
 
 defined('ABSPATH') || exit;
@@ -93,7 +94,8 @@ class GuestSession
 
     public static function cleanupExpired(): void
     {
-        $days = (int) apply_filters('fchub_wishlist/guest_cleanup_days', Constants::COOKIE_DAYS);
+        $defaultDays = (int) Hooks::getSetting('guest_cleanup_days', Constants::COOKIE_DAYS);
+        $days = (int) apply_filters('fchub_wishlist/guest_cleanup_days', $defaultDays);
         $repo = new WishlistRepository();
         $itemRepo = new WishlistItemRepository();
         $expired = $repo->getOrphanedGuestLists($days);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubWishlist\Domain\Rules;
 
 use FChubWishlist\Storage\WishlistItemRepository;
+use FChubWishlist\Support\Hooks;
 
 defined('ABSPATH') || exit;
 
@@ -22,7 +23,8 @@ class WishlistRules
      */
     public function isAtMaxItems(int $wishlistId, int $currentCount): bool
     {
-        $max = (int) apply_filters('fchub_wishlist/max_items_per_list', 100);
+        $defaultMax = (int) Hooks::getSetting('max_items_per_list', 100);
+        $max = (int) apply_filters('fchub_wishlist/max_items_per_list', $defaultMax);
 
         return $currentCount >= $max;
     }
@@ -56,6 +58,7 @@ class WishlistRules
      */
     public function getMaxItems(): int
     {
-        return (int) apply_filters('fchub_wishlist/max_items_per_list', 100);
+        $defaultMax = (int) Hooks::getSetting('max_items_per_list', 100);
+        return (int) apply_filters('fchub_wishlist/max_items_per_list', $defaultMax);
     }
 }

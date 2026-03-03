@@ -9,6 +9,7 @@ use FChubWishlist\Domain\GuestSession;
 use FChubWishlist\Domain\PurchaseWatcher;
 use FChubWishlist\Integration\AddonsRegistration;
 use FChubWishlist\Integration\DashboardWidget;
+use FChubWishlist\Integration\WishlistSettings;
 use FChubWishlist\GDPR\PersonalDataHandler;
 
 defined('ABSPATH') || exit;
@@ -28,6 +29,9 @@ final class CoreModule implements ModuleContract
 
         // Register dashboard stats widget
         DashboardWidget::register();
+
+        // Register FluentCart integration settings panel
+        WishlistSettings::register();
 
         // Register GDPR export and erasure hooks
         PersonalDataHandler::register();

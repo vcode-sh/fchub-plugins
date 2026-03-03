@@ -300,4 +300,47 @@ class AddItemActionTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Could not resolve', $result['error']);
     }
+
+    #[Test]
+    public function testInsertFailureDoesNotIncrementCountOrFireHook(): void
+    {
+        $wishlist = MockBuilder::wishlist(['id' => 5, 'item_count' => 2, 'user_id' => 42]);
+
+        $productRules = $this->createStub(ProductRules::class);
+        $productRules->method('validate')
+            ->willReturn(['valid' => true, 'error' => '']);
+        $productRules->method('getVariantPrice')
+            ->willReturn(10.0);
+
+        $variantResolver = $this->createStub(VariantResolver::class);
+        $variantResolver->method('resolve')
+            ->willReturn(200);
+        $variantResolver->method('validate')
+            ->willReturn(true);
+
+        $wishlistRules = $this->createStub(WishlistRules::class);
+        $wishlistRules->method('isDuplicate')
+            ->willReturn(false);
+        $wishlistRules->method('isAtMaxItems')
+            ->willReturn(false);
+
+        $wishlists = $this->createMock(WishlistRepository::class);
+        $wishlists->expects($this->never())
+            ->method('incrementItemCount');
+
+        $items = $this->createMock(WishlistItemRepository::class);
+        $items->expects($this->once())
+            ->method('create')
+            ->willReturn(0);
+        $items->expects($this->never())
+            ->method('find');
+
+        $action = $this->makeAction($items, $wishlists, $productRules, $wishlistRules, $variantResolver);
+        $result = $action->execute($wishlist, 100, 200);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('Could not save wishlist item.', $result['error']);
+        $this->assertSame(2, $result['count']);
+        $this->assertSame([], $this->getActionsFired('fchub_wishlist/item_added'));
+    }
 }
