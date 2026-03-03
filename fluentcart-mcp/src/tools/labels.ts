@@ -17,8 +17,12 @@ export function labelTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Create Label',
 			description: 'Create a new label for tagging orders, customers, etc.',
 			schema: z.object({
-				value: z.string().describe('Label text'),
+				title: z.string().describe('Label text (required)'),
 				color: z.string().optional().describe('Label colour as hex code (e.g. "#ff0000")'),
+				bind_to_type: z
+					.string()
+					.optional()
+					.describe('Entity type: order, customer (default: order)'),
 			}),
 			endpoint: '/labels',
 		}),

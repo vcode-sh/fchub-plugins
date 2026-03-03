@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { getTool, postTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
 
 export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -15,11 +15,11 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/settings/store',
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_settings_save_store',
 			title: 'Save Store Settings',
 			description:
-				'Update store settings. Only provided keys are updated; omitted keys remain unchanged.',
+				'Update store settings. Pass key-value pairs at top level (e.g. currency, order_mode, address). Only provided keys are updated.',
 			schema: z.object({
 				settings: z
 					.record(z.string(), z.unknown())
@@ -27,7 +27,11 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 						'Settings key-value pairs to update (e.g. {currency: "USD", order_mode: "live"})',
 					),
 			}),
-			endpoint: '/settings/store',
+			handler: async (c, input) => {
+				const settings = (input.settings ?? {}) as Record<string, unknown>
+				const resp = await c.post('/settings/store', settings)
+				return resp.data
+			},
 		}),
 
 		getTool(client, {
@@ -82,6 +86,80 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'Get available shortcodes for the order confirmation page template.',
 			schema: z.object({}),
 			endpoint: '/settings/confirmation/shortcode',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_settings_save_modules',
+			title: 'Save Module Settings',
+			description:
+				'Update module activation and configuration (Turnstile, Stock, Licensing, Order Bump).',
+			schema: z.object({
+				modules: z
+					.record(z.string(), z.unknown())
+					.describe('Module settings to save'),
+			}),
+			endpoint: '/settings/modules',
+		}),
+
+		createTool(client, {
+			name: 'fluentcart_settings_save_confirmation',
+			title: 'Save Confirmation Settings',
+			description: 'Update order confirmation page settings and template. Pass settings at top level.',
+			schema: z.object({
+				settings: z
+					.record(z.string(), z.unknown())
+					.describe('Confirmation page settings'),
+			}),
+			handler: async (c, input) => {
+				const settings = (input.settings ?? {}) as Record<string, unknown>
+				const resp = await c.post('/settings/confirmation', settings)
+				return resp.data ?? { success: true }
+			},
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_settings_save_payment_method',
+			title: 'Save Payment Method Settings',
+			description: 'Save settings for a specific payment method.',
+			schema: z.object({
+				method: z.string().describe('Payment method key'),
+				settings: z
+					.record(z.string(), z.unknown())
+					.describe('Payment method settings'),
+			}),
+			endpoint: '/settings/payment-methods',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_settings_reorder_payment_methods',
+			title: 'Reorder Payment Methods',
+			description: 'Set the display order of payment methods on checkout.',
+			schema: z.object({
+				methods: z
+					.array(z.string())
+					.describe('Ordered array of payment method keys'),
+			}),
+			endpoint: '/settings/payment-methods/reorder',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_settings_print_templates_get',
+			title: 'Get Print Templates',
+			description: 'Get print templates for invoices, packing slips, etc.',
+			schema: z.object({}),
+			endpoint: '/templates/print-templates',
+		}),
+
+		putTool(client, {
+			name: 'fluentcart_settings_print_templates_save',
+			title: 'Save Print Templates',
+			description: 'Update print templates for invoices, packing slips, etc.',
+			schema: z.object({
+				templates: z
+					.record(z.string(), z.unknown())
+					.describe('Template settings to save'),
+			}),
+			endpoint: '/templates/print-templates',
 		}),
 	]
 }

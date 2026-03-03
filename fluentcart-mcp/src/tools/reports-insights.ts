@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { getTool, type ToolDefinition } from './_factory.js'
+import { getTool, postTool, type ToolDefinition } from './_factory.js'
 
 const dateRange = {
 	startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
@@ -136,6 +136,71 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'License stats summary: total issued, active, expired, and revoked.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/license-summary',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_license_chart',
+			title: 'Get License Chart',
+			description: 'License issuance and activation trends over time.',
+			schema: z.object({ ...dateRangeWithGroup }),
+			endpoint: '/reports/license-chart',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_license_pie_chart',
+			title: 'Get License Pie Chart',
+			description: 'License distribution by status (active, expired, revoked).',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/license-pie-chart',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_retention_chart',
+			title: 'Get Retention Chart',
+			description: 'Customer retention rates over time periods.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/retention-chart',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_subscription_retention',
+			title: 'Get Subscription Retention',
+			description: 'Subscription-specific retention analysis with cohort data.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/subscription-retention',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_subscription_cohorts',
+			title: 'Get Subscription Cohorts',
+			description: 'Subscription cohort analysis: retention by sign-up period.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/subscription-cohorts',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_retention_snapshots_status',
+			title: 'Get Retention Snapshots Status',
+			description: 'Check the status of retention snapshot generation jobs.',
+			schema: z.object({}),
+			endpoint: '/reports/retention-snapshots/status',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_report_retention_snapshots_generate',
+			title: 'Generate Retention Snapshots',
+			description:
+				'Trigger generation of retention snapshot data. Long-running — check status afterwards.',
+			schema: z.object({}),
+			endpoint: '/reports/retention-snapshots/generate',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_sources',
+			title: 'Get Report Sources',
+			description: 'Traffic and attribution sources for orders.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/sources',
 		}),
 	]
 }

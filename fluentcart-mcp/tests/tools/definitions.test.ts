@@ -12,21 +12,15 @@ const mockClient = {
 const tools = createAllTools(mockClient)
 
 describe('tool definitions', () => {
-	it('should register between 189 and 200 tools (7 removed: 6 Phase 7 + variant_option_update)', () => {
+	it('should register between 270 and 290 tools (Round 2: +83 new tools)', () => {
 		console.log(`Total tools registered: ${tools.length}`)
-		expect(tools.length).toBeGreaterThanOrEqual(189)
-		expect(tools.length).toBeLessThanOrEqual(200)
+		expect(tools.length).toBeGreaterThanOrEqual(270)
+		expect(tools.length).toBeLessThanOrEqual(290)
 	})
 
 	it('should not contain removed tools', () => {
 		const names = tools.map((t) => t.name)
 		const removedTools = [
-			'fluentcart_coupon_list_alt',
-			'fluentcart_customer_address_add',
-			'fluentcart_customer_orders_simple',
-			'fluentcart_report_top_sold_products',
-			'fluentcart_report_dashboard_summary',
-			'fluentcart_report_summary',
 			'fluentcart_product_variant_option_update',
 		]
 		for (const removed of removedTools) {

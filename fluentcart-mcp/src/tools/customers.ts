@@ -260,5 +260,36 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			}),
 			endpoint: '/customers/do-bulk-action',
 		}),
+
+		getTool(client, {
+			name: 'fluentcart_customer_orders_simple',
+			title: 'Get Customer Orders (Simple)',
+			description:
+				'Get a simplified list of orders for a customer with basic order details.',
+			schema: z.object({
+				customer_id: z.number().describe('Customer ID'),
+			}),
+			endpoint: '/customers/:customer_id/order',
+		}),
+
+		postTool(client, {
+			name: 'fluentcart_customer_address_add',
+			title: 'Add Customer Address (Quick)',
+			description:
+				'Quick add a new address to a customer (alternative endpoint without customer_id in path).',
+			schema: z.object({
+				customer_id: z.number().describe('Customer ID'),
+				type: z.string().optional().describe('Address type: billing, shipping'),
+				name: z.string().describe('Full name'),
+				email: z.string().describe('Email address'),
+				phone: z.string().optional().describe('Phone number'),
+				address_1: z.string().optional().describe('Address line 1'),
+				city: z.string().optional().describe('City'),
+				state: z.string().optional().describe('State/province'),
+				postcode: z.string().optional().describe('Postal code'),
+				country: z.string().optional().describe('ISO country code'),
+			}),
+			endpoint: '/customers/add-address',
+		}),
 	]
 }

@@ -181,5 +181,17 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			}),
 			endpoint: '/coupons/storeCouponSettings',
 		}),
+
+		getTool(client, {
+			name: 'fluentcart_coupon_list_alt',
+			title: 'List Coupons (Alt)',
+			description: 'Alternative coupon listing endpoint with different response format.',
+			schema: z.object({
+				page: z.number().optional().describe('Page number'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
+				search: z.string().optional().describe('Search coupons'),
+			}),
+			endpoint: '/coupons/listCoupons',
+		}),
 	]
 }

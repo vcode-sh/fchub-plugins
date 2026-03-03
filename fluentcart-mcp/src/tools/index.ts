@@ -5,6 +5,8 @@ import { applicationTools } from './application.js'
 import { couponTools } from './coupons.js'
 import { customerTools } from './customers.js'
 import { dashboardTools } from './dashboard.js'
+import { emailNotificationTools } from './email-notifications.js'
+import { fileTools } from './files.js'
 import { integrationTools } from './integrations.js'
 import { labelTools } from './labels.js'
 import { miscTools } from './misc.js'
@@ -19,9 +21,12 @@ import { productPricingTools } from './products-pricing.js'
 import { productVariantTools } from './products-variants.js'
 import { publicTools } from './public.js'
 import { reportCoreTools } from './reports-core.js'
+import { shippingTools } from './shipping.js'
 import { reportInsightTools } from './reports-insights.js'
+import { roleTools } from './roles.js'
 import { settingsCoreTools } from './settings-core.js'
 import { subscriptionTools } from './subscriptions.js'
+import { taxTools } from './tax.js'
 
 export function createAllTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -47,5 +52,10 @@ export function createAllTools(client: FluentCartClient): ToolDefinition[] {
 		...applicationTools(client),
 		...publicTools(client),
 		...miscTools(client),
+		...shippingTools(client),
+		...taxTools(client),
+		...emailNotificationTools(client),
+		...roleTools(client),
+		...fileTools(client),
 	]
 }

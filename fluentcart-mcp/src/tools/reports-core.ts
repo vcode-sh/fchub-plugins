@@ -155,5 +155,94 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({}),
 			endpoint: '/reports/get-recent-activities',
 		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_dashboard_summary',
+			title: 'Get Dashboard Summary',
+			description:
+				'Dashboard summary with key metrics, trends, and period comparisons.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/get-dashboard-summary',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_summary',
+			title: 'Get Report Summary',
+			description: 'Report overview with aggregated metrics across all categories.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/report-overview',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_top_sold_products',
+			title: 'Get Top Sold Products',
+			description: 'Top products by units sold with revenue data. Values in cents.',
+			schema: z.object({
+				...dateRange,
+				per_page: z
+					.number()
+					.max(50)
+					.optional()
+					.describe('Number of results (max: 50)'),
+			}),
+			endpoint: '/reports/fetch-top-sold-products',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_country_heat_map',
+			title: 'Get Country Heat Map',
+			description: 'Order distribution by country for geographic heatmap visualisation.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/country-heat-map',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_cart',
+			title: 'Get Cart Report',
+			description:
+				'Cart analytics: abandonment rate, conversion funnel, and cart value metrics.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/cart-report',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_order_value_distribution',
+			title: 'Get Order Value Distribution',
+			description: 'Distribution of orders by value ranges (buckets). Values in cents.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/order-value-distribution',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_day_and_hour',
+			title: 'Get Day and Hour Report',
+			description: 'Order volume heatmap by day of week and hour of day.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/fetch-report-by-day-and-hour',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_item_count_distribution',
+			title: 'Get Item Count Distribution',
+			description: 'Distribution of orders by number of items per order.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/item-count-distribution',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_order_completion_time',
+			title: 'Get Order Completion Time',
+			description: 'Average time from order creation to completion/fulfilment.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/order-completion-time',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_report_weeks_between_refund',
+			title: 'Get Weeks Between Refund',
+			description: 'Distribution of time between purchase and refund request.',
+			schema: z.object({ ...dateRange }),
+			endpoint: '/reports/weeks-between-refund',
+		}),
 	]
 }
