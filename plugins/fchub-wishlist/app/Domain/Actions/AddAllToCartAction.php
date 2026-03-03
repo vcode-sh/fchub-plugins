@@ -27,7 +27,8 @@ class AddAllToCartAction
      * Actual cart addition is handled client-side via FluentCart's JS API
      * (FluentCartCart.addProduct), so this only validates and returns the data.
      *
-     * @return array{items: array<int, array{variant_id: int, product_id: int, product_title: string}>, failed: array<int, array{product_id: int, variant_id: int, reason: string}>}
+     * @return array{items: array<int, array{variant_id: int, product_id: int, product_title: string}>,
+     *               failed: array<int, array{product_id: int, variant_id: int, reason: string}>}
      */
     public function execute(int $wishlistId): array
     {

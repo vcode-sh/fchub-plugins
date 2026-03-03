@@ -19,6 +19,7 @@ final class CustomerPortalEndpoint
         }
 
         $iconPath = FCHUB_WISHLIST_PATH . 'assets/icons/wishlist.svg';
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local file, not a remote URL
         $iconSvg = file_exists($iconPath) ? file_get_contents($iconPath) : '';
 
         fluent_cart_api()->addCustomerDashboardEndpoint('wishlist', [

@@ -79,7 +79,9 @@ class WishlistProfileSection
 
         foreach (array_slice($items, 0, 20) as $item) {
             $productTitle = !empty($item['product_title'])
-                ? '<a href="' . esc_url(admin_url('admin.php?page=fluent-cart#/products/' . $item['product_id'])) . '">' . esc_html($item['product_title']) . '</a>'
+                ? '<a href="'
+                    . esc_url(admin_url('admin.php?page=fluent-cart#/products/' . $item['product_id']))
+                    . '">' . esc_html($item['product_title']) . '</a>'
                 : __('(Deleted)', 'fchub-wishlist');
 
             $variantTitle = !empty($item['variant_title'])
@@ -103,6 +105,7 @@ class WishlistProfileSection
         if (count($items) > 20) {
             $html .= '<p style="color:#909399;font-size:12px;">';
             $html .= sprintf(
+                /* translators: %d: total number of wishlist items */
                 __('Showing 20 of %d items', 'fchub-wishlist'),
                 count($items)
             );

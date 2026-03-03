@@ -35,6 +35,7 @@ final class Logger
         }
 
         $contextString = $context ? ' ' . wp_json_encode($context) : '';
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- intentional fallback logger
         error_log("[fchub-wishlist] [{$level}] {$message}{$contextString}");
     }
 }

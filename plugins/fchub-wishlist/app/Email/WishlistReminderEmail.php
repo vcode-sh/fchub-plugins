@@ -203,7 +203,9 @@ final class WishlistReminderEmail
 <p>You have {item_count} items waiting in your wishlist:</p>
 {item_list}
 <p>Don't let them slip away &mdash; visit your wishlist to check availability and prices.</p>
-<p><a href="{wishlist_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">View My Wishlist</a></p>
+<p><a href="{wishlist_url}" style="display:inline-block;padding:12px 24px;
+background-color:#2563eb;color:#ffffff;text-decoration:none;
+border-radius:6px;font-weight:600;">View My Wishlist</a></p>
 <p>Best regards,<br>{site_name}</p>
 HTML;
     }
@@ -223,7 +225,9 @@ HTML;
 <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f3f4f6;">
 <tr><td align="center" style="padding:40px 20px;">
-<table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+<table role="presentation" width="600" cellspacing="0" cellpadding="0"
+style="background-color:#ffffff;border-radius:8px;overflow:hidden;
+box-shadow:0 1px 3px rgba(0,0,0,0.1);">
 <tr><td style="padding:32px 40px;background-color:#2563eb;text-align:center;">
 <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">{$siteName}</h1>
 </td></tr>

@@ -140,7 +140,7 @@ class ItemAddedTrigger extends BaseTrigger
         }
 
         if ($checkIds = Arr::get($conditions, 'product_ids', [])) {
-            if (!in_array($productId, array_map('intval', $checkIds))) {
+            if (!in_array($productId, array_map('intval', $checkIds), true)) {
                 return false;
             }
         }

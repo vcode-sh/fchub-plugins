@@ -55,6 +55,7 @@ class WishlistStatsQuery
         }
 
         $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
+        // phpcs:disable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- dynamic placeholder count
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT product_id, COUNT(*) AS cnt
              FROM {$this->itemsTable}
@@ -62,6 +63,7 @@ class WishlistStatsQuery
              GROUP BY product_id",
             ...array_map('intval', $productIds)
         ), ARRAY_A);
+        // phpcs:enable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 
         $counts = [];
         foreach ($rows ?: [] as $row) {

@@ -167,10 +167,12 @@ class WishlistRepository
         if ($wishlistIds) {
             $itemsTable = $wpdb->prefix . 'fchub_wishlist_items';
             $placeholders = implode(',', array_fill(0, count($wishlistIds), '%d'));
+            // phpcs:disable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- dynamic placeholder count
             $wpdb->query($wpdb->prepare(
                 "DELETE FROM {$itemsTable} WHERE wishlist_id IN ({$placeholders})",
                 ...$wishlistIds
             ));
+            // phpcs:enable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
         }
 
         return (int) $wpdb->query($wpdb->prepare(
