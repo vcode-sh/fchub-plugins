@@ -52,6 +52,10 @@ jobs:
           fi
           echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Verify tool counts
+        working-directory: .
+        run: node scripts/count-mcp-tools.mjs --check
+
       - name: Typecheck
         run: npm run typecheck
 

@@ -1,0 +1,47 @@
+# CI for web-docs and version consistency.
+# Catches tool count drift, hardcoded release URLs, and versions.json validity.
+name: Docs CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web-docs/**'
+      - 'fluentcart-mcp/src/tools/**'
+      - 'scripts/count-mcp-tools.mjs'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web-docs/**'
+      - 'fluentcart-mcp/src/tools/**'
+      - 'scripts/count-mcp-tools.mjs'
+
+concurrency:
+  group: docs-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  consistency:
+    name: Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate versions.json
+        run: node -e "JSON.parse(require('fs').readFileSync('web-docs/lib/versions.json','utf8'))"
+
+      - name: Verify tool counts match source
+        run: node scripts/count-mcp-tools.mjs --check
+
+      - name: Check for hardcoded release URLs
+        run: |
+          HARDCODED=$(grep -rn "releases/tag/" web-docs/content/ web-docs/app/ --include="*.mdx" --include="*.tsx" | grep -v _changelog | grep -v versions || true)
+          if [ -n "$HARDCODED" ]; then
+            echo "::error::Found hardcoded release URLs. Use <PluginDownload> or versions imports instead."
+            echo "$HARDCODED"
+            exit 1
+          fi

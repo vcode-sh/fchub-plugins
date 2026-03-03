@@ -50,6 +50,16 @@ jobs:
 
           echo "Version validated: $VERSION"
 
+      - name: Check versions.json consistency
+        continue-on-error: true
+        run: |
+          SLUG="${{ steps.tag.outputs.slug }}"
+          VERSION="${{ steps.tag.outputs.version }}"
+          DOCS_VERSION=$(node -e "const v=JSON.parse(require('fs').readFileSync('web-docs/lib/versions.json','utf8'));console.log(v.plugins['${SLUG}']?.version??'NOT_FOUND')")
+          if [ "$DOCS_VERSION" != "$VERSION" ]; then
+            echo "::warning::versions.json has ${SLUG} at v${DOCS_VERSION}, tag is v${VERSION}. Update versions.json after this release."
+          fi
+
       - name: Setup Node.js
         if: steps.tag.outputs.slug == 'fchub-memberships' || steps.tag.outputs.slug == 'fchub-portal-extender' || steps.tag.outputs.slug == 'fchub-stream'
         uses: actions/setup-node@v4
