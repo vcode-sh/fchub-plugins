@@ -142,7 +142,7 @@ Dynamic mode gives the AI 3 tools to discover and execute any of the 279 tools o
 | Module | Tools | What It Covers |
 |--------|-------|----------------|
 | **Orders** | 23 | List, create, update, refund, disputes, bulk actions |
-| **Products** | 52 | CRUD, pricing, variants, downloads, categories |
+| **Products** | 55 | CRUD, pricing, variants, downloads, categories |
 | **Customers** | 19 | Profiles, addresses, stats, lifetime value |
 | **Subscriptions** | 7 | List, pause, resume, cancel, reactivate |
 | **Coupons** | 12 | Create, apply, eligibility, settings |
