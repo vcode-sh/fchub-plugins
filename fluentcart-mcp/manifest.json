@@ -11,7 +11,10 @@
   },
   "license": "MIT",
   "homepage": "https://fchub.co/docs/fluentcart-mcp",
-  "repository": "https://github.com/vcode-sh/fchub-plugins",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vcode-sh/fchub-plugins"
+  },
   "server": {
     "type": "node",
     "entry_point": "dist/index.js",

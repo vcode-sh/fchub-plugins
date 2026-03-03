@@ -11,6 +11,69 @@ import { Separator } from '@/components/ui/separator';
 
 This takes about 5 minutes. You'll generate a password in WordPress, paste a config snippet into your AI client, and you're done. I've made it as boring and straightforward as possible — no ceremony, no hoops.
 
+## Claude Desktop Extension
+
+No terminal. No JSON. No Node.js. Just download a file, double-click it, fill in three fields.
+If you can install a browser extension, you can do this.
+
+<Steps>
+<Step>
+### Download the Extension
+
+<Cards>
+  <Card title="Download fluentcart-mcp.mcpb" href="https://github.com/vcode-sh/fchub-plugins/releases/download/fluentcart-mcp/v1.0.0/fluentcart-mcp.mcpb">
+    Latest release — click to download.
+  </Card>
+</Cards>
+
+Or browse all versions on the [GitHub Releases page](https://github.com/vcode-sh/fchub-plugins/releases).
+
+</Step>
+<Step>
+### Install It
+
+Double-click the `.mcpb` file. Claude Desktop picks it up automatically.
+
+Or drag it into Claude Desktop. Or go to **Settings → Extensions → Install Extension** and select the file.
+Three ways to do the same thing — pick whichever makes you feel most in control.
+
+</Step>
+<Step>
+### Enter Your WordPress Credentials
+
+Claude Desktop shows three fields:
+
+| Field | What to enter |
+|-------|---------------|
+| **WordPress URL** | `https://your-store.com` — no trailing slash, no `/wp-admin/` |
+| **Username** | Your WordPress admin username |
+| **Application Password** | Generate one at **Users → Profile → Application Passwords** |
+
+<Callout type="warn" title="WordPress Shows This Once">
+The Application Password appears exactly once when you create it.
+Close that page without copying and you're generating a new one. Ask me how I know.
+</Callout>
+
+</Step>
+<Step>
+### Use It
+
+Open a new chat. The hammer icon in the input area should show FluentCart tools. Try:
+
+> "Show me today's orders"
+
+See store data? Done. No JSON was harmed in the process.
+
+</Step>
+</Steps>
+
+<Callout type="info" title="Using a Different AI Client?">
+The extension only works with Claude Desktop. For Claude Code, Cursor, VS Code, Windsurf,
+or Codex CLI — keep reading. The developer setup below covers all of them.
+</Callout>
+
+<Separator className="my-8" />
+
 ## Prerequisites
 
 <Steps>
@@ -86,6 +149,11 @@ Pick your weapon. Each one takes about 60 seconds.
 ### Claude Desktop
 
 Anthropic's standalone app. The one with the nice icon.
+
+<Callout type="info" title="Prefer the Easy Way?">
+Skip all this. Use the [Claude Desktop Extension](#claude-desktop-extension) above instead —
+one file, no terminal, no JSON editing.
+</Callout>
 
 <Steps>
 <Step>

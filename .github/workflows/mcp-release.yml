@@ -123,3 +123,43 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "fluentcart-mcp v${{ needs.validate.outputs.version }}" \
             --notes-file /tmp/release_notes.txt
+
+  attach-mcpb:
+    name: Attach MCPB
+    runs-on: ubuntu-latest
+    needs: [validate, github-release]
+    defaults:
+      run:
+        working-directory: fluentcart-mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: fluentcart-mcp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Prune to production dependencies
+        run: npm prune --production
+
+      - name: Install mcpb CLI
+        run: npm install -g @anthropic-ai/mcpb
+
+      - name: Validate manifest
+        run: mcpb validate .
+
+      - name: Pack MCPB
+        run: mcpb pack . fluentcart-mcp.mcpb
+
+      - name: Upload to GitHub Release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" fluentcart-mcp/fluentcart-mcp.mcpb --clobber

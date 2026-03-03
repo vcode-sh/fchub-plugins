@@ -6,7 +6,15 @@ Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Cod
 
 ## Quick Start
 
-### Claude Desktop
+### Claude Desktop — One Click (Recommended)
+
+Download the extension — no Node.js required:
+
+**[Download fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases/download/fluentcart-mcp/v1.0.0/fluentcart-mcp.mcpb)**
+
+Double-click the file. Claude Desktop prompts for your WordPress URL, username, and Application Password. Fill those in. Done.
+
+### Claude Desktop — Manual Config
 
 Add to `claude_desktop_config.json`:
 

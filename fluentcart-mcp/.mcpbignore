@@ -10,3 +10,13 @@ coverage/
 .github/
 smithery.yaml
 Dockerfile
+.dockerignore
+.env
+.env.*
+.gitignore
+.mcpbignore
+CLAUDE.md
+test-tool.sh
+docker-mcp-registry/
+*.tgz
+*.mcpb

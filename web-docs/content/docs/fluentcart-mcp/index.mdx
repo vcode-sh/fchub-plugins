@@ -69,7 +69,7 @@ Three things. That's it.
 
 | Requirement | Details |
 |-------------|---------|
-| **Node.js** | Version 22 or higher ([download](https://nodejs.org)) |
+| **Node.js** | Version 22 or higher ([download](https://nodejs.org)) — *not needed for the Claude Desktop Extension* |
 | **WordPress** | Version 5.6+ with FluentCart installed |
 | **Application Password** | A WordPress Application Password for API access |
 
@@ -77,7 +77,11 @@ No extra plugins. No external API keys. WordPress Application Passwords have bee
 
 ## Quick Start
 
-If you already know what MCP is and just want the commands:
+### Claude Desktop — One Click
+
+Download [fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases/download/fluentcart-mcp/v1.0.0/fluentcart-mcp.mcpb), double-click, enter your WordPress credentials. Done. No Node.js, no JSON, no terminal.
+
+### Everyone Else
 
 ```bash
 # Run directly — no global install needed
@@ -94,7 +98,8 @@ I tested this with everything that speaks MCP:
 
 | Client | Platform | How Hard? |
 |--------|----------|-----------|
-| **Claude Desktop** | macOS, Windows | Copy-paste some JSON |
+| **Claude Desktop (Extension)** | macOS, Windows | Download, double-click, done |
+| **Claude Desktop (npx)** | macOS, Windows | Copy-paste some JSON |
 | **Claude Code** | Terminal | One command, done |
 | **Cursor** | macOS, Windows, Linux | Copy-paste some JSON |
 | **VS Code + Copilot** | macOS, Windows, Linux | Add to settings.json |
