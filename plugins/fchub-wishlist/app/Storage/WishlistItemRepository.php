@@ -132,6 +132,37 @@ class WishlistItemRepository
     }
 
     /**
+     * Get wishlist counts for multiple products in a single query.
+     *
+     * @param array<int> $productIds
+     * @return array<int, int> Map of product_id => count
+     */
+    public function countByProductIds(array $productIds): array
+    {
+        global $wpdb;
+
+        if (empty($productIds)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT product_id, COUNT(*) AS cnt
+             FROM {$this->table}
+             WHERE product_id IN ({$placeholders})
+             GROUP BY product_id",
+            ...array_map('intval', $productIds)
+        ), ARRAY_A);
+
+        $counts = [];
+        foreach ($rows ?: [] as $row) {
+            $counts[(int) $row['product_id']] = (int) $row['cnt'];
+        }
+
+        return $counts;
+    }
+
+    /**
      * Get most wishlisted products with count, ordered by popularity.
      *
      * @return array<int, array{product_id: int, wishlist_count: int}>
