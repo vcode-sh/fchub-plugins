@@ -12,7 +12,7 @@ async function main() {
 	const groupTool = toolMap.get('fluentcart_attribute_group_create')!
 	const grpResult = await groupTool.handler({
 		title: 'Verify Fix Group',
-		slug: 'verify-fix-group-' + Date.now(),
+		slug: `verify-fix-group-${Date.now()}`,
 	})
 	const grpText = grpResult.content[0]?.text ?? ''
 	const grpData = JSON.parse(grpText) as { data?: { id: number }; id?: number }
@@ -41,7 +41,7 @@ async function main() {
 	await deleteTool.handler({ group_id: groupId })
 	console.log('\nCleaned up group', groupId)
 
-	console.log('\n' + (hasBugInfo ? 'PASS' : 'FAIL') + ': Custom error message works correctly')
+	console.log(`\n${hasBugInfo ? 'PASS' : 'FAIL'}: Custom error message works correctly`)
 }
 
 main().catch(console.error)

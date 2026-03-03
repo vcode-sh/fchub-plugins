@@ -20,7 +20,11 @@ async function call(name: string, input: Record<string, unknown> = {}): Promise<
 	}
 	const text = result.content[0]?.text ?? ''
 	let data: unknown
-	try { data = JSON.parse(text) } catch { data = text }
+	try {
+		data = JSON.parse(text)
+	} catch {
+		data = text
+	}
 	return { isError: result.isError, data, raw: text }
 }
 
@@ -37,7 +41,7 @@ function show(r: ToolResult, maxLen = 800) {
 	console.log(`  ${preview}`)
 }
 
-function extractId(data: unknown, ...keys: string[]): number | null {
+function _extractId(data: unknown, ...keys: string[]): number | null {
 	if (!data || typeof data !== 'object') return null
 	const obj = data as Record<string, unknown>
 	for (const k of keys) {
@@ -55,10 +59,20 @@ function extractId(data: unknown, ...keys: string[]): number | null {
 	return null
 }
 
-interface ScenarioResult { name: string; passed: boolean; error?: string }
+interface ScenarioResult {
+	name: string
+	passed: boolean
+	error?: string
+}
 const results: ScenarioResult[] = []
-function pass(name: string) { results.push({ name, passed: true }); console.log(`\n✅ SCENARIO PASSED: ${name}`) }
-function fail(name: string, error: string) { results.push({ name, passed: false, error }); console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`) }
+function pass(name: string) {
+	results.push({ name, passed: true })
+	console.log(`\n✅ SCENARIO PASSED: ${name}`)
+}
+function fail(name: string, error: string) {
+	results.push({ name, passed: false, error })
+	console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`)
+}
 
 // ── Scenario 1: Module Settings (get + save) ─────────────────────
 async function scenario1() {
@@ -71,7 +85,10 @@ async function scenario1() {
 		log('1.1', 'fluentcart_settings_get_modules')
 		const getModules = await call('fluentcart_settings_get_modules')
 		show(getModules)
-		if (getModules.isError) { fail(name, `get_modules error: ${getModules.raw}`); return }
+		if (getModules.isError) {
+			fail(name, `get_modules error: ${getModules.raw}`)
+			return
+		}
 
 		// Save same data back (idempotent)
 		const moduleData = getModules.data as Record<string, unknown>
@@ -81,13 +98,19 @@ async function scenario1() {
 			modules: modules as Record<string, unknown>,
 		})
 		show(saveModules)
-		if (saveModules.isError) { fail(name, `save_modules error: ${saveModules.raw}`); return }
+		if (saveModules.isError) {
+			fail(name, `save_modules error: ${saveModules.raw}`)
+			return
+		}
 
 		// Verify it's still the same
 		log('1.3', 'fluentcart_settings_get_modules (verify)')
 		const verifyModules = await call('fluentcart_settings_get_modules')
 		show(verifyModules)
-		if (verifyModules.isError) { fail(name, `verify get_modules error: ${verifyModules.raw}`); return }
+		if (verifyModules.isError) {
+			fail(name, `verify get_modules error: ${verifyModules.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -106,7 +129,10 @@ async function scenario2() {
 		log('2.1', 'fluentcart_settings_get_confirmation_shortcodes')
 		const shortcodes = await call('fluentcart_settings_get_confirmation_shortcodes')
 		show(shortcodes)
-		if (shortcodes.isError) { fail(name, `get_confirmation_shortcodes error: ${shortcodes.raw}`); return }
+		if (shortcodes.isError) {
+			fail(name, `get_confirmation_shortcodes error: ${shortcodes.raw}`)
+			return
+		}
 
 		log('2.2', 'fluentcart_settings_save_confirmation (empty settings to test endpoint)')
 		const saveConfirm = await call('fluentcart_settings_save_confirmation', {
@@ -135,7 +161,10 @@ async function scenario3() {
 		log('3.1', 'fluentcart_payment_get_all')
 		const allPayments = await call('fluentcart_payment_get_all')
 		show(allPayments)
-		if (allPayments.isError) { fail(name, `payment_get_all error: ${allPayments.raw}`); return }
+		if (allPayments.isError) {
+			fail(name, `payment_get_all error: ${allPayments.raw}`)
+			return
+		}
 
 		// Get settings for a specific payment method
 		const payData = allPayments.data as Record<string, unknown>
@@ -192,7 +221,10 @@ async function scenario4() {
 		log('4.1', 'fluentcart_settings_print_templates_get')
 		const getTemplates = await call('fluentcart_settings_print_templates_get')
 		show(getTemplates)
-		if (getTemplates.isError) { fail(name, `print_templates_get error: ${getTemplates.raw}`); return }
+		if (getTemplates.isError) {
+			fail(name, `print_templates_get error: ${getTemplates.raw}`)
+			return
+		}
 
 		// Save same data back
 		const templateData = getTemplates.data as Record<string, unknown>
@@ -202,7 +234,10 @@ async function scenario4() {
 			templates: templates as Record<string, unknown>,
 		})
 		show(saveTemplates)
-		if (saveTemplates.isError) { fail(name, `print_templates_save error: ${saveTemplates.raw}`); return }
+		if (saveTemplates.isError) {
+			fail(name, `print_templates_save error: ${saveTemplates.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -221,7 +256,10 @@ async function scenario5() {
 		log('5.1', 'fluentcart_settings_get_permissions')
 		const getPerms = await call('fluentcart_settings_get_permissions')
 		show(getPerms)
-		if (getPerms.isError) { fail(name, `get_permissions error: ${getPerms.raw}`); return }
+		if (getPerms.isError) {
+			fail(name, `get_permissions error: ${getPerms.raw}`)
+			return
+		}
 
 		// Extract current capabilities and save them back
 		const permData = getPerms.data as Record<string, unknown>
@@ -232,7 +270,10 @@ async function scenario5() {
 				capability: caps,
 			})
 			show(savePerms)
-			if (savePerms.isError) { fail(name, `save_permissions error: ${savePerms.raw}`); return }
+			if (savePerms.isError) {
+				fail(name, `save_permissions error: ${savePerms.raw}`)
+				return
+			}
 		} else {
 			console.log('  No capability array found in response; testing save with empty array')
 			log('5.2', 'fluentcart_settings_save_permissions (empty array)')
@@ -250,7 +291,10 @@ async function scenario5() {
 		log('5.3', 'fluentcart_settings_get_permissions (verify)')
 		const verifyPerms = await call('fluentcart_settings_get_permissions')
 		show(verifyPerms)
-		if (verifyPerms.isError) { fail(name, `verify get_permissions error: ${verifyPerms.raw}`); return }
+		if (verifyPerms.isError) {
+			fail(name, `verify get_permissions error: ${verifyPerms.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -269,7 +313,10 @@ async function scenario6() {
 		log('6.1', 'fluentcart_settings_get_store')
 		const getStore = await call('fluentcart_settings_get_store')
 		show(getStore)
-		if (getStore.isError) { fail(name, `get_store error: ${getStore.raw}`); return }
+		if (getStore.isError) {
+			fail(name, `get_store error: ${getStore.raw}`)
+			return
+		}
 
 		// Save a harmless setting back
 		log('6.2', 'fluentcart_settings_save_store (set order_mode to current value)')
@@ -280,7 +327,10 @@ async function scenario6() {
 			settings: { order_mode: currentMode },
 		})
 		show(saveStore)
-		if (saveStore.isError) { fail(name, `save_store error: ${saveStore.raw}`); return }
+		if (saveStore.isError) {
+			fail(name, `save_store error: ${saveStore.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -289,7 +339,6 @@ async function scenario6() {
 }
 
 // ── Run ──────────────────────────────────────────────────────────
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function run() {
 	console.log('╔══════════════════════════════════════════════════════════╗')
 	console.log('║  BATCH H — Settings Tools Scenarios                     ║')

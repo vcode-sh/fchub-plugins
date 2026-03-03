@@ -159,8 +159,7 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_dashboard_summary',
 			title: 'Get Dashboard Summary',
-			description:
-				'Dashboard summary with key metrics, trends, and period comparisons.',
+			description: 'Dashboard summary with key metrics, trends, and period comparisons.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/get-dashboard-summary',
 		}),
@@ -179,11 +178,7 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'Top products by units sold with revenue data. Values in cents.',
 			schema: z.object({
 				...dateRange,
-				per_page: z
-					.number()
-					.max(50)
-					.optional()
-					.describe('Number of results (max: 50)'),
+				per_page: z.number().max(50).optional().describe('Number of results (max: 50)'),
 			}),
 			endpoint: '/reports/fetch-top-sold-products',
 		}),
@@ -199,8 +194,7 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_cart',
 			title: 'Get Cart Report',
-			description:
-				'Cart analytics: abandonment rate, conversion funnel, and cart value metrics.',
+			description: 'Cart analytics: abandonment rate, conversion funnel, and cart value metrics.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/cart-report',
 		}),

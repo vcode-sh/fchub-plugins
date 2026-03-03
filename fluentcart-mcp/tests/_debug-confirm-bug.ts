@@ -13,7 +13,7 @@ async function main() {
 	try {
 		const resp = await ctx.client.post('/options/attr/group/1/term', {
 			title: 'API Via Workaround',
-			slug: 'api-via-workaround-' + Date.now(),
+			slug: `api-via-workaround-${Date.now()}`,
 		})
 		console.log('SUCCESS:', JSON.stringify(resp.data, null, 2))
 	} catch (e) {
@@ -25,7 +25,7 @@ async function main() {
 	try {
 		const grp = await ctx.client.post('/options/attr/group', {
 			title: 'Fresh Group',
-			slug: 'fresh-group-' + Date.now(),
+			slug: `fresh-group-${Date.now()}`,
 		})
 		const groupId = (grp.data as { data: { id: number } }).data.id
 		console.log('Created group with id:', groupId)
@@ -33,7 +33,7 @@ async function main() {
 		try {
 			const term = await ctx.client.post(`/options/attr/group/${groupId}/term`, {
 				title: 'Should Fail',
-				slug: 'should-fail-' + Date.now(),
+				slug: `should-fail-${Date.now()}`,
 			})
 			console.log('UNEXPECTED SUCCESS:', JSON.stringify(term.data, null, 2))
 		} catch (e) {

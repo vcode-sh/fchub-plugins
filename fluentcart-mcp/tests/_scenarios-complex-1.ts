@@ -68,8 +68,9 @@ const results: ScenarioResult[] = []
    SCENARIO 11: Full Product Lifecycle
    ═════════════════════════════════════════════════════════════════════════════ */
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function scenario11() {
-	console.log('\n' + '='.repeat(60))
+	console.log(`\n${'='.repeat(60)}`)
 	console.log('SCENARIO 11: Full Product Lifecycle')
 	console.log('='.repeat(60))
 
@@ -246,7 +247,7 @@ async function scenario11() {
    ═════════════════════════════════════════════════════════════════════════════ */
 
 async function scenario12() {
-	console.log('\n' + '='.repeat(60))
+	console.log(`\n${'='.repeat(60)}`)
 	console.log('SCENARIO 12: Order & Transaction Inspection')
 	console.log('='.repeat(60))
 
@@ -272,10 +273,12 @@ async function scenario12() {
 		console.log(`  -> Found ${orders.length} orders. Inspecting order #${orderId}`)
 
 		// Verify order list shape
-		if (!('status' in firstOrder) || !('total_amount' in firstOrder)) {
+		if (!('status' in firstOrder && 'total_amount' in firstOrder)) {
 			throw new Error('Order list items missing expected fields (status, total_amount)')
 		}
-		console.log(`  -> Order shape: status=${firstOrder.status}, total=${firstOrder.total_amount} (OK)`)
+		console.log(
+			`  -> Order shape: status=${firstOrder.status}, total=${firstOrder.total_amount} (OK)`,
+		)
 
 		// Step 2: Get full order details
 		log('12.2 Get order details', `fluentcart_order_get order_id: ${orderId}`)
@@ -285,10 +288,12 @@ async function scenario12() {
 
 		const detailData = detail.data as Record<string, unknown>
 		const order = (detailData?.order ?? detailData) as Record<string, unknown>
-		if (!('status' in order) || !('total_amount' in order)) {
+		if (!('status' in order && 'total_amount' in order)) {
 			throw new Error('Order detail missing expected fields')
 		}
-		console.log(`  -> Order detail: status=${order.status}, total=${order.total_amount}, customer=${JSON.stringify(order.customer)} (OK)`)
+		console.log(
+			`  -> Order detail: status=${order.status}, total=${order.total_amount}, customer=${JSON.stringify(order.customer)} (OK)`,
+		)
 
 		// Step 3: Get order transactions
 		log('12.3 Get order transactions', `fluentcart_order_transactions order_id: ${orderId}`)
@@ -316,8 +321,9 @@ async function scenario12() {
    SCENARIO 13: Variant Update Flow
    ═════════════════════════════════════════════════════════════════════════════ */
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function scenario13() {
-	console.log('\n' + '='.repeat(60))
+	console.log(`\n${'='.repeat(60)}`)
 	console.log('SCENARIO 13: Variant Update Flow')
 	console.log('='.repeat(60))
 
@@ -360,19 +366,22 @@ async function scenario13() {
 		})
 		show(update)
 		if (update.isError) {
-			console.log('  -> KNOWN BUG: variant_update fails validation (missing required fields: post_id, total_stock, available, committed, on_hold)')
+			console.log(
+				'  -> KNOWN BUG: variant_update fails validation (missing required fields: post_id, total_stock, available, committed, on_hold)',
+			)
 			console.log('  -> Workaround: use product_pricing_update to modify variants')
 		} else {
 			console.log('  -> variant_update succeeded (bug may have been fixed)')
 		}
 
 		// Step 4: Update variant via product_pricing_update (the working approach)
-		log('13.4 Update variant via pricing_update', 'fluentcart_product_pricing_update with updated variant')
+		log(
+			'13.4 Update variant via pricing_update',
+			'fluentcart_product_pricing_update with updated variant',
+		)
 		const pricingUpdate = await call('fluentcart_product_pricing_update', {
 			product_id: productId,
-			variants: [
-				{ id: variantId, title: 'Updated', price: 2000, sku: 'UPD-UPDATED' },
-			],
+			variants: [{ id: variantId, title: 'Updated', price: 2000, sku: 'UPD-UPDATED' }],
 		})
 		show(pricingUpdate)
 		if (pricingUpdate.isError) throw new Error('Failed to update variant via pricing_update')
@@ -397,7 +406,10 @@ async function scenario13() {
 			) as Record<string, unknown> | null
 		} else if (typeof variants === 'object' && variants !== null) {
 			const keyed = variants as Record<string, unknown>
-			updatedVariant = (keyed[String(variantId)] ?? Object.values(keyed)[0]) as Record<string, unknown> | null
+			updatedVariant = (keyed[String(variantId)] ?? Object.values(keyed)[0]) as Record<
+				string,
+				unknown
+			> | null
 		}
 
 		if (updatedVariant) {
@@ -438,8 +450,9 @@ async function scenario13() {
    SCENARIO 14: Bulk Product Operations
    ═════════════════════════════════════════════════════════════════════════════ */
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function scenario14() {
-	console.log('\n' + '='.repeat(60))
+	console.log(`\n${'='.repeat(60)}`)
 	console.log('SCENARIO 14: Bulk Product Operations')
 	console.log('='.repeat(60))
 
@@ -510,7 +523,9 @@ async function scenario14() {
 				if (found) foundAfterDelete++
 			}
 		}
-		console.log(`  -> Found ${foundAfterDelete} of ${productIds.length} in active list after delete`)
+		console.log(
+			`  -> Found ${foundAfterDelete} of ${productIds.length} in active list after delete`,
+		)
 		if (foundAfterDelete === 0) {
 			console.log('  -> All products removed (OK)')
 		}
@@ -536,7 +551,7 @@ async function scenario14() {
    ═════════════════════════════════════════════════════════════════════════════ */
 
 async function scenario15() {
-	console.log('\n' + '='.repeat(60))
+	console.log(`\n${'='.repeat(60)}`)
 	console.log('SCENARIO 15: Reports & Analytics')
 	console.log('='.repeat(60))
 
@@ -585,7 +600,9 @@ async function scenario15() {
 			show(result)
 			if (result.isError) {
 				if (knownServerBugs.has(rc.tool)) {
-					console.log(`  -> KNOWN BUG: ${rc.tool} fails server-side (FluentCart upstream issue, not MCP)`)
+					console.log(
+						`  -> KNOWN BUG: ${rc.tool} fails server-side (FluentCart upstream issue, not MCP)`,
+					)
 				} else {
 					console.log(`  -> FAIL: ${rc.tool} returned error`)
 					allPassed = false
@@ -617,7 +634,6 @@ async function scenario15() {
    MAIN
    ═════════════════════════════════════════════════════════════════════════════ */
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function run() {
 	console.log('+==========================================================+')
 	console.log('|  COMPLEX SCENARIOS 11-15: Multi-step MCP flows           |')
@@ -631,7 +647,7 @@ async function run() {
 	await scenario15()
 
 	// ── Summary table ───────────────────────────────────────────────────────
-	console.log('\n' + '='.repeat(60))
+	console.log(`\n${'='.repeat(60)}`)
 	console.log('RESULTS SUMMARY')
 	console.log('='.repeat(60))
 

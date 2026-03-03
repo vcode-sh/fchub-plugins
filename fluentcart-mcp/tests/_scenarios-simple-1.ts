@@ -184,9 +184,7 @@ async function scenario2() {
 		const detail = p.detail as Record<string, unknown> | undefined
 		if (!detail) throw new Error('No detail object in product')
 		if (detail.fulfillment_type !== 'digital') {
-			throw new Error(
-				`Expected fulfillment_type 'digital', got '${detail.fulfillment_type}'`,
-			)
+			throw new Error(`Expected fulfillment_type 'digital', got '${detail.fulfillment_type}'`)
 		}
 		console.log(`  → fulfillment_type: ${detail.fulfillment_type} ✓`)
 		console.log(`  → post_status: ${p.post_status} ✓`)
@@ -249,7 +247,9 @@ async function scenario3() {
 			const hasVariants = Array.isArray(p.variants)
 			console.log(`  → post_title: ${p.post_title} ✓`)
 			console.log(`  → detail: present ✓`)
-			console.log(`  → variants: ${hasVariants ? (p.variants as unknown[]).length : 'not present (ok for some states)'} ✓`)
+			console.log(
+				`  → variants: ${hasVariants ? (p.variants as unknown[]).length : 'not present (ok for some states)'} ✓`,
+			)
 		} else {
 			log('3.2 Get product details', 'SKIPPED — no products exist')
 		}
@@ -268,6 +268,7 @@ async function scenario3() {
 }
 
 // ── Scenario 4: Price Update ───────────────────────────────
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function scenario4() {
 	const name = '4. Price Update'
 	console.log(`\n${'═'.repeat(60)}`)
@@ -361,9 +362,7 @@ async function scenario4() {
 			throw new Error('Updated price is 0, expected non-zero after setting price=2000')
 		}
 		if (updatedPrice === initialPrice) {
-			throw new Error(
-				`Price did not change: still ${updatedPrice} after update from 1000 to 2000`,
-			)
+			throw new Error(`Price did not change: still ${updatedPrice} after update from 1000 to 2000`)
 		}
 		// Verify the ratio is correct (price doubled from 1000 to 2000)
 		const ratio = updatedPrice / initialPrice
@@ -372,7 +371,9 @@ async function scenario4() {
 				`Expected price to double (ratio 2.0), got ratio ${ratio.toFixed(3)} (${initialPrice} → ${updatedPrice})`,
 			)
 		}
-		console.log(`  → item_price changed: ${initialPrice} → ${updatedPrice} (ratio: ${ratio.toFixed(1)}x) ✓`)
+		console.log(
+			`  → item_price changed: ${initialPrice} → ${updatedPrice} (ratio: ${ratio.toFixed(1)}x) ✓`,
+		)
 
 		pass(name)
 	} catch (e) {
@@ -433,8 +434,7 @@ async function scenario5() {
 		show(getAfter)
 		if (!getAfter.isError) {
 			// Some APIs return the product in trashed state instead of error
-			const afterProduct =
-				(getAfter.data as Record<string, unknown>)?.product ?? getAfter.data
+			const afterProduct = (getAfter.data as Record<string, unknown>)?.product ?? getAfter.data
 			const ap = afterProduct as Record<string, unknown>
 			if (ap.post_status === 'trash') {
 				console.log('  → Product is in trash status (soft-delete) ✓')
@@ -458,7 +458,6 @@ async function scenario5() {
 }
 
 // ── Main runner ────────────────────────────────────────────
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function run() {
 	console.log('╔══════════════════════════════════════════════════════════╗')
 	console.log('║  SIMPLE SCENARIOS 1–5                                   ║')

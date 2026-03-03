@@ -72,9 +72,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Reorder Shipping Zones',
 			description: 'Reorder shipping zones by priority. Lower index = higher priority.',
 			schema: z.object({
-				zones: z
-					.array(z.number())
-					.describe('Ordered array of zone IDs (first = highest priority)'),
+				zones: z.array(z.number()).describe('Ordered array of zone IDs (first = highest priority)'),
 			}),
 			endpoint: '/shipping/zones/update-order',
 		}),
@@ -84,10 +82,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Get Zone States',
 			description: 'Get available states/regions for zone configuration.',
 			schema: z.object({
-				country: z
-					.string()
-					.optional()
-					.describe('ISO country code to get states for'),
+				country: z.string().optional().describe('ISO country code to get states for'),
 			}),
 			endpoint: '/shipping/zone/states',
 			cache: { key: 'shipping_zone_states', ttlMs: TTL.LONG },
@@ -103,9 +98,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				'Amount in cents.',
 			schema: z.object({
 				zone_id: z.number().describe('Zone ID to add the method to'),
-				type: z
-					.string()
-					.describe('Method type: flat_rate, free_shipping, local_pickup'),
+				type: z.string().describe('Method type: flat_rate, free_shipping, local_pickup'),
 				title: z.string().describe('Display title (required)'),
 				amount: z.number().optional().describe('Shipping cost in cents (for flat_rate)'),
 				min_amount: z
@@ -129,18 +122,9 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				zone_id: z.number().optional().describe('Zone ID'),
 				title: z.string().optional().describe('Display title'),
 				amount: z.number().optional().describe('Shipping cost in cents'),
-				min_amount: z
-					.number()
-					.optional()
-					.describe('Minimum order amount in cents'),
-				enabled: z
-					.string()
-					.optional()
-					.describe("Method status: 'yes' or 'no'"),
-				settings: z
-					.record(z.string(), z.unknown())
-					.optional()
-					.describe('Method settings'),
+				min_amount: z.number().optional().describe('Minimum order amount in cents'),
+				enabled: z.string().optional().describe("Method status: 'yes' or 'no'"),
+				settings: z.record(z.string(), z.unknown()).optional().describe('Method settings'),
 			}),
 			endpoint: '/shipping/methods',
 		}),
@@ -184,9 +168,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({
 				name: z.string().describe('Class name (required)'),
 				cost: z.number().describe('Additional cost in cents (required)'),
-				type: z
-					.string()
-					.describe('Cost type: fixed (flat amount) or percentage (required)'),
+				type: z.string().describe('Cost type: fixed (flat amount) or percentage (required)'),
 				description: z.string().optional().describe('Class description'),
 			}),
 			endpoint: '/shipping/classes',
@@ -200,10 +182,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				class_id: z.number().describe('Shipping class ID'),
 				name: z.string().optional().describe('Class name'),
 				cost: z.number().optional().describe('Additional cost in cents'),
-				type: z
-					.string()
-					.optional()
-					.describe('Cost type: fixed or percentage'),
+				type: z.string().optional().describe('Cost type: fixed or percentage'),
 				description: z.string().optional().describe('Class description'),
 			}),
 			endpoint: '/shipping/classes/:class_id',

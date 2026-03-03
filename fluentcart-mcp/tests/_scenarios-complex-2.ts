@@ -83,6 +83,7 @@ function record(id: number, name: string, passed: boolean, detail = '') {
 /* ══════════════════════════════════════════════════════════════════════════
    SCENARIO 16: Product Variant Pricing Matrix
    ══════════════════════════════════════════════════════════════════════════ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function scenario16() {
 	console.log('\n╔══════════════════════════════════════════════════════════╗')
 	console.log('║  SCENARIO 16: Product Variant Pricing Matrix            ║')
@@ -202,13 +203,20 @@ async function scenario16() {
 		// After update we send 2500 for Basic, expect it to differ from original 200000.
 		const originalBasicStored = variantPrices1[1] ?? 200000
 		const priceChanged = basicPrice !== originalBasicStored
-		console.log(`  → Original Basic stored price: ${originalBasicStored}, now: ${basicPrice}, changed: ${priceChanged}`)
+		console.log(
+			`  → Original Basic stored price: ${originalBasicStored}, now: ${basicPrice}, changed: ${priceChanged}`,
+		)
 		if (!priceChanged) {
 			console.log('  NOTE: variant_update and pricing_table_update may not apply correctly.')
 			console.log('  This could be a known API behaviour with internal price scaling.')
 		}
 
-		record(16, 'Product Variant Pricing Matrix', true, 'Variants created, pricing inspected, update attempted')
+		record(
+			16,
+			'Product Variant Pricing Matrix',
+			true,
+			'Variants created, pricing inspected, update attempted',
+		)
 	} catch (e) {
 		record(16, 'Product Variant Pricing Matrix', false, (e as Error).message)
 	} finally {
@@ -289,9 +297,7 @@ async function scenario17() {
 			const otherInfo = v?.other_info as Record<string, unknown> | undefined
 			console.log(`  → payment_type: ${otherInfo?.payment_type ?? 'N/A'}`)
 			console.log(`  → repeat_interval: ${otherInfo?.repeat_interval ?? 'N/A'}`)
-			console.log(
-				'  NOTE: payment_type is "onetime" by default. Setting recurring billing',
-			)
+			console.log('  NOTE: payment_type is "onetime" by default. Setting recurring billing')
 			console.log(
 				'  requires admin UI or direct API fields not fully exposed via MCP pricing_update.',
 			)
@@ -305,7 +311,12 @@ async function scenario17() {
 			'  NOTE: Our created product uses onetime payment_type, so it will not appear here.',
 		)
 
-		record(17, 'Subscription Product', true, 'Product created and published, subscription fields documented')
+		record(
+			17,
+			'Subscription Product',
+			true,
+			'Product created and published, subscription fields documented',
+		)
 	} catch (e) {
 		record(17, 'Subscription Product', false, (e as Error).message)
 	} finally {
@@ -350,7 +361,9 @@ async function scenario18() {
 		})
 		show(taxSet)
 		if (taxSet.isError) {
-			console.log('  NOTE: Tax class assignment may require pre-configured tax classes in FluentCart.')
+			console.log(
+				'  NOTE: Tax class assignment may require pre-configured tax classes in FluentCart.',
+			)
 			console.log('  This is expected if no tax classes are set up.')
 		} else {
 			console.log('  → Tax class "standard" assigned successfully')
@@ -364,9 +377,7 @@ async function scenario18() {
 		})
 		show(shipSet)
 		if (shipSet.isError) {
-			console.log(
-				'  NOTE: Shipping class assignment may require pre-configured shipping classes.',
-			)
+			console.log('  NOTE: Shipping class assignment may require pre-configured shipping classes.')
 		} else {
 			console.log('  → Shipping class "flat-rate" assigned successfully')
 		}
@@ -549,7 +560,13 @@ async function scenario20() {
 	console.log('║  SCENARIO 20: Full Store Snapshot                       ║')
 	console.log('╚══════════════════════════════════════════════════════════╝')
 
-	const checks: { name: string; toolName: string; input: Record<string, unknown>; passed: boolean; detail: string }[] = []
+	const checks: {
+		name: string
+		toolName: string
+		input: Record<string, unknown>
+		passed: boolean
+		detail: string
+	}[] = []
 
 	async function check(label: string, toolName: string, input: Record<string, unknown> = {}) {
 		log(`20: ${label}`, toolName)
@@ -562,7 +579,13 @@ async function scenario20() {
 		} else {
 			const data = result.data as Record<string, unknown>
 			const keys = Object.keys(data ?? {})
-			checks.push({ name: label, toolName, input, passed: true, detail: `keys: ${keys.join(', ')}` })
+			checks.push({
+				name: label,
+				toolName,
+				input,
+				passed: true,
+				detail: `keys: ${keys.join(', ')}`,
+			})
 			console.log(`  → ✅ OK — response keys: ${keys.join(', ')}`)
 		}
 	}
@@ -581,7 +604,9 @@ async function scenario20() {
 		const allPassed = checks.every((c) => c.passed)
 		const passCount = checks.filter((c) => c.passed).length
 
-		console.log(`\n  Store snapshot: ${passCount}/${checks.length} endpoints returned valid responses`)
+		console.log(
+			`\n  Store snapshot: ${passCount}/${checks.length} endpoints returned valid responses`,
+		)
 
 		if (!allPassed) {
 			const failures = checks.filter((c) => !c.passed)
@@ -601,7 +626,6 @@ async function scenario20() {
 /* ══════════════════════════════════════════════════════════════════════════
    MAIN
    ══════════════════════════════════════════════════════════════════════════ */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function run() {
 	console.log('╔══════════════════════════════════════════════════════════╗')
 	console.log('║  COMPLEX SCENARIOS 16-20                                ║')
@@ -620,9 +644,7 @@ async function run() {
 	console.log('SUMMARY — Complex Scenarios 16-20')
 	console.log('═'.repeat(60))
 	console.log('')
-	console.log(
-		`  ${'#'.padEnd(4)} ${'Scenario'.padEnd(38)} ${'Result'.padEnd(8)} Detail`,
-	)
+	console.log(`  ${'#'.padEnd(4)} ${'Scenario'.padEnd(38)} ${'Result'.padEnd(8)} Detail`)
 	console.log(`  ${'─'.repeat(4)} ${'─'.repeat(38)} ${'─'.repeat(8)} ${'─'.repeat(30)}`)
 
 	let passCount = 0

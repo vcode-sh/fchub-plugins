@@ -77,7 +77,10 @@ async function scenario6() {
 
 	try {
 		// Step 1: Create "Shoes" category
-		log('6.1 Create "Shoes" category', 'fluentcart_product_terms_add (taxonomy: product-categories)')
+		log(
+			'6.1 Create "Shoes" category',
+			'fluentcart_product_terms_add (taxonomy: product-categories)',
+		)
 		const shoes = await call('fluentcart_product_terms_add', {
 			names: 'Shoes',
 			taxonomy: 'product-categories',
@@ -291,7 +294,10 @@ async function scenario8() {
 		}
 
 		// Step 3: Verify via pricing endpoint (variant_list has a known FluentCart bug)
-		log('8.3 List variants via pricing', 'fluentcart_product_pricing_get (variant_list has server bug)')
+		log(
+			'8.3 List variants via pricing',
+			'fluentcart_product_pricing_get (variant_list has server bug)',
+		)
 		const pricing = await call('fluentcart_product_pricing_get', { product_id: productId })
 		show(pricing, 1500)
 		assert(!pricing.isError, 'Failed to get pricing')
@@ -386,7 +392,10 @@ async function scenario9() {
 		const couponDetail = getCoupon.data as Record<string, unknown>
 		const couponObj = (couponDetail?.coupon ?? couponDetail) as Record<string, unknown>
 		console.log(`  → Code: ${couponObj.code}, Type: ${couponObj.type}, Amount: ${couponObj.amount}`)
-		assert(String(couponObj.code) === couponCode, `Expected code ${couponCode}, got ${couponObj.code}`)
+		assert(
+			String(couponObj.code) === couponCode,
+			`Expected code ${couponCode}, got ${couponObj.code}`,
+		)
 		assert(Number(couponObj.amount) === 10, `Expected amount 10, got ${couponObj.amount}`)
 
 		// Step 3: List coupons and verify ours is in the list
@@ -473,10 +482,7 @@ async function scenario10() {
 
 		const statsData = stats.data as Record<string, unknown>
 		console.log(`  → Stats response keys: ${Object.keys(statsData).join(', ')}`)
-		assert(
-			typeof statsData === 'object' && statsData !== null,
-			'Stats response is not an object',
-		)
+		assert(typeof statsData === 'object' && statsData !== null, 'Stats response is not an object')
 
 		console.log('  → Customer lookup verified successfully')
 		results.push({ name: 'Scenario 10: Customer Lookup', passed: true })
@@ -488,7 +494,6 @@ async function scenario10() {
 }
 
 // ── Main runner ──────────────────────────────────────────────────────
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function run() {
 	console.log('╔══════════════════════════════════════════════════════════╗')
 	console.log('║  SIMPLE SCENARIOS 6–10                                  ║')

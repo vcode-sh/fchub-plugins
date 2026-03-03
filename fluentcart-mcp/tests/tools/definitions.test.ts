@@ -20,9 +20,7 @@ describe('tool definitions', () => {
 
 	it('should not contain removed tools', () => {
 		const names = tools.map((t) => t.name)
-		const removedTools = [
-			'fluentcart_product_variant_option_update',
-		]
+		const removedTools = ['fluentcart_product_variant_option_update']
 		for (const removed of removedTools) {
 			expect(names, `${removed} should have been removed`).not.toContain(removed)
 		}

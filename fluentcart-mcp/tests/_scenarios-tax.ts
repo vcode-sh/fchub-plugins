@@ -27,7 +27,11 @@ async function call(name: string, input: Record<string, unknown> = {}): Promise<
 	}
 	const text = result.content[0]?.text ?? ''
 	let data: unknown
-	try { data = JSON.parse(text) } catch { data = text }
+	try {
+		data = JSON.parse(text)
+	} catch {
+		data = text
+	}
 	return { isError: result.isError, data, raw: text }
 }
 
@@ -44,10 +48,21 @@ function show(r: ToolResult, maxLen = 800) {
 	console.log(`  ${preview}`)
 }
 
-interface ScenarioResult { name: string; passed: boolean; error?: string; bug?: string }
+interface ScenarioResult {
+	name: string
+	passed: boolean
+	error?: string
+	bug?: string
+}
 const results: ScenarioResult[] = []
-function pass(name: string) { results.push({ name, passed: true }); console.log(`\n✅ SCENARIO PASSED: ${name}`) }
-function fail(name: string, error: string, bug?: string) { results.push({ name, passed: false, error, bug }); console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`) }
+function pass(name: string) {
+	results.push({ name, passed: true })
+	console.log(`\n✅ SCENARIO PASSED: ${name}`)
+}
+function fail(name: string, error: string, bug?: string) {
+	results.push({ name, passed: false, error, bug })
+	console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`)
+}
 
 // ── Scenario 1: Tax Class CRUD ─────────────────────────────
 // BUG: MCP sends "name" but API expects "title".
@@ -67,7 +82,9 @@ async function scenario1() {
 		})
 		show(create)
 		if (create.isError) {
-			console.log('  → Confirmed: MCP sends "name" but API expects "title"; "slug" is not a valid API field')
+			console.log(
+				'  → Confirmed: MCP sends "name" but API expects "title"; "slug" is not a valid API field',
+			)
 		}
 
 		// List (read-only) should work
@@ -77,7 +94,11 @@ async function scenario1() {
 		if (list.isError) throw new Error(`List tax classes failed: ${list.raw}`)
 		console.log('  → List tax classes works')
 
-		fail(name, 'Create fails: MCP sends "name" but API expects "title"', 'MCP_BUG: tax_class_create "name" should be "title"; "slug" field does not exist in API')
+		fail(
+			name,
+			'Create fails: MCP sends "name" but API expects "title"',
+			'MCP_BUG: tax_class_create "name" should be "title"; "slug" field does not exist in API',
+		)
 	} catch (e) {
 		fail(name, (e as Error).message)
 	}
@@ -127,7 +148,11 @@ async function scenario2() {
 		if (allRates.isError) throw new Error(`List rates failed: ${allRates.raw}`)
 		console.log('  → List rates works')
 
-		fail(name, 'Create fails: multiple field name mismatches', 'MCP_BUG: tax_rate_create field mismatches (country_code→country, tax_class_id→class_id, compound→is_compound, shipping→for_shipping)')
+		fail(
+			name,
+			'Create fails: multiple field name mismatches',
+			'MCP_BUG: tax_rate_create field mismatches (country_code→country, tax_class_id→class_id, compound→is_compound, shipping→for_shipping)',
+		)
 	} catch (e) {
 		fail(name, (e as Error).message)
 	}
@@ -261,7 +286,7 @@ async function run() {
 	console.log(`\n  Total: ${results.length} | Passed: ${passed} | Failed: ${failed}`)
 
 	// MCP bugs found
-	const bugs = results.filter(r => r.bug)
+	const bugs = results.filter((r) => r.bug)
 	if (bugs.length > 0) {
 		console.log(`\n  MCP-SIDE BUGS FOUND:`)
 		for (const b of bugs) {

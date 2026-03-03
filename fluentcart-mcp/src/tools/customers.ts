@@ -264,8 +264,7 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_customer_orders_simple',
 			title: 'Get Customer Orders (Simple)',
-			description:
-				'Get a simplified list of orders for a customer with basic order details.',
+			description: 'Get a simplified list of orders for a customer with basic order details.',
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 			}),

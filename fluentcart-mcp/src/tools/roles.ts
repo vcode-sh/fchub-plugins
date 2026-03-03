@@ -47,10 +47,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({
 				key: z.string().describe('Role key'),
 				name: z.string().optional().describe('Role display name'),
-				capabilities: z
-					.array(z.string())
-					.optional()
-					.describe('Array of capability strings'),
+				capabilities: z.array(z.string()).optional().describe('Array of capability strings'),
 			}),
 			endpoint: '/roles/:key',
 		}),

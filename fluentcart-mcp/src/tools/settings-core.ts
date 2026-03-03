@@ -94,9 +94,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			description:
 				'Update module activation and configuration (Turnstile, Stock, Licensing, Order Bump).',
 			schema: z.object({
-				modules: z
-					.record(z.string(), z.unknown())
-					.describe('Module settings to save'),
+				modules: z.record(z.string(), z.unknown()).describe('Module settings to save'),
 			}),
 			endpoint: '/settings/modules',
 		}),
@@ -104,11 +102,10 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 		createTool(client, {
 			name: 'fluentcart_settings_save_confirmation',
 			title: 'Save Confirmation Settings',
-			description: 'Update order confirmation page settings and template. Pass settings at top level.',
+			description:
+				'Update order confirmation page settings and template. Pass settings at top level.',
 			schema: z.object({
-				settings: z
-					.record(z.string(), z.unknown())
-					.describe('Confirmation page settings'),
+				settings: z.record(z.string(), z.unknown()).describe('Confirmation page settings'),
 			}),
 			handler: async (c, input) => {
 				const settings = (input.settings ?? {}) as Record<string, unknown>
@@ -123,9 +120,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'Save settings for a specific payment method.',
 			schema: z.object({
 				method: z.string().describe('Payment method key'),
-				settings: z
-					.record(z.string(), z.unknown())
-					.describe('Payment method settings'),
+				settings: z.record(z.string(), z.unknown()).describe('Payment method settings'),
 			}),
 			endpoint: '/settings/payment-methods',
 		}),
@@ -135,9 +130,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Reorder Payment Methods',
 			description: 'Set the display order of payment methods on checkout.',
 			schema: z.object({
-				methods: z
-					.array(z.string())
-					.describe('Ordered array of payment method keys'),
+				methods: z.array(z.string()).describe('Ordered array of payment method keys'),
 			}),
 			endpoint: '/settings/payment-methods/reorder',
 		}),
@@ -155,9 +148,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Save Print Templates',
 			description: 'Update print templates for invoices, packing slips, etc.',
 			schema: z.object({
-				templates: z
-					.record(z.string(), z.unknown())
-					.describe('Template settings to save'),
+				templates: z.record(z.string(), z.unknown()).describe('Template settings to save'),
 			}),
 			endpoint: '/templates/print-templates',
 		}),

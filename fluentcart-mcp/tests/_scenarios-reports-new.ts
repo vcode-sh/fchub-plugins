@@ -20,7 +20,11 @@ async function call(name: string, input: Record<string, unknown> = {}): Promise<
 	}
 	const text = result.content[0]?.text ?? ''
 	let data: unknown
-	try { data = JSON.parse(text) } catch { data = text }
+	try {
+		data = JSON.parse(text)
+	} catch {
+		data = text
+	}
 	return { isError: result.isError, data, raw: text }
 }
 
@@ -37,7 +41,7 @@ function show(r: ToolResult, maxLen = 800) {
 	console.log(`  ${preview}`)
 }
 
-function extractId(data: unknown, ...keys: string[]): number | null {
+function _extractId(data: unknown, ...keys: string[]): number | null {
 	if (!data || typeof data !== 'object') return null
 	const obj = data as Record<string, unknown>
 	for (const k of keys) {
@@ -55,10 +59,20 @@ function extractId(data: unknown, ...keys: string[]): number | null {
 	return null
 }
 
-interface ScenarioResult { name: string; passed: boolean; error?: string }
+interface ScenarioResult {
+	name: string
+	passed: boolean
+	error?: string
+}
 const results: ScenarioResult[] = []
-function pass(name: string) { results.push({ name, passed: true }); console.log(`\n✅ SCENARIO PASSED: ${name}`) }
-function fail(name: string, error: string) { results.push({ name, passed: false, error }); console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`) }
+function pass(name: string) {
+	results.push({ name, passed: true })
+	console.log(`\n✅ SCENARIO PASSED: ${name}`)
+}
+function fail(name: string, error: string) {
+	results.push({ name, passed: false, error })
+	console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`)
+}
 
 const DATE_RANGE = { startDate: '2024-01-01', endDate: '2026-03-03' }
 
@@ -73,17 +87,26 @@ async function scenario1() {
 		log('1.1', 'fluentcart_report_dashboard_summary')
 		const dashSummary = await call('fluentcart_report_dashboard_summary', DATE_RANGE)
 		show(dashSummary)
-		if (dashSummary.isError) { fail(name, `dashboard_summary error: ${dashSummary.raw}`); return }
+		if (dashSummary.isError) {
+			fail(name, `dashboard_summary error: ${dashSummary.raw}`)
+			return
+		}
 
 		log('1.2', 'fluentcart_report_summary')
 		const reportSummary = await call('fluentcart_report_summary', DATE_RANGE)
 		show(reportSummary)
-		if (reportSummary.isError) { fail(name, `report_summary error: ${reportSummary.raw}`); return }
+		if (reportSummary.isError) {
+			fail(name, `report_summary error: ${reportSummary.raw}`)
+			return
+		}
 
 		log('1.3', 'fluentcart_report_dashboard_stats')
 		const dashStats = await call('fluentcart_report_dashboard_stats', DATE_RANGE)
 		show(dashStats)
-		if (dashStats.isError) { fail(name, `dashboard_stats error: ${dashStats.raw}`); return }
+		if (dashStats.isError) {
+			fail(name, `dashboard_stats error: ${dashStats.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -100,19 +123,34 @@ async function scenario2() {
 
 	try {
 		log('2.1', 'fluentcart_report_top_sold_products')
-		const topSold = await call('fluentcart_report_top_sold_products', { ...DATE_RANGE, per_page: 5 })
+		const topSold = await call('fluentcart_report_top_sold_products', {
+			...DATE_RANGE,
+			per_page: 5,
+		})
 		show(topSold)
-		if (topSold.isError) { fail(name, `top_sold_products error: ${topSold.raw}`); return }
+		if (topSold.isError) {
+			fail(name, `top_sold_products error: ${topSold.raw}`)
+			return
+		}
 
 		log('2.2', 'fluentcart_report_country_heat_map')
 		const heatmap = await call('fluentcart_report_country_heat_map', DATE_RANGE)
 		show(heatmap)
-		if (heatmap.isError) { fail(name, `country_heat_map error: ${heatmap.raw}`); return }
+		if (heatmap.isError) {
+			fail(name, `country_heat_map error: ${heatmap.raw}`)
+			return
+		}
 
 		log('2.3', 'fluentcart_report_top_products_sold (insight variant)')
-		const topProductsSold = await call('fluentcart_report_top_products_sold', { ...DATE_RANGE, per_page: 5 })
+		const topProductsSold = await call('fluentcart_report_top_products_sold', {
+			...DATE_RANGE,
+			per_page: 5,
+		})
 		show(topProductsSold)
-		if (topProductsSold.isError) { fail(name, `top_products_sold error: ${topProductsSold.raw}`); return }
+		if (topProductsSold.isError) {
+			fail(name, `top_products_sold error: ${topProductsSold.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -131,12 +169,18 @@ async function scenario3() {
 		log('3.1', 'fluentcart_report_cart')
 		const cart = await call('fluentcart_report_cart', DATE_RANGE)
 		show(cart)
-		if (cart.isError) { fail(name, `cart_report error: ${cart.raw}`); return }
+		if (cart.isError) {
+			fail(name, `cart_report error: ${cart.raw}`)
+			return
+		}
 
 		log('3.2', 'fluentcart_report_order_value_distribution')
 		const orderValue = await call('fluentcart_report_order_value_distribution', DATE_RANGE)
 		show(orderValue)
-		if (orderValue.isError) { fail(name, `order_value_distribution error: ${orderValue.raw}`); return }
+		if (orderValue.isError) {
+			fail(name, `order_value_distribution error: ${orderValue.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -155,12 +199,18 @@ async function scenario4() {
 		log('4.1', 'fluentcart_report_day_and_hour')
 		const dayHour = await call('fluentcart_report_day_and_hour', DATE_RANGE)
 		show(dayHour)
-		if (dayHour.isError) { fail(name, `day_and_hour error: ${dayHour.raw}`); return }
+		if (dayHour.isError) {
+			fail(name, `day_and_hour error: ${dayHour.raw}`)
+			return
+		}
 
 		log('4.2', 'fluentcart_report_item_count_distribution')
 		const itemCount = await call('fluentcart_report_item_count_distribution', DATE_RANGE)
 		show(itemCount)
-		if (itemCount.isError) { fail(name, `item_count_distribution error: ${itemCount.raw}`); return }
+		if (itemCount.isError) {
+			fail(name, `item_count_distribution error: ${itemCount.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -179,12 +229,18 @@ async function scenario5() {
 		log('5.1', 'fluentcart_report_order_completion_time')
 		const completion = await call('fluentcart_report_order_completion_time', DATE_RANGE)
 		show(completion)
-		if (completion.isError) { fail(name, `order_completion_time error: ${completion.raw}`); return }
+		if (completion.isError) {
+			fail(name, `order_completion_time error: ${completion.raw}`)
+			return
+		}
 
 		log('5.2', 'fluentcart_report_weeks_between_refund')
 		const refundWeeks = await call('fluentcart_report_weeks_between_refund', DATE_RANGE)
 		show(refundWeeks)
-		if (refundWeeks.isError) { fail(name, `weeks_between_refund error: ${refundWeeks.raw}`); return }
+		if (refundWeeks.isError) {
+			fail(name, `weeks_between_refund error: ${refundWeeks.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -201,19 +257,31 @@ async function scenario6() {
 
 	try {
 		log('6.1', 'fluentcart_report_license_chart')
-		const licChart = await call('fluentcart_report_license_chart', { ...DATE_RANGE, groupKey: 'monthly' })
+		const licChart = await call('fluentcart_report_license_chart', {
+			...DATE_RANGE,
+			groupKey: 'monthly',
+		})
 		show(licChart)
-		if (licChart.isError) { fail(name, `license_chart error: ${licChart.raw}`); return }
+		if (licChart.isError) {
+			fail(name, `license_chart error: ${licChart.raw}`)
+			return
+		}
 
 		log('6.2', 'fluentcart_report_license_pie_chart')
 		const licPie = await call('fluentcart_report_license_pie_chart', DATE_RANGE)
 		show(licPie)
-		if (licPie.isError) { fail(name, `license_pie_chart error: ${licPie.raw}`); return }
+		if (licPie.isError) {
+			fail(name, `license_pie_chart error: ${licPie.raw}`)
+			return
+		}
 
 		log('6.3', 'fluentcart_report_license_summary')
 		const licSummary = await call('fluentcart_report_license_summary', DATE_RANGE)
 		show(licSummary)
-		if (licSummary.isError) { fail(name, `license_summary error: ${licSummary.raw}`); return }
+		if (licSummary.isError) {
+			fail(name, `license_summary error: ${licSummary.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -223,7 +291,8 @@ async function scenario6() {
 
 // ── Scenario 7: Retention Reports ────────────────────────────────
 async function scenario7() {
-	const name = '7. Retention Reports (retention_chart + subscription_retention + subscription_cohorts)'
+	const name =
+		'7. Retention Reports (retention_chart + subscription_retention + subscription_cohorts)'
 	console.log(`\n${'═'.repeat(60)}`)
 	console.log(`SCENARIO: ${name}`)
 	console.log('═'.repeat(60))
@@ -232,17 +301,26 @@ async function scenario7() {
 		log('7.1', 'fluentcart_report_retention_chart')
 		const retChart = await call('fluentcart_report_retention_chart', DATE_RANGE)
 		show(retChart)
-		if (retChart.isError) { fail(name, `retention_chart error: ${retChart.raw}`); return }
+		if (retChart.isError) {
+			fail(name, `retention_chart error: ${retChart.raw}`)
+			return
+		}
 
 		log('7.2', 'fluentcart_report_subscription_retention')
 		const subRet = await call('fluentcart_report_subscription_retention', DATE_RANGE)
 		show(subRet)
-		if (subRet.isError) { fail(name, `subscription_retention error: ${subRet.raw}`); return }
+		if (subRet.isError) {
+			fail(name, `subscription_retention error: ${subRet.raw}`)
+			return
+		}
 
 		log('7.3', 'fluentcart_report_subscription_cohorts')
 		const cohorts = await call('fluentcart_report_subscription_cohorts', DATE_RANGE)
 		show(cohorts)
-		if (cohorts.isError) { fail(name, `subscription_cohorts error: ${cohorts.raw}`); return }
+		if (cohorts.isError) {
+			fail(name, `subscription_cohorts error: ${cohorts.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -261,17 +339,26 @@ async function scenario8() {
 		log('8.1', 'fluentcart_report_retention_snapshots_status')
 		const snapStatus = await call('fluentcart_report_retention_snapshots_status')
 		show(snapStatus)
-		if (snapStatus.isError) { fail(name, `retention_snapshots_status error: ${snapStatus.raw}`); return }
+		if (snapStatus.isError) {
+			fail(name, `retention_snapshots_status error: ${snapStatus.raw}`)
+			return
+		}
 
 		log('8.2', 'fluentcart_report_retention_snapshots_generate')
 		const snapGen = await call('fluentcart_report_retention_snapshots_generate')
 		show(snapGen)
-		if (snapGen.isError) { fail(name, `retention_snapshots_generate error: ${snapGen.raw}`); return }
+		if (snapGen.isError) {
+			fail(name, `retention_snapshots_generate error: ${snapGen.raw}`)
+			return
+		}
 
 		log('8.3', 'fluentcart_report_sources')
 		const sources = await call('fluentcart_report_sources', DATE_RANGE)
 		show(sources)
-		if (sources.isError) { fail(name, `report_sources error: ${sources.raw}`); return }
+		if (sources.isError) {
+			fail(name, `report_sources error: ${sources.raw}`)
+			return
+		}
 
 		pass(name)
 	} catch (e) {
@@ -370,7 +457,6 @@ async function scenario10() {
 }
 
 // ── Run ──────────────────────────────────────────────────────────
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function run() {
 	console.log('╔══════════════════════════════════════════════════════════╗')
 	console.log('║  BATCH F — Report Tools Scenarios                       ║')

@@ -74,8 +74,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_tax_rate_create',
 			title: 'Create Tax Rate',
-			description:
-				'Create a tax rate for a country. Rate is a percentage value (e.g. 23 for 23%).',
+			description: 'Create a tax rate for a country. Rate is a percentage value (e.g. 23 for 23%).',
 			schema: z.object({
 				country: z.string().describe('ISO country code (e.g. "PL", "US", "GB")'),
 				rate: z.number().describe('Tax rate percentage (e.g. 23 for 23%)'),
@@ -83,10 +82,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 				class_id: z.number().describe('Tax class ID (required)'),
 				priority: z.number().optional().describe('Rate priority'),
 				is_compound: z.number().optional().describe('Whether rate is compound (0 or 1)'),
-				for_shipping: z
-					.number()
-					.optional()
-					.describe('Whether rate applies to shipping (0 or 1)'),
+				for_shipping: z.number().optional().describe('Whether rate applies to shipping (0 or 1)'),
 			}),
 			endpoint: '/tax/country/rate',
 		}),
@@ -103,10 +99,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 				class_id: z.number().optional().describe('Tax class ID'),
 				priority: z.number().optional().describe('Rate priority'),
 				is_compound: z.number().optional().describe('Whether rate is compound (0 or 1)'),
-				for_shipping: z
-					.number()
-					.optional()
-					.describe('Whether rate applies to shipping (0 or 1)'),
+				for_shipping: z.number().optional().describe('Whether rate applies to shipping (0 or 1)'),
 			}),
 			endpoint: '/tax/country/rate/:rate_id',
 		}),
@@ -124,8 +117,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 		deleteTool(client, {
 			name: 'fluentcart_tax_country_delete_all',
 			title: 'Delete All Country Tax Rates',
-			description:
-				'Delete all tax rates for a country. This action cannot be undone.',
+			description: 'Delete all tax rates for a country. This action cannot be undone.',
 			schema: z.object({
 				country_code: z.string().describe('ISO country code'),
 			}),
@@ -151,10 +143,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({
 				country_code: z.string().describe('ISO country code'),
 				tax_id_label: z.string().optional().describe('Label for tax ID field'),
-				tax_id_required: z
-					.boolean()
-					.optional()
-					.describe('Whether tax ID is required'),
+				tax_id_required: z.boolean().optional().describe('Whether tax ID is required'),
 				settings: z
 					.record(z.string(), z.unknown())
 					.optional()
@@ -168,9 +157,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_tax_shipping_override_create',
 			title: 'Create Shipping Tax Override',
-			description:
-				'Create a shipping tax override for a country. ' +
-				'Rate is a percentage value.',
+			description: 'Create a shipping tax override for a country. ' + 'Rate is a percentage value.',
 			schema: z.object({
 				country_code: z.string().describe('ISO country code'),
 				rate: z.number().describe('Override tax rate percentage'),
@@ -204,9 +191,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Save Tax Countries',
 			description: 'Save the list of countries configured for tax collection.',
 			schema: z.object({
-				countries: z
-					.array(z.string())
-					.describe('Array of ISO country codes to configure for tax'),
+				countries: z.array(z.string()).describe('Array of ISO country codes to configure for tax'),
 			}),
 			endpoint: '/tax/configuration/countries',
 		}),
@@ -226,9 +211,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Save Tax Settings',
 			description: 'Save global tax settings.',
 			schema: z.object({
-				settings: z
-					.record(z.string(), z.unknown())
-					.describe('Tax settings to save'),
+				settings: z.record(z.string(), z.unknown()).describe('Tax settings to save'),
 			}),
 			endpoint: '/tax/configuration/settings',
 		}),
@@ -241,10 +224,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'Save EU VAT configuration settings.',
 			schema: z.object({
 				enabled: z.boolean().optional().describe('Enable EU VAT'),
-				settings: z
-					.record(z.string(), z.unknown())
-					.optional()
-					.describe('EU VAT configuration'),
+				settings: z.record(z.string(), z.unknown()).optional().describe('EU VAT configuration'),
 			}),
 			endpoint: '/tax/configuration/settings/eu-vat',
 		}),
@@ -266,11 +246,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'List tax records for reporting and filing.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number'),
-				per_page: z
-					.number()
-					.max(50)
-					.optional()
-					.describe('Results per page (max: 50)'),
+				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 				startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
 				endDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
 			}),
@@ -282,10 +258,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Mark Tax Records Filed',
 			description: 'Mark tax records as filed for a given period or set of IDs.',
 			schema: z.object({
-				tax_ids: z
-					.array(z.number())
-					.optional()
-					.describe('Tax record IDs to mark as filed'),
+				tax_ids: z.array(z.number()).optional().describe('Tax record IDs to mark as filed'),
 				startDate: z.string().optional().describe('Start date filter'),
 				endDate: z.string().optional().describe('End date filter'),
 			}),

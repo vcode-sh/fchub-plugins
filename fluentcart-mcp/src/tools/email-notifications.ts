@@ -73,8 +73,7 @@ export function emailNotificationTools(client: FluentCartClient): ToolDefinition
 		getTool(client, {
 			name: 'fluentcart_email_settings_get',
 			title: 'Get Email Settings',
-			description:
-				'Get global email notification settings (from address, logo, etc.).',
+			description: 'Get global email notification settings (from address, logo, etc.).',
 			schema: z.object({}),
 			endpoint: '/email-notification/get-settings',
 		}),

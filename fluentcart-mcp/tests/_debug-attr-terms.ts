@@ -42,7 +42,7 @@ async function directPost(path: string, body: Record<string, unknown>) {
 	}
 }
 
-async function directGet(path: string, params?: Record<string, unknown>) {
+async function _directGet(path: string, params?: Record<string, unknown>) {
 	try {
 		const resp = await ctx.client.get(path, params)
 		return { ok: true, data: resp.data }
@@ -62,6 +62,7 @@ async function cleanup() {
 	}
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: integration test
 async function run() {
 	console.log('╔══════════════════════════════════════════════════════════╗')
 	console.log('║  FluentCart Attribute Term Creation Bug Investigation    ║')
@@ -70,7 +71,10 @@ async function run() {
 	// ── Step 1: List existing groups and terms to understand current state ──
 	log('Step 1: Current attribute groups', null)
 	const groupsResult = await call('fluentcart_attribute_group_list', {})
-	console.log('Raw groups response shape:', JSON.stringify(groupsResult.data, null, 2).slice(0, 500))
+	console.log(
+		'Raw groups response shape:',
+		JSON.stringify(groupsResult.data, null, 2).slice(0, 500),
+	)
 
 	// Try to extract groups array from various possible shapes
 	const gData = groupsResult.data as Record<string, unknown>
@@ -79,7 +83,7 @@ async function run() {
 		existingGroups = gData
 	} else if (gData?.groups && Array.isArray(gData.groups)) {
 		existingGroups = gData.groups as typeof existingGroups
-	} else if (gData?.data && Array.isArray((gData.data as Record<string, unknown>))) {
+	} else if (gData?.data && Array.isArray(gData.data as Record<string, unknown>)) {
 		existingGroups = gData.data as typeof existingGroups
 	} else if (gData?.data && typeof gData.data === 'object') {
 		const inner = gData.data as Record<string, unknown>
@@ -95,7 +99,9 @@ async function run() {
 	log('Step 1b: Check existing terms for each group', null)
 	for (const group of existingGroups) {
 		const terms = await call('fluentcart_attribute_term_list', { group_id: group.id })
-		console.log(`  Group ${group.id} "${group.title}": terms = ${JSON.stringify(terms.data)}`.slice(0, 300))
+		console.log(
+			`  Group ${group.id} "${group.title}": terms = ${JSON.stringify(terms.data)}`.slice(0, 300),
+		)
 	}
 
 	// ── Step 2: Create a fresh group ──
@@ -178,8 +184,13 @@ async function run() {
 	// If there are existing terms with id=1,2,3... then groups with those IDs should work
 	if (existingGroups.length > 0) {
 		const firstExistingGroup = (existingGroups as { id: number; title: string }[])[0]
-		log(`Step 5b: Try creating term for existing group ${firstExistingGroup.id} ("${firstExistingGroup.title}")`, null)
-		console.log(`This group likely has ID ${firstExistingGroup.id}. If there's a term with that ID, creation should work.`)
+		log(
+			`Step 5b: Try creating term for existing group ${firstExistingGroup.id} ("${firstExistingGroup.title}")`,
+			null,
+		)
+		console.log(
+			`This group likely has ID ${firstExistingGroup.id}. If there's a term with that ID, creation should work.`,
+		)
 
 		const existingGroupTermResult = await call('fluentcart_attribute_term_create', {
 			group_id: firstExistingGroup.id,
@@ -194,7 +205,9 @@ async function run() {
 			const termData = existingGroupTermResult.data as { data?: { id: number } }
 			const termId = termData?.data?.id
 			if (termId) {
-				console.log(`  Success! Term ${termId} was created. This means the bug hypothesis may be wrong, or there happened to be a term with id=${firstExistingGroup.id}`)
+				console.log(
+					`  Success! Term ${termId} was created. This means the bug hypothesis may be wrong, or there happened to be a term with id=${firstExistingGroup.id}`,
+				)
 				// Delete the term we just created
 				await call('fluentcart_attribute_term_delete', {
 					group_id: firstExistingGroup.id,
@@ -244,7 +257,9 @@ async function run() {
 	console.log('This means term creation only works if there happens to be an')
 	console.log('existing term with the same numeric ID as the target group.')
 	console.log('')
-	console.log(`Fresh group (ID=${groupId}) term creation: ${termResult.isError ? 'FAILED (as expected)' : 'SUCCEEDED (unexpected)'}`)
+	console.log(
+		`Fresh group (ID=${groupId}) term creation: ${termResult.isError ? 'FAILED (as expected)' : 'SUCCEEDED (unexpected)'}`,
+	)
 
 	await cleanup()
 }

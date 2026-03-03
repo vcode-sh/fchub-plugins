@@ -27,7 +27,11 @@ async function call(name: string, input: Record<string, unknown> = {}): Promise<
 	}
 	const text = result.content[0]?.text ?? ''
 	let data: unknown
-	try { data = JSON.parse(text) } catch { data = text }
+	try {
+		data = JSON.parse(text)
+	} catch {
+		data = text
+	}
 	return { isError: result.isError, data, raw: text }
 }
 
@@ -44,13 +48,22 @@ function show(r: ToolResult, maxLen = 800) {
 	console.log(`  ${preview}`)
 }
 
-function extractId(data: unknown, ...keys: string[]): number | null {
+function _extractId(data: unknown, ...keys: string[]): number | null {
 	if (!data || typeof data !== 'object') return null
 	const obj = data as Record<string, unknown>
 	for (const k of keys) {
 		if (typeof obj[k] === 'number') return obj[k] as number
 	}
-	for (const wrapper of ['data', 'zone', 'shipping_zone', 'shipping_class', 'shipping_method', 'class', 'rate', 'method']) {
+	for (const wrapper of [
+		'data',
+		'zone',
+		'shipping_zone',
+		'shipping_class',
+		'shipping_method',
+		'class',
+		'rate',
+		'method',
+	]) {
 		const nested = obj[wrapper]
 		if (nested && typeof nested === 'object') {
 			const n = nested as Record<string, unknown>
@@ -62,10 +75,21 @@ function extractId(data: unknown, ...keys: string[]): number | null {
 	return null
 }
 
-interface ScenarioResult { name: string; passed: boolean; error?: string; bug?: string }
+interface ScenarioResult {
+	name: string
+	passed: boolean
+	error?: string
+	bug?: string
+}
 const results: ScenarioResult[] = []
-function pass(name: string) { results.push({ name, passed: true }); console.log(`\n✅ SCENARIO PASSED: ${name}`) }
-function fail(name: string, error: string, bug?: string) { results.push({ name, passed: false, error, bug }); console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`) }
+function pass(name: string) {
+	results.push({ name, passed: true })
+	console.log(`\n✅ SCENARIO PASSED: ${name}`)
+}
+function fail(name: string, error: string, bug?: string) {
+	results.push({ name, passed: false, error, bug })
+	console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`)
+}
 
 // ── Scenario 1: Shipping Zone CRUD ─────────────────────────
 // BUG: MCP schema uses zone_name, but FluentCart API expects "name".
@@ -76,7 +100,7 @@ async function scenario1() {
 	console.log(`SCENARIO: ${name}`)
 	console.log('═'.repeat(60))
 
-	let zoneId: number | null = null
+	const zoneId: number | null = null
 
 	try {
 		// Step 1a: Try with MCP schema field name "zone_name" — EXPECT FAILURE
@@ -116,7 +140,11 @@ async function scenario1() {
 		}
 
 		// Partial pass — reads work, creates fail due to MCP bug
-		fail(name, 'Create fails: MCP sends "zone_name" but API expects "name"; "countries" should be "region"', 'MCP_BUG: shipping_zone_create schema field names wrong')
+		fail(
+			name,
+			'Create fails: MCP sends "zone_name" but API expects "name"; "countries" should be "region"',
+			'MCP_BUG: shipping_zone_create schema field names wrong',
+		)
 	} catch (e) {
 		fail(name, (e as Error).message)
 	} finally {
@@ -146,10 +174,16 @@ async function scenario2() {
 		})
 		show(create)
 		if (create.isError) {
-			console.log('  → Confirmed: MCP sends "method_type" but API expects "type"; "cost" should be "amount"')
+			console.log(
+				'  → Confirmed: MCP sends "method_type" but API expects "type"; "cost" should be "amount"',
+			)
 		}
 
-		fail(name, 'MCP sends "method_type" but API expects "type"; "cost" should be "amount"', 'MCP_BUG: shipping_method_create schema field names wrong')
+		fail(
+			name,
+			'MCP sends "method_type" but API expects "type"; "cost" should be "amount"',
+			'MCP_BUG: shipping_method_create schema field names wrong',
+		)
 	} catch (e) {
 		fail(name, (e as Error).message)
 	}
@@ -173,7 +207,9 @@ async function scenario3() {
 		})
 		show(create)
 		if (create.isError) {
-			console.log('  → Confirmed: API requires "cost" (numeric) and "type" ("fixed"|"percentage"), MCP schema is missing them')
+			console.log(
+				'  → Confirmed: API requires "cost" (numeric) and "type" ("fixed"|"percentage"), MCP schema is missing them',
+			)
 		}
 
 		// Test list (read-only, should work)
@@ -183,7 +219,11 @@ async function scenario3() {
 		if (list.isError) throw new Error(`List classes failed: ${list.raw}`)
 		console.log('  → List classes works')
 
-		fail(name, 'Create fails: API requires "cost" and "type" fields that MCP schema does not expose', 'MCP_BUG: shipping_class_create missing required fields (cost, type)')
+		fail(
+			name,
+			'Create fails: API requires "cost" and "type" fields that MCP schema does not expose',
+			'MCP_BUG: shipping_class_create missing required fields (cost, type)',
+		)
 	} catch (e) {
 		fail(name, (e as Error).message)
 	}
@@ -246,7 +286,11 @@ async function scenario5() {
 			show(reorder)
 			if (reorder.isError) {
 				console.log('  → Note: API expects flat array of zone IDs, MCP sends {id, order}[] objects')
-				fail(name, 'Reorder may fail due to payload shape mismatch', 'MCP_BUG: shipping_zone_reorder sends {id,order}[] but API expects flat zoneId[]')
+				fail(
+					name,
+					'Reorder may fail due to payload shape mismatch',
+					'MCP_BUG: shipping_zone_reorder sends {id,order}[] but API expects flat zoneId[]',
+				)
 			} else {
 				// If it works, the API may be flexible enough
 				pass(name)
@@ -291,7 +335,7 @@ async function run() {
 	console.log(`\n  Total: ${results.length} | Passed: ${passed} | Failed: ${failed}`)
 
 	// MCP bugs found
-	const bugs = results.filter(r => r.bug)
+	const bugs = results.filter((r) => r.bug)
 	if (bugs.length > 0) {
 		console.log(`\n  MCP-SIDE BUGS FOUND:`)
 		for (const b of bugs) {

@@ -53,7 +53,11 @@ async function run() {
 
 	// Also test with raw curl-like approach via the client
 	console.log('\n--- Direct API test ---')
-	const client = (ctx as unknown as { client: { post: (path: string, body: Record<string, unknown>) => Promise<{ data: unknown }> } }).client
+	const client = (
+		ctx as unknown as {
+			client: { post: (path: string, body: Record<string, unknown>) => Promise<{ data: unknown }> }
+		}
+	).client
 	if (client) {
 		try {
 			const resp = await client.post(`/options/attr/group/${groupId}/term`, { title: 'Red' })

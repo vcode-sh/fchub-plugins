@@ -26,7 +26,11 @@ async function call(name: string, input: Record<string, unknown> = {}): Promise<
 	}
 	const text = result.content[0]?.text ?? ''
 	let data: unknown
-	try { data = JSON.parse(text) } catch { data = text }
+	try {
+		data = JSON.parse(text)
+	} catch {
+		data = text
+	}
 	return { isError: result.isError, data, raw: text }
 }
 
@@ -43,10 +47,21 @@ function show(r: ToolResult, maxLen = 800) {
 	console.log(`  ${preview}`)
 }
 
-interface ScenarioResult { name: string; passed: boolean; error?: string; bug?: string }
+interface ScenarioResult {
+	name: string
+	passed: boolean
+	error?: string
+	bug?: string
+}
 const results: ScenarioResult[] = []
-function pass(name: string) { results.push({ name, passed: true }); console.log(`\n✅ SCENARIO PASSED: ${name}`) }
-function fail(name: string, error: string, bug?: string) { results.push({ name, passed: false, error, bug }); console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`) }
+function pass(name: string) {
+	results.push({ name, passed: true })
+	console.log(`\n✅ SCENARIO PASSED: ${name}`)
+}
+function fail(name: string, error: string, bug?: string) {
+	results.push({ name, passed: false, error, bug })
+	console.log(`\n❌ SCENARIO FAILED: ${name}\n   Reason: ${error}`)
+}
 
 // ═══════════════════════════════════════════════════════════
 //  EMAIL SCENARIOS (Batch C)
@@ -124,9 +139,17 @@ async function emailScenario2() {
 		})
 		show(save)
 		if (save.isError) {
-			console.log('  → Confirmed: MCP wraps body in {settings: {...}} but API expects top-level fields')
-			console.log('    API requires: from_name (required), from_email (required), admin_email (required)')
-			fail(name, 'Save fails: MCP wraps in {settings} but API expects flat top-level fields', 'MCP_BUG: email_settings_save wraps in {settings} but API expects flat fields (from_name, from_email, admin_email required)')
+			console.log(
+				'  → Confirmed: MCP wraps body in {settings: {...}} but API expects top-level fields',
+			)
+			console.log(
+				'    API requires: from_name (required), from_email (required), admin_email (required)',
+			)
+			fail(
+				name,
+				'Save fails: MCP wraps in {settings} but API expects flat top-level fields',
+				'MCP_BUG: email_settings_save wraps in {settings} but API expects flat fields (from_name, from_email, admin_email required)',
+			)
 		} else {
 			// If it works somehow, great
 			pass(name)
@@ -159,7 +182,10 @@ async function emailScenario3() {
 		console.log(`  → Will toggle: ${notificationName}`)
 
 		// Toggle off — MCP sends "status" field, API reads "active"
-		log('C3.1 Toggle notification off', `fluentcart_email_toggle name=${notificationName} status=no`)
+		log(
+			'C3.1 Toggle notification off',
+			`fluentcart_email_toggle name=${notificationName} status=no`,
+		)
 		const off = await call('fluentcart_email_toggle', {
 			name: notificationName,
 			status: 'no',
@@ -168,7 +194,10 @@ async function emailScenario3() {
 		if (off.isError) throw new Error(`Toggle off failed: ${off.raw}`)
 
 		// Toggle back on
-		log('C3.2 Toggle notification back on', `fluentcart_email_toggle name=${notificationName} status=yes`)
+		log(
+			'C3.2 Toggle notification back on',
+			`fluentcart_email_toggle name=${notificationName} status=yes`,
+		)
 		const on = await call('fluentcart_email_toggle', {
 			name: notificationName,
 			status: 'yes',
@@ -179,7 +208,9 @@ async function emailScenario3() {
 		// Note: toggle works but "status" field may not be the field API reads.
 		// API reads "active" from request. The toggle succeeds because the update
 		// still fires (it just sets active=null). This may silently not work as intended.
-		console.log('  → WARNING: MCP sends "status" but API reads "active". Toggle may silently set active=null.')
+		console.log(
+			'  → WARNING: MCP sends "status" but API reads "active". Toggle may silently set active=null.',
+		)
 		pass(name)
 	} catch (e) {
 		fail(name, (e as Error).message)
@@ -279,7 +310,11 @@ async function roleScenario3() {
 		show(create)
 		if (create.isError) {
 			console.log('  → Role create failed — checking if field names match API expectation')
-			fail(name, 'Create role returns 422 — API may expect different field names or role CRUD may not be supported', 'MCP_BUG: role_create returns 422 — field name mismatch or unsupported endpoint')
+			fail(
+				name,
+				'Create role returns 422 — API may expect different field names or role CRUD may not be supported',
+				'MCP_BUG: role_create returns 422 — field name mismatch or unsupported endpoint',
+			)
 		} else {
 			// If it works, do the full CRUD
 			log('D3.2 Update role', `fluentcart_role_update key=${testKey}`)
@@ -301,7 +336,9 @@ async function roleScenario3() {
 	} finally {
 		// Cleanup
 		const del = await call('fluentcart_role_delete', { key: testKey })
-		console.log(`  Role ${testKey}: ${del.isError ? '❌ cleanup failed (expected if create failed)' : '✅ deleted'}`)
+		console.log(
+			`  Role ${testKey}: ${del.isError ? '❌ cleanup failed (expected if create failed)' : '✅ deleted'}`,
+		)
 	}
 }
 
@@ -344,7 +381,11 @@ async function fileScenario2() {
 		if (buckets.isError) {
 			console.log('  → Confirmed upstream FluentCart bug: "Invalid driver" error')
 			console.log('    This is a server-side issue, not an MCP bug')
-			fail(name, 'Upstream FluentCart bug: "Invalid driver" on /files/bucket-list', 'UPSTREAM_BUG: FluentCart file_bucket_list returns "Invalid driver" (storage driver not configured)')
+			fail(
+				name,
+				'Upstream FluentCart bug: "Invalid driver" on /files/bucket-list',
+				'UPSTREAM_BUG: FluentCart file_bucket_list returns "Invalid driver" (storage driver not configured)',
+			)
 		} else {
 			pass(name)
 		}
@@ -392,8 +433,8 @@ async function run() {
 	console.log(`\n  Total: ${results.length} | Passed: ${passed} | Failed: ${failed}`)
 
 	// Bugs found
-	const mcpBugs = results.filter(r => r.bug?.startsWith('MCP_BUG'))
-	const upstreamBugs = results.filter(r => r.bug?.startsWith('UPSTREAM_BUG'))
+	const mcpBugs = results.filter((r) => r.bug?.startsWith('MCP_BUG'))
+	const upstreamBugs = results.filter((r) => r.bug?.startsWith('UPSTREAM_BUG'))
 	if (mcpBugs.length > 0) {
 		console.log(`\n  MCP-SIDE BUGS FOUND:`)
 		for (const b of mcpBugs) {
