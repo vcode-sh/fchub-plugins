@@ -28,7 +28,8 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_overview',
 			title: 'Get Reports Overview',
 			description:
-				'Financial overview: gross/net revenue by month/quarter with YoY growth and top countries. Values in cents.',
+				'Financial overview: gross/net revenue by month/quarter with YoY growth and top countries. Values in cents. ' +
+				"Best for 'what's my revenue this month/quarter/year' questions.",
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/overview',
 		}),
@@ -46,7 +47,8 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_dashboard_stats',
 			title: 'Get Report Dashboard Stats',
 			description:
-				'Dashboard stats: total orders, paid orders, paid items, and paid amounts with comparison. Values in cents.',
+				'Dashboard stats: total orders, paid orders, paid items, and paid amounts with comparison. Values in cents. ' +
+				"Use for 'how many orders today/this week/this month' questions.",
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/dashboard-stats',
 		}),
@@ -115,7 +117,8 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_quick_order_stats',
 			title: 'Get Quick Order Stats',
-			description: 'Quick order statistics for a given lookback period.',
+			description:
+				"Quick order statistics for a given lookback period. Use day_range '1' for today, '7' for this week, '30' for this month.",
 			schema: z.object({
 				day_range: z
 					.string()
@@ -128,7 +131,8 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_recent_orders',
 			title: 'Get Recent Orders',
-			description: 'Most recent orders for the dashboard widget.',
+			description:
+				'Most recent orders with amounts and status. Quick snapshot without date filters.',
 			schema: z.object({}),
 			endpoint: '/reports/get-recent-orders',
 		}),

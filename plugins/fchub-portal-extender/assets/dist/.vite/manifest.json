@@ -1,0 +1,41 @@
+{
+  "__plugin-vue_export-helper-Dttr3qsl.js": {
+    "file": "chunks/_plugin-vue_export-helper-Dttr3qsl.js",
+    "name": "_plugin-vue_export-helper"
+  },
+  "resources/admin/main.js": {
+    "file": "fchub-portal-extender-admin-jgGOAySq.js",
+    "name": "main",
+    "src": "resources/admin/main.js",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/admin/pages/EndpointList.vue",
+      "resources/admin/pages/EndpointEditor.vue",
+      "resources/admin/pages/EndpointEditor.vue"
+    ]
+  },
+  "resources/admin/pages/EndpointEditor.vue": {
+    "file": "chunks/EndpointEditor-CREPHfNW.js",
+    "name": "EndpointEditor",
+    "src": "resources/admin/pages/EndpointEditor.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/admin/main.js",
+      "__plugin-vue_export-helper-Dttr3qsl.js"
+    ]
+  },
+  "resources/admin/pages/EndpointList.vue": {
+    "file": "chunks/EndpointList-D9mxb5uO.js",
+    "name": "EndpointList",
+    "src": "resources/admin/pages/EndpointList.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/admin/main.js",
+      "__plugin-vue_export-helper-Dttr3qsl.js"
+    ]
+  },
+  "style.css": {
+    "file": "assets/style-DLu3NZbz.css",
+    "src": "style.css"
+  }
+}

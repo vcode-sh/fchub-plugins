@@ -7,13 +7,19 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_customer_list',
 			title: 'List Customers',
-			description: 'List customers with optional filtering by name, email, or keyword.',
+			description:
+				'List customers with optional filtering and sorting. Sort by purchase_value or ltv DESC to find top customers.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				search: z.string().optional().describe('Search by name or email'),
-				order_by: z.string().optional().describe('Sort field (default: id)'),
-				order_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
+				sort_by: z
+					.string()
+					.optional()
+					.describe(
+						'Sort field: id, purchase_value, purchase_count, ltv, created_at, first_purchase_date (default: id)',
+					),
+				sort_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
 			}),
 			endpoint: '/customers',
 			transform: (data: unknown) => {
@@ -26,6 +32,7 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 						last_name: item.last_name,
 						email: item.email,
 						full_name: item.full_name,
+						status: item.status,
 						order_count: item.order_count,
 						total_spend: item.total_spend,
 						created_at: item.created_at,

@@ -45,7 +45,8 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_top_products_sold',
 			title: 'Get Top Products Sold',
-			description: 'Top-selling products ranked by units sold. Revenue in cents.',
+			description:
+				'Top-selling products ranked by units sold. Revenue in cents. Use per_page to control count (e.g. top 5, top 10).',
 			schema: z.object({ ...dateRangeWithPerPage }),
 			endpoint: '/reports/top-products-sold',
 		}),
@@ -53,7 +54,8 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_top_sold_variants',
 			title: 'Get Top Sold Variants',
-			description: 'Top-selling product variants with revenue and quantity. Revenue in cents.',
+			description:
+				"Top-selling product variants with revenue and quantity. Revenue in cents. Use per_page to control count. Best for 'top sellers by revenue'.",
 			schema: z.object({ ...dateRangeWithPerPage }),
 			endpoint: '/reports/fetch-top-sold-variants',
 		}),
@@ -62,7 +64,7 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_customer',
 			title: 'Get Customer Report',
 			description:
-				'Customer analytics: acquisition, lifetime value, and activity. Values in cents.',
+				"Customer analytics: acquisition, lifetime value, and activity. Values in cents. Use for 'how are customers performing' questions.",
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/customer-report',
 		}),
@@ -86,7 +88,8 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_repeat_customers',
 			title: 'Search Repeat Customers',
-			description: 'Search customers with multiple purchases. Supports pagination.',
+			description:
+				"Search customers with multiple purchases. Supports pagination. Use for 'who are my loyal/repeat customers' queries.",
 			schema: z.object({
 				...dateRange,
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),

@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Page */
+  --fchub-page-bg: #F3F5FA;
+  --fchub-card-bg: #fff;
+
+  /* Text — exact FluentCart values */
+  --fchub-text-primary: #151D26;
+  --fchub-text-secondary: #565865;
+
+  /* Borders */
+  --fchub-border-color: #EAECF0;
+
+  /* Nav */
+  --fchub-nav-shadow: rgba(28, 39, 50, 0.08) 0px 0px 20px 0px;
+  --fchub-nav-height: 64px;
+
+  /* Radius */
+  --fchub-radius-card: 8px;
+  --fchub-radius-dialog: 12px;
+
+  /* Font */
+  --fchub-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Dark mode — activated via .dark class on body (syncs with FluentCart) */
+body.dark {
+  --fchub-page-bg: #1a1d23;
+  --fchub-card-bg: #23272f;
+  --fchub-text-primary: #e4e6eb;
+  --fchub-text-secondary: #9da3ae;
+  --fchub-border-color: #363b44;
+  --fchub-nav-shadow: rgba(0, 0, 0, 0.25) 0px 0px 20px 0px;
+}

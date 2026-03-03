@@ -516,7 +516,7 @@ describe('P1.2 response transforms', () => {
 		expect(parsed.transactions[0]).not.toHaveProperty('meta')
 	})
 
-	it('order_list transform returns only summary fields', async () => {
+	it('order_list transform returns summary fields with customer name', async () => {
 		const client = mockClient()
 		const listResponse = {
 			data: [
@@ -533,7 +533,7 @@ describe('P1.2 response transforms', () => {
 					customer_id: 5,
 					created_at: '2025-01-01',
 					items: [{ id: 10 }],
-					customer: { id: 5, email: 'jane@test.com' },
+					customer: { id: 5, full_name: 'Jane Doe', email: 'jane@test.com' },
 					extra_field: 'should be stripped',
 				},
 			],
@@ -557,13 +557,107 @@ describe('P1.2 response transforms', () => {
 			shipping_status: 'shipped',
 			currency: 'USD',
 			total_amount: 5000,
-			customer_id: 5,
+			customer_name: 'Jane Doe',
+			customer_email: 'jane@test.com',
 			created_at: '2025-01-01',
 		})
 		expect(parsed.data[0]).not.toHaveProperty('items')
 		expect(parsed.data[0]).not.toHaveProperty('customer')
 		expect(parsed.data[0]).not.toHaveProperty('extra_field')
 		expect(parsed.data[0]).not.toHaveProperty('payment_method')
+		expect(parsed.data[0]).not.toHaveProperty('customer_id')
+	})
+
+	it('order_list falls back to first_name + last_name when full_name is absent', async () => {
+		const client = mockClient()
+		const listResponse = {
+			data: [
+				{
+					id: 2,
+					receipt_number: 'ORD-002',
+					status: 'pending',
+					payment_status: 'pending',
+					payment_method_title: null,
+					shipping_status: null,
+					currency: 'USD',
+					total_amount: 3000,
+					customer_id: 6,
+					created_at: '2025-01-02',
+					customer: { id: 6, first_name: 'John', last_name: 'Smith', email: 'john@test.com' },
+				},
+			],
+			total: 1,
+		}
+		vi.mocked(client.get).mockResolvedValue({ data: listResponse, status: 200 })
+
+		const { orderCoreTools } = await import('../../src/tools/orders-core.js')
+		const tools = orderCoreTools(client)
+		const orderList = tools.find((t) => t.name === 'fluentcart_order_list')!
+
+		const result = await orderList.handler({})
+		const parsed = JSON.parse(result.content[0].text)
+
+		expect(parsed.data[0].customer_name).toBe('John Smith')
+		expect(parsed.data[0].customer_email).toBe('john@test.com')
+	})
+
+	it('order_list returns null customer fields when customer is absent', async () => {
+		const client = mockClient()
+		const listResponse = {
+			data: [
+				{
+					id: 3,
+					receipt_number: 'ORD-003',
+					status: 'pending',
+					payment_status: 'pending',
+					payment_method_title: null,
+					shipping_status: null,
+					currency: 'USD',
+					total_amount: 1000,
+					customer_id: null,
+					created_at: '2025-01-03',
+				},
+			],
+			total: 1,
+		}
+		vi.mocked(client.get).mockResolvedValue({ data: listResponse, status: 200 })
+
+		const { orderCoreTools } = await import('../../src/tools/orders-core.js')
+		const tools = orderCoreTools(client)
+		const orderList = tools.find((t) => t.name === 'fluentcart_order_list')!
+
+		const result = await orderList.handler({})
+		const parsed = JSON.parse(result.content[0].text)
+
+		expect(parsed.data[0].customer_name).toBeNull()
+		expect(parsed.data[0].customer_email).toBeNull()
+	})
+
+	it('order_list passes with=customer and converts date filters to advanced_filters', async () => {
+		const client = mockClient()
+		vi.mocked(client.get).mockResolvedValue({ data: { data: [], total: 0 }, status: 200 })
+
+		const { orderCoreTools } = await import('../../src/tools/orders-core.js')
+		const tools = orderCoreTools(client)
+		const orderList = tools.find((t) => t.name === 'fluentcart_order_list')!
+
+		await orderList.handler({ date_from: '2025-01-01', date_to: '2025-01-31' })
+
+		const callArgs = vi.mocked(client.get).mock.calls[0]
+		expect(callArgs[0]).toBe('/orders')
+		const params = callArgs[1] as Record<string, unknown>
+		expect(params['with[]']).toBe('customer')
+		expect(params.filter_type).toBe('advanced')
+		expect(params).not.toHaveProperty('date_from')
+		expect(params).not.toHaveProperty('date_to')
+
+		const filters = JSON.parse(params.advanced_filters as string)
+		expect(filters).toHaveLength(1)
+		expect(filters[0]).toHaveLength(2)
+		expect(filters[0][0].operator).toBe('after')
+		expect(filters[0][0].value).toBe('2025-01-01')
+		expect(filters[0][1].operator).toBe('before')
+		expect(filters[0][1].value).toBe('2025-01-31 23:59:59')
 	})
 
 	it('product_get transform strips post_content and variant pricing_table', async () => {
@@ -648,7 +742,7 @@ describe('P1.2 response transforms', () => {
 		expect(parsed.address_count).toBe(2)
 	})
 
-	it('customer_list transform returns only summary fields', async () => {
+	it('customer_list transform returns only summary fields with status', async () => {
 		const client = mockClient()
 		const listResponse = {
 			data: [
@@ -658,6 +752,7 @@ describe('P1.2 response transforms', () => {
 					last_name: 'Doe',
 					email: 'john@test.com',
 					full_name: 'John Doe',
+					status: 'active',
 					order_count: 3,
 					total_spend: 15000,
 					created_at: '2025-01-01',
@@ -682,6 +777,7 @@ describe('P1.2 response transforms', () => {
 			last_name: 'Doe',
 			email: 'john@test.com',
 			full_name: 'John Doe',
+			status: 'active',
 			order_count: 3,
 			total_spend: 15000,
 			created_at: '2025-01-01',

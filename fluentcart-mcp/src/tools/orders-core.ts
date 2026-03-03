@@ -1,42 +1,94 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import {
+	createTool,
+	deleteTool,
+	getTool,
+	postTool,
+	putTool,
+	type ToolDefinition,
+} from './_factory.js'
 
 export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
-		getTool(client, {
+		createTool(client, {
 			name: 'fluentcart_order_list',
 			title: 'List Orders',
 			description:
-				'List orders with optional filtering by date range and status. ' +
-				'Statuses: pending, processing, completed, canceled. ' +
-				'Payment: pending, paid, partially_refunded, refunded, failed.',
+				'List orders with customer names. Filter by date range, status tab, or search. ' +
+				'Search matches customer name, email, and invoice number. ' +
+				'Tabs: paid, completed, processing, refunded, subscription, renewal.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
-				search: z.string().optional().describe('Search orders by keyword'),
+				search: z.string().optional().describe('Search by customer name, email, or invoice number'),
 				date_from: z.string().optional().describe('Filter from date (YYYY-MM-DD)'),
 				date_to: z.string().optional().describe('Filter to date (YYYY-MM-DD)'),
-				order_by: z.string().optional().describe('Sort field (default: id)'),
-				order_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
+				active_view: z
+					.string()
+					.optional()
+					.describe(
+						'Quick filter tab: paid, completed, processing, on-hold, refunded, partially_refunded, subscription, renewal, onetime',
+					),
+				sort_by: z
+					.string()
+					.optional()
+					.describe('Sort field: id, total_amount, created_at (default: id)'),
+				sort_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
 			}),
-			endpoint: '/orders',
-			transform: (data: unknown) => {
-				const resp = data as Record<string, unknown>
+			annotations: { readOnlyHint: true, idempotentHint: true },
+			handler: async (client, input) => {
+				const { date_from, date_to, ...params } = input as Record<string, unknown>
+
+				if (date_from || date_to) {
+					const dateFilters: unknown[] = []
+					if (date_from) {
+						dateFilters.push({
+							source: ['order', 'created_at'],
+							operator: 'after',
+							value: date_from,
+							filter_type: 'date',
+						})
+					}
+					if (date_to) {
+						dateFilters.push({
+							source: ['order', 'created_at'],
+							operator: 'before',
+							value: `${date_to} 23:59:59`,
+							filter_type: 'date',
+						})
+					}
+					params.filter_type = 'advanced'
+					params.advanced_filters = JSON.stringify([dateFilters])
+				}
+
+				const response = await client.get('/orders', {
+					...params,
+					'with[]': 'customer',
+				})
+				const resp = response.data as Record<string, unknown>
 				const wrapper = (resp?.orders ?? resp) as Record<string, unknown>
 				if (wrapper && Array.isArray(wrapper.data)) {
-					wrapper.data = (wrapper.data as Record<string, unknown>[]).map((item) => ({
-						id: item.id,
-						receipt_number: item.receipt_number,
-						status: item.status,
-						payment_status: item.payment_status,
-						payment_method_title: item.payment_method_title,
-						shipping_status: item.shipping_status,
-						currency: item.currency,
-						total_amount: item.total_amount,
-						customer_id: item.customer_id,
-						created_at: item.created_at,
-					}))
+					wrapper.data = (wrapper.data as Record<string, unknown>[]).map((item) => {
+						const c = item.customer as Record<string, unknown> | undefined
+						return {
+							id: item.id,
+							receipt_number: item.receipt_number,
+							status: item.status,
+							payment_status: item.payment_status,
+							payment_method_title: item.payment_method_title,
+							shipping_status: item.shipping_status,
+							currency: item.currency,
+							total_amount: item.total_amount,
+							customer_name: c
+								? (c.full_name as string) ||
+									`${(c.first_name as string) || ''} ${(c.last_name as string) || ''}`.trim() ||
+									null
+								: null,
+							customer_email: c ? c.email : null,
+							created_at: item.created_at,
+						}
+					})
 				}
 				return resp
 			},
@@ -79,7 +131,11 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 				const { activities, post_content, ...rest } = order
 				if (rest.customer && typeof rest.customer === 'object') {
 					const c = rest.customer as Record<string, unknown>
-					rest.customer = { id: c.id, name: c.full_name || c.first_name, email: c.email }
+					rest.customer = {
+						id: c.id,
+						name: c.full_name || c.first_name,
+						email: c.email,
+					}
 				}
 				if (Array.isArray(rest.transactions)) {
 					rest.transactions = (rest.transactions as Record<string, unknown>[]).map((t) => {

@@ -1,0 +1,177 @@
+/* Global overrides scoped to #fchub-portal-extender-app */
+
+#fchub-portal-extender-app {
+  font-family: var(--fchub-font-family);
+  color: var(--fchub-text-primary);
+}
+
+/* WordPress admin CSS reset — strip WP borders/shadows from form elements.
+   Element Plus uses wrapper elements (.el-input__wrapper) for borders,
+   so inner <input>/<textarea>/<select> must be visually bare. */
+#fchub-portal-extender-app input,
+#fchub-portal-extender-app textarea,
+#fchub-portal-extender-app select {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  outline: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  line-height: inherit;
+  min-height: 0;
+}
+
+#fchub-portal-extender-app input:focus,
+#fchub-portal-extender-app textarea:focus,
+#fchub-portal-extender-app select:focus {
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+
+/* Restore Element Plus component-specific padding/bg stripped by the reset above */
+#fchub-portal-extender-app .el-textarea__inner {
+  padding: 5px 11px;
+}
+
+#fchub-portal-extender-app .el-input-group__prepend,
+#fchub-portal-extender-app .el-input-group__append {
+  background: var(--el-fill-color-light, #f5f7fa);
+  color: var(--fchub-text-secondary);
+  padding: 0 20px;
+  border: none;
+}
+
+#fchub-portal-extender-app .el-input-group__prepend select,
+#fchub-portal-extender-app .el-input-group__append select {
+  background: transparent;
+}
+
+/* Form item overrides */
+#fchub-portal-extender-app .el-form-item__label {
+  font-weight: 500;
+  color: var(--fchub-text-primary);
+  font-size: 14px;
+}
+
+/* Card overrides */
+#fchub-portal-extender-app .el-card {
+  border: none;
+  border-radius: var(--fchub-radius-card);
+  box-shadow: none;
+}
+
+#fchub-portal-extender-app .el-card__header {
+  border-bottom: 1px solid var(--fchub-border-color);
+}
+
+/* Table overrides */
+#fchub-portal-extender-app .el-table {
+  --el-table-border-color: var(--fchub-border-color);
+  --el-table-text-color: var(--fchub-text-primary);
+  --el-table-header-text-color: var(--fchub-text-secondary);
+  --el-table-row-hover-bg-color: #f8f9fc;
+}
+
+body.dark #fchub-portal-extender-app .el-table {
+  --el-table-row-hover-bg-color: #2a2e37;
+}
+
+#fchub-portal-extender-app .el-table th.el-table__cell {
+  background: transparent;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--fchub-text-secondary);
+}
+
+/* Form/input overrides */
+#fchub-portal-extender-app .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--fchub-border-color) inset;
+  border-radius: 6px;
+}
+
+#fchub-portal-extender-app .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #c0c4cc inset;
+}
+
+body.dark #fchub-portal-extender-app .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #555a65 inset;
+}
+
+#fchub-portal-extender-app .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+
+#fchub-portal-extender-app .el-textarea__inner {
+  box-shadow: 0 0 0 1px var(--fchub-border-color) inset;
+  border-radius: 6px;
+}
+
+#fchub-portal-extender-app .el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+
+#fchub-portal-extender-app .el-select .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--fchub-border-color) inset;
+}
+
+/* ElMessage notification offset — avoid hiding under WP admin bar (32px) */
+.el-message {
+  top: 52px !important;
+}
+
+/* Tag overrides */
+#fchub-portal-extender-app .el-tag {
+  border-radius: 6px;
+}
+
+/* Dialog overrides */
+#fchub-portal-extender-app .el-dialog {
+  border-radius: var(--fchub-radius-dialog);
+}
+
+/* Switch override */
+#fchub-portal-extender-app .el-switch.is-checked .el-switch__core {
+  border-color: var(--el-color-primary);
+  background-color: var(--el-color-primary);
+}
+
+/* ───── Dark mode: Element Plus variable overrides ───── */
+body.dark #fchub-portal-extender-app {
+  --el-bg-color: #23272f;
+  --el-bg-color-overlay: #2a2e37;
+  --el-bg-color-page: #1a1d23;
+  --el-fill-color: #363b44;
+  --el-fill-color-light: #2a2e37;
+  --el-fill-color-lighter: #2f333c;
+  --el-fill-color-blank: #23272f;
+  --el-text-color-primary: #e4e6eb;
+  --el-text-color-regular: #cfd2d8;
+  --el-text-color-secondary: #9da3ae;
+  --el-text-color-placeholder: #6b7280;
+  --el-border-color: #363b44;
+  --el-border-color-light: #2f333c;
+  --el-border-color-lighter: #2a2e37;
+  --el-border-color-dark: #444950;
+  --el-color-white: #23272f;
+  --el-disabled-bg-color: #2a2e37;
+  --el-disabled-text-color: #6b7280;
+  --el-disabled-border-color: #363b44;
+  --el-mask-color: rgba(0, 0, 0, 0.6);
+  --el-box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.4);
+  --el-box-shadow-light: 0 2px 8px 0 rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+}
+
+body.dark #fchub-portal-extender-app .el-input-group__prepend,
+body.dark #fchub-portal-extender-app .el-input-group__append {
+  background: var(--el-fill-color-light);
+}
+
+body.dark #fchub-portal-extender-app .el-loading-mask {
+  background-color: rgba(26, 29, 35, 0.8);
+}
