@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-An MCP server that gives AI assistants full access to your [FluentCart](https://fluentcart.com) store. 276 tools across 27 modules — orders, products, customers, subscriptions, coupons, reports, shipping, tax, email notifications, and more. Open source, MIT licensed.
+An MCP server that gives AI assistants full access to your [FluentCart](https://fluentcart.com) store. 279 tools across 27 modules — orders, products, customers, subscriptions, coupons, reports, shipping, tax, email notifications, and more. Open source, MIT licensed.
 
 Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Codex CLI, ChatGPT, and anything else that speaks [MCP](https://modelcontextprotocol.io).
 
@@ -14,7 +14,7 @@ Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Cod
 
 Download the extension — no Node.js, no JSON, no terminal:
 
-**[Download fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases/download/fluentcart-mcp/v1.0.0/fluentcart-mcp.mcpb)**
+**[Download fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases/download/fluentcart-mcp/v1.0.1/fluentcart-mcp.mcpb)**
 
 Double-click the file. Claude Desktop prompts for your WordPress URL, username, and Application Password. Fill those in. Done.
 
@@ -130,14 +130,14 @@ HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and
 
 | Mode | Flag | Tools | Token Cost |
 |------|------|-------|------------|
-| **static** (default) | — | All 276 tools registered upfront | ~30K tokens |
+| **static** (default) | — | All 279 tools registered upfront | ~30K tokens |
 | **dynamic** | `--mode dynamic` | 3 meta-tools (search, describe, execute) | ~1.5K tokens |
 
-Dynamic mode gives the AI 3 tools to discover and execute any of the 276 tools on demand. Same capabilities, ~96% fewer tokens in context.
+Dynamic mode gives the AI 3 tools to discover and execute any of the 279 tools on demand. Same capabilities, ~96% fewer tokens in context.
 
 ## What's Inside
 
-276 tools across 27 modules:
+279 tools across 27 modules:
 
 | Module | Tools | What It Covers |
 |--------|-------|----------------|
