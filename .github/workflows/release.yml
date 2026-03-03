@@ -8,6 +8,7 @@ on:
       - 'fchub-memberships/v*'
       - 'fchub-portal-extender/v*'
       - 'fchub-stream/v*'
+      - 'fchub-wishlist/v*'
       - 'wc-fc/v*'
 
 permissions:

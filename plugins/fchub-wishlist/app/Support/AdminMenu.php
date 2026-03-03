@@ -23,6 +23,13 @@ class AdminMenu
 
     public static function enqueueAssets(): void
     {
+        $bundlePath = FCHUB_WISHLIST_PATH . 'admin/wishlist-admin.js';
+
+        if (!file_exists($bundlePath)) {
+            echo '<div class="notice notice-warning"><p>Wishlist admin assets not found. The admin interface requires the built JavaScript bundle.</p></div>';
+            return;
+        }
+
         wp_enqueue_script(
             'fchub-wishlist-admin',
             FCHUB_WISHLIST_URL . 'admin/wishlist-admin.js',

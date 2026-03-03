@@ -18,6 +18,8 @@ jobs:
             has_tests: true
           - plugin: fchub-stream
             has_tests: true
+          - plugin: fchub-wishlist
+            has_tests: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4

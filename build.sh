@@ -20,6 +20,7 @@ ALL_PLUGINS=(
     "fchub-fakturownia|fchub-fakturownia.php"
     "fchub-memberships|fchub-memberships.php"
     "fchub-portal-extender|fchub-portal-extender.php"
+    "fchub-wishlist|fchub-wishlist.php"
     "fchub-stream|fchub-stream.php"
     "wc-fc|wc-fc.php"
 )
@@ -43,7 +44,7 @@ usage() {
     printf "Build distribution ZIPs for FCHub plugins.\n\n"
     printf "${BOLD}Arguments:${NC}\n"
     printf "  plugin-slug    Build only the specified plugin (optional)\n"
-    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, fchub-portal-extender, fchub-stream, wc-fc\n\n"
+    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, fchub-portal-extender, fchub-wishlist, fchub-stream, wc-fc\n\n"
     printf "${BOLD}Examples:${NC}\n"
     printf "  ./build.sh                    Build all plugins\n"
     printf "  ./build.sh fchub-p24          Build only fchub-p24\n"

@@ -30,6 +30,12 @@
       "zipFilename": "fchub-portal-extender-1.0.2.zip",
       "mcpbFilename": null
     },
+    "fchub-wishlist": {
+      "version": "1.0.0",
+      "tagName": "fchub-wishlist/v1.0.0",
+      "zipFilename": "fchub-wishlist-1.0.0.zip",
+      "mcpbFilename": null
+    },
     "fchub-stream": {
       "version": "1.0.1",
       "tagName": "fchub-stream/v1.0.1",
