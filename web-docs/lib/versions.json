@@ -1,45 +1,45 @@
 {
   "plugins": {
     "fluentcart-mcp": {
-      "version": "1.0.1",
-      "tagName": "fluentcart-mcp/v1.0.1",
+      "version": "1.0.2",
+      "tagName": "fluentcart-mcp/v1.0.2",
       "zipFilename": null,
       "mcpbFilename": "fluentcart-mcp.mcpb"
     },
     "fchub-p24": {
-      "version": "1.0.0",
-      "tagName": "fchub-p24-v1.0.0",
-      "zipFilename": "fchub-p24-1.0.0.zip",
+      "version": "1.0.1",
+      "tagName": "fchub-p24/v1.0.1",
+      "zipFilename": "fchub-p24-1.0.1.zip",
       "mcpbFilename": null
     },
     "fchub-fakturownia": {
-      "version": "1.0.0",
-      "tagName": "fchub-fakturownia-v1.0.0",
-      "zipFilename": "fchub-fakturownia-1.0.0.zip",
+      "version": "1.0.1",
+      "tagName": "fchub-fakturownia/v1.0.1",
+      "zipFilename": "fchub-fakturownia-1.0.1.zip",
       "mcpbFilename": null
     },
     "fchub-memberships": {
-      "version": "1.0.0",
-      "tagName": "fchub-memberships-v1.0.0",
-      "zipFilename": "fchub-memberships-1.0.0.zip",
+      "version": "1.0.1",
+      "tagName": "fchub-memberships/v1.0.1",
+      "zipFilename": "fchub-memberships-1.0.1.zip",
       "mcpbFilename": null
     },
     "fchub-portal-extender": {
-      "version": "1.0.0",
-      "tagName": "fchub-portal-extender/v1.0.0",
-      "zipFilename": "fchub-portal-extender-1.0.0.zip",
+      "version": "1.0.1",
+      "tagName": "fchub-portal-extender/v1.0.1",
+      "zipFilename": "fchub-portal-extender-1.0.1.zip",
       "mcpbFilename": null
     },
     "fchub-stream": {
-      "version": "1.0.0",
-      "tagName": "fchub-stream-v1.0.0",
-      "zipFilename": "fchub-stream-1.0.0.zip",
+      "version": "1.0.1",
+      "tagName": "fchub-stream/v1.0.1",
+      "zipFilename": "fchub-stream-1.0.1.zip",
       "mcpbFilename": null
     },
     "wc-fc": {
-      "version": "1.0.0",
-      "tagName": "wc-fc-v1.0.0",
-      "zipFilename": "wc-fc-1.0.0.zip",
+      "version": "1.0.1",
+      "tagName": "wc-fc/v1.0.1",
+      "zipFilename": "wc-fc-1.0.1.zip",
       "mcpbFilename": null
     }
   },

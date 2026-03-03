@@ -3,7 +3,7 @@
  * Plugin Name: FCHub - Portal Extender
  * Plugin URI: https://fchub.co
  * Description: Visual admin interface for creating custom FluentCart Customer Portal endpoints — no code required
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -17,7 +17,7 @@
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_PORTAL_EXTENDER_VERSION', '1.0.0');
+define('FCHUB_PORTAL_EXTENDER_VERSION', '1.0.1');
 define('FCHUB_PORTAL_EXTENDER_FILE', __FILE__);
 define('FCHUB_PORTAL_EXTENDER_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_PORTAL_EXTENDER_URL', plugin_dir_url(__FILE__));
