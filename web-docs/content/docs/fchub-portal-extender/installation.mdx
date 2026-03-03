@@ -1,0 +1,129 @@
+---
+title: Installation
+description: How to download, install, and activate the FCHub Portal Extender plugin on your WordPress site.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+
+## Requirements Checklist
+
+Before you begin — and honestly, this bit is mercifully short — confirm that your site meets these requirements:
+
+| Requirement | Details |
+|-------------|---------|
+| **WordPress** | Version 6.0 or higher |
+| **PHP** | Version 7.4 or higher |
+| **FluentCart** | Installed and activated |
+
+That's it. No SSL demands, no third-party merchant accounts, no blood sacrifice. Just WordPress, PHP, and FluentCart.
+
+<Callout type="warn" title="FluentCart Must Be Active">
+FCHub Portal Extender is an extension for FluentCart's Customer Portal. If FluentCart is not installed and activated, the plugin has nothing to extend and will sit there doing precisely nothing useful. Install FluentCart first.
+</Callout>
+
+## Download
+
+FCHub Portal Extender is distributed as a WordPress plugin ZIP file. Grab the latest release from the GitHub Releases page:
+
+<Cards>
+  <Card title="GitHub Releases" href="https://github.com/vcode-sh/fchub-plugins/releases">
+    Download the latest `fchub-portal-extender-1.0.0.zip` from the Releases page.
+  </Card>
+</Cards>
+
+Look for the asset named `fchub-portal-extender-1.0.0.zip` in the latest release. Download it to your computer.
+
+## Installation Steps
+
+<Steps>
+<Step>
+### Upload the Plugin
+
+Navigate to **Plugins > Add New Plugin** in your WordPress admin dashboard. Click the **Upload Plugin** button at the top of the page.
+
+Choose the `fchub-portal-extender-1.0.0.zip` file you downloaded and click **Install Now**.
+</Step>
+
+<Step>
+### Activate the Plugin
+
+After the upload completes, click **Activate Plugin**. WordPress will activate FCHub Portal Extender.
+
+If FluentCart is not active at this point, the plugin will activate without complaint but won't actually do anything — it needs FluentCart's portal system to hook into.
+</Step>
+
+<Step>
+### Verify It Works
+
+Once both FluentCart and FCHub Portal Extender are active, navigate to **FluentCart > Portal Extender** in the admin sidebar. You should see the plugin's admin interface where you can create and manage custom portal endpoints.
+
+If you don't see the submenu item, double-check that FluentCart is active and try refreshing the page. The admin menu registers at priority 99, so it appears below FluentCart's own menu items.
+</Step>
+</Steps>
+
+## What Happens on Activation
+
+When the plugin activates, it registers three things — and none of them are particularly dramatic:
+
+1. **Portal endpoints register on `init` priority 3** — any endpoints you've configured get registered with FluentCart's Customer Portal
+2. **REST API routes register on `rest_api_init`** — the admin interface needs these to save and manage your endpoint configurations
+3. **Admin submenu page registers on `admin_menu` priority 99** — adds the "Portal Extender" item under FluentCart in the sidebar
+
+All endpoint configurations are stored in a single `wp_options` row under the key `fchub_portal_endpoints`. No custom database tables, no migrations, no existential dread.
+
+## What Happens on Deactivation
+
+When you deactivate the plugin:
+
+- Your endpoint configurations are **preserved** in the database — nothing is deleted
+- The endpoints simply stop rendering in the Customer Portal because the registration code no longer runs
+- The admin submenu disappears from the sidebar
+
+<Callout type="info" title="Settings Are Preserved">
+Deactivating the plugin does not delete your settings. If you reactivate later, all your custom endpoints will still be there, exactly as you left them. We're not monsters.
+</Callout>
+
+## What Happens on Uninstall (Deletion)
+
+If you delete the plugin through the WordPress admin, the `uninstall.php` routine runs and cleans up after itself:
+
+- `delete_option('fchub_portal_endpoints')` removes all your saved endpoint configurations
+- That's the only piece of data the plugin stores, so this is a full cleanup — no orphaned data left behind
+
+Clean in, clean out. As it should be.
+
+<Tabs items={['Manual Upload', 'WP-CLI']}>
+<Tab value="Manual Upload">
+
+If you prefer uploading via FTP/SFTP like it's 2009:
+
+1. Extract `fchub-portal-extender-1.0.0.zip` on your local machine
+2. Upload the `fchub-portal-extender` folder to `/wp-content/plugins/`
+3. Go to **Plugins** in WordPress admin and activate **FCHub - Portal Extender**
+
+</Tab>
+<Tab value="WP-CLI">
+
+If you have WP-CLI access (and good taste):
+
+```bash
+# Install from a local ZIP file
+wp plugin install /path/to/fchub-portal-extender-1.0.0.zip --activate
+
+# Verify it's active
+wp plugin list --name=fchub-portal-extender --fields=name,status,version
+```
+
+</Tab>
+</Tabs>
+
+## Next Steps
+
+<Cards>
+  <Card title="Content Sources" href="/docs/fchub-portal-extender/content-sources">
+    Learn how to create custom portal endpoints and configure what content they display.
+  </Card>
+</Cards>

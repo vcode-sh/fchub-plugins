@@ -12,6 +12,7 @@ import {
 	GitPullRequest,
 	Heart,
 	Home,
+	LayoutDashboard,
 	Mail,
 	MessageSquare,
 	Receipt,
@@ -42,6 +43,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
 						{ text: "Przelewy24", url: "/docs/fchub-p24", icon: <CreditCard size={16} /> },
 						{ text: "Fakturownia", url: "/docs/fchub-fakturownia", icon: <Receipt size={16} /> },
 						{ text: "Memberships", url: "/docs/fchub-memberships", icon: <Users size={16} /> },
+						{ text: "Portal Extender", url: "/docs/fchub-portal-extender", icon: <LayoutDashboard size={16} /> },
 						{ text: "WC Migrator", url: "/docs/wc-fc", icon: <ArrowRightLeft size={16} /> },
 						{ text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
 						{ text: "FCHub Stream", url: "/docs/fchub-stream", icon: <SquarePlay size={16} /> },
@@ -76,6 +78,13 @@ export default function Layout({ children }: LayoutProps<"/">) {
 										<Users size={16} />
 										Memberships
 										<Badge className="ml-auto text-[10px] h-4 bg-orange-500/15 text-orange-500 border-transparent"><Flame size={10} />Hot</Badge>
+									</NavigationMenuLink>
+									<NavigationMenuLink
+										render={<Link href="/docs/fchub-portal-extender" />}
+									>
+										<LayoutDashboard size={16} />
+										Portal Extender
+										<Badge variant="secondary" className="ml-auto text-[10px] h-4">New</Badge>
 									</NavigationMenuLink>
 									<NavigationMenuLink render={<Link href="/docs/wc-fc" />}>
 										<ArrowRightLeft size={16} />

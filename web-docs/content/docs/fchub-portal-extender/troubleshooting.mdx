@@ -1,0 +1,116 @@
+---
+title: Troubleshooting
+description: Common issues with FCHub Portal Extender and how to fix them — because something always goes sideways.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+
+Things not working as expected? Welcome to WordPress development. Below are the most common issues people run into with FCHub Portal Extender and — more importantly — how to make them stop.
+
+## Common Issues
+
+<Accordions type="multiple">
+
+<Accordion title="Endpoint doesn't appear in the Customer Portal">
+
+The classic "I set it up and nothing happened" scenario. Work through this checklist before questioning your life choices:
+
+- **Is the endpoint status set to Active?** — Inactive endpoints don't register with FluentCart. Toggle it on in the admin UI and check again.
+- **Is FluentCart installed and activated?** — Portal Extender extends FluentCart's Customer Portal. Without FluentCart running, there's no portal to extend. The plugin needs something to hook into.
+- **Clear your caches** — If you're running a page cache plugin, object cache (Redis, Memcached), or a hosting-level cache, flush the lot. Cached pages won't pick up newly registered endpoints until the cache is invalidated.
+- **Plugin conflict at `init` priority 3** — Portal Extender registers its endpoints on the `init` hook at priority 3 (after FluentCart's own registration at priority 2). If another plugin is doing something aggressive at the same priority, things can collide. Try deactivating other plugins one by one to isolate the culprit. Yes, it's tedious. No, there's no shortcut.
+
+</Accordion>
+
+<Accordion title='"This slug is reserved" error'>
+
+FluentCart reserves a handful of slugs for its own built-in portal pages. You cannot use any of the following:
+
+- `dashboard`
+- `purchase-history`
+- `subscriptions`
+- `licenses`
+- `downloads`
+- `profile`
+
+Pick a different slug. Something creative. Or at least something that isn't already taken by the system you're extending.
+
+</Accordion>
+
+<Accordion title='"This slug is already in use" error'>
+
+Every endpoint needs a unique slug — two endpoints can't share the same URL path in the portal. Check your existing endpoints for duplicates. If you renamed an endpoint but kept the original slug, that's your problem right there.
+
+</Accordion>
+
+<Accordion title="WordPress Page content not rendering properly">
+
+Page content is rendered via `the_content()` filter, which works beautifully for standard block editor content and reasonably well for most things. However:
+
+- **Page builders** (Elementor, Divi, Beaver Builder, etc.) that use custom rendering pipelines may not play nicely inside the portal chrome. Their output sometimes depends on specific template structures or JavaScript initialisation that doesn't fire in this context.
+- **Start with a simple block editor page** to confirm the endpoint itself is working. If that renders fine but your page builder page doesn't, the issue is with the builder's rendering, not the plugin.
+- **Asset conflicts** — some page builders inject CSS and JavaScript that can clash with FluentCart's portal layout. There's not much Portal Extender can do about that without rewriting someone else's plugin.
+
+</Accordion>
+
+<Accordion title="Shortcode not rendering">
+
+If your shortcode is coming through as raw text (literally showing `[your_shortcode]` on the page), check the usual suspects:
+
+- **Is the plugin providing the shortcode active?** — Shortcodes only work when the plugin that registers them is running. Obvious, but you'd be surprised.
+- **Test the shortcode on a regular WordPress page first** — if it doesn't work there either, the problem isn't Portal Extender. It's the shortcode itself.
+- **Missing assets** — some shortcodes rely on specific CSS or JavaScript files that their parent plugin enqueues on the front end. Inside the portal context, those assets may not be loaded. The shortcode might "work" but look broken because its stylesheet never fired.
+
+</Accordion>
+
+<Accordion title='Iframe shows blank or "refused to connect"'>
+
+External URL endpoints load content in a sandboxed iframe. If you're seeing a blank frame or a browser error about refused connections:
+
+- **X-Frame-Options / Content-Security-Policy headers** — the target site controls whether it can be embedded in an iframe. If they send `X-Frame-Options: DENY` or `SAMEORIGIN`, or a restrictive `Content-Security-Policy` header, browsers will refuse to load it. Portal Extender can't override another site's security headers.
+- **Sites that block embedding** — Google Docs, Facebook, most banking sites, and countless others explicitly block iframe embedding. This is by design on their end and there's no workaround.
+- **Test the URL in a plain HTML iframe first** — create a simple HTML file with `<iframe src="your-url"></iframe>` and open it in a browser. If it doesn't work there, it won't work in the portal either. At least you'll know it's not the plugin's fault.
+
+</Accordion>
+
+<Accordion title="Admin page shows blank white screen">
+
+The admin interface is a Vue 3 SPA. A blank white screen usually means the JavaScript failed to load or crashed:
+
+- **Check the browser console** — open Developer Tools (F12) and look at the Console tab for JavaScript errors. The error message will tell you more than staring at a white screen ever will.
+- **Verify the build output exists** — the compiled assets should be in `assets/dist/`. If that directory is empty or missing, the JavaScript hasn't been built.
+- **Installed from source?** — if you cloned the repo instead of installing the release ZIP, the built assets aren't included. Run `npm run build` in the plugin directory to generate them. The release ZIP ships with pre-built assets, so this only affects developers.
+
+</Accordion>
+
+<Accordion title="Custom post type not listed in the dropdown">
+
+The Post/CPT content source type shows a dropdown of available post types. If yours isn't appearing:
+
+- **Only public post types are listed** — the dropdown filters for post types registered with `'public' => true`. Internal or private post types are excluded by design.
+- **`attachment` is excluded** — media attachments are a post type technically, but nobody wants to render an attachment page inside a portal endpoint. It's filtered out.
+- **Check your CPT registration** — if you registered a custom post type and it's not showing up, verify that `'public' => true` is set in the `register_post_type()` args. Setting `'publicly_queryable' => true` alone isn't enough.
+
+</Accordion>
+
+<Accordion title="SVG icon not rendering">
+
+Portal Extender sanitises SVG input for security. If your icon isn't rendering, it's likely because the sanitiser stripped something it deemed unsafe:
+
+- **Stripped elements** — `<script>` tags, `<foreignObject>`, and any element with event handlers (`onclick`, `onload`, etc.) are removed entirely. For obvious reasons.
+- **Stripped attributes** — `xlink:href` attributes and any `href` pointing to `javascript:` are removed.
+- **Test with a simple SVG first** — try a basic `<svg><path d="..."/></svg>` to confirm the icon system works, then gradually add complexity to find what's being stripped.
+- **Grab a clean SVG** — sites like Heroicons or Lucide provide clean, minimal SVGs that work perfectly. If your SVG was exported from Illustrator with seventeen layers of metadata, consider cleaning it up first.
+
+</Accordion>
+
+</Accordions>
+
+## Still Stuck?
+
+<Cards>
+  <Card title="GitHub Issues" href="https://github.com/vcode-sh/fchub-plugins/issues">
+    If none of the above solved your problem, open an issue on GitHub. Include the WordPress version, FluentCart version, PHP version, and what you expected to happen versus what actually happened. Screenshots help. Vague complaints don't.
+  </Card>
+</Cards>

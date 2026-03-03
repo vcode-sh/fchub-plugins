@@ -9,6 +9,7 @@ import {
 	CreditCard,
 	Download,
 	Home,
+	LayoutDashboard,
 	MessageSquare,
 	Receipt,
 	Send,
@@ -94,6 +95,14 @@ const cartPlugins: Plugin[] = [
 		icon: Users,
 		docsHref: "/docs/fchub-memberships",
 		downloadUrl: `${GITHUB_REPO}/releases/tag/fchub-memberships-v1.0.0`,
+	},
+	{
+		title: "Portal Extender",
+		description:
+			"Custom portal pages without writing PHP. Because not everyone wants to be a developer.",
+		icon: LayoutDashboard,
+		docsHref: "/docs/fchub-portal-extender",
+		downloadUrl: `${GITHUB_REPO}/releases/tag/fchub-portal-extender/v1.0.0`,
 	},
 	{
 		title: "WC Migrator",

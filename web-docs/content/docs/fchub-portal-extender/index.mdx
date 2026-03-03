@@ -1,0 +1,83 @@
+---
+title: FCHub Portal Extender
+description: Custom customer portal endpoints for FluentCart. Add pages, shortcodes, HTML blocks, iframes, and redirects to the portal sidebar — no PHP required.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Portal Extender lets you add custom endpoints to FluentCart's customer portal without writing a single line of PHP. FluentCart ships with a perfectly fine `addCustomerDashboardEndpoint()` API for this — the catch is you need to actually know PHP to use it. Most site owners would rather chew through a USB cable. This plugin wraps that API in a visual admin UI so you can build portal pages the way civilisation intended: by clicking buttons.
+
+## What It Does
+
+<Cards>
+  <Card title="Content Sources">
+    Six ways to fill an endpoint: WordPress Page, Shortcode, raw HTML/Custom Code, External URL (iframe), Redirect/Link, or Post/CPT. Pick your poison, paste your content, move on with your life.
+  </Card>
+  <Card title="Icons & Branding">
+    Every endpoint gets its own sidebar icon. Drop in raw SVG code, pick a Dashicon, or point to an image URL. Your portal, your aesthetic — even if that aesthetic is questionable.
+  </Card>
+  <Card title="Display Control">
+    Content renders inside a scrollable container that either auto-fits the viewport height or locks to a fixed pixel value. Dark mode is handled automatically. No CSS required, no layout prayers.
+  </Card>
+  <Card title="Endpoint Management">
+    Drag-to-reorder sidebar position, toggle endpoints active or inactive, auto-generate slugs from titles, and reserved slug validation so you don't accidentally overwrite FluentCart's built-in pages. All stored in `wp_options` and cleaned up on uninstall.
+  </Card>
+</Cards>
+
+## How It Works
+
+<Accordions type="single">
+<Accordion title="Storage & Registration">
+
+Endpoints are stored as a serialised array in `wp_options`. On every page load, the plugin reads that option at `init` priority 3 (after FluentCart registers its own endpoints at priority 2) and calls `addCustomerDashboardEndpoint()` for each active endpoint. That's it. No custom tables, no post types, no existential overhead.
+
+</Accordion>
+<Accordion title="Admin Interface">
+
+The settings page is a Vue 3 single-page application embedded in a standard WordPress admin page. It handles endpoint creation, editing, reordering, and previewing — all without full page reloads. The UI communicates with the backend via the WordPress REST API.
+
+</Accordion>
+<Accordion title="Content Rendering">
+
+Each content source type has its own rendering strategy. WordPress Pages and Posts are fetched via `get_post()` and rendered through `the_content` filters. Shortcodes are processed with `do_shortcode()`. HTML is output directly. External URLs are loaded in a sandboxed iframe. Redirects skip rendering entirely and send a `wp_redirect()`. The scrollable container wrapper is applied to all types except redirects.
+
+</Accordion>
+<Accordion title="Dark Mode & Styling">
+
+The plugin detects FluentCart's dark mode state and applies appropriate styles to the content container. Custom CSS variables handle the transition so embedded content doesn't look like a flashbang at midnight.
+
+</Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Requirements
+
+| Requirement | Version |
+|---|---|
+| WordPress | 6.0+ |
+| PHP | 7.4+ |
+| FluentCart | Required (any version) |
+
+No Node.js, no build tools, no Composer dependencies. Install and go.
+
+<Callout type="warn" title="FluentCart is Required">
+FCHub Portal Extender extends FluentCart's customer portal. Without FluentCart installed and activated, the plugin has nothing to extend — it will display an admin notice and politely refuse to do anything useful.
+</Callout>
+
+## Next Steps
+
+<Cards>
+  <Card title="Installation" href="/docs/fchub-portal-extender/installation">
+    Download, install, and verify the plugin is running.
+  </Card>
+  <Card title="Content Sources" href="/docs/fchub-portal-extender/content-sources">
+    The six content types explained — when to use each one and how they render.
+  </Card>
+  <Card title="Icons & Display" href="/docs/fchub-portal-extender/icons-display">
+    Icon formats, scrollable container modes, and dark mode behaviour.
+  </Card>
+</Cards>

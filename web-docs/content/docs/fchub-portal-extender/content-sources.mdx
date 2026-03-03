@@ -1,0 +1,216 @@
+---
+title: Content Sources
+description: The six content source types for portal endpoints — WordPress Pages, Shortcodes, HTML, iframes, Redirects, and Custom Post Types. How each one renders and when to use it.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Every portal endpoint needs a content source — the actual stuff that appears when a customer clicks your custom sidebar item. There are six types, ranging from "I already have a WordPress page for this" to "just redirect them somewhere else entirely." Pick the one that matches your ambition-to-effort ratio.
+
+## Content Source Types
+
+<Tabs items={['WordPress Page', 'Shortcode', 'HTML / Custom Code', 'External URL (iframe)', 'Redirect / Link', 'Post / CPT']}>
+<Tab value="WordPress Page">
+
+### WordPress Page <Badge>page_id</Badge>
+
+The path of least resistance. Select any published WordPress page from a searchable dropdown and its content gets rendered directly inside the portal layout. No copying, no pasting, no reinventing the wheel.
+
+The plugin fetches the page via `get_post()` and renders it through WordPress's `the_content()` filter pipeline. The output is wrapped in a `<div class="fluent-cart-custom-page-content">` container, which means it inherits the portal's styling context rather than your theme's single-page template.
+
+**What works:**
+- Block editor (Gutenberg) content
+- Classic editor content
+- Page builder output (Elementor, Beaver Builder, Divi — anything that hooks into `the_content()`)
+- Embedded media, oEmbeds, and WordPress blocks
+- Shortcodes within the page content (processed as part of the normal `the_content()` pipeline)
+
+**Good for:** Terms of service, FAQ pages, static informational content, anything you've already built as a WordPress page and can't be bothered to recreate.
+
+<Callout type="info" title="Page Templates Don't Apply">
+The page's assigned template is irrelevant here. The plugin renders the page *content*, not the page *template*. FluentCart's portal layout is the template. Your page's "Full Width" or "Sidebar Left" template choice has no effect inside the portal.
+</Callout>
+
+</Tab>
+<Tab value="Shortcode">
+
+### Shortcode <Badge>shortcode</Badge>
+
+Enter any WordPress shortcode string and it gets executed inside the portal. That's it. No ceremony.
+
+```
+[my_contact_form id="5"]
+```
+
+The plugin processes the string through `do_shortcode()` and outputs the result directly in the portal layout. If the shortcode generates output, it appears. If it doesn't, you get a lovely blank space to contemplate your choices.
+
+**Good for:** Contact forms (WPForms, Gravity Forms, Fluent Forms), support ticket systems, any plugin that exposes functionality via shortcodes. Essentially, if a plugin says "paste this shortcode anywhere," the portal counts as anywhere.
+
+<Callout type="warn" title="Shortcode Dependencies">
+The shortcode's parent plugin must be active. If you enter `[gravity_form id="3"]` but Gravity Forms isn't installed, WordPress will cheerfully render the raw shortcode text to your customers. Not exactly the professional look you're going for.
+</Callout>
+
+</Tab>
+<Tab value="HTML / Custom Code">
+
+### HTML / Custom Code <Badge>html</Badge>
+
+A free-form textarea where you can write whatever HTML you fancy. Inline CSS, structural markup, embedded widgets — go wild. Well, within reason.
+
+The content is sanitised through `wp_kses_post()` before rendering, which means:
+
+- **HTML tags**: Most standard tags are allowed (`div`, `span`, `p`, `a`, `img`, `table`, `ul`, `ol`, `h1`-`h6`, etc.)
+- **Inline CSS**: Allowed via `style` attributes
+- **Shortcodes**: Fully supported — the HTML is processed through `do_shortcode()` before output
+- **Script tags**: Stripped. Sorry. Security isn't negotiable, even if your brilliant inline JavaScript would have been *totally fine*
+
+**Good for:** Custom layouts that don't warrant a full page, styled content blocks, embedded third-party widgets (that don't require `<script>` tags), quick HTML content where creating a WordPress page feels like overkill.
+
+```html
+<div style="padding: 20px; background: #f5f5f5; border-radius: 8px;">
+  <h2>Welcome to the Member Area</h2>
+  <p>Here's your exclusive content. Try not to screenshot it.</p>
+  [my_shortcode id="42"]
+</div>
+```
+
+Shortcodes embedded in the HTML are processed before the final output, so mixing markup and shortcodes works exactly as you'd expect.
+
+</Tab>
+<Tab value="External URL (iframe)">
+
+### External URL / iframe <Badge>iframe</Badge>
+
+Embed any external URL inside the portal via an iframe. For when your content lives somewhere else entirely and you'd rather not migrate it.
+
+The iframe is rendered with:
+- `loading="lazy"` — doesn't load until the customer scrolls to it
+- `allowfullscreen` — because sometimes you need it
+- Configurable height: **200px to 2000px** (default **600px**)
+- Full-width within the portal content area
+
+```html
+<iframe
+  src="https://your-external-app.com/dashboard"
+  height="600"
+  loading="lazy"
+  allowfullscreen
+></iframe>
+```
+
+**Good for:** External dashboards, third-party SaaS tools, embedded apps, documentation sites, anything that lives outside WordPress but should feel like part of the portal.
+
+<Callout type="warn" title="X-Frame-Options">
+The target website must allow iframe embedding. If the site sends `X-Frame-Options: DENY` or `X-Frame-Options: SAMEORIGIN` headers, the browser will refuse to load it in your iframe — and there's nothing this plugin (or any plugin) can do about it. This is a browser security feature, not a bug. Test your URL before going live.
+</Callout>
+
+</Tab>
+<Tab value="Redirect / Link">
+
+### Redirect / Link <Badge>redirect</Badge>
+
+This one doesn't render content at all. When a customer clicks the sidebar item, they're sent to a URL of your choosing. Simple, effective, occasionally sneaky.
+
+**Two targeting options:**
+
+| Option | Behaviour |
+|---|---|
+| **Same tab** | Uses `window.location.href` to navigate away from the portal. A fallback `<a>` link is rendered for browsers with JavaScript disabled. |
+| **New tab** | Uses `window.open()` to open the URL in a separate tab. A fallback `<a target="_blank">` link is provided. |
+
+The portal sidebar item still appears and looks like any other menu entry — there's no visual indicator that it's a redirect unless you add something to the title (like an arrow emoji, if you're into that sort of thing).
+
+**Good for:** External support portals, affiliate dashboards, third-party account management pages, anything that lives on a different domain and doesn't need to be embedded.
+
+<Callout type="info" title="No Display Settings">
+Since redirects don't render content inside the portal, the scrollable container and display settings are hidden for this content source type. There's nothing to scroll if you're not sticking around.
+</Callout>
+
+</Tab>
+<Tab value="Post / CPT">
+
+### Post / Custom Post Type <Badge>custom_post</Badge>
+
+A two-step cascading selector: first pick a post type, then pick a specific post. The plugin auto-detects all registered public post types on your site, so custom post types from other plugins show up automatically.
+
+The content rendering is identical to the WordPress Page source — `get_post()` followed by `the_content()`, wrapped in `<div class="fluent-cart-custom-page-content">`. The only difference is the selection interface, which gives you access to posts, knowledge base articles, documentation entries, portfolio items, or whatever custom post types your site has registered.
+
+**Selection flow:**
+
+<Steps>
+  <Step>
+    ### Choose a Post Type
+
+    A dropdown lists all public post types registered on your site. This includes WordPress defaults (`post`, `page`) and any custom post types from plugins or themes.
+  </Step>
+  <Step>
+    ### Choose a Specific Post
+
+    Once a post type is selected, a second dropdown loads all published entries of that type. Pick the one you want to display in the portal.
+  </Step>
+</Steps>
+
+**Good for:** Knowledge base articles, documentation pages, custom post type content from plugins like Toolset, Pods, or ACF, any content that doesn't live in the standard Pages post type.
+
+</Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## Common Settings
+
+All content source types **except Redirect** support the scrollable container feature, which controls how the content area behaves within the portal layout. This includes auto-height mode (fills the available viewport) and fixed-height mode (locks to a specific pixel value). The scrollable container and display settings are documented in detail on the [Icons & Display](/docs/fchub-portal-extender/icons-display) page.
+
+<Separator className="my-8" />
+
+## Endpoint Slugs
+
+### Auto-Generation
+
+When creating a new endpoint, typing into the title field auto-generates the slug in real time. The slug is derived from the title: lowercased, spaces replaced with hyphens, special characters stripped.
+
+Once you manually edit the slug field, auto-generation stops for that endpoint. The plugin assumes you know what you're doing at that point — a generous assumption, but there we are.
+
+### Reserved Slugs
+
+FluentCart uses several slugs for its built-in portal pages. The plugin blocks these to prevent you from accidentally overwriting core functionality:
+
+| Reserved Slug | Used By |
+|---|---|
+| `dashboard` | FluentCart customer dashboard |
+| `purchase-history` | Order history page |
+| `subscriptions` | Subscription management |
+| `licenses` | License key management |
+| `downloads` | Digital downloads page |
+| `profile` | Customer profile settings |
+
+Attempting to create an endpoint with any of these slugs will trigger a validation error. This is the plugin being helpful, not difficult — overwriting FluentCart's dashboard endpoint would be a spectacularly bad time for everyone involved.
+
+<Separator className="my-8" />
+
+## Choosing the Right Source
+
+If the decision tree feels overwhelming, here's the brutally honest guide:
+
+<Cards>
+  <Card title="Already have a page?">
+    Use **WordPress Page**. Why recreate what exists?
+  </Card>
+  <Card title="Need a form or plugin widget?">
+    Use **Shortcode**. That's literally what shortcodes are for.
+  </Card>
+  <Card title="Quick custom content?">
+    Use **HTML / Custom Code**. Fast, flexible, no page creation overhead.
+  </Card>
+  <Card title="Content lives elsewhere?">
+    Use **iframe** if it needs to appear inside the portal, **Redirect** if it doesn't.
+  </Card>
+  <Card title="Custom post type content?">
+    Use **Post / CPT**. It handles any registered public post type on your site.
+  </Card>
+</Cards>

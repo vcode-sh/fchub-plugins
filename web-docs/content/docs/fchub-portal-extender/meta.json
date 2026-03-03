@@ -1,0 +1,16 @@
+{
+  "title": "Portal Extender",
+  "root": true,
+  "description": "FluentCart.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "---Features---",
+    "content-sources",
+    "icons-display",
+    "---Reference---",
+    "troubleshooting",
+    "changelog"
+  ]
+}

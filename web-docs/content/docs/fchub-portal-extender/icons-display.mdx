@@ -1,0 +1,234 @@
+---
+title: Icons & Display
+description: Customise how your portal endpoints look — icon types, scrollable containers, ordering, and visibility toggles. Because an endpoint without an icon is just a sad text link.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Every endpoint you create gets a slot in FluentCart's Customer Portal sidebar. That slot needs an icon, a position, and possibly some display manners. This page covers all the visual knobs you can turn — from SVG code to viewport-aware scroll containers — so your portal doesn't look like a government intranet from 2003.
+
+## Icon Types
+
+Each endpoint supports three icon formats. Pick whichever suits your aesthetic sensibility (or lack thereof). The icon type is selected via a dropdown in the endpoint editor, and a live preview renders below the field so you can see what you're inflicting on your customers before you save.
+
+<Tabs items={['SVG Code', 'Dashicon', 'Image URL']}>
+<Tab value="SVG Code">
+
+### SVG Code <Badge variant="outline">Recommended</Badge>
+
+Paste raw SVG markup into the textarea field. The SVG is rendered inline in the portal sidebar, which means it scales perfectly at any size and supports `currentColor` for theme-aware colouring. If FluentCart switches between light and dark mode, your icon follows along without you lifting a finger.
+
+A live preview appears below the textarea as you type — useful for catching that moment when your hand-crafted SVG turns out to be an invisible 0x0 rectangle.
+
+**Example:**
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+     stroke="currentColor" stroke-width="2" stroke-linecap="round"
+     stroke-linejoin="round">
+  <circle cx="12" cy="12" r="10"/>
+  <path d="M12 6v6l4 2"/>
+</svg>
+```
+
+**Security sanitisation:**
+
+Because allowing arbitrary SVG in your admin panel would be a spectacular idea, the plugin strips the following on save:
+
+| Stripped Element / Attribute | Why |
+|---|---|
+| `<script>` tags | Obviously |
+| Event handlers (`onclick`, `onload`, `onerror`, etc.) | XSS vectors |
+| `xlink:href` attributes | Can reference external resources |
+| `javascript:` protocol in `href` values | Another XSS classic |
+| `<foreignObject>` elements | Can embed arbitrary HTML inside SVG |
+
+What survives sanitisation is a clean, inert SVG that renders as a visual element and nothing more. If your SVG relies on JavaScript to function, it will not function. That's the point.
+
+<Callout type="info" title="Use currentColor">
+Design your SVGs with `stroke="currentColor"` or `fill="currentColor"` so they inherit the sidebar's text colour. This ensures proper contrast in both light and dark mode without you maintaining two icon sets like some kind of design masochist.
+</Callout>
+
+</Tab>
+<Tab value="Dashicon">
+
+### Dashicon
+
+Select from a curated list of 29 WordPress Dashicons via a searchable dropdown. Start typing and the list filters down — no need to memorise the full Dashicon catalogue (all 300+ of them) because the plugin has already picked the ones that make sense for portal navigation.
+
+A live preview renders the actual dashicon next to the dropdown so you can see what you're getting.
+
+**Available icons:**
+
+| Icon | Name |
+|---|---|
+| Home | `dashicons-admin-home` |
+| Users | `dashicons-admin-users` |
+| Post | `dashicons-admin-post` |
+| Page | `dashicons-admin-page` |
+| Comments | `dashicons-admin-comments` |
+| Tools | `dashicons-admin-tools` |
+| Settings | `dashicons-admin-generic` |
+| Generic | `dashicons-admin-settings` |
+| Star | `dashicons-star-filled` |
+| Heart | `dashicons-heart` |
+| Book | `dashicons-book` |
+| Calendar | `dashicons-calendar-alt` |
+| Cart | `dashicons-cart` |
+| Email | `dashicons-email` |
+| Tickets | `dashicons-tickets-alt` |
+| Groups | `dashicons-groups` |
+| Portfolio | `dashicons-portfolio` |
+| Shield | `dashicons-shield` |
+| Awards | `dashicons-awards` |
+| Megaphone | `dashicons-megaphone` |
+| Lightbulb | `dashicons-lightbulb` |
+| Share | `dashicons-share` |
+| Chart Bar | `dashicons-chart-bar` |
+| Video | `dashicons-video-alt3` |
+| Audio | `dashicons-format-audio` |
+| Gallery | `dashicons-format-gallery` |
+| Location | `dashicons-location` |
+| Phone | `dashicons-phone` |
+| Info | `dashicons-info` |
+| Checkmark | `dashicons-yes-alt` |
+
+Dashicons use WordPress's built-in dashicons font — no additional assets are loaded. The icon renders in the sidebar as a `<span class="dashicons dashicons-xxx">` element, which means it inherits WordPress's icon styling and sizing conventions.
+
+Good for quick setups where you just need a recognisable icon and can't be bothered hand-crafting SVG. Perfectly respectable. Nobody's judging. (We're judging a little.)
+
+</Tab>
+<Tab value="Image URL">
+
+### Image URL
+
+Enter any image URL — PNG, SVG, ICO, whatever you've got — and the plugin renders it as an `<img>` tag at 20x20px with `object-fit: contain`. A live preview appears below the input field.
+
+**Good for:**
+- Brand logos that need to be pixel-perfect
+- Custom icon sets hosted on a CDN
+- That one icon your designer sent as a PNG and refuses to convert to SVG
+
+**Things to know:**
+
+| Detail | Value |
+|---|---|
+| Rendered size | 20 x 20 px |
+| Fit mode | `object-fit: contain` |
+| Sanitisation | URL passed through `esc_url_raw()` on save |
+| Supported formats | Anything a browser can render in an `<img>` tag |
+
+The URL is sanitised via WordPress's `esc_url_raw()` when the endpoint is saved. This strips protocol-relative URLs, JavaScript URIs, and other nonsense — but it won't validate that the URL actually points to an image. If you paste a link to a PDF, you'll get a broken image icon in your sidebar and a valuable life lesson.
+
+<Callout type="warn" title="External URLs and Performance">
+Image URLs load from whatever server hosts them. If that server is slow or offline, your portal sidebar icon will be slow or missing. For reliability, host icons on the same server as WordPress or use a CDN you trust.
+</Callout>
+
+</Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## Scrollable Container
+
+Long content inside a portal endpoint can push the sidebar navigation off the bottom of the screen, turning your carefully crafted portal into an infinite scroll nightmare. The scrollable container option wraps your endpoint content in a height-constrained box with its own scrollbar, keeping the portal layout intact.
+
+All content types except **Redirect** support this option. Redirects don't render content — they send the user elsewhere — so the scrollable container toggle is hidden when you select Redirect as the content source.
+
+<Tabs items={['Auto-fit Viewport', 'Fixed Height']}>
+<Tab value="Auto-fit Viewport">
+
+### Auto-fit Viewport <Badge variant="outline">Default when enabled</Badge>
+
+The container automatically fills the remaining viewport height, minus a 24px bottom margin for breathing room. No magic numbers to guess, no CSS to write — it measures the container's offset from the top of the viewport and sets `max-height` dynamically.
+
+**How it works:**
+
+```
+max-height = window.innerHeight - element.getBoundingClientRect().top - 24px
+```
+
+The minimum height is clamped at 200px, so even on absurdly small viewports the content area doesn't collapse into a unusable sliver.
+
+**Recalculation triggers:**
+- Window resize events
+- DOM mutations (content loaded asynchronously, AJAX updates, etc.)
+
+This mode is ideal when you don't know how tall the content will be — which, let's be honest, is most of the time. The content scrolls within the portal frame, and the page itself stays put. Your sidebar navigation remains visible. Order is maintained. Everyone's happy.
+
+</Tab>
+<Tab value="Fixed Height">
+
+### Fixed Height
+
+Set a specific pixel height and call it a day. Content taller than the specified value shows a vertical scrollbar. Content shorter just sits there with empty space below it. Simple, predictable, and requires zero JavaScript — it's pure CSS `max-height` plus `overflow-y: auto`.
+
+**Configuration:**
+
+| Setting | Value |
+|---|---|
+| Minimum | 200px |
+| Maximum | 2000px |
+| Default | 600px |
+
+Good for when you know exactly how much vertical space your content needs — a fixed-height form, an embedded tool with known dimensions, or a page you've already measured. Less adaptive than auto-fit, but also less clever, which sometimes is exactly what you want.
+
+</Tab>
+</Tabs>
+
+### When to Skip It
+
+Not every endpoint needs a scrollable container. If the content is short — a brief info panel, a couple of links, a haiku about your return policy — just leave scrollable container disabled. The content will render at its natural height within the portal layout. No scrollbar, no wrapper, no unnecessary complexity.
+
+<Separator className="my-8" />
+
+## Endpoint Ordering
+
+Endpoints appear in the Customer Portal sidebar in the order you define them. The admin interface shows up/down arrow buttons next to each endpoint — click to reposition. Changes are saved immediately via the REST API, so there's no separate "save order" button to forget about.
+
+The order is relative to other Portal Extender endpoints. FluentCart's built-in endpoints (Orders, Subscriptions, Addresses, etc.) maintain their own positions — your custom endpoints slot in after them.
+
+<Separator className="my-8" />
+
+## Active / Inactive Toggle
+
+Each endpoint has a status toggle in the endpoint list. This is a binary state — active or inactive — and it does exactly what you'd expect:
+
+| Status | Behaviour |
+|---|---|
+| **Active** | The endpoint is registered with FluentCart on page load and appears in the Customer Portal sidebar. Customers can see and navigate to it. |
+| **Inactive** | The endpoint is saved in the database but not registered with FluentCart. It does not appear in the portal sidebar. Invisible. Dormant. Waiting. |
+
+This is useful for drafting endpoints before publishing them. Build out a new portal page, preview it in the admin, and only flip it to active when you're satisfied. Or deactivate an endpoint temporarily without losing its configuration — because deleting things you might need later is a rookie move.
+
+<Separator className="my-8" />
+
+## Quick Reference
+
+<Accordions>
+<Accordion title="Icon Type Comparison">
+
+| Feature | SVG Code | Dashicon | Image URL |
+|---|---|---|---|
+| Scalability | Vector, infinite | Font-based, scales well | Depends on source image |
+| Theme-aware colour | Yes (`currentColor`) | Inherits WordPress styling | No (static image) |
+| Dark mode support | Automatic via `currentColor` | Automatic via font colour | Manual (use a transparent PNG) |
+| Extra assets loaded | None (inline) | None (built-in font) | HTTP request per icon |
+| Customisability | Full — any SVG you want | Limited to 29 curated icons | Full — any image you want |
+| Setup effort | Medium (need SVG markup) | Low (pick from dropdown) | Low (paste a URL) |
+
+</Accordion>
+<Accordion title="Scrollable Container Summary">
+
+| Mode | Height Calculation | Technology | Best For |
+|---|---|---|---|
+| Auto-fit Viewport | `viewport - offset - 24px` (min 200px) | JavaScript + resize/mutation observers | Dynamic content, unknown heights |
+| Fixed Height | User-defined (200-2000px, default 600px) | Pure CSS `max-height` | Known content dimensions |
+| Disabled | Natural content height | None | Short content that fits naturally |
+
+</Accordion>
+</Accordions>
