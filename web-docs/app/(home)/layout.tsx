@@ -45,6 +45,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
 						{ text: "Memberships", url: "/docs/fchub-memberships", icon: <Users size={16} /> },
 						{ text: "Portal Extender", url: "/docs/fchub-portal-extender", icon: <LayoutDashboard size={16} /> },
 						{ text: "WC Migrator", url: "/docs/wc-fc", icon: <ArrowRightLeft size={16} /> },
+						{ text: "Wishlist", url: "#", icon: <Heart size={16} /> },
 						{ text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
 						{ text: "FCHub Stream", url: "/docs/fchub-stream", icon: <SquarePlay size={16} /> },
 					],
@@ -91,6 +92,11 @@ export default function Layout({ children }: LayoutProps<"/">) {
 										WC Migrator
 										<Badge variant="secondary" className="ml-auto text-[10px] h-4">New</Badge>
 									</NavigationMenuLink>
+									<div className="flex items-center gap-1.5 rounded-sm p-2 text-sm text-muted-foreground/50 pointer-events-none [&_svg:not([class*='size-'])]:size-4">
+										<Heart size={16} />
+										Wishlist
+										<Badge variant="secondary" className="ml-auto text-[10px] h-4 opacity-60">Soon</Badge>
+									</div>
 								</div>
 								<div className="space-y-1 p-2">
 									<div className="px-2 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">

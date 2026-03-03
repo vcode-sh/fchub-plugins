@@ -9,6 +9,7 @@ import {
 	CreditCard,
 	Download,
 	Home,
+	Heart,
 	LayoutDashboard,
 	MessageSquare,
 	Receipt,
@@ -105,6 +106,13 @@ const cartPlugins: Plugin[] = [
 		downloadUrl: `${GITHUB_REPO}/releases/tag/fchub-portal-extender/v1.0.0`,
 	},
 	{
+		title: "Wishlist",
+		description: "Wishlists for FluentCart. Let customers hoard things they'll never buy.",
+		icon: Heart,
+		docsHref: "/docs/fchub-wishlist",
+		comingSoon: true,
+	},
+	{
 		title: "WC Migrator",
 		description:
 			"Products, orders, subscriptions, customers. Your WooCommerce escape hatch.",
@@ -156,7 +164,7 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
 
 	if (plugin.comingSoon) {
 		return (
-			<Card className="opacity-50 gap-0 py-0">
+			<Card className="h-full gap-0 py-0 opacity-50 pointer-events-none">
 				<CardHeader className="bg-muted/50 rounded-t-xl py-3">
 					<div className="flex items-center gap-2">
 						<Icon className="size-4" />
@@ -164,9 +172,19 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
 						<Badge variant="secondary">Coming Soon</Badge>
 					</div>
 				</CardHeader>
-				<CardContent className="py-4">
+				<CardContent className="pt-4 pb-6">
 					<CardDescription>{plugin.description}</CardDescription>
 				</CardContent>
+				<CardFooter className="gap-2 mt-auto justify-end bg-muted/50 rounded-b-xl py-3">
+					<Button variant="secondary" size="xs" disabled>
+						<BookOpen />
+						Docs
+					</Button>
+					<Button variant="outline" size="xs" disabled>
+						<Download />
+						Download
+					</Button>
+				</CardFooter>
 			</Card>
 		);
 	}
