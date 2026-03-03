@@ -54,11 +54,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64,amd64
-
       - name: Prepare Docker tags
         id: docker_meta
         uses: docker/metadata-action@v5
@@ -88,7 +83,7 @@ jobs:
         with:
           context: ./fluentcart-mcp
           file: ./fluentcart-mcp/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.docker_meta.outputs.tags }}
           cache-from: type=local,src=/tmp/cache/buildx
