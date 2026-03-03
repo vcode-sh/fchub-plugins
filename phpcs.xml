@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<ruleset name="FCHub Monorepo Defaults">
+	<description>Shared baseline for all FCHub plugins — IDE auto-detection fallback</description>
+
+	<!-- Scan nothing by default; per-plugin configs define their own <file> -->
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+
+	<!-- BASE: PSR-12 -->
+	<rule ref="PSR12">
+		<exclude name="PSR1.Files.SideEffects.FoundWithSymbols"/>
+	</rule>
+
+	<!-- 160-char lines (matches all plugin configs) -->
+	<rule ref="Generic.Files.LineLength">
+		<properties>
+			<property name="lineLimit" value="160"/>
+			<property name="absoluteLineLimit" value="0"/>
+		</properties>
+	</rule>
+
+	<!-- WordPress security rules -->
+	<rule ref="WordPress.DB.PreparedSQL">
+		<exclude name="WordPress.DB.PreparedSQL.InterpolatedNotPrepared"/>
+	</rule>
+	<rule ref="WordPress.DB.PreparedSQLPlaceholders"/>
+	<rule ref="WordPress.Security.EscapeOutput"/>
+	<rule ref="WordPress.Security.ValidatedSanitizedInput"/>
+	<rule ref="WordPress.Security.NonceVerification"/>
+	<rule ref="WordPress.WP.AlternativeFunctions"/>
+	<rule ref="WordPress.PHP.DiscouragedPHPFunctions"/>
+	<rule ref="WordPress.PHP.DevelopmentFunctions"/>
+	<rule ref="WordPress.PHP.StrictInArray"/>
+</ruleset>
