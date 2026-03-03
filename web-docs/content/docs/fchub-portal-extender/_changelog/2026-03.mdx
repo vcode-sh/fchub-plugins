@@ -1,0 +1,44 @@
+### v1.0.2
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.2)
+
+Minimum PHP bumped to 8.1, minimum WordPress to 6.4. Functionally identical to v1.0.1. Your portal pages still work exactly the same — we just stopped pretending PHP 7.4 was acceptable.
+
+<Separator className="my-8" />
+
+### v1.0.1
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.1)
+
+First release under the monorepo slash-tag convention. The plugin didn't change. The tag format did. Milestones come in all shapes and sizes.
+
+<Separator className="my-8" />
+
+### v1.0.0
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.0)
+
+The initial release. FluentCart's customer portal is useful — but it only shows what FluentCart decides to show. This plugin adds custom pages to it, no PHP required. Build a "Manage Subscription" page with an embedded form. Add a help centre link. Stick a shortcode in there. Whatever your portal is missing, you can probably add it now.
+
+#### Content sources
+
+Six ways to populate a custom portal page:
+
+| Source | What it renders |
+|--------|----------------|
+| WordPress Page | Renders an existing page by ID — content, blocks, the lot |
+| Shortcode | Any shortcode, executed in portal context |
+| HTML | Raw HTML, for when you know exactly what you want |
+| iframe | Embed external tools, forms, or dashboards |
+| Redirect | Sends the user somewhere else — portal page as a nav shortcut |
+| Post / CPT | Any post or custom post type by ID |
+
+#### Icons and display
+
+Three icon types for your custom nav entries: SVG (inline), Dashicons (WordPress native), or image URL. Supports dark mode out of the box — icons and labels adapt without extra configuration.
+
+Reorder portal pages via drag-and-drop. Toggle endpoints active or inactive without deleting them. Slugs auto-generate from the page title, or set your own.
+
+#### Cleanup
+
+Full uninstall cleanup. When you remove the plugin, it removes its database entries. No ghost data lingering in your wp_options.

@@ -1,92 +1,15 @@
 ---
 title: Changelog
-description: Version history and release notes for the FCHub Przelewy24 plugin.
+description: Every release, every fix, every time we touched the thing.
 ---
 
-import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
-import { Badge } from '@/components/ui/badge';
+import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-All notable changes to FCHub Przelewy24 are documented here.
+What changed, when, and whether it actually affects you.
 
-<Separator className="my-4" />
+---
 
-## v1.0.0 <Badge variant="outline">Initial Release</Badge>
+## March 2026
 
-The first public release of FCHub Przelewy24 — a Przelewy24 payment gateway for FluentCart.
-
-### Payment Processing
-
-- **Transaction registration** with the Przelewy24 REST API (`/api/v1/transaction/register`)
-- **IPN webhook handling** with full SHA-384 signature verification
-- **Transaction verification** via the P24 verify endpoint (`PUT /api/v1/transaction/verify`)
-- **Redirect-based payment flow** — customers pay on the Przelewy24 hosted page
-- **Idempotent IPN processing** — duplicate notifications are handled gracefully
-- **Amount and currency validation** on incoming IPN notifications
-
-### Payment Channels
-
-- Credit and debit cards (Visa, Mastercard, Apple Pay, Google Pay)
-- BLIK mobile payments
-- Online bank transfers (fast transfers and e-transfers)
-- Digital wallets (PayPal, SkyCash)
-- Traditional bank wire transfers
-- Installment payments (requires separate P24 agreement)
-- 24/7 payment method filtering
-- Configurable channel bitmask sent with each transaction
-
-### Refunds
-
-- **Admin-initiated refunds** from the FluentCart order panel
-- **P24 refund API integration** (`POST /api/v1/transaction/refund`)
-- **Refund notification processing** with separate signature verification
-- Support for partial refunds
-- Refund status tracking (completed / rejected)
-
-### Subscription Billing
-
-- **Card-on-file recurring payments** via Przelewy24's `methodRefId` system
-- **Automatic card tokenization** after initial subscription payment
-- **Action Scheduler integration** for background renewal processing (`fchub_p24_process_renewal`)
-- **Retry logic** with 3 attempts at escalating delays (4h, 24h, 72h)
-- **Status transitions** — active, failing, expired
-- **Subscription operations** — cancel, pause, resume, cancel auto-renewal, plan change
-- Card info storage (mask, type, expiry) on subscription meta
-
-### Configuration
-
-- Separate credential fields for live and sandbox environments
-- `wp-config.php` constants for hardcoding credentials (8 constants total)
-- Payment channel toggles for granular control
-- Configurable payment time limit (0–60 minutes)
-- Card recurring payments toggle
-- Automatic API connection test on settings save
-
-### Checkout Experience
-
-- Dynamic payment method loading from the P24 API
-- Grouped payment method display (BLIK, cards, transfers, wallets)
-- Language-aware method names (Polish and English)
-- Payment method caching (1 hour) for performance
-- Localized checkout strings
-
-### Technical
-
-- FluentCart `AbstractPaymentGateway` implementation
-- SHA-384 signature generation and verification for all API interactions
-- Basic authentication for P24 API requests (Shop ID + API Key)
-- Transaction UUID fallback for FluentCart checkout retry edge case
-- Receipt page redirect fix for UUID regeneration
-- PSU (Payment Service User) data forwarding (IP, User-Agent)
-- Cart payload support via `fchub_p24_enable_cart_payload` filter (opt-in)
-- Customer data forwarding (name, address, phone, city, zip)
-- Full uninstall cleanup (settings, transients, Action Scheduler entries, order meta)
-
-### Supported Languages
-
-Payment page language auto-detected from WordPress locale. Supported: `bg`, `cs`, `de`, `en`, `es`, `fr`, `hr`, `hu`, `it`, `nl`, `pl`, `pt`, `se`, `sk`, `ro`.
-
-### Known Limitations
-
-- Card update for existing subscriptions is not supported (cancel and resubscribe required)
-- No remote subscription state sync (P24 doesn't have a subscription model — renewals are managed locally)
+<include>./_changelog/2026-03.mdx</include>

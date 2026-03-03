@@ -1,0 +1,84 @@
+### v1.0.2
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.0.2)
+
+PHP 8.1 and WordPress 6.4 are now the minimums. PHP 7.4 has been retired with all the fanfare it deserves. No functional changes — your invoices still work exactly as before.
+
+<Separator className="my-8" />
+
+### v1.0.1
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.0.1)
+
+Version bump only. First release under the monorepo tag convention. The plugin itself is unchanged; the CI pipeline just needed a properly tagged release.
+
+<Separator className="my-8" />
+
+### v1.0.0
+
+*Released 2 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia-v1.0.0)
+
+Initial release of FCHub Fakturownia. FluentCart order gets paid → invoice appears in Fakturownia. That's the pitch. There's rather more going on under the bonnet.
+
+#### Automatic invoicing
+
+When an order is paid in FluentCart, an invoice is created in Fakturownia without you having to do anything. Several invoice types are supported:
+
+| Type | When to use |
+|------|-------------|
+| VAT invoice | Standard — for most businesses |
+| Proforma | Issued before payment is confirmed |
+| Bill (rachunek) | For sellers not registered for VAT |
+
+Invoices are created only once per order — duplicate prevention is built in. Polish VAT rates (0%, 5%, 8%, 23%, exempt) are detected and mapped automatically. Prices are converted from FluentCart's internal format to whatever Fakturownia expects without any manual intervention.
+
+**Invoice language options:** Polish, English, German, French, bilingual PL/EN.
+
+#### B2B and B2C invoices
+
+Customers who need a company invoice can tick "I want a company invoice" at checkout, which reveals a NIP (Polish tax ID) field. The NIP is validated client-side (checksum check) before the order goes through.
+
+- B2B invoices include the customer's company name and NIP
+- B2C invoices go out as standard consumer documents
+- The checkout field initialises correctly even with FluentCart's dynamic rendering
+
+#### KSeF 2.0
+
+Poland's national e-invoicing system. If you need it, it's here.
+
+- Invoices submitted to KSeF automatically after creation
+- Status is checked asynchronously — WordPress cron polls for the result
+- KSeF ID and verification link are stored on the order once confirmed
+- Status visible in the order admin panel with colour-coded labels
+
+Correction invoices (see below) are also submitted to KSeF when auto-send is enabled.
+
+<Callout type="info">
+  KSeF submission is optional. You can leave it off until you actually need it.
+</Callout>
+
+#### Correction invoices on refund
+
+When you issue a refund in FluentCart, a correction invoice is created in Fakturownia and linked to the original. Duplicate corrections are prevented. KSeF submission for corrections follows the same auto-send setting as regular invoices.
+
+#### Order admin panel
+
+From the FluentCart order screen you can see:
+
+- Invoice number with a direct link into Fakturownia
+- PDF download link
+- KSeF status (with colour-coded label)
+- Correction invoice details if a refund was issued
+- An order log entry for every invoice operation (created, submitted, error)
+
+#### Configuration
+
+Settings live inside FluentCart's integration panel. You can configure invoice type, payment method, language, KSeF, and NIP behaviour without touching code.
+
+Credentials (API domain, token, department ID) can be set via `wp-config.php` constants if you'd rather not store them in the database.
+
+Connection is tested automatically when you save settings.
+
+#### Full uninstall
+
+Deactivating clears the cron jobs. Deleting the plugin removes all settings and order metadata. Fakturownia invoices already created are unaffected — those live on their servers, not yours.

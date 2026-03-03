@@ -1,0 +1,76 @@
+### v1.0.2
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.0.2)
+
+Minimum PHP bumped to 8.1, minimum WordPress to 6.4. If you're running older versions — not our problem, but also sort of our problem now. No functional changes.
+
+<Separator className="my-8" />
+
+### v1.0.1
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.0.1)
+
+Version bump. First release under the monorepo slash-tag convention. Nothing changed except the number, which felt important enough to tag anyway.
+
+<Separator className="my-8" />
+
+### v1.0.0
+
+*Released 2 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships-v1.0.0)
+
+The initial release. A complete membership system built on top of FluentCart — plans, content protection, drip scheduling, trials, emails, and more third-party integrations than your theme has shortcodes. Built for stores that want to sell access, not just products.
+
+#### Plans and access control
+
+Create membership plans with durations (lifetime, fixed days, or mirrors a subscription), optional trial periods, and grace periods for when payments inevitably get complicated. Plans support hierarchy — higher tiers can include everything lower tiers get without duplicating rules. Duplicate plans, schedule activation dates, and configure exactly what happens when a membership ends.
+
+| Feature | What you get |
+|---------|-------------|
+| Plan durations | Lifetime, fixed days, subscription mirror |
+| Trial periods | Configurable per plan, auto-converts or auto-expires |
+| Grace periods | For cancellations and failed renewals |
+| Plan hierarchy | Higher tiers can include lower tier content |
+| Custom restrictions | Per-plan messages and redirect URLs |
+
+#### Content protection
+
+Lock down content without writing a line of PHP. Protect posts, pages, custom post types, categories, tags, and custom taxonomies. Hide nav menu items from non-members. Block URL patterns with exact, prefix, or regex matching. Add teasers — excerpt, first N words, custom text — so visitors know what they're missing.
+
+Archive filtering keeps protected posts out of search results and feeds. The REST API respects protection too, so headless setups don't accidentally leak members-only content.
+
+#### Drip content
+
+Unlock content on a schedule. Either X days after a member joins, or on a fixed calendar date. Members get email notifications when content unlocks. Admin views include a drip timeline and calendar so you can see what unlocks when without squinting at a spreadsheet.
+
+#### Trials
+
+Configurable trial periods per plan. When a payment is confirmed, the trial converts automatically. When it isn't, it expires automatically. Either way, the cron job handles it — you don't have to.
+
+#### Email notifications
+
+Eight transactional emails covering the full membership lifecycle: access granted, access revoked, access expiring, drip content unlocked, membership paused, membership resumed, trial converted, trial expiring. HTML templates with smart codes, async delivery, and individual enable/disable toggles per type.
+
+#### Integrations
+
+| Integration | What it does |
+|-------------|-------------|
+| FluentCart | Triggered by order events — grants and revokes access, mirrors subscription state, auto-creates WP users |
+| FluentCRM | 15 automation triggers, 7 actions, 7 benchmarks, 25+ smart codes, contact profile section, segment filters |
+| FluentCommunity | Auto-adds/removes members from spaces and groups, badge assignment and revocation |
+| LearnDash | Course and lesson access through plan rules |
+
+#### Analytics
+
+Overview dashboard with active member count, churn rate, new and churned members this month. Charts for member growth over 30 days, 6 months, and 12 months. Plan distribution, churn analysis, revenue by plan, and content popularity. Numbers aggregate daily — no live query hammering your database.
+
+#### Frontend
+
+Four shortcodes and two Gutenberg blocks for displaying membership status, restricting inline content, showing drip progress, and listing a user's active memberships. A member account page with content library and access history. CSS included, fully overridable.
+
+#### Developer tools
+
+Full REST API for plans, members, content rules, drip, reports, settings, and import. WP-CLI commands for everything from bulk grants to debug output. Five webhook events with HMAC-SHA256 signatures and async delivery. CSV import with parsers for generic and PMPro formats.
+
+<Callout type="info">
+  The WP-CLI `backfill` and `sync` commands are useful when migrating from another membership plugin. The import tool handles generic CSV and PMPro exports.
+</Callout>

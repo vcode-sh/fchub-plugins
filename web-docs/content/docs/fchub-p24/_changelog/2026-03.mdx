@@ -1,0 +1,73 @@
+### v1.0.2
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.2)
+
+PHP 7.4 is no longer PHP. Minimum requirements bumped to PHP 8.1 and WordPress 6.4. No functional changes — if your site was already running a setup from this decade, you're fine.
+
+<Separator className="my-8" />
+
+### v1.0.1
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.1)
+
+Version bump only. First release under the monorepo tag convention. Nothing changed except the number on the tin.
+
+<Separator className="my-8" />
+
+### v1.0.0
+
+*Released 2 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24-v1.0.0)
+
+First public release of FCHub Przelewy24. Take Przelewy24 payments inside FluentCart — cards, BLIK, bank transfers, wallets, instalments — the lot.
+
+#### Payment methods
+
+Everything P24 supports, available at checkout:
+
+| Method | Notes |
+|--------|-------|
+| Credit & debit cards | Visa, Mastercard, Apple Pay, Google Pay |
+| BLIK | Polish mobile payments, beloved by anyone who's used it |
+| Online bank transfers | Fast transfers and e-transfers |
+| Digital wallets | PayPal, SkyCash |
+| Traditional bank wire | For the patient |
+| Instalment payments | Requires a separate agreement with P24 |
+
+Payment methods load dynamically from the P24 API and are grouped sensibly at checkout. Language-aware labels in Polish and English. Method list is cached for an hour so every page load doesn't phone home.
+
+#### Refunds
+
+Refunds initiated from the FluentCart order panel are forwarded to P24 automatically. Partial refunds are supported. You'll see the status (completed or rejected) without leaving the order screen.
+
+#### Subscription billing
+
+Recurring payments work via card-on-file: after the first subscription payment, the card is tokenised and future renewals charge automatically in the background.
+
+- 3 retry attempts at 4h, 24h, and 72h delays if a renewal fails
+- Subscription operations supported: cancel, pause, resume, cancel auto-renewal, plan change
+- Card details (masked number, type, expiry) stored on the subscription
+
+<Callout type="warn">
+  Card updates for existing subscriptions are not supported. If a customer needs to change their card, they'll need to cancel and resubscribe.
+</Callout>
+
+#### Configuration
+
+- Separate credential sets for live and sandbox environments
+- Credentials can be hardcoded via `wp-config.php` constants (8 constants total) — useful if you'd rather not store them in the database
+- Payment channel toggles for granular control over what appears at checkout
+- Configurable payment time limit (0–60 minutes)
+- Toggle for card recurring payments
+- Connection test runs automatically when you save settings
+
+#### Checkout experience
+
+- Payment methods load from the P24 API per checkout session
+- Grouped display: BLIK, cards, transfers, wallets
+- Payment page language auto-detected from your WordPress locale
+
+**Supported payment page languages:** `bg`, `cs`, `de`, `en`, `es`, `fr`, `hr`, `hu`, `it`, `nl`, `pl`, `pt`, `se`, `sk`, `ro`
+
+#### Full uninstall
+
+Deleting the plugin cleans up after itself: settings, cached data, scheduled jobs, and all order metadata are removed.

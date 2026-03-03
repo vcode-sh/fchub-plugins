@@ -11,6 +11,7 @@
     "migration-guide",
     "rollback",
     "---Reference---",
-    "troubleshooting"
+    "troubleshooting",
+    "changelog"
   ]
 }

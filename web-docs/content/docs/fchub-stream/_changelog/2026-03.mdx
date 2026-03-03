@@ -1,0 +1,75 @@
+### v1.0.1
+
+*Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-stream/v1.0.1)
+
+Version bump. First release under the monorepo slash-tag convention. Nothing changed in the code. PHP 8.3+ and WordPress 6.7+ requirements unchanged.
+
+<Separator className="my-8" />
+
+### v1.0.0
+
+*Released 2 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-stream-v1.0.0)
+
+The open source release. Free. GPLv2. No license keys. No telemetry. No paywalls. Just video uploads for FluentCommunity — because the WordPress media library and video have never been friends.
+
+#### Video uploads
+
+Drag and drop video files in the FluentCommunity post composer. They upload directly to your video provider — the WordPress media library is not involved. That's the whole point.
+
+- Real-time progress bar with speed estimates
+- Delete the post and the video deletes from the provider too
+- Works in both posts and comments
+- Supported formats: MP4, MOV, AVI, WebM — the provider handles transcoding
+
+#### Two video providers
+
+| Provider | Status |
+|----------|--------|
+| **Cloudflare Stream** | Full support — upload, playback, encoding webhooks, automatic cleanup |
+| **Bunny.net Stream** | Full support — upload, playback, automatic cleanup |
+
+Switch between providers in admin settings without losing your mind.
+
+#### Floating video player
+
+Playing videos follow you when you scroll past them. Picture-in-picture for people who scroll.
+
+- Drag it anywhere on screen. Resize from the corners. Always 16:9. Cannot escape viewport.
+- Position and size saved to localStorage — come back and it's exactly where you left it.
+- Only one video plays at a time. Starting a second pauses the first. Crowd control for your feed.
+- Close button stops playback and removes the player. No phantom floating videos.
+
+#### Upload controls
+
+All configurable in admin settings:
+
+- Maximum file size
+- Maximum video duration
+- Allowed formats
+- Per-post and per-comment upload toggles
+
+#### Encoding reliability
+
+Cloudflare says a video is "ready" when encoding reaches 40%. That is not ready. The plugin:
+
+- Waits for 100% encoding completion
+- Probes the manifest URL (HEAD request, HTTP 200 required) before rendering the player
+- Updates the database when confirmed ready — page refreshes show the player immediately, no encoding flash
+- Handles expired WordPress nonces during long encoding sessions (15+ minutes) gracefully
+- Polling continues through 401/403 errors and gives up only after 5 consecutive failures
+
+#### Dark mode
+
+Upload modal inherits FluentCommunity's theme. Because uploading videos at 2am in blinding white was never the vibe.
+
+#### What was removed (compared to proprietary beta)
+
+- License system — gone. Settings work immediately on install.
+- All telemetry (Sentry, PostHog) — gone. Zero tracking. Zero phone-home.
+- Tamper detection — gone. Open source means you can modify it.
+- Plugin update checker — gone. Updates come from [GitHub Releases](https://github.com/vcode-sh/fchub-plugins/releases).
+- Admin app bundle reduced from 322KB to 197KB. Less code. Same features.
+
+<Callout type="info">
+**Requirements:** WordPress 6.7+, PHP 8.3+, FluentCommunity active, and a Cloudflare Stream or Bunny.net account.
+</Callout>

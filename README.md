@@ -6,14 +6,14 @@ FluentCart and FluentCommunity plugins that actually do things WordPress forgot 
 
 ## Plugins
 
-| Plugin | What it does | Version |
-|--------|-------------|---------|
-| [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway — because Stripe doesn't speak Polish | 1.0.0 |
-| [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 — automate paperwork before the tax office automates you | 1.0.0 |
-| [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling — 15k lines of PHP and Vue so people can pay to read your blog | 1.0.0 |
-| [fchub-portal-extender](plugins/fchub-portal-extender/) | Custom portal pages without writing PHP — because not everyone wants to be a developer | 1.0.0 |
-| [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net — because the WP media library and video is a war crime | 1.0.0 |
-| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — products, orders, subscriptions, customers, coupons. Your escape hatch | 1.0.0 |
+| Plugin | What it does |
+|--------|-------------|
+| [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway — because Stripe doesn't speak Polish |
+| [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 — automate paperwork before the tax office automates you |
+| [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling — 15k lines of PHP and Vue so people can pay to read your blog |
+| [fchub-portal-extender](plugins/fchub-portal-extender/) | Custom portal pages without writing PHP — because not everyone wants to be a developer |
+| [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net — because the WP media library and video is a war crime |
+| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — products, orders, subscriptions, customers, coupons. Your escape hatch |
 
 All require [FluentCart](https://fluentcart.com) except fchub-stream which needs [FluentCommunity](https://fluentcommunity.com). WordPress 6.5+. PHP 8.3+.
 
