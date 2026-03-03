@@ -49,6 +49,18 @@ class EndpointController
             'callback'            => [self::class, 'searchPages'],
             'permission_callback' => [self::class, 'checkPermission'],
         ]);
+
+        register_rest_route(self::NAMESPACE, '/post-types', [
+            'methods'             => 'GET',
+            'callback'            => [self::class, 'listPostTypes'],
+            'permission_callback' => [self::class, 'checkPermission'],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/posts', [
+            'methods'             => 'GET',
+            'callback'            => [self::class, 'searchPosts'],
+            'permission_callback' => [self::class, 'checkPermission'],
+        ]);
     }
 
     public static function checkPermission(): bool
@@ -172,5 +184,60 @@ class EndpointController
         return new \WP_REST_Response([
             'pages' => $pages,
         ]);
+    }
+
+    public static function listPostTypes(): \WP_REST_Response
+    {
+        $types = get_post_types(['public' => true], 'objects');
+        $result = [];
+
+        foreach ($types as $type) {
+            if ($type->name === 'attachment') {
+                continue;
+            }
+
+            $result[] = [
+                'name'  => $type->name,
+                'label' => $type->labels->singular_name ?: $type->name,
+            ];
+        }
+
+        return new \WP_REST_Response(['post_types' => $result]);
+    }
+
+    public static function searchPosts(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $postType = sanitize_text_field($request->get_param('post_type') ?? 'post');
+        $search = sanitize_text_field($request->get_param('search') ?? '');
+
+        $typeObj = get_post_type_object($postType);
+
+        if (!$typeObj || !$typeObj->public) {
+            return new \WP_REST_Response(['posts' => []]);
+        }
+
+        $args = [
+            'post_type'      => $postType,
+            'post_status'    => 'publish',
+            'posts_per_page' => 20,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+        ];
+
+        if (!empty($search)) {
+            $args['s'] = $search;
+        }
+
+        $query = new \WP_Query($args);
+        $posts = [];
+
+        foreach ($query->posts as $post) {
+            $posts[] = [
+                'id'    => $post->ID,
+                'title' => $post->post_title ?: __('(no title)', 'fchub-portal-extender'),
+            ];
+        }
+
+        return new \WP_REST_Response(['posts' => $posts]);
     }
 }

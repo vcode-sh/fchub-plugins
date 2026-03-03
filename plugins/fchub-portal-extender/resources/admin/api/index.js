@@ -55,3 +55,11 @@ export const endpoints = {
 export const pages = {
   search: (search) => api.get('pages', { search }),
 }
+
+export const postTypes = {
+  list: () => api.get('post-types'),
+}
+
+export const posts = {
+  search: (postType, search) => api.get('posts', { post_type: postType, search }),
+}

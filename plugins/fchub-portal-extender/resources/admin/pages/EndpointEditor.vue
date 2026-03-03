@@ -53,6 +53,10 @@
             <el-radio-group v-model="form.type">
               <el-radio-button value="page_id">WordPress Page</el-radio-button>
               <el-radio-button value="shortcode">Shortcode</el-radio-button>
+              <el-radio-button value="html">HTML / Custom Code</el-radio-button>
+              <el-radio-button value="iframe">External URL (iframe)</el-radio-button>
+              <el-radio-button value="redirect">Redirect / Link</el-radio-button>
+              <el-radio-button value="custom_post">Post / CPT</el-radio-button>
             </el-radio-group>
           </el-form-item>
 
@@ -82,9 +86,81 @@
             />
             <div class="field-tip">The shortcode will be rendered inside the portal layout.</div>
           </el-form-item>
+
+          <el-form-item v-if="form.type === 'html'" label="HTML Content" prop="html_content">
+            <el-input
+              v-model="form.html_content"
+              type="textarea"
+              :rows="10"
+              placeholder="Enter HTML content..."
+            />
+            <div class="field-tip">HTML, inline CSS and shortcodes are supported. Script tags are stripped for security.</div>
+          </el-form-item>
+
+          <el-form-item v-if="form.type === 'iframe'" label="URL" prop="iframe_url">
+            <el-input v-model="form.iframe_url" placeholder="https://example.com/page" />
+            <div class="field-tip">The external page will be embedded in an iframe inside the portal.</div>
+          </el-form-item>
+
+          <el-form-item v-if="form.type === 'iframe'" label="Iframe Height (px)">
+            <el-input-number
+              v-model="form.iframe_height"
+              :min="200"
+              :max="2000"
+              :step="50"
+            />
+          </el-form-item>
+
+          <el-form-item v-if="form.type === 'redirect'" label="Redirect URL" prop="redirect_url">
+            <el-input v-model="form.redirect_url" placeholder="https://example.com" />
+            <div class="field-tip">Users will be redirected to this URL when they click the menu item.</div>
+          </el-form-item>
+
+          <el-form-item v-if="form.type === 'redirect'" label="Open in New Tab">
+            <el-switch
+              v-model="form.redirect_new_tab"
+              active-text="New tab"
+              inactive-text="Same tab"
+            />
+          </el-form-item>
+
+          <el-form-item v-if="form.type === 'custom_post'" label="Post Type" prop="cpt_post_type">
+            <el-select
+              v-model="form.cpt_post_type"
+              placeholder="Select a post type..."
+              style="width: 100%"
+              @change="onPostTypeChange"
+            >
+              <el-option
+                v-for="pt in postTypeOptions"
+                :key="pt.name"
+                :label="pt.label"
+                :value="pt.name"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item v-if="form.type === 'custom_post' && form.cpt_post_type" label="Post" prop="cpt_post_id">
+            <el-select
+              v-model="form.cpt_post_id"
+              filterable
+              remote
+              :remote-method="searchCptPosts"
+              :loading="cptPostsLoading"
+              placeholder="Search for a post..."
+              style="width: 100%"
+            >
+              <el-option
+                v-for="p in cptPostOptions"
+                :key="p.id"
+                :label="p.title"
+                :value="p.id"
+              />
+            </el-select>
+          </el-form-item>
         </div>
 
-        <div class="form-section">
+        <div v-if="form.type !== 'redirect'" class="form-section">
           <h3 class="form-section-title">Display</h3>
 
           <el-form-item label="Scrollable Container">
@@ -202,7 +278,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { endpoints as endpointsApi, pages as pagesApi } from '@/api/index.js'
+import { endpoints as endpointsApi, pages as pagesApi, postTypes as postTypesApi, posts as postsApi } from '@/api/index.js'
 
 const props = defineProps({
   isNew: { type: Boolean, default: false },
@@ -215,6 +291,9 @@ const saving = ref(false)
 const loadingEndpoint = ref(false)
 const pagesLoading = ref(false)
 const pageOptions = ref([])
+const postTypeOptions = ref([])
+const cptPostOptions = ref([])
+const cptPostsLoading = ref(false)
 const slugManuallyEdited = ref(false)
 
 const form = reactive({
@@ -223,6 +302,13 @@ const form = reactive({
   type: 'page_id',
   page_id: null,
   shortcode: '',
+  html_content: '',
+  iframe_url: '',
+  iframe_height: 600,
+  redirect_url: '',
+  redirect_new_tab: false,
+  cpt_post_type: '',
+  cpt_post_id: null,
   icon_type: 'svg',
   icon_value: '',
   statusActive: true,
@@ -256,6 +342,56 @@ const rules = {
       }
     },
     trigger: 'blur',
+  }],
+  html_content: [{
+    validator: (rule, value, callback) => {
+      if (form.type === 'html' && !value) {
+        callback(new Error('Please enter HTML content'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'blur',
+  }],
+  iframe_url: [{
+    validator: (rule, value, callback) => {
+      if (form.type === 'iframe' && !value) {
+        callback(new Error('Please enter a URL'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'blur',
+  }],
+  redirect_url: [{
+    validator: (rule, value, callback) => {
+      if (form.type === 'redirect' && !value) {
+        callback(new Error('Please enter a redirect URL'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'blur',
+  }],
+  cpt_post_type: [{
+    validator: (rule, value, callback) => {
+      if (form.type === 'custom_post' && !value) {
+        callback(new Error('Please select a post type'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'change',
+  }],
+  cpt_post_id: [{
+    validator: (rule, value, callback) => {
+      if (form.type === 'custom_post' && !value) {
+        callback(new Error('Please select a post'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'change',
   }],
 }
 
@@ -303,6 +439,36 @@ function onTitleInput() {
   }
 }
 
+async function fetchPostTypes() {
+  try {
+    const res = await postTypesApi.list()
+    postTypeOptions.value = res.post_types || []
+  } catch {
+    postTypeOptions.value = []
+  }
+}
+
+function onPostTypeChange() {
+  form.cpt_post_id = null
+  cptPostOptions.value = []
+  if (form.cpt_post_type) {
+    searchCptPosts('')
+  }
+}
+
+async function searchCptPosts(query) {
+  if (!form.cpt_post_type) return
+  cptPostsLoading.value = true
+  try {
+    const res = await postsApi.search(form.cpt_post_type, query || '')
+    cptPostOptions.value = res.posts || []
+  } catch {
+    cptPostOptions.value = []
+  } finally {
+    cptPostsLoading.value = false
+  }
+}
+
 async function searchPages(query) {
   pagesLoading.value = true
   try {
@@ -334,6 +500,13 @@ async function loadEndpoint(id) {
     form.icon_type = ep.icon_type || 'svg'
     form.icon_value = ep.icon_value || ''
     form.statusActive = ep.status === 'active'
+    form.html_content = ep.html_content || ''
+    form.iframe_url = ep.iframe_url || ''
+    form.iframe_height = ep.iframe_height || 600
+    form.redirect_url = ep.redirect_url || ''
+    form.redirect_new_tab = !!ep.redirect_new_tab
+    form.cpt_post_type = ep.cpt_post_type || ''
+    form.cpt_post_id = ep.cpt_post_id || null
     form.scroll_enabled = !!ep.scroll_enabled
     form.scroll_mode = ep.scroll_mode || 'auto'
     form.scroll_height = ep.scroll_height || 600
@@ -346,6 +519,17 @@ async function loadEndpoint(id) {
       // If the current page isn't in the initial list, add it
       if (!pageOptions.value.find(p => p.id === ep.page_id)) {
         pageOptions.value.unshift({ id: ep.page_id, title: `Page #${ep.page_id}` })
+      }
+    }
+
+    // Pre-load CPT post options when editing a custom_post endpoint
+    if (ep.type === 'custom_post' && ep.cpt_post_type) {
+      if (ep.cpt_post_id) {
+        const postsRes = await postsApi.search(ep.cpt_post_type, '')
+        cptPostOptions.value = postsRes.posts || []
+        if (!cptPostOptions.value.find(p => p.id === ep.cpt_post_id)) {
+          cptPostOptions.value.unshift({ id: ep.cpt_post_id, title: `Post #${ep.cpt_post_id}` })
+        }
       }
     }
   } catch (e) {
@@ -372,10 +556,17 @@ async function save() {
     type: form.type,
     page_id: form.type === 'page_id' ? form.page_id : 0,
     shortcode: form.type === 'shortcode' ? form.shortcode : '',
+    html_content: form.type === 'html' ? form.html_content : '',
+    iframe_url: form.type === 'iframe' ? form.iframe_url : '',
+    iframe_height: form.type === 'iframe' ? form.iframe_height : 600,
+    redirect_url: form.type === 'redirect' ? form.redirect_url : '',
+    redirect_new_tab: form.type === 'redirect' ? form.redirect_new_tab : false,
+    cpt_post_type: form.type === 'custom_post' ? form.cpt_post_type : '',
+    cpt_post_id: form.type === 'custom_post' ? form.cpt_post_id : 0,
     icon_type: form.icon_type,
     icon_value: form.icon_value,
     status: form.statusActive ? 'active' : 'inactive',
-    scroll_enabled: form.scroll_enabled,
+    scroll_enabled: form.type !== 'redirect' ? form.scroll_enabled : false,
     scroll_mode: form.scroll_mode,
     scroll_height: form.scroll_height,
   }
@@ -397,6 +588,7 @@ async function save() {
 }
 
 onMounted(() => {
+  fetchPostTypes()
   if (!props.isNew && route.params.id) {
     loadEndpoint(route.params.id)
   } else {

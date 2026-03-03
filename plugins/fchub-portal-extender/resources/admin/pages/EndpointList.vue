@@ -54,8 +54,8 @@
 
         <el-table-column label="Type" width="120">
           <template #default="{ row }">
-            <el-tag :type="row.type === 'page_id' ? '' : 'warning'" size="small">
-              {{ row.type === 'page_id' ? 'Page' : 'Shortcode' }}
+            <el-tag :type="typeTag(row.type).type" size="small">
+              {{ typeTag(row.type).label }}
             </el-tag>
           </template>
         </el-table-column>
@@ -186,6 +186,18 @@ async function confirmDelete(row) {
   } catch {
     // User cancelled
   }
+}
+
+function typeTag(type) {
+  const map = {
+    page_id: { label: 'Page', type: '' },
+    shortcode: { label: 'Shortcode', type: 'warning' },
+    html: { label: 'HTML', type: 'success' },
+    iframe: { label: 'Iframe', type: 'info' },
+    redirect: { label: 'Redirect', type: 'danger' },
+    custom_post: { label: 'Post', type: '' },
+  }
+  return map[type] || { label: type, type: 'info' }
 }
 
 function getIconPreview(row) {

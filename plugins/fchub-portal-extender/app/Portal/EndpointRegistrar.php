@@ -59,6 +59,68 @@ class EndpointRegistrar
                         echo do_shortcode($shortcode);
                     };
                 }
+            } elseif ($endpoint['type'] === 'html' && !empty($endpoint['html_content'])) {
+                $htmlContent = $endpoint['html_content'];
+                if ($scrollEnabled) {
+                    $args['render_callback'] = function () use ($htmlContent, $scrollMode, $scrollHeight) {
+                        self::renderScrollWrapper($htmlContent, $scrollMode, $scrollHeight);
+                    };
+                } else {
+                    $args['render_callback'] = function () use ($htmlContent) {
+                        echo $htmlContent;
+                    };
+                }
+            } elseif ($endpoint['type'] === 'iframe' && !empty($endpoint['iframe_url'])) {
+                $iframeUrl = $endpoint['iframe_url'];
+                $iframeHeight = max(200, (int) ($endpoint['iframe_height'] ?? 600));
+                if ($scrollEnabled) {
+                    $args['render_callback'] = function () use ($iframeUrl, $iframeHeight, $scrollMode, $scrollHeight) {
+                        self::renderScrollWrapper(self::renderIframeHtml($iframeUrl, $iframeHeight), $scrollMode, $scrollHeight);
+                    };
+                } else {
+                    $args['render_callback'] = function () use ($iframeUrl, $iframeHeight) {
+                        echo self::renderIframeHtml($iframeUrl, $iframeHeight);
+                    };
+                }
+            } elseif ($endpoint['type'] === 'custom_post' && !empty($endpoint['cpt_post_id'])) {
+                $postId = (int) $endpoint['cpt_post_id'];
+                $postType = $endpoint['cpt_post_type'] ?? 'post';
+                if ($scrollEnabled) {
+                    $args['render_callback'] = function () use ($postId, $postType, $scrollMode, $scrollHeight) {
+                        self::renderPostContent($postId, $postType, $scrollMode, $scrollHeight);
+                    };
+                } else {
+                    $args['render_callback'] = function () use ($postId, $postType) {
+                        self::renderPostContent($postId, $postType);
+                    };
+                }
+            } elseif ($endpoint['type'] === 'redirect' && !empty($endpoint['redirect_url'])) {
+                $redirectUrl = $endpoint['redirect_url'];
+                $newTab = !empty($endpoint['redirect_new_tab']);
+                if ($newTab) {
+                    $args['render_callback'] = function () use ($redirectUrl) {
+                        printf(
+                            '<div style="padding:24px;text-align:center;">'
+                            . '<p style="margin-bottom:12px;">This link opens in a new tab.</p>'
+                            . '<a href="%s" target="_blank" rel="noopener noreferrer">Open link &rarr;</a>'
+                            . '</div>'
+                            . '<script>window.open(%s,"_blank","noopener,noreferrer");</script>',
+                            esc_url($redirectUrl),
+                            wp_json_encode($redirectUrl)
+                        );
+                    };
+                } else {
+                    $args['render_callback'] = function () use ($redirectUrl) {
+                        printf(
+                            '<div style="padding:24px;text-align:center;">'
+                            . '<p>Redirecting&hellip; <a href="%s">Click here</a> if you are not redirected.</p>'
+                            . '</div>'
+                            . '<script>window.location.href=%s;</script>',
+                            esc_url($redirectUrl),
+                            wp_json_encode($redirectUrl)
+                        );
+                    };
+                }
             } else {
                 continue;
             }
@@ -132,6 +194,36 @@ class EndpointRegistrar
         );
     }
 
+    private static function renderPostContent(int $postId, string $postType, string $scrollMode = '', int $maxHeight = 0): void
+    {
+        $query = new \WP_Query([
+            'post_type'      => $postType,
+            'post__in'       => [$postId],
+            'posts_per_page' => 1,
+            'orderby'        => 'post__in',
+        ]);
+
+        if ($query->have_posts()) {
+            ob_start();
+            while ($query->have_posts()) {
+                $query->the_post();
+                the_content();
+            }
+            wp_reset_postdata();
+            $content = ob_get_clean();
+
+            $wrapped = '<div class="fluent-cart-custom-page-content"><div>' . $content . '</div></div>';
+
+            if ($scrollMode && $maxHeight > 0) {
+                self::renderScrollWrapper($wrapped, $scrollMode, $maxHeight);
+            } else {
+                echo $wrapped;
+            }
+        } else {
+            echo '<p>' . esc_html__('No content found!', 'fluent-cart') . '</p>';
+        }
+    }
+
     private static function resolveIcon(array $endpoint): string
     {
         if ($endpoint['icon_type'] === 'dashicon') {
@@ -140,5 +232,14 @@ class EndpointRegistrar
         }
 
         return $endpoint['icon_value'];
+    }
+
+    private static function renderIframeHtml(string $url, int $height): string
+    {
+        return sprintf(
+            '<iframe src="%s" style="width:100%%;height:%dpx;border:none;display:block;" loading="lazy" allowfullscreen></iframe>',
+            esc_url($url),
+            $height
+        );
     }
 }

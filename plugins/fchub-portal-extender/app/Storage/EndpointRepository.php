@@ -70,7 +70,7 @@ class EndpointRepository
             'id'             => wp_generate_uuid4(),
             'slug'           => sanitize_title($data['slug']),
             'title'          => sanitize_text_field($data['title'] ?? ''),
-            'type'           => in_array($data['type'] ?? '', ['page_id', 'shortcode']) ? $data['type'] : 'page_id',
+            'type'           => in_array($data['type'] ?? '', ['page_id', 'shortcode', 'html', 'iframe', 'redirect', 'custom_post']) ? $data['type'] : 'page_id',
             'page_id'        => absint($data['page_id'] ?? 0),
             'shortcode'      => sanitize_text_field($data['shortcode'] ?? ''),
             'icon_type'      => in_array($data['icon_type'] ?? '', ['svg', 'dashicon', 'url']) ? $data['icon_type'] : 'svg',
@@ -80,6 +80,13 @@ class EndpointRepository
             'scroll_enabled' => !empty($data['scroll_enabled']),
             'scroll_mode'    => in_array($data['scroll_mode'] ?? '', ['auto', 'fixed']) ? $data['scroll_mode'] : 'auto',
             'scroll_height'  => absint($data['scroll_height'] ?? 600),
+            'html_content'   => wp_kses_post($data['html_content'] ?? ''),
+            'iframe_url'     => esc_url_raw($data['iframe_url'] ?? ''),
+            'iframe_height'  => absint($data['iframe_height'] ?? 600),
+            'redirect_url'   => esc_url_raw($data['redirect_url'] ?? ''),
+            'redirect_new_tab' => !empty($data['redirect_new_tab']),
+            'cpt_post_type'  => sanitize_text_field($data['cpt_post_type'] ?? ''),
+            'cpt_post_id'    => absint($data['cpt_post_id'] ?? 0),
             'created_at'     => $now,
             'updated_at'     => $now,
         ];
@@ -115,7 +122,7 @@ class EndpointRepository
             $endpoints[$index]['title'] = sanitize_text_field($data['title']);
         }
 
-        if (isset($data['type']) && in_array($data['type'], ['page_id', 'shortcode'])) {
+        if (isset($data['type']) && in_array($data['type'], ['page_id', 'shortcode', 'html', 'iframe', 'redirect', 'custom_post'])) {
             $endpoints[$index]['type'] = $data['type'];
         }
 
@@ -125,6 +132,34 @@ class EndpointRepository
 
         if (isset($data['shortcode'])) {
             $endpoints[$index]['shortcode'] = sanitize_text_field($data['shortcode']);
+        }
+
+        if (isset($data['html_content'])) {
+            $endpoints[$index]['html_content'] = wp_kses_post($data['html_content']);
+        }
+
+        if (isset($data['iframe_url'])) {
+            $endpoints[$index]['iframe_url'] = esc_url_raw($data['iframe_url']);
+        }
+
+        if (isset($data['iframe_height'])) {
+            $endpoints[$index]['iframe_height'] = absint($data['iframe_height']);
+        }
+
+        if (isset($data['redirect_url'])) {
+            $endpoints[$index]['redirect_url'] = esc_url_raw($data['redirect_url']);
+        }
+
+        if (array_key_exists('redirect_new_tab', $data)) {
+            $endpoints[$index]['redirect_new_tab'] = !empty($data['redirect_new_tab']);
+        }
+
+        if (isset($data['cpt_post_type'])) {
+            $endpoints[$index]['cpt_post_type'] = sanitize_text_field($data['cpt_post_type']);
+        }
+
+        if (isset($data['cpt_post_id'])) {
+            $endpoints[$index]['cpt_post_id'] = absint($data['cpt_post_id']);
         }
 
         if (isset($data['icon_type']) && in_array($data['icon_type'], ['svg', 'dashicon', 'url'])) {
