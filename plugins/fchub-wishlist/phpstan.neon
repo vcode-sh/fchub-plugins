@@ -1,0 +1,28 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+        - fchub-wishlist.php
+        - uninstall.php
+    excludePaths:
+        - app/*/index.php
+    bootstrapFiles:
+        - vendor/autoload.php
+        - phpstan-bootstrap.php
+    scanDirectories:
+        # FluentCart classes (git submodule in playground)
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/app
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/vendor/wpfluent
+        # FluentCRM classes
+        - ../../../fchub-playground/wp-content/plugins/fluent-crm/app
+        - ../../../fchub-playground/wp-content/plugins/fluent-crm/vendor/wpfluent
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        # FluentCRM functions defined at runtime
+        - '#Function FluentCrmApi not found#'
+        - '#Function fluentCrmDb not found#'
+        - '#Function fluentcrm_get_option not found#'

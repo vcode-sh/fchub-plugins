@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<ruleset name="FCHub Coding Standards">
+	<description>PSR-12 base with WordPress security checks for FCHub plugins</description>
+
+	<!-- What to scan -->
+	<file>.</file>
+
+	<!-- Exclude paths -->
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+	<exclude-pattern>*/docs/*</exclude-pattern>
+	<exclude-pattern>*/assets/*</exclude-pattern>
+	<exclude-pattern>*/scripts/*</exclude-pattern>
+	<exclude-pattern>*/resources/*</exclude-pattern>
+	<exclude-pattern>*/views/*</exclude-pattern>
+	<exclude-pattern>*/admin/dist/*</exclude-pattern>
+
+	<!-- How to scan -->
+	<arg value="sp"/>
+	<arg name="basepath" value="./"/>
+	<arg name="colors"/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="8"/>
+
+	<!-- ================================================================== -->
+	<!-- BASE: PSR-12 (matches FluentCart's own style)                      -->
+	<!-- ================================================================== -->
+	<rule ref="PSR12">
+		<!-- index.php security files and main plugin file mix symbols + side effects -->
+		<exclude name="PSR1.Files.SideEffects.FoundWithSymbols"/>
+	</rule>
+
+	<!-- Allow long lines — SQL strings, arrays, and URLs will exceed 120 chars -->
+	<rule ref="Generic.Files.LineLength">
+		<properties>
+			<property name="lineLimit" value="160"/>
+			<property name="absoluteLineLimit" value="0"/>
+		</properties>
+	</rule>
+
+	<!-- ================================================================== -->
+	<!-- PHP Compatibility: ensure we don't use features beyond PHP 8.3     -->
+	<!-- ================================================================== -->
+	<config name="testVersion" value="8.3-"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- ================================================================== -->
+	<!-- WordPress security rules (the ones that actually catch bugs)       -->
+	<!-- ================================================================== -->
+
+	<!-- SQL injection prevention -->
+	<rule ref="WordPress.DB.PreparedSQL">
+		<!-- $this->table interpolation in prepared statements is safe (class property, not user input) -->
+		<exclude name="WordPress.DB.PreparedSQL.InterpolatedNotPrepared"/>
+	</rule>
+	<rule ref="WordPress.DB.PreparedSQLPlaceholders"/>
+
+	<!-- XSS / output escaping -->
+	<rule ref="WordPress.Security.EscapeOutput"/>
+
+	<!-- Input sanitisation and nonce verification -->
+	<rule ref="WordPress.Security.ValidatedSanitizedInput"/>
+	<rule ref="WordPress.Security.NonceVerification"/>
+
+	<!-- i18n text domain -->
+	<config name="minimum_supported_wp_version" value="6.7"/>
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="fchub-wishlist"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Prefer WP filesystem/http functions over raw PHP -->
+	<rule ref="WordPress.WP.AlternativeFunctions"/>
+
+	<!-- Discourage eval() and similar -->
+	<rule ref="WordPress.PHP.DiscouragedPHPFunctions"/>
+
+	<!-- No development functions in production (var_dump, print_r, etc.) -->
+	<rule ref="WordPress.PHP.DevelopmentFunctions"/>
+
+	<!-- Strict in_array / array_search comparisons -->
+	<rule ref="WordPress.PHP.StrictInArray"/>
+
+	<!-- Global prefix enforcement -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="fchub_wishlist"/>
+				<element value="fchubwishlist"/>
+				<element value="FChubWishlist"/>
+				<element value="FCHUB_WISHLIST"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>
