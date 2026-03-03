@@ -91,5 +91,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.docker_meta.outputs.tags }}
-          cache-from: type=registry,ref=${{ env.GHCR_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.GHCR_IMAGE }}:buildcache,mode=max
+          cache-from: type=local,src=/tmp/cache/buildx
+          cache-to: type=local,dest=/tmp/cache/buildx-new,mode=max
+      - name: Rotate build cache
+        run: |
+          rm -rf /tmp/cache/buildx
+          mv /tmp/cache/buildx-new /tmp/cache/buildx
