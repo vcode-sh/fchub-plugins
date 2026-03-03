@@ -1,23 +1,24 @@
 <?php
+
 // If uninstall not called from WordPress, die.
 defined('WP_UNINSTALL_PLUGIN') || exit;
 
-$settings = get_option('fchub_wishlist_settings', []);
-$removeData = isset($settings['uninstall_remove_data']) && $settings['uninstall_remove_data'] === 'yes';
+$fchub_wishlist_settings = get_option('fchub_wishlist_settings', []);
+$fchub_wishlist_remove = isset($fchub_wishlist_settings['uninstall_remove_data']) && $fchub_wishlist_settings['uninstall_remove_data'] === 'yes';
 
-if ($removeData) {
+if ($fchub_wishlist_remove) {
     global $wpdb;
 
-    $prefix = $wpdb->prefix . 'fchub_wishlist_';
+    $fchub_wishlist_prefix = $wpdb->prefix . 'fchub_wishlist_';
 
     // Drop all custom tables
-    $tables = [
-        $prefix . 'items',
-        $prefix . 'lists',
+    $fchub_wishlist_tables = [
+        $fchub_wishlist_prefix . 'items',
+        $fchub_wishlist_prefix . 'lists',
     ];
 
-    foreach ($tables as $table) {
-        $wpdb->query("DROP TABLE IF EXISTS {$table}");
+    foreach ($fchub_wishlist_tables as $fchub_wishlist_table) {
+        $wpdb->query("DROP TABLE IF EXISTS {$fchub_wishlist_table}");
     }
 
     // Delete options

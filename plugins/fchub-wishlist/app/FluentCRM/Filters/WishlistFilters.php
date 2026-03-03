@@ -46,7 +46,7 @@ class WishlistFilters
     public static function applyFilters($query, array $filters)
     {
         foreach ($filters as $filter) {
-            $query = static::applyFilter($query, $filter);
+            $query = self::applyFilter($query, $filter);
         }
         return $query;
     }
@@ -64,8 +64,8 @@ class WishlistFilters
         $itemsTable = $wpdb->prefix . 'fchub_wishlist_items';
 
         return match ($key) {
-            'fchub_has_wishlist_items' => static::filterHasItems($query, $operator, $listsTable, $itemsTable),
-            'fchub_wishlist_item_count' => static::filterItemCount($query, $operator, $filter['value'] ?? '', $listsTable, $itemsTable),
+            'fchub_has_wishlist_items' => self::filterHasItems($query, $operator, $listsTable, $itemsTable),
+            'fchub_wishlist_item_count' => self::filterItemCount($query, $operator, $filter['value'] ?? '', $listsTable, $itemsTable),
             default => $query,
         };
     }
@@ -97,7 +97,7 @@ class WishlistFilters
             return $query;
         }
 
-        return $query->whereExists(function ($q) use ($listsTable, $itemsTable, $operator, $value) {
+        return $query->whereExists(function ($q) use ($listsTable, $operator, $value) {
             $q->select(fluentCrmDb()->raw(1))
                 ->from($listsTable)
                 ->whereColumn($listsTable . '.user_id', 'fc_subscribers.user_id')

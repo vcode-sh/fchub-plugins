@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FChubWishlist\Email;
 
-use FChubWishlist\Storage\WishlistRepository;
 use FChubWishlist\Storage\WishlistItemRepository;
 use FChubWishlist\Support\Constants;
 use FChubWishlist\Support\Logger;
@@ -17,12 +16,10 @@ final class WishlistReminderEmail
     private const MAX_DISPLAY_ITEMS = 5;
     private const TEMPLATE_KEY = 'wishlist_reminder';
 
-    private WishlistRepository $wishlists;
     private WishlistItemRepository $items;
 
     public function __construct()
     {
-        $this->wishlists = new WishlistRepository();
         $this->items = new WishlistItemRepository();
     }
 

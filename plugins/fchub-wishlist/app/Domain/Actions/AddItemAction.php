@@ -87,6 +87,7 @@ class AddItemAction
         ]);
 
         if ($itemId <= 0) {
+            /** @phpstan-ignore if.alwaysFalse (race condition: concurrent insert may trigger UNIQUE constraint) */
             if ($this->wishlistRules->isDuplicate($wishlistId, $productId, $variantId)) {
                 return ['success' => false, 'item' => null, 'count' => $wishlist['item_count'], 'error' => 'This item is already in your wishlist.'];
             }

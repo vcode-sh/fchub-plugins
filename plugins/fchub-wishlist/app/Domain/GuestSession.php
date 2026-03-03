@@ -25,7 +25,9 @@ class GuestSession
 
     public static function getHash(): string
     {
-        return $_COOKIE[Constants::COOKIE_KEY] ?? '';
+        return isset($_COOKIE[Constants::COOKIE_KEY])
+            ? sanitize_text_field(wp_unslash($_COOKIE[Constants::COOKIE_KEY]))
+            : '';
     }
 
     public static function setHash(string $hash): void
@@ -75,8 +77,6 @@ class GuestSession
 
     /**
      * Handle edge case: set_logged_in_cookie fires before wp_login in some flows.
-     *
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public static function onSetLoggedInCookie(
         string $cookie,

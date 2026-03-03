@@ -68,9 +68,11 @@ class WishlistFunnelHelper
 
         $sql .= " ORDER BY post_title ASC LIMIT 200";
 
+        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $sql built from safe table names; user input uses prepare()
         $rows = $params
             ? $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A)
             : $wpdb->get_results($sql, ARRAY_A);
+        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
         return array_map(fn(array $row) => [
             'id'    => (string) $row['ID'],
@@ -103,9 +105,11 @@ class WishlistFunnelHelper
 
         $sql .= " ORDER BY variation_title ASC LIMIT 200";
 
+        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $sql built from safe table names; user input uses prepare()
         $rows = $params
             ? $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A)
             : $wpdb->get_results($sql, ARRAY_A);
+        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
         return array_map(fn(array $row) => [
             'id'    => (string) $row['id'],

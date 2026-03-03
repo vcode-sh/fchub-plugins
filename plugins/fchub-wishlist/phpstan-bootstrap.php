@@ -16,5 +16,5 @@ define('FCHUB_WISHLIST_DB_VERSION', '1.0.0');
 
 // WordPress constants used in the plugin.
 if (!defined('COOKIEPATH')) {
-	define('COOKIEPATH', '/');
+    define('COOKIEPATH', '/');
 }

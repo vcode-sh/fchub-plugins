@@ -213,6 +213,13 @@ if (!function_exists('add_action')) {
     }
 }
 
+if (!function_exists('wp_unslash')) {
+    function wp_unslash($value)
+    {
+        return is_string($value) ? stripslashes($value) : $value;
+    }
+}
+
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field($str)
     {

@@ -40,8 +40,8 @@ final class ProductsColumn
     /**
      * Attach wishlist count to each product in the paginated collection.
      *
-     * @param \FluentCart\Framework\Database\Orm\LengthAwarePaginator $products
-     * @return \FluentCart\Framework\Database\Orm\LengthAwarePaginator
+     * @param \FluentCart\Framework\Pagination\LengthAwarePaginator $products
+     * @return \FluentCart\Framework\Pagination\LengthAwarePaginator
      */
     public static function attachWishlistCounts($products)
     {

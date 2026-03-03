@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: FCHub - Wishlist
  * Plugin URI: https://fchub.co

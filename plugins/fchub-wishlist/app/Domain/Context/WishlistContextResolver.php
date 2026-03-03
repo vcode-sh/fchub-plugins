@@ -96,6 +96,8 @@ class WishlistContextResolver
      */
     private function getGuestHash(): string
     {
-        return $_COOKIE['fchub_wishlist_hash'] ?? '';
+        return isset($_COOKIE['fchub_wishlist_hash'])
+            ? sanitize_text_field(wp_unslash($_COOKIE['fchub_wishlist_hash']))
+            : '';
     }
 }

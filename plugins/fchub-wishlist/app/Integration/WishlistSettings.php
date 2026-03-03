@@ -92,8 +92,6 @@ final class WishlistSettings
                 'settings'    => $fieldSettings,
             ],
         ], 200);
-
-        return $fieldSettings;
     }
 
     public static function saveGlobalSettings($args): void
