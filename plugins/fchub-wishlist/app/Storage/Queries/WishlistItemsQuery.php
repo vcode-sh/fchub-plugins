@@ -53,7 +53,10 @@ class WishlistItemsQuery
              FROM {$this->itemsTable} i
              INNER JOIN {$this->listsTable} l ON i.wishlist_id = l.id
              LEFT JOIN {$postsTable} p ON i.product_id = p.ID
-             LEFT JOIN {$variationsTable} v ON i.variant_id = v.id
+             LEFT JOIN {$variationsTable} v ON v.id = COALESCE(
+                 NULLIF(i.variant_id, 0),
+                 (SELECT dv.id FROM {$variationsTable} dv WHERE dv.post_id = i.product_id AND dv.item_status = 'active' ORDER BY dv.serial_index ASC LIMIT 1)
+             )
              WHERE l.user_id = %d
              ORDER BY i.created_at DESC
              LIMIT %d OFFSET %d",
@@ -103,7 +106,10 @@ class WishlistItemsQuery
              FROM {$this->itemsTable} i
              INNER JOIN {$this->listsTable} l ON i.wishlist_id = l.id
              LEFT JOIN {$postsTable} p ON i.product_id = p.ID
-             LEFT JOIN {$variationsTable} v ON i.variant_id = v.id
+             LEFT JOIN {$variationsTable} v ON v.id = COALESCE(
+                 NULLIF(i.variant_id, 0),
+                 (SELECT dv.id FROM {$variationsTable} dv WHERE dv.post_id = i.product_id AND dv.item_status = 'active' ORDER BY dv.serial_index ASC LIMIT 1)
+             )
              WHERE l.session_hash = %s AND l.user_id IS NULL
              ORDER BY i.created_at DESC
              LIMIT %d OFFSET %d",
@@ -164,7 +170,10 @@ class WishlistItemsQuery
                 v.sku AS variant_sku
              FROM {$this->itemsTable} i
              LEFT JOIN {$postsTable} p ON i.product_id = p.ID
-             LEFT JOIN {$variationsTable} v ON i.variant_id = v.id
+             LEFT JOIN {$variationsTable} v ON v.id = COALESCE(
+                 NULLIF(i.variant_id, 0),
+                 (SELECT dv.id FROM {$variationsTable} dv WHERE dv.post_id = i.product_id AND dv.item_status = 'active' ORDER BY dv.serial_index ASC LIMIT 1)
+             )
              WHERE i.wishlist_id = %d
              ORDER BY i.created_at DESC",
             $wishlistId
