@@ -1,6 +1,6 @@
 # FCHub Plugins
 
-FluentCart and FluentCommunity plugins that actually do things WordPress forgot to ship. One monorepo, five plugins, zero vendor lock-in.
+FluentCart and FluentCommunity plugins that actually do things WordPress forgot to ship. One monorepo, six plugins, zero vendor lock-in.
 
 **[fchub.co](https://fchub.co)** — docs, downloads, and everything else.
 
@@ -11,6 +11,7 @@ FluentCart and FluentCommunity plugins that actually do things WordPress forgot 
 | [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway — because Stripe doesn't speak Polish | 1.0.0 |
 | [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 — automate paperwork before the tax office automates you | 1.0.0 |
 | [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling — 15k lines of PHP and Vue so people can pay to read your blog | 1.0.0 |
+| [fchub-portal-extender](plugins/fchub-portal-extender/) | Custom portal pages without writing PHP — because not everyone wants to be a developer | 1.0.0 |
 | [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net — because the WP media library and video is a war crime | 1.0.0 |
 | [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — products, orders, subscriptions, customers, coupons. Your escape hatch | 1.0.0 |
 
@@ -53,7 +54,7 @@ Version in the plugin header must match the tag. If they disagree, the build fai
 PRs touching `plugins/` get:
 
 - **PHPUnit** — fchub-p24, fchub-memberships, fchub-stream
-- **Vite build** — fchub-memberships and fchub-stream (making sure the Vue apps didn't spontaneously combust)
+- **Vite build** — fchub-memberships, fchub-portal-extender, and fchub-stream (making sure the Vue apps didn't spontaneously combust)
 
 ## Development
 
@@ -80,6 +81,9 @@ cd plugins/fchub-p24 && composer install && ./vendor/bin/phpunit
 # Vue admin app (memberships)
 cd plugins/fchub-memberships && npm install && npm run dev
 
+# Vue admin app (portal extender)
+cd plugins/fchub-portal-extender && npm install && npm run dev
+
 # Vue apps (stream)
 cd plugins/fchub-stream/admin-app && npm install && npm run dev
 cd plugins/fchub-stream/portal-app && npm install && npm run dev
@@ -92,6 +96,7 @@ plugins/
   fchub-p24/              Przelewy24 gateway
   fchub-fakturownia/      Fakturownia invoices
   fchub-memberships/      Membership system
+  fchub-portal-extender/  Custom portal endpoints
   fchub-stream/           Video streaming for FluentCommunity
   wc-fc/                  WooCommerce migrator
 translations/
@@ -100,6 +105,7 @@ web-docs/                 fchub.co documentation site
 .github/workflows/
   release.yml             Tag → ZIP → GitHub Release
   ci.yml                  PR checks
+  mcp-release.yml         FluentCart MCP releases
 build.sh                  Local ZIP builder
 ```
 
