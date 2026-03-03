@@ -6,6 +6,7 @@ on:
       - 'fchub-p24/v*'
       - 'fchub-fakturownia/v*'
       - 'fchub-memberships/v*'
+      - 'fchub-portal-extender/v*'
       - 'fchub-stream/v*'
       - 'wc-fc/v*'
 
@@ -50,7 +51,7 @@ jobs:
           echo "Version validated: $VERSION"
 
       - name: Setup Node.js
-        if: steps.tag.outputs.slug == 'fchub-memberships' || steps.tag.outputs.slug == 'fchub-stream'
+        if: steps.tag.outputs.slug == 'fchub-memberships' || steps.tag.outputs.slug == 'fchub-portal-extender' || steps.tag.outputs.slug == 'fchub-stream'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -58,6 +59,21 @@ jobs:
       - name: Build assets (fchub-memberships)
         if: steps.tag.outputs.slug == 'fchub-memberships'
         working-directory: plugins/fchub-memberships
+        run: |
+          npm ci
+          npm run build
+
+          if [ ! -d "assets/dist" ] || [ -z "$(ls -A assets/dist)" ]; then
+            echo "::error::Build failed — assets/dist/ is empty"
+            exit 1
+          fi
+
+          echo "Build output:"
+          ls -la assets/dist/
+
+      - name: Build assets (fchub-portal-extender)
+        if: steps.tag.outputs.slug == 'fchub-portal-extender'
+        working-directory: plugins/fchub-portal-extender
         run: |
           npm ci
           npm run build

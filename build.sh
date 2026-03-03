@@ -19,6 +19,7 @@ ALL_PLUGINS=(
     "fchub-p24|fchub-p24.php"
     "fchub-fakturownia|fchub-fakturownia.php"
     "fchub-memberships|fchub-memberships.php"
+    "fchub-portal-extender|fchub-portal-extender.php"
     "fchub-stream|fchub-stream.php"
     "wc-fc|wc-fc.php"
 )
@@ -42,7 +43,7 @@ usage() {
     printf "Build distribution ZIPs for FCHub plugins.\n\n"
     printf "${BOLD}Arguments:${NC}\n"
     printf "  plugin-slug    Build only the specified plugin (optional)\n"
-    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, fchub-stream, wc-fc\n\n"
+    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, fchub-portal-extender, fchub-stream, wc-fc\n\n"
     printf "${BOLD}Examples:${NC}\n"
     printf "  ./build.sh                    Build all plugins\n"
     printf "  ./build.sh fchub-p24          Build only fchub-p24\n"
@@ -127,6 +128,18 @@ for entry in "${PLUGINS[@]}"; do
         continue
     fi
     info "Version: $version"
+
+    # Run npm build for portal-extender
+    if [ "$slug" = "fchub-portal-extender" ]; then
+        if [ -f "$plugin_dir/package.json" ]; then
+            info "Running npm build for $slug ..."
+            (cd "$plugin_dir" && npm ci --silent && npm run build --silent)
+            if [ ! -d "$plugin_dir/assets/dist" ] || [ -z "$(ls -A "$plugin_dir/assets/dist" 2>/dev/null)" ]; then
+                error "npm build failed — assets/dist/ is empty"
+            fi
+            success "npm build complete"
+        fi
+    fi
 
     # Run npm build for memberships
     if [ "$slug" = "fchub-memberships" ]; then

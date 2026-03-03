@@ -91,6 +91,51 @@ jobs:
 
           echo "Build validation passed: $JS_COUNT JS file(s) in assets/dist/"
 
+  vite-build-portal-extender:
+    name: Vite Build (fchub-portal-extender)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for changes
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/fchub-portal-extender/ | wc -l)
+          echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.count > 0
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: plugins/fchub-portal-extender/package-lock.json
+
+      - name: Install and build
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-portal-extender
+        run: |
+          npm ci
+          npm run build
+
+      - name: Validate build output
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-portal-extender
+        run: |
+          if [ ! -d "assets/dist" ] || [ -z "$(ls -A assets/dist)" ]; then
+            echo "::error::Build produced no output in assets/dist/"
+            exit 1
+          fi
+
+          JS_COUNT=$(find assets/dist -name "*.js" | wc -l)
+          if [ "$JS_COUNT" -eq 0 ]; then
+            echo "::error::No JS files found in assets/dist/"
+            exit 1
+          fi
+
+          echo "Build validation passed: $JS_COUNT JS file(s) in assets/dist/"
+
   vite-build-stream:
     name: Vite Build (fchub-stream)
     runs-on: ubuntu-latest
