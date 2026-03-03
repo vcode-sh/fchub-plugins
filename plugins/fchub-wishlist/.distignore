@@ -1,0 +1,16 @@
+.git/
+.gitignore
+.distignore
+node_modules/
+vendor/
+tests/
+docs/
+.phpunit.cache/
+composer.json
+composer.lock
+phpunit.xml
+phpunit.xml.dist
+*.md
+.DS_Store
+Thumbs.db
+resources/

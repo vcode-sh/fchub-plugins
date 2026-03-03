@@ -1,0 +1,488 @@
+/* ==========================================================================
+   FCHub Wishlist — Frontend Styles
+   All classes prefixed with .fchub-wishlist-*
+   ========================================================================== */
+
+/* ---------- Heart button — Grid view (overlay on product image) ---------- */
+/* button.class selector (0,2,1) beats FluentCart's .fct-product-card button (0,1,1) */
+
+.fct-product-card button.fchub-wishlist-heart {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    color: #9ca3af;
+    cursor: pointer;
+    opacity: 0;
+    transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+}
+
+.fct-product-card:hover button.fchub-wishlist-heart {
+    opacity: 1;
+}
+
+.fct-product-card button.fchub-wishlist-heart.is-active {
+    opacity: 1;
+    color: #ef4444;
+}
+
+.fct-product-card button.fchub-wishlist-heart:hover {
+    color: #ef4444;
+    background: #fff;
+    transform: scale(1.1);
+}
+
+.fchub-wishlist-heart.is-active .fchub-wishlist-heart-icon {
+    fill: currentColor;
+}
+
+.fchub-wishlist-heart-icon {
+    display: block;
+    width: 20px;
+    height: 20px;
+    transition: fill 0.2s ease;
+}
+
+/* ---------- Heart button — List view (inline square next to View Options) ---------- */
+/* Full ancestor chain (0,5,1) beats FluentCart's shop-app.css @media rule (0,4,1)
+   that sets min-width: 160px on all card buttons in list mode */
+
+.fct-products-wrapper .fct-products-wrapper-inner.mode-list .fct-products-container .fct-product-card button.fchub-wishlist-heart {
+    position: static;
+    opacity: 1;
+    width: 40px;
+    height: 40px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border-radius: 8px;
+    background: transparent;
+    box-shadow: none;
+    border: 1px solid #e5e7eb;
+    color: #9ca3af;
+    cursor: pointer;
+    margin: 0 176px 8px 0;
+    place-self: end;
+}
+
+.fct-products-wrapper .fct-products-wrapper-inner.mode-list .fct-products-container .fct-product-card button.fchub-wishlist-heart:hover {
+    color: #ef4444;
+    border-color: #ef4444;
+    background: #fef2f2;
+    transform: none;
+}
+
+.fct-products-wrapper .fct-products-wrapper-inner.mode-list .fct-products-container .fct-product-card button.fchub-wishlist-heart.is-active {
+    color: #ef4444;
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+/* ---------- "Add to Wishlist" button (single product) ---------- */
+
+.fchub-wishlist-add-wrap {
+    margin: 8px 0;
+}
+
+.fchub-wishlist-add-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: transparent;
+    color: #374151;
+    font-size: 14px;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.fchub-wishlist-add-button:hover {
+    color: #ef4444;
+    border-color: #ef4444;
+}
+
+.fchub-wishlist-add-button.is-active {
+    color: #ef4444;
+    border-color: #ef4444;
+}
+
+.fchub-wishlist-add-button.is-active .fchub-wishlist-heart-icon {
+    fill: currentColor;
+}
+
+.fchub-wishlist-add-button .fchub-wishlist-heart-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* ---------- Counter badge ---------- */
+
+.fchub-wishlist-counter {
+    display: none;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    min-width: 18px;
+    height: 18px;
+    padding: 2px 5px;
+    border-radius: 9px;
+    background: #ef4444;
+    color: #fff;
+    text-align: center;
+}
+
+.fchub-wishlist-counter.has-items {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---------- Wishlist page ---------- */
+
+.fchub-wishlist-page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 0;
+}
+
+.fchub-wishlist-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.fchub-wishlist-add-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    background: #4f46e5;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.fchub-wishlist-add-all-btn:hover {
+    background: #4338ca;
+}
+
+.fchub-wishlist-add-all-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ---------- Wishlist grid ---------- */
+
+.fchub-wishlist-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.fchub-wishlist-item {
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    transition: opacity 0.3s ease;
+}
+
+.fchub-wishlist-item--removing {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.fchub-wishlist-item__image {
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+
+.fchub-wishlist-item__image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fchub-wishlist-item__placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #e5e7eb;
+}
+
+.fchub-wishlist-item__title {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+.fchub-wishlist-item__title a {
+    color: #111827;
+    text-decoration: none;
+}
+
+.fchub-wishlist-item__title a:hover {
+    text-decoration: underline;
+}
+
+.fchub-wishlist-item__variant {
+    display: block;
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.fchub-wishlist-item__price {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.fchub-wishlist-item__stock {
+    display: inline-block;
+    font-size: 12px;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.fchub-wishlist-item__stock--out {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.fchub-wishlist-item__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fchub-wishlist-cart-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #4f46e5;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    white-space: nowrap;
+}
+
+.fchub-wishlist-cart-btn:hover {
+    background: #4338ca;
+}
+
+.fchub-wishlist-cart-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.fchub-wishlist-cart-btn--sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.fchub-wishlist-remove-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.fchub-wishlist-remove-btn:hover {
+    color: #dc2626;
+    border-color: #dc2626;
+}
+
+/* ---------- Empty state ---------- */
+
+.fchub-wishlist-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+    text-align: center;
+    color: #9ca3af;
+}
+
+.fchub-wishlist-empty svg {
+    margin-bottom: 16px;
+    color: #d1d5db;
+}
+
+.fchub-wishlist-empty__title {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.fchub-wishlist-empty__text {
+    margin: 0;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+/* ---------- Customer portal styles ---------- */
+
+.fchub-wishlist-portal {
+    padding: 0;
+}
+
+.fchub-wishlist-portal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.fchub-wishlist-portal__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.fchub-wishlist-portal__grid {
+    display: grid;
+    gap: 12px;
+}
+
+.fchub-wishlist-portal__item {
+    display: grid;
+    grid-template-columns: 56px 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid #f3f4f6;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+}
+
+.fchub-wishlist-portal__item:hover {
+    background: #f9fafb;
+}
+
+.fchub-wishlist-portal__item-image {
+    width: 56px;
+    height: 56px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+
+.fchub-wishlist-portal__item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fchub-wishlist-portal__item-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #111827;
+    text-decoration: none;
+}
+
+.fchub-wishlist-portal__item-title:hover {
+    text-decoration: underline;
+}
+
+.fchub-wishlist-portal__item-variant {
+    display: block;
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 2px;
+}
+
+.fchub-wishlist-portal__item-price {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+}
+
+.fchub-wishlist-portal__item-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fchub-wishlist-portal__item-unavailable {
+    font-size: 12px;
+    color: #dc2626;
+    padding: 4px 8px;
+    background: #fef2f2;
+    border-radius: 4px;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 640px) {
+    .fchub-wishlist-item {
+        grid-template-columns: 60px 1fr;
+        gap: 12px;
+    }
+
+    .fchub-wishlist-item__actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+    }
+
+    .fchub-wishlist-portal__item {
+        grid-template-columns: 48px 1fr;
+        gap: 8px;
+    }
+
+    .fchub-wishlist-portal__item-price,
+    .fchub-wishlist-portal__item-actions {
+        grid-column: 2 / -1;
+    }
+
+    .fchub-wishlist-portal__header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+}
