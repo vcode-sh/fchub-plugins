@@ -23,7 +23,7 @@ defaults:
 jobs:
   validate:
     name: Validate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vps]
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -71,7 +71,7 @@ jobs:
 
   publish:
     name: Publish to npm
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vps]
     needs: validate
     steps:
       - uses: actions/checkout@v4
