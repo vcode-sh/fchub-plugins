@@ -53,17 +53,24 @@ class WishlistFunnelHelper
      *
      * @return array<int, array{id: string, title: string}>
      */
-    public static function getProductOptions(): array
+    public static function getProductOptions(string $search = ''): array
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results(
-            "SELECT ID, post_title FROM {$wpdb->posts}
-             WHERE post_type = 'fluent-products' AND post_status = 'publish'
-             ORDER BY post_title ASC
-             LIMIT 200",
-            ARRAY_A
-        );
+        $sql = "SELECT ID, post_title FROM {$wpdb->posts}
+                WHERE post_type = 'fluent-products' AND post_status = 'publish'";
+
+        $params = [];
+        if ($search !== '') {
+            $sql .= " AND post_title LIKE %s";
+            $params[] = '%' . $wpdb->esc_like($search) . '%';
+        }
+
+        $sql .= " ORDER BY post_title ASC LIMIT 200";
+
+        $rows = $params
+            ? $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A)
+            : $wpdb->get_results($sql, ARRAY_A);
 
         return array_map(fn(array $row) => [
             'id'    => (string) $row['ID'],
@@ -76,7 +83,7 @@ class WishlistFunnelHelper
      *
      * @return array<int, array{id: string, title: string}>
      */
-    public static function getVariantOptions(int $productId = 0): array
+    public static function getVariantOptions(int $productId = 0, string $search = ''): array
     {
         global $wpdb;
         $table = $wpdb->prefix . 'fct_product_variations';
@@ -87,6 +94,11 @@ class WishlistFunnelHelper
         if ($productId > 0) {
             $sql .= " AND post_id = %d";
             $params[] = $productId;
+        }
+
+        if ($search !== '') {
+            $sql .= " AND variation_title LIKE %s";
+            $params[] = '%' . $wpdb->esc_like($search) . '%';
         }
 
         $sql .= " ORDER BY variation_title ASC LIMIT 200";

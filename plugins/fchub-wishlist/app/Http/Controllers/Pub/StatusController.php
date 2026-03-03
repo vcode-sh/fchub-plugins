@@ -111,10 +111,20 @@ final class StatusController
             $item['variant_status'] = $variant['item_status'] ?? '';
             $item['variant_sku'] = $variant['sku'] ?? '';
         } else {
-            $item['variant_title'] = '';
-            $item['current_price'] = 0.0;
-            $item['variant_status'] = '';
-            $item['variant_sku'] = '';
+            global $wpdb;
+            $variationsTable = $wpdb->prefix . 'fct_product_variations';
+            $defaultVariant = $wpdb->get_row($wpdb->prepare(
+                "SELECT variation_title, item_price, item_status, sku
+                 FROM {$variationsTable}
+                 WHERE post_id = %d AND item_status = 'active'
+                 ORDER BY serial_index ASC LIMIT 1",
+                $item['product_id']
+            ), ARRAY_A);
+
+            $item['variant_title'] = $defaultVariant['variation_title'] ?? '';
+            $item['current_price'] = isset($defaultVariant['item_price']) ? (float) $defaultVariant['item_price'] : 0.0;
+            $item['variant_status'] = $defaultVariant['item_status'] ?? '';
+            $item['variant_sku'] = $defaultVariant['sku'] ?? '';
         }
 
         return apply_filters('fchub_wishlist/enriched_item', $item);

@@ -42,26 +42,37 @@ spl_autoload_register(function ($class) {
 });
 
 /**
- * Plugin activation: create database tables and register cron jobs.
+ * Plugin activation: create database tables and register scheduled actions.
  */
 register_activation_hook(__FILE__, function () {
     FChubWishlist\Support\Migrations::run();
 
-    if (!wp_next_scheduled('fchub_wishlist_cleanup_guests')) {
-        wp_schedule_event(time(), 'daily', 'fchub_wishlist_cleanup_guests');
-    }
-    if (!wp_next_scheduled('fchub_wishlist_cleanup_orphans')) {
-        wp_schedule_event(time(), 'weekly', 'fchub_wishlist_cleanup_orphans');
-    }
-    if (!wp_next_scheduled('fchub_wishlist_reminder')) {
-        wp_schedule_event(time(), 'daily', 'fchub_wishlist_reminder');
+    if (function_exists('as_schedule_recurring_action')) {
+        as_schedule_recurring_action(time(), DAY_IN_SECONDS, 'fchub_wishlist_cleanup_guests', [], 'fchub-wishlist', true);
+        as_schedule_recurring_action(time(), WEEK_IN_SECONDS, 'fchub_wishlist_cleanup_orphans', [], 'fchub-wishlist', true);
+        as_schedule_recurring_action(time(), DAY_IN_SECONDS, 'fchub_wishlist_reminder', [], 'fchub-wishlist', true);
+    } else {
+        if (!wp_next_scheduled('fchub_wishlist_cleanup_guests')) {
+            wp_schedule_event(time(), 'daily', 'fchub_wishlist_cleanup_guests');
+        }
+        if (!wp_next_scheduled('fchub_wishlist_cleanup_orphans')) {
+            wp_schedule_event(time(), 'weekly', 'fchub_wishlist_cleanup_orphans');
+        }
+        if (!wp_next_scheduled('fchub_wishlist_reminder')) {
+            wp_schedule_event(time(), 'daily', 'fchub_wishlist_reminder');
+        }
     }
 });
 
 /**
- * Plugin deactivation: unregister cron jobs, preserve tables.
+ * Plugin deactivation: unregister scheduled actions, preserve tables.
  */
 register_deactivation_hook(__FILE__, function () {
+    if (function_exists('as_unschedule_all_actions')) {
+        as_unschedule_all_actions('fchub_wishlist_cleanup_guests', [], 'fchub-wishlist');
+        as_unschedule_all_actions('fchub_wishlist_cleanup_orphans', [], 'fchub-wishlist');
+        as_unschedule_all_actions('fchub_wishlist_reminder', [], 'fchub-wishlist');
+    }
     wp_clear_scheduled_hook('fchub_wishlist_cleanup_guests');
     wp_clear_scheduled_hook('fchub_wishlist_cleanup_orphans');
     wp_clear_scheduled_hook('fchub_wishlist_reminder');
@@ -139,6 +150,18 @@ add_action('fchub_wishlist_reminder', function () {
     }
     (new FChubWishlist\Email\WishlistReminderEmail())->sendPendingReminders();
 });
+
+/**
+ * Async email dispatch via Action Scheduler.
+ */
+add_action('fchub_wishlist_send_email', function (string $to, string $subject, string $body, array $headers) {
+    $sent = wp_mail($to, $subject, $body, $headers);
+    if (!$sent) {
+        FChubWishlist\Support\Logger::error('Wishlist email send failed', [
+            'to' => $to,
+        ]);
+    }
+}, 10, 4);
 
 /**
  * Admin notice when FluentCart is missing.

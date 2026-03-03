@@ -88,6 +88,7 @@ class AddToWishlistAction extends BaseAction
 
         $itemRepo = new WishlistItemRepository();
         if ($itemRepo->exists($wishlist['id'], $productId, $variantId)) {
+            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
             return;
         }
 

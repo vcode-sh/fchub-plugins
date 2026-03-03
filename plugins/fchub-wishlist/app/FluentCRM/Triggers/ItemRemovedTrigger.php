@@ -67,6 +67,7 @@ class ItemRemovedTrigger extends BaseTrigger
     {
         return [
             'product_ids'  => [],
+            'update_type'  => 'update',
             'run_multiple' => 'no',
         ];
     }
@@ -74,6 +75,12 @@ class ItemRemovedTrigger extends BaseTrigger
     public function getConditionFields($funnel): array
     {
         return [
+            'update_type'  => [
+                'type'    => 'radio',
+                'label'   => __('If Contact Already Exist?', 'fchub-wishlist'),
+                'help'    => __('Please specify what will happen if the subscriber already exists in the database', 'fchub-wishlist'),
+                'options' => FunnelHelper::getUpdateOptions(),
+            ],
             'product_ids'  => [
                 'type'        => 'rest_selector',
                 'option_key'  => 'fchub_wishlist_products',
@@ -125,13 +132,18 @@ class ItemRemovedTrigger extends BaseTrigger
     {
         $conditions = $funnel->conditions;
 
+        $subscriber = FunnelHelper::getSubscriber($user->user_email);
+        $updateType = Arr::get($conditions, 'update_type');
+        if ($updateType === 'skip_all_if_exist' && $subscriber) {
+            return false;
+        }
+
         if ($checkIds = Arr::get($conditions, 'product_ids', [])) {
             if (!in_array($productId, array_map('intval', $checkIds))) {
                 return false;
             }
         }
 
-        $subscriber = FunnelHelper::getSubscriber($user->user_email);
         if ($subscriber && FunnelHelper::ifAlreadyInFunnel($funnel->id, $subscriber->id)) {
             $multipleRun = Arr::get($conditions, 'run_multiple') === 'yes';
             if ($multipleRun) {

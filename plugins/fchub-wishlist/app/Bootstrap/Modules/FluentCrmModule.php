@@ -38,7 +38,7 @@ final class FluentCrmModule implements ModuleContract
      */
     public function getWishlistProducts($options, $search = '', $includedIds = []): array
     {
-        return WishlistFunnelHelper::getProductOptions();
+        return WishlistFunnelHelper::getProductOptions((string) $search);
     }
 
     /**
@@ -46,7 +46,7 @@ final class FluentCrmModule implements ModuleContract
      */
     public function getWishlistVariants($options, $search = '', $includedIds = []): array
     {
-        return WishlistFunnelHelper::getVariantOptions();
+        return WishlistFunnelHelper::getVariantOptions(0, (string) $search);
     }
 
     public function addAutomationConditions(array $groups, $funnel): array
