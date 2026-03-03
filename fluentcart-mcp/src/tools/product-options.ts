@@ -1,14 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import {
-	createTool,
-	deleteTool,
-	getTool,
-	postTool,
-	putTool,
-	type ToolDefinition,
-} from './_factory.js'
+import { createTool, deleteTool, getTool, postTool, type ToolDefinition } from './_factory.js'
 
 export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -44,7 +37,7 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/options/attr/group',
 		}),
 
-		putTool(client, {
+		createTool(client, {
 			name: 'fluentcart_attribute_group_update',
 			title: 'Update Attribute Group',
 			description: 'Update an attribute group title or slug.',
@@ -53,7 +46,21 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 				title: z.string().optional().describe('Group display name'),
 				slug: z.string().optional().describe('URL-friendly identifier'),
 			}),
-			endpoint: '/options/attr/group/:group_id',
+			annotations: { idempotentHint: true, openWorldHint: true },
+			handler: async (client, input) => {
+				const groupId = input.group_id as number
+				// API requires slug on every update — fetch current if not provided
+				if (!input.slug) {
+					const current = await client.get(`/options/attr/group/${groupId}`)
+					const group = (current.data as Record<string, unknown>).group as Record<string, unknown>
+					input.slug = group?.slug ?? ''
+				}
+				const body: Record<string, unknown> = {}
+				if (input.title !== undefined) body.title = input.title
+				if (input.slug !== undefined) body.slug = input.slug
+				const response = await client.put(`/options/attr/group/${groupId}`, body)
+				return response.data
+			},
 		}),
 
 		deleteTool(client, {

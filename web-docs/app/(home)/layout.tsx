@@ -48,6 +48,8 @@ export default function Layout({ children }: LayoutProps<"/">) {
 						{ text: "Wishlist", url: "#", icon: <Heart size={16} /> },
 						{ text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
 						{ text: "FCHub Stream", url: "/docs/fchub-stream", icon: <SquarePlay size={16} /> },
+						{ text: "FluentCart MCP", url: "/docs/fluentcart-mcp", icon: <Bot size={16} /> },
+						{ text: "FluentCart API", url: "/docs/fluentcart-api", icon: <Braces size={16} /> },
 					],
 				},
 				{
@@ -56,7 +58,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
 					children: (
 						<NavbarMenu>
 							<NavbarMenuTrigger>Docs</NavbarMenuTrigger>
-							<NavigationMenuContent className="grid grid-cols-[1.2fr_1fr] p-2 w-[460px]">
+							<NavigationMenuContent className="grid grid-cols-[1.2fr_1fr_1fr] p-2 w-[640px]">
 								<div className="space-y-1 rounded-lg bg-muted/50 p-2">
 									<div className="px-2 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
 										FluentCart
@@ -122,6 +124,19 @@ export default function Layout({ children }: LayoutProps<"/">) {
 										FCHub Mobile
 										<Badge variant="secondary" className="ml-auto text-[10px] h-4 opacity-60">Soon</Badge>
 									</div>
+								</div>
+								<div className="space-y-1 p-2">
+									<div className="px-2 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+										Tools & Extra
+									</div>
+									<NavigationMenuLink render={<Link href="/docs/fluentcart-mcp" />}>
+										<Bot size={16} />
+										FluentCart MCP
+									</NavigationMenuLink>
+									<NavigationMenuLink render={<Link href="/docs/fluentcart-api" />}>
+										<Braces size={16} />
+										FluentCart API
+									</NavigationMenuLink>
 								</div>
 							</NavigationMenuContent>
 						</NavbarMenu>

@@ -139,23 +139,26 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_taxonomy_sync',
 			title: 'Sync Taxonomy Terms',
-			description: 'Sync taxonomy terms for a product (replaces existing).',
+			description:
+				'Sync taxonomy terms for a product (replaces all existing terms for that taxonomy).',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				term_ids: z.array(z.number()).optional().describe('Term IDs to sync'),
-				taxonomy: z.string().optional().describe('Taxonomy name'),
+				terms: z.array(z.number()).describe('Term IDs to sync'),
+				taxonomy: z.string().describe('Taxonomy: product-categories or product-brands'),
 			}),
 			endpoint: '/products/sync-taxonomy-term/:product_id',
 		}),
 
 		postTool(client, {
 			name: 'fluentcart_product_taxonomy_delete',
-			title: 'Delete Taxonomy Terms',
-			description: 'Delete taxonomy terms from a product.',
+			title: 'Delete Taxonomy Term',
+			description:
+				'Remove a single taxonomy term from a product. ' +
+				'Call multiple times to remove several terms.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				term_ids: z.array(z.number()).optional().describe('Term IDs to remove'),
-				taxonomy: z.string().optional().describe('Taxonomy name'),
+				term: z.number().describe('Term ID to remove'),
+				taxonomy: z.string().describe('Taxonomy: product-categories or product-brands'),
 			}),
 			endpoint: '/products/delete-taxonomy-term/:product_id',
 		}),

@@ -678,7 +678,7 @@ describe('P1.2 response transforms', () => {
 		const result = await productGet.handler({ product_id: 42 })
 		const parsed = JSON.parse(result.content[0].text)
 
-		expect(parsed).not.toHaveProperty('post_content')
+		expect(parsed).toHaveProperty('post_content')
 		expect(parsed.variants[0]).not.toHaveProperty('pricing_table')
 		expect(parsed.variants[0].title).toBe('Default')
 		expect(parsed).not.toHaveProperty('integrations')

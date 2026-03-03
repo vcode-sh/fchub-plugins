@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "fluentcart-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "display_name": "FluentCart",
   "description": "200+ tools for managing your FluentCart store — orders, products, customers, subscriptions, coupons, reports.",
   "author": {

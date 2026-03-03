@@ -56,8 +56,8 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
               "/docs/fchub-memberships": "FluentCart",
               "/docs/fchub-portal-extender": "FluentCart",
               "/docs/wc-fc": "FluentCart",
-              "/docs/fluentcart-api": "FluentCart REST API",
-              "/docs/fluentcart-mcp": "FluentCart MCP Server",
+              "/docs/fluentcart-api": "Tools & Extra",
+              "/docs/fluentcart-mcp": "Tools & Extra",
             };
 
             return {

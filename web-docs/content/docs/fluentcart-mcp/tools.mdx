@@ -1,13 +1,13 @@
 ---
 title: Tool Reference
-description: Every tool in FluentCart MCP, listed by module. 276 tools covering orders, products, customers, subscriptions, shipping, tax, reports, and more.
+description: Every tool in FluentCart MCP, listed by module. 279 tools covering orders, products, customers, subscriptions, shipping, tax, reports, and more.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-The complete inventory. Every tool, every module, every HTTP method. 276 tools organised into 27 modules so the AI (and you) can find what it needs.
+The complete inventory. Every tool, every module, every HTTP method. 279 tools organised into 27 modules so the AI (and you) can find what it needs.
 
 You'll never need to call these yourself — the AI picks the right tool based on what you ask. But if you want to know exactly what's possible, or you want to verify that a specific capability exists before asking for it, this is your reference.
 
@@ -19,7 +19,7 @@ This page is a lookup table, not homework. The AI already knows all of this. You
 
 ## Dynamic Mode
 
-Don't fancy loading 276 tool definitions into your LLM context? Fair enough. Start the server with `--mode dynamic` and you get 3 meta-tools instead:
+Don't fancy loading 279 tool definitions into your LLM context? Fair enough. Start the server with `--mode dynamic` and you get 3 meta-tools instead:
 
 | Tool | What It Does |
 |------|-------------|
@@ -27,7 +27,7 @@ Don't fancy loading 276 tool definitions into your LLM context? Fair enough. Sta
 | `fluentcart_describe_tools` | Get full input schemas and annotations for specific tools (max 10 per request). |
 | `fluentcart_execute_tool` | Execute any tool by name with provided input. |
 
-The AI discovers tools on demand instead of loading all 276 upfront. Same tools, same results — just lazily loaded.
+The AI discovers tools on demand instead of loading all 279 upfront. Same tools, same results — just lazily loaded.
 
 Categories for filtering: `product`, `order`, `customer`, `coupon`, `report`, `subscription`, `integration`, `setting`, `shipping`, `tax`, `email`, `role`, `file`, `label`, `activity`, `note`, `dashboard`, `application`, `public`, `misc`.
 
@@ -88,7 +88,7 @@ Transaction-level stuff. Payments, disputes, shipping calculations.
 | `fluentcart_order_customer_orders` | GET | Get orders for a specific customer |
 
 </Accordion>
-<Accordion title="Products — Core (13 tools)">
+<Accordion title="Products — Core (16 tools)">
 
 Product CRUD, search, and bulk operations.
 
@@ -107,6 +107,9 @@ Product CRUD, search, and bulk operations.
 | `fluentcart_product_suggest_sku` | GET | Generate a SKU suggestion |
 | `fluentcart_product_fetch_by_ids` | POST | Fetch multiple products by ID |
 | `fluentcart_product_find_subscription_variants` | GET | Find subscription-enabled variants |
+| `fluentcart_product_editor_mode_update` | POST | Switch long description between wp-editor and block-editor |
+| `fluentcart_product_create_dummy` | POST | Generate test products for development |
+| `fluentcart_product_variant_option_update` | POST | Configure attribute combinations for advanced_variations products |
 
 </Accordion>
 <Accordion title="Products — Pricing (12 tools)">
@@ -552,7 +555,7 @@ Lookup data that other tools depend on.
 | Module | Tools | Type |
 |--------|-------|------|
 | Orders (Core + Transactions) | 23 | CRUD + workflows |
-| Products (Core + Pricing + Variants + Catalogue) | 52 | Full catalogue management |
+| Products (Core + Pricing + Variants + Catalogue) | 55 | Full catalogue management |
 | Customers | 19 | Profiles, addresses, stats |
 | Subscriptions | 7 | Lifecycle management |
 | Coupons | 12 | Discounts and promotions |
@@ -573,8 +576,8 @@ Lookup data that other tools depend on.
 | Files | 4 | File management |
 | Public | 4 | Public-facing |
 | Miscellaneous | 4 | Utilities |
-| **Total (static mode)** | **276** | |
-| **Total (dynamic mode)** | **3** | Meta-tools that proxy to all 276 |
+| **Total (static mode)** | **279** | |
+| **Total (dynamic mode)** | **3** | Meta-tools that proxy to all 279 |
 
 Key endpoints also feature **response transforms** — `order_get`, `product_get`, `customer_get` and all list endpoints strip HTML blobs, embedded objects, and serialised metadata before returning. Less noise, fewer tokens, same useful data.
 
