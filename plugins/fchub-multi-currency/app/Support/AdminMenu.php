@@ -15,7 +15,7 @@ final class AdminMenu
         $submenu['fluent-cart']['multi_currency'] = [
             __('Multi-Currency', 'fchub-multi-currency'),
             'manage_options',
-            'admin.php?page=fluent-cart#/multi-currency',
+            'admin.php?page=fluent-cart#/settings/multi-currency',
             '',
             'fchub_multi_currency',
         ];

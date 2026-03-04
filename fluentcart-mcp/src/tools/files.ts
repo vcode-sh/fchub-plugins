@@ -19,10 +19,14 @@ export function fileTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_file_upload',
 			title: 'Upload File',
-			description: 'Upload a file (provide URL or base64 content).',
+			description:
+				'Upload a file. ' +
+				'WARNING: This endpoint requires multipart/form-data file upload which is not supported via JSON API. ' +
+				'The backend reads files from $request->files(), not from JSON body fields. ' +
+				'This tool will not work until FluentCart adds URL-based file import support.',
 			schema: z.object({
-				file_url: z.string().optional().describe('URL to download file from'),
-				file_name: z.string().optional().describe('File name'),
+				file_url: z.string().optional().describe('URL to download file from (NOT SUPPORTED by backend)'),
+				file_name: z.string().optional().describe('File name (backend validates as "name")'),
 				bucket: z.string().optional().describe('Storage bucket name'),
 			}),
 			endpoint: '/files/upload',

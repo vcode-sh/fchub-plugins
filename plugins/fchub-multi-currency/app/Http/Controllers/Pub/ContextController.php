@@ -46,18 +46,31 @@ final class ContextController
             ], 422);
         }
 
+        $currencyCode = strtoupper($currencyCode);
+
+        $optionStore = new OptionStore();
+        /** @var array<int, array{code: string}> $displayCurrencies */
+        $displayCurrencies = $optionStore->get('display_currencies', []);
+        $validCodes = array_column($displayCurrencies, 'code');
+
+        if (!in_array($currencyCode, $validCodes, true)) {
+            return new \WP_REST_Response([
+                'data' => ['message' => 'Invalid currency code.'],
+            ], 422);
+        }
+
         $action = new PersistContextAction(new PreferenceRepository());
-        $action->execute(strtoupper($currencyCode));
+        $action->execute($currencyCode);
 
         CurrencyContextService::reset();
 
         $userId = get_current_user_id();
-        do_action('fchub_mc/context_switched', strtoupper($currencyCode), $userId);
+        do_action('fchub_mc/context_switched', $currencyCode, $userId);
 
         return new \WP_REST_Response([
             'data' => [
                 'message'  => 'Currency preference saved.',
-                'currency' => strtoupper($currencyCode),
+                'currency' => $currencyCode,
             ],
         ]);
     }

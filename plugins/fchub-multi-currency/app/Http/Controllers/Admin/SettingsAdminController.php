@@ -26,6 +26,8 @@ final class SettingsAdminController
         $params = $request->get_json_params();
         $optionStore = new OptionStore();
 
+        $previousInterval = (int) $optionStore->get('rate_refresh_interval_hrs', 6);
+
         $allowedKeys = array_keys(\FChubMultiCurrency\Support\Constants::DEFAULT_SETTINGS);
         $sanitized = [];
 
@@ -42,6 +44,13 @@ final class SettingsAdminController
         }
 
         $optionStore->save($sanitized);
+
+        // Reschedule cron if the rate refresh interval changed
+        $newInterval = (int) ($sanitized['rate_refresh_interval_hrs'] ?? $previousInterval);
+        if ($newInterval !== $previousInterval) {
+            wp_clear_scheduled_hook('fchub_mc_refresh_rates');
+            wp_schedule_event(time(), 'fchub_mc_rate_interval', 'fchub_mc_refresh_rates');
+        }
 
         return new \WP_REST_Response([
             'data' => [

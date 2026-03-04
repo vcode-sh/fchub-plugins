@@ -7,6 +7,7 @@ namespace FChubMultiCurrency\Bootstrap\Modules;
 use FChubMultiCurrency\Bootstrap\ModuleContract;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
+use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\FeatureFlags;
@@ -33,16 +34,18 @@ final class FrontendModule implements ModuleContract
         $context = $contextService->resolve();
 
         $config = [
-            'rate'            => $context->rate->rateAsFloat(),
-            'displayCurrency' => $context->displayCurrency->code,
-            'baseCurrency'    => $context->baseCurrency->code,
-            'decimals'        => $context->displayCurrency->decimals,
-            'symbol'          => $context->displayCurrency->symbol,
-            'position'        => $context->displayCurrency->position->value,
-            'isBaseDisplay'   => $context->isBaseDisplay,
-            'restUrl'         => rest_url(Constants::REST_NAMESPACE),
-            'nonce'           => wp_create_nonce('wp_rest'),
-            'currencies'      => $optionStore->get('display_currencies', []),
+            'rate'              => $context->rate->rateAsFloat(),
+            'displayCurrency'   => $context->displayCurrency->code,
+            'baseCurrency'      => $context->baseCurrency->code,
+            'decimals'          => $context->displayCurrency->decimals,
+            'symbol'            => $context->displayCurrency->symbol,
+            'position'          => $context->displayCurrency->position->value,
+            'isBaseDisplay'     => $context->isBaseDisplay,
+            'roundingMode'      => $optionStore->get('rounding_mode', 'half_up'),
+            'roundingPrecision' => (int) $optionStore->get('rounding_precision', 0),
+            'restUrl'           => rest_url(Constants::REST_NAMESPACE),
+            'nonce'             => wp_create_nonce('wp_rest'),
+            'currencies'        => $optionStore->get('display_currencies', []),
         ];
 
         if (FeatureFlags::isEnabled('js_projection')) {
@@ -76,6 +79,31 @@ final class FrontendModule implements ModuleContract
         );
     }
 
+    private static function renderRateBadge(OptionStore $optionStore, ExchangeRate $rate): string
+    {
+        if ($optionStore->get('show_rate_freshness_badge', 'yes') !== 'yes') {
+            return '';
+        }
+
+        $staleThresholdHrs = (int) $optionStore->get('stale_threshold_hrs', 24);
+        $staleThresholdSeconds = $staleThresholdHrs * 3600;
+        $isStale = $rate->isStale($staleThresholdSeconds);
+
+        $fetchedTimestamp = strtotime($rate->fetchedAt);
+        if ($fetchedTimestamp === false) {
+            return '';
+        }
+
+        $ago = human_time_diff($fetchedTimestamp, time());
+        $class = 'fchub-mc-rate-badge' . ($isStale ? ' fchub-mc-rate-badge--stale' : '');
+        $text = esc_html(
+            /* translators: %s: human-readable time difference, e.g. "2 hours" */
+            sprintf(__('Rates updated %s ago', 'fchub-multi-currency'), $ago),
+        );
+
+        return " <span class=\"{$class}\">{$text}</span>";
+    }
+
     /**
      * @param array<string, string>|string $atts
      */
@@ -106,6 +134,8 @@ final class FrontendModule implements ModuleContract
             $html .= "<option value=\"{$code}\"{$selected}>{$name}</option>";
         }
         $html .= '</select>';
+
+        $html .= self::renderRateBadge($optionStore, $context->rate);
 
         return $html;
     }

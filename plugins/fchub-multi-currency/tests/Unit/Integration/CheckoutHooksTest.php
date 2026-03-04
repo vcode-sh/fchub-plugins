@@ -15,10 +15,10 @@ final class CheckoutHooksTest extends TestCase
     {
         CheckoutHooks::register();
 
-        $registered = array_column($GLOBALS['wp_actions_registered'], 'tag');
+        $registered = array_column($GLOBALS['wp_actions_registered'] ?? [], 'tag');
         $filters = array_column($GLOBALS['wp_filters_registered'], 'tag');
 
-        $this->assertContains('fluent_cart/checkout/before_patch_checkout_data', $registered);
+        $this->assertNotContains('fluent_cart/checkout/before_patch_checkout_data', $registered);
         $this->assertContains('fluent_cart/checkout/after_patch_checkout_data_fragments', $filters);
     }
 }

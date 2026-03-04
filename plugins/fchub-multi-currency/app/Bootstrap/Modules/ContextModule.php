@@ -7,7 +7,6 @@ namespace FChubMultiCurrency\Bootstrap\Modules;
 use FChubMultiCurrency\Bootstrap\ModuleContract;
 use FChubMultiCurrency\Domain\Enums\ResolverSource;
 use FChubMultiCurrency\Domain\Resolvers\CookieResolver;
-use FChubMultiCurrency\Domain\Resolvers\DefaultResolver;
 use FChubMultiCurrency\Domain\Resolvers\GeoResolver;
 use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
 use FChubMultiCurrency\Domain\Resolvers\UrlParamResolver;
@@ -67,10 +66,13 @@ final class ContextModule implements ModuleContract
     private static function buildResolverChain(OptionStore $optionStore): ResolverChain
     {
         $settings = $optionStore->all();
+        $rateRepo = new ExchangeRateRepository();
         $rateService = new ExchangeRateService(
-            new ExchangeRateRepository(),
+            $rateRepo,
             new RatesCacheStore(),
         );
+
+        $staleFallback = $settings['stale_fallback'] ?? 'base';
 
         $chain = new ResolverChain();
 
@@ -78,37 +80,34 @@ final class ContextModule implements ModuleContract
         if (($settings['url_param_enabled'] ?? 'yes') === 'yes') {
             $paramKey = $settings['url_param_key'] ?? 'currency';
             $urlResolver = new UrlParamResolver($paramKey);
-            $chain->add(ResolverSource::UrlParam, self::wrapResolver($urlResolver, $rateService, ResolverSource::UrlParam));
+            $chain->add(ResolverSource::UrlParam, self::wrapResolver($urlResolver, $rateService, $rateRepo, $staleFallback, ResolverSource::UrlParam));
         }
 
         // Priority 2: Logged-in user meta
         $userMetaResolver = new UserMetaResolver();
-        $chain->add(ResolverSource::UserMeta, self::wrapResolver($userMetaResolver, $rateService, ResolverSource::UserMeta));
+        $chain->add(ResolverSource::UserMeta, self::wrapResolver($userMetaResolver, $rateService, $rateRepo, $staleFallback, ResolverSource::UserMeta));
 
         // Priority 3: Guest cookie
         if (($settings['cookie_enabled'] ?? 'yes') === 'yes') {
             $cookieResolver = new CookieResolver();
-            $chain->add(ResolverSource::Cookie, self::wrapResolver($cookieResolver, $rateService, ResolverSource::Cookie));
+            $chain->add(ResolverSource::Cookie, self::wrapResolver($cookieResolver, $rateService, $rateRepo, $staleFallback, ResolverSource::Cookie));
         }
 
         // Priority 4: Geolocation (feature-flagged)
         if (($settings['geo_enabled'] ?? 'no') === 'yes' && FeatureFlags::isEnabled('geo_resolver')) {
             $geoResolver = new GeoResolver();
-            $chain->add(ResolverSource::Geo, self::wrapResolver($geoResolver, $rateService, ResolverSource::Geo));
+            $chain->add(ResolverSource::Geo, self::wrapResolver($geoResolver, $rateService, $rateRepo, $staleFallback, ResolverSource::Geo));
         }
 
-        // Priority 5: Default (always returns base currency)
-        $defaultResolver = new DefaultResolver();
-        $chain->add(ResolverSource::Fallback, function (string $baseCurrencyCode, array $enabledCurrencies) use ($defaultResolver) {
-            $code = $defaultResolver->resolve($baseCurrencyCode, $enabledCurrencies);
-            $baseCurrency = Currency::from([
-                'code'     => $code,
-                'name'     => $code,
-                'symbol'   => $code,
-                'decimals' => 2,
-                'position' => 'left',
-            ]);
-            return CurrencyContext::baseOnly($baseCurrency);
+        // Priority 5: Default (uses default_display_currency setting, falls back to base)
+        $defaultCurrency = $settings['default_display_currency'] ?? '';
+        $chain->add(ResolverSource::Fallback, function (string $baseCurrencyCode, array $enabledCurrencies) use ($defaultCurrency) {
+            $code = ($defaultCurrency !== '' && $defaultCurrency !== $baseCurrencyCode)
+                ? $defaultCurrency
+                : $baseCurrencyCode;
+
+            $currency = self::findCurrency($code, $enabledCurrencies);
+            return CurrencyContext::baseOnly($currency);
         });
 
         return $chain;
@@ -119,9 +118,14 @@ final class ContextModule implements ModuleContract
      *
      * @param object $resolver Any resolver with a resolve(string, array): ?string method
      */
-    private static function wrapResolver(object $resolver, ExchangeRateService $rateService, ResolverSource $source): callable
-    {
-        return function (string $baseCurrencyCode, array $enabledCurrencies) use ($resolver, $rateService, $source): ?CurrencyContext {
+    private static function wrapResolver(
+        object $resolver,
+        ExchangeRateService $rateService,
+        ExchangeRateRepository $rateRepo,
+        string $staleFallback,
+        ResolverSource $source,
+    ): callable {
+        return function (string $baseCurrencyCode, array $enabledCurrencies) use ($resolver, $rateService, $rateRepo, $staleFallback, $source): ?CurrencyContext {
             $code = $resolver->resolve($baseCurrencyCode, $enabledCurrencies);
 
             if ($code === null) {
@@ -145,7 +149,14 @@ final class ContextModule implements ModuleContract
             $rate = $rateService->getRate($baseCurrencyCode, $code);
 
             if ($rate === null) {
-                return CurrencyContext::baseOnly($baseCurrency);
+                // If stale_fallback is 'last_known', try the most recent rate from DB even if stale
+                if ($staleFallback === 'last_known') {
+                    $rate = $rateRepo->findLatest($baseCurrencyCode, $code);
+                }
+
+                if ($rate === null) {
+                    return CurrencyContext::baseOnly($baseCurrency);
+                }
             }
 
             return new CurrencyContext(

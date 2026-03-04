@@ -1,0 +1,412 @@
+---
+title: "How to Hijack FluentCart's Admin Panel (Politely)"
+description: "A complete guide to adding pages, routes, and menu items to FluentCart's Vue 3 admin SPA from your own plugin. Including the bit where they overwrite your menu items."
+author: "Vibe Code"
+date: "2026-03-04"
+category: "fluentcart"
+tags: ["fluentcart", "wordpress", "vue", "tutorial"]
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+
+You've built a FluentCart extension. You've got your REST API endpoints humming along, your data models are clean, your PHP is immaculate. Now you just need a page in FluentCart's admin panel to actually *show* all that lovely data. How hard can it be?
+
+Harder than it should be, as it turns out. But not impossible — once you understand the architecture, the boot sequence, and the one place where FluentCart actively sabotages your work (we'll get to that).
+
+Everything in this guide is battle-tested with [fchub-wishlist](https://github.com/vcode-sh/fchub-plugins). Not theoretical. Not "should work in principle." Actually works in production, dark mode included.
+
+## What You're Actually Dealing With
+
+Here's the architectural plot twist nobody warns you about: FluentCart's admin isn't *just* a Vue SPA. The top navigation bar is server-rendered PHP. The page content is a Vue 3 single-page application. Two worlds, one page, zero documentation about how they coexist.
+
+```
+┌─────────────────────────────────────────────────┐
+│  PHP-rendered top nav (.fct_admin_menu_wrap)     │  ← Server-side, NOT Vue
+│  ┌───────┬──────────┬─────────┬───────┬─────┐   │
+│  │ Home  │ Products │ Orders  │ Subs  │ More│   │
+│  └───────┴──────────┴─────────┴───────┴─────┘   │
+├─────────────────────────────────────────────────┤
+│  #fluent_cart_plugin_app                         │  ← Vue 3 SPA mounts here
+│                                                  │
+│    <router-view />                               │
+│    Your component renders here via route          │
+│                                                  │
+└─────────────────────────────────────────────────┘
+```
+
+<Callout type="info" title="Hash-Based Routing">
+  Routes use hash-based URLs (`#/path`), not HTML5 history mode. Your page lives at something like `admin.php?page=fluent-cart#/wishlist`, not a clean `/wishlist` path. It's not glamorous, but it works without server-side rewrite rules.
+</Callout>
+
+## The Boot Sequence (Read This or Suffer)
+
+Understanding the exact order things happen is the difference between "it works" and "everything is undefined and I'm questioning my career choices." Here's the sequence:
+
+1. **`fluent_cart/loading_app`** fires — this is your cue to enqueue scripts
+2. FluentCart registers its own scripts (`fluent-cart_global_admin_hooks`, then `fluent-cart_admin_app_start`)
+3. **`fluent_cart/admin_js_loaded`** fires — your last chance to manipulate the dependency chain
+4. PHP renders the page HTML: the navigation menu, the `#fluent_cart_plugin_app` div
+5. Footer scripts execute in WordPress dependency order
+6. **`fluent-cart_admin_app_start`** applies the `fluent_cart_routes` filter, creates the Vue router, mounts the app
+
+<Callout type="warn" title="Timing Is Everything">
+  Your script **must** execute before `fluent-cart_admin_app_start`. If it doesn't, the router is already created and your routes don't exist. No error, no warning — just a blank page and a vague sense of betrayal.
+</Callout>
+
+## Building the Thing
+
+<Tabs items={['PHP Hooks', 'Sidebar Menu', 'Vue Route', 'The More Menu (The Hard Bit)']}>
+  <Tab value="PHP Hooks">
+    Two hooks, two methods. The bootstrap wires them up:
+
+    ```php
+    // AdminModule.php (or wherever you bootstrap)
+    add_action('fluent_cart/loading_app', [AdminMenu::class, 'enqueueAssets']);
+    add_action('fluent_cart/admin_js_loaded', [AdminMenu::class, 'ensureLoadOrder']);
+    ```
+
+    The `AdminMenu` class does the actual work:
+
+    ```php
+    public static function enqueueAssets(): void
+    {
+        wp_enqueue_script(
+            'my-plugin-admin',
+            MY_PLUGIN_URL . 'admin/my-admin.js',
+            ['fluent-cart_global_admin_hooks'],  // Must depend on this
+            (string) filemtime(MY_PLUGIN_PATH . 'admin/my-admin.js'),
+            true  // Footer — non-negotiable
+        );
+
+        wp_localize_script('my-plugin-admin', 'myPluginAdmin', [
+            'rest_url' => esc_url_raw(rest_url('my-plugin/v1/')),
+            'nonce'    => wp_create_nonce('wp_rest'),
+        ]);
+    }
+    ```
+
+    And here's the clever bit — injecting your script into the dependency chain so it runs *before* the app starts:
+
+    ```php
+    public static function ensureLoadOrder(): void
+    {
+        global $wp_scripts;
+
+        if (isset($wp_scripts->registered['fluent-cart_admin_app_start'])) {
+            $wp_scripts->registered['fluent-cart_admin_app_start']->deps[] = 'my-plugin-admin';
+        }
+    }
+    ```
+
+    This tells WordPress: "don't you dare run `admin_app_start` until my script has executed." Without this, your route registration fires into the void.
+
+    <Callout type="warn" title="Cache Busting Matters">
+      Use `filemtime()` for the version parameter, not your plugin's version constant. During development the version string doesn't change, but the file does. Cloudflare tunnels and browser caching will happily serve you yesterday's JavaScript while you wonder why nothing works.
+    </Callout>
+  </Tab>
+  <Tab value="Sidebar Menu">
+    This bit is mercifully straightforward. Add a WordPress submenu item that points to FluentCart's page with your hash route:
+
+    ```php
+    add_action('admin_menu', function () {
+        global $submenu;
+
+        $submenu['fluent-cart']['my_page'] = [
+            __('My Page', 'my-plugin'),
+            'manage_options',
+            'admin.php?page=fluent-cart#/my-page',
+            '',
+            'my_plugin_page',
+        ];
+    }, 20);  // Priority 20: after FC registers its own menu
+    ```
+
+    Priority 20 because FluentCart registers its menu at the default priority. You want to append to it, not race it.
+
+    That's it. You get a clickable entry in the WordPress sidebar under FluentCart. It navigates to your hash route. No drama.
+  </Tab>
+  <Tab value="Vue Route">
+    Your entire admin JS is a single IIFE. No build step, no Webpack, no Vite, no `node_modules` directory the size of a small country. Just a `.js` file:
+
+    ```js
+    (function () {
+        'use strict';
+
+        // Define your page component (Options API + template string)
+        var MyPage = {
+            name: 'MyPage',
+            data: function () {
+                return {
+                    loading: true,
+                    items: [],
+                };
+            },
+            mounted: function () {
+                this.changeTitle('My Page');  // FC global mixin
+                this.fetchItems();
+            },
+            methods: {
+                fetchItems: function () {
+                    // Your REST calls here
+                },
+            },
+            template: '\
+                <div class="my-plugin-page fct-layout-width">\
+                    <div class="page-heading-wrap">\
+                        <h1 class="page-title">My Page</h1>\
+                    </div>\
+                    <div class="fct-card">\
+                        <div class="fct-card-body" v-loading="loading">\
+                            <!-- Your content -->\
+                        </div>\
+                    </div>\
+                </div>\
+            ',
+        };
+
+        // Register the route via FC's filter hook
+        window.fluent_cart_admin.hooks.addFilter(
+            'fluent_cart_routes',
+            'my_plugin',
+            function (routes) {
+                routes.my_plugin_page = {
+                    name: 'my_plugin_page',
+                    path: '/my-page',
+                    component: MyPage,
+                    meta: {
+                        active_menu: 'my_plugin_page',
+                        title: 'My Page',
+                    },
+                };
+                return routes;
+            }
+        );
+    })();
+    ```
+
+    The route object shape:
+
+    | Property | Type | Purpose |
+    |----------|------|---------|
+    | `name` | `string` | Used by `<router-link :to="{name: ...}">` |
+    | `path` | `string` | Hash route path (e.g. `/my-page`) |
+    | `component` | `object` | Options API component with template string |
+    | `meta.active_menu` | `string` | Which sidebar item to highlight |
+    | `meta.title` | `string` | Browser tab title |
+    | `meta.permission` | `string` | Optional — checked by FC's route middleware |
+
+    <Callout type="info" title="No Build Step Required">
+      FluentCart bundles `vue.esm-bundler.js` — the full Vue build with the runtime template compiler. Options API components with `template` strings work at runtime. You don't need a build step unless you genuinely want one.
+    </Callout>
+  </Tab>
+  <Tab value="The More Menu (The Hard Bit)">
+    Right. Here's where it gets spicy.
+
+    You'd think adding an item to FluentCart's "More" dropdown would be a filter away. There *is* a filter — `fluent_cart/global_admin_menu_items` — and it fires at exactly the right time. The problem? FluentCart applies it, lets you add whatever you want, then **hard-resets** the `more` key, obliterating your additions like they never existed.
+
+    Here's the offending code from `AdminHelper.php`:
+
+    ```php
+    // Line ~80: the filter fires, you add your item, life is good
+    $menuItems = apply_filters('fluent_cart/global_admin_menu_items', [...]);
+
+    // Line ~120: your additions are now gone. completely.
+    $menuItems['more'] = [
+        'label'    => __('More', 'fluent-cart'),
+        'link'     => '#',
+        'children' => []
+    ];
+    // Hard-coded children added below...
+    ```
+
+    No second filter after the reset. No hook point between the reset and the render. Your server-side options are precisely zero.
+
+    **The solution: client-side DOM injection.** The menu is server-rendered HTML, so we wait for it to appear in the DOM and surgically append our item:
+
+    ```js
+    function injectMoreMenuItem() {
+        var moreMenu = document.querySelector(
+            '.fct_menu_item.has-child .fct_menu_child'
+        );
+        if (!moreMenu || moreMenu.querySelector('.fct_menu_child_item_my_page')) {
+            return;
+        }
+
+        var li = document.createElement('li');
+        li.className = 'fct_menu_child_item fct_menu_child_item_my_page';
+
+        var a = document.createElement('a');
+        a.setAttribute('type', 'button');
+        a.setAttribute('aria-label', 'My Page');
+
+        // Derive the base URL from an existing FC link
+        var dashboardLink = document.querySelector(
+            '.fct_menu_item a[href*="fluent-cart"]'
+        );
+        a.href = dashboardLink
+            ? dashboardLink.href.split('#')[0] + '#/my-page'
+            : 'admin.php?page=fluent-cart#/my-page';
+        a.textContent = 'My Page';
+
+        li.appendChild(a);
+        moreMenu.appendChild(li);
+
+        // Also inject into the mobile off-canvas menu
+        var offcanvas = document.querySelector('.fct-offcanvas-menu-list');
+        if (offcanvas && !offcanvas.querySelector('[href*="#/my-page"]')) {
+            var div = document.createElement('div');
+            div.className = 'fct-offcanvas-menu-item';
+            div.innerHTML =
+                '<div class="fct-offcanvas-menu-label">' +
+                '<a href="' + a.href + '">My Page</a></div>';
+            offcanvas.appendChild(div);
+        }
+    }
+
+    // Poll with rAF until the menu DOM is available
+    function tryInject() {
+        if (document.querySelector('.fct_menu_item.has-child .fct_menu_child')) {
+            injectMoreMenuItem();
+        } else {
+            requestAnimationFrame(tryInject);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+            tryInject();
+        });
+    } else {
+        tryInject();
+    }
+    ```
+
+    <Callout type="warn" title="Why requestAnimationFrame Polling?">
+      The menu HTML is server-rendered and appears before your script in the document. But the browser may not have parsed it into the DOM by the time your script executes. `DOMContentLoaded` handles most cases, but `requestAnimationFrame` polling catches the edge cases where the parser hasn't quite finished. It's ugly. It works.
+    </Callout>
+  </Tab>
+</Tabs>
+
+## Your Cheat Sheet
+
+<Tabs items={['CSS Classes', 'Global Mixins', 'Element Plus']}>
+  <Tab value="CSS Classes">
+    FluentCart uses Tailwind internally but exposes these semantic classes you can rely on:
+
+    | Class | Purpose |
+    |-------|---------|
+    | `.fct-layout-width` | Full-width page container |
+    | `.page-heading-wrap` | Page title bar (flex, space-between) |
+    | `.page-title` | H1 inside heading wrap |
+    | `.actions` | Right-aligned action buttons in heading |
+    | `.fct-card` | White card container with rounded corners |
+    | `.fct-card-border` | Card variant with visible border |
+    | `.fct-card-header` | Card header section |
+    | `.fct-card-body` | Card content area (padding: 20px) |
+    | `.fct-card-footer` | Card footer with top border |
+  </Tab>
+  <Tab value="Global Mixins">
+    FluentCart's `useAppMixin()` is applied to every component. You get all of these for free:
+
+    | Method | What It Does |
+    |--------|-------------|
+    | `this.$message.success(text)` | Green toast notification |
+    | `this.$message.error(text)` | Red toast notification |
+    | `this.$notify({...})` | Full notification with options |
+    | `this.$confirm(msg, title, opts)` | Confirmation dialog |
+    | `this.changeTitle(text)` | Update the browser tab title |
+    | `this.appVars` | Access to `window.fluentCartAdminApp` config |
+  </Tab>
+  <Tab value="Element Plus">
+    All registered globally — use them directly in template strings, no imports needed:
+
+    `el-tabs`, `el-tab-pane`, `el-form`, `el-form-item`, `el-input`, `el-input-number`, `el-select`, `el-option`, `el-button`, `el-table`, `el-table-column`, `el-tag`, `el-badge`, `el-alert`, `el-dialog`, `el-drawer`, `el-switch`, `el-checkbox`, `el-radio`, `el-tooltip`, `el-popover`, `el-dropdown`, `el-pagination`, `el-empty`, `el-progress`, and roughly 40 more.
+
+    The `v-loading` directive is also globally available — stick it on any element for a loading spinner.
+  </Tab>
+</Tabs>
+
+## REST API — Roll Your Own
+
+You can't use FluentCart's built-in `$get` / `$post` helpers. They prepend FC's own REST base URL, which won't match your plugin's namespace. Write a minimal fetch wrapper instead:
+
+```js
+var config = window.myPluginAdmin || {};
+
+function request(method, path, body) {
+    var opts = {
+        method: method === 'PUT' ? 'POST' : method,
+        headers: {
+            'Content-Type': 'application/json',
+            'X-WP-Nonce': config.nonce || '',
+        },
+        credentials: 'same-origin',
+    };
+    // WP REST doesn't reliably support PUT in all setups
+    if (method === 'PUT') {
+        opts.headers['X-HTTP-Method-Override'] = 'PUT';
+    }
+    if (body) {
+        opts.body = JSON.stringify(body);
+    }
+    return fetch(config.rest_url + path, opts).then(function (res) {
+        return res.json().then(function (json) {
+            if (!res.ok) throw json;
+            return json.data || json;
+        });
+    });
+}
+```
+
+The `X-HTTP-Method-Override` trick handles the environments where `PUT` requests get mangled by Apache or security plugins. Send it as `POST` with the override header, and WordPress's REST API does the right thing.
+
+## Page Template
+
+The standard HTML pattern that matches FluentCart's own pages. Use this and your page looks native:
+
+```html
+<div class="my-plugin-page fct-layout-width">
+    <div class="page-heading-wrap">
+        <h1 class="page-title">My Page</h1>
+        <div class="actions">
+            <el-button type="primary" :loading="saving" @click="save">
+                Save Settings
+            </el-button>
+        </div>
+    </div>
+    <div class="fct-card">
+        <div class="fct-card-body">
+            <!-- Your content here -->
+        </div>
+    </div>
+</div>
+```
+
+## Gotchas (The Bit You'll Wish You Read First)
+
+<Accordions type="single">
+  <Accordion title="No build step needed — seriously">
+    FluentCart bundles `vue.esm-bundler.js`, the full Vue build with the runtime template compiler. Options API components with `template` strings work perfectly at runtime. Don't create a Vite or Webpack setup unless you genuinely need Composition API, TypeScript, or SFC support. A single `.js` file is fine. It's liberating, actually.
+  </Accordion>
+  <Accordion title="The global_admin_menu_items filter is useless for More children">
+    `fluent_cart/global_admin_menu_items` fires, you add your item to the `more.children` array, and then FluentCart hard-resets the entire `more` key. Your additions vanish. There's no hook after the reset. Client-side DOM injection is the only viable path. Yes, it feels wrong. It works.
+  </Accordion>
+  <Accordion title="Cache busting with filemtime() is essential">
+    Use `filemtime()` as the version parameter for `wp_enqueue_script`, not your plugin's version constant. The version constant doesn't change between file edits during development, which means the browser (and Cloudflare, if you're using a tunnel) serves stale JavaScript while you stare at unchanged behaviour wondering what's gone wrong. Ask how we know.
+  </Accordion>
+  <Accordion title="Dark mode works automatically">
+    FluentCart's CSS classes handle dark mode via Tailwind's `dark:` variants. If you stick to the semantic classes (`.fct-card`, `.page-heading-wrap`, etc.), dark mode just works. For custom CSS, use CSS custom properties or `@media (prefers-color-scheme: dark)`. Don't fight the system.
+  </Accordion>
+  <Accordion title="Script must be in footer with correct dependency chain">
+    Your script needs two things: (a) a dependency on `fluent-cart_global_admin_hooks` so `window.fluent_cart_admin.hooks` exists when your code runs, and (b) to be injected into `fluent-cart_admin_app_start`'s dependency array so routes register before the router initialises. Miss either one and you get either "hooks is undefined" or routes that register after the router has already been created. Both are silent failures.
+  </Accordion>
+  <Accordion title="Template string line continuations in vanilla JS">
+    Without a build step, multi-line template strings use backslash line continuations (`\` at the end of each line). Watch for unescaped quotes inside your templates — a stray `'` in an HTML attribute will terminate your string literal and the error message won't point you anywhere useful.
+  </Accordion>
+</Accordions>
+
+---
+
+Now go build something. And when FluentCart updates and breaks all of this, you'll know exactly which hook to blame.

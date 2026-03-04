@@ -83,29 +83,60 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			},
 		}),
 
-		putTool(client, {
+		createTool(client, {
 			name: 'fluentcart_customer_update',
 			title: 'Update Customer',
-			description: 'Update an existing customer profile.',
+			description:
+				'Update a customer profile using fetch-merge. Fetches current state, merges your changes, ensures required fields (full_name, email) are always sent.',
+			annotations: { idempotentHint: true },
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 				first_name: z.string().optional().describe('First name'),
 				last_name: z.string().optional().describe('Last name'),
-				phone: z.string().optional().describe('Phone number'),
+				full_name: z.string().optional().describe('Full name'),
+				email: z.string().optional().describe('Email address'),
 				status: z.string().optional().describe('Customer status: active, inactive'),
+				notes: z.string().optional().describe('Customer notes'),
 			}),
-			endpoint: '/customers/:customer_id',
+			handler: async (c, input) => {
+				const customerId = input.customer_id as number
+				// Fetch current customer
+				const current = await c.get(`/customers/${customerId}`)
+				const wrapper = current.data as Record<string, unknown>
+				const customer = (wrapper.customer ?? wrapper) as Record<string, unknown>
+				// Merge changes over current state
+				const { customer_id, ...changes } = input
+				const merged: Record<string, unknown> = {
+					// id is required in body so the validator can exclude this customer from email uniqueness check
+					id: customerId,
+					first_name: customer.first_name,
+					last_name: customer.last_name,
+					full_name: customer.full_name,
+					email: customer.email,
+					status: customer.status,
+					...changes,
+				}
+				const resp = await c.put(`/customers/${customerId}`, merged)
+				return resp.data
+			},
 		}),
 
-		putTool(client, {
+		createTool(client, {
 			name: 'fluentcart_customer_update_additional_info',
-			title: 'Update Customer Additional Info',
-			description: 'Update custom metadata fields on a customer record.',
+			title: 'Update Customer Labels',
+			description:
+				'Update label assignments on a customer record. Pass an array of label IDs to sync.',
+			annotations: { idempotentHint: true },
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
-				info: z.record(z.string(), z.unknown()).optional().describe('Key-value metadata to update'),
+				labels: z.array(z.number()).describe('Array of label IDs to assign to the customer'),
 			}),
-			endpoint: '/customers/:customer_id/additional-info',
+			handler: async (c, input) => {
+				const customerId = input.customer_id as number
+				const labels = input.labels as number[]
+				const resp = await c.put(`/customers/${customerId}/additional-info`, { labels })
+				return resp.data
+			},
 		}),
 
 		getTool(client, {
@@ -260,14 +291,10 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_customer_bulk_action',
 			title: 'Bulk Customer Actions',
 			description:
-				'Perform bulk actions on multiple customers. Actions: update_status, delete, export.',
+				'Perform bulk actions on multiple customers. Only supported action: delete_customers.',
 			schema: z.object({
-				action: z.string().describe('Bulk action: update_status, delete, export'),
+				action: z.enum(['delete_customers']).describe('Bulk action: delete_customers'),
 				customer_ids: z.array(z.number()).describe('Array of customer IDs'),
-				data: z
-					.record(z.string(), z.unknown())
-					.optional()
-					.describe('Additional action data (e.g. status for update_status)'),
 			}),
 			endpoint: '/customers/do-bulk-action',
 		}),

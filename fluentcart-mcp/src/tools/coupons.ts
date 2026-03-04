@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
 
 export function couponTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -69,12 +69,13 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/coupons/:coupon_id',
 		}),
 
-		putTool(client, {
+		createTool(client, {
 			name: 'fluentcart_coupon_update',
 			title: 'Update Coupon',
 			description:
-				'Update an existing coupon. All required fields must be sent (no partial updates). ' +
+				'Update a coupon using fetch-merge pattern. Fetches current state, merges your changes, submits full payload. ' +
 				'Types: percentage, fixed, free_shipping.',
+			annotations: { idempotentHint: true },
 			schema: z.object({
 				coupon_id: z.number().describe('Coupon ID'),
 				title: z.string().optional().describe('Coupon display name'),
@@ -104,7 +105,17 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 					.optional()
 					.describe('Coupon conditions and restrictions'),
 			}),
-			endpoint: '/coupons/:coupon_id',
+			handler: async (c, input) => {
+				const id = input.coupon_id as number
+				const current = await c.get(`/coupons/${id}`)
+				const wrapper = current.data as Record<string, unknown>
+				const coupon = (wrapper.coupon ?? wrapper) as Record<string, unknown>
+				const { coupon_id: _id, ...changes } = input
+				const merged = { ...coupon, ...changes } as Record<string, unknown>
+				delete merged.id
+				const resp = await c.put(`/coupons/${id}`, merged)
+				return resp.data
+			},
 		}),
 
 		createTool(client, {
@@ -126,28 +137,65 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			},
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_coupon_apply',
 			title: 'Apply Coupon',
 			description:
-				'Apply a coupon to an order. Side effect: recalculates order totals with discount.',
+				'Apply a coupon to an order. Fetches order items automatically. ' +
+				'Side effect: recalculates order totals with discount.',
 			schema: z.object({
 				code: z.string().describe('Coupon code to apply'),
 				order_id: z.number().describe('Order ID to apply the coupon to'),
 			}),
-			endpoint: '/coupons/apply',
+			handler: async (c, input) => {
+				const orderId = input.order_id as number
+				const code = input.code as string
+				const orderResp = await c.get(`/orders/${orderId}`)
+				const orderWrapper = orderResp.data as Record<string, unknown>
+				const order = (orderWrapper.order ?? orderWrapper) as Record<string, unknown>
+				const items = (order.items ?? order.order_items ?? []) as Record<string, unknown>[]
+				const orderItems = items.map((item) => ({
+					post_id: item.post_id ?? item.product_id,
+					object_id: item.object_id ?? item.variant_id ?? item.post_id ?? item.product_id,
+					quantity: item.quantity ?? 1,
+				}))
+				const resp = await c.post('/coupons/apply', {
+					coupon_code: code,
+					order_id: orderId,
+					order_items: orderItems,
+				})
+				return resp.data
+			},
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_coupon_cancel',
 			title: 'Cancel Coupon',
 			description:
-				'Remove an applied coupon from an order. Side effect: recalculates totals without discount.',
+				'Remove an applied coupon from an order. Fetches order items automatically. ' +
+				'Side effect: recalculates totals without discount.',
 			schema: z.object({
 				code: z.string().describe('Coupon code to remove'),
 				order_id: z.number().describe('Order ID to remove the coupon from'),
 			}),
-			endpoint: '/coupons/cancel',
+			handler: async (c, input) => {
+				const orderId = input.order_id as number
+				const orderResp = await c.get(`/orders/${orderId}`)
+				const orderWrapper = orderResp.data as Record<string, unknown>
+				const order = (orderWrapper.order ?? orderWrapper) as Record<string, unknown>
+				const items = (order.items ?? order.order_items ?? []) as Record<string, unknown>[]
+				const orderItems = items.map((item) => ({
+					post_id: item.post_id ?? item.product_id,
+					object_id: item.object_id ?? item.variant_id ?? item.post_id ?? item.product_id,
+					quantity: item.quantity ?? 1,
+				}))
+				const resp = await c.post('/coupons/cancel', {
+					coupon_code: input.code,
+					order_id: orderId,
+					order_items: orderItems,
+				})
+				return resp.data
+			},
 		}),
 
 		postTool(client, {

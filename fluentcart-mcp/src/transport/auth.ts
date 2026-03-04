@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import type { NextFunction, Request, Response } from 'express'
 
 export function createBearerAuth(): (req: Request, res: Response, next: NextFunction) => void {
@@ -15,7 +16,9 @@ export function createBearerAuth(): (req: Request, res: Response, next: NextFunc
 		}
 
 		const token = header.slice(7)
-		if (token !== apiKey) {
+		const tokenBuf = Buffer.from(token)
+		const keyBuf = Buffer.from(apiKey)
+		if (tokenBuf.length !== keyBuf.length || !timingSafeEqual(tokenBuf, keyBuf)) {
 			res.status(401).json({ error: 'Invalid API key' })
 			return
 		}

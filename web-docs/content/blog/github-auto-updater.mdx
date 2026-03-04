@@ -1,0 +1,172 @@
+---
+title: "WordPress Auto-Updates from GitHub (No License Server Required)"
+description: "How I wired up native WordPress plugin updates using nothing but the GitHub Releases API, one PHP class, and a healthy disregard for paid update services."
+author: "Vibe Code"
+date: "2026-03-04"
+category: "general"
+tags: ["wordpress", "github", "updates", "open-source"]
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+
+WordPress has had a native mechanism for third-party plugin updates since version 5.8. It's called `Update URI`. It shipped in July 2021. Almost nobody uses it.
+
+Instead, the WordPress ecosystem has collectively decided that plugin updates require one of the following: a custom license server you maintain forever, a SaaS that charges per-site, or a convoluted GitHub integration library that hasn't been updated since the Obama administration. For *public* repos. Where the ZIP is sitting right there. On GitHub. For free.
+
+Right. I fixed that.
+
+## The Problem
+
+I've got eight plugins in a public monorepo. Tagged releases. ZIPs attached. A perfectly functional CI pipeline that builds and publishes everything. And absolutely zero mechanism for WordPress to know any of this exists. Users download a ZIP, install it, and then... never hear about updates again. Unless they happen to check the GitHub releases page. Which they don't. Nobody does. I barely do it myself.
+
+So I sat down and looked at the options:
+
+1. **License server** — Maintain a server just to tell people a new version exists? For free plugins? Absolutely not.
+2. **Third-party update service** — Pay someone to host a JSON endpoint. The JSON contains a version number and a URL. That's it. That's what you're paying for.
+3. **Existing GitHub updater libraries** — Most are abandoned, over-engineered, or require an auth token for public repos because the author didn't read the GitHub API docs.
+4. **WordPress's built-in `Update URI` mechanism** — One filter. No external dependencies. Ships with WordPress since 5.8.
+
+I went with option 4. Revolutionary, I know.
+
+## How It Works
+
+The entire system is one PHP class: `FCHub_GitHub_Updater`. About 270 lines. No Composer dependencies, no external services, no auth tokens. Here's the flow:
+
+Each plugin declares a custom `Update URI` in its header:
+
+```php
+/**
+ * Plugin Name: FCHub - Przelewy24
+ * Version: 1.0.2
+ * Update URI: https://fchub.co/fchub-p24
+ */
+```
+
+WordPress reads this header, extracts the hostname (`fchub.co`), and fires a filter called `update_plugins_fchub.co` every time it checks for updates. My class catches that filter, queries the GitHub Releases API, compares versions, and returns update data if something newer exists.
+
+That's it. WordPress handles the rest — the notification badge, the "View details" modal, the one-click update button. I just told it where to look.
+
+<Callout type="info" title="Why fchub.co and Not github.com?">
+  Using `Update URI: https://github.com/...` would fire `update_plugins_github.com` for *every* GitHub-hosted plugin on every WordPress site. Namespace collision. `fchub.co` is my own domain, so only my plugins trigger the filter. WordPress only cares about the hostname — the path is irrelevant.
+</Callout>
+
+## The Monorepo Wrinkle
+
+Most GitHub updater solutions assume one repo, one plugin, one tag format. I have eight plugins in one repo. Tags look like `fchub-p24/v1.0.2` — slash-separated, prefixed by slug.
+
+The class fetches all releases once, parses the slash-tags, matches them against a known slugs allowlist, and caches the result. One API call covers all eight plugins. If the MCP server releases a tag like `fluentcart-mcp/v1.0.2`, the allowlist filters it out — it's not a WordPress plugin, it doesn't belong in the update checker.
+
+```
+GitHub API → 21 releases
+  ↓ filter drafts/prereleases
+  ↓ parse slash-tags (slug/vX.Y.Z)
+  ↓ match against known plugin slugs
+  ↓ require ZIP asset named {slug}-{version}.zip
+  ↓ keep latest version per slug
+Result → 6 plugins with valid updates
+```
+
+Old-format tags like `fchub-p24-v1.0.0` (dash instead of slash) get quietly ignored. Legacy is legacy.
+
+## The Cache (Because GitHub Has Feelings)
+
+The public GitHub API allows 60 unauthenticated requests per hour. More than enough for a few plugins checking twice daily. But hammering the API on every page load would be rude, so I cache aggressively:
+
+1. **Static property** — Same PHP request? Already in memory. Zero cost.
+2. **WordPress transient** — Six-hour TTL. Survives across requests.
+3. **GitHub API** — Only when both caches miss.
+
+If the API returns a 403 or 429 (rate limited), the class backs off for 15 minutes. If the API is completely down, it caches an empty result for 5 minutes and moves on. No error messages, no admin notices, no drama. Just silent degradation.
+
+WordPress clears its own update transient periodically. I hook `delete_site_transient_update_plugins` to clear mine at the same time, so the caches stay in sync.
+
+## The Changelog Modal
+
+When you click "View version X.Y.Z details" on the WordPress Plugins page, it fires `plugins_api`. My class intercepts that too, returning the release notes from GitHub (converted from Markdown to HTML), the download URL, author info, and version requirements.
+
+It's not going to win any design awards, but it shows the changelog, the download link, and an "Update Now" button. Exactly what WordPress expects. No custom UI, no JavaScript, no framework. Just data in the right shape.
+
+## Integration: Two Lines Per Plugin
+
+Every plugin needs a `Update URI` header and two lines of PHP:
+
+```php
+require_once __DIR__ . '/lib/GitHubUpdater.php';
+FCHub_GitHub_Updater::register('fchub-p24', plugin_basename(__FILE__), FCHUB_P24_VERSION);
+```
+
+The class uses a `class_exists` guard — each plugin ships its own copy of the file, but only the first one to load actually defines the class. All eight share the same instance, the same cache, the same single API call. Zero duplication at runtime.
+
+The file gets synced into every plugin directory by `build.sh` and the CI release workflow. One canonical source in `lib/GitHubUpdater.php`, eight identical copies in production. I wrote a three-line shell script for it and moved on with my life.
+
+## The Build
+
+I built this in one sitting. One class, no dependencies, no external services. The most complex part was parsing monorepo slash-tags, and even that's just a regex. The WordPress `Update URI` mechanism does all the heavy lifting — I just feed it data.
+
+Honestly? The testing was more fun than the building. I downgraded a plugin to version `0.0.1`, cleared the transients, hit the updates page, and watched WordPress light up with an update notification like I'd just plugged it into wordpress.org. Clicked "View details" — changelog pulled straight from the GitHub release notes. Clicked "Update Now" — ZIP downloaded from GitHub Releases and installed. The whole native WordPress update flow, powered by a public API endpoint that doesn't even know I exist.
+
+No API keys were generated. No servers were provisioned. No SaaS subscriptions were started. No tokens were pasted into settings pages. I'm unreasonably pleased about this. The kind of pleased where you lean back in your chair and just stare at the screen for a bit.
+
+<Callout type="warn" title="The One Thing You'll Forget">
+  When adding a new plugin, you must add its slug to the `KNOWN_SLUGS` array in `lib/GitHubUpdater.php` and then run `scripts/sync-updater.sh`. If you skip this, the updater will silently ignore the new plugin. No errors, no warnings. Just vibes. Ask me how I know.
+</Callout>
+
+## What It Looks Like
+
+WordPress treats my updates identically to plugins from wordpress.org:
+
+- **Dashboard → Updates** shows "Plugins (1)" with the update count
+- **Plugins page** shows "There is a new version of FCHub - Przelewy24 available" with an update link
+- **"View details" modal** shows version, author, changelog, download link, and "Update Now"
+- **One-click update** downloads the ZIP from GitHub Releases and installs it
+
+No branding differences. No "this plugin doesn't support auto-updates" disclaimers. Just native WordPress behaviour. If you didn't know the plugins came from GitHub, you wouldn't be able to tell.
+
+## The Numbers
+
+- **1** PHP class
+- **270** lines of code
+- **8** plugins covered
+- **1** GitHub API call per check cycle
+- **6-hour** cache TTL
+- **0** external services
+- **0** API tokens
+- **0** licence servers
+- **0** SaaS subscriptions
+- **0** reasons this needed to be complicated
+
+<Accordions>
+  <Accordion title="Edge cases handled (because paranoia is a feature)">
+    **All plugins deactivated** — No updater loads. Activating any single FCHub plugin checks for updates across all installed ones, active or not.
+
+    **GitHub API down** — Empty cache for 5 minutes, silent degradation. WordPress admin works fine.
+
+    **Rate limited** — 15-minute backoff. Auto-recovery. At 60 requests/hour you'd need impressive scale to hit this.
+
+    **Release without ZIP asset** — Skipped. Falls back to the previous release with a valid ZIP.
+
+    **Draft/prerelease releases** — Filtered out entirely.
+
+    **Non-plugin tags** (like `fluentcart-mcp/*`) — Filtered by known slugs allowlist.
+  </Accordion>
+  <Accordion title="Adding a new plugin (the checklist)">
+    1. Add `Update URI: https://fchub.co/{slug}` to the plugin header
+    2. Add `require_once __DIR__ . '/lib/GitHubUpdater.php'` after constants
+    3. Add `FCHub_GitHub_Updater::register(...)` right after the require
+    4. Add the slug to `KNOWN_SLUGS` in `lib/GitHubUpdater.php`
+    5. Run `scripts/sync-updater.sh`
+    6. Tag a release: `{slug}/v1.0.0`
+    7. Ensure the release has a ZIP asset named `{slug}-1.0.0.zip`
+  </Accordion>
+</Accordions>
+
+## Why I'm Writing About This
+
+Because I spent an embarrassing amount of time researching update solutions before realising WordPress already had one built in. Five years it's been there. Five years of people spinning up license servers, paying for update hosting, pulling in massive libraries — all to serve a version number and a download URL.
+
+The `Update URI` header and the `update_plugins_{hostname}` filter are built-in, documented, and stable. For public GitHub repos, the Releases API gives you everything you need — version numbers, changelogs, downloadable assets — with zero authentication.
+
+The entire WordPress plugin update ecosystem has been over-engineered for years. If your plugins are on a public GitHub repo with tagged releases and ZIP assets, you are about 270 lines of PHP away from native WordPress auto-updates.
+
+I just wrote those 270 lines. You can too.

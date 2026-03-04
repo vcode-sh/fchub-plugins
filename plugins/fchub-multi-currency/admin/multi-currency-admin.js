@@ -52,49 +52,101 @@
         name: 'GeneralSettings',
         props: { settings: { type: Object, required: true } },
         template: '\
-<el-form label-position="top">\
-    <el-form-item label="Multi-Currency Enabled">\
-        <el-select v-model="settings.enabled">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-        <p class="fchub-mc-tip">Master switch for display-layer multi-currency across the store.</p>\
-    </el-form-item>\
-    <el-form-item label="Base Currency">\
-        <el-input v-model="settings.base_currency" placeholder="USD" maxlength="3" style="max-width:120px" />\
-        <p class="fchub-mc-tip">ISO 4217 code. All payments are settled in this currency.</p>\
-    </el-form-item>\
-    <el-form-item label="Default Display Currency">\
-        <el-input v-model="settings.default_display_currency" placeholder="USD" maxlength="3" style="max-width:120px" />\
-        <p class="fchub-mc-tip">Currency shown to visitors before any preference is detected.</p>\
-    </el-form-item>\
-    <el-form-item label="URL Parameter">\
-        <el-select v-model="settings.url_param_enabled">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-        <p class="fchub-mc-tip">Allow currency switching via URL (e.g. ?currency=EUR).</p>\
-    </el-form-item>\
-    <el-form-item v-if="settings.url_param_enabled === \'yes\'" label="URL Parameter Key">\
-        <el-input v-model="settings.url_param_key" placeholder="currency" style="max-width:200px" />\
-    </el-form-item>\
-    <el-form-item label="Cookie Persistence">\
-        <el-select v-model="settings.cookie_enabled">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-    </el-form-item>\
-    <el-form-item v-if="settings.cookie_enabled === \'yes\'" label="Cookie Lifetime (days)">\
-        <el-input-number v-model="settings.cookie_lifetime_days" :min="1" :max="365" />\
-    </el-form-item>\
-    <el-form-item label="Remove Data on Uninstall">\
-        <el-select v-model="settings.uninstall_remove_data">\
-            <el-option label="No (keep data)" value="no" />\
-            <el-option label="Yes (delete all)" value="yes" />\
-        </el-select>\
-        <p class="fchub-mc-tip">If enabled, all tables and settings will be removed when the plugin is uninstalled.</p>\
-    </el-form-item>\
-</el-form>',
+<div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Multi-Currency Enabled</span>\
+            <div class="form-note">Master switch for display-layer multi-currency across the store.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Base Currency</span>\
+            <div class="form-note">ISO 4217 code. All payments are settled in this currency.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-input v-model="settings.base_currency" placeholder="USD" maxlength="3" style="max-width:120px" autocomplete="one-time-code" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Default Display Currency</span>\
+            <div class="form-note">Currency shown to visitors before any preference is detected.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-input v-model="settings.default_display_currency" placeholder="USD" maxlength="3" style="max-width:120px" autocomplete="one-time-code" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">URL Parameter</span>\
+            <div class="form-note">Allow currency switching via URL (e.g. ?currency=EUR).</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.url_param_enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div v-if="settings.url_param_enabled === \'yes\'">\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">URL Parameter Key</span>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input v-model="settings.url_param_key" placeholder="currency" style="max-width:200px" autocomplete="one-time-code" />\
+            </div>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Cookie Persistence</span>\
+            <div class="form-note">Remember visitor currency preference in browser cookies.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.cookie_enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div v-if="settings.cookie_enabled === \'yes\'">\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">Cookie Lifetime (days)</span>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input-number v-model="settings.cookie_lifetime_days" :min="1" :max="365" />\
+            </div>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Remove Data on Uninstall</span>\
+            <div class="form-note">If enabled, all tables and settings will be removed when the plugin is uninstalled.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.uninstall_remove_data">\
+                <el-radio label="Keep data" value="no" />\
+                <el-radio label="Delete all" value="yes" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+</div>',
     };
 
     var CurrencySettings = {
@@ -176,32 +228,71 @@
         },
         template: '\
 <div>\
-    <el-form label-position="top" style="max-width:560px">\
-        <el-form-item label="Rate Provider">\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Rate Provider</span>\
+            <div class="form-note">Service used to fetch exchange rates.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
             <el-select v-model="settings.rate_provider">\
                 <el-option label="ExchangeRate-API (free tier)" value="exchange_rate_api" />\
                 <el-option label="Open Exchange Rates" value="open_exchange_rates" />\
                 <el-option label="European Central Bank (free)" value="ecb" />\
                 <el-option label="Manual rates" value="manual" />\
             </el-select>\
-        </el-form-item>\
-        <el-form-item v-if="settings.rate_provider !== \'ecb\' && settings.rate_provider !== \'manual\'" label="API Key">\
-            <el-input v-model="settings.rate_provider_api_key" type="password" show-password />\
-        </el-form-item>\
-        <el-form-item label="Refresh Interval (hours)">\
+        </div>\
+    </div>\
+    <div v-if="settings.rate_provider !== \'ecb\' && settings.rate_provider !== \'manual\'">\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">API Key</span>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input v-model="settings.rate_provider_api_key" type="password" show-password autocomplete="one-time-code" />\
+            </div>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Refresh Interval (hours)</span>\
+            <div class="form-note">How often to fetch new exchange rates.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
             <el-input-number v-model="settings.rate_refresh_interval_hrs" :min="1" :max="168" />\
-        </el-form-item>\
-        <el-form-item label="Stale Threshold (hours)">\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Stale Threshold (hours)</span>\
+            <div class="form-note">Rates older than this will trigger an admin warning.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
             <el-input-number v-model="settings.stale_threshold_hrs" :min="1" :max="720" />\
-            <p class="fchub-mc-tip">Rates older than this will trigger an admin warning.</p>\
-        </el-form-item>\
-        <el-form-item label="Stale Rate Fallback">\
-            <el-select v-model="settings.stale_fallback">\
-                <el-option label="Show base currency" value="base" />\
-                <el-option label="Use last known rate" value="last_known" />\
-            </el-select>\
-        </el-form-item>\
-        <el-form-item label="Rounding Mode">\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Stale Rate Fallback</span>\
+            <div class="form-note">What to do when rates are outdated beyond the threshold.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.stale_fallback">\
+                <el-radio label="Show base currency" value="base" />\
+                <el-radio label="Use last known rate" value="last_known" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Rounding Mode</span>\
+            <div class="form-note">How converted prices are rounded.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
             <el-select v-model="settings.rounding_mode">\
                 <el-option label="No rounding" value="none" />\
                 <el-option label="Round half up (standard)" value="half_up" />\
@@ -209,9 +300,9 @@
                 <el-option label="Always round up" value="ceil" />\
                 <el-option label="Always round down" value="floor" />\
             </el-select>\
-        </el-form-item>\
-    </el-form>\
-    <div style="margin-top:20px">\
+        </div>\
+    </div>\
+    <div style="margin-top:24px">\
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">\
             <h3 style="font-size:16px;font-weight:500;margin:0">Current Rates</h3>\
             <el-button size="small" @click="$emit(\'refresh-rates\')" :loading="ratesLoading">Refresh Now</el-button>\
@@ -239,70 +330,131 @@
         name: 'CheckoutSettings',
         props: { settings: { type: Object, required: true } },
         template: '\
-<el-form label-position="top" style="max-width:560px">\
-    <el-form-item label="Checkout Disclosure">\
-        <el-select v-model="settings.checkout_disclosure_enabled">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-        <p class="fchub-mc-tip">Show a notice at checkout that payment is processed in the base currency.</p>\
-    </el-form-item>\
-    <el-form-item v-if="settings.checkout_disclosure_enabled === \'yes\'" label="Disclosure Text">\
-        <el-input v-model="settings.checkout_disclosure_text" type="textarea" :rows="3" />\
-        <p class="fchub-mc-tip">Supports placeholders: {base_currency}, {display_currency}, {rate}</p>\
-    </el-form-item>\
-    <el-form-item label="Show Rate Freshness Badge">\
-        <el-select v-model="settings.show_rate_freshness_badge">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-    </el-form-item>\
-</el-form>',
+<div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Checkout Disclosure</span>\
+            <div class="form-note">Show a notice at checkout that payment is processed in the base currency.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.checkout_disclosure_enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div v-if="settings.checkout_disclosure_enabled === \'yes\'">\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">Disclosure Text</span>\
+                <div class="form-note">Supports placeholders: {base_currency}, {display_currency}, {rate}</div>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input v-model="settings.checkout_disclosure_text" type="textarea" :rows="3" />\
+            </div>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Rate Freshness Badge</span>\
+            <div class="form-note">Display a badge indicating when rates were last updated.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.show_rate_freshness_badge">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+</div>',
     };
 
     var CrmSettings = {
         name: 'CrmSettings',
         props: { settings: { type: Object, required: true } },
         template: '\
-<el-form label-position="top" style="max-width:560px">\
-    <h3 style="font-size:16px;font-weight:500;margin:0 0 16px">FluentCRM</h3>\
-    <el-form-item label="FluentCRM Sync">\
-        <el-select v-model="settings.fluentcrm_enabled">\
-            <el-option label="Enabled" value="yes" />\
-            <el-option label="Disabled" value="no" />\
-        </el-select>\
-        <p class="fchub-mc-tip">Tag contacts and update custom fields based on currency preference.</p>\
-    </el-form-item>\
-    <el-form-item v-if="settings.fluentcrm_enabled === \'yes\'" label="Auto-create Tags">\
-        <el-select v-model="settings.fluentcrm_auto_create_tags">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-    </el-form-item>\
-    <el-form-item v-if="settings.fluentcrm_enabled === \'yes\'" label="Tag Prefix">\
-        <el-input v-model="settings.fluentcrm_tag_prefix" placeholder="currency:" style="max-width:200px" />\
-        <p class="fchub-mc-tip">Tags created as {prefix}{CODE}, e.g. currency:EUR</p>\
-    </el-form-item>\
-    <el-form-item v-if="settings.fluentcrm_enabled === \'yes\'" label="Preferred Currency Field">\
-        <el-input v-model="settings.fluentcrm_field_preferred" style="max-width:300px" />\
-    </el-form-item>\
-    <el-form-item v-if="settings.fluentcrm_enabled === \'yes\'" label="Last Order Currency Field">\
-        <el-input v-model="settings.fluentcrm_field_last_order" style="max-width:300px" />\
-    </el-form-item>\
-    <el-form-item v-if="settings.fluentcrm_enabled === \'yes\'" label="Last Order FX Rate Field">\
-        <el-input v-model="settings.fluentcrm_field_last_rate" style="max-width:300px" />\
-    </el-form-item>\
-    <div style="border-top:1px solid var(--el-border-color);padding-top:20px;margin-top:20px">\
-        <h3 style="font-size:16px;font-weight:500;margin:0 0 16px">FluentCommunity</h3>\
-        <el-form-item label="FluentCommunity Sync">\
-            <el-select v-model="settings.fluentcommunity_enabled">\
-                <el-option label="Enabled" value="yes" />\
-                <el-option label="Disabled" value="no" />\
-            </el-select>\
-            <p class="fchub-mc-tip">Sync currency preference to FluentCommunity user meta.</p>\
-        </el-form-item>\
+<div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">FluentCRM Sync</span>\
+            <div class="form-note">Tag contacts and update custom fields based on currency preference.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.fluentcrm_enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
     </div>\
-</el-form>',
+    <div v-if="settings.fluentcrm_enabled === \'yes\'">\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">Auto-create Tags</span>\
+                <div class="form-note">Automatically create tags for each currency.</div>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-radio-group v-model="settings.fluentcrm_auto_create_tags">\
+                    <el-radio label="Yes" value="yes" />\
+                    <el-radio label="No" value="no" />\
+                </el-radio-group>\
+            </div>\
+        </div>\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">Tag Prefix</span>\
+                <div class="form-note">Tags created as {prefix}{CODE}, e.g. currency:EUR</div>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input v-model="settings.fluentcrm_tag_prefix" placeholder="currency:" style="max-width:200px" autocomplete="one-time-code" />\
+            </div>\
+        </div>\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">Preferred Currency Field</span>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input v-model="settings.fluentcrm_field_preferred" style="max-width:300px" autocomplete="one-time-code" />\
+            </div>\
+        </div>\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">Last Order Currency Field</span>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input v-model="settings.fluentcrm_field_last_order" style="max-width:300px" autocomplete="one-time-code" />\
+            </div>\
+        </div>\
+        <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+        <div class="fchub-mc-row">\
+            <div class="setting-html-wrapper">\
+                <span class="setting-label">Last Order FX Rate Field</span>\
+            </div>\
+            <div class="setting-fields-inner">\
+                <el-input v-model="settings.fluentcrm_field_last_rate" style="max-width:300px" autocomplete="one-time-code" />\
+            </div>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper" style="margin-top:8px"><hr class="settings-divider"></div>\
+    <h3 style="font-size:14px;font-weight:600;margin:16px 0 12px">FluentCommunity</h3>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">FluentCommunity Sync</span>\
+            <div class="form-note">Sync currency preference to FluentCommunity user meta.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.fluentcommunity_enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+</div>',
     };
 
     var DiagnosticsView = {
@@ -327,7 +479,7 @@
         <div class="fct-card fct-card-border">\
             <div class="fct-card-body">\
                 <h4 style="margin:0 0 12px;font-size:14px;font-weight:500">Dependencies</h4>\
-                <div class="fchub-mc-diag-row"><span>FluentCart</span><el-tag :type="diagnostics.fluentcart_active ? \'success\' : \'danger\'" size="small">{{ diagnostics.fluentcart_active ? "Active" : "Missing" }}</el-tag></div>\
+                <div class="fchub-mc-diag-row"><span>FluentCart</span><el-tag :type="diagnostics.fluentcart_version && diagnostics.fluentcart_version !== \'not installed\' ? \'success\' : \'danger\'" size="small">{{ diagnostics.fluentcart_version && diagnostics.fluentcart_version !== \'not installed\' ? diagnostics.fluentcart_version : "Missing" }}</el-tag></div>\
                 <div class="fchub-mc-diag-row"><span>FluentCRM</span><el-tag :type="diagnostics.fluentcrm_active ? \'success\' : \'info\'" size="small">{{ diagnostics.fluentcrm_active ? "Active" : "Not found" }}</el-tag></div>\
             </div>\
         </div>\
@@ -383,7 +535,9 @@
         mounted: function () {
             this.loadSettings();
             this.loadRates();
-            this.changeTitle('Multi-Currency');
+            if (typeof this.changeTitle === 'function') {
+                this.changeTitle('Multi-Currency');
+            }
             document.addEventListener('keydown', this.onKeyDown);
         },
         beforeUnmount: function () {
@@ -402,7 +556,7 @@
                 vm.loading = true;
                 request('GET', 'admin/settings')
                     .then(function (data) {
-                        vm.settings = data;
+                        vm.settings = data.settings || data;
                     })
                     .catch(function () {
                         vm.$message.error('Failed to load settings.');
@@ -451,7 +605,7 @@
                 vm.saving = true;
                 request('POST', 'admin/settings', vm.settings)
                     .then(function (data) {
-                        vm.settings = data;
+                        vm.settings = data.settings || data;
                         vm.$message.success('Settings saved.');
                     })
                     .catch(function () {
@@ -469,47 +623,49 @@
             },
         },
         template: '\
-<div class="fchub-mc-page fct-layout-width">\
-    <div class="page-heading-wrap">\
-        <h1 class="page-title">Multi-Currency</h1>\
-        <div class="actions">\
-            <el-button type="primary" :loading="saving" @click="saveSettings">\
-                <span v-if="!saving" class="cmd block leading-none">\u2318S</span>\
-                {{ saving ? "Saving..." : "Save Settings" }}\
+<div class="setting-wrap fchub-mc-page">\
+    <div class="fct-setting-header">\
+        <div class="fct-setting-header-content">\
+            <h3 class="fct-setting-head-title">Multi-Currency</h3>\
+        </div>\
+        <div class="fct-setting-header-action">\
+            <el-button type="primary" size="small" :loading="saving" @click="saveSettings">\
+                <span v-if="!saving" class="cmd">\u2318S</span>\
+                {{ saving ? "Saving..." : "Save" }}\
             </el-button>\
         </div>\
     </div>\
-    <div class="fct-card">\
-        <div class="fct-card-body">\
-            <el-tabs v-model="activeTab">\
-                <el-tab-pane label="General" name="general">\
-                    <div v-loading="loading" class="fchub-mc-settings-wrap">\
-                        <general-settings :settings="settings" />\
-                    </div>\
-                </el-tab-pane>\
-                <el-tab-pane label="Currencies" name="currencies">\
-                    <div v-loading="loading">\
-                        <currency-settings :settings="settings" />\
-                    </div>\
-                </el-tab-pane>\
-                <el-tab-pane label="Exchange Rates" name="rates">\
+    <div class="setting-wrap-inner">\
+        <el-tabs v-model="activeTab">\
+            <el-tab-pane label="General" name="general">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body" v-loading="loading">\
+                    <general-settings :settings="settings" />\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="Currencies" name="currencies">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body" v-loading="loading">\
+                    <currency-settings :settings="settings" />\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="Exchange Rates" name="rates">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body">\
                     <rate-settings :settings="settings" :rates="rates" :rates-loading="ratesLoading" @refresh-rates="refreshRates" />\
-                </el-tab-pane>\
-                <el-tab-pane label="Checkout" name="checkout">\
-                    <div v-loading="loading" class="fchub-mc-settings-wrap">\
-                        <checkout-settings :settings="settings" />\
-                    </div>\
-                </el-tab-pane>\
-                <el-tab-pane label="CRM" name="crm">\
-                    <div v-loading="loading" class="fchub-mc-settings-wrap">\
-                        <crm-settings :settings="settings" />\
-                    </div>\
-                </el-tab-pane>\
-                <el-tab-pane label="Diagnostics" name="diagnostics">\
-                    <diagnostics-view :diagnostics="diagnostics" :loading="diagLoading" />\
-                </el-tab-pane>\
-            </el-tabs>\
-        </div>\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="Checkout" name="checkout">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body" v-loading="loading">\
+                    <checkout-settings :settings="settings" />\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="CRM" name="crm">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body" v-loading="loading">\
+                    <crm-settings :settings="settings" />\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="Diagnostics" name="diagnostics">\
+                <diagnostics-view :diagnostics="diagnostics" :loading="diagLoading" />\
+            </el-tab-pane>\
+        </el-tabs>\
     </div>\
 </div>',
     };
@@ -522,63 +678,124 @@
         'fluent_cart_routes',
         'fchub_multi_currency',
         function (routes) {
-            routes.fchub_multi_currency = {
-                name: 'fchub_multi_currency',
-                path: '/multi-currency',
-                component: MultiCurrencyPage,
-                meta: {
-                    active_menu: 'fchub_multi_currency',
-                    title: 'Multi-Currency',
-                },
-            };
+            if (routes.settings && routes.settings.children) {
+                routes.settings.children.push({
+                    name: 'multi_currency',
+                    path: 'multi-currency',
+                    component: MultiCurrencyPage,
+                    meta: {
+                        active_menu: 'settings',
+                        title: 'Multi-Currency',
+                    },
+                });
+            }
             return routes;
         }
     );
 
     /* ------------------------------------------------------------------ */
-    /*  Inject "Multi-Currency" into the More dropdown (DOM)               */
-    /*  FluentCart hard-codes the More children after the PHP filter runs, */
-    /*  so we append the item client-side once the menu is in the DOM.     */
+    /*  Inject "Multi-Currency" into the settings sidebar (DOM)            */
+    /*  Inserts a tab item before "Tax & Duties" so it groups logically   */
+    /*  with other financial settings.                                     */
     /* ------------------------------------------------------------------ */
 
-    function injectMoreMenuItem() {
-        var moreMenu = document.querySelector('.fct_menu_item.has-child .fct_menu_child');
-        if (!moreMenu || moreMenu.querySelector('.fct_menu_child_item_multi_currency')) return;
+    var MC_HASH = '#/settings/multi-currency';
+    var MC_ICON = '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5"/><path d="M2 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 2a12.24 12.24 0 0 1 3.2 8 12.24 12.24 0 0 1-3.2 8 12.24 12.24 0 0 1-3.2-8A12.24 12.24 0 0 1 10 2z" stroke="currentColor" stroke-width="1.5"/></svg>';
+    var MC_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 14" fill="none"><path d="M1 13L6.29289 7.70711C6.62623 7.37377 6.79289 7.20711 6.79289 7C6.79289 6.79289 6.62623 6.62623 6.29289 6.29289L1 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-        var li = document.createElement('li');
-        li.className = 'fct_menu_child_item fct_menu_child_item_multi_currency';
-        var a = document.createElement('a');
-        a.setAttribute('type', 'button');
-        a.setAttribute('aria-label', 'Multi-Currency');
-        var dashboardLink = document.querySelector('.fct_menu_item a[href*="fluent-cart"]');
-        a.href = dashboardLink
-            ? dashboardLink.href.split('#')[0] + '#/multi-currency'
-            : 'admin.php?page=fluent-cart#/multi-currency';
-        a.textContent = 'Multi-Currency';
-        li.appendChild(a);
-        moreMenu.appendChild(li);
-
-        var offcanvas = document.querySelector('.fct-offcanvas-menu-list');
-        if (offcanvas && !offcanvas.querySelector('[href*="#/multi-currency"]')) {
-            var div = document.createElement('div');
-            div.className = 'fct-offcanvas-menu-item';
-            div.innerHTML = '<div class="fct-offcanvas-menu-label"><a href="' + a.href + '">Multi-Currency</a></div>';
-            offcanvas.appendChild(div);
-        }
+    function isMultiCurrencyRoute() {
+        return window.location.hash.indexOf('/settings/multi-currency') !== -1;
     }
 
-    function tryInject() {
-        if (document.querySelector('.fct_menu_item.has-child .fct_menu_child')) {
-            injectMoreMenuItem();
+    function updateActiveState(navItem) {
+        if (isMultiCurrencyRoute()) {
+            navItem.classList.add('fct-settings-nav-item-active');
         } else {
-            requestAnimationFrame(tryInject);
+            navItem.classList.remove('fct-settings-nav-item-active');
         }
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { tryInject(); });
-    } else {
-        tryInject();
+    function injectSettingsSidebarItem() {
+        var navList = document.querySelector('.fct-settings-nav');
+        if (!navList) return false;
+
+        if (navList.querySelector('.fct-settings-nav-item-multi-currency')) return true;
+
+        // Build: <li class="fct-settings-nav-item">
+        var navItem = document.createElement('li');
+        navItem.className = 'fct-settings-nav-item fct-settings-nav-item-multi-currency';
+        if (isMultiCurrencyRoute()) {
+            navItem.classList.add('fct-settings-nav-item-active');
+        }
+
+        // Build: <a class="fct-settings-nav-link" href="#/settings/multi-currency">
+        var link = document.createElement('a');
+        link.className = 'fct-settings-nav-link';
+        link.href = MC_HASH;
+
+        // Icon wrapper: <div class="icon">SVG</div>
+        var iconDiv = document.createElement('div');
+        iconDiv.className = 'icon';
+        iconDiv.innerHTML = MC_ICON;
+
+        // Label + chevron: <span class="fct-settings-nav-link-text">Multi-Currency <div class="icon fct-settings-nav-link-icon">chevron</div></span>
+        var labelSpan = document.createElement('span');
+        labelSpan.className = 'fct-settings-nav-link-text';
+        labelSpan.textContent = 'Multi-Currency';
+
+        var chevronDiv = document.createElement('div');
+        chevronDiv.className = 'icon fct-settings-nav-link-icon';
+        chevronDiv.innerHTML = MC_CHEVRON;
+        labelSpan.appendChild(chevronDiv);
+
+        link.appendChild(iconDiv);
+        link.appendChild(labelSpan);
+        navItem.appendChild(link);
+
+        // Insert before "Tax & Duties"
+        var inserted = false;
+        var items = navList.querySelectorAll(':scope > .fct-settings-nav-item');
+        for (var i = 0; i < items.length; i++) {
+            var text = items[i].querySelector('.fct-settings-nav-link-text');
+            if (text && text.firstChild && text.firstChild.textContent.trim() === 'Tax & Duties') {
+                navList.insertBefore(navItem, items[i]);
+                inserted = true;
+                break;
+            }
+        }
+        if (!inserted) {
+            navList.appendChild(navItem);
+        }
+
+        // Active state tracking
+        window.addEventListener('hashchange', function () {
+            updateActiveState(navItem);
+        });
+
+        return true;
+    }
+
+    function tryInjectSidebar() {
+        if (!injectSettingsSidebarItem()) {
+            requestAnimationFrame(tryInjectSidebar);
+        }
+    }
+
+    // Start injection when navigating to settings
+    function onHashChange() {
+        if (window.location.hash.indexOf('#/settings') === 0) {
+            tryInjectSidebar();
+        }
+    }
+
+    window.addEventListener('hashchange', onHashChange);
+
+    if (window.location.hash.indexOf('#/settings') === 0) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () { tryInjectSidebar(); });
+        } else {
+            tryInjectSidebar();
+        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -587,8 +804,9 @@
 
     var style = document.createElement('style');
     style.textContent = [
-        '.fchub-mc-settings-wrap { max-width: 560px; padding: 8px 0; }',
-        '.fchub-mc-tip { font-size: 12px; color: #909399; margin: 4px 0 0; line-height: 1.4; }',
+        '.fchub-mc-page .form-section { padding: 0; }',
+        '.fchub-mc-row { display: grid; gap: 0.5rem; grid-template-columns: 1fr; padding: 4px 0; }',
+        '@media (min-width: 1024px) { .fchub-mc-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } .fchub-mc-row .setting-fields-inner { grid-column: span 2 / span 2; } }',
         '.fchub-mc-page .cmd { display: inline-block; font-size: 11px; margin-right: 4px; padding: 1px 5px; border: 1px solid rgba(255,255,255,.3); border-radius: 3px; line-height: 1; }',
         '.fchub-mc-diag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }',
         '.fchub-mc-diag-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--el-border-color-lighter); font-size: 13px; }',

@@ -73,7 +73,7 @@ export function emailNotificationTools(client: FluentCartClient): ToolDefinition
 			title: 'Preview Email Template',
 			description: 'Preview rendered email template with sample data.',
 			schema: z.object({
-				notification: z.string().optional().describe('Notification key to preview'),
+				template: z.string().optional().describe('Notification template key to preview'),
 				body: z.string().optional().describe('Custom body to render'),
 			}),
 			endpoint: '/email-notification/get-template',

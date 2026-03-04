@@ -54,7 +54,7 @@ register_activation_hook(__FILE__, function () {
     update_option('fchub_mc_db_version', FCHUB_MC_DB_VERSION);
 
     if (!wp_next_scheduled('fchub_mc_refresh_rates')) {
-        wp_schedule_event(time(), 'six_hours', 'fchub_mc_refresh_rates');
+        wp_schedule_event(time(), 'fchub_mc_rate_interval', 'fchub_mc_refresh_rates');
     }
 });
 
@@ -66,12 +66,19 @@ register_deactivation_hook(__FILE__, function () {
 });
 
 /**
- * Register custom cron interval for rate refresh.
+ * Register dynamic cron interval for rate refresh based on saved setting.
  */
 add_filter('cron_schedules', function (array $schedules): array {
-    $schedules['six_hours'] = [
-        'interval' => 6 * HOUR_IN_SECONDS,
-        'display'  => __('Every Six Hours', 'fchub-multi-currency'),
+    $settings = get_option('fchub_mc_settings', []);
+    $hours = max(1, (int) ($settings['rate_refresh_interval_hrs'] ?? 6));
+
+    $schedules['fchub_mc_rate_interval'] = [
+        'interval' => $hours * HOUR_IN_SECONDS,
+        'display'  => sprintf(
+            // translators: %d is the number of hours between rate refreshes
+            __('Every %d Hours', 'fchub-multi-currency'),
+            $hours,
+        ),
     ];
     return $schedules;
 });

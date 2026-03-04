@@ -235,9 +235,10 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_product_create_dummy',
 			title: 'Create Dummy Products',
-			description: 'Create dummy/test products for development and testing.',
+			description: 'Create dummy/test products for development and testing. Category is required by the backend.',
 			schema: z.object({
 				count: z.number().optional().describe('Number of dummy products to create'),
+				category: z.string().describe('Product category name (required by backend)'),
 			}),
 			endpoint: '/products/create-dummy',
 		}),

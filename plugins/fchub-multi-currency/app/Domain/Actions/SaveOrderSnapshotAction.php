@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Domain\Actions;
 
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
-use FChubMultiCurrency\Domain\Services\PriceProjector;
 
 defined('ABSPATH') || exit;
 
