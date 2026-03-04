@@ -8,6 +8,7 @@ import {
   Braces,
   CreditCard,
   Download,
+  Globe,
   Heart,
   Home,
   LayoutDashboard,
@@ -112,6 +113,14 @@ const cartPlugins: Plugin[] = [
       "Wishlists for FluentCart. Let customers hoard things they'll never buy.",
     icon: Heart,
     docsHref: "/docs/fchub-wishlist",
+    comingSoon: true,
+  },
+  {
+    title: "Multi-Currency",
+    description:
+      "Automatic currency conversion. Show prices in your customer's currency so they can complain in their own language.",
+    icon: Globe,
+    docsHref: "/docs/fchub-multi-currency",
     comingSoon: true,
   },
   {

@@ -7,6 +7,7 @@ import {
   CreditCard,
   Flame,
   GitPullRequest,
+  Globe,
   Heart,
   Home,
   LayoutDashboard,
@@ -64,6 +65,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
               icon: <ArrowRightLeft size={16} />,
             },
             { text: "Wishlist", url: "#", icon: <Heart size={16} /> },
+            { text: "Multi-Currency", url: "#", icon: <Globe size={16} /> },
             { text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
             {
               text: "FCHub Stream",
@@ -150,6 +152,16 @@ export default function Layout({ children }: LayoutProps<"/">) {
                   <div className="flex items-center gap-1.5 rounded-sm p-2 text-sm text-muted-foreground/50 pointer-events-none [&_svg:not([class*='size-'])]:size-4">
                     <Heart size={16} />
                     Wishlist
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto text-[10px] h-4 opacity-60"
+                    >
+                      Soon
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-sm p-2 text-sm text-muted-foreground/50 pointer-events-none [&_svg:not([class*='size-'])]:size-4">
+                    <Globe size={16} />
+                    Multi-Currency
                     <Badge
                       variant="secondary"
                       className="ml-auto text-[10px] h-4 opacity-60"
