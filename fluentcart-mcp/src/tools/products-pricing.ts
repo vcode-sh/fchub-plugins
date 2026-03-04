@@ -50,12 +50,16 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 				'or update its variants. Prices in whole currency units (e.g. 400 for 400 PLN, not cents). ' +
 				'The API converts to cents internally. Variants require at least title and price. ' +
 				'Fetches current product state first, then merges your changes.',
-			schema: z.object({
-				product_id: z.number().describe('Product ID'),
-				post_title: z.string().optional().describe('Product title'),
-				post_status: z.string().optional().describe('Product status: draft, publish, future'),
-				post_content: z.string().optional().describe('Long description (HTML)'),
-				post_excerpt: z.string().optional().describe('Short description'),
+				schema: z.object({
+					product_id: z.number().describe('Product ID'),
+					post_title: z.string().optional().describe('Product title'),
+					post_name: z
+						.string()
+						.optional()
+						.describe('Product slug (post_name). Use lowercase and hyphens.'),
+					post_status: z.string().optional().describe('Product status: draft, publish, future'),
+					post_content: z.string().optional().describe('Long description (HTML)'),
+					post_excerpt: z.string().optional().describe('Short description'),
 				fulfillment_type: z
 					.string()
 					.optional()
@@ -138,17 +142,17 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 						(input.fulfillment_type as string) ||
 						(existingDetail.fulfillment_type as string) ||
 						'physical'
-					variants = inputVariants.map((v) => ({
-						...(v.id ? { id: v.id } : {}),
-						post_id: productId,
-						variation_title: v.title as string,
-						item_price: v.price as number,
-						...(v.compare_price !== undefined ? { compare_price: v.compare_price as number } : {}),
-						sku: (v.sku as string) || '',
-						fulfillment_type: ft,
-						stock_status: 'in-stock',
-						item_status: (v.item_status as string) || 'active',
-						other_info: buildOtherInfo(v),
+						variants = inputVariants.map((v) => ({
+							...(v.id ? { id: v.id } : {}),
+							post_id: productId,
+							variation_title: v.title as string,
+							item_price: v.price as number,
+							...(v.compare_price !== undefined ? { compare_price: v.compare_price as number } : {}),
+							...(typeof v.sku === 'string' && v.sku.trim() ? { sku: v.sku.trim() } : {}),
+							fulfillment_type: ft,
+							stock_status: 'in-stock',
+							item_status: (v.item_status as string) || 'active',
+							other_info: buildOtherInfo(v),
 						...(v.total_stock !== undefined
 							? { total_stock: v.total_stock, available: v.total_stock }
 							: {}),
@@ -176,12 +180,13 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 					post_status: (input.post_status as string) ?? product.post_status,
 					detail,
 					variants,
-				}
-				if (input.post_content !== undefined) body.post_content = input.post_content
-				if (input.post_excerpt !== undefined) body.post_excerpt = input.post_excerpt
+					}
+					if (input.post_content !== undefined) body.post_content = input.post_content
+					if (input.post_excerpt !== undefined) body.post_excerpt = input.post_excerpt
+					if (input.post_name !== undefined) body.post_name = input.post_name
 
-				const response = await client.post(`/products/${productId}/pricing`, body)
-				return response.data
+					const response = await client.post(`/products/${productId}/pricing`, body)
+					return response.data
 			},
 		}),
 
@@ -205,14 +210,34 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 			endpoint: '/products/:product_id/related-products',
 		}),
 
-		getTool(client, {
+		createTool(client, {
 			name: 'fluentcart_product_bundle_info',
 			title: 'Get Product Bundle Info',
-			description: 'Get bundle information for a bundled product.',
+			description:
+				'Get bundle information for a bundled product. ' +
+				'If the bundle module/route is unavailable, returns a compact capability response instead of a hard failure.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),
-			endpoint: '/products/:product_id/get-bundle-info',
+			handler: async (c, input) => {
+				const productId = input.product_id as number
+				try {
+					const response = await c.get(`/products/${productId}/get-bundle-info`)
+					return response.data
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error)
+					const routeMissing =
+						message.includes('No route was found matching the URL and request method') ||
+						message.includes('rest_no_route')
+					if (!routeMissing) throw error
+					return {
+						supported: false,
+						reason: 'module_not_enabled',
+						message:
+							'Bundle info endpoint is not available on this store/runtime. Enable bundle module or compatible addon.',
+					}
+				}
+			},
 		}),
 
 		postTool(client, {

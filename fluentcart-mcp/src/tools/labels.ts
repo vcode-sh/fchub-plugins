@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { getTool, postTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
 
 export function labelTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -12,19 +12,32 @@ export function labelTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/labels',
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_label_create',
 			title: 'Create Label',
-			description: 'Create a new label for tagging orders, customers, etc.',
+			description:
+				'Create a new label for tagging orders, customers, etc. ' +
+				'Use `value` (preferred). `title` is accepted as a backward-compatible alias.',
 			schema: z.object({
-				title: z.string().describe('Label text (required)'),
+				value: z.string().optional().describe('Label text (preferred field)'),
+				title: z.string().optional().describe('Deprecated alias for value'),
 				color: z.string().optional().describe('Label colour as hex code (e.g. "#ff0000")'),
 				bind_to_type: z
 					.string()
 					.optional()
 					.describe('Entity type: order, customer (default: order)'),
 			}),
-			endpoint: '/labels',
+			handler: async (c, input) => {
+				const value = ((input.value as string) || (input.title as string) || '').trim()
+				if (!value) {
+					throw new Error('Label text is required. Provide `value` (or `title` alias).')
+				}
+				const body: Record<string, unknown> = { value }
+				if (input.color !== undefined) body.color = input.color
+				if (input.bind_to_type !== undefined) body.bind_to_type = input.bind_to_type
+				const resp = await c.post('/labels', body)
+				return resp.data
+			},
 		}),
 
 		postTool(client, {

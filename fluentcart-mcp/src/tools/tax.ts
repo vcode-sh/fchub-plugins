@@ -1,7 +1,54 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
+import { FluentCartApiError } from '../api/errors.js'
 import { TTL } from '../cache.js'
-import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import {
+	createTool,
+	deleteTool,
+	getTool,
+	postTool,
+	putTool,
+	type ToolDefinition,
+} from './_factory.js'
+
+function asNumber(value: unknown): number | null {
+	if (typeof value === 'number' && Number.isFinite(value)) return value
+	if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+		return Number(value)
+	}
+	return null
+}
+
+function asFlag(value: unknown): number | undefined {
+	if (value === undefined) return undefined
+	if (typeof value === 'boolean') return value ? 1 : 0
+	const numeric = asNumber(value)
+	return numeric == null ? undefined : numeric
+}
+
+function extractId(data: unknown): number | null {
+	const wrappers = ['data', 'class', 'tax_class']
+	const keys = ['class_id', 'id']
+	if (!data || typeof data !== 'object') return null
+
+	const obj = data as Record<string, unknown>
+	for (const key of keys) {
+		const maybe = asNumber(obj[key])
+		if (maybe != null) return maybe
+	}
+
+	for (const wrapper of wrappers) {
+		const nested = obj[wrapper]
+		if (!nested || typeof nested !== 'object') continue
+		const nestedObj = nested as Record<string, unknown>
+		for (const key of keys) {
+			const maybe = asNumber(nestedObj[key])
+			if (maybe != null) return maybe
+		}
+	}
+
+	return null
+}
 
 export function taxTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -16,15 +63,50 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			cache: { key: 'tax_classes', ttlMs: TTL.MEDIUM },
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_tax_class_create',
 			title: 'Create Tax Class',
-			description: 'Create a new tax class for categorising products with different tax rates.',
+			description:
+				'Create a new tax class for categorising products with different tax rates. ' +
+				'Accepts `title` (preferred) and `name` (legacy alias).',
 			schema: z.object({
-				title: z.string().describe('Tax class title (required)'),
+				title: z.string().optional().describe('Tax class title (required)'),
+				name: z.string().optional().describe('Legacy alias for title'),
 				description: z.string().optional().describe('Description'),
 			}),
-			endpoint: '/tax/classes',
+			handler: async (c, input) => {
+				const title = (input.title as string | undefined) || (input.name as string | undefined)
+				if (!title) {
+					throw new FluentCartApiError(
+						'VALIDATION_ERROR',
+						'Validation error: title is required',
+						422,
+					)
+				}
+
+				const body: Record<string, unknown> = { title }
+				if (input.description !== undefined) body.description = input.description
+
+				const created = await c.post('/tax/classes', body)
+				const directId = extractId(created.data)
+				if (directId != null) return created.data
+
+				// Some runtimes only return a success message; enrich with class_id via list lookup.
+				const list = await c.get('/tax/classes')
+				const classes = ((list.data as Record<string, unknown>).tax_classes ?? []) as Array<
+					Record<string, unknown>
+				>
+				const matched = classes.find((taxClass) => taxClass.title === title)
+				const classId = matched ? asNumber(matched.id) : null
+				if (classId == null) return created.data
+
+				return {
+					...(created.data as Record<string, unknown>),
+					class_id: classId,
+					class: matched,
+					_enriched: true,
+				}
+			},
 		}),
 
 		putTool(client, {
@@ -71,20 +153,62 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/tax/rates/country/rates/:country_code',
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_tax_rate_create',
 			title: 'Create Tax Rate',
-			description: 'Create a tax rate for a country. Rate is a percentage value (e.g. 23 for 23%).',
+			description:
+				'Create a tax rate for a country. Rate is a percentage value (e.g. 23 for 23%). ' +
+				'Supports aliases: country_code->country, tax_class_id->class_id, compound->is_compound, shipping->for_shipping.',
 			schema: z.object({
-				country: z.string().describe('ISO country code (e.g. "PL", "US", "GB")'),
+				country: z.string().optional().describe('ISO country code (e.g. "PL", "US", "GB")'),
+				country_code: z.string().optional().describe('Legacy alias for country'),
 				rate: z.number().describe('Tax rate percentage (e.g. 23 for 23%)'),
-				name: z.string().describe('Rate name (e.g. "VAT", "GST")'),
-				class_id: z.number().describe('Tax class ID (required)'),
+				name: z.string().optional().describe('Rate name (e.g. "VAT", "GST")'),
+				class_id: z.number().optional().describe('Tax class ID (required)'),
+				tax_class_id: z.number().optional().describe('Legacy alias for class_id'),
 				priority: z.number().optional().describe('Rate priority'),
 				is_compound: z.number().optional().describe('Whether rate is compound (0 or 1)'),
+				compound: z.union([z.number(), z.boolean()]).optional().describe('Legacy alias'),
 				for_shipping: z.number().optional().describe('Whether rate applies to shipping (0 or 1)'),
+				shipping: z.union([z.number(), z.boolean()]).optional().describe('Legacy alias'),
 			}),
-			endpoint: '/tax/country/rate',
+			handler: async (c, input) => {
+				const country =
+					(input.country as string | undefined) || (input.country_code as string | undefined)
+				const classId = asNumber(input.class_id) ?? asNumber(input.tax_class_id)
+
+				if (!country) {
+					throw new FluentCartApiError(
+						'VALIDATION_ERROR',
+						'Validation error: country is required',
+						422,
+					)
+				}
+				if (classId == null) {
+					throw new FluentCartApiError(
+						'VALIDATION_ERROR',
+						'Validation error: class_id is required',
+						422,
+					)
+				}
+
+				const body: Record<string, unknown> = {
+					country,
+					rate: input.rate,
+					name: (input.name as string | undefined) || 'VAT',
+					class_id: classId,
+				}
+				if (input.priority !== undefined) body.priority = input.priority
+
+				const isCompound = asFlag(input.is_compound ?? input.compound)
+				if (isCompound !== undefined) body.is_compound = isCompound
+
+				const forShipping = asFlag(input.for_shipping ?? input.shipping)
+				if (forShipping !== undefined) body.for_shipping = forShipping
+
+				const response = await c.post('/tax/country/rate', body)
+				return response.data
+			},
 		}),
 
 		putTool(client, {

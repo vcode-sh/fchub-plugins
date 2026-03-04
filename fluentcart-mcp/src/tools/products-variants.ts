@@ -42,7 +42,9 @@ function buildVariantFromExisting(
 		variation_title: existing?.variation_title ?? '',
 		item_price: existingPrice,
 		compare_price: existingComparePrice,
-		sku: existing?.sku ?? '',
+		...(typeof existing?.sku === 'string' && existing.sku.trim()
+			? { sku: existing.sku.trim() }
+			: {}),
 		fulfillment_type: existing?.fulfillment_type ?? 'physical',
 		stock_status: existing?.stock_status ?? 'in-stock',
 		item_status: existing?.item_status ?? 'active',
@@ -114,23 +116,56 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 		createTool(client, {
 			name: 'fluentcart_variant_list',
 			title: 'List Variations',
-			description: 'List product variations with optional product filtering.',
+			description:
+				'List product variations for a specific product. ' +
+				'`product_id` is required because the backend route is unstable without it. ' +
+				'If upstream `/products/variants` fails with a known runtime bug, this tool falls back to `/products/:id` and returns variants from product detail.',
 			schema: z.object({
-				product_id: z.number().optional().describe('Filter by product ID'),
+				product_id: z.number().describe('Parent product ID'),
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 			}),
 			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
 			handler: async (client, input) => {
+				const productId = input.product_id as number
+				const page = (input.page as number) ?? 1
+				const perPage = (input.per_page as number) ?? 15
 				const params: Record<string, unknown> = {
-					page: (input.page as number) ?? 1,
-					per_page: (input.per_page as number) ?? 15,
+					product_id: productId,
+					page,
+					per_page: perPage,
 				}
-				if (input.product_id) params.product_id = input.product_id
-				const response = await client.get('/products/variants', params)
-				return response.data
+
+				try {
+					const response = await client.get('/products/variants', params)
+					return response.data
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error)
+					const isKnownUpstreamBug =
+						message.includes('ProductVariationResource::get()') && message.includes('null given')
+					if (!isKnownUpstreamBug) throw error
+
+					const fallback = await client.get(`/products/${productId}`)
+					const wrapper = fallback.data as Record<string, unknown>
+					const product = (wrapper.product ?? wrapper) as Record<string, unknown>
+					const variantsRaw = Array.isArray(product.variants)
+						? (product.variants as unknown[])
+						: []
+					const from = Math.max(0, (page - 1) * perPage)
+					const to = from + perPage
+					const variants = variantsRaw.slice(from, to)
+
+					return {
+						variants,
+						page,
+						per_page: perPage,
+						total: variantsRaw.length,
+						source: 'fallback_product_get',
+						note: 'Upstream /products/variants route failed; served from product detail variants.',
+					}
+				}
 			},
-		}),
+			}),
 
 		createTool(client, {
 			name: 'fluentcart_variant_create',
@@ -154,17 +189,19 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 			handler: async (client, input) => {
 				const productId = input.product_id as number
 				const otherInfo = buildOtherInfo(input)
-				const body = {
-					product_id: productId,
-					variants: {
-						post_id: productId,
-						variation_title: (input.title as string) || '',
-						item_price: (input.price as number) ?? 0,
-						compare_price: (input.compare_price as number) ?? 0,
-						sku: (input.sku as string) || '',
-						fulfillment_type: (input.fulfillment_type as string) || 'physical',
-						total_stock: (input.stock_quantity as number) ?? 0,
-						available: (input.stock_quantity as number) ?? 0,
+					const body = {
+						product_id: productId,
+						variants: {
+							post_id: productId,
+							variation_title: (input.title as string) || '',
+							item_price: (input.price as number) ?? 0,
+							compare_price: (input.compare_price as number) ?? 0,
+							...(typeof input.sku === 'string' && input.sku.trim()
+								? { sku: input.sku.trim() }
+								: {}),
+							fulfillment_type: (input.fulfillment_type as string) || 'physical',
+							total_stock: (input.stock_quantity as number) ?? 0,
+							available: (input.stock_quantity as number) ?? 0,
 						committed: 0,
 						on_hold: 0,
 						stock_status: 'in-stock',
@@ -208,13 +245,15 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				const variants = buildVariantFromExisting(existing, productId, variantId)
 
 				// Apply user's changes
-				const overrides: Record<string, unknown> = {}
-				if (input.title !== undefined) overrides.variation_title = input.title
-				if (input.price !== undefined) overrides.item_price = input.price
-				if (input.sku !== undefined) overrides.sku = input.sku
-				if (input.stock_quantity !== undefined) {
-					overrides.total_stock = input.stock_quantity
-					overrides.available = input.stock_quantity
+					const overrides: Record<string, unknown> = {}
+					if (input.title !== undefined) overrides.variation_title = input.title
+					if (input.price !== undefined) overrides.item_price = input.price
+					if (input.sku !== undefined && typeof input.sku === 'string' && input.sku.trim()) {
+						overrides.sku = input.sku.trim()
+					}
+					if (input.stock_quantity !== undefined) {
+						overrides.total_stock = input.stock_quantity
+						overrides.available = input.stock_quantity
 				}
 				if (input.compare_price !== undefined) overrides.compare_price = input.compare_price
 				if (input.item_status !== undefined) overrides.item_status = input.item_status

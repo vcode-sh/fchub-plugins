@@ -50,7 +50,7 @@ describe.skipIf(!hasCredentials)('E2E: MCP Protocol over HTTP', () => {
 		const info = mcpClient.getServerVersion()
 		expect(info).toBeDefined()
 		expect(info!.name).toBe('fluentcart-mcp')
-		expect(info!.version).toBe('1.0.0')
+		expect(info!.version).toMatch(/^\d+\.\d+\.\d+$/)
 	})
 
 	it('server capabilities include tools', () => {

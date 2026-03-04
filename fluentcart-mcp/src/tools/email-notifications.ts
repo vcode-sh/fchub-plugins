@@ -39,15 +39,24 @@ export function emailNotificationTools(client: FluentCartClient): ToolDefinition
 			endpoint: '/email-notification/:notification',
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_email_toggle',
 			title: 'Toggle Email Notification',
-			description: 'Enable or disable an email notification.',
+			description:
+				'Enable or disable an email notification. Use `active` (`yes`/`no`); `status` is accepted as a legacy alias.',
 			schema: z.object({
 				name: z.string().describe('Notification key/name'),
 				active: z.string().optional().describe("Active status: 'yes' or 'no'"),
+				status: z.string().optional().describe('Legacy alias for active'),
 			}),
-			endpoint: '/email-notification/enable-notification/:name',
+			handler: async (c, input) => {
+				const name = input.name as string
+				const active = (input.active as string | undefined) || (input.status as string | undefined)
+				const body: Record<string, unknown> = {}
+				if (active !== undefined) body.active = active
+				const response = await c.post(`/email-notification/enable-notification/${name}`, body)
+				return response.data
+			},
 		}),
 
 		getTool(client, {

@@ -1,6 +1,13 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import {
+	createTool,
+	deleteTool,
+	getTool,
+	postTool,
+	putTool,
+	type ToolDefinition,
+} from './_factory.js'
 
 const discountSchema = z
 	.object({
@@ -51,11 +58,12 @@ const conditionsSchema = z
 
 export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 	return [
-		getTool(client, {
+		createTool(client, {
 			name: 'fluentcart_order_bump_list',
 			title: 'List Order Bumps',
 			description:
-				'List order bump configurations with status and variant info. Statuses: active, draft.',
+				'List order bump configurations with status and variant info. Statuses: active, draft. ' +
+				'If order-bump storage tables are missing, returns a capability response instead of a hard failure.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 15, max: 50)'),
@@ -66,7 +74,24 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 					.describe('Sort field (default: id)'),
 				sort_type: z.enum(['ASC', 'DESC']).optional().describe('Sort direction (default: DESC)'),
 			}),
-			endpoint: '/order_bump',
+			handler: async (c, input) => {
+				try {
+					const response = await c.get('/order_bump', input)
+					return response.data
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error)
+					const missingTable =
+						message.includes('wp_fct_order_promotions') && message.includes("doesn't exist")
+					if (!missingTable) throw error
+					return {
+						supported: false,
+						reason: 'missing_database_table',
+						table: 'wp_fct_order_promotions',
+						message:
+							'Order bump module is not fully installed on this store. Required table wp_fct_order_promotions is missing.',
+					}
+				}
+			},
 		}),
 
 		getTool(client, {
