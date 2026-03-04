@@ -148,7 +148,8 @@ async function scenario1CoreMappings() {
 		log('1.4', 'Save confirmation with empty object (expects 200 + empty body upstream)')
 		const saveConfirm = await call('fluentcart_settings_save_confirmation', { settings: {} })
 		show(saveConfirm)
-		if (saveConfirm.isError) throw new Error(`settings_save_confirmation failed: ${saveConfirm.raw}`)
+		if (saveConfirm.isError)
+			throw new Error(`settings_save_confirmation failed: ${saveConfirm.raw}`)
 		notes.push('Empty 200-body confirmation endpoint now handled without JSON parse failure')
 
 		pass(name, notes)
@@ -173,7 +174,7 @@ async function scenario2OrderFixes() {
 
 		const listObj = asObj(list.data)
 		const orders = asObj(listObj.orders).data as Array<Record<string, unknown>> | undefined
-		if (!orders || !orders.length) throw new Error('No order found')
+		if (!(orders && orders.length)) throw new Error('No order found')
 		const orderId = asNum(orders[0].id)
 		if (!orderId) throw new Error('No order_id found')
 		console.log(`  Using order_id=${orderId}`)
@@ -231,7 +232,11 @@ async function scenario3ProductFixes() {
 		show(created)
 		if (created.isError) throw new Error(`product_create failed: ${created.raw}`)
 		productId = extractId(created.data, ['ID', 'id'])
-		variantId = asNum(asObj(asObj(created.data).data).variant ? asObj(asObj(created.data).data).variant['id'] : null)
+		variantId = asNum(
+			asObj(asObj(created.data).data).variant
+				? asObj(asObj(created.data).data).variant['id']
+				: null,
+		)
 		if (!productId) throw new Error('No product ID from create')
 
 		cleanupActions.push(async () => {

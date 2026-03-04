@@ -40,6 +40,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 					.describe('Region codes — ISO country codes or state codes (CC:STATE format)'),
 			}),
 			endpoint: '/shipping/zones',
+			invalidates: ['shipping_zones'],
 		}),
 
 		putTool(client, {
@@ -55,6 +56,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 					.describe('Region codes — ISO country codes or state codes (CC:STATE format)'),
 			}),
 			endpoint: '/shipping/zones/:zone_id',
+			invalidates: ['shipping_zones'],
 		}),
 
 		deleteTool(client, {
@@ -65,6 +67,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				zone_id: z.number().describe('Shipping zone ID'),
 			}),
 			endpoint: '/shipping/zones/:zone_id',
+			invalidates: ['shipping_zones'],
 		}),
 
 		postTool(client, {
@@ -75,6 +78,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				zones: z.array(z.number()).describe('Ordered array of zone IDs (first = highest priority)'),
 			}),
 			endpoint: '/shipping/zones/update-order',
+			invalidates: ['shipping_zones'],
 		}),
 
 		getTool(client, {
@@ -111,6 +115,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 					.describe('Additional method settings'),
 			}),
 			endpoint: '/shipping/methods',
+			invalidates: ['shipping_zones'],
 		}),
 
 		putTool(client, {
@@ -123,13 +128,18 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				method_id: z.number().describe('Shipping method ID'),
 				zone_id: z.number().describe('Zone ID (required by backend validation)'),
 				title: z.string().describe('Display title (required by backend validation)'),
-				type: z.string().describe('Method type: flat_rate, free_shipping, local_pickup (required by backend validation)'),
+				type: z
+					.string()
+					.describe(
+						'Method type: flat_rate, free_shipping, local_pickup (required by backend validation)',
+					),
 				amount: z.number().optional().describe('Shipping cost in cents'),
 				min_amount: z.number().optional().describe('Minimum order amount in cents'),
 				enabled: z.string().optional().describe("Method status: 'yes' or 'no'"),
 				settings: z.record(z.string(), z.unknown()).optional().describe('Method settings'),
 			}),
 			endpoint: '/shipping/methods',
+			invalidates: ['shipping_zones'],
 		}),
 
 		deleteTool(client, {
@@ -140,6 +150,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				method_id: z.number().describe('Shipping method ID'),
 			}),
 			endpoint: '/shipping/methods/:method_id',
+			invalidates: ['shipping_zones'],
 		}),
 
 		// ── Classes ────────────────────────────────────────────
@@ -175,6 +186,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				description: z.string().optional().describe('Class description'),
 			}),
 			endpoint: '/shipping/classes',
+			invalidates: ['shipping_classes'],
 		}),
 
 		putTool(client, {
@@ -189,6 +201,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				description: z.string().optional().describe('Class description'),
 			}),
 			endpoint: '/shipping/classes/:class_id',
+			invalidates: ['shipping_classes'],
 		}),
 
 		deleteTool(client, {
@@ -199,6 +212,7 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 				class_id: z.number().describe('Shipping class ID'),
 			}),
 			endpoint: '/shipping/classes/:class_id',
+			invalidates: ['shipping_classes'],
 		}),
 	]
 }

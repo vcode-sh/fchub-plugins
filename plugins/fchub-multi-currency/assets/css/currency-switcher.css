@@ -25,11 +25,16 @@
 .fchub-mc-disclosure {
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: #fef3cd;
-    border: 1px solid #ffc107;
+    background: #f0f4f8;
+    border: 1px solid #d0d7de;
     border-radius: 4px;
-    font-size: 0.8125rem;
-    color: #856404;
+    font-size: 0.75rem;
+    color: #57606a;
+    line-height: 1.4;
+}
+
+.fchub-mc-disclosure--drawer {
+    margin: 0.5rem 0;
 }
 
 .fchub-mc-rate-badge {
@@ -42,4 +47,34 @@
 
 .fchub-mc-rate-badge--stale {
     color: #dc3545;
+}
+
+/**
+ * FOUC prevention — hide price elements briefly while JS projection runs.
+ * The projection script adds .fchub-mc-projecting to <html> immediately,
+ * then removes it after the first projection pass completes.
+ */
+.fchub-mc-projecting .fct-item-price,
+.fchub-mc-projecting .fct-compare-price,
+.fchub-mc-projecting .fct-min-price,
+.fchub-mc-projecting .fct-max-price,
+.fchub-mc-projecting .fct-cart-item-price,
+.fchub-mc-projecting .fct-cart-item-total,
+.fchub-mc-projecting .fct_summary_value,
+.fchub-mc-projecting .fct_line_item_price,
+.fchub-mc-projecting .fct_line_item_total,
+.fchub-mc-projecting .fct_promo_price,
+.fchub-mc-projecting .fluent-cart-pricing-table-variant-price,
+.fchub-mc-projecting .fluent-cart-pricing-table-variant-compare-price,
+.fchub-mc-projecting [data-fchub-mc-base] {
+    visibility: hidden;
+}
+
+/* Safety fallback — remove FOUC class after 2s in case JS fails */
+@keyframes fchub-mc-fouc-fallback {
+    to { visibility: visible; }
+}
+.fchub-mc-projecting .fct-item-price,
+.fchub-mc-projecting .fct-compare-price {
+    animation: fchub-mc-fouc-fallback 0s 2s forwards;
 }

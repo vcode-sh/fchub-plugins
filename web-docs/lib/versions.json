@@ -1,8 +1,8 @@
 {
   "plugins": {
     "fluentcart-mcp": {
-      "version": "1.0.2",
-      "tagName": "fluentcart-mcp/v1.0.2",
+      "version": "1.1.0",
+      "tagName": "fluentcart-mcp/v1.1.0",
       "zipFilename": null,
       "mcpbFilename": "fluentcart-mcp.mcpb"
     },
@@ -50,7 +50,7 @@
     }
   },
   "mcp": {
-    "toolCount": 279,
+    "toolCount": 274,
     "moduleCount": 23
   }
 }

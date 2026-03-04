@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { TTL } from '../cache.js'
+import { invalidate, TTL } from '../cache.js'
 import {
 	createTool,
 	deleteTool,
@@ -88,6 +88,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 				if (input.description !== undefined) body.description = input.description
 
 				const created = await c.post('/tax/classes', body)
+				invalidate('tax_classes')
 				const directId = extractId(created.data)
 				if (directId != null) return created.data
 
@@ -119,6 +120,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 				description: z.string().optional().describe('Description'),
 			}),
 			endpoint: '/tax/classes/:class_id',
+			invalidates: ['tax_classes'],
 		}),
 
 		deleteTool(client, {
@@ -129,6 +131,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 				class_id: z.number().describe('Tax class ID'),
 			}),
 			endpoint: '/tax/classes/:class_id',
+			invalidates: ['tax_classes'],
 		}),
 
 		// ── Tax Rates ──────────────────────────────────────────
@@ -343,19 +346,55 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 				settings: z.record(z.string(), z.unknown()).describe('Tax settings to save'),
 			}),
 			endpoint: '/tax/configuration/settings',
+			invalidates: ['tax_settings'],
 		}),
 
 		// ── EU VAT ─────────────────────────────────────────────
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_tax_eu_vat_save',
-			title: 'Save EU VAT Settings',
-			description: 'Save EU VAT configuration settings.',
+			title: 'Save EU VAT Cross-Border Settings',
+			description:
+				'Save EU VAT cross-border registration settings. ' +
+				'The backend requires action="euCrossBorderSettings" (sent automatically). ' +
+				'Choose a method: "oss" (One Stop Shop — requires oss_country), ' +
+				'"home" (home country — requires home_country), or "specific" (specific countries). ' +
+				'Set reset_registration to "yes" to clear the current registration method.',
 			schema: z.object({
-				enabled: z.boolean().optional().describe('Enable EU VAT'),
-				settings: z.record(z.string(), z.unknown()).optional().describe('EU VAT configuration'),
+				method: z.enum(['oss', 'home', 'specific']).describe('Cross-border registration type'),
+				oss_country: z
+					.string()
+					.optional()
+					.describe('ISO country code for OSS registration (required when method is "oss")'),
+				home_country: z
+					.string()
+					.optional()
+					.describe(
+						'ISO country code for home country registration (required when method is "home")',
+					),
+				reset_registration: z
+					.enum(['yes', 'no'])
+					.optional()
+					.describe('Set to "yes" to clear the current registration method'),
 			}),
-			endpoint: '/tax/configuration/settings/eu-vat',
+			handler: async (c, input) => {
+				const euVatSettings: Record<string, string> = {
+					method: input.method as string,
+				}
+				if (input.oss_country) euVatSettings.oss_country = input.oss_country as string
+				if (input.home_country) euVatSettings.home_country = input.home_country as string
+
+				const body: Record<string, unknown> = {
+					action: 'euCrossBorderSettings',
+					eu_vat_settings: euVatSettings,
+				}
+				if (input.reset_registration === 'yes') body.reset_registration = 'yes'
+
+				const response = await c.post('/tax/configuration/settings/eu-vat', body)
+				invalidate('tax_eu_rates')
+				invalidate('tax_settings')
+				return response.data
+			},
 		}),
 
 		getTool(client, {
@@ -386,8 +425,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_tax_records_mark_filed',
 			title: 'Mark Tax Records Filed',
 			description:
-				'Mark specific tax records as filed. ' +
-				'Pass an array of tax record IDs to mark.',
+				'Mark specific tax records as filed. ' + 'Pass an array of tax record IDs to mark.',
 			schema: z.object({
 				ids: z.array(z.number()).describe('Tax record IDs to mark as filed'),
 			}),

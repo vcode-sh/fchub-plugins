@@ -85,10 +85,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 					.describe(
 						'JSON-encoded feed configuration object. Use get_feed_settings to discover the schema — required',
 					),
-				status: z
-					.string()
-					.optional()
-					.describe('Feed status: "yes" (enabled), "no" (disabled)'),
+				status: z.string().optional().describe('Feed status: "yes" (enabled), "no" (disabled)'),
 			}),
 			endpoint: '/integration/global-feeds/settings',
 		}),

@@ -12,6 +12,7 @@ use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\FeatureFlags;
 use FChubMultiCurrency\Support\Hooks;
+use FluentCart\Api\CurrencySettings;
 
 defined('ABSPATH') || exit;
 
@@ -33,12 +34,16 @@ final class FrontendModule implements ModuleContract
         $contextService = new CurrencyContextService(new ResolverChain(), $optionStore);
         $context = $contextService->resolve();
 
+        // Read FluentCart's base currency formatting config (before any filter)
+        $fcSettings = CurrencySettings::get();
+        $baseSeparatorSetting = $fcSettings['currency_separator'] ?? 'dot';
+
         $config = [
             'rate'              => $context->rate->rateAsFloat(),
             'displayCurrency'   => $context->displayCurrency->code,
             'baseCurrency'      => $context->baseCurrency->code,
             'decimals'          => $context->displayCurrency->decimals,
-            'symbol'            => $context->displayCurrency->symbol,
+            'symbol'            => html_entity_decode($context->displayCurrency->symbol, ENT_QUOTES, 'UTF-8'),
             'position'          => $context->displayCurrency->position->value,
             'isBaseDisplay'     => $context->isBaseDisplay,
             'roundingMode'      => $optionStore->get('rounding_mode', 'half_up'),
@@ -46,14 +51,30 @@ final class FrontendModule implements ModuleContract
             'restUrl'           => rest_url(Constants::REST_NAMESPACE),
             'nonce'             => wp_create_nonce('wp_rest'),
             'currencies'        => $optionStore->get('display_currencies', []),
+            // Base currency formatting info for JS price parsing
+            'baseCurrencySign'      => html_entity_decode($fcSettings['currency_sign'] ?? '$', ENT_QUOTES, 'UTF-8'),
+            'baseCurrencyPosition'  => $fcSettings['currency_position'] ?? 'before',
+            'baseCurrencyCode'      => $fcSettings['currency'] ?? 'USD',
+            'baseDecimalSep'        => match ($baseSeparatorSetting) {
+                'comma', 'space_comma' => ',',
+                default                => '.',
+            },
+            'baseThousandSep'       => match ($baseSeparatorSetting) {
+                'comma'       => '.',
+                'space_comma' => ' ',
+                'none_dot'    => '',
+                default       => ',',
+            },
+            'baseDecimals'          => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
         ];
 
         if (FeatureFlags::isEnabled('js_projection')) {
+            $projectionPath = FCHUB_MC_PATH . 'assets/js/currency-projection.js';
             wp_enqueue_script(
                 'fchub-mc-projection',
                 FCHUB_MC_URL . 'assets/js/currency-projection.js',
                 [],
-                FCHUB_MC_VERSION,
+                (string) filemtime($projectionPath),
                 true,
             );
             wp_localize_script('fchub-mc-projection', 'fchubMcConfig', $config);

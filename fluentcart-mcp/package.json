@@ -1,6 +1,6 @@
 {
   "name": "fluentcart-mcp",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "MCP server for the FluentCart REST API — AI-agent-friendly tools for managing orders, products, customers, subscriptions, and more.",
   "type": "module",
   "exports": {

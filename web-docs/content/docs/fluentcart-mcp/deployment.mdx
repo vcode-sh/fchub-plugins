@@ -76,7 +76,7 @@ The container exposes port `3000` and starts with `--transport http` by default.
 | `FLUENTCART_MCP_API_KEY` | No | Bearer token for the MCP endpoint. If set, all requests to `/mcp` must include `Authorization: Bearer <key>`. If not set, the endpoint is wide open. |
 
 <Callout type="warn" title="Set the API key">
-Without `FLUENTCART_MCP_API_KEY`, anyone who discovers your endpoint can query your store, create orders, issue refunds — the full 279-tool experience. Thrilling for you, potentially expensive. Set the key.
+Without `FLUENTCART_MCP_API_KEY`, anyone who discovers your endpoint can query your store, create orders, issue refunds — the full 274-tool experience. Thrilling for you, potentially expensive. Set the key.
 </Callout>
 
 ## Dokploy Setup
@@ -147,7 +147,7 @@ ChatGPT will negotiate the connection via Streamable HTTP. If you've set a beare
 Same deal. Point the client at your `/mcp` endpoint. Set the bearer token if configured. The server speaks standard MCP over Streamable HTTP — no special sauce required.
 
 <Callout type="info" title="Stateless mode">
-The HTTP transport creates a fresh server instance per request. This keeps things simple and works with scale-to-zero deployments, but it means each request resolves config and registers all 279 tools. On a reasonable VPS, this adds maybe 10-20ms overhead. Not exactly a crisis.
+The HTTP transport creates a fresh server instance per request. This keeps things simple and works with scale-to-zero deployments, but it means each request resolves config and registers all 274 tools. On a reasonable VPS, this adds maybe 10-20ms overhead. Not exactly a crisis.
 </Callout>
 
 <Separator className="my-8" />

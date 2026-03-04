@@ -125,8 +125,9 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_terms_by_parent',
 			title: 'Get Product Terms by Parent',
-			description: 'Get product terms filtered by parent term. Uses POST but is a read-only operation.',
-			annotations: { readOnlyHint: true },
+			description:
+				'Get product terms filtered by parent term. Uses POST but is a read-only operation.',
+			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
 			schema: z.object({
 				parent_id: z.number().optional().describe('Parent term ID'),
 				taxonomy: z.string().optional().describe('Taxonomy name'),
@@ -215,7 +216,9 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 				'Fetch integration settings first to get the expected field schema for each provider.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				integration_name: z.string().describe('Integration provider name (e.g. "fluentcrm", "fluentcommunity")'),
+				integration_name: z
+					.string()
+					.describe('Integration provider name (e.g. "fluentcrm", "fluentcommunity")'),
 				integration_id: z
 					.number()
 					.optional()

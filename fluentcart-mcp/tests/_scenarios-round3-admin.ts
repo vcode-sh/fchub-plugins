@@ -182,7 +182,9 @@ async function scenario1OrderHandling() {
 		})
 		show(bulkLegacy, 350)
 		if (bulkLegacy.isError) {
-			warnings.push('order_bulk_action legacy action=update_status failed (expected on current backend)')
+			warnings.push(
+				'order_bulk_action legacy action=update_status failed (expected on current backend)',
+			)
 		}
 
 		log('1.6', 'Try real backend bulk action: action=change_order_status')
@@ -193,7 +195,9 @@ async function scenario1OrderHandling() {
 		})
 		show(bulkReal, 350)
 		if (bulkReal.isError) {
-			warnings.push('order_bulk_action action=change_order_status also failed (needs exact payload mapping)')
+			warnings.push(
+				'order_bulk_action action=change_order_status also failed (needs exact payload mapping)',
+			)
 		}
 
 		log('1.7', 'Attach admin note to order')
@@ -492,7 +496,9 @@ async function cleanup() {
 	}
 	for (const id of createdProductIds) {
 		const del = await call('fluentcart_product_delete', { product_id: id })
-		console.log(`  Product ${id}: ${del.isError ? 'not deleted (already gone or failed)' : 'deleted'}`)
+		console.log(
+			`  Product ${id}: ${del.isError ? 'not deleted (already gone or failed)' : 'deleted'}`,
+		)
 	}
 }
 

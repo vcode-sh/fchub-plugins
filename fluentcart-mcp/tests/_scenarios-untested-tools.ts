@@ -547,12 +547,12 @@ async function scenario11() {
 			return
 		}
 
-			const labelValue = `MCP Test Label ${Date.now()}`
-			log('11.2', `fluentcart_label_create "${labelValue}"`)
-			const created = await call('fluentcart_label_create', {
-				value: labelValue,
-				color: '#3498db',
-			})
+		const labelValue = `MCP Test Label ${Date.now()}`
+		log('11.2', `fluentcart_label_create "${labelValue}"`)
+		const created = await call('fluentcart_label_create', {
+			value: labelValue,
+			color: '#3498db',
+		})
 		show(created)
 		if (created.isError) {
 			fail(name, `label_create error: ${created.raw}`)

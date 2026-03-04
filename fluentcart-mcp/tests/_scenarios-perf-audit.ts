@@ -6,9 +6,9 @@
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { resolveServerContext } from '../src/server.js'
-import { truncateResponse, MAX_RESPONSE_CHARS } from '../src/tools/_factory.js'
 import { clearCache } from '../src/cache.js'
+import { resolveServerContext } from '../src/server.js'
+import { MAX_RESPONSE_CHARS, truncateResponse } from '../src/tools/_factory.js'
 
 // ── harness ──────────────────────────────────────────────────────────────────
 
@@ -203,7 +203,9 @@ async function testResponseSizeAndTruncation(): Promise<void> {
 	console.log(`    _truncated flag:     ${obj._truncated}`)
 	console.log(`    _total:              ${obj._total}`)
 	console.log(`    _showing:            ${obj._showing}`)
-	console.log(`    Under limit:         ${truncatedNestedJson.length <= MAX_RESPONSE_CHARS ? 'YES' : 'NO'}`)
+	console.log(
+		`    Under limit:         ${truncatedNestedJson.length <= MAX_RESPONSE_CHARS ? 'YES' : 'NO'}`,
+	)
 
 	if (truncatedNestedJson.length > MAX_RESPONSE_CHARS) {
 		finding(
@@ -224,7 +226,9 @@ async function testResponseSizeAndTruncation(): Promise<void> {
 	console.log(`    Output size:         ${truncBigObjJson.length}`)
 	console.log(`    Has _message:        ${!!bigObj._message}`)
 	// Note: bigObject has `data` which is a string, not array — should fall through to "non-array" path
-	console.log(`    Correct fallback:    ${bigObj._truncated === true && bigObj._chars !== undefined ? 'YES' : 'NO'}`)
+	console.log(
+		`    Correct fallback:    ${bigObj._truncated === true && bigObj._chars !== undefined ? 'YES' : 'NO'}`,
+	)
 }
 
 // ── 2. TIMING & PERFORMANCE ────────────────────────────────────────────────
@@ -279,7 +283,9 @@ async function testTiming(): Promise<void> {
 	const second = await call('fluentcart_report_meta')
 	console.log(`    First call:  ${first.elapsed}ms`)
 	console.log(`    Second call: ${second.elapsed}ms (cached)`)
-	console.log(`    Speedup:     ${first.elapsed > 0 ? (first.elapsed / Math.max(1, second.elapsed)).toFixed(1) : 'N/A'}x`)
+	console.log(
+		`    Speedup:     ${first.elapsed > 0 ? (first.elapsed / Math.max(1, second.elapsed)).toFixed(1) : 'N/A'}x`,
+	)
 
 	if (second.elapsed > 50) {
 		finding(
@@ -289,7 +295,12 @@ async function testTiming(): Promise<void> {
 			`Second call took ${second.elapsed}ms — expected near-zero for cached result.`,
 		)
 	} else {
-		finding('PERFORMANCE', 'INFO', 'Cache working correctly for report_meta', `Cached call: ${second.elapsed}ms vs uncached: ${first.elapsed}ms.`)
+		finding(
+			'PERFORMANCE',
+			'INFO',
+			'Cache working correctly for report_meta',
+			`Cached call: ${second.elapsed}ms vs uncached: ${first.elapsed}ms.`,
+		)
 	}
 }
 
@@ -304,10 +315,16 @@ async function testDynamicTools(): Promise<void> {
 	// 3a. Check dynamic tool count
 	console.log('\n  [3a] Dynamic tool count verification:')
 	const hardcodedCount = 3
-	const actualDynamicTools = ['fluentcart_search_tools', 'fluentcart_describe_tools', 'fluentcart_execute_tool']
+	const actualDynamicTools = [
+		'fluentcart_search_tools',
+		'fluentcart_describe_tools',
+		'fluentcart_execute_tool',
+	]
 	console.log(`    Hardcoded in server.ts: ${hardcodedCount}`)
 	console.log(`    Actual dynamic tools:   ${actualDynamicTools.length}`)
-	console.log(`    Correct:                ${hardcodedCount === actualDynamicTools.length ? 'YES' : 'NO'}`)
+	console.log(
+		`    Correct:                ${hardcodedCount === actualDynamicTools.length ? 'YES' : 'NO'}`,
+	)
 
 	if (hardcodedCount !== actualDynamicTools.length) {
 		finding(
@@ -317,7 +334,12 @@ async function testDynamicTools(): Promise<void> {
 			`Hardcoded ${hardcodedCount} but actually registers ${actualDynamicTools.length} tools.`,
 		)
 	} else {
-		finding('DYNAMIC', 'INFO', 'Dynamic tool count is correct', `Hardcoded value (${hardcodedCount}) matches actual registration count.`)
+		finding(
+			'DYNAMIC',
+			'INFO',
+			'Dynamic tool count is correct',
+			`Hardcoded value (${hardcodedCount}) matches actual registration count.`,
+		)
 	}
 
 	// 3b. Verify total tools match expectations
@@ -339,7 +361,9 @@ async function testDynamicTools(): Promise<void> {
 	// 3d. Verify describe_tools returns inputSchema
 	console.log('\n  [3d] Tool schema availability:')
 	const toolsWithoutSchema = ctx.tools.filter((t) => !t.schema)
-	console.log(`    Tools with schema: ${ctx.tools.length - toolsWithoutSchema.length}/${ctx.tools.length}`)
+	console.log(
+		`    Tools with schema: ${ctx.tools.length - toolsWithoutSchema.length}/${ctx.tools.length}`,
+	)
 	if (toolsWithoutSchema.length > 0) {
 		finding(
 			'DYNAMIC',
@@ -369,7 +393,12 @@ async function testErrorHandling(): Promise<void> {
 			'product_get with id=999999 should return isError=true.',
 		)
 	} else {
-		finding('ERROR', 'INFO', 'Non-existent resource error is correct', `Returns isError=true with: ${notFound.raw.slice(0, 80)}`)
+		finding(
+			'ERROR',
+			'INFO',
+			'Non-existent resource error is correct',
+			`Returns isError=true with: ${notFound.raw.slice(0, 80)}`,
+		)
 	}
 
 	// 4b. Wrong types — pass string where number expected
@@ -479,7 +508,8 @@ async function testInfrastructure(): Promise<void> {
 	console.log('\n  [5b] Auth timing-safe comparison check:')
 	const authSrc = readFileSync(resolve(import.meta.dirname, '../src/transport/auth.ts'), 'utf-8')
 	const usesTimingSafe = authSrc.includes('timingSafeEqual')
-	const usesDirectCompare = authSrc.includes('token !== apiKey') || authSrc.includes('token === apiKey')
+	const usesDirectCompare =
+		authSrc.includes('token !== apiKey') || authSrc.includes('token === apiKey')
 
 	console.log(`    Uses timingSafeEqual:     ${usesTimingSafe}`)
 	console.log(`    Uses direct comparison:   ${usesDirectCompare}`)
@@ -557,7 +587,10 @@ async function testInfrastructure(): Promise<void> {
 	console.log('\n  [5e] variant_create schema — required fields check:')
 	const variantCreate = toolMap.get('fluentcart_variant_create')
 	if (variantCreate) {
-		const shape = variantCreate.schema.shape as Record<string, { isOptional?: () => boolean; _def?: { typeName?: string } }>
+		const shape = variantCreate.schema.shape as Record<
+			string,
+			{ isOptional?: () => boolean; _def?: { typeName?: string } }
+		>
 
 		const titleOptional = shape.title?.isOptional?.() ?? false
 		const priceOptional = shape.price?.isOptional?.() ?? false

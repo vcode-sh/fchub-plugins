@@ -1,13 +1,13 @@
 ---
 title: Tool Reference
-description: Every tool in FluentCart MCP, listed by module. 279 tools covering orders, products, customers, subscriptions, shipping, tax, reports, and more.
+description: Every tool in FluentCart MCP, listed by module. 274 tools covering orders, products, customers, subscriptions, shipping, tax, reports, and more.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-The complete inventory. Every tool, every module, every HTTP method. 279 tools organised into 27 modules so the AI (and you) can find what it needs.
+The complete inventory. Every tool, every module, every HTTP method. 274 tools organised into 27 modules so the AI (and you) can find what it needs.
 
 You'll never need to call these yourself — the AI picks the right tool based on what you ask. But if you want to know exactly what's possible, or you want to verify that a specific capability exists before asking for it, this is your reference.
 
@@ -19,7 +19,7 @@ This page is a lookup table, not homework. The AI already knows all of this. You
 
 ## Dynamic Mode
 
-Don't fancy loading 279 tool definitions into your LLM context? Fair enough. Start the server with `--mode dynamic` and you get 3 meta-tools instead:
+Don't fancy loading 274 tool definitions into your LLM context? Fair enough. Start the server with `--mode dynamic` and you get 3 meta-tools instead:
 
 | Tool | What It Does |
 |------|-------------|
@@ -27,7 +27,7 @@ Don't fancy loading 279 tool definitions into your LLM context? Fair enough. Sta
 | `fluentcart_describe_tools` | Get full input schemas and annotations for specific tools (max 10 per request). |
 | `fluentcart_execute_tool` | Execute any tool by name with provided input. |
 
-The AI discovers tools on demand instead of loading all 279 upfront. Same tools, same results — just lazily loaded.
+The AI discovers tools on demand instead of loading all 274 upfront. Same tools, same results — just lazily loaded.
 
 Categories for filtering: `product`, `order`, `customer`, `coupon`, `report`, `subscription`, `integration`, `setting`, `shipping`, `tax`, `email`, `role`, `file`, `label`, `activity`, `note`, `dashboard`, `application`, `public`, `misc`.
 
@@ -576,8 +576,8 @@ Lookup data that other tools depend on.
 | Files | 4 | File management |
 | Public | 4 | Public-facing |
 | Miscellaneous | 4 | Utilities |
-| **Total (static mode)** | **279** | |
-| **Total (dynamic mode)** | **3** | Meta-tools that proxy to all 279 |
+| **Total (static mode)** | **274** | |
+| **Total (dynamic mode)** | **3** | Meta-tools that proxy to all 274 |
 
 Key endpoints also feature **response transforms** — `order_get`, `product_get`, `customer_get` and all list endpoints strip HTML blobs, embedded objects, and serialised metadata before returning. Less noise, fewer tokens, same useful data.
 

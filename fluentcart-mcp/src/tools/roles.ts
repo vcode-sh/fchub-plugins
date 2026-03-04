@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { TTL } from '../cache.js'
+import { invalidate, TTL } from '../cache.js'
 import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
 
 export function roleTools(client: FluentCartClient): ToolDefinition[] {
@@ -48,7 +48,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 					(input.slug as string | undefined) ||
 					(input.key as string | undefined)
 
-				if (!userId || !roleKey) {
+				if (!(userId && roleKey)) {
 					throw new FluentCartApiError(
 						'VALIDATION_ERROR',
 						'Validation error: user_id and role_key are required',
@@ -56,7 +56,11 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 					)
 				}
 
-				const resp = await c.post('/roles', { user_id: userId, role_key: roleKey })
+				const resp = await c.post('/roles', {
+					user_id: userId,
+					role_key: roleKey,
+				})
+				invalidate('roles')
 				return resp.data
 			},
 		}),
@@ -92,6 +96,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 				const key = input.key as string
 				const userId = input.user_id as number
 				const resp = await c.delete(`/roles/${key}`, { user_id: userId })
+				invalidate('roles')
 				return resp.data
 			},
 		}),

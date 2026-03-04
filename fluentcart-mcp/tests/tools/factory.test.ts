@@ -715,6 +715,8 @@ describe('P1.2 response transforms', () => {
 			post_status: 'publish',
 			post_name: 'widget',
 			post_date: '2025-01-01',
+			product_type: null,
+			fulfillment_type: null,
 		})
 		expect(parsed.data[0]).not.toHaveProperty('post_content')
 		expect(parsed.data[0]).not.toHaveProperty('variants')

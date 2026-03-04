@@ -15,10 +15,15 @@ export interface ResolvedConfig extends FluentCartConfig {
 
 export function resolveApiUrls(config: FluentCartConfig): ResolvedConfig {
 	const base = config.url.replace(/\/+$/, '')
+	// FluentCart registers both admin and public (frontend) routes under the same
+	// REST namespace "fluent-cart/v2".  Public endpoints are distinguished by their
+	// URL prefix (e.g. /public/products) rather than a separate namespace.
+	// The isPublic flag on individual tools controls auth behaviour, not the base URL.
+	const apiBase = `${base}/wp-json/fluent-cart/v2`
 	return {
 		...config,
-		adminBase: `${base}/wp-json/fluent-cart/v2`,
-		publicBase: `${base}/wp-json/fluent-cart/v2`,
+		adminBase: apiBase,
+		publicBase: apiBase,
 	}
 }
 

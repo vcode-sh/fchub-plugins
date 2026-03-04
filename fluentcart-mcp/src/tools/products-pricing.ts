@@ -50,24 +50,28 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 				'or update its variants. Prices in whole currency units (e.g. 400 for 400 PLN, not cents). ' +
 				'The API converts to cents internally. Variants require at least title and price. ' +
 				'Fetches current product state first, then merges your changes.',
-				schema: z.object({
-					product_id: z.number().describe('Product ID'),
-					post_title: z.string().optional().describe('Product title'),
-					post_name: z
-						.string()
-						.optional()
-						.describe('Product slug (post_name). Use lowercase and hyphens.'),
-					post_status: z.string().optional().describe('Product status: draft, publish, future'),
-					post_content: z.string().optional().describe('Long description (HTML)'),
-					post_excerpt: z.string().optional().describe('Short description'),
+			schema: z.object({
+				product_id: z.number().describe('Product ID'),
+				post_title: z.string().optional().describe('Product title'),
+				post_name: z
+					.string()
+					.optional()
+					.describe('Product slug (post_name). Use lowercase and hyphens.'),
+				post_status: z.string().optional().describe('Product status: draft, publish, future'),
+				post_content: z.string().optional().describe('Long description (HTML)'),
+				post_excerpt: z.string().optional().describe('Short description'),
 				fulfillment_type: z
 					.string()
 					.optional()
 					.describe('Fulfilment: physical or digital (default: physical)'),
 				variation_type: z
-					.enum(['simple', 'variable', 'subscription'])
+					.enum(['simple', 'simple_variations', 'advanced_variations'])
 					.optional()
-					.describe('Product variation type'),
+					.describe(
+						'Product variation type: "simple" (single variant), ' +
+							'"simple_variations" (multiple variants with simple options), ' +
+							'"advanced_variations" (variants with attribute-based options)',
+					),
 				variants: z
 					.array(
 						z.object({
@@ -142,17 +146,17 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 						(input.fulfillment_type as string) ||
 						(existingDetail.fulfillment_type as string) ||
 						'physical'
-						variants = inputVariants.map((v) => ({
-							...(v.id ? { id: v.id } : {}),
-							post_id: productId,
-							variation_title: v.title as string,
-							item_price: v.price as number,
-							...(v.compare_price !== undefined ? { compare_price: v.compare_price as number } : {}),
-							...(typeof v.sku === 'string' && v.sku.trim() ? { sku: v.sku.trim() } : {}),
-							fulfillment_type: ft,
-							stock_status: 'in-stock',
-							item_status: (v.item_status as string) || 'active',
-							other_info: buildOtherInfo(v),
+					variants = inputVariants.map((v) => ({
+						...(v.id ? { id: v.id } : {}),
+						post_id: productId,
+						variation_title: v.title as string,
+						item_price: v.price as number,
+						...(v.compare_price !== undefined ? { compare_price: v.compare_price as number } : {}),
+						...(typeof v.sku === 'string' && v.sku.trim() ? { sku: v.sku.trim() } : {}),
+						fulfillment_type: ft,
+						stock_status: 'in-stock',
+						item_status: (v.item_status as string) || 'active',
+						other_info: buildOtherInfo(v),
 						...(v.total_stock !== undefined
 							? { total_stock: v.total_stock, available: v.total_stock }
 							: {}),
@@ -180,13 +184,13 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 					post_status: (input.post_status as string) ?? product.post_status,
 					detail,
 					variants,
-					}
-					if (input.post_content !== undefined) body.post_content = input.post_content
-					if (input.post_excerpt !== undefined) body.post_excerpt = input.post_excerpt
-					if (input.post_name !== undefined) body.post_name = input.post_name
+				}
+				if (input.post_content !== undefined) body.post_content = input.post_content
+				if (input.post_excerpt !== undefined) body.post_excerpt = input.post_excerpt
+				if (input.post_name !== undefined) body.post_name = input.post_name
 
-					const response = await client.post(`/products/${productId}/pricing`, body)
-					return response.data
+				const response = await client.post(`/products/${productId}/pricing`, body)
+				return response.data
 			},
 		}),
 
@@ -243,13 +247,19 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_bundle_save',
 			title: 'Save Product Bundle Info',
-			description: 'Save bundle configuration for a product variation.',
+			description:
+				'Save bundle child variation IDs for a product variation. ' +
+				'The parent variation must belong to a bundle product (detail.other_info.is_bundle_product = "yes"). ' +
+				'Child variations cannot themselves be bundle products. ' +
+				'Pass an array of variation IDs to link as bundle children.',
 			schema: z.object({
-				variation_id: z.number().describe('Variation ID'),
-				bundle_items: z
-					.array(z.record(z.string(), z.unknown()))
-					.optional()
-					.describe('Bundle item configuration'),
+				variation_id: z.number().describe('Parent variation ID to attach bundle children to'),
+				bundle_child_ids: z
+					.array(z.number())
+					.describe(
+						'Array of variation IDs to include in the bundle. ' +
+							'These must be non-bundle product variations.',
+					),
 			}),
 			endpoint: '/products/save-bundle-info/:variation_id',
 		}),

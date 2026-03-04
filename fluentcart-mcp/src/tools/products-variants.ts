@@ -9,6 +9,30 @@ import {
 	type ToolDefinition,
 } from './_factory.js'
 
+function trimVariant(v: Record<string, unknown>) {
+	const otherInfo = v.other_info as Record<string, unknown> | undefined
+	return {
+		id: v.id,
+		post_id: v.post_id,
+		variation_title: v.variation_title,
+		item_price: v.item_price,
+		compare_price: v.compare_price,
+		sku: v.sku,
+		stock_status: v.stock_status,
+		item_status: v.item_status,
+		total_stock: v.total_stock,
+		fulfillment_type: v.fulfillment_type,
+		payment_type: v.payment_type,
+		...(otherInfo?.payment_type === 'subscription'
+			? {
+					repeat_interval: otherInfo.repeat_interval,
+					times: otherInfo.times,
+					trial_days: otherInfo.trial_days,
+				}
+			: {}),
+	}
+}
+
 const DEFAULT_OTHER_INFO = {
 	payment_type: 'onetime',
 	times: '',
@@ -112,6 +136,10 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 			}),
 			endpoint: '/variants',
+			transform: (data: unknown) => {
+				if (!Array.isArray(data)) return data
+				return data.map((v: Record<string, unknown>) => trimVariant(v))
+			},
 		}),
 
 		createTool(client, {
@@ -137,9 +165,16 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 					per_page: perPage,
 				}
 
+				const trimVariants = (arr: unknown[]) =>
+					arr.map((v) => trimVariant(v as Record<string, unknown>))
+
 				try {
 					const response = await client.get('/products/variants', params)
-					return response.data
+					const resp = response.data as Record<string, unknown>
+					if (resp && Array.isArray(resp.variants)) {
+						resp.variants = trimVariants(resp.variants)
+					}
+					return resp
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error)
 					const isKnownUpstreamBug =
@@ -149,12 +184,10 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 					const fallback = await client.get(`/products/${productId}`)
 					const wrapper = fallback.data as Record<string, unknown>
 					const product = (wrapper.product ?? wrapper) as Record<string, unknown>
-					const variantsRaw = Array.isArray(product.variants)
-						? (product.variants as unknown[])
-						: []
+					const variantsRaw = Array.isArray(product.variants) ? (product.variants as unknown[]) : []
 					const from = Math.max(0, (page - 1) * perPage)
 					const to = from + perPage
-					const variants = variantsRaw.slice(from, to)
+					const variants = trimVariants(variantsRaw.slice(from, to))
 
 					return {
 						variants,
@@ -166,7 +199,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 					}
 				}
 			},
-			}),
+		}),
 
 		createTool(client, {
 			name: 'fluentcart_variant_create',
@@ -178,7 +211,10 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 			schema: z.object({
 				product_id: z.number().describe('Parent product ID'),
 				title: z.string().describe('Variation title (required, e.g. "Tiger Pants - White")'),
-				price: z.number().optional().describe('Price in currency units (e.g. 10 for 10.00, default: 0)'),
+				price: z
+					.number()
+					.optional()
+					.describe('Price in currency units (e.g. 10 for 10.00, default: 0)'),
 				sku: z.string().optional().describe('Stock keeping unit'),
 				stock_quantity: z.number().optional().describe('Stock quantity'),
 				fulfillment_type: z
@@ -190,19 +226,17 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 			handler: async (client, input) => {
 				const productId = input.product_id as number
 				const otherInfo = buildOtherInfo(input)
-					const body = {
-						product_id: productId,
-						variants: {
-							post_id: productId,
-							variation_title: (input.title as string) || '',
-							item_price: (input.price as number) ?? 0,
-							compare_price: (input.compare_price as number) ?? 0,
-							...(typeof input.sku === 'string' && input.sku.trim()
-								? { sku: input.sku.trim() }
-								: {}),
-							fulfillment_type: (input.fulfillment_type as string) || 'physical',
-							total_stock: (input.stock_quantity as number) ?? 0,
-							available: (input.stock_quantity as number) ?? 0,
+				const body = {
+					product_id: productId,
+					variants: {
+						post_id: productId,
+						variation_title: (input.title as string) || '',
+						item_price: (input.price as number) ?? 0,
+						compare_price: (input.compare_price as number) ?? 0,
+						...(typeof input.sku === 'string' && input.sku.trim() ? { sku: input.sku.trim() } : {}),
+						fulfillment_type: (input.fulfillment_type as string) || 'physical',
+						total_stock: (input.stock_quantity as number) ?? 0,
+						available: (input.stock_quantity as number) ?? 0,
 						committed: 0,
 						on_hold: 0,
 						stock_status: 'in-stock',
@@ -248,15 +282,15 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				const variants = buildVariantFromExisting(existing, productId, variantId)
 
 				// Apply user's changes
-					const overrides: Record<string, unknown> = {}
-					if (input.title !== undefined) overrides.variation_title = input.title
-					if (input.price !== undefined) overrides.item_price = input.price
-					if (input.sku !== undefined && typeof input.sku === 'string' && input.sku.trim()) {
-						overrides.sku = input.sku.trim()
-					}
-					if (input.stock_quantity !== undefined) {
-						overrides.total_stock = input.stock_quantity
-						overrides.available = input.stock_quantity
+				const overrides: Record<string, unknown> = {}
+				if (input.title !== undefined) overrides.variation_title = input.title
+				if (input.price !== undefined) overrides.item_price = input.price
+				if (input.sku !== undefined && typeof input.sku === 'string' && input.sku.trim()) {
+					overrides.sku = input.sku.trim()
+				}
+				if (input.stock_quantity !== undefined) {
+					overrides.total_stock = input.stock_quantity
+					overrides.available = input.stock_quantity
 				}
 				if (input.compare_price !== undefined) overrides.compare_price = input.compare_price
 				if (input.item_status !== undefined) overrides.item_status = input.item_status

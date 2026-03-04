@@ -25,7 +25,10 @@ export function fileTools(client: FluentCartClient): ToolDefinition[] {
 				'The backend reads files from $request->files(), not from JSON body fields. ' +
 				'This tool will not work until FluentCart adds URL-based file import support.',
 			schema: z.object({
-				file_url: z.string().optional().describe('URL to download file from (NOT SUPPORTED by backend)'),
+				file_url: z
+					.string()
+					.optional()
+					.describe('URL to download file from (NOT SUPPORTED by backend)'),
 				file_name: z.string().optional().describe('File name (backend validates as "name")'),
 				bucket: z.string().optional().describe('Storage bucket name'),
 			}),
@@ -50,10 +53,14 @@ export function fileTools(client: FluentCartClient): ToolDefinition[] {
 		deleteTool(client, {
 			name: 'fluentcart_file_delete',
 			title: 'Delete File',
-			description: 'Delete one or more files. Use file_id for a single file, or file_ids for bulk deletion. This action cannot be undone.',
+			description:
+				'Delete one or more files. Use file_id for a single file, or file_ids for bulk deletion. This action cannot be undone.',
 			schema: z.object({
 				file_id: z.number().optional().describe('Single file ID to delete (use this OR file_ids)'),
-				file_ids: z.array(z.number()).optional().describe('Array of file IDs for bulk deletion (use this OR file_id)'),
+				file_ids: z
+					.array(z.number())
+					.optional()
+					.describe('Array of file IDs for bulk deletion (use this OR file_id)'),
 			}),
 			endpoint: '/files/delete',
 		}),

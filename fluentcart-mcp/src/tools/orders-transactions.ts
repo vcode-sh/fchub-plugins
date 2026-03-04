@@ -138,7 +138,9 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 				'Optionally provide order_items to override.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID to calculate shipping for'),
-				shipping_id: z.number().describe('Shipping method ID (from fluentcart_order_shipping_methods)'),
+				shipping_id: z
+					.number()
+					.describe('Shipping method ID (from fluentcart_order_shipping_methods)'),
 				order_items: z
 					.array(z.record(z.string(), z.unknown()))
 					.optional()

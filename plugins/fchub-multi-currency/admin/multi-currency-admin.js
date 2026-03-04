@@ -8,67 +8,68 @@
  * and FluentCart's globally registered Element Plus components.
  */
 
-(function () {
-    'use strict';
+(() => {
+	/* ------------------------------------------------------------------ */
+	/*  REST helper                                                        */
+	/* ------------------------------------------------------------------ */
 
-    /* ------------------------------------------------------------------ */
-    /*  REST helper                                                        */
-    /* ------------------------------------------------------------------ */
+	var config = window.fchubMcAdmin || {};
 
-    var config = window.fchubMcAdmin || {};
+	function restUrl(path) {
+		return (config.rest_url || "/wp-json/fchub-mc/v1/") + path;
+	}
 
-    function restUrl(path) {
-        return (config.rest_url || '/wp-json/fchub-mc/v1/') + path;
-    }
+	function request(method, path, body) {
+		var opts = {
+			method: method === "PUT" ? "POST" : method,
+			headers: {
+				"Content-Type": "application/json",
+				"X-WP-Nonce": config.nonce || "",
+			},
+			credentials: "same-origin",
+		};
+		if (method === "PUT") {
+			opts.headers["X-HTTP-Method-Override"] = "PUT";
+		}
+		if (body) {
+			opts.body = JSON.stringify(body);
+		}
+		return fetch(restUrl(path), opts).then((res) =>
+			res.json().then((json) => {
+				if (!res.ok) throw json;
+				return json.data || json;
+			}),
+		);
+	}
 
-    function request(method, path, body) {
-        var opts = {
-            method: method === 'PUT' ? 'POST' : method,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-WP-Nonce': config.nonce || '',
-            },
-            credentials: 'same-origin',
-        };
-        if (method === 'PUT') {
-            opts.headers['X-HTTP-Method-Override'] = 'PUT';
-        }
-        if (body) {
-            opts.body = JSON.stringify(body);
-        }
-        return fetch(restUrl(path), opts).then(function (res) {
-            return res.json().then(function (json) {
-                if (!res.ok) throw json;
-                return json.data || json;
-            });
-        });
-    }
+	/* ------------------------------------------------------------------ */
+	/*  Sub-components                                                     */
+	/* ------------------------------------------------------------------ */
 
-    /* ------------------------------------------------------------------ */
-    /*  Sub-components                                                     */
-    /* ------------------------------------------------------------------ */
+	var catalogue = config.currency_catalogue || [];
+	var catalogueMap = {};
+	catalogue.forEach((c) => {
+		catalogueMap[c.code] = c;
+	});
 
-    var catalogue = config.currency_catalogue || [];
-    var catalogueMap = {};
-    catalogue.forEach(function (c) { catalogueMap[c.code] = c; });
-
-    var GeneralSettings = {
-        name: 'GeneralSettings',
-        props: { settings: { type: Object, required: true } },
-        data: function () {
-            return { catalogue: catalogue };
-        },
-        computed: {
-            defaultDisplayOptions: function () {
-                var base = this.settings.base_currency;
-                var display = this.settings.display_currencies || [];
-                var codes = {};
-                if (base) codes[base] = true;
-                display.forEach(function (d) { codes[d.code] = true; });
-                return catalogue.filter(function (c) { return codes[c.code]; });
-            },
-        },
-        template: '\
+	var GeneralSettings = {
+		name: "GeneralSettings",
+		props: { settings: { type: Object, required: true } },
+		data: () => ({ catalogue: catalogue }),
+		computed: {
+			defaultDisplayOptions: function () {
+				var base = this.settings.base_currency;
+				var display = this.settings.display_currencies || [];
+				var codes = {};
+				if (base) codes[base] = true;
+				display.forEach((d) => {
+					codes[d.code] = true;
+				});
+				return catalogue.filter((c) => codes[c.code]);
+			},
+		},
+		template:
+			'\
 <div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
@@ -168,43 +169,44 @@
         </div>\
     </div>\
 </div>',
-    };
+	};
 
-    var CurrencySettings = {
-        name: 'CurrencySettings',
-        props: { settings: { type: Object, required: true } },
-        data: function () {
-            return { pickerValue: '', catalogueMap: catalogueMap };
-        },
-        computed: {
-            availableCurrencies: function () {
-                var added = {};
-                (this.settings.display_currencies || []).forEach(function (d) { added[d.code] = true; });
-                return catalogue.filter(function (c) { return !added[c.code]; });
-            },
-        },
-        methods: {
-            onPick: function (code) {
-                if (!code) return;
-                var entry = catalogueMap[code];
-                if (!entry) return;
-                if (!this.settings.display_currencies) {
-                    this.settings.display_currencies = [];
-                }
-                this.settings.display_currencies.push({
-                    code: entry.code,
-                    name: entry.name,
-                    symbol: entry.symbol,
-                    decimals: entry.decimals,
-                    position: 'left',
-                });
-                this.pickerValue = '';
-            },
-            removeCurrency: function (index) {
-                this.settings.display_currencies.splice(index, 1);
-            },
-        },
-        template: '\
+	var CurrencySettings = {
+		name: "CurrencySettings",
+		props: { settings: { type: Object, required: true } },
+		data: () => ({ pickerValue: "", catalogueMap: catalogueMap }),
+		computed: {
+			availableCurrencies: function () {
+				var added = {};
+				(this.settings.display_currencies || []).forEach((d) => {
+					added[d.code] = true;
+				});
+				return catalogue.filter((c) => !added[c.code]);
+			},
+		},
+		methods: {
+			onPick: function (code) {
+				if (!code) return;
+				var entry = catalogueMap[code];
+				if (!entry) return;
+				if (!this.settings.display_currencies) {
+					this.settings.display_currencies = [];
+				}
+				this.settings.display_currencies.push({
+					code: entry.code,
+					name: entry.name,
+					symbol: entry.symbol,
+					decimals: entry.decimals,
+					position: "left",
+				});
+				this.pickerValue = "";
+			},
+			removeCurrency: function (index) {
+				this.settings.display_currencies.splice(index, 1);
+			},
+		},
+		template:
+			'\
 <div>\
     <div style="margin-bottom:20px">\
         <el-select\
@@ -256,16 +258,17 @@
         No display currencies added yet. Use the picker above to add currencies.\
     </div>\
 </div>',
-    };
+	};
 
-    var RateSettings = {
-        name: 'RateSettings',
-        props: {
-            settings: { type: Object, required: true },
-            rates: { type: Array, default: function () { return []; } },
-            ratesLoading: { type: Boolean, default: false },
-        },
-        template: '\
+	var RateSettings = {
+		name: "RateSettings",
+		props: {
+			settings: { type: Object, required: true },
+			rates: { type: Array, default: () => [] },
+			ratesLoading: { type: Boolean, default: false },
+		},
+		template:
+			'\
 <div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
@@ -363,12 +366,13 @@
         </div>\
     </div>\
 </div>',
-    };
+	};
 
-    var CheckoutSettings = {
-        name: 'CheckoutSettings',
-        props: { settings: { type: Object, required: true } },
-        template: '\
+	var CheckoutSettings = {
+		name: "CheckoutSettings",
+		props: { settings: { type: Object, required: true } },
+		template:
+			'\
 <div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
@@ -408,12 +412,13 @@
         </div>\
     </div>\
 </div>',
-    };
+	};
 
-    var CrmSettings = {
-        name: 'CrmSettings',
-        props: { settings: { type: Object, required: true } },
-        template: '\
+	var CrmSettings = {
+		name: "CrmSettings",
+		props: { settings: { type: Object, required: true } },
+		template:
+			'\
 <div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
@@ -494,15 +499,16 @@
         </div>\
     </div>\
 </div>',
-    };
+	};
 
-    var DiagnosticsView = {
-        name: 'DiagnosticsView',
-        props: {
-            diagnostics: { type: Object, default: function () { return {}; } },
-            loading: { type: Boolean, default: false },
-        },
-        template: '\
+	var DiagnosticsView = {
+		name: "DiagnosticsView",
+		props: {
+			diagnostics: { type: Object, default: () => ({}) },
+			loading: { type: Boolean, default: false },
+		},
+		template:
+			'\
 <div v-loading="loading">\
     <div v-if="diagnostics.plugin_version" class="fchub-mc-diag-grid">\
         <div class="fct-card fct-card-border">\
@@ -543,127 +549,121 @@
         No diagnostics data.\
     </div>\
 </div>',
-    };
+	};
 
-    /* ------------------------------------------------------------------ */
-    /*  Main page component                                                */
-    /* ------------------------------------------------------------------ */
+	/* ------------------------------------------------------------------ */
+	/*  Main page component                                                */
+	/* ------------------------------------------------------------------ */
 
-    var MultiCurrencyPage = {
-        name: 'MultiCurrencyPage',
-        components: {
-            GeneralSettings: GeneralSettings,
-            CurrencySettings: CurrencySettings,
-            RateSettings: RateSettings,
-            CheckoutSettings: CheckoutSettings,
-            CrmSettings: CrmSettings,
-            DiagnosticsView: DiagnosticsView,
-        },
-        data: function () {
-            return {
-                activeTab: 'general',
-                loading: true,
-                saving: false,
-                ratesLoading: false,
-                diagLoading: false,
-                settings: {},
-                rates: [],
-                diagnostics: {},
-                catalogue: catalogue,
-                catalogueMap: catalogueMap,
-            };
-        },
-        mounted: function () {
-            this.loadSettings();
-            this.loadRates();
-            if (typeof this.changeTitle === 'function') {
-                this.changeTitle('Multi-Currency');
-            }
-            document.addEventListener('keydown', this.onKeyDown);
-        },
-        beforeUnmount: function () {
-            document.removeEventListener('keydown', this.onKeyDown);
-        },
-        watch: {
-            activeTab: function (tab) {
-                if (tab === 'diagnostics' && !this.diagnostics.plugin_version) {
-                    this.loadDiagnostics();
-                }
-            },
-        },
-        methods: {
-            loadSettings: function () {
-                var vm = this;
-                vm.loading = true;
-                request('GET', 'admin/settings')
-                    .then(function (data) {
-                        vm.settings = data.settings || data;
-                    })
-                    .catch(function () {
-                        vm.$message.error('Failed to load settings.');
-                    })
-                    .finally(function () {
-                        vm.loading = false;
-                    });
-            },
-            loadRates: function () {
-                var vm = this;
-                vm.ratesLoading = true;
-                request('GET', 'admin/rates')
-                    .then(function (data) {
-                        vm.rates = data.rates || [];
-                    })
-                    .finally(function () {
-                        vm.ratesLoading = false;
-                    });
-            },
-            loadDiagnostics: function () {
-                var vm = this;
-                vm.diagLoading = true;
-                request('GET', 'admin/diagnostics')
-                    .then(function (data) {
-                        vm.diagnostics = data;
-                    })
-                    .finally(function () {
-                        vm.diagLoading = false;
-                    });
-            },
-            refreshRates: function () {
-                var vm = this;
-                vm.ratesLoading = true;
-                request('POST', 'admin/rates/refresh')
-                    .then(function () {
-                        vm.$message.success('Rates refreshed.');
-                        vm.loadRates();
-                    })
-                    .catch(function () {
-                        vm.$message.error('Rate refresh failed.');
-                        vm.ratesLoading = false;
-                    });
-            },
-            saveSettings: function () {
-                var vm = this;
-                vm.saving = true;
-                request('POST', 'admin/settings', vm.settings)
-                    .then(function (data) {
-                        vm.settings = data.settings || data;
-                        vm.$message.success('Settings saved.');
-                    })
-                    .catch(function () {
-                        vm.$message.error('Failed to save settings.');
-                    })
-                    .finally(function () {
-                        vm.saving = false;
-                    });
-            },
-            onKeyDown: function (e) {
-                if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-                    e.preventDefault();
-                    this.saveSettings();
-                }
-            },
-        },
-        template: '\
+	var MultiCurrencyPage = {
+		name: "MultiCurrencyPage",
+		components: {
+			GeneralSettings: GeneralSettings,
+			CurrencySettings: CurrencySettings,
+			RateSettings: RateSettings,
+			CheckoutSettings: CheckoutSettings,
+			CrmSettings: CrmSettings,
+			DiagnosticsView: DiagnosticsView,
+		},
+		data: () => ({
+			activeTab: "general",
+			loading: true,
+			saving: false,
+			ratesLoading: false,
+			diagLoading: false,
+			settings: {},
+			rates: [],
+			diagnostics: {},
+			catalogue: catalogue,
+			catalogueMap: catalogueMap,
+		}),
+		mounted: function () {
+			this.loadSettings();
+			this.loadRates();
+			if (typeof this.changeTitle === "function") {
+				this.changeTitle("Multi-Currency");
+			}
+			document.addEventListener("keydown", this.onKeyDown);
+		},
+		beforeUnmount: function () {
+			document.removeEventListener("keydown", this.onKeyDown);
+		},
+		watch: {
+			activeTab: function (tab) {
+				if (tab === "diagnostics" && !this.diagnostics.plugin_version) {
+					this.loadDiagnostics();
+				}
+			},
+		},
+		methods: {
+			loadSettings: function () {
+				this.loading = true;
+				request("GET", "admin/settings")
+					.then((data) => {
+						this.settings = data.settings || data;
+					})
+					.catch(() => {
+						this.$message.error("Failed to load settings.");
+					})
+					.finally(() => {
+						this.loading = false;
+					});
+			},
+			loadRates: function () {
+				this.ratesLoading = true;
+				request("GET", "admin/rates")
+					.then((data) => {
+						this.rates = data.rates || [];
+					})
+					.finally(() => {
+						this.ratesLoading = false;
+					});
+			},
+			loadDiagnostics: function () {
+				this.diagLoading = true;
+				request("GET", "admin/diagnostics")
+					.then((data) => {
+						this.diagnostics = data;
+					})
+					.finally(() => {
+						this.diagLoading = false;
+					});
+			},
+			refreshRates: function () {
+				this.ratesLoading = true;
+				request("POST", "admin/rates/refresh")
+					.then(() => {
+						this.$message.success("Rates refreshed.");
+						this.loadRates();
+					})
+					.catch(() => {
+						this.$message.error("Rate refresh failed.");
+						this.ratesLoading = false;
+					});
+			},
+			saveSettings: function () {
+				this.saving = true;
+				request("POST", "admin/settings", this.settings)
+					.then((data) => {
+						this.settings = data.settings || data;
+						this.$message.success("Settings saved.");
+					})
+					.catch(() => {
+						this.$message.error("Failed to save settings.");
+					})
+					.finally(() => {
+						this.saving = false;
+					});
+			},
+			onKeyDown: function (e) {
+				if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+					e.preventDefault();
+					this.saveSettings();
+				}
+			},
+		},
+		template:
+			'\
 <div class="setting-wrap fchub-mc-page">\
     <div class="fct-setting-header">\
         <div class="fct-setting-header-content">\
@@ -709,150 +709,154 @@
         </el-tabs>\
     </div>\
 </div>',
-    };
+	};
 
-    /* ------------------------------------------------------------------ */
-    /*  Route registration                                                 */
-    /* ------------------------------------------------------------------ */
+	/* ------------------------------------------------------------------ */
+	/*  Route registration                                                 */
+	/* ------------------------------------------------------------------ */
 
-    window.fluent_cart_admin.hooks.addFilter(
-        'fluent_cart_routes',
-        'fchub_multi_currency',
-        function (routes) {
-            if (routes.settings && routes.settings.children) {
-                routes.settings.children.push({
-                    name: 'multi_currency',
-                    path: 'multi-currency',
-                    component: MultiCurrencyPage,
-                    meta: {
-                        active_menu: 'settings',
-                        title: 'Multi-Currency',
-                    },
-                });
-            }
-            return routes;
-        }
-    );
+	window.fluent_cart_admin.hooks.addFilter(
+		"fluent_cart_routes",
+		"fchub_multi_currency",
+		(routes) => {
+			if (routes.settings?.children) {
+				routes.settings.children.push({
+					name: "multi_currency",
+					path: "multi-currency",
+					component: MultiCurrencyPage,
+					meta: {
+						active_menu: "settings",
+						title: "Multi-Currency",
+					},
+				});
+			}
+			return routes;
+		},
+	);
 
-    /* ------------------------------------------------------------------ */
-    /*  Inject "Multi-Currency" into the settings sidebar (DOM)            */
-    /*  Inserts a tab item before "Tax & Duties" so it groups logically   */
-    /*  with other financial settings.                                     */
-    /* ------------------------------------------------------------------ */
+	/* ------------------------------------------------------------------ */
+	/*  Inject "Multi-Currency" into the settings sidebar (DOM)            */
+	/*  Inserts a tab item before "Tax & Duties" so it groups logically   */
+	/*  with other financial settings.                                     */
+	/* ------------------------------------------------------------------ */
 
-    var MC_HASH = '#/settings/multi-currency';
-    var MC_ICON = '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5"/><path d="M2 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 2a12.24 12.24 0 0 1 3.2 8 12.24 12.24 0 0 1-3.2 8 12.24 12.24 0 0 1-3.2-8A12.24 12.24 0 0 1 10 2z" stroke="currentColor" stroke-width="1.5"/></svg>';
-    var MC_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 14" fill="none"><path d="M1 13L6.29289 7.70711C6.62623 7.37377 6.79289 7.20711 6.79289 7C6.79289 6.79289 6.62623 6.62623 6.29289 6.29289L1 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+	var MC_HASH = "#/settings/multi-currency";
+	var MC_ICON =
+		'<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5"/><path d="M2 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 2a12.24 12.24 0 0 1 3.2 8 12.24 12.24 0 0 1-3.2 8 12.24 12.24 0 0 1-3.2-8A12.24 12.24 0 0 1 10 2z" stroke="currentColor" stroke-width="1.5"/></svg>';
+	var MC_CHEVRON =
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 14" fill="none"><path d="M1 13L6.29289 7.70711C6.62623 7.37377 6.79289 7.20711 6.79289 7C6.79289 6.79289 6.62623 6.62623 6.29289 6.29289L1 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-    function isMultiCurrencyRoute() {
-        return window.location.hash.indexOf('/settings/multi-currency') !== -1;
-    }
+	function isMultiCurrencyRoute() {
+		return window.location.hash.indexOf("/settings/multi-currency") !== -1;
+	}
 
-    function updateActiveState(navItem) {
-        if (isMultiCurrencyRoute()) {
-            navItem.classList.add('fct-settings-nav-item-active');
-        } else {
-            navItem.classList.remove('fct-settings-nav-item-active');
-        }
-    }
+	function updateActiveState(navItem) {
+		if (isMultiCurrencyRoute()) {
+			navItem.classList.add("fct-settings-nav-item-active");
+		} else {
+			navItem.classList.remove("fct-settings-nav-item-active");
+		}
+	}
 
-    function injectSettingsSidebarItem() {
-        var navList = document.querySelector('.fct-settings-nav');
-        if (!navList) return false;
+	function injectSettingsSidebarItem() {
+		var navList = document.querySelector(".fct-settings-nav");
+		if (!navList) return false;
 
-        if (navList.querySelector('.fct-settings-nav-item-multi-currency')) return true;
+		if (navList.querySelector(".fct-settings-nav-item-multi-currency")) return true;
 
-        // Build: <li class="fct-settings-nav-item">
-        var navItem = document.createElement('li');
-        navItem.className = 'fct-settings-nav-item fct-settings-nav-item-multi-currency';
-        if (isMultiCurrencyRoute()) {
-            navItem.classList.add('fct-settings-nav-item-active');
-        }
+		// Build: <li class="fct-settings-nav-item">
+		var navItem = document.createElement("li");
+		navItem.className = "fct-settings-nav-item fct-settings-nav-item-multi-currency";
+		if (isMultiCurrencyRoute()) {
+			navItem.classList.add("fct-settings-nav-item-active");
+		}
 
-        // Build: <a class="fct-settings-nav-link" href="#/settings/multi-currency">
-        var link = document.createElement('a');
-        link.className = 'fct-settings-nav-link';
-        link.href = MC_HASH;
+		// Build: <a class="fct-settings-nav-link" href="#/settings/multi-currency">
+		var link = document.createElement("a");
+		link.className = "fct-settings-nav-link";
+		link.href = MC_HASH;
 
-        // Icon wrapper: <div class="icon">SVG</div>
-        var iconDiv = document.createElement('div');
-        iconDiv.className = 'icon';
-        iconDiv.innerHTML = MC_ICON;
+		// Icon wrapper: <div class="icon">SVG</div>
+		var iconDiv = document.createElement("div");
+		iconDiv.className = "icon";
+		iconDiv.innerHTML = MC_ICON;
 
-        // Label + chevron: <span class="fct-settings-nav-link-text">Multi-Currency <div class="icon fct-settings-nav-link-icon">chevron</div></span>
-        var labelSpan = document.createElement('span');
-        labelSpan.className = 'fct-settings-nav-link-text';
-        labelSpan.textContent = 'Multi-Currency';
+		// Label + chevron: <span class="fct-settings-nav-link-text">Multi-Currency <div class="icon fct-settings-nav-link-icon">chevron</div></span>
+		var labelSpan = document.createElement("span");
+		labelSpan.className = "fct-settings-nav-link-text";
+		labelSpan.textContent = "Multi-Currency";
 
-        var chevronDiv = document.createElement('div');
-        chevronDiv.className = 'icon fct-settings-nav-link-icon';
-        chevronDiv.innerHTML = MC_CHEVRON;
-        labelSpan.appendChild(chevronDiv);
+		var chevronDiv = document.createElement("div");
+		chevronDiv.className = "icon fct-settings-nav-link-icon";
+		chevronDiv.innerHTML = MC_CHEVRON;
+		labelSpan.appendChild(chevronDiv);
 
-        link.appendChild(iconDiv);
-        link.appendChild(labelSpan);
-        navItem.appendChild(link);
+		link.appendChild(iconDiv);
+		link.appendChild(labelSpan);
+		navItem.appendChild(link);
 
-        // Insert before "Tax & Duties"
-        var inserted = false;
-        var items = navList.querySelectorAll(':scope > .fct-settings-nav-item');
-        for (var i = 0; i < items.length; i++) {
-            var text = items[i].querySelector('.fct-settings-nav-link-text');
-            if (text && text.firstChild && text.firstChild.textContent.trim() === 'Tax & Duties') {
-                navList.insertBefore(navItem, items[i]);
-                inserted = true;
-                break;
-            }
-        }
-        if (!inserted) {
-            navList.appendChild(navItem);
-        }
+		// Insert before "Tax & Duties"
+		let inserted = false;
+		const items = navList.querySelectorAll(":scope > .fct-settings-nav-item");
+		for (let i = 0; i < items.length; i++) {
+			const text = items[i].querySelector(".fct-settings-nav-link-text");
+			if (text?.firstChild && text.firstChild.textContent.trim() === "Tax & Duties") {
+				navList.insertBefore(navItem, items[i]);
+				inserted = true;
+				break;
+			}
+		}
+		if (!inserted) {
+			navList.appendChild(navItem);
+		}
 
-        // Active state tracking
-        window.addEventListener('hashchange', function () {
-            updateActiveState(navItem);
-        });
+		// Active state tracking
+		window.addEventListener("hashchange", () => {
+			updateActiveState(navItem);
+		});
 
-        return true;
-    }
+		return true;
+	}
 
-    function tryInjectSidebar() {
-        if (!injectSettingsSidebarItem()) {
-            requestAnimationFrame(tryInjectSidebar);
-        }
-    }
+	function tryInjectSidebar() {
+		if (!injectSettingsSidebarItem()) {
+			requestAnimationFrame(tryInjectSidebar);
+		}
+	}
 
-    // Start injection when navigating to settings
-    function onHashChange() {
-        if (window.location.hash.indexOf('#/settings') === 0) {
-            tryInjectSidebar();
-        }
-    }
+	// Start injection when navigating to settings
+	function onHashChange() {
+		if (window.location.hash.indexOf("#/settings") === 0) {
+			tryInjectSidebar();
+		}
+	}
 
-    window.addEventListener('hashchange', onHashChange);
+	window.addEventListener("hashchange", onHashChange);
 
-    if (window.location.hash.indexOf('#/settings') === 0) {
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function () { tryInjectSidebar(); });
-        } else {
-            tryInjectSidebar();
-        }
-    }
+	if (window.location.hash.indexOf("#/settings") === 0) {
+		if (document.readyState === "loading") {
+			document.addEventListener("DOMContentLoaded", () => {
+				tryInjectSidebar();
+			});
+		} else {
+			tryInjectSidebar();
+		}
+	}
 
-    /* ------------------------------------------------------------------ */
-    /*  Minimal CSS                                                        */
-    /* ------------------------------------------------------------------ */
+	/* ------------------------------------------------------------------ */
+	/*  Minimal CSS                                                        */
+	/* ------------------------------------------------------------------ */
 
-    var style = document.createElement('style');
-    style.textContent = [
-        '.fchub-mc-page .form-section { padding: 0; }',
-        '.fchub-mc-row { display: grid; gap: 0.5rem; grid-template-columns: 1fr; padding: 4px 0; }',
-        '@media (min-width: 1024px) { .fchub-mc-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } .fchub-mc-row .setting-fields-inner { grid-column: span 2 / span 2; } }',
-        '.fchub-mc-page .cmd { display: inline-block; font-size: 11px; margin-right: 4px; padding: 1px 5px; border: 1px solid rgba(255,255,255,.3); border-radius: 3px; line-height: 1; }',
-        '.fchub-mc-diag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }',
-        '.fchub-mc-diag-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--el-border-color-lighter); font-size: 13px; }',
-        '.fchub-mc-diag-row:last-child { border-bottom: none; }',
-        '.fchub-mc-flag { font-size: 1.2em; margin-right: 6px; vertical-align: middle; }',
-    ].join('\n');
-    document.head.appendChild(style);
+	var style = document.createElement("style");
+	style.textContent = [
+		".fchub-mc-page .form-section { padding: 0; }",
+		".fchub-mc-row { display: grid; gap: 0.5rem; grid-template-columns: 1fr; padding: 4px 0; }",
+		"@media (min-width: 1024px) { .fchub-mc-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } .fchub-mc-row .setting-fields-inner { grid-column: span 2 / span 2; } }",
+		".fchub-mc-page .cmd { display: inline-block; font-size: 11px; margin-right: 4px; padding: 1px 5px; border: 1px solid rgba(255,255,255,.3); border-radius: 3px; line-height: 1; }",
+		".fchub-mc-diag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }",
+		".fchub-mc-diag-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--el-border-color-lighter); font-size: 13px; }",
+		".fchub-mc-diag-row:last-child { border-bottom: none; }",
+		".fchub-mc-flag { font-size: 1.2em; margin-right: 6px; vertical-align: middle; }",
+	].join("\n");
+	document.head.appendChild(style);
 })();

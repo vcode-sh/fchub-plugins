@@ -76,9 +76,40 @@ async function handleErrorResponse(response: Response): Promise<never> {
 			? parsedObj.message
 			: raw.trim().startsWith('<')
 				? 'Received HTML instead of JSON'
-				: previewRaw(raw) ?? response.statusText
+				: (previewRaw(raw) ?? response.statusText)
 	const detail = parsed ?? (previewRaw(raw) ? { raw_preview: previewRaw(raw) } : null)
 	throw errorFromStatus(response.status, message, detail)
+}
+
+async function parseSuccessBody<T>(response: Response, method: string, path: string): Promise<T> {
+	const raw = await readResponseText(response)
+	if (raw.trim().startsWith('<')) {
+		const recovered = parseJsonLenient(raw)
+		const recoveredObj =
+			recovered && typeof recovered === 'object'
+				? (recovered as Record<string, unknown>)
+				: undefined
+		const message =
+			typeof recoveredObj?.message === 'string'
+				? recoveredObj.message
+				: 'Received HTML instead of JSON'
+		throw new FluentCartApiError('CONNECTION_ERROR', message, response.status, {
+			recovered,
+			raw_preview: previewRaw(raw),
+		})
+	}
+
+	const parsed = parseJsonLenient(raw)
+	if (parsed !== undefined) {
+		return parsed as T
+	}
+
+	throw new FluentCartApiError(
+		'CONNECTION_ERROR',
+		`Expected JSON response but received non-JSON payload for ${method} ${path}`,
+		response.status,
+		{ raw_preview: previewRaw(raw) },
+	)
 }
 
 export function createClient(config: ResolvedConfig) {
@@ -114,43 +145,13 @@ export function createClient(config: ResolvedConfig) {
 				signal: controller.signal,
 			})
 
-				if (!response.ok) {
-					await handleErrorResponse(response)
-				}
+			if (!response.ok) {
+				await handleErrorResponse(response)
+			}
 
-				const raw = await readResponseText(response)
-				// A 2xx HTTP status with HTML payload indicates a backend/runtime warning page.
-				// Do not treat this as success, even if trailing JSON can be extracted.
-				if (raw.trim().startsWith('<')) {
-					const recovered = parseJsonLenient(raw)
-					const recoveredObj =
-						recovered && typeof recovered === 'object'
-							? (recovered as Record<string, unknown>)
-							: undefined
-					const message =
-						typeof recoveredObj?.message === 'string'
-							? recoveredObj.message
-							: 'Received HTML instead of JSON'
-					throw new FluentCartApiError(
-						'CONNECTION_ERROR',
-						message,
-						response.status,
-						{ recovered, raw_preview: previewRaw(raw) },
-					)
-				}
-
-				const parsed = parseJsonLenient(raw)
-				if (parsed !== undefined) {
-					return { data: parsed as T, status: response.status }
-				}
-
-				throw new FluentCartApiError(
-					'CONNECTION_ERROR',
-					`Expected JSON response but received non-JSON payload for ${method} ${path}`,
-					response.status,
-					{ raw_preview: previewRaw(raw) },
-				)
-			} catch (error) {
+			const data = await parseSuccessBody<T>(response, method, path)
+			return { data, status: response.status }
+		} catch (error) {
 			if (error instanceof DOMException && error.name === 'AbortError') {
 				throw new FluentCartApiError(
 					'TIMEOUT',

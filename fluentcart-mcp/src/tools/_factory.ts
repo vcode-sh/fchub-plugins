@@ -1,7 +1,7 @@
 import type { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { cached } from '../cache.js'
+import { cached, invalidate } from '../cache.js'
 
 export interface ToolAnnotations {
 	readOnlyHint?: boolean
@@ -35,6 +35,8 @@ interface EndpointToolConfig extends BaseToolConfig {
 	isPublic?: boolean
 	transform?: (data: unknown) => unknown
 	cache?: { key: string; ttlMs: number }
+	/** Cache keys to invalidate on successful write (POST/PUT/DELETE). */
+	invalidates?: string[]
 }
 
 interface CustomToolConfig extends BaseToolConfig {
@@ -59,64 +61,56 @@ function resolveEndpoint(
 	return { path, rest }
 }
 
+function sliceToFit(arr: unknown[], budget: number): unknown[] {
+	const arrJson = JSON.stringify(arr)
+	const avgItemSize = arrJson.length / arr.length
+	let targetCount = Math.max(1, Math.floor(budget / avgItemSize))
+	let sliced = arr.slice(0, targetCount)
+	while (sliced.length > 1 && JSON.stringify(sliced).length > budget) {
+		targetCount = Math.max(1, Math.floor(targetCount * 0.75))
+		sliced = arr.slice(0, targetCount)
+	}
+	return sliced
+}
+
+function truncateObjectArray(
+	obj: Record<string, unknown>,
+	jsonLen: number,
+): Record<string, unknown> | null {
+	const arrayKey =
+		'data' in obj && Array.isArray(obj.data)
+			? 'data'
+			: 'items' in obj && Array.isArray(obj.items)
+				? 'items'
+				: null
+	if (!arrayKey) return null
+	const arr = obj[arrayKey] as unknown[]
+	if (arr.length === 0) return null
+	const overhead = jsonLen - JSON.stringify(arr).length
+	const sliced = sliceToFit(arr, MAX_RESPONSE_CHARS * 0.85 - overhead)
+	return {
+		...obj,
+		[arrayKey]: sliced,
+		_truncated: true,
+		_total: arr.length,
+		_showing: sliced.length,
+	}
+}
+
 export function truncateResponse(data: unknown): unknown {
 	const json = JSON.stringify(data)
 	if (json.length <= MAX_RESPONSE_CHARS) return data
 
-	// Array response — slice to fit
 	if (Array.isArray(data) && data.length > 0) {
-		const avgItemSize = json.length / data.length
-		let targetCount = Math.max(1, Math.floor((MAX_RESPONSE_CHARS * 0.85) / avgItemSize))
-		let sliced = data.slice(0, targetCount)
-
-		// Safety cap: verify result fits after slicing (average-based estimate can overshoot for high-variance arrays)
-		while (sliced.length > 1 && JSON.stringify(sliced).length > MAX_RESPONSE_CHARS) {
-			targetCount = Math.max(1, Math.floor(targetCount * 0.75))
-			sliced = data.slice(0, targetCount)
-		}
-
+		const sliced = sliceToFit(data, MAX_RESPONSE_CHARS * 0.85)
 		return { _truncated: true, _total: data.length, _showing: sliced.length, items: sliced }
 	}
 
-	// Object with data/items array (paginated response)
 	if (typeof data === 'object' && data !== null) {
-		const obj = data as Record<string, unknown>
-		const arrayKey =
-			'data' in obj && Array.isArray(obj.data)
-				? 'data'
-				: 'items' in obj && Array.isArray(obj.items)
-					? 'items'
-					: null
-		if (arrayKey) {
-			const arr = obj[arrayKey] as unknown[]
-			if (arr.length > 0) {
-				const arrJson = JSON.stringify(arr)
-				const overhead = json.length - arrJson.length
-				const available = MAX_RESPONSE_CHARS * 0.85 - overhead
-				const avgItemSize = arrJson.length / arr.length
-				let targetCount = Math.max(1, Math.floor(available / avgItemSize))
-				let sliced = arr.slice(0, targetCount)
-
-				// Safety cap: verify result fits after slicing
-				while (sliced.length > 1) {
-					const candidate = { ...obj, [arrayKey]: sliced, _truncated: true, _total: arr.length, _showing: sliced.length }
-					if (JSON.stringify(candidate).length <= MAX_RESPONSE_CHARS) break
-					targetCount = Math.max(1, Math.floor(targetCount * 0.75))
-					sliced = arr.slice(0, targetCount)
-				}
-
-				return {
-					...obj,
-					[arrayKey]: sliced,
-					_truncated: true,
-					_total: arr.length,
-					_showing: sliced.length,
-				}
-			}
-		}
+		const result = truncateObjectArray(data as Record<string, unknown>, json.length)
+		if (result) return result
 	}
 
-	// Non-array large response — return notice
 	return {
 		_truncated: true,
 		_chars: json.length,
@@ -220,6 +214,9 @@ function createEndpointTool(
 				const data = config.cache
 					? await cached(config.cache.key, config.cache.ttlMs, fetcher)
 					: await fetcher()
+				if (config.invalidates) {
+					for (const key of config.invalidates) invalidate(key)
+				}
 				return formatSuccess(data)
 			} catch (error) {
 				return formatError(error)

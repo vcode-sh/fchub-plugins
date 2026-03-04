@@ -181,7 +181,10 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 				type: z.string().optional().describe('Address type: billing, shipping'),
 				name: z.string().describe('Full name (required)'),
 				email: z.string().describe('Email address (required)'),
-				label: z.string().max(15).describe('Address label, required (e.g. Home, Office — max 15 chars)'),
+				label: z
+					.string()
+					.max(15)
+					.describe('Address label, required (e.g. Home, Office — max 15 chars)'),
 				company_name: z.string().optional().describe('Company name'),
 				phone: z.string().optional().describe('Phone number'),
 				address_1: z.string().optional().describe('Address line 1'),
@@ -206,7 +209,11 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 				type: z.string().optional().describe('Address type: billing, shipping'),
 				name: z.string().optional().describe('Full name'),
 				email: z.string().optional().describe('Email address'),
-				label: z.string().max(15).optional().describe('Address label (e.g. Home, Office — max 15 chars)'),
+				label: z
+					.string()
+					.max(15)
+					.optional()
+					.describe('Address label (e.g. Home, Office — max 15 chars)'),
 				company_name: z.string().optional().describe('Company name'),
 				phone: z.string().optional().describe('Phone number'),
 				address_1: z.string().optional().describe('Address line 1'),
@@ -312,6 +319,5 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			}),
 			endpoint: '/customers/:customer_id/order',
 		}),
-
 	]
 }

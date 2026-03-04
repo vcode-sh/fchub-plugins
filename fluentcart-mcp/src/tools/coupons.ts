@@ -130,8 +130,7 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 				const wrapper = current.data as Record<string, unknown>
 				const coupon = (wrapper.coupon ?? wrapper) as Record<string, unknown>
 				const { coupon_id: _id, ...changes } = input
-				const merged = { ...coupon, ...changes } as Record<string, unknown>
-				delete merged.id
+				const { id: _existingId, ...merged } = { ...coupon, ...changes } as Record<string, unknown>
 				const resp = await c.put(`/coupons/${id}`, merged)
 				return resp.data
 			},

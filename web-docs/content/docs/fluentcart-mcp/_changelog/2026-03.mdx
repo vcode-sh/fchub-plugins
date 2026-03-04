@@ -1,3 +1,103 @@
+### v1.1.0
+
+*Released 4 March 2026* — [npm](https://www.npmjs.com/package/fluentcart-mcp/v/1.1.0) · [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fluentcart-mcp/v1.1.0)
+
+The "full audit" release. Every single tool was tested against live FluentCart 1.3.13, the backend PHP source was read line-by-line, and every schema, response shape, and undocumented quirk was hunted down. 41 bug fixes, 30 quality improvements, 14 new upstream issues filed. The tool count dropped from 279 to 274 — five tools were removed because their backend endpoints are genuinely broken with no workaround.
+
+**274 total tools** (was 279).
+
+#### What changed
+
+**Response transforms** — List endpoints now return trimmed payloads. `product_list` includes `product_type` and `fulfillment_type`. `customer_list` includes `purchase_value`, `ltv`, and `purchase_count`. `subscription_list` and `subscription_get` strip bloat via `transformSubscription()`. `variant_list` and `variant_list_all` trim variants to essential fields via `trimVariant()`.
+
+**Fetch-merge pattern** — Write tools that were silently nuking unspecified fields now fetch the current state first, merge your changes, and send the complete object. Applied to: `coupon_update`, `customer_update`, `variant_update`, `product_update_detail`, `settings_save_store`.
+
+**Cache invalidation** — Write tools now declare which cache keys to invalidate on success via `invalidates` in the factory. 17 write tools wired: tax classes, tax settings, shipping zones, shipping classes, and roles. No more stale cached data after mutations.
+
+**Schema corrections from PHP source** — `bundle_save` was sending `bundle_items` (wrong) instead of `bundle_child_ids`. `pricing_update` had invalid enum values `variable`/`subscription` — corrected to `simple_variations`/`advanced_variations`. `tax_eu_vat_save` was missing the required `action: 'euCrossBorderSettings'` discriminator and `eu_vat_settings` wrapper.
+
+**Timing-safe auth** — HTTP transport Bearer token comparison now uses `crypto.timingSafeEqual` instead of string equality.
+
+#### Bug fixes (41)
+
+| Area | Fix |
+|------|-----|
+| Coupons | `coupon_update` rewritten with fetch-merge pattern |
+| Coupons | `coupon_list` response transform added (trim to essential fields) |
+| Coupons | `coupon_apply`/`coupon_cancel` converted to `createTool` with correct field names |
+| Coupons | `coupon_settings_save` specific field schema added |
+| Customers | `customer_list` transform includes purchase analytics fields |
+| Customers | `customer_update` rewritten with fetch-merge pattern |
+| Customers | `customer_bulk_action` enum restricted to `delete_customers` |
+| Customers | `customer_update_additional_info` now handles label sync correctly |
+| Subscriptions | `subscription_list` now supports `active_view` filter |
+| Subscriptions | Response transforms strip bloat from subscription data |
+| Products | `product_list` transform includes `product_type` and `fulfillment_type` |
+| Products | `product_bulk_action` enum restricted to valid actions |
+| Products | `product_update_detail` rewritten with fetch-merge pattern |
+| Products | `product_fetch_by_ids` array serialisation fixed |
+| Products | `variant_create` title marked as required |
+| Products | `variant_update` warning added about subscription field re-specification |
+| Products | `buildVariantFromExisting` now spreads `other_info` instead of mutating input |
+| Products | `bundle_save` field name corrected to `bundle_child_ids` |
+| Products | `pricing_update` enum values corrected to match backend constants |
+| Products | Upgrade path schemas corrected |
+| Products | `integration_save` integration field schema added |
+| Products | `feed_status` field renamed to `notification_id` |
+| Products | `terms_by_parent` annotations corrected (readOnly + idempotent) |
+| Tax | `tax_eu_vat_save` rewritten as `createTool` with correct payload structure |
+| Tax | Cache invalidation wired to tax write tools |
+| Integrations | `integration_change_feed_status` enum added |
+| Integrations | `integration_get_feed_settings` required fields added |
+| Integrations | `integration_save_feed_settings` required fields + integration field added |
+| Settings | `settings_save_store` rewritten to flat key-value structure |
+| Shipping | Cache invalidation wired to all shipping write tools |
+| Roles | Capability guards and FluentCart Pro requirement notes added |
+| Roles | `role_get` WARNING (empty backend), `role_update` WARNING (no-op) |
+| Files | `file_upload` WARNING (multipart-only, JSON not supported) |
+| Files | `file_bucket_list` driver field marked required with warning |
+| Email | `email_template_preview` param renamed to match backend |
+| Email | `email_list` format note added |
+| Orders | `order_sync_statuses` warning added |
+| Orders | `order_transaction_update_status` warning added |
+| Orders | Order bump tools get capability guards |
+| Reports | Duplicate report clarifications added |
+| Public | `public_user_login` HTTPS security warning added |
+
+#### Infrastructure improvements (30 P2 fixes)
+
+- `truncateResponse` refactored with `sliceToFit` helper and while-loop safety cap for high-variance arrays
+- `server.ts` imports `DYNAMIC_TOOL_COUNT` constant instead of hardcoded `3`
+- `parseSuccessBody` extracted from `request()` to reduce cognitive complexity
+- `executeStatusOperations` extracted from order status handler
+- Biome config updated to exclude test utility scripts from linting
+- 22 stale debug/scenario test files removed (6,813 lines)
+
+#### Upstream FluentCart bugs filed
+
+14 new issues filed on [fluent-cart/fluent-cart](https://github.com/fluent-cart/fluent-cart) (issues #22–#35):
+
+| Issue | Bug |
+|-------|-----|
+| [#22](https://github.com/fluent-cart/fluent-cart/issues/22) | revenue-by-group and fetch-order-by-group crash with SQL syntax error for all groupKey values |
+| [#23](https://github.com/fluent-cart/fluent-cart/issues/23) | POST /coupons returns full WordPress HTML page instead of JSON |
+| [#24](https://github.com/fluent-cart/fluent-cart/issues/24) | Customer address API — three endpoint inconsistencies |
+| [#25](https://github.com/fluent-cart/fluent-cart/issues/25) | Subscription pause, resume, and reactivate return 'Not available yet' |
+| [#26](https://github.com/fluent-cart/fluent-cart/issues/26) | Role get and update methods have empty bodies — endpoints are no-ops |
+| [#27](https://github.com/fluent-cart/fluent-cart/issues/27) | Coupon apply expects 'coupon_code' — inconsistent with every other coupon endpoint |
+| [#28](https://github.com/fluent-cart/fluent-cart/issues/28) | File upload endpoint requires multipart only — no JSON-based upload option |
+| [#29](https://github.com/fluent-cart/fluent-cart/issues/29) | Customer bulk action only supports delete — no status updates |
+| [#30](https://github.com/fluent-cart/fluent-cart/issues/30) | Email template preview crashes — undocumented 'template' parameter required |
+| [#31](https://github.com/fluent-cart/fluent-cart/issues/31) | Transaction status update accepts any value — no server-side validation |
+| [#32](https://github.com/fluent-cart/fluent-cart/issues/32) | Coupon cancel crashes with null dereference when no coupons applied |
+| [#33](https://github.com/fluent-cart/fluent-cart/issues/33) | EU VAT settings endpoint requires undocumented action discriminator |
+| [#34](https://github.com/fluent-cart/fluent-cart/issues/34) | File bucket-list throws 'Invalid driver' — unclear which driver values are accepted |
+| [#35](https://github.com/fluent-cart/fluent-cart/issues/35) | Coupon re-apply and checkProductEligibility are checkout-only but registered as admin REST routes |
+
+Previously filed (v1.0.1): [#9](https://github.com/fluent-cart/fluent-cart/issues/9)–[#15](https://github.com/fluent-cart/fluent-cart/issues/15), [#17](https://github.com/fluent-cart/fluent-cart/issues/17)–[#21](https://github.com/fluent-cart/fluent-cart/issues/21)
+
+<Separator className="my-8" />
+
 ### v1.0.1
 
 *Released 3 March 2026* — [npm](https://www.npmjs.com/package/fluentcart-mcp/v/1.0.1) · [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fluentcart-mcp/v1.0.1)

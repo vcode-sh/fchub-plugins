@@ -305,7 +305,9 @@ async function scenario6_orderTransactions(orderId: number) {
 
 	// Verify transform output shape
 	if (data.order_id !== undefined && Array.isArray(data.transactions)) {
-		notes.push(`Transformed: order_id=${data.order_id}, ${(data.transactions as unknown[]).length} transactions`)
+		notes.push(
+			`Transformed: order_id=${data.order_id}, ${(data.transactions as unknown[]).length} transactions`,
+		)
 		// Check meta was stripped
 		const txArr = data.transactions as Record<string, unknown>[]
 		if (txArr.length > 0 && 'meta' in txArr[0]) {
@@ -397,7 +399,9 @@ async function scenario8_orderBulkAction() {
 	// so we accept either success or upstream error
 	const notes: string[] = []
 	if (r.isError) {
-		notes.push(`Bulk status action returned error (may be upstream instability): ${r.raw.slice(0, 200)}`)
+		notes.push(
+			`Bulk status action returned error (may be upstream instability): ${r.raw.slice(0, 200)}`,
+		)
 	}
 
 	pass(name, notes)
@@ -574,7 +578,7 @@ async function main() {
 	console.log('\n--- Setup ---')
 	const { customerId, productId, variantId } = await setupTestData()
 
-	if (!customerId || !productId || !variantId) {
+	if (!(customerId && productId && variantId)) {
 		console.log('\n❌ Setup failed: need existing customer + product with variant')
 		process.exit(1)
 	}

@@ -98,6 +98,11 @@
           }
         }
       }
+    },
+    {
+      "includes": ["tests/_*.ts"],
+      "linter": { "enabled": false },
+      "formatter": { "enabled": false }
     }
   ]
 }

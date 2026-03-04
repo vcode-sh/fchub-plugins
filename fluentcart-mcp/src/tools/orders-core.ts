@@ -10,6 +10,31 @@ import {
 	type ToolDefinition,
 } from './_factory.js'
 
+async function executeStatusOperations(
+	c: FluentCartClient,
+	orderId: number,
+	operations: { key: string; body: Record<string, unknown> }[],
+): Promise<Array<Record<string, unknown>>> {
+	const results: Array<Record<string, unknown>> = []
+	for (const op of operations) {
+		try {
+			const resp = await c.put(`/orders/${orderId}/statuses`, op.body)
+			results.push({ field: op.key, ok: true, data: resp.data })
+		} catch (error) {
+			if (error instanceof FluentCartApiError) {
+				results.push({
+					field: op.key,
+					ok: false,
+					error: { code: error.code, message: error.message, detail: error.detail },
+				})
+				continue
+			}
+			throw error
+		}
+	}
+	return results
+}
+
 export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
 		createTool(client, {
@@ -107,7 +132,10 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 					.array(
 						z.object({
 							product_id: z.number().describe('Product ID (mapped to post_id)'),
-							variation_id: z.number().optional().describe('Variation/variant ID (mapped to object_id)'),
+							variation_id: z
+								.number()
+								.optional()
+								.describe('Variation/variant ID (mapped to object_id)'),
 							quantity: z.number().optional().describe('Quantity (default: 1)'),
 							unit_price: z.number().optional().describe('Unit price override'),
 						}),
@@ -192,12 +220,12 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 				const order = (wrapper.order ?? wrapper) as Record<string, unknown>
 
 				// Extract current order items, converting prices from cents back to currency units
-				const currentItems = ((order.items ?? order.order_items ?? []) as Record<string, unknown>[]).map(
-					(item) => ({
-						...item,
-						unit_price: typeof item.unit_price === 'number' ? item.unit_price / 100 : item.unit_price,
-					}),
-				)
+				const currentItems = (
+					(order.items ?? order.order_items ?? []) as Record<string, unknown>[]
+				).map((item) => ({
+					...item,
+					unit_price: typeof item.unit_price === 'number' ? item.unit_price / 100 : item.unit_price,
+				}))
 
 				const body: Record<string, unknown> = {
 					customer_id: (input.customer_id as number) ?? order.customer_id,
@@ -307,89 +335,44 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			}),
 			handler: async (c, input) => {
 				const orderId = input.order_id as number
-				const operations: { key: string; body: Record<string, unknown> }[] = []
 				const currentResp = await c.get(`/orders/${orderId}`)
 				const currentWrapper = currentResp.data as Record<string, unknown>
 				const currentOrder = (currentWrapper.order ?? currentWrapper) as Record<string, unknown>
-				const currentOrderStatus =
-					(currentOrder.status as string | undefined) ??
-					(currentOrder.order_status as string | undefined)
-				const currentShippingStatus = currentOrder.shipping_status as string | undefined
-				const currentPaymentStatus = currentOrder.payment_status as string | undefined
 
-				if (
-					input.order_status !== undefined &&
-					String(input.order_status) !== String(currentOrderStatus ?? '')
-				) {
-					operations.push({
+				const statusFields = [
+					{
 						key: 'order_status',
-						body: {
-							action: 'change_order_status',
-							statuses: {
-								order_status: input.order_status,
-							},
-						},
-					})
-				}
-				if (
-					input.shipping_status !== undefined &&
-					String(input.shipping_status) !== String(currentShippingStatus ?? '')
-				) {
-					operations.push({
+						action: 'change_order_status',
+						current:
+							(currentOrder.status as string | undefined) ??
+							(currentOrder.order_status as string | undefined),
+					},
+					{
 						key: 'shipping_status',
-						body: {
-							action: 'change_shipping_status',
-							statuses: {
-								shipping_status: input.shipping_status,
-							},
-						},
-					})
-				}
-				if (
-					input.payment_status !== undefined &&
-					String(input.payment_status) !== String(currentPaymentStatus ?? '')
-				) {
-					operations.push({
+						action: 'change_shipping_status',
+						current: currentOrder.shipping_status as string | undefined,
+					},
+					{
 						key: 'payment_status',
-						body: {
-							action: 'change_payment_status',
-							statuses: {
-								payment_status: input.payment_status,
-							},
-						},
-					})
-				}
+						action: 'change_payment_status',
+						current: currentOrder.payment_status as string | undefined,
+					},
+				] as const
+
+				const operations = statusFields
+					.filter(
+						(f) => input[f.key] !== undefined && String(input[f.key]) !== String(f.current ?? ''),
+					)
+					.map((f) => ({
+						key: f.key,
+						body: { action: f.action, statuses: { [f.key]: input[f.key] } },
+					}))
 
 				if (!operations.length) {
-					return {
-						message: 'No status changes required',
-						order_id: orderId,
-						results: [],
-					}
+					return { message: 'No status changes required', order_id: orderId, results: [] }
 				}
 
-				const results: Array<Record<string, unknown>> = []
-				for (const op of operations) {
-					try {
-						const resp = await c.put(`/orders/${orderId}/statuses`, op.body)
-						results.push({ field: op.key, ok: true, data: resp.data })
-					} catch (error) {
-						if (error instanceof FluentCartApiError) {
-							results.push({
-								field: op.key,
-								ok: false,
-								error: {
-									code: error.code,
-									message: error.message,
-									detail: error.detail,
-								},
-							})
-							continue
-						}
-						throw error
-					}
-				}
-
+				const results = await executeStatusOperations(c, orderId, operations)
 				const successCount = results.filter((r) => r.ok === true).length
 				if (successCount === 0) {
 					throw new FluentCartApiError(
@@ -414,7 +397,8 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_order_sync_statuses',
 			title: 'Sync Order Statuses',
-			description: 'Synchronise order statuses with the payment gateway. May fail with timezone errors on certain orders (data-dependent upstream issue).',
+			description:
+				'Synchronise order statuses with the payment gateway. May fail with timezone errors on certain orders (data-dependent upstream issue).',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 			}),

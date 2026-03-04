@@ -125,8 +125,8 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'Perform bulk actions on multiple products.',
 			schema: z.object({
 				action: z
-				.enum(['delete_products', 'duplicate_products'])
-				.describe('Bulk action: delete_products or duplicate_products'),
+					.enum(['delete_products', 'duplicate_products'])
+					.describe('Bulk action: delete_products or duplicate_products'),
 				product_ids: z.array(z.number()).describe('Array of product IDs'),
 			}),
 			endpoint: '/products/do-bulk-action',
@@ -149,18 +149,9 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 					.array(z.number())
 					.optional()
 					.describe('Variant IDs to keep when switching to simple (others are deleted)'),
-				action: z
-					.string()
-					.optional()
-					.describe('Action: change_variation_type (default)'),
-				manage_stock: z
-					.enum(['yes', 'no'])
-					.optional()
-					.describe('Enable stock management'),
-				sold_individually: z
-					.enum(['yes', 'no'])
-					.optional()
-					.describe('Sell individually'),
+				action: z.string().optional().describe('Action: change_variation_type (default)'),
+				manage_stock: z.enum(['yes', 'no']).optional().describe('Enable stock management'),
+				sold_individually: z.enum(['yes', 'no']).optional().describe('Sell individually'),
 			}),
 			endpoint: '/products/detail/:detail_id',
 		}),
@@ -271,7 +262,8 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_product_create_dummy',
 			title: 'Create Dummy Products',
-			description: 'Create dummy/test products for development and testing. Category is required by the backend.',
+			description:
+				'Create dummy/test products for development and testing. Category is required by the backend.',
 			schema: z.object({
 				count: z.number().optional().describe('Number of dummy products to create'),
 				category: z.string().describe('Product category name (required by backend)'),
