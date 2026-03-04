@@ -8,6 +8,7 @@ use FChubMultiCurrency\Bootstrap\ModuleContract;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
 use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
+use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\FeatureFlags;
@@ -80,11 +81,12 @@ final class FrontendModule implements ModuleContract
             wp_localize_script('fchub-mc-projection', 'fchubMcConfig', $config);
         }
 
+        $switcherJsPath = FCHUB_MC_PATH . 'assets/js/currency-switcher.js';
         wp_enqueue_script(
             'fchub-mc-switcher',
             FCHUB_MC_URL . 'assets/js/currency-switcher.js',
             [],
-            FCHUB_MC_VERSION,
+            (string) filemtime($switcherJsPath),
             true,
         );
 
@@ -92,11 +94,12 @@ final class FrontendModule implements ModuleContract
             wp_localize_script('fchub-mc-switcher', 'fchubMcConfig', $config);
         }
 
+        $switcherCssPath = FCHUB_MC_PATH . 'assets/css/currency-switcher.css';
         wp_enqueue_style(
             'fchub-mc-switcher',
             FCHUB_MC_URL . 'assets/css/currency-switcher.css',
             [],
-            FCHUB_MC_VERSION,
+            (string) filemtime($switcherCssPath),
         );
     }
 
@@ -122,7 +125,11 @@ final class FrontendModule implements ModuleContract
             sprintf(__('Rates updated %s ago', 'fchub-multi-currency'), $ago),
         );
 
-        return " <span class=\"{$class}\">{$text}</span>";
+        return '<span class="fchub-mc-switcher__footer">'
+            . "<span class=\"{$class}\">"
+            . '<span class="fchub-mc-rate-badge__dot" aria-hidden="true"></span>'
+            . $text
+            . '</span></span>';
     }
 
     /**
@@ -144,19 +151,47 @@ final class FrontendModule implements ModuleContract
             return '';
         }
 
-        $html = '<select data-fchub-mc-switcher class="fchub-mc-switcher">';
+        $currentFlag = CurrencyCatalogueController::codeToFlag($currentCode);
+
+        // Use only inline elements (<span>) to prevent wpautop from injecting <p> tags.
+        // ARIA roles (listbox, option) handle semantics; CSS handles layout.
+        $html = '<span class="fchub-mc-switcher" data-fchub-mc-switcher>';
+        $html .= '<button type="button" class="fchub-mc-switcher__trigger" data-fchub-mc-trigger>';
+        $html .= '<span class="fchub-mc-switcher__flag">' . $currentFlag . '</span>';
+        $html .= '<span class="fchub-mc-switcher__code">' . esc_html($currentCode) . '</span>';
+        $html .= '<span class="fchub-mc-switcher__caret" aria-hidden="true">&#9662;</span>';
+        $html .= '</button>';
+
+        // Dropdown panel
+        $html .= '<span class="fchub-mc-switcher__dropdown" data-fchub-mc-dropdown hidden>';
+        $html .= '<span class="fchub-mc-switcher__list" role="listbox" aria-label="'
+            . esc_attr__('Select currency', 'fchub-multi-currency') . '">';
+
         foreach ($currencies as $currency) {
             if (!is_array($currency) || empty($currency['code'])) {
                 continue;
             }
             $code = esc_attr($currency['code']);
             $name = esc_html($currency['name'] ?? $code);
-            $selected = ($code === $currentCode) ? ' selected' : '';
-            $html .= "<option value=\"{$code}\"{$selected}>{$name}</option>";
-        }
-        $html .= '</select>';
+            $flag = CurrencyCatalogueController::codeToFlag($currency['code']);
+            $isActive = ($code === $currentCode);
+            $activeClass = $isActive ? ' fchub-mc-switcher__option--active' : '';
+            $ariaSelected = $isActive ? 'true' : 'false';
 
+            $html .= "<span class=\"fchub-mc-switcher__option{$activeClass}\""
+                . " role=\"option\" data-value=\"{$code}\""
+                . " aria-selected=\"{$ariaSelected}\" tabindex=\"-1\">";
+            $html .= "<span class=\"fchub-mc-switcher__flag\">{$flag}</span>";
+            $html .= "<span class=\"fchub-mc-switcher__option-code\">{$code}</span>";
+            $html .= '<span class="fchub-mc-switcher__option-sep" aria-hidden="true">&mdash;</span>';
+            $html .= "<span class=\"fchub-mc-switcher__option-name\">{$name}</span>";
+            $html .= '</span>';
+        }
+
+        $html .= '</span>'; // listbox
         $html .= self::renderRateBadge($optionStore, $context->rate);
+        $html .= '</span>'; // dropdown
+        $html .= '</span>'; // switcher
 
         return $html;
     }

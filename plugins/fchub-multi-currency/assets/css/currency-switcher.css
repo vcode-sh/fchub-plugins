@@ -1,13 +1,196 @@
 /**
- * FCHub Multi-Currency — Switcher Styles
+ * FCHub Multi-Currency — Switcher Widget Styles
  */
+
+/* ----- Custom properties ----- */
 .fchub-mc-switcher {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
+    --fchub-mc-radius: 6px;
+    --fchub-mc-border-color: #d0d5dd;
+    --fchub-mc-bg: #fff;
+    --fchub-mc-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --fchub-mc-transition: 150ms ease;
+    --fchub-mc-hover-bg: #f5f5f5;
+    --fchub-mc-active-bg: #eff6ff;
+    --fchub-mc-active-color: #1d4ed8;
+    --fchub-mc-text: #344054;
+    --fchub-mc-text-secondary: #667085;
+    --fchub-mc-badge-ok: #12b76a;
+    --fchub-mc-badge-stale: #f04438;
+
+    position: relative;
+    display: inline-block;
+    font-family: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5;
 }
 
-.fchub-mc-switcher select {
+/* ----- Trigger button ----- */
+.fchub-mc-switcher__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--fchub-mc-border-color);
+    border-radius: var(--fchub-mc-radius);
+    background: var(--fchub-mc-bg);
+    color: var(--fchub-mc-text);
+    font: inherit;
+    cursor: pointer;
+    transition: border-color var(--fchub-mc-transition),
+                box-shadow var(--fchub-mc-transition);
+    white-space: nowrap;
+    line-height: 1.5;
+}
+
+.fchub-mc-switcher__trigger:hover {
+    border-color: #98a2b3;
+}
+
+.fchub-mc-switcher__trigger:focus-visible {
+    outline: 2px solid var(--fchub-mc-active-color);
+    outline-offset: 2px;
+}
+
+.fchub-mc-switcher__flag {
+    font-size: 1.125em;
+    line-height: 1;
+}
+
+.fchub-mc-switcher__code {
+    font-weight: 600;
+}
+
+.fchub-mc-switcher__caret {
+    font-size: 0.625em;
+    transition: transform var(--fchub-mc-transition);
+    margin-left: 0.125rem;
+}
+
+.fchub-mc-switcher--open .fchub-mc-switcher__caret {
+    transform: rotate(180deg);
+}
+
+/* ----- Dropdown panel ----- */
+.fchub-mc-switcher__dropdown {
+    display: block;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 9999;
+    min-width: 100%;
+    width: max-content;
+    background: var(--fchub-mc-bg);
+    border: 1px solid var(--fchub-mc-border-color);
+    border-radius: var(--fchub-mc-radius);
+    box-shadow: var(--fchub-mc-shadow);
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+    transition: opacity var(--fchub-mc-transition),
+                transform var(--fchub-mc-transition);
+}
+
+.fchub-mc-switcher--open .fchub-mc-switcher__dropdown {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+/* Override the hidden attribute when open so CSS transitions work */
+.fchub-mc-switcher--open .fchub-mc-switcher__dropdown[hidden] {
+    display: block;
+}
+
+/* ----- Option list ----- */
+.fchub-mc-switcher__list {
+    display: block;
+    margin: 0;
+    padding: 0.25rem 0;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.fchub-mc-switcher__option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: background-color var(--fchub-mc-transition);
+    white-space: nowrap;
+}
+
+.fchub-mc-switcher__option:hover,
+.fchub-mc-switcher__option--focused {
+    background: var(--fchub-mc-hover-bg);
+}
+
+.fchub-mc-switcher__option--active {
+    background: var(--fchub-mc-active-bg);
+    font-weight: 600;
+}
+
+.fchub-mc-switcher__option--active .fchub-mc-switcher__option-code {
+    color: var(--fchub-mc-active-color);
+}
+
+.fchub-mc-switcher__option-code {
+    min-width: 2.5em;
+    font-weight: 600;
+    color: var(--fchub-mc-text);
+}
+
+.fchub-mc-switcher__option-sep {
+    color: var(--fchub-mc-border-color);
+    font-size: 0.75em;
+}
+
+.fchub-mc-switcher__option-name {
+    color: var(--fchub-mc-text-secondary);
+    font-weight: 400;
+}
+
+/* ----- Rate badge footer ----- */
+.fchub-mc-switcher__footer {
+    display: block;
+    padding: 0.375rem 0.75rem;
+    border-top: 1px solid var(--fchub-mc-border-color);
+}
+
+.fchub-mc-rate-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.6875rem;
+    color: var(--fchub-mc-text-secondary);
+    line-height: 1.4;
+}
+
+.fchub-mc-rate-badge__dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--fchub-mc-badge-ok);
+    flex-shrink: 0;
+}
+
+.fchub-mc-rate-badge--stale {
+    color: var(--fchub-mc-badge-stale);
+}
+
+.fchub-mc-rate-badge--stale .fchub-mc-rate-badge__dot {
+    background: var(--fchub-mc-badge-stale);
+}
+
+/* ----- Loading state ----- */
+.fchub-mc-switcher--loading .fchub-mc-switcher__trigger {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* ----- No-JS fallback ----- */
+.fchub-mc-switcher-fallback {
     padding: 0.25rem 0.5rem;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -16,12 +199,7 @@
     cursor: pointer;
 }
 
-.fchub-mc-switcher select:focus {
-    outline: 2px solid #0073aa;
-    outline-offset: -2px;
-    border-color: #0073aa;
-}
-
+/* ----- Disclosure notice ----- */
 .fchub-mc-disclosure {
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
@@ -35,18 +213,6 @@
 
 .fchub-mc-disclosure--drawer {
     margin: 0.5rem 0;
-}
-
-.fchub-mc-rate-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.75rem;
-    color: #6c757d;
-}
-
-.fchub-mc-rate-badge--stale {
-    color: #dc3545;
 }
 
 /**

@@ -67,7 +67,7 @@ final class CurrencyCatalogueController
      * Uses regional indicator symbols: each letter A-Z maps to U+1F1E6..U+1F1FF.
      * Two regional indicators form a flag emoji for the ISO 3166-1 country code.
      */
-    private static function codeToFlag(string $currencyCode): string
+    public static function codeToFlag(string $currencyCode): string
     {
         $countryCode = self::FLAG_OVERRIDES[$currencyCode]
             ?? substr($currencyCode, 0, 2);
