@@ -13,6 +13,7 @@
  * Requires at least: 6.4
  * Tested up to:    6.7
  * Requires PHP: 8.1
+ * Update URI: https://fchub.co/fchub-p24
  */
 
 defined('ABSPATH') || exit;
@@ -21,6 +22,9 @@ define('FCHUB_P24_VERSION', '1.0.2');
 define('FCHUB_P24_FILE', __FILE__);
 define('FCHUB_P24_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_P24_URL', plugin_dir_url(__FILE__));
+
+require_once __DIR__ . '/lib/GitHubUpdater.php';
+FCHub_GitHub_Updater::register('fchub-p24', plugin_basename(__FILE__), FCHUB_P24_VERSION);
 
 // Ensure urlStatus points to the active FluentCart IPN route.
 add_filter('fluent_cart_ipn_url_przelewy24', function () {

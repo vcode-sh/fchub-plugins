@@ -170,6 +170,8 @@ export function createClient(config: ResolvedConfig) {
 	}
 
 	return {
+		request,
+
 		get: <T = unknown>(path: string, params?: Record<string, unknown>, isPublic?: boolean) =>
 			request<T>('GET', path, { params, isPublic }),
 

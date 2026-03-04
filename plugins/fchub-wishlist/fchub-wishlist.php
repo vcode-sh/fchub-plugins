@@ -14,6 +14,7 @@
  * Requires at least: 6.7
  * Tested up to:    6.7
  * Requires PHP: 8.3
+ * Update URI: https://fchub.co/fchub-wishlist
  */
 
 defined('ABSPATH') || exit;
@@ -23,6 +24,9 @@ define('FCHUB_WISHLIST_FILE', __FILE__);
 define('FCHUB_WISHLIST_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_WISHLIST_URL', plugin_dir_url(__FILE__));
 define('FCHUB_WISHLIST_DB_VERSION', '1.0.0');
+
+require_once __DIR__ . '/lib/GitHubUpdater.php';
+FCHub_GitHub_Updater::register('fchub-wishlist', plugin_basename(__FILE__), FCHUB_WISHLIST_VERSION);
 
 // Autoloader
 spl_autoload_register(function ($class) {

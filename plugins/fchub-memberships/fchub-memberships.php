@@ -13,6 +13,7 @@
  * Requires at least: 6.4
  * Tested up to:    6.7
  * Requires PHP: 8.1
+ * Update URI: https://fchub.co/fchub-memberships
  */
 
 defined('ABSPATH') || exit;
@@ -22,6 +23,9 @@ define('FCHUB_MEMBERSHIPS_FILE', __FILE__);
 define('FCHUB_MEMBERSHIPS_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MEMBERSHIPS_URL', plugin_dir_url(__FILE__));
 define('FCHUB_MEMBERSHIPS_DB_VERSION', '1.2.0');
+
+require_once __DIR__ . '/lib/GitHubUpdater.php';
+FCHub_GitHub_Updater::register('fchub-memberships', plugin_basename(__FILE__), FCHUB_MEMBERSHIPS_VERSION);
 
 // Autoloader
 spl_autoload_register(function ($class) {

@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquare,
+  Newspaper,
   Receipt,
   Smartphone,
   SquarePlay,
@@ -212,6 +213,11 @@ export default function Layout({ children }: LayoutProps<"/">) {
               </NavigationMenuContent>
             </NavbarMenu>
           ),
+        },
+        {
+          text: "Blog",
+          url: "/blog",
+          icon: <Newspaper size={18} />,
         },
         {
           text: "MCP",

@@ -118,8 +118,14 @@ function formatSuccess(data: unknown) {
 
 function formatError(error: unknown) {
 	if (error instanceof FluentCartApiError) {
+		let text = `Error [${error.code}]: ${error.message}`
+		if (error.detail !== undefined) {
+			const detailStr =
+				typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail)
+			text += `: ${detailStr}`
+		}
 		return {
-			content: [{ type: 'text' as const, text: `Error [${error.code}]: ${error.message}` }],
+			content: [{ type: 'text' as const, text }],
 			isError: true,
 		}
 	}

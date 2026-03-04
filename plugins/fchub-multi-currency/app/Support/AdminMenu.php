@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+namespace FChubMultiCurrency\Support;
+
+defined('ABSPATH') || exit;
+
+final class AdminMenu
+{
+    public static function register(): void
+    {
+        global $submenu;
+
+        $submenu['fluent-cart']['multi_currency'] = [
+            __('Multi-Currency', 'fchub-multi-currency'),
+            'manage_options',
+            'admin.php?page=fluent-cart#/multi-currency',
+            '',
+            'fchub_multi_currency',
+        ];
+    }
+
+    public static function enqueueAssets(): void
+    {
+        $bundlePath = FCHUB_MC_PATH . 'admin/multi-currency-admin.js';
+
+        if (!file_exists($bundlePath)) {
+            return;
+        }
+
+        wp_enqueue_script(
+            'fchub-mc-admin',
+            FCHUB_MC_URL . 'admin/multi-currency-admin.js',
+            ['fluent-cart_global_admin_hooks'],
+            (string) filemtime($bundlePath),
+            true,
+        );
+
+        wp_localize_script('fchub-mc-admin', 'fchubMcAdmin', [
+            'rest_url' => esc_url_raw(rest_url(Constants::REST_NAMESPACE . '/')),
+            'nonce'    => wp_create_nonce('wp_rest'),
+        ]);
+    }
+
+    public static function ensureLoadOrder(): void
+    {
+        global $wp_scripts;
+
+        if (isset($wp_scripts->registered['fluent-cart_admin_app_start'])) {
+            $wp_scripts->registered['fluent-cart_admin_app_start']->deps[] = 'fchub-mc-admin';
+        }
+    }
+}

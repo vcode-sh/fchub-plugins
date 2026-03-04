@@ -13,6 +13,7 @@
  * Requires at least: 6.7
  * Tested up to: 6.9
  * Requires PHP: 8.3
+ * Update URI: https://fchub.co/fchub-stream
  *
  * @package FCHub_Stream
  * @since 0.0.1
@@ -57,6 +58,9 @@ define( 'FCHUB_STREAM_DIR', plugin_dir_path( __FILE__ ) );
  * @since 0.0.1
  */
 define( 'FCHUB_STREAM_FILE', __FILE__ );
+
+require_once __DIR__ . '/lib/GitHubUpdater.php';
+FCHub_GitHub_Updater::register( 'fchub-stream', plugin_basename( __FILE__ ), FCHUB_STREAM_VERSION );
 
 // Require Composer autoloader.
 if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {

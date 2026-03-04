@@ -1,7 +1,26 @@
-import { createFromSource } from "fumadocs-core/search/server";
-import { source } from "@/lib/source";
+import { createSearchAPI } from "fumadocs-core/search/server";
+import { source, blogSource } from "@/lib/source";
 
-export const { GET } = createFromSource(source, {
-  // https://docs.orama.com/docs/orama-js/supported-languages
+export const { GET } = createSearchAPI("advanced", {
   language: "english",
+  indexes: source
+    .getPages()
+    .map((page) => ({
+      id: page.url,
+      title: page.data.title,
+      description: page.data.description,
+      url: page.url,
+      structuredData: page.data.structuredData,
+      tag: "docs",
+    }))
+    .concat(
+      blogSource.getPages().map((page) => ({
+        id: page.url,
+        title: page.data.title,
+        description: page.data.description,
+        url: page.url,
+        structuredData: page.data.structuredData,
+        tag: "blog",
+      })),
+    ),
 });

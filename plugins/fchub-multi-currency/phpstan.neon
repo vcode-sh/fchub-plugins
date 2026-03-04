@@ -1,0 +1,26 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+        - fchub-multi-currency.php
+        - uninstall.php
+    excludePaths:
+        - app/*/index.php
+    bootstrapFiles:
+        - vendor/autoload.php
+        - phpstan-bootstrap.php
+    scanDirectories:
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/app
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/vendor/wpfluent
+        - ../../../fchub-playground/wp-content/plugins/fluent-crm/app
+        - ../../../fchub-playground/wp-content/plugins/fluent-crm/vendor/wpfluent
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        - '#Function FluentCrmApi not found#'
+        - '#Function fluentCrmDb not found#'
+        - '#Function fluentcrm_get_option not found#'
+        - '#Call to an undefined static method FluentCrm\\App\\Models\\Tag::firstOrCreate#'

@@ -8,6 +8,7 @@ import {
   Home,
   LayoutDashboard,
   MessageSquare,
+  Newspaper,
   Receipt,
   Smartphone,
   SquarePlay,
@@ -22,6 +23,11 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
       tree={source.pageTree}
       {...baseOptions()}
       links={[
+        {
+          text: "Blog",
+          url: "/blog",
+          icon: <Newspaper size={18} />,
+        },
         {
           text: "Support Projects",
           url: "https://donate.stripe.com/aFa00i5Ml01U1eKeO39Zm0G",

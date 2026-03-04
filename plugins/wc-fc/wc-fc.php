@@ -14,6 +14,7 @@
  * Requires PHP: 8.1
  * Tested up to:    6.7
  * Requires Plugins: woocommerce, fluent-cart
+ * Update URI: https://fchub.co/wc-fc
  */
 
 defined('ABSPATH') or die;
@@ -22,6 +23,9 @@ define('WCFC_VERSION', '1.0.2');
 define('WCFC_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('WCFC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WCFC_PLUGIN_FILE', __FILE__);
+
+require_once __DIR__ . '/lib/GitHubUpdater.php';
+FCHub_GitHub_Updater::register('wc-fc', plugin_basename(__FILE__), WCFC_VERSION);
 
 /**
  * PSR-4 autoloader for the WcFc namespace.

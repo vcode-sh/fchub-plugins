@@ -37,7 +37,10 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({
 				order_id: z.number().describe('Order ID that owns the subscription'),
 				subscription_id: z.number().describe('Subscription ID to cancel'),
-				reason: z.string().optional().describe('Cancellation reason'),
+				cancel_reason: z
+					.string()
+					.optional()
+					.describe('Cancellation reason — strongly recommended for audit trail'),
 				cancel_immediately: z
 					.boolean()
 					.optional()
@@ -58,43 +61,7 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/orders/:order_id/subscriptions/:subscription_id/fetch',
 		}),
 
-		putTool(client, {
-			name: 'fluentcart_subscription_pause',
-			title: 'Pause Subscription',
-			description: 'Pause an active subscription. Optionally set a date to auto-resume.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID that owns the subscription'),
-				subscription_id: z.number().describe('Subscription ID to pause'),
-				pause_until: z
-					.string()
-					.optional()
-					.describe('ISO 8601 date to auto-resume the subscription'),
-				reason: z.string().optional().describe('Reason for pausing'),
-			}),
-			endpoint: '/orders/:order_id/subscriptions/:subscription_id/pause',
-		}),
-
-		putTool(client, {
-			name: 'fluentcart_subscription_reactivate',
-			title: 'Reactivate Subscription',
-			description: 'Reactivate a cancelled or expired subscription. Creates a new billing cycle.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID that owns the subscription'),
-				subscription_id: z.number().describe('Subscription ID to reactivate'),
-				reactivation_date: z.string().optional().describe('ISO 8601 reactivation date'),
-			}),
-			endpoint: '/orders/:order_id/subscriptions/:subscription_id/reactivate',
-		}),
-
-		putTool(client, {
-			name: 'fluentcart_subscription_resume',
-			title: 'Resume Subscription',
-			description: 'Resume a paused subscription. Only paused subscriptions can be resumed.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID that owns the subscription'),
-				subscription_id: z.number().describe('Subscription ID to resume'),
-			}),
-			endpoint: '/orders/:order_id/subscriptions/:subscription_id/resume',
-		}),
+		// NOTE: subscription_pause, subscription_resume, and subscription_reactivate
+		// have been removed — the FluentCart backend returns "Not available yet" for all three.
 	]
 }

@@ -278,16 +278,24 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 
 		// ── Shipping Tax Overrides ─────────────────────────────
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_tax_shipping_override_create',
 			title: 'Create Shipping Tax Override',
-			description: 'Create a shipping tax override for a country. ' + 'Rate is a percentage value.',
+			description:
+				'Add a shipping tax override to an existing tax rate. ' +
+				'Pass the existing tax rate ID and the override rate percentage. ' +
+				'This sets the for_shipping flag on the rate with a custom override rate.',
 			schema: z.object({
-				country_code: z.string().describe('ISO country code'),
-				rate: z.number().describe('Override tax rate percentage'),
-				name: z.string().optional().describe('Override name'),
+				id: z.number().describe('Existing tax rate ID to add shipping override to'),
+				override_tax_rate: z.number().describe('Override tax rate percentage for shipping'),
 			}),
-			endpoint: '/tax/rates/country/override',
+			handler: async (c, input) => {
+				const response = await c.post('/tax/rates/country/override', {
+					id: input.id,
+					override_tax_rate: input.override_tax_rate,
+				})
+				return response.data
+			},
 		}),
 
 		deleteTool(client, {
@@ -380,11 +388,11 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_tax_records_mark_filed',
 			title: 'Mark Tax Records Filed',
-			description: 'Mark tax records as filed for a given period or set of IDs.',
+			description:
+				'Mark specific tax records as filed. ' +
+				'Pass an array of tax record IDs to mark.',
 			schema: z.object({
-				tax_ids: z.array(z.number()).optional().describe('Tax record IDs to mark as filed'),
-				startDate: z.string().optional().describe('Start date filter'),
-				endDate: z.string().optional().describe('End date filter'),
+				ids: z.array(z.number()).describe('Tax record IDs to mark as filed'),
 			}),
 			endpoint: '/taxes',
 		}),

@@ -22,6 +22,7 @@ ALL_PLUGINS=(
     "fchub-portal-extender|fchub-portal-extender.php"
     "fchub-wishlist|fchub-wishlist.php"
     "fchub-stream|fchub-stream.php"
+    "fchub-multi-currency|fchub-multi-currency.php"
     "wc-fc|wc-fc.php"
 )
 
@@ -44,7 +45,7 @@ usage() {
     printf "Build distribution ZIPs for FCHub plugins.\n\n"
     printf "${BOLD}Arguments:${NC}\n"
     printf "  plugin-slug    Build only the specified plugin (optional)\n"
-    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, fchub-portal-extender, fchub-wishlist, fchub-stream, wc-fc\n\n"
+    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, fchub-portal-extender, fchub-wishlist, fchub-stream, fchub-multi-currency, wc-fc\n\n"
     printf "${BOLD}Examples:${NC}\n"
     printf "  ./build.sh                    Build all plugins\n"
     printf "  ./build.sh fchub-p24          Build only fchub-p24\n"
@@ -98,6 +99,17 @@ if [ -n "$FILTER_SLUG" ]; then
 else
     info "Building all plugins"
 fi
+
+# Sync shared updater into all plugins
+info "Syncing GitHubUpdater into plugins ..."
+for dir in "$PLUGINS_DIR"/fchub-* "$PLUGINS_DIR"/wc-fc; do
+    if [ -d "$dir" ]; then
+        mkdir -p "$dir/lib"
+        cp "$ROOT_DIR/lib/GitHubUpdater.php" "$dir/lib/GitHubUpdater.php"
+    fi
+done
+success "GitHubUpdater synced"
+echo ""
 
 if [ -z "$FILTER_SLUG" ] && [ -d "$DIST_DIR" ]; then
     info "Cleaning previous dist/ ..."

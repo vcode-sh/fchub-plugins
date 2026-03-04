@@ -13,6 +13,7 @@
  * Requires at least: 6.4
  * Tested up to:    6.7
  * Requires PHP: 8.1
+ * Update URI: https://fchub.co/fchub-portal-extender
  */
 
 defined('ABSPATH') || exit;
@@ -21,6 +22,9 @@ define('FCHUB_PORTAL_EXTENDER_VERSION', '1.0.2');
 define('FCHUB_PORTAL_EXTENDER_FILE', __FILE__);
 define('FCHUB_PORTAL_EXTENDER_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_PORTAL_EXTENDER_URL', plugin_dir_url(__FILE__));
+
+require_once __DIR__ . '/lib/GitHubUpdater.php';
+FCHub_GitHub_Updater::register('fchub-portal-extender', plugin_basename(__FILE__), FCHUB_PORTAL_EXTENDER_VERSION);
 
 // Autoloader
 spl_autoload_register(function ($class) {

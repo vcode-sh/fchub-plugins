@@ -1,0 +1,45 @@
+/**
+ * FCHub Multi-Currency — Switcher Styles
+ */
+.fchub-mc-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.fchub-mc-switcher select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    background: #fff;
+    cursor: pointer;
+}
+
+.fchub-mc-switcher select:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: -2px;
+    border-color: #0073aa;
+}
+
+.fchub-mc-disclosure {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #fef3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    color: #856404;
+}
+
+.fchub-mc-rate-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.fchub-mc-rate-badge--stale {
+    color: #dc3545;
+}

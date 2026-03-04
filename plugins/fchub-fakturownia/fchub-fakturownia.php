@@ -13,6 +13,7 @@
  * Requires at least: 6.4
  * Requires PHP: 8.1
  * Tested up to:    6.7
+ * Update URI: https://fchub.co/fchub-fakturownia
  */
 
 defined('ABSPATH') || exit;
@@ -21,6 +22,9 @@ define('FCHUB_FAKTUROWNIA_VERSION', '1.0.2');
 define('FCHUB_FAKTUROWNIA_FILE', __FILE__);
 define('FCHUB_FAKTUROWNIA_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_FAKTUROWNIA_URL', plugin_dir_url(__FILE__));
+
+require_once __DIR__ . '/lib/GitHubUpdater.php';
+FCHub_GitHub_Updater::register('fchub-fakturownia', plugin_basename(__FILE__), FCHUB_FAKTUROWNIA_VERSION);
 
 register_deactivation_hook(__FILE__, function () {
     wp_clear_scheduled_hook('fchub_fakturownia_check_ksef_status');

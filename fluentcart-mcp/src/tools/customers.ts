@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
 
 export function customerTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -138,16 +138,6 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/customers/:customer_id/address',
 		}),
 
-		getTool(client, {
-			name: 'fluentcart_customer_address_select',
-			title: 'Get Address Select Options',
-			description: 'Retrieve address options for the customer address selector dropdown.',
-			schema: z.object({
-				customer_id: z.number().describe('Customer ID'),
-			}),
-			endpoint: '/customers/:customer_id/update-address-select',
-		}),
-
 		postTool(client, {
 			name: 'fluentcart_customer_address_create',
 			title: 'Create Customer Address',
@@ -157,7 +147,7 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 				type: z.string().optional().describe('Address type: billing, shipping'),
 				name: z.string().describe('Full name (required)'),
 				email: z.string().describe('Email address (required)'),
-				label: z.string().optional().describe('Address label (e.g. Home, Office)'),
+				label: z.string().max(15).describe('Address label, required (e.g. Home, Office — max 15 chars)'),
 				company_name: z.string().optional().describe('Company name'),
 				phone: z.string().optional().describe('Phone number'),
 				address_1: z.string().optional().describe('Address line 1'),
@@ -170,16 +160,19 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/customers/:customer_id/address',
 		}),
 
-		putTool(client, {
+		createTool(client, {
 			name: 'fluentcart_customer_address_update',
 			title: 'Update Customer Address',
-			description: 'Update an existing customer address.',
+			description:
+				'Update an existing customer address. Backend validates all required fields on every update, so always include: name, email, address_1, city, state, country.',
+			annotations: { idempotentHint: true },
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
-				address_id: z.number().optional().describe('Address ID to update'),
+				address_id: z.number().describe('Address ID to update'),
+				type: z.string().optional().describe('Address type: billing, shipping'),
 				name: z.string().optional().describe('Full name'),
 				email: z.string().optional().describe('Email address'),
-				label: z.string().optional().describe('Address label (e.g. Home, Office)'),
+				label: z.string().max(15).optional().describe('Address label (e.g. Home, Office — max 15 chars)'),
 				company_name: z.string().optional().describe('Company name'),
 				phone: z.string().optional().describe('Phone number'),
 				address_1: z.string().optional().describe('Address line 1'),
@@ -189,29 +182,47 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 				postcode: z.string().optional().describe('Postal code'),
 				country: z.string().optional().describe('ISO 3166-1 alpha-2 country code'),
 			}),
-			endpoint: '/customers/:customer_id/address',
+			handler: async (client, input) => {
+				const { customer_id, address_id, ...fields } = input
+				const body = { ...fields, id: address_id }
+				const response = await client.put(`/customers/${customer_id}/address`, body)
+				return response.data
+			},
 		}),
 
-		deleteTool(client, {
+		createTool(client, {
 			name: 'fluentcart_customer_address_delete',
 			title: 'Delete Customer Address',
 			description: 'Delete a customer address. This action cannot be undone.',
+			annotations: { destructiveHint: true },
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 				address_id: z.number().describe('Address ID to delete'),
 			}),
-			endpoint: '/customers/:customer_id/address',
+			handler: async (client, input) => {
+				const { customer_id, address_id } = input
+				const response = await client.request('DELETE', `/customers/${customer_id}/address`, {
+					body: { address: { id: address_id } },
+				})
+				return response.data
+			},
 		}),
 
-		postTool(client, {
+		createTool(client, {
 			name: 'fluentcart_customer_address_make_primary',
 			title: 'Set Primary Address',
-			description: 'Set an address as the primary address for a customer.',
+			description: 'Set an address as the primary billing or shipping address for a customer.',
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 				address_id: z.number().describe('Address ID to set as primary'),
+				type: z.enum(['billing', 'shipping']).describe('Address type: billing or shipping'),
 			}),
-			endpoint: '/customers/:customer_id/address/make-primary',
+			handler: async (client, input) => {
+				const { customer_id, address_id, type } = input
+				const body = { addressId: address_id, type }
+				const response = await client.post(`/customers/${customer_id}/address/make-primary`, body)
+				return response.data
+			},
 		}),
 
 		getTool(client, {
@@ -271,24 +282,5 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/customers/:customer_id/order',
 		}),
 
-		postTool(client, {
-			name: 'fluentcart_customer_address_add',
-			title: 'Add Customer Address (Quick)',
-			description:
-				'Quick add a new address to a customer (alternative endpoint without customer_id in path).',
-			schema: z.object({
-				customer_id: z.number().describe('Customer ID'),
-				type: z.string().optional().describe('Address type: billing, shipping'),
-				name: z.string().describe('Full name'),
-				email: z.string().describe('Email address'),
-				phone: z.string().optional().describe('Phone number'),
-				address_1: z.string().optional().describe('Address line 1'),
-				city: z.string().optional().describe('City'),
-				state: z.string().optional().describe('State/province'),
-				postcode: z.string().optional().describe('Postal code'),
-				country: z.string().optional().describe('ISO country code'),
-			}),
-			endpoint: '/customers/add-address',
-		}),
 	]
 }

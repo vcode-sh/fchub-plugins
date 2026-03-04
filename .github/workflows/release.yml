@@ -9,6 +9,7 @@ on:
       - 'fchub-portal-extender/v*'
       - 'fchub-stream/v*'
       - 'fchub-wishlist/v*'
+      - 'fchub-multi-currency/v*'
       - 'wc-fc/v*'
 
 permissions:
@@ -123,6 +124,14 @@ jobs:
 
           echo "portal-app build output:"
           ls -la dist/
+
+      - name: Sync GitHubUpdater
+        run: |
+          SLUG="${{ steps.tag.outputs.slug }}"
+          PLUGIN_DIR="plugins/${SLUG}"
+          mkdir -p "${PLUGIN_DIR}/lib"
+          cp lib/GitHubUpdater.php "${PLUGIN_DIR}/lib/GitHubUpdater.php"
+          echo "Synced GitHubUpdater into ${SLUG}"
 
       - name: Build ZIP
         run: |

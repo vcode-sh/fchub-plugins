@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Circular arrow (top-right arc, clockwise) -->
+  <path d="M36 12a16 16 0 0 1 0 24" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Arrowhead at end of top-right arc -->
+  <polyline points="32,34 36,36 38,32" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Circular arrow (bottom-left arc, clockwise) -->
+  <path d="M12 36a16 16 0 0 1 0-24" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Arrowhead at end of bottom-left arc -->
+  <polyline points="16,14 12,12 10,16" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Dollar sign -->
+  <text x="13" y="27" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#4F46E5">$</text>
+
+  <!-- Euro sign -->
+  <text x="28" y="27" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#4F46E5">€</text>
+</svg>

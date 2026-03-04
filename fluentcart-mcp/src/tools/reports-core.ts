@@ -65,7 +65,9 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_revenue_by_group',
 			title: 'Get Revenue by Group',
-			description: 'Revenue segmented by product group or category. Values in cents.',
+			description:
+				'Revenue segmented by product group or category. Values in cents. ' +
+				'\u26a0\ufe0f UPSTREAM BUG: This endpoint crashes with SQL syntax errors for all groupKey values (UB-007a).',
 			schema: z.object({ ...dateRangeWithGroup }),
 			endpoint: '/reports/revenue-by-group',
 		}),
@@ -81,7 +83,9 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_sales_growth',
 			title: 'Get Sales Growth',
-			description: 'Sales growth metrics over time for a date range.',
+			description:
+				'Sales growth metrics over time for a date range. ' +
+				'\u26a0\ufe0f UPSTREAM BUG: Crashes with missing Status class import (UB-007b).',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/sales-growth',
 		}),
@@ -106,7 +110,9 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_orders_by_group',
 			title: 'Get Orders by Group',
-			description: 'Order data grouped by dimension (e.g. payment method, product type).',
+			description:
+				'Order data grouped by dimension (e.g. payment method, product type). ' +
+				'\u26a0\ufe0f UPSTREAM BUG: This endpoint crashes with SQL syntax errors regardless of groupKey value (UB-007a).',
 			schema: z.object({
 				...dateRange,
 				groupKey: z.string().optional().describe('Grouping dimension key'),
@@ -118,7 +124,8 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_quick_order_stats',
 			title: 'Get Quick Order Stats',
 			description:
-				"Quick order statistics for a given lookback period. Use day_range '1' for today, '7' for this week, '30' for this month.",
+				"Quick order statistics for a given lookback period. Use day_range '1' for today, '7' for this week, '30' for this month. " +
+				'\u26a0\ufe0f UPSTREAM BUG: Crashes with missing Status class import (UB-007b).',
 			schema: z.object({
 				day_range: z
 					.string()
@@ -167,7 +174,9 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_summary',
 			title: 'Get Report Summary',
-			description: 'Report overview with aggregated metrics across all categories.',
+			description:
+				'Report overview with aggregated metrics across all categories. ' +
+				"\u26a0\ufe0f UPSTREAM BUG: Crashes with 'Unknown column discount_total' (UB-004).",
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/report-overview',
 		}),
@@ -175,7 +184,9 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_top_sold_products',
 			title: 'Get Top Sold Products',
-			description: 'Top products by units sold with revenue data. Values in cents.',
+			description:
+				'Top products by units sold with revenue data. Values in cents. ' +
+				'\u26a0\ufe0f UPSTREAM BUG: Crashes with array_intersect_key() on null (UB-006).',
 			schema: z.object({
 				...dateRange,
 				per_page: z.number().max(50).optional().describe('Number of results (max: 50)'),

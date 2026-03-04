@@ -1,0 +1,42 @@
+{
+    "name": "fchub/multi-currency",
+    "description": "FCHub Multi-Currency - Display-layer multi-currency for FluentCart",
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=8.3"
+    },
+    "require-dev": {
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^13.0",
+        "squizlabs/php_codesniffer": "^3.11",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "wp-coding-standards/wpcs": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "FChubMultiCurrency\\": "app/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "FChubMultiCurrency\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpcs": "phpcs --standard=phpcs.xml",
+        "phpcbf": "phpcbf --standard=phpcs.xml",
+        "lint": "composer phpcs",
+        "fix": "composer phpcbf",
+        "analyse": "phpstan analyse --configuration=phpstan.neon",
+        "check": ["@lint", "@analyse", "@test"]
+    }
+}

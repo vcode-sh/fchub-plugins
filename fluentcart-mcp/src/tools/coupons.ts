@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { deleteTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
 
 export function couponTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -107,14 +107,23 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/coupons/:coupon_id',
 		}),
 
-		deleteTool(client, {
+		createTool(client, {
 			name: 'fluentcart_coupon_delete',
 			title: 'Delete Coupon',
 			description: 'Permanently delete a coupon. This action cannot be undone.',
 			schema: z.object({
 				coupon_id: z.number().describe('Coupon ID'),
 			}),
-			endpoint: '/coupons/:coupon_id',
+			annotations: { destructiveHint: true },
+			handler: async (cl, input) => {
+				const id = input.coupon_id as number
+				// The backend reads `id` from $request->all(). The standard deleteTool
+				// only passes remaining params as query params, and the URL path param
+				// may not propagate into the request bag. Sending `id` explicitly as a
+				// query param ensures the controller can find it.
+				const response = await cl.delete(`/coupons/${id}`, { id })
+				return response.data
+			},
 		}),
 
 		postTool(client, {
@@ -145,7 +154,10 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_coupon_reapply',
 			title: 'Re-apply Coupon',
 			description:
-				'Re-apply a previously cancelled coupon. Side effect: recalculates totals with discount.',
+				'Re-apply a previously cancelled coupon. ' +
+				'WARNING: This endpoint requires cart-session fields (order_uuid, applied_coupons array, order_items array) ' +
+				'that are only available during an active checkout session. Returns empty defaults without them. ' +
+				'Use coupon_apply for admin-side coupon operations on existing orders.',
 			schema: z.object({
 				code: z.string().optional().describe('Coupon code to re-apply'),
 				order_id: z.number().optional().describe('Order ID'),
@@ -156,7 +168,11 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_coupon_check_eligibility',
 			title: 'Check Product Eligibility',
-			description: 'Check whether a specific product is eligible for a coupon.',
+			description:
+				'Check whether a specific product is eligible for a coupon. ' +
+				'WARNING: This endpoint expects cart-context fields (appliedCoupons array, productId in camelCase) ' +
+				'that are only available during an active checkout session. Not suitable for admin API usage. ' +
+				'To check coupon rules, use coupon_get to inspect the conditions object instead.',
 			schema: z.object({
 				coupon_id: z.number().describe('Coupon ID'),
 				product_id: z.number().describe('Product ID to check eligibility for'),
