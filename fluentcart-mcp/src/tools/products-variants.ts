@@ -29,7 +29,8 @@ function buildVariantFromExisting(
 	const existingPrice = typeof existing?.item_price === 'number' ? existing.item_price / 100 : 0
 	const existingComparePrice =
 		typeof existing?.compare_price === 'number' ? existing.compare_price / 100 : 0
-	const existingOtherInfo = (existing?.other_info ?? DEFAULT_OTHER_INFO) as Record<string, unknown>
+	const rawOtherInfo = (existing?.other_info ?? DEFAULT_OTHER_INFO) as Record<string, unknown>
+	const existingOtherInfo = { ...rawOtherInfo }
 
 	// Convert signup_fee from cents if stored as number
 	if (typeof existingOtherInfo.signup_fee === 'number') {
@@ -176,8 +177,8 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				'Set payment_type to "subscription" for recurring billing variants.',
 			schema: z.object({
 				product_id: z.number().describe('Parent product ID'),
-				title: z.string().optional().describe('Variation title (e.g. "Tiger Pants - White")'),
-				price: z.number().optional().describe('Price in currency units (e.g. 10 for 10.00)'),
+				title: z.string().describe('Variation title (required, e.g. "Tiger Pants - White")'),
+				price: z.number().optional().describe('Price in currency units (e.g. 10 for 10.00, default: 0)'),
 				sku: z.string().optional().describe('Stock keeping unit'),
 				stock_quantity: z.number().optional().describe('Stock quantity'),
 				fulfillment_type: z
@@ -220,7 +221,9 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 			description:
 				'Update an existing product variation. Only provided fields are changed. ' +
 				'Price in whole currency units (e.g. 400 for 400 PLN, not cents). ' +
-				'Fetches current variant state first, then merges your changes.',
+				'Fetches current variant state first, then merges your changes. ' +
+				'When updating subscription variants, you must re-specify payment_type to change any subscription field. ' +
+				'Partial subscription field updates are silently ignored by the backend.',
 			schema: z.object({
 				product_id: z.number().describe('Parent product ID'),
 				variant_id: z.number().describe('Variant ID'),

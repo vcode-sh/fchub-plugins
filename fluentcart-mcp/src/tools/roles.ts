@@ -9,7 +9,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_role_list',
 			title: 'List Roles',
-			description: 'List all FluentCart roles with capabilities.',
+			description: 'List all FluentCart roles with capabilities. Requires FluentCart Pro.',
 			schema: z.object({}),
 			endpoint: '/roles',
 			cache: { key: 'roles', ttlMs: TTL.MEDIUM },
@@ -18,7 +18,10 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_role_get',
 			title: 'Get Role',
-			description: 'Get a specific role by key.',
+			description:
+				'Get a specific role by key. ' +
+				'WARNING: Backend method has an empty body — returns nothing useful. ' +
+				'Use role_list to retrieve all roles instead.',
 			schema: z.object({
 				key: z.string().describe('Role key (e.g. "admin", "shop_manager")'),
 			}),
@@ -29,8 +32,9 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_role_create',
 			title: 'Create Role',
 			description:
-				'Assign a FluentCart role to a WordPress user. ' +
-				'Despite historical naming, backend expects user_id + role_key (not role CRUD payload).',
+				'Assign a FluentCart management role to an existing WordPress user. ' +
+				'This does NOT create a new role type — it assigns a pre-defined role (manager, worker, accountant) to a user. ' +
+				'Requires FluentCart Pro.',
 			schema: z.object({
 				user_id: z.number().optional().describe('WordPress user ID to assign role to'),
 				role_key: z.string().optional().describe('Role key (e.g. manager, worker, accountant)'),
@@ -60,7 +64,11 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_role_update',
 			title: 'Update Role',
-			description: 'Update a role (NOTE: POST not PUT per API).',
+			description:
+				'Update a role. ' +
+				'WARNING: Backend method has an empty body — this is a no-op. ' +
+				'Role permissions cannot be updated via this endpoint. ' +
+				'Requires FluentCart Pro.',
 			schema: z.object({
 				key: z.string().describe('Role key'),
 				name: z.string().optional().describe('Role display name'),
@@ -74,7 +82,8 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Delete Role',
 			description:
 				'Remove a FluentCart role assignment from a user. ' +
-				'Backend requires role key in path and user_id in request.',
+				'Backend requires role key in path and user_id in request. ' +
+				'Requires FluentCart Pro.',
 			schema: z.object({
 				key: z.string().describe('Role key to remove'),
 				user_id: z.number().describe('WordPress user ID'),
@@ -90,7 +99,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_role_managers',
 			title: 'List Managers',
-			description: 'List users with FluentCart management roles.',
+			description: 'List users with FluentCart management roles. Requires FluentCart Pro.',
 			schema: z.object({}),
 			endpoint: '/roles/managers',
 		}),
@@ -98,7 +107,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_role_user_list',
 			title: 'List Role Users',
-			description: 'List all users with their assigned FluentCart roles.',
+			description: 'List all users with their assigned FluentCart roles. Requires FluentCart Pro.',
 			schema: z.object({
 				search: z.string().optional().describe('Search users by name or email'),
 				page: z.number().optional().describe('Page number'),

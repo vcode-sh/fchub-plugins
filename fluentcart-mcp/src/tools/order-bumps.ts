@@ -97,7 +97,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_order_bump_get',
 			title: 'Get Order Bump',
-			description: 'Get order bump details: config, discount, conditions, and variant.',
+			description: 'Get order bump details: config, discount, conditions, and variant. Requires Order Bumps module to be enabled.',
 			schema: z.object({
 				id: z.number().describe('Order bump ID'),
 			}),
@@ -107,7 +107,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_order_bump_create',
 			title: 'Create Order Bump',
-			description: 'Create an order bump. Requires title and src_object_id (product variation ID).',
+			description: 'Create an order bump. Requires title and src_object_id (product variation ID). Requires Order Bumps module to be enabled.',
 			schema: z.object({
 				title: z.string().describe('Bump offer title shown to customers at checkout'),
 				src_object_id: z.number().describe('Product variation ID to use as the bump offer product'),
@@ -126,7 +126,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_order_bump_update',
 			title: 'Update Order Bump',
-			description: 'Update an order bump. Only provided fields are changed.',
+			description: 'Update an order bump. Only provided fields are changed. Requires Order Bumps module to be enabled.',
 			schema: z.object({
 				id: z.number().describe('Order bump ID to update'),
 				title: z.string().optional().describe('Bump offer title shown to customers'),
@@ -143,7 +143,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 		deleteTool(client, {
 			name: 'fluentcart_order_bump_delete',
 			title: 'Delete Order Bump',
-			description: 'Permanently delete an order bump. Cannot be undone.',
+			description: 'Permanently delete an order bump. Cannot be undone. Requires Order Bumps module to be enabled.',
 			schema: z.object({
 				id: z.number().describe('Order bump ID to delete'),
 			}),

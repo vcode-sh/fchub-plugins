@@ -66,8 +66,15 @@ export function truncateResponse(data: unknown): unknown {
 	// Array response — slice to fit
 	if (Array.isArray(data) && data.length > 0) {
 		const avgItemSize = json.length / data.length
-		const targetCount = Math.max(1, Math.floor((MAX_RESPONSE_CHARS * 0.85) / avgItemSize))
-		const sliced = data.slice(0, targetCount)
+		let targetCount = Math.max(1, Math.floor((MAX_RESPONSE_CHARS * 0.85) / avgItemSize))
+		let sliced = data.slice(0, targetCount)
+
+		// Safety cap: verify result fits after slicing (average-based estimate can overshoot for high-variance arrays)
+		while (sliced.length > 1 && JSON.stringify(sliced).length > MAX_RESPONSE_CHARS) {
+			targetCount = Math.max(1, Math.floor(targetCount * 0.75))
+			sliced = data.slice(0, targetCount)
+		}
+
 		return { _truncated: true, _total: data.length, _showing: sliced.length, items: sliced }
 	}
 
@@ -87,8 +94,17 @@ export function truncateResponse(data: unknown): unknown {
 				const overhead = json.length - arrJson.length
 				const available = MAX_RESPONSE_CHARS * 0.85 - overhead
 				const avgItemSize = arrJson.length / arr.length
-				const targetCount = Math.max(1, Math.floor(available / avgItemSize))
-				const sliced = arr.slice(0, targetCount)
+				let targetCount = Math.max(1, Math.floor(available / avgItemSize))
+				let sliced = arr.slice(0, targetCount)
+
+				// Safety cap: verify result fits after slicing
+				while (sliced.length > 1) {
+					const candidate = { ...obj, [arrayKey]: sliced, _truncated: true, _total: arr.length, _showing: sliced.length }
+					if (JSON.stringify(candidate).length <= MAX_RESPONSE_CHARS) break
+					targetCount = Math.max(1, Math.floor(targetCount * 0.75))
+					sliced = arr.slice(0, targetCount)
+				}
+
 				return {
 					...obj,
 					[arrayKey]: sliced,

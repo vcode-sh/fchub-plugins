@@ -66,9 +66,23 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_upgrade_path_save',
 			title: 'Save Upgrade Path',
-			description: 'Create a new upgrade path for a product.',
+			description:
+				'Create a new upgrade path for a product. ' +
+				'Defines which variant can upgrade to which target variants, with optional proration and discount.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
+				from_variant: z.number().describe('Source variant ID (the variant being upgraded from)'),
+				to_variants: z
+					.array(z.number())
+					.describe('Target variant IDs (variants the customer can upgrade to)'),
+				is_prorate: z
+					.boolean()
+					.optional()
+					.describe('Prorate remaining value of current subscription (default: false)'),
+				discount_amount: z
+					.number()
+					.optional()
+					.describe('Fixed discount amount applied to the upgrade price'),
 			}),
 			endpoint: '/products/:product_id/upgrade-path',
 		}),
@@ -79,6 +93,13 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 			description: 'Update an existing upgrade path.',
 			schema: z.object({
 				upgrade_path_id: z.number().describe('Upgrade path ID'),
+				from_variant: z.number().describe('Source variant ID'),
+				to_variants: z.array(z.number()).describe('Target variant IDs'),
+				is_prorate: z
+					.boolean()
+					.optional()
+					.describe('Prorate remaining value of current subscription'),
+				discount_amount: z.number().optional().describe('Fixed discount amount'),
 			}),
 			endpoint: '/products/upgrade-path/:upgrade_path_id/update',
 		}),
@@ -104,7 +125,8 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_terms_by_parent',
 			title: 'Get Product Terms by Parent',
-			description: 'Get product terms filtered by parent term.',
+			description: 'Get product terms filtered by parent term. Uses POST but is a read-only operation.',
+			annotations: { readOnlyHint: true },
 			schema: z.object({
 				parent_id: z.number().optional().describe('Parent term ID'),
 				taxonomy: z.string().optional().describe('Taxonomy name'),
@@ -187,9 +209,23 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		postTool(client, {
 			name: 'fluentcart_product_integration_save',
 			title: 'Save Product Integration',
-			description: 'Save an integration feed for a product.',
+			description:
+				'Save an integration feed for a product. ' +
+				'The integration field must be a JSON string of the feed configuration. ' +
+				'Fetch integration settings first to get the expected field schema for each provider.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
+				integration_name: z.string().describe('Integration provider name (e.g. "fluentcrm", "fluentcommunity")'),
+				integration_id: z
+					.number()
+					.optional()
+					.describe('Existing feed ID to update (omit to create new)'),
+				integration: z
+					.string()
+					.describe(
+						'JSON string of the feed configuration. Structure varies by provider. ' +
+							'Use fluentcart_product_integration_settings to get the expected schema.',
+					),
 			}),
 			endpoint: '/products/:product_id/integrations',
 		}),
@@ -211,8 +247,8 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 			description: 'Enable or disable an integration feed on a product.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				feed_id: z.number().optional().describe('Feed ID'),
-				status: z.string().optional().describe('New status: active, inactive'),
+				notification_id: z.number().describe('Integration feed ID (required)'),
+				status: z.enum(['yes', 'no']).describe('New status: yes to enable, no to disable'),
 			}),
 			endpoint: '/products/:product_id/integrations/feed/change-status',
 		}),

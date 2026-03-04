@@ -19,39 +19,18 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_settings_save_store',
 			title: 'Save Store Settings',
 			description:
-				'Update store settings. Backend expects `store_setup` as a JSON string. ' +
-				'For backward compatibility, this tool accepts `store_setup`, `settings`, or top-level keys.',
+				'Update store settings. Backend reads top-level keys directly (e.g. store_name, currency, order_mode). ' +
+				'Use get_store first to discover current values. Pass only the keys you want to change.',
 			schema: z.object({
-				store_setup: z
-					.union([z.string(), z.record(z.string(), z.unknown())])
-					.optional()
-					.describe('Store settings payload (stringified JSON preferred by backend)'),
 				settings: z
 					.record(z.string(), z.unknown())
-					.optional()
 					.describe(
-						'Legacy alias for store_setup object (e.g. {currency: "USD", order_mode: "live"})',
+						'Store settings as key-value pairs at top level (e.g. {currency: "USD", store_name: "My Shop", order_mode: "live"})',
 					),
 			}),
 			handler: async (c, input) => {
-				const explicitSetup = input.store_setup
-				const legacySettings = input.settings as Record<string, unknown> | undefined
-				let setupPayload: string
-
-				if (typeof explicitSetup === 'string') {
-					setupPayload = explicitSetup
-				} else if (explicitSetup && typeof explicitSetup === 'object') {
-					setupPayload = JSON.stringify(explicitSetup)
-				} else if (legacySettings && typeof legacySettings === 'object') {
-					setupPayload = JSON.stringify(legacySettings)
-				} else {
-					const topLevel = { ...input } as Record<string, unknown>
-					delete topLevel.store_setup
-					delete topLevel.settings
-					setupPayload = JSON.stringify(topLevel)
-				}
-
-				const resp = await c.post('/settings/store', { store_setup: setupPayload })
+				const settings = (input.settings ?? {}) as Record<string, unknown>
+				const resp = await c.post('/settings/store', settings)
 				return resp.data
 			},
 		}),

@@ -51,6 +51,9 @@ function matchScore(tool: ToolDefinition, query: string, category?: string): num
 	return score
 }
 
+/** Number of meta-tools registered in dynamic mode (search, describe, execute). */
+export const DYNAMIC_TOOL_COUNT = 3
+
 export function registerDynamicTools(server: McpServer, tools: ToolDefinition[]): void {
 	const toolMap = new Map<string, ToolDefinition>()
 	for (const tool of tools) {

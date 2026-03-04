@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Http\Controllers\Admin;
 
+use FChubMultiCurrency\Domain\Enums\CurrencyPosition;
 use FChubMultiCurrency\Storage\OptionStore;
+use FluentCart\App\Helpers\CurrenciesHelper;
 
 defined('ABSPATH') || exit;
 
@@ -36,10 +38,16 @@ final class SettingsAdminController
                 continue;
             }
 
+            $value = $params[$key];
+
+            if ($key === 'display_currencies' && is_array($value)) {
+                $value = self::sanitizeDisplayCurrencies($value);
+            }
+
             $sanitized[$key] = match (true) {
-                is_array($params[$key]) => $params[$key],
-                is_int($params[$key])   => $params[$key],
-                default                 => sanitize_text_field((string) $params[$key]),
+                is_array($value) => $value,
+                is_int($value)   => $value,
+                default          => sanitize_text_field((string) $value),
             };
         }
 
@@ -58,5 +66,54 @@ final class SettingsAdminController
                 'settings' => $optionStore->all(),
             ],
         ]);
+    }
+
+    /**
+     * Validate and sanitize display_currencies entries.
+     *
+     * @param array<int, mixed> $currencies
+     * @return array<int, array{code: string, name: string, symbol: string, decimals: int, position: string}>
+     */
+    private static function sanitizeDisplayCurrencies(array $currencies): array
+    {
+        $validCodes    = CurrenciesHelper::getCurrencies();
+        $validPositions = array_column(CurrencyPosition::cases(), 'value');
+        $seen          = [];
+        $clean         = [];
+
+        foreach ($currencies as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $code = strtoupper(trim((string) ($entry['code'] ?? '')));
+
+            if ($code === '' || !isset($validCodes[$code])) {
+                continue;
+            }
+
+            if (isset($seen[$code])) {
+                continue;
+            }
+            $seen[$code] = true;
+
+            $decimals = (int) ($entry['decimals'] ?? 2);
+            $decimals = max(0, min(4, $decimals));
+
+            $position = (string) ($entry['position'] ?? 'left');
+            if (!in_array($position, $validPositions, true)) {
+                $position = 'left';
+            }
+
+            $clean[] = [
+                'code'     => $code,
+                'name'     => sanitize_text_field((string) ($entry['name'] ?? $validCodes[$code])),
+                'symbol'   => wp_kses_post((string) ($entry['symbol'] ?? $code)),
+                'decimals' => $decimals,
+                'position' => $position,
+            ];
+        }
+
+        return $clean;
     }
 }

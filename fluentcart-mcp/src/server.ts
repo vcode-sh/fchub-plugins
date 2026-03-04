@@ -8,7 +8,7 @@ import { createLogger } from './logging.js'
 import { registerPrompts } from './prompts.js'
 import { registerResources } from './resources.js'
 import type { ToolDefinition } from './tools/_factory.js'
-import { registerDynamicTools } from './tools/dynamic.js'
+import { DYNAMIC_TOOL_COUNT, registerDynamicTools } from './tools/dynamic.js'
 import { createAllTools } from './tools/index.js'
 
 const require = createRequire(import.meta.url)
@@ -63,7 +63,7 @@ export function createServerFromContext(
 	registerPrompts(server)
 
 	const logger = createLogger(server)
-	const toolCount = mode === 'dynamic' ? 3 : ctx.tools.length
+	const toolCount = mode === 'dynamic' ? DYNAMIC_TOOL_COUNT : ctx.tools.length
 	logger.info(`fluentcart-mcp v${version} started — ${toolCount} tools registered (${mode} mode)`)
 	logger.debug(`config source: ${ctx.configSource}`)
 

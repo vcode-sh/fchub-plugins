@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Http\Routes;
 
+use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
 use FChubMultiCurrency\Http\Controllers\Admin\DiagnosticsController;
 use FChubMultiCurrency\Http\Controllers\Admin\RatesAdminController;
 use FChubMultiCurrency\Http\Controllers\Admin\SettingsAdminController;
@@ -38,6 +39,12 @@ final class AdminRoutes
                 'callback'            => [new SettingsAdminController(), 'save'],
                 'permission_callback' => [self::class, 'canManage'],
             ],
+        ]);
+
+        register_rest_route(Constants::REST_NAMESPACE, '/admin/currencies/catalogue', [
+            'methods'             => 'GET',
+            'callback'            => [new CurrencyCatalogueController(), 'index'],
+            'permission_callback' => [self::class, 'canManage'],
         ]);
 
         register_rest_route(Constants::REST_NAMESPACE, '/admin/diagnostics', [

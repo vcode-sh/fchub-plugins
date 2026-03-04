@@ -8,7 +8,9 @@ export function emailNotificationTools(client: FluentCartClient): ToolDefinition
 		getTool(client, {
 			name: 'fluentcart_email_list',
 			title: 'List Email Notifications',
-			description: 'List all email notification templates with status.',
+			description:
+				'List all email notification templates with status. ' +
+				'Response is an object keyed by notification name, not a paginated array.',
 			schema: z.object({}),
 			endpoint: '/email-notification',
 		}),

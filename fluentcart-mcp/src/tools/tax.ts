@@ -263,15 +263,12 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_tax_country_id_save',
 			title: 'Save Country Tax ID Settings',
-			description: 'Save country tax identification settings.',
+			description:
+				'Save the tax identification number for a country. ' +
+				'Backend stores { tax_id } in fct_meta keyed by country code.',
 			schema: z.object({
 				country_code: z.string().describe('ISO country code'),
-				tax_id_label: z.string().optional().describe('Label for tax ID field'),
-				tax_id_required: z.boolean().optional().describe('Whether tax ID is required'),
-				settings: z
-					.record(z.string(), z.unknown())
-					.optional()
-					.describe('Additional tax ID settings'),
+				tax_id: z.string().describe('Tax identification number for this country (e.g. VAT number)'),
 			}),
 			endpoint: '/tax/country-tax-id/:country_code',
 		}),
@@ -375,12 +372,12 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_tax_records_list',
 			title: 'List Tax Records',
-			description: 'List tax records for reporting and filing.',
+			description:
+				'List tax records for reporting and filing. ' +
+				'Note: Date filtering is not currently supported by the backend TaxFilter.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number'),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
-				startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-				endDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
 			}),
 			endpoint: '/taxes',
 		}),

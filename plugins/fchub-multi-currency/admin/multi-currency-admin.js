@@ -48,9 +48,26 @@
     /*  Sub-components                                                     */
     /* ------------------------------------------------------------------ */
 
+    var catalogue = config.currency_catalogue || [];
+    var catalogueMap = {};
+    catalogue.forEach(function (c) { catalogueMap[c.code] = c; });
+
     var GeneralSettings = {
         name: 'GeneralSettings',
         props: { settings: { type: Object, required: true } },
+        data: function () {
+            return { catalogue: catalogue };
+        },
+        computed: {
+            defaultDisplayOptions: function () {
+                var base = this.settings.base_currency;
+                var display = this.settings.display_currencies || [];
+                var codes = {};
+                if (base) codes[base] = true;
+                display.forEach(function (d) { codes[d.code] = true; });
+                return catalogue.filter(function (c) { return codes[c.code]; });
+            },
+        },
         template: '\
 <div>\
     <div class="fchub-mc-row">\
@@ -72,7 +89,9 @@
             <div class="form-note">ISO 4217 code. All payments are settled in this currency.</div>\
         </div>\
         <div class="setting-fields-inner">\
-            <el-input v-model="settings.base_currency" placeholder="USD" maxlength="3" style="max-width:120px" autocomplete="one-time-code" />\
+            <el-select v-model="settings.base_currency" filterable placeholder="Select currency" style="max-width:320px">\
+                <el-option v-for="c in catalogue" :key="c.code" :label="c.flag + \' \' + c.code + \' \\u2014 \' + c.name" :value="c.code" />\
+            </el-select>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
@@ -82,7 +101,9 @@
             <div class="form-note">Currency shown to visitors before any preference is detected.</div>\
         </div>\
         <div class="setting-fields-inner">\
-            <el-input v-model="settings.default_display_currency" placeholder="USD" maxlength="3" style="max-width:120px" autocomplete="one-time-code" />\
+            <el-select v-model="settings.default_display_currency" filterable placeholder="Select currency" style="max-width:320px">\
+                <el-option v-for="c in defaultDisplayOptions" :key="c.code" :label="c.flag + \' \' + c.code + \' \\u2014 \' + c.name" :value="c.code" />\
+            </el-select>\
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
@@ -153,24 +174,31 @@
         name: 'CurrencySettings',
         props: { settings: { type: Object, required: true } },
         data: function () {
-            return {
-                newCurrency: { code: '', name: '', symbol: '', decimals: 2, position: 'left' },
-            };
+            return { pickerValue: '', catalogueMap: catalogueMap };
+        },
+        computed: {
+            availableCurrencies: function () {
+                var added = {};
+                (this.settings.display_currencies || []).forEach(function (d) { added[d.code] = true; });
+                return catalogue.filter(function (c) { return !added[c.code]; });
+            },
         },
         methods: {
-            addCurrency: function () {
-                if (!this.newCurrency.code || !this.newCurrency.name) return;
+            onPick: function (code) {
+                if (!code) return;
+                var entry = catalogueMap[code];
+                if (!entry) return;
                 if (!this.settings.display_currencies) {
                     this.settings.display_currencies = [];
                 }
                 this.settings.display_currencies.push({
-                    code: this.newCurrency.code.toUpperCase(),
-                    name: this.newCurrency.name,
-                    symbol: this.newCurrency.symbol || this.newCurrency.code.toUpperCase(),
-                    decimals: this.newCurrency.decimals,
-                    position: this.newCurrency.position,
+                    code: entry.code,
+                    name: entry.name,
+                    symbol: entry.symbol,
+                    decimals: entry.decimals,
+                    position: 'left',
                 });
-                this.newCurrency = { code: '', name: '', symbol: '', decimals: 2, position: 'left' };
+                this.pickerValue = '';
             },
             removeCurrency: function (index) {
                 this.settings.display_currencies.splice(index, 1);
@@ -178,43 +206,54 @@
         },
         template: '\
 <div>\
-    <el-table :data="settings.display_currencies || []" stripe size="small" style="margin-bottom:20px">\
-        <el-table-column prop="code" label="Code" width="80" />\
-        <el-table-column prop="name" label="Name" />\
-        <el-table-column prop="symbol" label="Symbol" width="80" />\
-        <el-table-column prop="decimals" label="Decimals" width="90" align="center" />\
-        <el-table-column prop="position" label="Position" width="100" />\
-        <el-table-column label="" width="80" align="center">\
+    <div style="margin-bottom:20px">\
+        <el-select\
+            v-model="pickerValue"\
+            filterable\
+            placeholder="Search and add a currency\u2026"\
+            style="width:100%;max-width:420px"\
+            @change="onPick"\
+        >\
+            <el-option\
+                v-for="c in availableCurrencies"\
+                :key="c.code"\
+                :label="c.flag + \' \' + c.code + \' \\u2014 \' + c.name"\
+                :value="c.code"\
+            />\
+        </el-select>\
+    </div>\
+    <el-table v-if="settings.display_currencies && settings.display_currencies.length" :data="settings.display_currencies" stripe size="small">\
+        <el-table-column label="Currency" min-width="180">\
             <template v-slot="scope">\
-                <el-button type="danger" size="small" text @click="removeCurrency(scope.$index)">&times;</el-button>\
+                <span class="fchub-mc-flag">{{ (catalogueMap[scope.row.code] || {}).flag }}</span>\
+                <strong>{{ scope.row.code }}</strong>\
+                <span style="margin-left:4px;color:#909399">{{ scope.row.name }}</span>\
             </template>\
         </el-table-column>\
-    </el-table>\
-    <div class="fct-card fct-card-border" style="padding:16px">\
-        <h4 style="margin:0 0 12px;font-size:14px;font-weight:500">Add Currency</h4>\
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">\
-            <el-form-item label="Code" style="margin-bottom:0">\
-                <el-input v-model="newCurrency.code" placeholder="EUR" maxlength="3" style="width:80px" />\
-            </el-form-item>\
-            <el-form-item label="Name" style="margin-bottom:0">\
-                <el-input v-model="newCurrency.name" placeholder="Euro" style="width:160px" />\
-            </el-form-item>\
-            <el-form-item label="Symbol" style="margin-bottom:0">\
-                <el-input v-model="newCurrency.symbol" placeholder="&euro;" style="width:80px" />\
-            </el-form-item>\
-            <el-form-item label="Decimals" style="margin-bottom:0">\
-                <el-input-number v-model="newCurrency.decimals" :min="0" :max="4" style="width:90px" />\
-            </el-form-item>\
-            <el-form-item label="Position" style="margin-bottom:0">\
-                <el-select v-model="newCurrency.position" style="width:120px">\
+        <el-table-column label="Symbol" width="90" align="center">\
+            <template v-slot="scope">\
+                <span v-html="scope.row.symbol"></span>\
+            </template>\
+        </el-table-column>\
+        <el-table-column prop="decimals" label="Decimals" width="90" align="center" />\
+        <el-table-column label="Position" width="180">\
+            <template v-slot="scope">\
+                <el-select v-model="scope.row.position" size="small">\
                     <el-option label="Left ($100)" value="left" />\
                     <el-option label="Right (100$)" value="right" />\
                     <el-option label="Left space ($ 100)" value="left_space" />\
                     <el-option label="Right space (100 $)" value="right_space" />\
                 </el-select>\
-            </el-form-item>\
-            <el-button type="primary" @click="addCurrency" :disabled="!newCurrency.code || !newCurrency.name">Add</el-button>\
-        </div>\
+            </template>\
+        </el-table-column>\
+        <el-table-column label="" width="60" align="center">\
+            <template v-slot="scope">\
+                <el-button type="danger" size="small" text @click="removeCurrency(scope.$index)">&times;</el-button>\
+            </template>\
+        </el-table-column>\
+    </el-table>\
+    <div v-else style="padding:40px;text-align:center;color:#909399">\
+        No display currencies added yet. Use the picker above to add currencies.\
     </div>\
 </div>',
     };
@@ -530,6 +569,8 @@
                 settings: {},
                 rates: [],
                 diagnostics: {},
+                catalogue: catalogue,
+                catalogueMap: catalogueMap,
             };
         },
         mounted: function () {
@@ -811,6 +852,7 @@
         '.fchub-mc-diag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }',
         '.fchub-mc-diag-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--el-border-color-lighter); font-size: 13px; }',
         '.fchub-mc-diag-row:last-child { border-bottom: none; }',
+        '.fchub-mc-flag { font-size: 1.2em; margin-right: 6px; vertical-align: middle; }',
     ].join('\n');
     document.head.appendChild(style);
 })();

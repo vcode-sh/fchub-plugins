@@ -40,7 +40,8 @@ export function publicTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_public_user_login',
 			title: 'User Login',
 			description:
-				'Frontend login: authenticate by email/password, returns customer data with token.',
+				'Frontend login: authenticate by email/password, returns customer data with token. ' +
+				'WARNING: Sends credentials in plaintext. Only use over HTTPS.',
 			schema: z.object({
 				email: z.string().describe('User email address'),
 				password: z.string().describe('User password'),

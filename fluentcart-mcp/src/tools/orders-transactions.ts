@@ -63,7 +63,8 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 			name: 'fluentcart_order_transaction_update_status',
 			title: 'Update Transaction Status',
 			description:
-				'Update transaction status. Statuses: succeeded, pending, failed, refunded, disputed.',
+				'Update transaction status. Statuses: succeeded, pending, failed, refunded, disputed. ' +
+				'WARNING: No server-side validation — accepts and persists any status value including invalid ones.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 				transaction_id: z.number().describe('Transaction ID'),

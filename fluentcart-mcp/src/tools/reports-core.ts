@@ -185,7 +185,9 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_top_sold_products',
 			title: 'Get Top Sold Products',
 			description:
-				'Top products by units sold with revenue data. Values in cents. ' +
+				'Top products by units sold with revenue data (endpoint: fetch-top-sold-products). ' +
+				'Note: Similar to report_top_products_sold which uses a different endpoint (top-products-sold) and may return a different response shape. ' +
+				'Values in cents. ' +
 				'\u26a0\ufe0f UPSTREAM BUG: Crashes with array_intersect_key() on null (UB-006).',
 			schema: z.object({
 				...dateRange,

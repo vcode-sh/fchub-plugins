@@ -16,6 +16,25 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 				search: z.string().optional().describe('Search by coupon code or name'),
 			}),
 			endpoint: '/coupons',
+			transform: (data: unknown) => {
+				const resp = data as Record<string, unknown>
+				const wrapper = (resp?.coupons ?? resp) as Record<string, unknown>
+				if (wrapper && Array.isArray(wrapper.data)) {
+					wrapper.data = (wrapper.data as Record<string, unknown>[]).map((item) => ({
+						id: item.id,
+						title: item.title,
+						code: item.code,
+						type: item.type,
+						amount: item.amount,
+						status: item.status,
+						stackable: item.stackable,
+						show_on_checkout: item.show_on_checkout,
+						usage_count: item.usage_count,
+						created_at: item.created_at,
+					}))
+				}
+				return resp
+			},
 		}),
 
 		postTool(client, {
@@ -241,7 +260,9 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Save Coupon Settings',
 			description: 'Save global coupon settings for the store.',
 			schema: z.object({
-				settings: z.record(z.string(), z.unknown()).optional().describe('Coupon settings object'),
+				show_on_checkout: z
+					.boolean()
+					.describe('Whether to show coupon input on checkout page (true/false)'),
 			}),
 			endpoint: '/coupons/storeCouponSettings',
 		}),
@@ -249,7 +270,8 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_coupon_list_alt',
 			title: 'List Coupons (Alt)',
-			description: 'Alternative coupon listing endpoint with different response format.',
+			description:
+				'Non-paginated coupon list for dropdowns and selectors. Returns a simpler format than the main listing.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number'),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),

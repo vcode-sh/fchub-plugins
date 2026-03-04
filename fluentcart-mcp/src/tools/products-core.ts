@@ -29,13 +29,18 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 				const resp = data as Record<string, unknown>
 				const wrapper = (resp?.products ?? resp) as Record<string, unknown>
 				if (wrapper && Array.isArray(wrapper.data)) {
-					wrapper.data = (wrapper.data as Record<string, unknown>[]).map((item) => ({
-						ID: item.ID,
-						post_title: item.post_title,
-						post_status: item.post_status,
-						post_name: item.post_name,
-						post_date: item.post_date,
-					}))
+					wrapper.data = (wrapper.data as Record<string, unknown>[]).map((item) => {
+						const detail = (item.detail ?? {}) as Record<string, unknown>
+						return {
+							ID: item.ID,
+							post_title: item.post_title,
+							post_status: item.post_status,
+							post_name: item.post_name,
+							post_date: item.post_date,
+							product_type: detail.variation_type ?? null,
+							fulfillment_type: detail.fulfillment_type ?? null,
+						}
+					})
 				}
 				return resp
 			},
@@ -44,7 +49,9 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		createTool(client, {
 			name: 'fluentcart_product_create',
 			title: 'Create Product',
-			description: 'Create a product (defaults to draft). Fulfillment type: digital or physical.',
+			description:
+				'Create a product (defaults to draft). Fulfillment type: digital or physical. ' +
+				'At least one variant must be created after the product for checkout to work.',
 			schema: z.object({
 				post_title: z.string().describe('Product title (required)'),
 				post_status: z.string().optional().describe('Status: publish, draft (default: draft)'),
@@ -117,7 +124,9 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Bulk Product Actions',
 			description: 'Perform bulk actions on multiple products.',
 			schema: z.object({
-				action: z.string().describe('Bulk action to perform'),
+				action: z
+				.enum(['delete_products', 'duplicate_products'])
+				.describe('Bulk action: delete_products or duplicate_products'),
 				product_ids: z.array(z.number()).describe('Array of product IDs'),
 			}),
 			endpoint: '/products/do-bulk-action',
@@ -126,12 +135,32 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_product_update_detail',
 			title: 'Update Product Detail',
-			description: 'Update a product detail record (fulfillment type, stock settings, etc.).',
+			description:
+				'Update a product detail record (variation type). ' +
+				'Backend replaces the variation type and may delete orphan variants when switching to simple. ' +
+				'Fetch current detail first to understand current state before changing.',
 			schema: z.object({
 				detail_id: z.number().describe('Product detail ID'),
-				fulfillment_type: z.string().optional().describe('Fulfillment: digital, physical'),
-				manage_stock: z.string().optional().describe('Enable stock management: 0 or 1'),
-				sold_individually: z.string().optional().describe('Sell individually: 0 or 1'),
+				variation_type: z
+					.enum(['simple', 'simple_variations', 'advanced_variations'])
+					.optional()
+					.describe('Variation type'),
+				variation_ids: z
+					.array(z.number())
+					.optional()
+					.describe('Variant IDs to keep when switching to simple (others are deleted)'),
+				action: z
+					.string()
+					.optional()
+					.describe('Action: change_variation_type (default)'),
+				manage_stock: z
+					.enum(['yes', 'no'])
+					.optional()
+					.describe('Enable stock management'),
+				sold_individually: z
+					.enum(['yes', 'no'])
+					.optional()
+					.describe('Sell individually'),
 			}),
 			endpoint: '/products/detail/:detail_id',
 		}),
@@ -176,14 +205,21 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/products/suggest-sku',
 		}),
 
-		getTool(client, {
+		createTool(client, {
 			name: 'fluentcart_product_fetch_by_ids',
 			title: 'Fetch Products by IDs',
 			description: 'Retrieve multiple products by their IDs. Limit to 20 IDs per request.',
 			schema: z.object({
-				product_ids: z.string().describe('Comma-separated product IDs (max 20)'),
+				product_ids: z.array(z.number()).describe('Array of product IDs (max 20)'),
 			}),
-			endpoint: '/products/fetchProductsByIds',
+			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+			handler: async (client, input) => {
+				const ids = input.product_ids as number[]
+				const response = await client.get('/products/fetchProductsByIds', {
+					productIds: ids,
+				})
+				return response.data
+			},
 		}),
 
 		getTool(client, {

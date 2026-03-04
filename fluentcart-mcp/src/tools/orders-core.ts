@@ -414,7 +414,7 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_order_sync_statuses',
 			title: 'Sync Order Statuses',
-			description: 'Synchronise order statuses with the payment gateway.',
+			description: 'Synchronise order statuses with the payment gateway. May fail with timezone errors on certain orders (data-dependent upstream issue).',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 			}),

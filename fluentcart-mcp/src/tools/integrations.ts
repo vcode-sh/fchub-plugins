@@ -54,12 +54,12 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_feed_settings',
 			title: 'Get Integration Feed Settings',
 			description:
-				'Get feed settings/template. Pass integration_name for blank template, add integration_id for existing feed.',
+				'Get feed settings/template. integration_name is required by the backend. ' +
+				'Pass integration_name alone for a blank template, add integration_id to load an existing feed.',
 			schema: z.object({
 				integration_name: z
 					.string()
-					.optional()
-					.describe('Integration provider name (e.g. "fluent-crm")'),
+					.describe('Integration provider name (e.g. "fluent-crm") — required'),
 				integration_id: z
 					.number()
 					.optional()
@@ -71,15 +71,24 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_integration_save_feed_settings',
 			title: 'Save Integration Feed Settings',
-			description: 'Create or update a feed. Include integration_id to update, omit to create new.',
+			description:
+				'Create or update a global integration feed. Include integration_id to update, omit to create new. ' +
+				'Backend requires integration_name and integration (JSON string of feed config). ' +
+				'Use get_feed_settings first to discover the feed schema for a provider.',
 			schema: z.object({
 				integration_id: z.number().optional().describe('Feed ID (omit to create new feed)'),
-				integration_name: z.string().optional().describe('Integration provider name'),
-				status: z.string().optional().describe('Feed status: "yes" (enabled), "no" (disabled)'),
-				settings: z
-					.record(z.string(), z.unknown())
+				integration_name: z
+					.string()
+					.describe('Integration provider name (e.g. "fluent-crm") — required'),
+				integration: z
+					.string()
+					.describe(
+						'JSON-encoded feed configuration object. Use get_feed_settings to discover the schema — required',
+					),
+				status: z
+					.string()
 					.optional()
-					.describe('Feed-specific settings object'),
+					.describe('Feed status: "yes" (enabled), "no" (disabled)'),
 			}),
 			endpoint: '/integration/global-feeds/settings',
 		}),
@@ -90,7 +99,7 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			description: 'Enable or disable a global integration feed without modifying its settings.',
 			schema: z.object({
 				integration_id: z.number().describe('Integration feed ID'),
-				status: z.string().describe('New status: "yes" (enabled) or "no" (disabled)'),
+				status: z.enum(['yes', 'no']).describe('New status: "yes" (enabled) or "no" (disabled)'),
 			}),
 			endpoint: '/integration/global-feeds/change-status/:integration_id',
 		}),

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
 
 export function customerTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -35,6 +35,9 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 						status: item.status,
 						order_count: item.order_count,
 						total_spend: item.total_spend,
+						purchase_value: item.purchase_value,
+						purchase_count: item.purchase_count,
+						ltv: item.ltv,
 						created_at: item.created_at,
 					}))
 				}
@@ -302,7 +305,8 @@ export function customerTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_customer_orders_simple',
 			title: 'Get Customer Orders (Simple)',
-			description: 'Get a simplified list of orders for a customer with basic order details.',
+			description:
+				'Get a non-paginated list of orders for a customer with basic order details. For paginated results, use order_list with customer_id filter.',
 			schema: z.object({
 				customer_id: z.number().describe('Customer ID'),
 			}),

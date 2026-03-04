@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Support;
 
+use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
+
 defined('ABSPATH') || exit;
 
 final class AdminMenu
@@ -38,8 +40,9 @@ final class AdminMenu
         );
 
         wp_localize_script('fchub-mc-admin', 'fchubMcAdmin', [
-            'rest_url' => esc_url_raw(rest_url(Constants::REST_NAMESPACE . '/')),
-            'nonce'    => wp_create_nonce('wp_rest'),
+            'rest_url'           => esc_url_raw(rest_url(Constants::REST_NAMESPACE . '/')),
+            'nonce'              => wp_create_nonce('wp_rest'),
+            'currency_catalogue' => CurrencyCatalogueController::getCatalogue(),
         ]);
     }
 

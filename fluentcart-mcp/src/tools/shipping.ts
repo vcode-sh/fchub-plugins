@@ -116,11 +116,14 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 		putTool(client, {
 			name: 'fluentcart_shipping_method_update',
 			title: 'Update Shipping Method',
-			description: 'Update a shipping method. Amount in cents.',
+			description:
+				'Update a shipping method. Amount in cents. ' +
+				'Backend validates zone_id, title, and type as required even on update.',
 			schema: z.object({
 				method_id: z.number().describe('Shipping method ID'),
-				zone_id: z.number().optional().describe('Zone ID'),
-				title: z.string().optional().describe('Display title'),
+				zone_id: z.number().describe('Zone ID (required by backend validation)'),
+				title: z.string().describe('Display title (required by backend validation)'),
+				type: z.string().describe('Method type: flat_rate, free_shipping, local_pickup (required by backend validation)'),
 				amount: z.number().optional().describe('Shipping cost in cents'),
 				min_amount: z.number().optional().describe('Minimum order amount in cents'),
 				enabled: z.string().optional().describe("Method status: 'yes' or 'no'"),
