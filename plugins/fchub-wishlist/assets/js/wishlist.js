@@ -369,7 +369,12 @@
 			if (window.fluentCartCart && window.fluentCartCart.addProduct) {
 				try {
 					var result = window.fluentCartCart.addProduct(cartItemId, 1);
-					return Promise.resolve(result);
+					return Promise.resolve(result).then(function (res) {
+						if (window.fluentCartCart.openModal) {
+							window.fluentCartCart.openModal();
+						}
+						return res;
+					});
 				} catch (e) {
 					return Promise.reject(e);
 				}

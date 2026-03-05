@@ -98,14 +98,14 @@ defined('ABSPATH') || exit;
         </div>
 
         <?php if (($pagination['total_pages'] ?? 0) > 1) : ?>
-            <?php $currentPage = (int) ($pagination['page'] ?? 1); $totalPages = (int) ($pagination['total_pages'] ?? 1); $queryArgs = is_array($_GET) ? $_GET : []; ?>
+            <?php $currentPage = (int) ($pagination['page'] ?? 1); $totalPages = (int) ($pagination['total_pages'] ?? 1); ?>
             <div class="fchub-wishlist-pagination" role="navigation" aria-label="<?= esc_attr__('Wishlist pagination', 'fchub-wishlist') ?>">
-                <?php if ($currentPage > 1) : $prevArgs = $queryArgs; $prevArgs['wishlist_page'] = $currentPage - 1; ?>
-                    <a class="fchub-wishlist-pagination__link" href="<?= esc_url('?' . http_build_query($prevArgs)) ?>"><?= esc_html__('Previous', 'fchub-wishlist') ?></a>
+                <?php if ($currentPage > 1) : ?>
+                    <a class="fchub-wishlist-pagination__link" href="<?= esc_url('?' . http_build_query(['wishlist_page' => $currentPage - 1])) ?>"><?= esc_html__('Previous', 'fchub-wishlist') ?></a>
                 <?php endif; ?>
                 <span class="fchub-wishlist-pagination__meta"><?= esc_html(sprintf(__('Page %1$d of %2$d', 'fchub-wishlist'), $currentPage, $totalPages)) ?></span>
-                <?php if ($currentPage < $totalPages) : $nextArgs = $queryArgs; $nextArgs['wishlist_page'] = $currentPage + 1; ?>
-                    <a class="fchub-wishlist-pagination__link" href="<?= esc_url('?' . http_build_query($nextArgs)) ?>"><?= esc_html__('Next', 'fchub-wishlist') ?></a>
+                <?php if ($currentPage < $totalPages) : ?>
+                    <a class="fchub-wishlist-pagination__link" href="<?= esc_url('?' . http_build_query(['wishlist_page' => $currentPage + 1])) ?>"><?= esc_html__('Next', 'fchub-wishlist') ?></a>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
