@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Calendar, Tag, Text, User } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { DocsBody } from "fumadocs-ui/page";
-import { TOCProvider, TOCScrollArea } from "fumadocs-ui/components/toc/index";
 import { TOCItems } from "fumadocs-ui/components/toc/clerk";
+import { TOCProvider, TOCScrollArea } from "fumadocs-ui/components/toc/index";
+import { DocsBody } from "fumadocs-ui/page";
+import { ArrowLeft, Calendar, Tag, Text, User } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { blogSource, getBlogPageImage } from "@/lib/source";
 import { getMDXComponents } from "@/mdx-components";
@@ -24,7 +24,9 @@ const categoryColors: Record<string, string> = {
 
 export default async function BlogPostPage({
   params,
-}: { params: Promise<{ slug: string }> }) {
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = await params;
   const page = blogSource.getPage([slug]);
   if (!page) notFound();
@@ -53,7 +55,10 @@ export default async function BlogPostPage({
               </Badge>
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Calendar size={14} />
-                {format(typeof date === "string" ? parseISO(date) : date, "d MMMM yyyy")}
+                {format(
+                  typeof date === "string" ? parseISO(date) : date,
+                  "d MMMM yyyy",
+                )}
               </span>
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <User size={14} />
@@ -112,7 +117,9 @@ export function generateStaticParams() {
 
 export async function generateMetadata({
   params,
-}: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
   const page = blogSource.getPage([slug]);
   if (!page) notFound();

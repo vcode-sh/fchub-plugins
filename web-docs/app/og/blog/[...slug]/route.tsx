@@ -1,7 +1,7 @@
 import { generate as DefaultImage } from "fumadocs-ui/og";
 import { notFound } from "next/navigation";
 import { ImageResponse } from "next/og";
-import { getBlogPageImage, blogSource } from "@/lib/source";
+import { blogSource, getBlogPageImage } from "@/lib/source";
 
 export const revalidate = false;
 

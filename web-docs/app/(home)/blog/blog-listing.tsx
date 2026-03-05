@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { format, parseISO } from "date-fns";
 import { ArrowRight, Calendar, Tag, User } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
-import { format, parseISO } from "date-fns";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
 type BlogPost = {
@@ -69,7 +69,8 @@ const categoryLabels: Record<string, string> = {
 };
 
 const categoryColors: Record<string, string> = {
-  fluentcart: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-transparent",
+  fluentcart:
+    "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-transparent",
   fluentcommunity:
     "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-transparent",
   general:
@@ -107,11 +108,7 @@ function PostCard({ post }: { post: BlogPost }) {
             <div className="flex items-center gap-1.5">
               <Tag size={12} className="text-muted-foreground" />
               {post.tags.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="outline"
-                  className="text-[10px] h-4"
-                >
+                <Badge key={tag} variant="outline" className="text-[10px] h-4">
                   {tag}
                 </Badge>
               ))}
@@ -189,7 +186,9 @@ export function BlogListing({ posts }: { posts: BlogPost[] }) {
           {filtered.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
               <p className="text-lg">Nothing here yet.</p>
-              <p className="text-sm mt-1">Check back soon — or don't. We're not your mum.</p>
+              <p className="text-sm mt-1">
+                Check back soon — or don't. We're not your mum.
+              </p>
             </div>
           )}
         </motion.div>
