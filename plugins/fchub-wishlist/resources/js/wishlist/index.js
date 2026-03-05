@@ -11,7 +11,7 @@ import PageHandler from './page-handler.js';
 import VariantSync from './variant-sync.js';
 import CounterSync from './counter-sync.js';
 
-document.addEventListener('DOMContentLoaded', function () {
+function boot() {
     // Load initial wishlist state from API
     ApiClient.getStatus()
         .then(function (res) {
@@ -31,7 +31,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialise variant change and modal listeners
     VariantSync.init();
-});
+}
+
+// On the customer portal, the script is enqueued inside a render_callback
+// that runs after DOMContentLoaded has already fired. Handle both cases.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+} else {
+    boot();
+}
 
 // FluentCart renders product listings asynchronously via Vue.
 // When the app finishes rendering, it fires this event — re-sync hearts.

@@ -528,7 +528,7 @@
        Init
        ======================================================================== */
 
-	document.addEventListener("DOMContentLoaded", function () {
+	function boot() {
 		ApiClient.getStatus()
 			.then(function (res) {
 				var data = res.data || res;
@@ -544,7 +544,15 @@
 		ToggleHandler.init();
 		PageHandler.init();
 		VariantSync.init();
-	});
+	}
+
+	// On the customer portal the script is enqueued inside a render_callback
+	// that runs after DOMContentLoaded has already fired. Handle both cases.
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", boot);
+	} else {
+		boot();
+	}
 
 	// FluentCart renders product listings asynchronously via Vue.
 	// When the app finishes rendering, it fires this event — re-sync hearts.
