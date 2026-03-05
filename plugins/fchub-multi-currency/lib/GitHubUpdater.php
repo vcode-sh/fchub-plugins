@@ -13,7 +13,6 @@
  * @package FCHub
  */
 
-// phpcs:disable PSR1.Classes.ClassDeclaration.MissingNamespace, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound, Squiz.Classes.ValidClassName.NotCamelCaps
 if (class_exists('FCHub_GitHub_Updater')) {
     return;
 }
@@ -353,4 +352,3 @@ class FCHub_GitHub_Updater
         return wp_kses_post($html);
     }
 }
-// phpcs:enable
