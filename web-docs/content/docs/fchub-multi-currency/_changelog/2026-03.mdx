@@ -1,0 +1,35 @@
+### v1.0.0
+
+*Released March 2026* — Initial release
+
+The first release of FCHub Multi-Currency. Display-layer multi-currency for FluentCart — because not everyone thinks in dollars.
+
+#### Core Features
+
+- **Currency switcher widget** — custom dropdown with flag emojis, ARIA listbox roles, keyboard navigation, and a rate freshness badge. Place it anywhere with `[fchub_currency_switcher]`
+- **Price projection engine** — JavaScript-based real-time price conversion across all FluentCart elements. Product cards, cart drawer, checkout totals, pricing tables, variant buttons — everything gets projected
+- **Exchange rate management** — four providers (Exchange Rate API, Open Exchange Rates, European Central Bank, Manual), automatic cron refresh, rate history with 90-day retention, staleness detection
+- **Checkout disclosure** — configurable notice at checkout with template tokens (`{base_currency}`, `{display_currency}`, `{rate}`). Injected into checkout summary, cart drawer, and cart page
+- **Order snapshots** — display currency, base currency, and exchange rate saved to order metadata on payment
+- **Context resolution chain** — URL parameter → user meta → cookie → geolocation (feature-flagged) → fallback default. First match wins, all validated against display currency whitelist
+
+#### Integrations
+
+- **FluentCRM sync** — automatic contact tagging with currency tags, custom field updates on context switch and order payment
+- **FluentCommunity sync** — preferred currency written to community user meta
+- **FluentCart addon** — appears in FluentCart's integration modules, extends store settings API, injects checkout data fragments
+
+#### Admin
+
+- **Six-tab settings SPA** — General, Currencies, Exchange Rates, Checkout, CRM, and Diagnostics. Built as a Vue 3 component inside FluentCart's admin
+- **Real-time diagnostics** — plugin version, PHP/bcmath status, FluentCart/FluentCRM presence, rate count, stale currency detection, feature flags
+- **Stale rate admin notice** — dashboard warning when any exchange rate exceeds the stale threshold
+
+#### Developer
+
+- **REST API** — public endpoints for context get/set and rate listing; admin endpoints for settings, rate refresh, currency catalogue, and diagnostics
+- **PHP API** — `fchub_mc_format_price()` function for theme/plugin developers
+- **JavaScript API** — `window.fchubMcSwitchCurrency()`, `window.fchubMcInitSwitchers()`, `window.fchubMcProjectPrices()` globals
+- **Custom hooks** — `fchub_mc/context_switched`, `fchub_mc/rates_refreshed`, `fchub_mc/context` filter, `fchub_mc/modules` filter
+- **GDPR compliant** — personal data exporter and eraser registered with WordPress privacy tools
+- **Feature flags** — `js_projection` and `geo_resolver` for gradual rollout control

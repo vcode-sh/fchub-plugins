@@ -1,0 +1,196 @@
+---
+title: Exchange Rates
+description: How FCHub Multi-Currency fetches, stores, caches, and manages exchange rates from multiple providers with automatic refresh and staleness detection.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Exchange rates are the engine behind display-layer multi-currency. The plugin fetches rates from an external provider, stores them with full history, caches the latest values, and automatically detects when rates go stale.
+
+## Rate Providers
+
+Four providers are available. You choose one in the settings — the plugin fetches from that provider exclusively.
+
+<Tabs items={['Exchange Rate API', 'Open Exchange Rates', 'European Central Bank', 'Manual']}>
+<Tab value="Exchange Rate API">
+
+**Slug:** `exchange_rate_api`
+
+The default provider. Reliable, wide currency coverage, and a free tier that's generous enough for most stores.
+
+- **API Key:** Required — get one at [exchangerate-api.com](https://www.exchangerate-api.com/)
+- **Endpoint:** `https://v6.exchangerate-api.com/v6/{key}/latest/{base}`
+- **Base currency:** Uses your configured base currency directly
+
+</Tab>
+<Tab value="Open Exchange Rates">
+
+**Slug:** `open_exchange_rates`
+
+Alternative provider with a slightly different free tier structure.
+
+- **API Key:** Required — get one at [openexchangerates.org](https://openexchangerates.org/)
+- **Endpoint:** `https://openexchangerates.org/api/latest.json`
+- **Base currency:** Uses your configured base currency directly
+
+</Tab>
+<Tab value="European Central Bank">
+
+**Slug:** `ecb`
+
+The free option. The ECB publishes daily reference rates with no API key, no rate limiting, and no terms of service to worry about.
+
+- **API Key:** Not required
+- **Endpoint:** `https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml`
+- **Base currency:** Always EUR. If your base currency is not EUR, the plugin automatically cross-rates by dividing each ECB rate by the EUR-to-base rate. This uses `bcdiv` when bcmath is available.
+
+<Callout type="warn" title="ECB Limitations">
+The ECB only covers about 30 major currencies (plus EUR). If you need exotic currencies, use one of the API-key providers. Also, ECB rates are published once daily around 16:00 CET — setting a 1-hour refresh interval won't get you fresher rates than that.
+</Callout>
+
+</Tab>
+<Tab value="Manual">
+
+**Slug:** `manual`
+
+No external HTTP calls. The provider reads the most recent rate from the database for each currency pair. Useful if you want to set rates yourself (via the admin) or let a previous provider's rates persist after switching.
+
+</Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## Refresh Cycle
+
+The rate refresh runs on a WordPress cron schedule:
+
+<Steps>
+  <Step>
+    **Cron Fires**
+
+    The `fchub_mc_refresh_rates` event fires at the configured interval (default: every 6 hours). Changing the interval in settings reschedules the cron immediately.
+  </Step>
+  <Step>
+    **Lock Acquired**
+
+    A 120-second option-based lock prevents concurrent refreshes. If another refresh is already running, the new one exits silently.
+  </Step>
+  <Step>
+    **Provider Fetched**
+
+    The configured provider's `fetchRates()` method is called with the base currency. The provider returns an associative array of `code => rate` pairs.
+  </Step>
+  <Step>
+    **Validation**
+
+    Each rate is validated against the display currencies whitelist. Rates for currencies not in your display list are ignored. Zero or negative rates are skipped and logged as errors — because a rate of `0` would zero out every price on your storefront.
+  </Step>
+  <Step>
+    **Storage**
+
+    Valid rates are inserted into the `fchub_mc_rate_history` table and written to the WordPress object cache (group `fchub_mc_rates`, 1-hour TTL). Existing cache entries for the refreshed pairs are deleted first to prevent stale reads.
+  </Step>
+  <Step>
+    **Pruning**
+
+    Rate history rows older than 90 days are deleted. This keeps the table from growing unboundedly.
+  </Step>
+  <Step>
+    **Hook Fired**
+
+    `fchub_mc/rates_refreshed` action fires with the base currency and rate count.
+  </Step>
+</Steps>
+
+You can also trigger a manual refresh from the admin: **FluentCart > Settings > Multi-Currency > Exchange Rates > Refresh Now**. This calls the same action as the cron job.
+
+<Separator className="my-8" />
+
+## Storage Architecture
+
+Rates live in three layers:
+
+### 1. WordPress Object Cache (Hot)
+
+The latest rate per currency pair is cached in WordPress object cache with group `fchub_mc_rates` and a 1-hour TTL. This is the first thing the plugin checks when it needs a rate.
+
+On hosts with persistent object cache (Redis, Memcached), this means rate lookups are sub-millisecond. Without persistent cache, the cache only lasts for the current PHP request — but the database fallback is still fast.
+
+### 2. Database Table (Warm)
+
+The `fchub_mc_rate_history` table stores every rate ever fetched. When the cache misses, the plugin queries the most recent row for the requested currency pair.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | `BIGINT UNSIGNED` | Auto-increment primary key |
+| `base_currency` | `CHAR(3)` | ISO 4217 base code |
+| `quote_currency` | `CHAR(3)` | ISO 4217 quote code |
+| `rate` | `DECIMAL(18,8)` | Exchange rate (8 decimal places) |
+| `provider` | `VARCHAR(64)` | Provider slug that fetched this rate |
+| `fetched_at` | `DATETIME` | Timestamp in WordPress site timezone |
+
+Indexed on `(base_currency, quote_currency, fetched_at)` for efficient latest-rate lookups.
+
+### 3. Synthetic Identity Rate
+
+When the display currency equals the base currency, a synthetic `1.00000000` rate is returned. No database query, no cache lookup.
+
+<Separator className="my-8" />
+
+## Staleness Detection
+
+A rate is considered stale when its `fetched_at` timestamp is older than the configured stale threshold (default: 24 hours). The comparison uses WordPress's site timezone (`current_time('timestamp')`) to avoid UTC offset mismatches.
+
+When staleness is detected:
+
+| Behaviour | Where |
+|---|---|
+| Admin warning notice | WordPress dashboard (for `manage_options` users) |
+| Red dot on rate badge | Currency switcher dropdown footer |
+| Stale fallback applies | Price display (base currency or last known rate) |
+
+### Stale Fallback Options
+
+| Setting | Behaviour |
+|---|---|
+| `base` | Display reverts to the base currency. The visitor sees all prices in the base currency until fresh rates arrive. |
+| `last_known` | Keep using the stale rate. Prices continue to display in the selected currency, but the rate badge warns it's outdated. |
+
+<Separator className="my-8" />
+
+## Rate History and Pruning
+
+Every rate refresh inserts new rows into the history table — existing rows are never updated. This gives you a complete audit trail of rate changes over time.
+
+The cron job automatically deletes rows older than 90 days after each refresh. This is a hard-coded retention period designed to balance history depth with table size.
+
+The `RateHistoryQuery::forPair()` method returns the last 30 rows for any currency pair, ordered newest first. This is used internally but also available for custom integrations.
+
+<Separator className="my-8" />
+
+## Rounding
+
+After the exchange rate multiplication, the resulting amount is rounded according to your settings:
+
+| Mode | Behaviour | Example (input: 12.345) |
+|---|---|---|
+| **None** | No rounding | `12.345` |
+| **Half Up** | Standard rounding | `12.35` |
+| **Half Down** | Round half towards zero | `12.34` |
+| **Ceil** | Always round up | `12.35` |
+| **Floor** | Always round down | `12.34` |
+
+The precision setting controls the granularity:
+
+| Precision | Rounds To | Example (input: 12.345, Half Up) |
+|---|---|---|
+| 0 | Nearest cent | `12.35` |
+| 1 | Nearest 10 cents | `12.30` |
+| 2 | Nearest whole unit | `12.00` |
+
+Rounding is applied identically in both the PHP `fchub_mc_format_price()` function and the JavaScript projection engine.

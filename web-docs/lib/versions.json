@@ -36,6 +36,12 @@
       "zipFilename": "fchub-wishlist-1.0.0.zip",
       "mcpbFilename": null
     },
+    "fchub-multi-currency": {
+      "version": "1.0.0",
+      "tagName": "fchub-multi-currency/v1.0.0",
+      "zipFilename": "fchub-multi-currency-1.0.0.zip",
+      "mcpbFilename": null
+    },
     "fchub-stream": {
       "version": "1.0.1",
       "tagName": "fchub-stream/v1.0.1",

@@ -1,0 +1,23 @@
+{
+  "title": "Multi-Currency",
+  "root": true,
+  "description": "Display-layer multi-currency for FluentCart.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "configuration",
+    "---Features---",
+    "currency-switcher",
+    "exchange-rates",
+    "checkout",
+    "---Integrations---",
+    "fluentcrm",
+    "fluentcommunity",
+    "---Developer---",
+    "developer-reference",
+    "---Reference---",
+    "troubleshooting",
+    "changelog"
+  ]
+}

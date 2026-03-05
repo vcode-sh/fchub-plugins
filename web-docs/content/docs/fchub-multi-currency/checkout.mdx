@@ -1,0 +1,161 @@
+---
+title: Checkout & Price Projection
+description: How FCHub Multi-Currency handles checkout disclosure notices, price projection across FluentCart pages, and order snapshots.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+This is display-layer multi-currency. Prices on the page are projected client-side, the checkout tells the customer what they'll actually be charged, and the order records what they saw. No payment gateway currency changes, no surprises.
+
+## Price Projection
+
+The JavaScript projection engine rewrites FluentCart price elements in real time. No server round-trips, no page reload required.
+
+### What Gets Projected
+
+The engine targets all standard FluentCart price elements:
+
+| Target | Type | Examples |
+|---|---|---|
+| Product prices | CSS class | `.fct-item-price`, `.fct-compare-price`, `.fct-min-price`, `.fct-max-price` |
+| Product card prices | CSS class | `.fct-product-item-price` |
+| Cart item prices | CSS class | `.fct-cart-item-price`, `.fct-cart-item-total` |
+| Summary values | CSS class | `.fct_summary_value`, `.fct_line_item_price`, `.fct_line_item_total` |
+| Promotional prices | CSS class | `.fct_promo_price` |
+| Pricing table | CSS class | `.fluent-cart-pricing-table-variant-price`, `.fluent-cart-pricing-table-variant-compare-price` |
+| Cart data attributes | Attribute | `[data-fluent-cart-cart-list-item-price]`, `[data-fluent-cart-cart-total-price]`, etc. |
+| Variant buttons | Attribute | `data-item-price`, `data-compare-price` on variant elements |
+| Shop currency sign | CSS class | `.fct-shop-currency-sign` in the price filter sidebar |
+| Custom opt-in | Attribute | Any element with `[data-fchub-mc-base]` |
+
+### Special Handling
+
+| Scenario | Behaviour |
+|---|---|
+| **Price ranges** | `$11.00 – $12.30` → both sides projected independently |
+| **"From" prefixes** | `From $9.99` → prefix preserved, amount projected |
+| **Strikethrough prices** | `<del>` elements projected with the compare price styling preserved |
+| **Totals** | Cart total, checkout estimated total, and subtotal get an `≈` prefix to signal approximation |
+| **Same currency** | When display currency equals base currency, no projection happens — the engine skips silently |
+
+### DOM Observation
+
+A 50ms-debounced `MutationObserver` watches for DOM changes. This catches:
+
+- AJAX cart updates
+- Cart drawer open/close
+- FluentCart fragment replacements
+- Any dynamic content insertion
+
+The engine also listens to FluentCart-specific events: `fluentCartFragmentsReplaced`, `fluentCartNotifySummaryViewUpdated`, `fluentCartNotifyCartDrawerItemChanged`.
+
+### Custom Element Projection
+
+Want to project a price in your own theme or plugin? Add the `data-fchub-mc-base` attribute with the base-currency amount:
+
+```html
+<span data-fchub-mc-base="99.99">$99.99</span>
+```
+
+The projection engine will pick this up automatically and rewrite the text content with the converted amount.
+
+<Separator className="my-8" />
+
+## Checkout Disclosure
+
+When the visitor is viewing prices in a different currency than your store's base currency, a disclosure notice appears at checkout.
+
+### Where It Appears
+
+The disclosure is injected in three locations:
+
+1. **Below the checkout order summary** — after `.fct_summary_box`
+2. **Inside the cart drawer** — after the drawer's total wrapper
+3. **On the cart page** — after the cart page total wrapper
+
+### Configurable Text
+
+The disclosure text is set in **FluentCart > Settings > Multi-Currency > Checkout**. You can use template tokens:
+
+```text
+Prices shown in {display_currency} are approximate.
+Your payment will be processed in {base_currency} at the current rate of {rate}.
+```
+
+### Fallback Message
+
+If no custom disclosure text is configured, or the setting is empty, a generic fallback is used:
+
+```
+Prices shown in EUR are approximate. You will be charged in USD.
+```
+
+This fallback always includes both the display and base currency codes. It's deliberately conservative — customers should always know what currency they'll be charged in.
+
+### When It Doesn't Appear
+
+The disclosure is suppressed when:
+- The display currency is the same as the base currency (no conversion happening)
+- The `checkout_disclosure_enabled` setting is `no`
+- The plugin is disabled
+
+<Separator className="my-8" />
+
+## Checkout Data Fragments
+
+The plugin hooks into FluentCart's checkout fragment system via `fluent_cart/checkout/after_patch_checkout_data_fragments`. When the display currency differs from base, the plugin adds an `fchub_mc_disclosure` key to the checkout fragments containing the rendered disclosure HTML.
+
+This means the disclosure text is available to FluentCart's Vue checkout component, not just injected via JavaScript DOM manipulation.
+
+<Separator className="my-8" />
+
+## Order Snapshots
+
+When an order is paid (`fluent_cart/order_paid_done`), the plugin writes a permanent snapshot to order metadata:
+
+| Meta Key | Value | Example |
+|---|---|---|
+| `_fchub_mc_display_currency` | The currency the customer was viewing | `EUR` |
+| `_fchub_mc_base_currency` | Your store's base currency | `USD` |
+| `_fchub_mc_rate` | The exchange rate at the time of order | `0.92140000` |
+| `_fchub_mc_disclosure_version` | Plugin version | `1.0.0` |
+
+### Why Snapshots Matter
+
+Exchange rates change. Three weeks after an order, the EUR/USD rate might be completely different. The snapshot preserves exactly what the customer saw and what rate was in effect when they paid. This is useful for:
+
+- Customer support ("What rate was I charged at?")
+- Auditing and compliance
+- Internal reporting
+- Dispute resolution
+
+### When Snapshots Are Skipped
+
+If the visitor was viewing prices in the base currency (i.e., no conversion happened), the snapshot is skipped entirely. No point recording a 1:1 identity rate.
+
+<Separator className="my-8" />
+
+## FOUC Prevention
+
+"Flash of Unconverted Content" — that brief moment where the page shows base-currency prices before the projection engine runs. The plugin handles this:
+
+1. The projection script adds `fchub-mc-projecting` to `<html>` immediately on load
+2. CSS rules hide FluentCart price elements while this class is present
+3. After the first projection pass completes, the class is removed
+4. A 2-second safety timeout removes the class regardless, preventing an indefinite blank state if something errors
+
+```css
+/* Built into the plugin stylesheet */
+.fchub-mc-projecting .fct-item-price,
+.fchub-mc-projecting .fct-compare-price,
+/* ... other price selectors ... */ {
+  visibility: hidden;
+}
+```
+
+This means visitors never see a flash of USD prices before the EUR conversion kicks in.

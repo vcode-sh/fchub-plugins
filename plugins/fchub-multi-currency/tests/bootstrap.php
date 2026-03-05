@@ -169,6 +169,25 @@ if (!function_exists('current_time')) {
     }
 }
 
+if (!function_exists('human_time_diff')) {
+    function human_time_diff($from, $to = null)
+    {
+        $to = $to ?? time();
+        $diff = abs((int) $to - (int) $from);
+        $hours = (int) floor($diff / 3600);
+        if ($hours > 0) {
+            return $hours . ' hours';
+        }
+
+        $minutes = (int) floor($diff / 60);
+        if ($minutes > 0) {
+            return $minutes . ' mins';
+        }
+
+        return $diff . ' secs';
+    }
+}
+
 if (!function_exists('wp_json_encode')) {
     function wp_json_encode($data)
     {
@@ -269,6 +288,13 @@ if (!function_exists('__')) {
 
 if (!function_exists('esc_html__')) {
     function esc_html__($text, $domain = 'default')
+    {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('esc_attr__')) {
+    function esc_attr__($text, $domain = 'default')
     {
         return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }

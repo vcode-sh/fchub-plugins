@@ -1,0 +1,276 @@
+---
+title: Configuration
+description: Set up currencies, exchange rate providers, checkout disclosure, rounding, and CRM integrations for FCHub Multi-Currency.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+All settings live inside FluentCart's admin SPA. The plugin adds a dedicated settings page with six tabs covering everything from currency selection to CRM integration.
+
+## Settings Location
+
+Navigate to: **FluentCart > Settings > Multi-Currency**
+
+Or go directly to:
+```
+/wp-admin/admin.php?page=fluent-cart#/settings/multi-currency
+```
+
+<Callout type="info" title="Keyboard Shortcut">
+Press **Cmd+S** (Mac) or **Ctrl+S** (Windows) to save settings from any tab. Because we respect your time.
+</Callout>
+
+<Separator className="my-8" />
+
+## General Tab
+
+The basics — master switch, base currency, and preference persistence.
+
+### Enabled
+
+Master on/off switch for the entire plugin. When disabled, all frontend output stops — no price projection, no switcher, no disclosure notices. The admin UI remains accessible so you can re-enable it.
+
+### Base Currency
+
+Your store's actual transaction currency. This is the currency FluentCart charges in. All exchange rates are relative to this. Default: `USD`.
+
+<Callout type="warn" title="Changing Base Currency">
+If you change the base currency after rates have been fetched, existing rate history becomes invalid. The next rate refresh will fetch fresh rates relative to the new base. Existing order snapshots are unaffected — they recorded the base currency at the time of purchase.
+</Callout>
+
+### Default Display Currency
+
+The currency shown to visitors before any preference is detected. If a visitor has never switched currencies, hasn't set a cookie, isn't logged in with a saved preference, and geolocation is off — this is what they see.
+
+### URL Parameter
+
+| Setting | Default | Description |
+|---|---|---|
+| URL Parameter Enabled | Yes | Allow currency switching via `?currency=EUR` query parameter |
+| URL Parameter Key | `currency` | The query parameter name. Change it if `currency` conflicts with something else |
+
+Useful for marketing links: `yourstore.com/pricing?currency=GBP` lands the visitor directly in GBP.
+
+### Cookie
+
+| Setting | Default | Description |
+|---|---|---|
+| Cookie Enabled | Yes | Persist the visitor's currency preference in a browser cookie |
+| Cookie Lifetime | 90 days | How long the cookie lasts (1–365 days) |
+
+The cookie is set with `HttpOnly`, `Secure` (on HTTPS), `SameSite=Lax`, and scoped to `COOKIEPATH`. On login, the guest cookie preference is merged into the user's WordPress meta if no existing preference is saved.
+
+### Uninstall Data
+
+| Setting | Default | Description |
+|---|---|---|
+| Remove all data on uninstall | No | When enabled, deleting the plugin drops tables, options, and user meta |
+
+Leave this off unless you're truly done with the plugin. See [Uninstallation](/docs/fchub-multi-currency/installation#uninstallation) for what exactly gets removed.
+
+<Separator className="my-8" />
+
+## Currencies Tab
+
+This is where you build your display currency catalogue.
+
+### Adding Currencies
+
+A searchable picker lets you browse FluentCart's full currency catalogue (180+ currencies). Select a currency to add it to your display list. Each currency in the list shows:
+
+| Column | Description |
+|---|---|
+| Flag | Emoji flag derived from the ISO country code |
+| Code | Three-letter ISO 4217 code (e.g. `EUR`, `GBP`, `PLN`) |
+| Name | Full currency name |
+| Symbol | Currency symbol (e.g. `€`, `£`, `zł`) |
+| Decimals | Number of decimal places (0–4) |
+| Position | Symbol placement: left, right, left with space, right with space |
+
+You can customise the symbol, decimals, and position per currency. These values are used by the price projection engine and the switcher widget.
+
+<Callout type="info" title="Base Currency in the List">
+Your base currency should be in the display list if you want visitors to be able to switch back to it. The plugin won't show a "switch to base" option unless the base currency appears in the display currencies array.
+</Callout>
+
+<Separator className="my-8" />
+
+## Exchange Rates Tab
+
+Rate provider selection, refresh scheduling, and staleness configuration.
+
+### Rate Provider
+
+| Provider | API Key | Notes |
+|---|---|---|
+| **Exchange Rate API** | Required | Default. Reliable, wide currency coverage. Free tier available at [exchangerate-api.com](https://www.exchangerate-api.com/) |
+| **Open Exchange Rates** | Required | Alternative provider at [openexchangerates.org](https://openexchangerates.org/) |
+| **European Central Bank** | Not required | Free. No API key needed. EUR-based only — the plugin cross-rates automatically for non-EUR base currencies using bcmath |
+| **Manual** | Not required | Uses the most recent rates from the database. No external HTTP calls. You set rates manually or let a previous provider's rates persist |
+
+The API key field only appears when the selected provider requires one.
+
+<Callout type="info" title="ECB Cross-Rating">
+The ECB publishes rates relative to EUR only. If your base currency is USD, the plugin automatically cross-rates: it divides each ECB rate by the EUR/USD rate to produce USD-based rates. This requires the bcmath PHP extension for precise decimal division. Without bcmath, the plugin falls back to native float division.
+</Callout>
+
+### Refresh Interval
+
+How often the cron job fetches fresh rates. Range: 1–168 hours (1 hour to 1 week). Default: 6 hours.
+
+Changing this value reschedules the cron event immediately on save.
+
+### Stale Threshold
+
+How old a rate can be (in hours) before it's considered stale. Range: 1–720 hours. Default: 24 hours.
+
+When rates are stale:
+- Admin users see a warning notice in the WordPress dashboard
+- The currency switcher's rate badge turns red with a stale indicator
+- The stale fallback behaviour kicks in (see below)
+
+### Stale Fallback
+
+What to do when the exchange rate for a currency pair is stale:
+
+| Value | Behaviour |
+|---|---|
+| **Show base currency** | Fall back to displaying prices in the base currency. Safe but jarring for the visitor. |
+| **Use last known rate** | Keep using the stale rate. The rate badge shows it's old, but prices still display. |
+
+### Rounding
+
+| Setting | Default | Options |
+|---|---|---|
+| Rounding Mode | Half Up | `None`, `Half Up`, `Half Down`, `Ceil`, `Floor` |
+| Rounding Precision | 2 (cent) | `0` = cent, `1` = nearest 10 cents, `2` = nearest whole unit, up to `4` |
+
+Rounding is applied after the exchange rate multiplication. "Half Up" with precision 0 means standard rounding to the nearest cent — `€12.345` becomes `€12.35`.
+
+<Separator className="my-8" />
+
+## Checkout Tab
+
+Controls the disclosure notice and rate freshness badge.
+
+### Checkout Disclosure
+
+| Setting | Default | Description |
+|---|---|---|
+| Enabled | Yes | Show a notice at checkout when the display currency differs from the base currency |
+| Disclosure Text | `Your payment will be processed in {base_currency}.` | The notice template |
+
+Available template tokens:
+
+| Token | Replaced With | Example |
+|---|---|---|
+| `{base_currency}` | Base currency code | `USD` |
+| `{display_currency}` | Display currency code | `EUR` |
+| `{rate}` | Current exchange rate | `0.92140000` |
+
+The disclosure appears in three places:
+1. Below the checkout order summary
+2. Inside the cart drawer total
+3. On the cart page total
+
+A generic fallback message ("Prices shown in \{display\} are approximate. You will be charged in \{base\}.") is used when the display currency differs from base and no custom text is set. This fallback always appears — it's important for transparency.
+
+### Rate Freshness Badge
+
+| Setting | Default | Description |
+|---|---|---|
+| Show rate freshness badge | Yes | Display "Rates updated X ago" in the currency switcher dropdown footer |
+
+The badge shows a green dot when rates are fresh and a red dot when stale. The timestamp uses WordPress's site timezone.
+
+<Separator className="my-8" />
+
+## CRM Tab
+
+FluentCRM and FluentCommunity sync settings. These integrations only activate when the respective plugins are installed.
+
+### FluentCRM
+
+| Setting | Default | Description |
+|---|---|---|
+| FluentCRM Sync | Yes | Enable contact tagging and field updates |
+| Auto-create Tags | Yes | Create tags like `currency:EUR` automatically |
+| Tag Prefix | `currency:` | Prefix for auto-created tags |
+| Preferred Currency Field | `preferred_currency` | Custom field key updated on currency switch |
+| Last Order Currency Field | `last_order_display_currency` | Custom field key updated on order payment |
+| Last Order FX Rate Field | `last_order_fx_rate` | Custom field key updated on order payment |
+
+See [FluentCRM Integration](/docs/fchub-multi-currency/fluentcrm) for the full sync behaviour.
+
+### FluentCommunity
+
+| Setting | Default | Description |
+|---|---|---|
+| FluentCommunity Sync | Yes | Write preferred currency to community user meta |
+
+See [FluentCommunity Integration](/docs/fchub-multi-currency/fluentcommunity) for details.
+
+<Separator className="my-8" />
+
+## Diagnostics Tab
+
+Read-only status cards showing the plugin's health. Nothing to configure here — just useful information when debugging.
+
+| Card | Shows |
+|---|---|
+| Plugin Version | Current plugin version and DB migration version |
+| Base Currency | Active base currency code |
+| PHP Version | Server PHP version |
+| bcmath | Whether the bcmath extension is loaded |
+| FluentCart | Whether FluentCart is active |
+| FluentCRM | Whether FluentCRM is active |
+| Rate Count | Number of rate history rows in the database |
+| Stale Currencies | List of currency pairs with stale rates |
+| Feature Flags | Current state of internal feature flags (`js_projection`, `geo_resolver`) |
+
+<Separator className="my-8" />
+
+## Complete Settings Reference
+
+<Accordions>
+  <Accordion title="All Settings Keys and Defaults">
+    All settings are stored as a single serialised array under the `fchub_mc_settings` WordPress option.
+
+    | Key | Type | Default | Description |
+    |---|---|---|---|
+    | `enabled` | string | `yes` | Master switch |
+    | `base_currency` | string | `USD` | Base transaction currency |
+    | `display_currencies` | array | `[]` | Array of currency config objects |
+    | `default_display_currency` | string | `USD` | Fallback display currency |
+    | `url_param_enabled` | string | `yes` | URL parameter switching |
+    | `url_param_key` | string | `currency` | URL parameter name |
+    | `cookie_enabled` | string | `yes` | Cookie persistence |
+    | `cookie_lifetime_days` | int | `90` | Cookie lifetime in days |
+    | `geo_enabled` | string | `no` | Geolocation auto-detect |
+    | `geo_provider` | string | `ip_api` | Geolocation provider slug |
+    | `geo_api_key` | string | `""` | Geolocation API key |
+    | `rate_provider` | string | `exchange_rate_api` | Exchange rate provider |
+    | `rate_provider_api_key` | string | `""` | Rate provider API key |
+    | `rate_refresh_interval_hrs` | int | `6` | Cron refresh interval (hours) |
+    | `stale_threshold_hrs` | int | `24` | Stale rate threshold (hours) |
+    | `stale_fallback` | string | `base` | Stale behaviour: `base` or `last_known` |
+    | `rounding_mode` | string | `half_up` | Rounding mode |
+    | `rounding_precision` | int | `2` | Rounding precision |
+    | `checkout_disclosure_enabled` | string | `yes` | Checkout disclosure notice |
+    | `checkout_disclosure_text` | string | `Your payment will be processed in {base_currency}.` | Disclosure template |
+    | `show_rate_freshness_badge` | string | `yes` | Switcher rate badge |
+    | `fluentcrm_enabled` | string | `yes` | FluentCRM sync |
+    | `fluentcrm_auto_create_tags` | string | `yes` | Auto-create currency tags |
+    | `fluentcrm_tag_prefix` | string | `currency:` | Tag prefix |
+    | `fluentcrm_field_preferred` | string | `preferred_currency` | CRM field: preferred currency |
+    | `fluentcrm_field_last_order` | string | `last_order_display_currency` | CRM field: last order currency |
+    | `fluentcrm_field_last_rate` | string | `last_order_fx_rate` | CRM field: last order rate |
+    | `fluentcommunity_enabled` | string | `yes` | FluentCommunity sync |
+    | `uninstall_remove_data` | string | `no` | Delete everything on uninstall |
+  </Accordion>
+</Accordions>

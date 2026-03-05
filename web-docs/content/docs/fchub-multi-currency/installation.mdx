@@ -1,0 +1,132 @@
+---
+title: Installation
+description: How to install and activate FCHub Multi-Currency on your WordPress site with FluentCart.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Separator } from '@/components/ui/separator';
+
+## Prerequisites
+
+Before you begin:
+
+- **WordPress 6.7+** installed and running
+- **PHP 8.3+** on your server
+- **FluentCart** installed and activated
+- **bcmath PHP extension** recommended (not required — the plugin falls back to native float math, but bcmath gives you proper decimal precision for exchange rate calculations)
+
+<Callout type="warn" title="FluentCart Is Required">
+FCHub Multi-Currency is a FluentCart extension. If FluentCart is not active when you activate the plugin, you'll see an admin notice and the plugin will sit there doing nothing until FluentCart shows up.
+</Callout>
+
+<Separator className="my-8" />
+
+## Installation Steps
+
+<Tabs items={['Upload via Admin', 'Upload via FTP/SSH']}>
+<Tab value="Upload via Admin">
+
+<Steps>
+  <Step>
+    **Download the Plugin**
+
+    Download the latest <PluginDownload plugin="fchub-multi-currency">fchub-multi-currency.zip</PluginDownload> from GitHub.
+  </Step>
+  <Step>
+    **Upload to WordPress**
+
+    Go to **Plugins > Add New > Upload Plugin** in your WordPress admin. Choose the zip file and click **Install Now**.
+  </Step>
+  <Step>
+    **Activate the Plugin**
+
+    Click **Activate Plugin**. If FluentCart is active, the plugin registers itself immediately — modules boot, database tables are created, and the cron job is scheduled.
+  </Step>
+</Steps>
+
+</Tab>
+<Tab value="Upload via FTP/SSH">
+
+<Steps>
+  <Step>
+    **Extract the Zip**
+
+    Extract `fchub-multi-currency.zip` on your local machine. You should have a folder called `fchub-multi-currency`.
+  </Step>
+  <Step>
+    **Upload to wp-content/plugins**
+
+    Upload the entire `fchub-multi-currency` folder to `/wp-content/plugins/` on your server.
+  </Step>
+  <Step>
+    **Activate in WordPress**
+
+    Go to **Plugins** in your WordPress admin and activate **FCHub - Multi-Currency**.
+  </Step>
+</Steps>
+
+</Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## What Happens on Activation
+
+When you activate the plugin:
+
+1. **Database tables are created** — Two custom tables (`fchub_mc_rate_history` and `fchub_mc_event_log`) are created via `dbDelta()`. Safe to run multiple times.
+
+2. **Cron job is scheduled** — The `fchub_mc_refresh_rates` event is registered with a configurable interval (default: every 6 hours). This fetches fresh exchange rates from your provider.
+
+3. **Modules boot** — Ten internal modules register their hooks: settings, context resolution, frontend assets, checkout integration, admin UI, REST API, FluentCRM sync, FluentCommunity sync, and diagnostics.
+
+4. **FluentCart addon registers** — "Multi-Currency" appears in FluentCart's integration modules list.
+
+5. **Admin route is injected** — A "Multi-Currency" item appears in FluentCart's settings sidebar (under Tax & Duties).
+
+<Separator className="my-8" />
+
+## Verify the Installation
+
+After activation, confirm everything is running:
+
+1. Go to **FluentCart > Settings > Multi-Currency** — the settings SPA should load with six tabs
+2. Go to **FluentCart > Modules** — "Multi-Currency" should appear as an integration
+3. Check **FluentCart > Settings > Multi-Currency > Diagnostics** tab — this shows plugin version, PHP version, bcmath availability, and FluentCart status
+
+<Callout type="info" title="Direct URL">
+You can access the settings directly:
+`/wp-admin/admin.php?page=fluent-cart#/settings/multi-currency`
+</Callout>
+
+<Separator className="my-8" />
+
+## After Installation
+
+Your next step is to [configure the plugin](/docs/fchub-multi-currency/configuration). At minimum, you'll want to:
+
+1. Set your base currency (if different from USD)
+2. Add display currencies
+3. Choose an exchange rate provider
+4. Place the `[fchub_currency_switcher]` shortcode somewhere visible
+
+The plugin ships with sensible defaults, but it won't do much until you add at least one display currency.
+
+<Separator className="my-8" />
+
+## Uninstallation
+
+**Deactivating** the plugin clears the rate refresh cron job but preserves all data — tables, settings, user preferences. You can deactivate and reactivate without losing anything.
+
+**Deleting** the plugin runs the uninstaller, but only if you've enabled the "Remove all data on uninstall" toggle in settings. When enabled, the uninstaller:
+
+1. Drops both database tables (`fchub_mc_rate_history`, `fchub_mc_event_log`)
+2. Deletes all plugin options (`fchub_mc_settings`, `fchub_mc_db_version`, `fchub_mc_feature_flags`)
+3. Removes `_fchub_mc_currency` from all user meta
+4. Removes `_fcom_preferred_currency` from all user meta (FluentCommunity sync)
+5. Clears the cron schedule
+
+<Callout type="warn" title="Data Removal Is Opt-In">
+By default, deleting the plugin leaves your data intact. You must explicitly enable "Remove all data on uninstall" in the settings before deletion to trigger cleanup. This is intentional — nobody likes surprises when managing plugins.
+</Callout>

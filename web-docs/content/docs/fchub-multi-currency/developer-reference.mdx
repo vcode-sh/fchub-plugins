@@ -1,0 +1,322 @@
+---
+title: Developer Reference
+description: REST API endpoints, WordPress hooks, PHP API, feature flags, order metadata, and database schema for FCHub Multi-Currency.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Everything a developer needs to extend, integrate with, or debug FCHub Multi-Currency.
+
+## REST API
+
+All endpoints use the `fchub-mc/v1` namespace. Admin endpoints require `manage_options` capability and a valid `X-WP-Nonce` header.
+
+### Public Endpoints
+
+<Tabs items={['GET /context', 'POST /context', 'GET /rates']}>
+<Tab value="GET /context">
+
+Returns the current resolved currency context.
+
+**Response:**
+
+```json
+{
+  "display_currency": {
+    "code": "EUR",
+    "name": "Euro",
+    "symbol": "€",
+    "decimals": 2,
+    "position": "right_space"
+  },
+  "base_currency": {
+    "code": "USD",
+    "name": "US Dollar",
+    "symbol": "$",
+    "decimals": 2,
+    "position": "left"
+  },
+  "rate": "0.92140000",
+  "source": "cookie",
+  "is_base_display": false
+}
+```
+
+</Tab>
+<Tab value="POST /context">
+
+Sets the visitor's currency preference. Saves to cookie and user meta (if logged in). Fires `fchub_mc/context_switched`.
+
+**Request body:**
+
+```json
+{
+  "currency": "EUR"
+}
+```
+
+**Response:** Same as `GET /context` with the newly set currency.
+
+The currency code is validated against the display currencies whitelist. Invalid codes return 400.
+
+</Tab>
+<Tab value="GET /rates">
+
+Returns the latest exchange rates for all configured display currencies.
+
+**Response:**
+
+```json
+{
+  "base": "USD",
+  "rates": {
+    "EUR": "0.92140000",
+    "GBP": "0.79230000",
+    "PLN": "4.02150000"
+  }
+}
+```
+
+</Tab>
+</Tabs>
+
+### Admin Endpoints
+
+All require `manage_options` and nonce verification.
+
+<Tabs items={['GET /admin/settings', 'POST /admin/settings', 'POST /admin/rates/refresh', 'GET /admin/currencies/catalogue', 'GET /admin/diagnostics']}>
+<Tab value="GET /admin/settings">
+
+Returns all plugin settings with defaults merged.
+
+</Tab>
+<Tab value="POST /admin/settings">
+
+Saves and sanitises settings. Reschedules the cron job if the refresh interval changed.
+
+**Request body:** Full or partial settings object. Missing keys retain their current values.
+
+</Tab>
+<Tab value="POST /admin/rates/refresh">
+
+Triggers an immediate rate refresh from the configured provider. Returns success/failure with the number of rates refreshed.
+
+Returns HTTP 500 if the refresh fails (provider error, lock contention, empty rates).
+
+</Tab>
+<Tab value="GET /admin/currencies/catalogue">
+
+Returns FluentCart's full currency catalogue with flag emojis.
+
+```json
+[
+  {
+    "code": "EUR",
+    "name": "Euro",
+    "symbol": "€",
+    "decimals": 2,
+    "flag": "🇪🇺"
+  }
+]
+```
+
+</Tab>
+<Tab value="GET /admin/diagnostics">
+
+Returns plugin health information: versions, bcmath status, FluentCart/CRM status, rate counts, stale currencies, feature flags.
+
+</Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## WordPress Hooks
+
+### Actions (fired by the plugin)
+
+| Hook | Arguments | Description |
+|---|---|---|
+| `fchub_mc/context_switched` | `string $currencyCode, int $userId` | Fired when a user selects a new currency. `$userId` is `0` for guests. |
+| `fchub_mc/rates_refreshed` | `string $baseCurrency, int $count` | Fired after a successful rate refresh. |
+| `fchub_mc/community_currency_updated` | `string $currencyCode, int $userId` | Fired after FluentCommunity user meta is written. |
+
+### Filters (fired by the plugin)
+
+| Hook | Arguments | Description |
+|---|---|---|
+| `fchub_mc/modules` | `array $modules` | Modify the list of modules before registration. Add or remove module classes. |
+| `fchub_mc/context` | `CurrencyContext $context` | Override the resolved currency context. Runs after the resolver chain. |
+
+### Hooks consumed (FluentCart)
+
+| Hook | Type | Description |
+|---|---|---|
+| `fluent_cart/integration/addons` | filter | Registers the plugin as a FluentCart addon |
+| `fluent_cart/checkout/after_patch_checkout_data_fragments` | filter | Injects disclosure text into checkout fragments |
+| `fluent_cart/order_paid_done` | action | Triggers order snapshot and FluentCRM sync |
+| `fluent_cart/store_settings/values` | filter | Adds multi-currency fields to store settings API |
+| `fluent_cart/loading_app` | action | Enqueues admin JS bundle |
+
+<Separator className="my-8" />
+
+## PHP API
+
+### `fchub_mc_format_price(float $basePrice): string`
+
+Converts a base-currency price to the visitor's display currency and returns formatted HTML.
+
+```php
+echo fchub_mc_format_price(99.99);
+// Output: "€92.14" (when display currency is EUR with rate 0.9214)
+```
+
+Falls back to FluentCart's native formatter when the plugin is disabled or the visitor is in the base currency. Uses `bcmul` for precision when bcmath is available.
+
+### JavaScript Globals
+
+```javascript
+// Switch currency programmatically (REST call + page reload)
+window.fchubMcSwitchCurrency('EUR');
+
+// Re-initialise all switcher widgets after dynamic content load
+window.fchubMcInitSwitchers();
+
+// Re-project prices on a specific DOM subtree
+window.fchubMcProjectPrices(document.getElementById('my-container'));
+```
+
+### JavaScript Events
+
+| Event | Target | Description |
+|---|---|---|
+| `fchub_mc:context_changed` | `document` | Fired before page reload after currency switch |
+| `fchub_mc:prices_projected` | `document` | Fired after each projection pass |
+
+<Separator className="my-8" />
+
+## JavaScript Configuration Object
+
+The `fchubMcConfig` object is injected via `wp_localize_script` and available globally:
+
+| Key | Type | Description |
+|---|---|---|
+| `rate` | string | Current exchange rate |
+| `displayCurrency` | string | Display currency code |
+| `baseCurrency` | string | Base currency code |
+| `decimals` | int | Display currency decimal places |
+| `symbol` | string | Display currency symbol |
+| `position` | string | Symbol position (`left`, `right`, `left_space`, `right_space`) |
+| `isBaseDisplay` | bool | Whether display equals base |
+| `roundingMode` | string | Rounding mode slug |
+| `roundingPrecision` | int | Rounding precision |
+| `restUrl` | string | REST API base URL |
+| `nonce` | string | WP REST nonce |
+| `currencies` | array | All display currencies with flags |
+| `baseCurrencySign` | string | Base currency symbol |
+| `baseCurrencyPosition` | string | Base currency symbol position |
+| `baseCurrencyCode` | string | Base currency ISO code |
+| `baseDecimalSep` | string | Base currency decimal separator |
+| `baseThousandSep` | string | Base currency thousand separator |
+| `baseDecimals` | int | Base currency decimal places |
+| `disclosureEnabled` | bool | Whether checkout disclosure is active |
+| `disclosureText` | string\|null | Rendered disclosure text with tokens replaced |
+
+<Separator className="my-8" />
+
+## Feature Flags
+
+Internal flags stored under the `fchub_mc_feature_flags` option. Not exposed in the settings UI — visible in the Diagnostics tab.
+
+| Flag | Default | Controls |
+|---|---|---|
+| `js_projection` | `true` | Whether `currency-projection.js` is enqueued. Disable to turn off client-side price rewriting. |
+| `geo_resolver` | `false` | Whether the geolocation resolver is included in the chain. Not yet production-ready. |
+
+<Separator className="my-8" />
+
+## Order Metadata
+
+Written by `SaveOrderSnapshotAction` on `fluent_cart/order_paid_done`. Only written when the display currency differs from base.
+
+| Meta Key | Type | Description |
+|---|---|---|
+| `_fchub_mc_display_currency` | string | ISO 4217 display currency code at time of order |
+| `_fchub_mc_base_currency` | string | ISO 4217 base currency code |
+| `_fchub_mc_rate` | string | Exchange rate (8 decimal places) |
+| `_fchub_mc_disclosure_version` | string | Plugin version string |
+
+<Separator className="my-8" />
+
+## Database Schema
+
+### fchub\_mc\_rate\_history
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `BIGINT UNSIGNED AUTO_INCREMENT` | Primary key |
+| `base_currency` | `CHAR(3)` | ISO 4217 |
+| `quote_currency` | `CHAR(3)` | ISO 4217 |
+| `rate` | `DECIMAL(18,8)` | Exchange rate |
+| `provider` | `VARCHAR(64)` | Provider slug, default `manual` |
+| `fetched_at` | `DATETIME` | WordPress site timezone |
+
+**Indexes:** `base_quote_fetched (base_currency, quote_currency, fetched_at)`, `fetched_at`
+
+Pruned automatically: rows older than 90 days are deleted by the cron job.
+
+### fchub\_mc\_event\_log
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `BIGINT UNSIGNED AUTO_INCREMENT` | Primary key |
+| `event` | `VARCHAR(128)` | Event name |
+| `user_id` | `BIGINT UNSIGNED NULL` | WordPress user ID |
+| `ip_hash` | `VARCHAR(64) NULL` | Hashed IP address |
+| `payload` | `LONGTEXT NULL` | JSON payload |
+| `created_at` | `DATETIME` | Timestamp |
+
+**Indexes:** `event_created (event, created_at)`, `user_id`
+
+Used by the GDPR personal data exporter/eraser.
+
+<Separator className="my-8" />
+
+## GDPR / Privacy
+
+The plugin registers with WordPress's privacy tools:
+
+### Personal Data Exporter
+
+Exports for a given email address:
+- User meta `_fchub_mc_currency` (preferred currency preference)
+- All `fchub_mc_event_log` rows for the user (event name, timestamp; paginated at 50 per page)
+
+### Personal Data Eraser
+
+Deletes for a given email address:
+- `_fchub_mc_currency` user meta
+- All `fchub_mc_event_log` rows for the user
+
+<Separator className="my-8" />
+
+## Constants Reference
+
+All constants are defined in `FChubMultiCurrency\Support\Constants`:
+
+| Constant | Value | Usage |
+|---|---|---|
+| `REST_NAMESPACE` | `fchub-mc/v1` | REST API namespace |
+| `OPTION_SETTINGS` | `fchub_mc_settings` | Main settings option key |
+| `OPTION_DB_VERSION` | `fchub_mc_db_version` | DB migration tracking |
+| `OPTION_FEATURE_FLAGS` | `fchub_mc_feature_flags` | Feature flag storage |
+| `HOOK_PREFIX` | `fchub_mc/` | Internal action/filter prefix |
+| `COOKIE_KEY` | `fchub_mc_currency` | Browser cookie name |
+| `COOKIE_DAYS` | `90` | Default cookie lifetime |
+| `USER_META_KEY` | `_fchub_mc_currency` | WP user meta key |
+| `TABLE_RATE_HISTORY` | `fchub_mc_rate_history` | Rate history table (without prefix) |
+| `TABLE_EVENT_LOG` | `fchub_mc_event_log` | Event log table (without prefix) |
+| `FC_ADDON_SLUG` | `fchub-multi-currency` | FluentCart addon registration slug |
+| `CRON_REFRESH_RATES` | `fchub_mc_refresh_rates` | WP cron event name |

@@ -1,0 +1,48 @@
+---
+title: FluentCommunity Integration
+description: How FCHub Multi-Currency syncs the visitor's preferred currency to their FluentCommunity profile.
+---
+
+import { Separator } from '@/components/ui/separator';
+
+When FluentCommunity is active, the plugin writes the visitor's preferred currency to their WordPress user meta. This makes the currency preference available within the community context for personalisation or reporting.
+
+<Callout type="info" title="Optional Integration">
+This integration only activates when FluentCommunity is installed and active (`FLUENT_COMMUNITY_PLUGIN_VERSION` constant defined). No errors or overhead when FluentCommunity is absent.
+</Callout>
+
+## What Gets Synced
+
+When a logged-in user switches their display currency, the plugin writes `_fcom_preferred_currency` to their WordPress user meta with the uppercase ISO currency code (e.g. `EUR`, `GBP`).
+
+This fires on the `fchub_mc/context_switched` action — the same event that triggers the FluentCRM sync.
+
+## Configuration
+
+A single toggle on the **CRM** tab:
+
+| Setting | Default | Description |
+|---|---|---|
+| FluentCommunity Sync | Yes | Write preferred currency to community user meta |
+
+## Custom Hook
+
+After writing the user meta, the plugin fires:
+
+```php
+do_action('fchub_mc/community_currency_updated', $currencyCode, $userId);
+```
+
+Hook into this if you want to extend the sync — for example, to update a custom community profile field or trigger a notification.
+
+<Separator className="my-8" />
+
+## Cleanup
+
+The uninstaller (when "Remove all data on uninstall" is enabled) deletes `_fcom_preferred_currency` from all user meta rows:
+
+```sql
+DELETE FROM wp_usermeta WHERE meta_key = '_fcom_preferred_currency'
+```
+
+This ensures no orphaned meta remains after the plugin is fully removed.

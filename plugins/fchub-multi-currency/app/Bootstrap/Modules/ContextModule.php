@@ -101,13 +101,30 @@ final class ContextModule implements ModuleContract
 
         // Priority 5: Default (uses default_display_currency setting, falls back to base)
         $defaultCurrency = $settings['default_display_currency'] ?? '';
-        $chain->add(ResolverSource::Fallback, function (string $baseCurrencyCode, array $enabledCurrencies) use ($defaultCurrency) {
-            $code = ($defaultCurrency !== '' && $defaultCurrency !== $baseCurrencyCode)
-                ? $defaultCurrency
-                : $baseCurrencyCode;
+        $chain->add(ResolverSource::Fallback, function (
+            string $baseCurrencyCode,
+            array $enabledCurrencies
+        ) use (
+            $defaultCurrency,
+            $rateService,
+            $rateRepo,
+            $staleFallback
+        ) {
+            $baseCode = strtoupper($baseCurrencyCode);
+            $defaultCode = strtoupper((string) $defaultCurrency);
+            $code = ($defaultCode !== '' && $defaultCode !== $baseCode)
+                ? $defaultCode
+                : $baseCode;
 
-            $currency = self::findCurrency($code, $enabledCurrencies);
-            return CurrencyContext::baseOnly($currency);
+            return self::buildContextFromCode(
+                $code,
+                $baseCode,
+                $enabledCurrencies,
+                $rateService,
+                $rateRepo,
+                $staleFallback,
+                ResolverSource::Fallback,
+            );
         });
 
         return $chain;
@@ -141,41 +158,57 @@ final class ContextModule implements ModuleContract
                 return null;
             }
 
-            if (strtoupper($code) === strtoupper($baseCurrencyCode)) {
-                $baseCurrency = self::findCurrency($code, $enabledCurrencies);
-                return CurrencyContext::baseOnly($baseCurrency);
-            }
-
-            $displayCurrency = self::findCurrency($code, $enabledCurrencies);
-            $baseCurrency = Currency::from([
-                'code'     => $baseCurrencyCode,
-                'name'     => $baseCurrencyCode,
-                'symbol'   => $baseCurrencyCode,
-                'decimals' => 2,
-                'position' => 'left',
-            ]);
-
-            $rate = $rateService->getRate($baseCurrencyCode, $code);
-
-            if ($rate === null) {
-                // If stale_fallback is 'last_known', try the most recent rate from DB even if stale
-                if ($staleFallback === 'last_known') {
-                    $rate = $rateRepo->findLatest($baseCurrencyCode, $code);
-                }
-
-                if ($rate === null) {
-                    return CurrencyContext::baseOnly($baseCurrency);
-                }
-            }
-
-            return new CurrencyContext(
-                displayCurrency: $displayCurrency,
-                baseCurrency: $baseCurrency,
-                rate: $rate,
-                source: $source,
-                isBaseDisplay: false,
+            return self::buildContextFromCode(
+                $code,
+                $baseCurrencyCode,
+                $enabledCurrencies,
+                $rateService,
+                $rateRepo,
+                $staleFallback,
+                $source,
             );
         };
+    }
+
+    /**
+     * @param array<int|string, mixed> $enabledCurrencies
+     */
+    private static function buildContextFromCode(
+        string $code,
+        string $baseCurrencyCode,
+        array $enabledCurrencies,
+        ExchangeRateService $rateService,
+        ExchangeRateRepository $rateRepo,
+        string $staleFallback,
+        ResolverSource $source,
+    ): CurrencyContext {
+        $resolvedCode = strtoupper($code);
+        $baseCode = strtoupper($baseCurrencyCode);
+        $baseCurrency = self::findCurrency($baseCode, $enabledCurrencies);
+
+        if ($resolvedCode === $baseCode) {
+            return CurrencyContext::baseOnly($baseCurrency);
+        }
+
+        $displayCurrency = self::findCurrency($resolvedCode, $enabledCurrencies);
+        $rate = $rateService->getRate($baseCode, $resolvedCode);
+
+        if ($rate === null && $staleFallback === 'last_known') {
+            // If stale_fallback is 'last_known', try the most recent DB rate even if stale.
+            $rate = $rateRepo->findLatest($baseCode, $resolvedCode);
+        }
+
+        if ($rate === null) {
+            return CurrencyContext::baseOnly($baseCurrency);
+        }
+
+        return new CurrencyContext(
+            displayCurrency: $displayCurrency,
+            baseCurrency: $baseCurrency,
+            rate: $rate,
+            source: $source,
+            isBaseDisplay: false,
+        );
     }
 
     /**

@@ -1,0 +1,173 @@
+---
+title: Currency Switcher
+description: How the frontend currency switcher widget works — shortcode usage, keyboard accessibility, flag emojis, rate badge, and customisation.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+The currency switcher is a custom dropdown widget — not a native `<select>` — with flag emojis, smooth animations, full keyboard accessibility, and a rate freshness badge. Drop it anywhere on your site with a shortcode.
+
+## Shortcode
+
+```
+[fchub_currency_switcher]
+```
+
+Place this in any page, post, widget area, or template. The shortcode accepts no attributes — all configuration comes from the plugin settings.
+
+The shortcode returns an empty string when the plugin is disabled or no display currencies are configured. No broken markup, no empty wrappers.
+
+<Separator className="my-8" />
+
+## How It Looks
+
+The widget renders as a compact button showing the current currency:
+
+```
+🇪🇺 EUR ▾
+```
+
+Clicking the trigger opens a dropdown panel with all configured currencies:
+
+```
+🇪🇺 EUR — Euro            ← active (highlighted)
+🇬🇧 GBP — British Pound
+🇵🇱 PLN — Polish Zloty
+🇺🇸 USD — US Dollar
+
+────────────────────────────
+● Rates updated 2 hours ago
+```
+
+Each option shows the flag emoji, currency code, and full name. The active currency has a blue highlight. The footer shows the rate freshness badge (green dot = fresh, red dot = stale).
+
+<Separator className="my-8" />
+
+## Keyboard Navigation
+
+The widget implements the ARIA combobox/listbox pattern with full keyboard support:
+
+| Key | Action |
+|---|---|
+| **Enter / Space** | Open dropdown (from trigger) or select option (from list) |
+| **Arrow Down** | Open dropdown (from trigger) or move to next option |
+| **Arrow Up** | Move to previous option |
+| **Home** | Jump to first option |
+| **End** | Jump to last option |
+| **Escape** | Close dropdown, return focus to trigger |
+| **Tab** | Close dropdown, move focus naturally |
+
+Arrow keys wrap — pressing Down on the last option jumps to the first, and vice versa.
+
+<Separator className="my-8" />
+
+## Accessibility
+
+The widget is built with proper ARIA roles and states:
+
+- Trigger has `role="combobox"`, `aria-expanded`, `aria-haspopup="listbox"`, `aria-controls`
+- Dropdown list has `role="listbox"` with `aria-label="Select currency"`
+- Each option has `role="option"` with `aria-selected` on the active one
+- Focus is managed: opening the dropdown focuses the active option, closing it returns focus to the trigger
+- `aria-activedescendant` tracks the currently focused option for screen readers
+
+<Separator className="my-8" />
+
+## Selection Flow
+
+When a visitor selects a different currency:
+
+<Steps>
+  <Step>
+    **Visual Feedback**
+
+    The trigger enters a loading state — opacity drops and pointer events are disabled. The selected option gets highlighted immediately.
+  </Step>
+  <Step>
+    **REST API Call**
+
+    The widget sends `POST /fchub-mc/v1/context` with the new currency code. The server saves the preference to a cookie (with the configured lifetime) and to user meta for logged-in users.
+  </Step>
+  <Step>
+    **Page Reload**
+
+    After the API call succeeds, the page reloads. The new currency preference is picked up by the resolver chain on the fresh page load, and all prices are projected in the selected currency.
+  </Step>
+</Steps>
+
+The widget also fires a `CustomEvent('fchub_mc:context_changed')` on the document before reloading, in case other scripts need to react.
+
+<Separator className="my-8" />
+
+## Rate Freshness Badge
+
+When enabled in settings (`show_rate_freshness_badge: yes`), the dropdown footer shows:
+
+- **Green dot** + "Rates updated 2 hours ago" — rates are within the stale threshold
+- **Red dot** + "Rates updated 3 days ago" — rates have exceeded the stale threshold
+
+The timestamp uses WordPress's `human_time_diff()` relative to the site's configured timezone.
+
+<Separator className="my-8" />
+
+## No-JavaScript Fallback
+
+The widget renders a `<noscript>` block containing a native `<select>` element. Visitors with JavaScript disabled see a plain dropdown with the same currency options. The fallback form submits to the current page with the selected currency as a query parameter.
+
+<Separator className="my-8" />
+
+## Multiple Instances
+
+You can place `[fchub_currency_switcher]` multiple times on the same page — each instance works independently. The widget uses a `data-fchub-mc-enhanced` attribute to prevent double-initialisation, and ARIA IDs are generated uniquely per instance.
+
+<Separator className="my-8" />
+
+## Programmatic API
+
+Two globals are exposed for theme/plugin developers:
+
+```javascript
+// Switch to a specific currency (triggers API call + reload)
+window.fchubMcSwitchCurrency('EUR');
+
+// Re-initialise all switcher widgets (e.g. after AJAX content load)
+window.fchubMcInitSwitchers();
+```
+
+<Separator className="my-8" />
+
+## Styling
+
+The widget uses CSS custom properties for theming. Override these on `.fchub-mc-switcher` to match your theme:
+
+```css
+.fchub-mc-switcher {
+  --fchub-mc-radius: 6px;
+  --fchub-mc-border-color: #d0d5dd;
+  --fchub-mc-bg: #fff;
+  --fchub-mc-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --fchub-mc-transition: 150ms ease;
+  --fchub-mc-badge-ok: #12b76a;
+  --fchub-mc-badge-stale: #f04438;
+}
+```
+
+The dropdown panel uses `position: absolute` with `z-index: 9999` and opens with a `translateY + opacity` CSS transition.
+
+<Separator className="my-8" />
+
+## FOUC Prevention
+
+The plugin adds an `fchub-mc-projecting` class to `<html>` immediately when the projection script loads. This class hides FluentCart price elements during the initial projection pass to prevent a flash of unconverted prices. The class is removed after the first projection completes, or after a 2-second safety timeout if something goes wrong.
+
+```css
+/* This is built into the plugin — no action needed */
+.fchub-mc-projecting .fct-item-price,
+.fchub-mc-projecting .fct-compare-price {
+  visibility: hidden;
+}
+```

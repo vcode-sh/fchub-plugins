@@ -1,0 +1,202 @@
+---
+title: Troubleshooting
+description: Common issues with FCHub Multi-Currency and how to resolve them. Covers price projection problems, exchange rate failures, switcher issues, checkout disclosure, and FluentCRM sync.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+## Prices Not Converting
+
+<Accordions>
+  <Accordion title="Plugin is disabled">
+    Check that the master switch is on: **FluentCart > Settings > Multi-Currency > General > Enabled**. When disabled, no frontend output happens at all — no projection, no switcher, no disclosure.
+  </Accordion>
+  <Accordion title="No display currencies configured">
+    The plugin needs at least one display currency to do anything useful. Go to the **Currencies** tab and add currencies. Your base currency should be in the list too if you want visitors to switch back to it.
+  </Accordion>
+  <Accordion title="No exchange rates available">
+    If rates haven't been fetched yet, the plugin has nothing to convert with. Check the **Exchange Rates** tab — if the rates table is empty, click **Refresh Now** or wait for the cron job. If the refresh fails, check your API key and provider settings.
+  </Accordion>
+  <Accordion title="JavaScript errors blocking projection">
+    The price projection engine is JavaScript. If another plugin or theme throws a JS error before the projection script runs, it may never execute.
+
+    **Debug steps:**
+    1. Open browser developer tools (F12)
+    2. Check the Console tab for JavaScript errors
+    3. Look for errors before `fchub-mc-projection` loads
+    4. Try disabling other plugins temporarily to isolate conflicts
+  </Accordion>
+  <Accordion title="js_projection feature flag is off">
+    The `js_projection` feature flag controls whether the projection script is enqueued. Check **Diagnostics** tab — if `js_projection` shows `false`, the script is disabled. This flag is stored in `fchub_mc_feature_flags` option and can be toggled via `wp_options`.
+  </Accordion>
+  <Accordion title="Prices showing in base currency despite switching">
+    If you've switched to EUR but prices still show in USD, the context resolution may be failing. Check:
+
+    1. **Cookie blocked** — some caching plugins strip cookies. Verify the `fchub_mc_currency` cookie exists in your browser
+    2. **Full page cache** — if your host serves cached HTML, the projection script config may have the wrong currency. Exclude the `fchub_mc_currency` cookie from cache key or use a cache-busting URL parameter
+    3. **REST API blocked** — the `POST /fchub-mc/v1/context` call may be failing. Check the Network tab in dev tools for 403 or 404 responses
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Exchange Rate Issues
+
+<Accordions>
+  <Accordion title="Rates not refreshing automatically">
+    The rate refresh depends on WordPress cron. If your site has low traffic, WP-Cron may not fire on time.
+
+    **Fix:** Set up a system cron:
+    ```bash
+    */10 * * * * curl -s https://yoursite.com/wp-cron.php > /dev/null 2>&1
+    ```
+
+    Also check that the cron event is scheduled: look for `fchub_mc_refresh_rates` in a cron inspector plugin like WP Crontrol.
+  </Accordion>
+  <Accordion title="Manual refresh returns an error">
+    The **Refresh Now** button calls `POST /fchub-mc/v1/admin/rates/refresh`. If it returns 500:
+
+    1. **API key invalid** — check your rate provider API key in settings
+    2. **Provider down** — the external API may be temporarily unavailable
+    3. **Lock contention** — another refresh is already running (120-second lock). Wait and try again
+    4. **Empty rates** — the provider returned no rates. Check your base currency is supported by the provider
+  </Accordion>
+  <Accordion title="Stale rate warning in admin">
+    A yellow admin notice appears when any rate exceeds the stale threshold. This means the cron job hasn't successfully refreshed rates recently.
+
+    **Common causes:**
+    - WP-Cron not running (see above)
+    - API key expired or rate-limited
+    - Provider returning errors
+    - The cron event was unscheduled (try deactivating and reactivating the plugin)
+  </Accordion>
+  <Accordion title="ECB cross-rates seem wrong">
+    The ECB provider publishes EUR-based rates only. If your base currency is USD, the plugin cross-rates by dividing. This requires the `bcmath` PHP extension for precision.
+
+    Without bcmath, the plugin uses native PHP float division, which can introduce tiny rounding errors (e.g. `0.92139999` instead of `0.92140000`). These are usually insignificant for display purposes, but if precision matters, install bcmath.
+
+    Also note: ECB rates update once daily around 16:00 CET. A 1-hour refresh interval won't get you fresher data.
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Currency Switcher Issues
+
+<Accordions>
+  <Accordion title="Switcher not appearing">
+    1. **Shortcode placed?** — make sure `[fchub_currency_switcher]` is in a page, post, or widget area that's rendered on the current page
+    2. **Plugin disabled?** — the shortcode returns empty when the plugin is off
+    3. **No display currencies?** — the shortcode returns empty when no currencies are configured
+    4. **Theme conflict** — check if another element is overlapping the switcher (z-index issue). The dropdown uses `z-index: 9999`
+  </Accordion>
+  <Accordion title="Switcher dropdown doesn't open">
+    The dropdown is controlled by JavaScript. If the script fails to initialise:
+
+    1. Check browser console for JS errors
+    2. Look for the `data-fchub-mc-enhanced` attribute on the switcher element — if it's missing, the init script didn't run
+    3. Try calling `window.fchubMcInitSwitchers()` from the console to manually trigger initialisation
+  </Accordion>
+  <Accordion title="Currency switch doesn't stick">
+    After selecting a currency, the page reloads but the old currency appears.
+
+    1. **Cookie blocked** — check that the `fchub_mc_currency` cookie is being set. Some privacy plugins or browser settings may block it
+    2. **REST API error** — the `POST /context` call may be failing. Check the Network tab
+    3. **Cache serving stale HTML** — full page cache may serve the old page. Clear cache or exclude the cookie
+    4. **Nonce expired** — if the page was open for a long time, the WP REST nonce may have expired. Reload the page and try again
+  </Accordion>
+  <Accordion title="Rate badge shows wrong time">
+    The badge uses WordPress's `human_time_diff()` with the site's configured timezone. If the time seems off:
+
+    1. Check your WordPress timezone: **Settings > General > Timezone**
+    2. The `fetched_at` column stores timestamps in WordPress site timezone. If your site timezone changed after rates were fetched, the diff may look wrong
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Checkout Disclosure Issues
+
+<Accordions>
+  <Accordion title="Disclosure notice not appearing">
+    The disclosure only appears when the display currency differs from the base currency. If you're viewing prices in the base currency, there's nothing to disclose.
+
+    Also check:
+    1. **Setting enabled** — `checkout_disclosure_enabled` must be `yes`
+    2. **JavaScript running** — the disclosure is injected via the projection script. JS errors may prevent it
+    3. **FluentCart checkout element present** — the script looks for `.fct_summary_box` to inject after
+  </Accordion>
+  <Accordion title="Custom disclosure text not showing">
+    If you've set custom text in settings but still see the generic fallback:
+
+    1. Verify the text is saved — check the **Checkout** tab
+    2. The custom text is passed to JavaScript via `fchubMcConfig.disclosureText`. Check if this value is populated in the page source
+    3. The fallback triggers when `disclosureText` is empty or null
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## FluentCRM Sync Issues
+
+<Accordions>
+  <Accordion title="Tags not being created">
+    1. **FluentCRM active?** — the sync only fires when `defined('FLUENTCRM')` is true
+    2. **Sync enabled?** — check `fluentcrm_enabled` and `fluentcrm_auto_create_tags` in settings
+    3. **Guest user** — tag sync only fires for logged-in users. Guests have no FluentCRM contact
+    4. **Contact exists?** — the plugin looks up the contact by WordPress user ID. If no FluentCRM contact exists for the user, sync is skipped
+  </Accordion>
+  <Accordion title="Custom fields not updating">
+    The custom field keys must exist as FluentCRM custom fields. If the field key doesn't match a configured custom field in FluentCRM, the `syncCustomFieldValues()` call silently does nothing.
+
+    **Fix:** Go to **FluentCRM > Contacts > Custom Fields** and create text fields with the exact key names from your settings (default: `preferred_currency`, `last_order_display_currency`, `last_order_fx_rate`).
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Performance Issues
+
+<Accordions>
+  <Accordion title="Pages loading slowly">
+    The plugin's frontend impact is minimal — two small JS files and one CSS file. If you notice slowness:
+
+    1. **Rate cache miss** — without persistent object cache (Redis/Memcached), every page load queries the database for rates. Install a persistent cache for sub-millisecond lookups
+    2. **MutationObserver thrashing** — if your page has extremely frequent DOM mutations, the 50ms debounce may still cause excessive projection runs. This is very rare in practice
+  </Accordion>
+  <Accordion title="Rate history table growing large">
+    The cron job prunes rows older than 90 days. If the table is still large, you have many currency pairs being tracked.
+
+    For example: 10 display currencies × 1 base = 10 pairs. At 4 refreshes per day over 90 days = 3,600 rows. At 30 currencies, that's 10,800 rows — still very manageable.
+
+    If you're concerned, you can manually prune:
+    ```sql
+    DELETE FROM wp_fchub_mc_rate_history WHERE fetched_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
+    ```
+  </Accordion>
+</Accordions>
+
+<Separator className="my-8" />
+
+## Debug Tips
+
+<Callout type="info" title="Diagnostics Tab">
+Your first stop for any issue: **FluentCart > Settings > Multi-Currency > Diagnostics**. It shows plugin version, PHP version, bcmath availability, FluentCart/FluentCRM status, rate count, stale currencies, and feature flags.
+</Callout>
+
+**General debugging steps:**
+
+1. **Check Diagnostics tab** — most status information is there
+2. **Check browser console** — JS errors, failed REST calls, cookie issues
+3. **Check browser Network tab** — look for failing `/fchub-mc/v1/` requests
+4. **Verify cron is running** — install WP Crontrol and check for `fchub_mc_refresh_rates`
+5. **Enable WP_DEBUG_LOG** — the plugin logs errors to WordPress's debug log via its internal logger
+6. **Check `wp_options`** — look at `fchub_mc_settings`, `fchub_mc_feature_flags`, and `fchub_mc_db_version`
+
+If you need to [report an issue](https://github.com/vcode-sh/fchub-plugins/issues), include:
+- Diagnostics tab output
+- Browser console errors
+- WordPress and PHP versions
+- Whether you're using a persistent object cache
