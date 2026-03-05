@@ -1,5 +1,6 @@
 import { blogSource } from "@/lib/source";
 import { BlogListing } from "./blog-listing";
+import type { BlogPost } from "./blog-listing.types";
 
 function estimateReadingTime(text: string): number {
   const words = text.trim().split(/\s+/).length;
@@ -13,7 +14,7 @@ export default async function BlogPage() {
     return dateB.getTime() - dateA.getTime();
   });
 
-  const posts = await Promise.all(
+  const posts: BlogPost[] = await Promise.all(
     pages.map(async (post) => {
       const text = await post.data.getText("raw");
       return {
@@ -21,15 +22,16 @@ export default async function BlogPage() {
         description: post.data.description ?? "",
         url: post.url,
         slug: post.slugs[0] ?? "",
-        author: post.data.author,
         date:
           typeof post.data.date === "string"
             ? post.data.date
             : post.data.date.toISOString().split("T")[0],
         category: post.data.category,
-        tags: post.data.tags,
         image: post.data.image,
         video: post.data.video,
+        featured: post.data.featured,
+        pinned: post.data.pinned,
+        pinOrder: post.data.pinOrder,
         readingTime: estimateReadingTime(text),
       };
     }),

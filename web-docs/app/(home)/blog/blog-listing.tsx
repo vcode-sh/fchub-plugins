@@ -1,285 +1,97 @@
 "use client";
 
-import { format, parseISO } from "date-fns";
-import { ArrowRight, Calendar, Clock, Tag, User } from "lucide-react";
 import { motion } from "motion/react";
-import Image from "next/image";
-import Link from "next/link";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState } from "react";
+import { BlogCategoryFilter } from "./blog-category-filter";
+import { BlogEmptyState } from "./blog-empty-state";
+import { BlogHeroPost } from "./blog-hero-post";
+import { type BlogFilterCategory, fadeIn } from "./blog-listing.config";
+import type { BlogPost } from "./blog-listing.types";
+import { filterPostsByCategory, sortPinnedPosts } from "./blog-listing.utils";
+import { BlogPinnedSection } from "./blog-pinned-section";
+import { BlogSectionDivider } from "./blog-section-divider";
+import { BlogTimeline } from "./blog-timeline";
 
-type BlogPost = {
-  title: string;
-  description: string;
-  url: string;
-  slug: string;
-  author: string;
-  date: string;
-  category: string;
-  tags: string[];
-  image?: string;
-  video?: string;
-  readingTime: number;
+type BlogListingProps = {
+  posts: BlogPost[];
 };
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
+export function BlogListing({ posts }: BlogListingProps) {
+  const [activeCategory, setActiveCategory] =
+    useState<BlogFilterCategory>("all");
+  const [pinnedOpen, setPinnedOpen] = useState(true);
 
-const itemVariants = {
-  hidden: {
-    opacity: 0,
-    transform: "translateY(20px)",
-  },
-  visible: {
-    opacity: 1,
-    transform: "translateY(0px)",
-    transition: {
-      duration: 0.3,
-      ease: [0.25, 0.1, 0.25, 1] as const,
-    },
-  },
-};
-
-const heroVariants = {
-  hidden: { opacity: 0, transform: "translateY(-10px)" },
-  visible: {
-    opacity: 1,
-    transform: "translateY(0px)",
-    transition: {
-      duration: 0.25,
-      ease: [0.25, 0.1, 0.25, 1] as const,
-    },
-  },
-};
-
-const categories = [
-  { value: "all", label: "All Posts" },
-  { value: "fluentcart", label: "FluentCart" },
-  { value: "fluentcommunity", label: "FluentCommunity" },
-  { value: "general", label: "General" },
-] as const;
-
-const categoryLabels: Record<string, string> = {
-  fluentcart: "FluentCart",
-  fluentcommunity: "FluentCommunity",
-  general: "General",
-};
-
-const categoryColors: Record<string, string> = {
-  fluentcart:
-    "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-transparent",
-  fluentcommunity:
-    "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-transparent",
-  general:
-    "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-transparent",
-};
-
-function PostCard({ post }: { post: BlogPost }) {
-  const hasMedia = post.image || post.video;
-
-  if (hasMedia) {
-    return (
-      <Link href={post.url} className="group block">
-        <article className="rounded-xl border border-foreground/10 bg-card overflow-hidden transition-all hover:border-primary/30 hover:shadow-sm">
-          <div className="flex flex-col sm:flex-row">
-            <div className="relative sm:w-72 shrink-0 aspect-[16/9] sm:aspect-auto sm:h-auto overflow-hidden bg-muted">
-              {post.video ? (
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="absolute inset-0 h-full w-full object-cover"
-                  src={post.video}
-                />
-              ) : post.image ? (
-                <Image
-                  src={post.image}
-                  alt={post.title}
-                  fill
-                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                  sizes="(max-width: 640px) 100vw, 288px"
-                />
-              ) : null}
-            </div>
-            <div className="flex flex-col justify-between p-5 sm:p-6 min-w-0">
-              <div>
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <Badge className={categoryColors[post.category]}>
-                    {categoryLabels[post.category] ?? post.category}
-                  </Badge>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Calendar size={12} />
-                    {format(parseISO(post.date), "d MMM yyyy")}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Clock size={12} />
-                    {post.readingTime} min read
-                  </span>
-                </div>
-
-                <h2 className="text-xl font-semibold tracking-tight mb-2 group-hover:text-primary transition-colors">
-                  {post.title}
-                </h2>
-
-                <p className="text-muted-foreground leading-relaxed mb-4 line-clamp-2">
-                  {post.description}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between">
-                {post.tags.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <Tag size={12} className="text-muted-foreground" />
-                    {post.tags.slice(0, 3).map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        className="text-[10px] h-4"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                <span className="ml-auto flex items-center gap-1 text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                  Read
-                  <ArrowRight size={14} />
-                </span>
-              </div>
-            </div>
-          </div>
-        </article>
-      </Link>
-    );
-  }
-
-  return (
-    <Link href={post.url} className="group block">
-      <article className="rounded-xl border border-foreground/10 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-sm">
-        <div className="flex items-center gap-3 mb-3">
-          <Badge className={categoryColors[post.category]}>
-            {categoryLabels[post.category] ?? post.category}
-          </Badge>
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Calendar size={12} />
-            {format(parseISO(post.date), "d MMM yyyy")}
-          </span>
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock size={12} />
-            {post.readingTime} min read
-          </span>
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <User size={12} />
-            {post.author}
-          </span>
-        </div>
-
-        <h2 className="text-xl font-semibold tracking-tight mb-2 group-hover:text-primary transition-colors">
-          {post.title}
-        </h2>
-
-        <p className="text-muted-foreground leading-relaxed mb-4">
-          {post.description}
-        </p>
-
-        <div className="flex items-center justify-between">
-          {post.tags.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Tag size={12} className="text-muted-foreground" />
-              {post.tags.map((tag) => (
-                <Badge key={tag} variant="outline" className="text-[10px] h-4">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-          <span className="ml-auto flex items-center gap-1 text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-            Read
-            <ArrowRight size={14} />
-          </span>
-        </div>
-      </article>
-    </Link>
-  );
-}
-
-export function BlogListing({ posts }: { posts: BlogPost[] }) {
-  const [activeCategory, setActiveCategory] = useState("all");
-
-  const filtered = posts.filter(
-    (post) => activeCategory === "all" || post.category === activeCategory,
+  const featuredPost = useMemo(
+    () => posts.find((post) => post.featured) ?? null,
+    [posts],
   );
 
+  const pinnedPosts = useMemo(
+    () => sortPinnedPosts(posts.filter((post) => post.pinned)),
+    [posts],
+  );
+
+  const timelinePosts = useMemo(
+    () => posts.filter((post) => !post.featured),
+    [posts],
+  );
+
+  const filteredTimeline = useMemo(
+    () => filterPostsByCategory(timelinePosts, activeCategory),
+    [timelinePosts, activeCategory],
+  );
+
+  const nothingVisible =
+    !featuredPost && pinnedPosts.length === 0 && filteredTimeline.length === 0;
+
   return (
-    <div className="flex flex-col items-center px-4 pt-12 pb-20">
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={heroVariants}
-        className="max-w-4xl w-full text-center mb-16"
-      >
-        <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
-          Blog
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Release notes, tutorials, and the occasional hot take on the WordPress
-          ecosystem.
-        </p>
-      </motion.div>
+    <div className="pb-20">
+      {featuredPost && <BlogHeroPost post={featuredPost} />}
 
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={itemVariants}
-        className="max-w-4xl w-full"
-      >
-        <div className="flex items-center gap-2 mb-8">
-          {categories.map((cat) => (
-            <button
-              key={cat.value}
-              type="button"
-              onClick={() => setActiveCategory(cat.value)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeCategory === cat.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
+      <div className="max-w-5xl mx-auto px-4 pt-10">
         <motion.div
-          key={activeCategory}
           initial="hidden"
           animate="visible"
-          variants={containerVariants}
-          className="space-y-4"
+          variants={fadeIn}
+          className={featuredPost ? "" : "text-center mb-12 pt-12"}
         >
-          {filtered.map((post) => (
-            <motion.div key={post.slug} variants={itemVariants}>
-              <PostCard post={post} />
-            </motion.div>
-          ))}
-          {filtered.length === 0 && (
-            <div className="text-center py-16 text-muted-foreground">
-              <p className="text-lg">Nothing here yet.</p>
-              <p className="text-sm mt-1">
-                Check back soon — or don't. We're not your mum.
+          {!featuredPost && (
+            <>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
+                Blog
+              </h1>
+              <p className="text-muted-foreground text-lg mb-8">
+                Release notes, tutorials, and the occasional hot take on the
+                WordPress ecosystem.
               </p>
-            </div>
+            </>
           )}
+
+          <BlogCategoryFilter
+            activeCategory={activeCategory}
+            onChange={setActiveCategory}
+          />
         </motion.div>
-      </motion.div>
+
+        <BlogPinnedSection
+          posts={pinnedPosts}
+          open={pinnedOpen}
+          onToggle={() => setPinnedOpen((value) => !value)}
+        />
+
+        {filteredTimeline.length > 0 && (
+          <div>
+            <BlogSectionDivider>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                All Posts
+              </span>
+            </BlogSectionDivider>
+            <BlogTimeline posts={filteredTimeline} />
+          </div>
+        )}
+
+        {nothingVisible && <BlogEmptyState />}
+      </div>
     </div>
   );
 }
