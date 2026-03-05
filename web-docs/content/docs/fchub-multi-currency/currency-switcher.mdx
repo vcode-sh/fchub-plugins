@@ -1,173 +1,96 @@
 ---
 title: Currency Switcher
-description: How the frontend currency switcher widget works — shortcode usage, keyboard accessibility, flag emojis, rate badge, and customisation.
+description: A polished dropdown with flag emojis, keyboard navigation, and a rate freshness badge. Drop it anywhere with one shortcode.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
-import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
-import { Cards, Card } from 'fumadocs-ui/components/card';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-The currency switcher is a custom dropdown widget — not a native `<select>` — with flag emojis, smooth animations, full keyboard accessibility, and a rate freshness badge. Drop it anywhere on your site with a shortcode.
+The currency switcher is how your visitors pick their currency. Not a sad native browser dropdown — a proper custom widget with country flags, smooth animations, and a little green dot that says "yes, these rates are fresh." One shortcode, works anywhere.
 
-## Shortcode
+## Add It to Your Site
 
-```
+```text
 [fchub_currency_switcher]
 ```
 
-Place this in any page, post, widget area, or template. The shortcode accepts no attributes — all configuration comes from the plugin settings.
+Paste this shortcode into any page, post, widget area, or template file. That's the entire setup. No attributes, no parameters, no configuration needed — the widget pulls everything from your [plugin settings](/docs/fchub-multi-currency/configuration).
 
-The shortcode returns an empty string when the plugin is disabled or no display currencies are configured. No broken markup, no empty wrappers.
+If the plugin is disabled or you haven't added any currencies yet, the shortcode outputs nothing. No broken markup, no empty boxes.
+
+You can also place it multiple times on the same page — header and footer, for example. Each instance works independently.
 
 <Separator className="my-8" />
 
 ## How It Looks
 
-The widget renders as a compact button showing the current currency:
+When closed, the switcher sits as a compact button showing the visitor's current currency with its flag:
 
-```
-🇪🇺 EUR ▾
-```
+![Shop page with the currency switcher button in the top right corner](/multi-currency/fluentcart-multi-currency-switcher-closed.webp)
 
-Clicking the trigger opens a dropdown panel with all configured currencies:
+Click it, and a dropdown opens with every currency you've configured — each with its flag, code, and full name:
 
-```
-🇪🇺 EUR — Euro            ← active (highlighted)
-🇬🇧 GBP — British Pound
-🇵🇱 PLN — Polish Zloty
-🇺🇸 USD — US Dollar
+![Shop page with the currency switcher dropdown open, showing PLN, EUR, USD, and GBP options](/multi-currency/fluentcart-multi-currency-switcher-shop.webp)
 
-────────────────────────────
-● Rates updated 2 hours ago
-```
+The active currency is highlighted in blue. At the bottom, a rate freshness badge tells visitors when rates were last updated — green dot means fresh, red dot means stale:
 
-Each option shows the flag emoji, currency code, and full name. The active currency has a blue highlight. The footer shows the rate freshness badge (green dot = fresh, red dot = stale).
+![Currency switcher dropdown close-up with flag emojis, currency names, and rate freshness badge](/multi-currency/fluentcart-multi-currency-switcher.webp)
 
 <Separator className="my-8" />
 
-## Keyboard Navigation
-
-The widget implements the ARIA combobox/listbox pattern with full keyboard support:
-
-| Key | Action |
-|---|---|
-| **Enter / Space** | Open dropdown (from trigger) or select option (from list) |
-| **Arrow Down** | Open dropdown (from trigger) or move to next option |
-| **Arrow Up** | Move to previous option |
-| **Home** | Jump to first option |
-| **End** | Jump to last option |
-| **Escape** | Close dropdown, return focus to trigger |
-| **Tab** | Close dropdown, move focus naturally |
-
-Arrow keys wrap — pressing Down on the last option jumps to the first, and vice versa.
-
-<Separator className="my-8" />
-
-## Accessibility
-
-The widget is built with proper ARIA roles and states:
-
-- Trigger has `role="combobox"`, `aria-expanded`, `aria-haspopup="listbox"`, `aria-controls`
-- Dropdown list has `role="listbox"` with `aria-label="Select currency"`
-- Each option has `role="option"` with `aria-selected` on the active one
-- Focus is managed: opening the dropdown focuses the active option, closing it returns focus to the trigger
-- `aria-activedescendant` tracks the currently focused option for screen readers
-
-<Separator className="my-8" />
-
-## Selection Flow
-
-When a visitor selects a different currency:
+## What Happens When Someone Switches
 
 <Steps>
   <Step>
-    **Visual Feedback**
+    **Visitor clicks a currency**
 
-    The trigger enters a loading state — opacity drops and pointer events are disabled. The selected option gets highlighted immediately.
+    The button dims slightly to show something's happening.
   </Step>
   <Step>
-    **REST API Call**
+    **Preference is saved**
 
-    The widget sends `POST /fchub-mc/v1/context` with the new currency code. The server saves the preference to a cookie (with the configured lifetime) and to user meta for logged-in users.
+    Their choice is remembered — in a browser cookie (sticks for 90 days) and in their account if they're logged in. No need to pick again next time.
   </Step>
   <Step>
-    **Page Reload**
+    **Page refreshes with new prices**
 
-    After the API call succeeds, the page reloads. The new currency preference is picked up by the resolver chain on the fresh page load, and all prices are projected in the selected currency.
+    The page reloads and every price on the site is now in the selected currency. Product cards, cart totals, checkout — everything updates.
   </Step>
 </Steps>
-
-The widget also fires a `CustomEvent('fchub_mc:context_changed')` on the document before reloading, in case other scripts need to react.
 
 <Separator className="my-8" />
 
 ## Rate Freshness Badge
 
-When enabled in settings (`show_rate_freshness_badge: yes`), the dropdown footer shows:
+The little footer inside the dropdown that reads "Rates updated 2 hours ago" with a coloured dot.
 
-- **Green dot** + "Rates updated 2 hours ago" — rates are within the stale threshold
-- **Red dot** + "Rates updated 3 days ago" — rates have exceeded the stale threshold
+- **Green dot** — rates are fresh, everything's current
+- **Red dot** — rates haven't been updated in a while
 
-The timestamp uses WordPress's `human_time_diff()` relative to the site's configured timezone.
-
-<Separator className="my-8" />
-
-## No-JavaScript Fallback
-
-The widget renders a `<noscript>` block containing a native `<select>` element. Visitors with JavaScript disabled see a plain dropdown with the same currency options. The fallback form submits to the current page with the selected currency as a query parameter.
+You can toggle this on or off in the [Checkout settings](/docs/fchub-multi-currency/configuration#checkout). It's a small touch, but it builds trust — visitors can see that the converted prices aren't based on exchange rates from three months ago.
 
 <Separator className="my-8" />
 
-## Multiple Instances
+## Keyboard Navigation
 
-You can place `[fchub_currency_switcher]` multiple times on the same page — each instance works independently. The widget uses a `data-fchub-mc-enhanced` attribute to prevent double-initialisation, and ARIA IDs are generated uniquely per instance.
+The switcher is fully keyboard-accessible — you can navigate the whole thing without touching a mouse:
 
-<Separator className="my-8" />
-
-## Programmatic API
-
-Two globals are exposed for theme/plugin developers:
-
-```javascript
-// Switch to a specific currency (triggers API call + reload)
-window.fchubMcSwitchCurrency('EUR');
-
-// Re-initialise all switcher widgets (e.g. after AJAX content load)
-window.fchubMcInitSwitchers();
-```
+| Key | What It Does |
+|---|---|
+| **Enter** or **Space** | Opens the dropdown, or selects the focused currency |
+| **Arrow Down / Up** | Moves through the currency list |
+| **Home / End** | Jumps to the first or last currency |
+| **Escape** | Closes the dropdown |
+| **Tab** | Closes the dropdown and moves focus along naturally |
 
 <Separator className="my-8" />
 
-## Styling
+## No JavaScript? No Problem
 
-The widget uses CSS custom properties for theming. Override these on `.fchub-mc-switcher` to match your theme:
-
-```css
-.fchub-mc-switcher {
-  --fchub-mc-radius: 6px;
-  --fchub-mc-border-color: #d0d5dd;
-  --fchub-mc-bg: #fff;
-  --fchub-mc-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  --fchub-mc-transition: 150ms ease;
-  --fchub-mc-badge-ok: #12b76a;
-  --fchub-mc-badge-stale: #f04438;
-}
-```
-
-The dropdown panel uses `position: absolute` with `z-index: 9999` and opens with a `translateY + opacity` CSS transition.
+If a visitor has JavaScript disabled (rare, but it happens), they get a plain native dropdown as a fallback. Same currencies, same functionality, just less pretty.
 
 <Separator className="my-8" />
 
-## FOUC Prevention
+## Matching Your Theme
 
-The plugin adds an `fchub-mc-projecting` class to `<html>` immediately when the projection script loads. This class hides FluentCart price elements during the initial projection pass to prevent a flash of unconverted prices. The class is removed after the first projection completes, or after a 2-second safety timeout if something goes wrong.
-
-```css
-/* This is built into the plugin — no action needed */
-.fchub-mc-projecting .fct-item-price,
-.fchub-mc-projecting .fct-compare-price {
-  visibility: hidden;
-}
-```
+The switcher ships with clean, neutral styling that works with most themes out of the box. If you need to tweak colours, border radius, or shadow to match your brand — see the [CSS custom properties reference](/docs/fchub-multi-currency/developer-reference#javascript-configuration-object) in the Developer Reference.

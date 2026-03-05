@@ -1,48 +1,57 @@
 ---
 title: FluentCommunity Integration
-description: How FCHub Multi-Currency syncs the visitor's preferred currency to their FluentCommunity profile.
+description: Saves your visitors' preferred currency to their community profile. One toggle, zero maintenance.
 ---
 
 import { Separator } from '@/components/ui/separator';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 
-When FluentCommunity is active, the plugin writes the visitor's preferred currency to their WordPress user meta. This makes the currency preference available within the community context for personalisation or reporting.
+If you're running FluentCommunity, Multi-Currency can save each member's preferred currency to their community profile. One toggle, and it works — no fields to create, no mapping to configure.
 
-<Callout type="info" title="Optional Integration">
-This integration only activates when FluentCommunity is installed and active (`FLUENT_COMMUNITY_PLUGIN_VERSION` constant defined). No errors or overhead when FluentCommunity is absent.
+<Callout type="info" title="Only When FluentCommunity Is Active">
+No FluentCommunity installed? The plugin doesn't even try. No errors, no wasted resources — it just skips the sync entirely.
 </Callout>
 
-## What Gets Synced
+## What It Does
 
-When a logged-in user switches their display currency, the plugin writes `_fcom_preferred_currency` to their WordPress user meta with the uppercase ISO currency code (e.g. `EUR`, `GBP`).
+When a logged-in member switches their currency — say, from USD to EUR — the plugin saves `EUR` to their WordPress user profile. That's it. Simple, quiet, done.
 
-This fires on the `fchub_mc/context_switched` action — the same event that triggers the FluentCRM sync.
+This means FluentCommunity (and any other plugin reading user meta) can access the member's currency preference. Useful if you're building personalised community experiences, showing localised pricing in course pages, or just want to know what currency your members prefer.
 
-## Configuration
+<Separator className="my-8" />
 
-A single toggle on the **CRM** tab:
+## Setting It Up
 
-| Setting | Default | Description |
+One toggle on the **CRM** tab in your [Multi-Currency settings](/docs/fchub-multi-currency/configuration#crm):
+
+| Setting | Default | What It Does |
 |---|---|---|
-| FluentCommunity Sync | Yes | Write preferred currency to community user meta |
+| **FluentCommunity Sync** | Enabled | Saves the visitor's preferred currency to their user profile on every switch |
 
-## Custom Hook
-
-After writing the user meta, the plugin fires:
-
-```php
-do_action('fchub_mc/community_currency_updated', $currencyCode, $userId);
-```
-
-Hook into this if you want to extend the sync — for example, to update a custom community profile field or trigger a notification.
+That's the entire configuration. No custom fields to create, no API keys, no mapping tables.
 
 <Separator className="my-8" />
 
 ## Cleanup
 
-The uninstaller (when "Remove all data on uninstall" is enabled) deletes `_fcom_preferred_currency` from all user meta rows:
+If you uninstall the plugin with "Remove all data on uninstall" enabled, the saved currency preferences are deleted from all user profiles. Nothing orphaned, nothing left behind.
 
-```sql
-DELETE FROM wp_usermeta WHERE meta_key = '_fcom_preferred_currency'
-```
+<Separator className="my-8" />
 
-This ensures no orphaned meta remains after the plugin is fully removed.
+## Technical Details
+
+<Accordions>
+  <Accordion title="For developers: meta key and custom hook">
+    The currency preference is stored as `_fcom_preferred_currency` in the `wp_usermeta` table with the uppercase ISO code (e.g. `EUR`, `GBP`).
+
+    After writing the meta, the plugin fires:
+
+    ```php
+    do_action('fchub_mc/community_currency_updated', $currencyCode, $userId);
+    ```
+
+    Hook into this if you want to extend the sync — for example, to update a custom community profile field or trigger a notification.
+
+    See the [Developer Reference](/docs/fchub-multi-currency/developer-reference) for the full hook list.
+  </Accordion>
+</Accordions>

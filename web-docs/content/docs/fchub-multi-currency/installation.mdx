@@ -1,68 +1,75 @@
 ---
 title: Installation
-description: How to install and activate FCHub Multi-Currency on your WordPress site with FluentCart.
+description: Install FCHub Multi-Currency in about two minutes. Download, upload, activate — the usual WordPress ritual.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Separator } from '@/components/ui/separator';
 
-## Prerequisites
+## Before You Start
 
-Before you begin:
+You need three things:
 
-- **WordPress 6.7+** installed and running
-- **PHP 8.3+** on your server
+- **WordPress 6.7** or newer
+- **PHP 8.3** or newer (ask your host if unsure — they love that question)
 - **FluentCart** installed and activated
-- **bcmath PHP extension** recommended (not required — the plugin falls back to native float math, but bcmath gives you proper decimal precision for exchange rate calculations)
 
-<Callout type="warn" title="FluentCart Is Required">
-FCHub Multi-Currency is a FluentCart extension. If FluentCart is not active when you activate the plugin, you'll see an admin notice and the plugin will sit there doing nothing until FluentCart shows up.
+That's it. If FluentCart isn't active when you activate Multi-Currency, the plugin will politely tell you and wait. No errors, no drama, just a quiet admin notice.
+
+<Callout type="info" title="Optional Extras">
+**FluentCRM** and **FluentCommunity** aren't required, but if you have them installed, Multi-Currency will automatically sync currency preferences to contacts and community profiles. Zero extra setup.
 </Callout>
 
 <Separator className="my-8" />
 
-## Installation Steps
+## Install the Plugin
 
-<Tabs items={['Upload via Admin', 'Upload via FTP/SSH']}>
-<Tab value="Upload via Admin">
+Two minutes, tops. Pick whichever method you prefer:
+
+<Tabs items={['Upload via WordPress Admin', 'Upload via FTP']}>
+<Tab value="Upload via WordPress Admin">
+
+The easy way. No FTP clients, no file managers, no existential dread.
 
 <Steps>
   <Step>
-    **Download the Plugin**
+    **Download the ZIP**
 
-    Download the latest <PluginDownload plugin="fchub-multi-currency">fchub-multi-currency.zip</PluginDownload> from GitHub.
+    Grab the latest <PluginDownload plugin="fchub-multi-currency">fchub-multi-currency.zip</PluginDownload> from the releases page.
   </Step>
   <Step>
-    **Upload to WordPress**
+    **Upload it**
 
-    Go to **Plugins > Add New > Upload Plugin** in your WordPress admin. Choose the zip file and click **Install Now**.
+    In your WordPress admin, go to **Plugins → Add New → Upload Plugin**. Choose the ZIP file, click **Install Now**.
   </Step>
   <Step>
-    **Activate the Plugin**
+    **Activate**
 
-    Click **Activate Plugin**. If FluentCart is active, the plugin registers itself immediately — modules boot, database tables are created, and the cron job is scheduled.
+    Click **Activate Plugin**. Done. The plugin sets itself up automatically — you'll see "Multi-Currency" appear in your FluentCart settings within seconds.
   </Step>
 </Steps>
 
 </Tab>
-<Tab value="Upload via FTP/SSH">
+<Tab value="Upload via FTP">
+
+For those who enjoy the classics.
 
 <Steps>
   <Step>
-    **Extract the Zip**
+    **Extract the ZIP**
 
-    Extract `fchub-multi-currency.zip` on your local machine. You should have a folder called `fchub-multi-currency`.
+    Unzip `fchub-multi-currency.zip` on your computer. You'll get a folder called `fchub-multi-currency`.
   </Step>
   <Step>
-    **Upload to wp-content/plugins**
+    **Upload the folder**
 
     Upload the entire `fchub-multi-currency` folder to `/wp-content/plugins/` on your server.
   </Step>
   <Step>
     **Activate in WordPress**
 
-    Go to **Plugins** in your WordPress admin and activate **FCHub - Multi-Currency**.
+    Go to **Plugins** in your WordPress admin, find **FCHub - Multi-Currency**, click **Activate**.
   </Step>
 </Steps>
 
@@ -71,62 +78,37 @@ FCHub Multi-Currency is a FluentCart extension. If FluentCart is not active when
 
 <Separator className="my-8" />
 
-## What Happens on Activation
+## Check That It's Working
 
-When you activate the plugin:
+After activation, head to **FluentCart → Settings → Multi-Currency**. You should see the settings panel with six tabs. If you see it, everything's working.
 
-1. **Database tables are created** — Two custom tables (`fchub_mc_rate_history` and `fchub_mc_event_log`) are created via `dbDelta()`. Safe to run multiple times.
-
-2. **Cron job is scheduled** — The `fchub_mc_refresh_rates` event is registered with a configurable interval (default: every 6 hours). This fetches fresh exchange rates from your provider.
-
-3. **Modules boot** — Ten internal modules register their hooks: settings, context resolution, frontend assets, checkout integration, admin UI, REST API, FluentCRM sync, FluentCommunity sync, and diagnostics.
-
-4. **FluentCart addon registers** — "Multi-Currency" appears in FluentCart's integration modules list.
-
-5. **Admin route is injected** — A "Multi-Currency" item appears in FluentCart's settings sidebar (under Tax & Duties).
-
-<Separator className="my-8" />
-
-## Verify the Installation
-
-After activation, confirm everything is running:
-
-1. Go to **FluentCart > Settings > Multi-Currency** — the settings SPA should load with six tabs
-2. Go to **FluentCart > Modules** — "Multi-Currency" should appear as an integration
-3. Check **FluentCart > Settings > Multi-Currency > Diagnostics** tab — this shows plugin version, PHP version, bcmath availability, and FluentCart status
-
-<Callout type="info" title="Direct URL">
-You can access the settings directly:
-`/wp-admin/admin.php?page=fluent-cart#/settings/multi-currency`
+<Callout type="info" title="Direct Link">
+Bookmark this: `/wp-admin/admin.php?page=fluent-cart#/settings/multi-currency`
 </Callout>
 
-<Separator className="my-8" />
-
-## After Installation
-
-Your next step is to [configure the plugin](/docs/fchub-multi-currency/configuration). At minimum, you'll want to:
-
-1. Set your base currency (if different from USD)
-2. Add display currencies
-3. Choose an exchange rate provider
-4. Place the `[fchub_currency_switcher]` shortcode somewhere visible
-
-The plugin ships with sensible defaults, but it won't do much until you add at least one display currency.
+Want a quick health check? Click the **Diagnostics** tab — it shows your PHP version, plugin version, and whether all the pieces are connected properly.
 
 <Separator className="my-8" />
 
-## Uninstallation
+## What's Next
 
-**Deactivating** the plugin clears the rate refresh cron job but preserves all data — tables, settings, user preferences. You can deactivate and reactivate without losing anything.
+The plugin ships with sensible defaults, but it won't do much until you tell it which currencies to show. Head to [Configuration](/docs/fchub-multi-currency/configuration) and:
 
-**Deleting** the plugin runs the uninstaller, but only if you've enabled the "Remove all data on uninstall" toggle in settings. When enabled, the uninstaller:
+1. Set your base currency (if it's not USD)
+2. Add the currencies your customers care about
+3. Pick an exchange rate provider (or use the free ECB option)
+4. Drop the `[fchub_currency_switcher]` shortcode on your site
 
-1. Drops both database tables (`fchub_mc_rate_history`, `fchub_mc_event_log`)
-2. Deletes all plugin options (`fchub_mc_settings`, `fchub_mc_db_version`, `fchub_mc_feature_flags`)
-3. Removes `_fchub_mc_currency` from all user meta
-4. Removes `_fcom_preferred_currency` from all user meta (FluentCommunity sync)
-5. Clears the cron schedule
+Five minutes of setup, and your store speaks every currency that matters.
+
+<Separator className="my-8" />
+
+## Removing the Plugin
+
+**Deactivating** pauses everything but keeps your data safe. Reactivate any time — your currencies, rates, and customer preferences are all still there.
+
+**Deleting** the plugin? By default, your data stays put even after deletion. If you want a clean break, flip the "Remove all data on uninstall" toggle in settings *before* you delete. That wipes everything — rate history, settings, saved preferences, the lot.
 
 <Callout type="warn" title="Data Removal Is Opt-In">
-By default, deleting the plugin leaves your data intact. You must explicitly enable "Remove all data on uninstall" in the settings before deletion to trigger cleanup. This is intentional — nobody likes surprises when managing plugins.
+We don't delete your data unless you explicitly ask for it. Because surprises are for birthdays, not plugin management.
 </Callout>

@@ -1,0 +1,31 @@
+---
+title: Wishlist Integration
+description: FCHub Wishlist prices convert automatically when a visitor switches currency. Zero setup, zero configuration.
+---
+
+import { Separator } from '@/components/ui/separator';
+
+If you're running [FCHub Wishlist](/docs/fchub-wishlist) alongside Multi-Currency, wishlist prices convert automatically. No setup, no configuration, no "enable integration" toggle to hunt for. It just works.
+
+## How It Works
+
+When a visitor switches their currency — say, from PLN to USD — every price on the wishlist page updates to match. The same conversion engine that handles your shop, cart, and checkout also covers the wishlist. Product prices, variant prices, the lot.
+
+![Wishlist page with prices converted to USD and the currency switcher in the header](/multi-currency/fluentcart-multi-currency-wishlists.webp)
+
+Visitors save items to their wishlist in whatever currency they're browsing. Come back next week in a different currency? Prices update. Switch currencies mid-session? Prices update. The wishlist always shows prices in the visitor's current currency — not whatever currency they were in when they added the item.
+
+<Separator className="my-8" />
+
+## What You Need
+
+- **FCHub Multi-Currency** — installed and enabled (obviously)
+- **FCHub Wishlist** — installed and activated
+
+That's it. Both plugins are FCHub family — they recognise each other and play nicely. No integration feeds to configure, no API keys to exchange, no settings page to visit.
+
+<Separator className="my-8" />
+
+## What About the "Add All to Cart" Button?
+
+Works exactly as you'd expect. Visitors see prices in their chosen currency on the wishlist, click "Add All to Cart", and the cart shows the same converted prices. The checkout disclosure still appears, the order snapshot still records the exchange rate — the full Multi-Currency flow applies.

@@ -1,102 +1,91 @@
 ---
 title: FluentCRM Integration
-description: How FCHub Multi-Currency syncs currency preferences and order data to FluentCRM contacts with automatic tagging and custom field updates.
+description: Automatically tag contacts by currency, sync custom fields on every switch and purchase, and segment your audience by what money they think in.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-When FluentCRM is active, the plugin automatically syncs currency data to your CRM contacts. This lets you segment audiences by preferred currency, trigger automation based on currency switches, and track which currencies your customers are buying in.
+If you're running FluentCRM alongside FluentCart, Multi-Currency feeds currency data straight into your CRM — automatically. Every time a visitor picks a currency or pays for an order, their FluentCRM contact gets updated. No manual tagging, no CSV imports, no guesswork.
 
-<Callout type="info" title="Optional Integration">
-This integration only activates when FluentCRM is installed and active. If FluentCRM is not present, the plugin skips all CRM-related hooks entirely. No errors, no overhead.
+<Callout type="info" title="Only When FluentCRM Is Active">
+No FluentCRM? No problem. The plugin detects whether FluentCRM is installed and simply skips all CRM work if it's not there. Zero errors, zero overhead.
 </Callout>
 
-## What Gets Synced
+## What Happens Automatically
 
-Two events trigger CRM updates:
+Two things trigger CRM updates:
 
-### On Currency Switch
+### When Someone Switches Currency
 
-When a logged-in user switches their display currency (via the switcher widget or URL parameter), the plugin:
+A logged-in visitor picks EUR from the currency switcher. Behind the scenes:
 
-1. **Updates the preferred currency custom field** — writes the ISO currency code (e.g. `EUR`) to the configured custom field key (default: `preferred_currency`)
-2. **Creates and attaches a currency tag** — creates a tag like `currency:EUR` (prefix is configurable) via `Tag::firstOrCreate` and attaches it to the contact
+1. Their FluentCRM contact gets a **tag** — like `currency:EUR` — so you can find them later
+2. Their **preferred currency** custom field updates to `EUR`
 
-Guest visitors (not logged in) are ignored — there's no FluentCRM contact to update.
+That's it. Instant. If they switch again to GBP tomorrow, they get a `currency:GBP` tag too, and the preferred currency field updates. Tags accumulate (showing every currency they've ever used), the field always reflects the latest pick.
 
-### On Order Payment
+Guest visitors are skipped — there's no FluentCRM contact to update for someone who isn't logged in.
 
-When a paid order has multi-currency metadata, the plugin:
+### When Someone Pays for an Order
 
-1. **Updates the last order display currency field** — writes the display currency code to the configured field key (default: `last_order_display_currency`)
-2. **Updates the last order FX rate field** — writes the exchange rate string to the configured field key (default: `last_order_fx_rate`)
+If a customer was browsing in a different currency when they paid, two more custom fields update on their contact:
 
-This only fires for orders where the customer was viewing a non-base currency.
+- **Last order currency** — which currency they were viewing (e.g. `EUR`)
+- **Last order FX rate** — the exchange rate at the time of payment (e.g. `0.92140000`)
+
+This only fires when the customer was viewing a non-base currency. If they were already in your base currency, there's nothing to record.
 
 <Separator className="my-8" />
 
-## Configuration
+## Setting It Up
 
-All FluentCRM settings are on the **CRM** tab in the plugin settings:
+Everything's on the **CRM** tab in your [Multi-Currency settings](/docs/fchub-multi-currency/configuration#crm).
 
-| Setting | Default | Description |
+| Setting | Default | What It Does |
 |---|---|---|
-| FluentCRM Sync | Yes | Master switch for all FluentCRM integrations |
-| Auto-create Tags | Yes | Create tags automatically when a new currency is encountered |
-| Tag Prefix | `currency:` | Prefix for auto-created tags. The full tag becomes `currency:EUR`, `currency:GBP`, etc. |
-| Preferred Currency Field | `preferred_currency` | FluentCRM custom field key for the visitor's last-selected currency |
-| Last Order Currency Field | `last_order_display_currency` | FluentCRM custom field key for the currency used in the most recent order |
-| Last Order FX Rate Field | `last_order_fx_rate` | FluentCRM custom field key for the exchange rate used in the most recent order |
+| **FluentCRM Sync** | Enabled | Master switch — turn this off and nothing syncs |
+| **Auto-create Tags** | Yes | Creates tags like `currency:EUR` automatically when a new currency is detected |
+| **Tag Prefix** | `currency:` | What goes before the currency code in the tag name |
+| **Preferred Currency Field** | `preferred_currency` | Custom field that stores what currency the visitor is browsing in |
+| **Last Order Currency Field** | `last_order_display_currency` | Custom field that stores what currency they last paid in |
+| **Last Order FX Rate Field** | `last_order_fx_rate` | Custom field that stores the exchange rate from their last order |
 
-<Callout type="warn" title="Create Custom Fields First">
-The custom field keys must exist as FluentCRM custom fields before the plugin can write to them. Go to **FluentCRM > Contacts > Custom Fields** and create text fields matching the key names you've configured. If the fields don't exist, the sync calls will silently fail.
+<Callout type="warn" title="Create Your Custom Fields First">
+The custom field keys need to exist in FluentCRM before the plugin can write to them. Go to **FluentCRM → Contacts → Custom Fields** and create text fields matching the key names above. If the fields don't exist, the sync just silently skips — no errors, but no data either.
 </Callout>
 
 <Separator className="my-8" />
 
-## Segmentation Use Cases
+## What You Can Do With This
 
-With currency data flowing into FluentCRM, you can:
+Once currency data is flowing into FluentCRM, the interesting stuff starts:
 
-- **Segment by preferred currency** — filter contacts where `preferred_currency = EUR` for currency-specific campaigns
-- **Tag-based automations** — trigger a welcome sequence when the `currency:GBP` tag is applied (first time a contact switches to GBP)
-- **Order currency reporting** — use `last_order_display_currency` to see which currencies customers are actually buying in
-- **FX rate analysis** — the `last_order_fx_rate` field lets you check what rate was in effect for each customer's last order
+- **Currency-specific email campaigns** — filter contacts by `preferred_currency = EUR` and send promotions with prices in euros. No more "starting at $49" to someone who thinks in pounds.
+- **Tag-based automations** — trigger a welcome email when the `currency:GBP` tag is first applied. "Welcome, looks like you're shopping in pounds — here's what's popular in the UK."
+- **Order currency insights** — use `last_order_display_currency` to see which currencies people are actually buying in, not just browsing in.
+- **Segment by region** — currency preference is a surprisingly good proxy for location. EUR visitors are mostly European, GBP mostly UK, JPY mostly Japan. Use it for targeting without needing IP geolocation.
 
 <Separator className="my-8" />
 
 ## Error Handling
 
-All FluentCRM sync operations are wrapped in try/catch blocks. If FluentCRM throws an exception (contact not found, custom field doesn't exist, tag creation fails), the error is logged via the plugin's internal logger and the rest of the request continues normally.
-
-Currency sync failures never block the main user flow — if tagging fails, the currency switch still completes. If order field updates fail, the order is still marked as paid.
+If something goes wrong with the CRM sync — FluentCRM throws an error, a custom field doesn't exist, tag creation hiccups — the plugin logs it and moves on. The currency switch still works. The order still completes. CRM sync is always a best-effort background operation, never a blocker.
 
 <Separator className="my-8" />
 
 ## Technical Details
 
 <Accordions>
-  <Accordion title="Hook Registration">
-    The `FluentCrmSync` class registers two hooks, but only when `defined('FLUENTCRM')` is true:
+  <Accordion title="For developers: hooks, tag creation, field sync">
+    The `FluentCrmSync` class hooks into two events (only when FluentCRM is active):
 
-    - `fchub_mc/context_switched` (priority 10, 2 args) — fires on currency switch
-    - `fluent_cart/order_paid_done` (priority 10, 1 arg) — fires on order payment
+    - `fchub_mc/context_switched` — fires on currency switch, updates preferred currency field and creates/attaches tag
+    - `fluent_cart/order_paid_done` — fires on order payment, updates last order currency and FX rate fields
 
-    Both hooks are registered by the `FluentCrmModule` during plugin bootstrap.
-  </Accordion>
-  <Accordion title="Tag Creation">
-    Tags are created via `FluentCrm\App\Models\Tag::firstOrCreate()` with:
-    - `slug` — `sanitize_title($tagPrefix . strtoupper($currencyCode))`
-    - `title` — `$tagPrefix . strtoupper($currencyCode)`
+    Tags are created via `Tag::firstOrCreate()` — existing tags are reused, no duplicates. Custom fields are synced via `$contact->syncCustomFieldValues()` without overwriting other fields on the contact.
 
-    If the tag already exists, the existing tag is attached to the contact. No duplicates.
-  </Accordion>
-  <Accordion title="Custom Field Sync">
-    Custom fields are synced via FluentCRM's `$contact->syncCustomFieldValues()` method with the second argument `false` (don't delete existing field values not in the array).
-
-    Only the specified field key is updated — other custom fields on the contact remain untouched.
+    See the [Developer Reference](/docs/fchub-multi-currency/developer-reference) for the full hook list and REST API.
   </Accordion>
 </Accordions>

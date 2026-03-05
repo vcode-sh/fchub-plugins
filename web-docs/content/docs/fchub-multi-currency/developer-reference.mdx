@@ -197,6 +197,36 @@ window.fchubMcProjectPrices(document.getElementById('my-container'));
 
 <Separator className="my-8" />
 
+## Currency Switcher Widget
+
+### CSS Custom Properties
+
+Override these on `.fchub-mc-switcher` to theme the widget:
+
+```css
+.fchub-mc-switcher {
+  --fchub-mc-radius: 6px;
+  --fchub-mc-border-color: #d0d5dd;
+  --fchub-mc-bg: #fff;
+  --fchub-mc-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --fchub-mc-transition: 150ms ease;
+  --fchub-mc-badge-ok: #12b76a;
+  --fchub-mc-badge-stale: #f04438;
+}
+```
+
+### ARIA Roles
+
+The widget implements the combobox/listbox pattern:
+
+- Trigger: `role="combobox"` with `aria-expanded`, `aria-haspopup="listbox"`, `aria-controls`
+- Option list: `role="listbox"` with `aria-label="Select currency"`
+- Each option: `role="option"` with `aria-selected` on the active currency
+- `aria-activedescendant` tracks the currently focused option
+- Unique ARIA IDs per instance for multiple widgets on one page
+
+<Separator className="my-8" />
+
 ## JavaScript Configuration Object
 
 The `fchubMcConfig` object is injected via `wp_localize_script` and available globally:
