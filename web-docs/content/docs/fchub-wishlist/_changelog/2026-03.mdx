@@ -1,0 +1,72 @@
+### v1.0.0
+
+*Released March 2026* — Initial release
+
+The first release of FCHub Wishlist. Hearts on product cards, a proper My Account page, and FluentCRM automation triggers — because FluentCart forgot to ship wishlists.
+
+<video
+  autoPlay
+  loop
+  muted
+  playsInline
+  className="rounded-xl border mt-6 mb-3"
+  src="https://files.vcode.sh/fchub/docs/wishlists/fluentcart-wishlists.mp4"
+/>
+<div className="grid grid-cols-4 gap-3 mb-6">
+  <ImageZoom
+    src="/wishlists/fluentcart-wishlists-general.webp"
+    alt="General settings tab with master switch and guest options"
+    width={400}
+    height={400}
+    className="rounded-lg border aspect-square object-cover"
+  />
+  <ImageZoom
+    src="/wishlists/fluentcart-wishlists-shop.webp"
+    alt="Shop page with heart icons on product cards"
+    width={400}
+    height={400}
+    className="rounded-lg border aspect-square object-cover"
+  />
+  <ImageZoom
+    src="/wishlists/fluentcart-wishlists-myaccount.webp"
+    alt="My Account wishlist page with saved items"
+    width={400}
+    height={400}
+    className="rounded-lg border aspect-square object-cover"
+  />
+  <ImageZoom
+    src="/wishlists/fluentcart-wishlists-single-add.webp"
+    alt="Single product page with Add to Wishlist button"
+    width={400}
+    height={400}
+    className="rounded-lg border aspect-square object-cover"
+  />
+</div>
+
+#### Core Features
+
+- **Heart icons on product cards** — red heart overlay on every product card in grid and list views. One click to add, one click to remove. Works on shop, category, and search pages
+- **Single product button** — "Add to Wishlist" / "Remove from Wishlist" button with heart icon below the quantity selector. Customisable text and visibility
+- **My Account wishlist tab** — dedicated "My Wishlist" page in the FluentCart customer portal with product thumbnails, variant info, prices, individual "Add to Cart" buttons, and "Add All to Cart"
+- **Guest wishlist support** — non-logged-in visitors can use wishlists via cookies. Auto-merges with account on registration or login
+- **Auto-remove purchased items** — optionally removes items from the wishlist after the customer buys them
+- **Configurable limits** — max items per wishlist (default 50) and guest cleanup after configurable days (default 30)
+
+#### Display
+
+- **Icon style selection** — choose between heart and other icon styles
+- **Custom button text** — configurable "Add" and "Remove" labels for the single product page button
+- **Counter badge** — wishlist item count via `[fchub_wishlist_count]` shortcode or `wp_footer` hook
+- **Grid and list view support** — heart adapts to both FluentCart shop layout modes
+
+#### Integrations
+
+- **FluentCRM tag sync** — automatic tags based on wishlist activity with configurable prefix and auto-create
+- **FluentCRM automation triggers** — "Item Added to Wishlist" and "Item Removed from Wishlist" triggers in the funnel builder
+- **FCHub Multi-Currency** — wishlist prices convert automatically when visitors switch currency
+
+#### Admin
+
+- **Four-tab settings panel** — General, Display, FluentCRM, and Statistics. Lives inside FluentCart's settings
+- **Statistics dashboard** — total wishlisted items, active wishlists, 30-day activity, average items per wishlist, and most-wishlisted products table
+- **Data removal opt-in** — all data preserved on uninstall by default, explicit toggle to wipe everything

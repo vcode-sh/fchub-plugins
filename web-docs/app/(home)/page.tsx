@@ -79,6 +79,15 @@ const communityPlugins: Plugin[] = [
 
 const cartPlugins: Plugin[] = [
   {
+    title: "Wishlist",
+    description:
+      "Wishlists for FluentCart. Let customers hoard things they'll never buy.",
+    icon: Heart,
+    docsHref: "/docs/fchub-wishlist",
+    downloadUrl: versions["fchub-wishlist"].releaseUrl,
+    hot: true,
+  },
+  {
     title: "Multi-Currency",
     description:
       "Automatic currency conversion. Show prices in your customer's currency so they can complain in their own language.",
@@ -117,14 +126,6 @@ const cartPlugins: Plugin[] = [
     icon: LayoutDashboard,
     docsHref: "/docs/fchub-portal-extender",
     downloadUrl: versions["fchub-portal-extender"].releaseUrl,
-  },
-  {
-    title: "Wishlist",
-    description:
-      "Wishlists for FluentCart. Let customers hoard things they'll never buy.",
-    icon: Heart,
-    docsHref: "/docs/fchub-wishlist",
-    comingSoon: true,
   },
   {
     title: "WC Migrator",

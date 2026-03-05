@@ -1,0 +1,19 @@
+{
+  "title": "Wishlist",
+  "root": true,
+  "description": "Wishlists for FluentCart. Heart icons, guest support, FluentCRM tagging, and statistics.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "configuration",
+    "---Features---",
+    "shop-display",
+    "my-account",
+    "---Integrations---",
+    "fluentcrm",
+    "---Reference---",
+    "statistics",
+    "changelog"
+  ]
+}

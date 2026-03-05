@@ -1,0 +1,111 @@
+---
+title: Installation
+description: Install FCHub Wishlist in about two minutes. Download, upload, activate — the usual WordPress ritual.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Separator } from '@/components/ui/separator';
+
+## Before You Start
+
+You need three things:
+
+- **WordPress 6.7** or newer
+- **PHP 8.3** or newer
+- **FluentCart** installed and activated
+
+That's it. If FluentCart isn't active when you activate FCHub Wishlist, the plugin will tell you and wait. No errors, no drama, just a quiet admin notice.
+
+<Callout type="info" title="Optional Extras">
+**FluentCRM** isn't required, but if you have it installed, Wishlist will automatically tag contacts based on their wishlist activity. **FCHub Multi-Currency** will convert wishlist prices automatically. Zero extra setup for either.
+</Callout>
+
+<Separator className="my-8" />
+
+## Install the Plugin
+
+<Tabs items={['Upload via WordPress Admin', 'Upload via FTP']}>
+<Tab value="Upload via WordPress Admin">
+
+The easy way. No FTP clients, no file managers, no existential dread.
+
+<Steps>
+  <Step>
+    **Download the ZIP**
+
+    Grab the latest <PluginDownload plugin="fchub-wishlist">fchub-wishlist.zip</PluginDownload> from the releases page.
+  </Step>
+  <Step>
+    **Upload it**
+
+    In your WordPress admin, go to **Plugins > Add New > Upload Plugin**. Choose the ZIP file, click **Install Now**.
+  </Step>
+  <Step>
+    **Activate**
+
+    Click **Activate Plugin**. Done. You'll see "Wishlist" appear in your FluentCart settings within seconds.
+  </Step>
+</Steps>
+
+</Tab>
+<Tab value="Upload via FTP">
+
+For those who enjoy the classics.
+
+<Steps>
+  <Step>
+    **Extract the ZIP**
+
+    Unzip `fchub-wishlist.zip` on your computer. You'll get a folder called `fchub-wishlist`.
+  </Step>
+  <Step>
+    **Upload the folder**
+
+    Upload the entire `fchub-wishlist` folder to `/wp-content/plugins/` on your server.
+  </Step>
+  <Step>
+    **Activate in WordPress**
+
+    Go to **Plugins** in your WordPress admin, find **FCHub - Wishlist**, click **Activate**.
+  </Step>
+</Steps>
+
+</Tab>
+</Tabs>
+
+<Separator className="my-8" />
+
+## Check That It's Working
+
+After activation, head to **FluentCart > Settings > Wishlist**. You should see the settings panel with four tabs: General, Display, FluentCRM, and Statistics. If you see them, everything's working.
+
+<Callout type="info" title="Direct Link">
+Bookmark this: `/wp-admin/admin.php?page=fluent-cart#/settings/wishlist`
+</Callout>
+
+Visit your shop page — you should see heart icons on every product card. If hearts are showing, you're done.
+
+<Separator className="my-8" />
+
+## What's Next
+
+The plugin ships with sensible defaults and works out of the box. But you might want to tweak a few things:
+
+1. Enable or disable guest wishlists
+2. Customise the icon style and button text
+3. Turn on FluentCRM tag sync
+
+Head to [Configuration](/docs/fchub-wishlist/configuration) for the full rundown.
+
+<Separator className="my-8" />
+
+## Removing the Plugin
+
+**Deactivating** pauses everything but keeps your data safe. Reactivate any time — wishlists, settings, and statistics are all still there.
+
+**Deleting** the plugin? By default, your data stays put even after deletion. If you want a clean break, flip the "Remove Data on Uninstall" toggle in settings *before* you delete. That wipes everything — wishlist items, settings, statistics, the lot.
+
+<Callout type="warn" title="Data Removal Is Opt-In">
+We don't delete your data unless you explicitly ask for it. Because surprises are for birthdays, not plugin management.
+</Callout>

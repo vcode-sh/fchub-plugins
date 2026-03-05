@@ -1,0 +1,125 @@
+---
+title: FCHub Wishlist
+description: Wishlists for FluentCart. Heart icons on product cards, guest support, FluentCRM tagging, and statistics — without the bloat.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+Customers want to save things for later. FluentCart doesn't ship wishlists. So here we are.
+
+<video
+  autoPlay
+  loop
+  muted
+  playsInline
+  className="rounded-xl border my-6"
+  src="https://files.vcode.sh/fchub/docs/wishlists/fluentcart-wishlists.mp4"
+/>
+
+FCHub Wishlist adds heart icons to your product cards, a dedicated wishlist page in the customer's account, guest wishlist support via cookies, and FluentCRM tag sync — all without a single line of custom code.
+
+## Why Bother?
+
+A visitor browses your store, sees something they like, but isn't ready to buy. Without a wishlist, that product disappears the moment they close the tab. With a wishlist, they click a heart, come back next week, and buy it. Or they don't. But at least they had the option.
+
+More practically: wishlist data tells you which products people *want* but haven't bought yet. That's marketing gold. Pair it with FluentCRM and you can send "still thinking about it?" emails to people who wishlisted a product three days ago.
+
+<Separator className="my-8" />
+
+## What You Get
+
+<Cards>
+  <Card title="Heart Icons on Product Cards" href="/docs/fchub-wishlist/shop-display">
+    A red heart overlay on every product card. One click to add, one click to remove. Works on grid and list views, product pages, and anywhere FluentCart renders a product.
+  </Card>
+  <Card title="My Account Wishlist" href="/docs/fchub-wishlist/my-account">
+    A dedicated "My Wishlist" tab in the customer portal. Shows all saved items with prices, variants, and one-click "Add to Cart" or "Add All to Cart" buttons.
+  </Card>
+  <Card title="Guest Wishlists">
+    Non-logged-in visitors can save items too. Their wishlist lives in a browser cookie. If they register later, the guest wishlist merges with their account automatically.
+  </Card>
+  <Card title="FluentCRM Tagging" href="/docs/fchub-wishlist/fluentcrm">
+    Automatic tags based on wishlist activity. Know who's wishlisting what, segment by product interest, trigger re-engagement automations.
+  </Card>
+  <Card title="Statistics Dashboard" href="/docs/fchub-wishlist/statistics">
+    Total wishlisted items, active wishlists, most-wishlisted products. Quick numbers to see what people want but haven't bought.
+  </Card>
+  <Card title="Display Customisation" href="/docs/fchub-wishlist/configuration">
+    Heart or bookmark icon, custom button text, counter badge in the header. Make it yours without touching CSS.
+  </Card>
+</Cards>
+
+<Separator className="my-8" />
+
+## How It Works
+
+<Steps>
+  <Step>
+    **Visitor sees a product they like**
+
+    A heart icon appears on every product card in the shop. On the single product page, there's a dedicated "Add to Wishlist" button. Both do the same thing.
+  </Step>
+  <Step>
+    **One click to save**
+
+    Click the heart — it turns red. The product is saved to the wishlist. If the visitor is logged in, it's stored in the database. If they're a guest, it goes into a cookie.
+  </Step>
+  <Step>
+    **Wishlist lives in My Account**
+
+    Logged-in customers can see all their saved items in the "My Wishlist" tab of the FluentCart customer portal. Each item shows the product name, variant, price, and "Add to Cart" button.
+  </Step>
+  <Step>
+    **Bulk add to cart**
+
+    The "Add All to Cart" button does exactly what it says. One click, entire wishlist in the cart. Items are optionally auto-removed from the wishlist after purchase.
+  </Step>
+  <Step>
+    **You get the data**
+
+    The statistics tab shows which products are most wishlisted. FluentCRM tags contacts automatically. You know what people want — now sell it to them.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Requirements
+
+| Requirement | Version |
+|---|---|
+| WordPress | 6.7+ |
+| PHP | 8.3+ |
+| FluentCart | Latest version |
+
+<Callout type="warn" title="FluentCart Required">
+This is a FluentCart extension. Without FluentCart, the plugin politely does nothing.
+</Callout>
+
+**Optional extras** — not required, but nice to have:
+
+| Plugin | What It Adds |
+|---|---|
+| **FluentCRM** | Automatic wishlist activity tags on contacts |
+| **FCHub Multi-Currency** | Wishlist prices convert automatically when visitors switch currency |
+
+<Separator className="my-8" />
+
+## Get Started
+
+<Cards>
+  <Card title="Installation" href="/docs/fchub-wishlist/installation">
+    Download, install, activate. The usual WordPress ritual.
+  </Card>
+  <Card title="Configuration" href="/docs/fchub-wishlist/configuration">
+    General settings, display options, FluentCRM sync, statistics.
+  </Card>
+  <Card title="Shop Display" href="/docs/fchub-wishlist/shop-display">
+    How hearts appear on product cards and how to switch between grid and list views.
+  </Card>
+  <Card title="My Account" href="/docs/fchub-wishlist/my-account">
+    The customer-facing wishlist page inside the FluentCart portal.
+  </Card>
+</Cards>
