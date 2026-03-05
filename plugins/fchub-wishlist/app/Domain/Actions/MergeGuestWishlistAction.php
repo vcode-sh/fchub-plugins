@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace FChubWishlist\Domain\Actions;
 
 use FChubWishlist\Domain\Context\WishlistContextResolver;
-use FChubWishlist\Storage\WishlistItemRepository;
 use FChubWishlist\Storage\WishlistRepository;
 use FChubWishlist\Support\Logger;
 
@@ -14,16 +13,13 @@ defined('ABSPATH') || exit;
 class MergeGuestWishlistAction
 {
     private WishlistRepository $wishlists;
-    private WishlistItemRepository $items;
     private WishlistContextResolver $context;
 
     public function __construct(
         WishlistRepository $wishlists,
-        WishlistItemRepository $items,
         WishlistContextResolver $context,
     ) {
         $this->wishlists = $wishlists;
-        $this->items = $items;
         $this->context = $context;
     }
 
@@ -45,38 +41,80 @@ class MergeGuestWishlistAction
         }
 
         $userWishlist = $this->context->getOrCreateForUser($userId);
-        $guestItems = $this->items->findByWishlistId($guestWishlist['id']);
-
-        if (empty($guestItems)) {
-            $this->wishlists->delete($guestWishlist['id']);
+        if (!$userWishlist) {
+            Logger::error('Could not resolve user wishlist for guest merge', [
+                'user_id'    => $userId,
+                'guest_hash' => $sessionHash,
+            ]);
             return 0;
         }
 
-        $movedCount = 0;
+        global $wpdb;
+        $itemsTable = $wpdb->prefix . 'fchub_wishlist_items';
+        $listsTable = $wpdb->prefix . 'fchub_wishlist_lists';
 
-        foreach ($guestItems as $guestItem) {
-            $existsInUser = $this->items->exists(
-                $userWishlist['id'],
-                $guestItem['product_id'],
-                $guestItem['variant_id']
-            );
+        $transactionStarted = $wpdb->query('START TRANSACTION') !== false;
 
-            if ($existsInUser) {
-                // Duplicate: discard guest item
-                $this->items->delete($guestItem['id']);
-            } else {
-                // Move item to user wishlist
-                $this->moveItem($guestItem['id'], $userWishlist['id']);
-                $movedCount++;
+        try {
+            $wpdb->query($wpdb->prepare(
+                "SELECT id FROM {$listsTable} WHERE id IN (%d, %d) FOR UPDATE",
+                (int) $guestWishlist['id'],
+                (int) $userWishlist['id']
+            ));
+
+            $deletedDuplicates = $wpdb->query($wpdb->prepare(
+                "DELETE guest_items
+                 FROM {$itemsTable} guest_items
+                 INNER JOIN {$itemsTable} user_items
+                    ON user_items.wishlist_id = %d
+                   AND user_items.product_id = guest_items.product_id
+                   AND user_items.variant_id = guest_items.variant_id
+                 WHERE guest_items.wishlist_id = %d",
+                (int) $userWishlist['id'],
+                (int) $guestWishlist['id']
+            ));
+
+            if ($deletedDuplicates === false) {
+                throw new \RuntimeException('Could not delete duplicate guest wishlist items.');
             }
+
+            $movedCountResult = $wpdb->query($wpdb->prepare(
+                "UPDATE {$itemsTable}
+                 SET wishlist_id = %d
+                 WHERE wishlist_id = %d",
+                (int) $userWishlist['id'],
+                (int) $guestWishlist['id']
+            ));
+
+            if ($movedCountResult === false) {
+                throw new \RuntimeException('Could not move guest wishlist items.');
+            }
+
+            $movedCount = (int) $movedCountResult;
+
+            $this->wishlists->recalculateItemCount((int) $userWishlist['id']);
+
+            if (!$this->wishlists->delete((int) $guestWishlist['id'])) {
+                throw new \RuntimeException('Could not delete merged guest wishlist.');
+            }
+
+            if ($transactionStarted) {
+                $wpdb->query('COMMIT');
+            }
+        } catch (\Throwable $e) {
+            if ($transactionStarted) {
+                $wpdb->query('ROLLBACK');
+            }
+
+            Logger::error('Guest wishlist merge failed', [
+                'user_id'           => $userId,
+                'guest_wishlist_id' => (int) $guestWishlist['id'],
+                'user_wishlist_id'  => (int) $userWishlist['id'],
+                'error'             => $e->getMessage(),
+            ]);
+
+            return 0;
         }
-
-        // Recalculate counts
-        $this->wishlists->recalculateItemCount($userWishlist['id']);
-        $this->wishlists->recalculateItemCount($guestWishlist['id']);
-
-        // Delete the now-empty guest wishlist
-        $this->wishlists->delete($guestWishlist['id']);
 
         if ($movedCount > 0) {
             do_action(
@@ -96,21 +134,5 @@ class MergeGuestWishlistAction
         ]);
 
         return $movedCount;
-    }
-
-    /**
-     * Move an item from one wishlist to another via direct UPDATE.
-     */
-    private function moveItem(int $itemId, int $targetWishlistId): void
-    {
-        global $wpdb;
-
-        $table = $wpdb->prefix . 'fchub_wishlist_items';
-
-        $wpdb->update(
-            $table,
-            ['wishlist_id' => $targetWishlistId],
-            ['id' => $itemId]
-        );
     }
 }

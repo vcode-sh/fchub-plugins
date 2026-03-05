@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubWishlist\GDPR;
 
+use FChubWishlist\Integration\FluentCrmSync;
 use FChubWishlist\Storage\WishlistRepository;
 use FChubWishlist\Storage\WishlistItemRepository;
 
@@ -128,6 +129,8 @@ final class PersonalDataHandler
             $wishlistRepo->delete($wishlist['id']);
             $removedCount++; // +1 for the wishlist record itself
         }
+
+        FluentCrmSync::detachActiveTagForUser((int) $user->ID);
 
         return [
             'items_removed'  => $removedCount,

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FChubWishlist\Domain\Actions;
 
-use FChubWishlist\Storage\WishlistItemRepository;
+use FChubWishlist\Storage\WishlistRepository;
 
 defined('ABSPATH') || exit;
 
@@ -12,16 +12,16 @@ class ToggleItemAction
 {
     private AddItemAction $addItem;
     private RemoveItemAction $removeItem;
-    private WishlistItemRepository $items;
+    private WishlistRepository $wishlists;
 
     public function __construct(
         AddItemAction $addItem,
         RemoveItemAction $removeItem,
-        WishlistItemRepository $items,
+        WishlistRepository $wishlists,
     ) {
         $this->addItem = $addItem;
         $this->removeItem = $removeItem;
-        $this->items = $items;
+        $this->wishlists = $wishlists;
     }
 
     /**
@@ -31,36 +31,34 @@ class ToggleItemAction
      */
     public function execute(array $wishlist, int $productId, int $variantId): array
     {
-        $exists = $this->items->exists($wishlist['id'], $productId, $variantId);
+        $result = $this->addItem->execute($wishlist, $productId, $variantId);
 
-        if ($exists) {
-            $removed = $this->removeItem->execute($wishlist, $productId, $variantId);
-            $newCount = max(0, $wishlist['item_count'] - ($removed ? 1 : 0));
-
+        if ($result['success']) {
             return [
-                'action' => 'removed',
-                'item'   => null,
-                'count'  => $newCount,
+                'action' => 'added',
+                'item'   => $result['item'],
+                'count'  => $result['count'],
                 'error'  => '',
             ];
         }
 
-        $result = $this->addItem->execute($wishlist, $productId, $variantId);
+        if ($result['error'] === AddItemAction::ERROR_DUPLICATE) {
+            $removed = $this->removeItem->execute($wishlist, $productId, $variantId);
+            $newCount = $this->wishlists->getItemCount((int) $wishlist['id']);
 
-        if (!$result['success']) {
             return [
-                'action' => 'failed',
+                'action' => $removed ? 'removed' : 'failed',
                 'item'   => null,
-                'count'  => $wishlist['item_count'],
-                'error'  => $result['error'],
+                'count'  => $newCount,
+                'error'  => $removed ? '' : 'Could not remove wishlist item.',
             ];
         }
 
         return [
-            'action' => 'added',
-            'item'   => $result['item'],
+            'action' => 'failed',
+            'item'   => null,
             'count'  => $result['count'],
-            'error'  => '',
+            'error'  => $result['error'],
         ];
     }
 }

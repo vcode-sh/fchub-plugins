@@ -51,18 +51,16 @@ class AutoRemovePurchasedActionTest extends TestCase
             ->willReturn($wishlist);
 
         $items = $this->createMock(WishlistItemRepository::class);
-        // First item matches, second does not
-        $items->method('findByProductAndVariant')
-            ->willReturnCallback(function ($wishlistId, $productId, $variantId) {
-                if ($productId === 100) {
-                    return MockBuilder::wishlistItem(['id' => 10, 'product_id' => 100, 'variant_id' => 200]);
-                }
-                return null;
-            });
+        $items->method('findByWishlistId')
+            ->willReturn([
+                MockBuilder::wishlistItem(['id' => 10, 'product_id' => 100, 'variant_id' => 200]),
+                MockBuilder::wishlistItem(['id' => 11, 'product_id' => 101, 'variant_id' => 201]),
+            ]);
 
         $items->expects($this->once())
-            ->method('delete')
-            ->with(10);
+            ->method('deleteByIds')
+            ->with([10])
+            ->willReturn(1);
 
         $action = new AutoRemovePurchasedAction($items, $wishlists);
         $result = $action->execute(42, [
@@ -83,11 +81,13 @@ class AutoRemovePurchasedActionTest extends TestCase
             ->willReturn($wishlist);
 
         $items = $this->createMock(WishlistItemRepository::class);
-        $items->method('findByProductAndVariant')
-            ->willReturn(null); // No matching items
+        $items->method('findByWishlistId')
+            ->willReturn([
+                MockBuilder::wishlistItem(['id' => 10, 'product_id' => 100, 'variant_id' => 200]),
+            ]);
 
         $items->expects($this->never())
-            ->method('delete');
+            ->method('deleteByIds');
 
         $action = new AutoRemovePurchasedAction($items, $wishlists);
         $result = $action->execute(42, [
@@ -110,9 +110,15 @@ class AutoRemovePurchasedActionTest extends TestCase
             ->method('recalculateItemCount')
             ->with(1);
 
-        $items = $this->createStub(WishlistItemRepository::class);
-        $items->method('findByProductAndVariant')
-            ->willReturn(MockBuilder::wishlistItem(['id' => 10]));
+        $items = $this->createMock(WishlistItemRepository::class);
+        $items->method('findByWishlistId')
+            ->willReturn([
+                MockBuilder::wishlistItem(['id' => 10, 'product_id' => 100, 'variant_id' => 200]),
+            ]);
+        $items->expects($this->once())
+            ->method('deleteByIds')
+            ->with([10])
+            ->willReturn(1);
 
         $action = new AutoRemovePurchasedAction($items, $wishlists);
         $action->execute(42, [
@@ -129,9 +135,13 @@ class AutoRemovePurchasedActionTest extends TestCase
         $wishlists->method('findByUserId')
             ->willReturn($wishlist);
 
-        $items = $this->createStub(WishlistItemRepository::class);
-        $items->method('findByProductAndVariant')
-            ->willReturn(MockBuilder::wishlistItem(['id' => 10, 'product_id' => 100]));
+        $items = $this->createMock(WishlistItemRepository::class);
+        $items->method('findByWishlistId')
+            ->willReturn([
+                MockBuilder::wishlistItem(['id' => 10, 'product_id' => 100, 'variant_id' => 200]),
+            ]);
+        $items->method('deleteByIds')
+            ->willReturn(1);
 
         $action = new AutoRemovePurchasedAction($items, $wishlists);
         $action->execute(42, [
@@ -155,9 +165,12 @@ class AutoRemovePurchasedActionTest extends TestCase
         $wishlists->method('findByUserId')
             ->willReturn($wishlist);
 
-        $items = $this->createStub(WishlistItemRepository::class);
-        $items->method('findByProductAndVariant')
-            ->willReturn(null);
+        $items = $this->createMock(WishlistItemRepository::class);
+        $items->method('findByWishlistId')
+            ->willReturn([
+                MockBuilder::wishlistItem(['id' => 10, 'product_id' => 100, 'variant_id' => 200]),
+            ]);
+        $items->expects($this->never())->method('deleteByIds');
 
         $action = new AutoRemovePurchasedAction($items, $wishlists);
         $action->execute(42, [
@@ -177,16 +190,16 @@ class AutoRemovePurchasedActionTest extends TestCase
             ->willReturn($wishlist);
 
         $items = $this->createMock(WishlistItemRepository::class);
-
-        $callCount = 0;
-        $items->method('findByProductAndVariant')
-            ->willReturnCallback(function () use (&$callCount) {
-                $callCount++;
-                return MockBuilder::wishlistItem(['id' => $callCount]);
-            });
-
-        $items->expects($this->exactly(3))
-            ->method('delete');
+        $items->method('findByWishlistId')
+            ->willReturn([
+                MockBuilder::wishlistItem(['id' => 10, 'product_id' => 100, 'variant_id' => 200]),
+                MockBuilder::wishlistItem(['id' => 11, 'product_id' => 101, 'variant_id' => 201]),
+                MockBuilder::wishlistItem(['id' => 12, 'product_id' => 102, 'variant_id' => 202]),
+            ]);
+        $items->expects($this->once())
+            ->method('deleteByIds')
+            ->with([10, 11, 12])
+            ->willReturn(3);
 
         $action = new AutoRemovePurchasedAction($items, $wishlists);
         $result = $action->execute(42, [

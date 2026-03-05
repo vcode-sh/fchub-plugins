@@ -1,0 +1,93 @@
+{
+  "$schema": "https://biomejs.dev/schemas/latest/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": false
+  },
+  "files": {
+    "includes": ["resources/js/**/*.js", "admin/**/*.js"],
+    "ignoreUnknown": true
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 4,
+    "lineWidth": 120,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "none",
+      "arrowParentheses": "always"
+    },
+    "globals": [
+      "window",
+      "document",
+      "fetch",
+      "Promise",
+      "Map",
+      "Set",
+      "setTimeout",
+      "clearTimeout",
+      "URLSearchParams",
+      "CustomEvent",
+      "MutationObserver",
+      "requestAnimationFrame",
+      "location",
+      "fchubWishlistVars",
+      "fchubWishlistAdmin",
+      "FluentCartCart",
+      "fluent_cart_admin"
+    ]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "noForEach": "off",
+        "useArrowFunction": "off",
+        "useOptionalChain": "off",
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": { "maxAllowedComplexity": 25 }
+        }
+      },
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedFunctionParameters": "warn",
+        "noInnerDeclarations": "off"
+      },
+      "performance": {
+        "noAccumulatingSpread": "error",
+        "noDelete": "off",
+        "useTopLevelRegex": "off"
+      },
+      "style": {
+        "useConst": "warn",
+        "useTemplate": "off",
+        "noParameterAssign": "off",
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "requireAscii": true,
+            "filenameCases": ["kebab-case"]
+          }
+        }
+      },
+      "suspicious": {
+        "noConsole": "off",
+        "noEmptyBlockStatements": "off",
+        "noRedundantUseStrict": "off"
+      }
+    }
+  },
+  "css": {
+    "linter": {
+      "enabled": false
+    }
+  }
+}

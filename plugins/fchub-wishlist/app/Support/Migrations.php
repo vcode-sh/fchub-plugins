@@ -10,40 +10,13 @@ class Migrations
 {
     public static function run(): void
     {
-        global $wpdb;
-        $charset = $wpdb->get_charset_collate();
-        $prefix = $wpdb->prefix . 'fchub_wishlist_';
+        $currentVersion = (string) get_option(Constants::OPTION_DB_VERSION, '0');
 
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        self::migrateTo100();
 
-        dbDelta("CREATE TABLE {$prefix}lists (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            user_id BIGINT UNSIGNED NULL,
-            customer_id BIGINT UNSIGNED NULL,
-            session_hash VARCHAR(64) NULL,
-            title VARCHAR(192) NOT NULL DEFAULT 'Wishlist',
-            item_count INT UNSIGNED NOT NULL DEFAULT 0,
-            created_at DATETIME NULL,
-            updated_at DATETIME NULL,
-            PRIMARY KEY (id),
-            UNIQUE KEY user_id (user_id),
-            KEY session_hash (session_hash),
-            KEY customer_id (customer_id)
-        ) {$charset};");
-
-        dbDelta("CREATE TABLE {$prefix}items (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            wishlist_id BIGINT UNSIGNED NOT NULL,
-            product_id BIGINT UNSIGNED NOT NULL,
-            variant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
-            price_at_addition DOUBLE NOT NULL DEFAULT 0,
-            note TEXT NULL,
-            created_at DATETIME NULL,
-            PRIMARY KEY (id),
-            KEY wishlist_id (wishlist_id),
-            UNIQUE KEY wishlist_product_variant (wishlist_id, product_id, variant_id),
-            KEY product_id (product_id)
-        ) {$charset};");
+        if (version_compare($currentVersion, '1.0.1', '<')) {
+            self::migrateTo101();
+        }
     }
 
     /**
@@ -65,5 +38,56 @@ class Migrations
 
         delete_option(Constants::OPTION_DB_VERSION);
         delete_option(Constants::OPTION_SETTINGS);
+        delete_option('fchub_wishlist_feature_flags');
+    }
+
+    private static function migrateTo100(): void
+    {
+        self::createOrUpdateSchema();
+    }
+
+    private static function migrateTo101(): void
+    {
+        self::createOrUpdateSchema();
+    }
+
+    private static function createOrUpdateSchema(): void
+    {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+        $prefix = $wpdb->prefix . 'fchub_wishlist_';
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        dbDelta("CREATE TABLE {$prefix}lists (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NULL,
+            customer_id BIGINT UNSIGNED NULL,
+            session_hash VARCHAR(64) NULL,
+            title VARCHAR(192) NOT NULL DEFAULT 'Wishlist',
+            item_count INT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NULL,
+            updated_at DATETIME NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY user_id (user_id),
+            KEY session_hash (session_hash),
+            KEY customer_id (customer_id),
+            KEY updated_at (updated_at)
+        ) {$charset};");
+
+        dbDelta("CREATE TABLE {$prefix}items (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            wishlist_id BIGINT UNSIGNED NOT NULL,
+            product_id BIGINT UNSIGNED NOT NULL,
+            variant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            price_at_addition DOUBLE NOT NULL DEFAULT 0,
+            note TEXT NULL,
+            created_at DATETIME NULL,
+            PRIMARY KEY (id),
+            KEY wishlist_id (wishlist_id),
+            UNIQUE KEY wishlist_product_variant (wishlist_id, product_id, variant_id),
+            KEY product_id (product_id),
+            KEY created_at (created_at)
+        ) {$charset};");
     }
 }

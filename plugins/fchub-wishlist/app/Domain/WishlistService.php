@@ -116,7 +116,7 @@ class WishlistService
         return $userId > 0 ? $this->context->getOrCreateForUser($userId) : null;
     }
 
-    public function getOrCreateForGuest(string $sessionHash): array
+    public function getOrCreateForGuest(string $sessionHash): ?array
     {
         return $this->context->getOrCreateForGuest($sessionHash);
     }

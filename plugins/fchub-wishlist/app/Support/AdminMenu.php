@@ -15,7 +15,7 @@ class AdminMenu
         $submenu['fluent-cart']['wishlist'] = [
             __('Wishlist', 'fchub-wishlist'),
             'manage_options',
-            'admin.php?page=fluent-cart#/wishlist',
+            'admin.php?page=fluent-cart#/settings/wishlist',
             '',
             'fchub_wishlist',
         ];

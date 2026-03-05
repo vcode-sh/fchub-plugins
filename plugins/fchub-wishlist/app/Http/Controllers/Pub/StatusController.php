@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace FChubWishlist\Http\Controllers\Pub;
 
 use FChubWishlist\Domain\GuestSession;
-use FChubWishlist\Storage\WishlistItemRepository;
+use FChubWishlist\Storage\Queries\WishlistItemsQuery;
 use FChubWishlist\Storage\WishlistRepository;
 use FChubWishlist\Support\Hooks;
 
@@ -19,16 +19,12 @@ final class StatusController
             return self::emptyItemsResponse();
         }
 
-        $wishlist = self::resolveWishlist();
-        if (!$wishlist) {
-            return self::emptyItemsResponse();
-        }
-
         $page = max(1, absint($request->get_param('page') ?? 1));
         $perPage = min(100, max(1, absint($request->get_param('per_page') ?? 20)));
+        $wishlist = self::resolveWishlist();
 
         $queryArgs = apply_filters('fchub_wishlist/items_query', [
-            'wishlist_id' => $wishlist['id'],
+            'wishlist_id' => (int) ($wishlist['id'] ?? 0),
             'page'        => $page,
             'per_page'    => $perPage,
         ]);
@@ -38,21 +34,31 @@ final class StatusController
             $perPage = min(100, max(1, absint($queryArgs['per_page'] ?? $perPage)));
         }
 
-        $itemRepo = new WishlistItemRepository();
-        $allItems = $itemRepo->getItemsWithProductData($wishlist['id']);
-        $total = count($allItems);
-        $offset = ($page - 1) * $perPage;
-        $items = array_slice($allItems, $offset, $perPage);
+        $query = new WishlistItemsQuery();
+        $userId = get_current_user_id();
+
+        if ($userId > 0) {
+            $result = $query->getItemsForUser($userId, $page, $perPage);
+        } else {
+            $hash = GuestSession::getHash();
+            if ($hash === '') {
+                return self::emptyItemsResponse();
+            }
+
+            $result = $query->getItemsForGuest($hash, $page, $perPage);
+        }
 
         $enriched = array_map(static function (array $item): array {
-            return apply_filters('fchub_wishlist/enriched_item', $item);
-        }, $items);
+            $item = apply_filters('fchub_wishlist/enriched_item', $item);
+            unset($item['id'], $item['wishlist_id']);
+            return $item;
+        }, $result['items']);
 
         return new \WP_REST_Response([
             'success' => true,
             'data'    => [
                 'items'    => $enriched,
-                'total'    => $total,
+                'total'    => $result['total'],
                 'page'     => $page,
                 'per_page' => $perPage,
             ],
@@ -70,21 +76,15 @@ final class StatusController
             return self::emptyStatusResponse();
         }
 
-        $itemRepo = new WishlistItemRepository();
-        $items = $itemRepo->findByWishlistId($wishlist['id']);
-
-        $pairs = array_map(static function (array $item): array {
-            return [
-                'product_id' => $item['product_id'],
-                'variant_id' => $item['variant_id'],
-            ];
-        }, $items);
+        $query = new WishlistItemsQuery();
+        $pairs = $query->getProductIdsInWishlist((int) $wishlist['id']);
+        $count = count($pairs);
 
         return new \WP_REST_Response([
             'success' => true,
             'data'    => [
                 'items' => $pairs,
-                'count' => $wishlist['item_count'],
+                'count' => $count,
             ],
         ]);
     }

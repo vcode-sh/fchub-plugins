@@ -24,6 +24,23 @@ if ($fchub_wishlist_remove) {
     // Delete options
     delete_option('fchub_wishlist_settings');
     delete_option('fchub_wishlist_db_version');
+    delete_option('fchub_wishlist_feature_flags');
+
+    // Remove reminder marker user meta from all users.
+    if (isset($wpdb->usermeta)) {
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s",
+            '_fchub_wishlist_last_reminder'
+        ));
+    }
+
+    // Clean up Action Scheduler hooks.
+    if (function_exists('as_unschedule_all_actions')) {
+        as_unschedule_all_actions('fchub_wishlist_cleanup_guests', [], 'fchub-wishlist');
+        as_unschedule_all_actions('fchub_wishlist_cleanup_orphans', [], 'fchub-wishlist');
+        as_unschedule_all_actions('fchub_wishlist_reminder', [], 'fchub-wishlist');
+        as_unschedule_all_actions('fchub_wishlist_send_email', [], 'fchub-wishlist');
+    }
 
     // Clean up scheduled hooks
     wp_clear_scheduled_hook('fchub_wishlist_cleanup_guests');

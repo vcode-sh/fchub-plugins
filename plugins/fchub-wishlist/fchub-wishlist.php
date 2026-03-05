@@ -23,7 +23,7 @@ define('FCHUB_WISHLIST_VERSION', '1.0.0');
 define('FCHUB_WISHLIST_FILE', __FILE__);
 define('FCHUB_WISHLIST_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_WISHLIST_URL', plugin_dir_url(__FILE__));
-define('FCHUB_WISHLIST_DB_VERSION', '1.0.0');
+define('FCHUB_WISHLIST_DB_VERSION', '1.0.1');
 
 require_once __DIR__ . '/lib/GitHubUpdater.php';
 FCHub_GitHub_Updater::register('fchub-wishlist', plugin_basename(__FILE__), FCHUB_WISHLIST_VERSION);
@@ -46,6 +46,10 @@ spl_autoload_register(function ($class) {
     }
 });
 
+$fchubWishlistCleanupGuestsHook = FChubWishlist\Support\Constants::CRON_CLEANUP_GUESTS;
+$fchubWishlistCleanupOrphansHook = FChubWishlist\Support\Constants::CRON_CLEANUP_ORPHANS;
+$fchubWishlistReminderHook = FChubWishlist\Support\Constants::CRON_REMINDER;
+
 /**
  * Plugin activation: create database tables and register scheduled actions.
  */
@@ -53,19 +57,21 @@ register_activation_hook(__FILE__, function () {
     FChubWishlist\Support\Migrations::run();
     update_option('fchub_wishlist_db_version', FCHUB_WISHLIST_DB_VERSION);
 
+    global $fchubWishlistCleanupGuestsHook, $fchubWishlistCleanupOrphansHook, $fchubWishlistReminderHook;
+
     if (function_exists('as_schedule_recurring_action')) {
-        as_schedule_recurring_action(time(), DAY_IN_SECONDS, 'fchub_wishlist_cleanup_guests', [], 'fchub-wishlist', true);
-        as_schedule_recurring_action(time(), WEEK_IN_SECONDS, 'fchub_wishlist_cleanup_orphans', [], 'fchub-wishlist', true);
-        as_schedule_recurring_action(time(), DAY_IN_SECONDS, 'fchub_wishlist_reminder', [], 'fchub-wishlist', true);
+        as_schedule_recurring_action(time(), DAY_IN_SECONDS, $fchubWishlistCleanupGuestsHook, [], 'fchub-wishlist', true);
+        as_schedule_recurring_action(time(), WEEK_IN_SECONDS, $fchubWishlistCleanupOrphansHook, [], 'fchub-wishlist', true);
+        as_schedule_recurring_action(time(), DAY_IN_SECONDS, $fchubWishlistReminderHook, [], 'fchub-wishlist', true);
     } else {
-        if (!wp_next_scheduled('fchub_wishlist_cleanup_guests')) {
-            wp_schedule_event(time(), 'daily', 'fchub_wishlist_cleanup_guests');
+        if (!wp_next_scheduled($fchubWishlistCleanupGuestsHook)) {
+            wp_schedule_event(time(), 'daily', $fchubWishlistCleanupGuestsHook);
         }
-        if (!wp_next_scheduled('fchub_wishlist_cleanup_orphans')) {
-            wp_schedule_event(time(), 'weekly', 'fchub_wishlist_cleanup_orphans');
+        if (!wp_next_scheduled($fchubWishlistCleanupOrphansHook)) {
+            wp_schedule_event(time(), 'weekly', $fchubWishlistCleanupOrphansHook);
         }
-        if (!wp_next_scheduled('fchub_wishlist_reminder')) {
-            wp_schedule_event(time(), 'daily', 'fchub_wishlist_reminder');
+        if (!wp_next_scheduled($fchubWishlistReminderHook)) {
+            wp_schedule_event(time(), 'daily', $fchubWishlistReminderHook);
         }
     }
 });
@@ -74,14 +80,16 @@ register_activation_hook(__FILE__, function () {
  * Plugin deactivation: unregister scheduled actions, preserve tables.
  */
 register_deactivation_hook(__FILE__, function () {
+    global $fchubWishlistCleanupGuestsHook, $fchubWishlistCleanupOrphansHook, $fchubWishlistReminderHook;
+
     if (function_exists('as_unschedule_all_actions')) {
-        as_unschedule_all_actions('fchub_wishlist_cleanup_guests', [], 'fchub-wishlist');
-        as_unschedule_all_actions('fchub_wishlist_cleanup_orphans', [], 'fchub-wishlist');
-        as_unschedule_all_actions('fchub_wishlist_reminder', [], 'fchub-wishlist');
+        as_unschedule_all_actions($fchubWishlistCleanupGuestsHook, [], 'fchub-wishlist');
+        as_unschedule_all_actions($fchubWishlistCleanupOrphansHook, [], 'fchub-wishlist');
+        as_unschedule_all_actions($fchubWishlistReminderHook, [], 'fchub-wishlist');
     }
-    wp_clear_scheduled_hook('fchub_wishlist_cleanup_guests');
-    wp_clear_scheduled_hook('fchub_wishlist_cleanup_orphans');
-    wp_clear_scheduled_hook('fchub_wishlist_reminder');
+    wp_clear_scheduled_hook($fchubWishlistCleanupGuestsHook);
+    wp_clear_scheduled_hook($fchubWishlistCleanupOrphansHook);
+    wp_clear_scheduled_hook($fchubWishlistReminderHook);
 });
 
 /**
@@ -126,7 +134,7 @@ add_action('admin_menu', function () {
 /**
  * Cron: delete guest wishlists older than 30 days.
  */
-add_action('fchub_wishlist_cleanup_guests', function () {
+add_action($fchubWishlistCleanupGuestsHook, function () {
     if (!defined('FLUENTCART_VERSION')) {
         return;
     }
@@ -136,7 +144,7 @@ add_action('fchub_wishlist_cleanup_guests', function () {
 /**
  * Cron: remove items for deleted/trashed products.
  */
-add_action('fchub_wishlist_cleanup_orphans', function () {
+add_action($fchubWishlistCleanupOrphansHook, function () {
     if (!defined('FLUENTCART_VERSION')) {
         return;
     }
@@ -146,7 +154,7 @@ add_action('fchub_wishlist_cleanup_orphans', function () {
 /**
  * Cron: send wishlist reminder emails.
  */
-add_action('fchub_wishlist_reminder', function () {
+add_action($fchubWishlistReminderHook, function () {
     if (!defined('FLUENTCART_VERSION')) {
         return;
     }

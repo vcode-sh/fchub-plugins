@@ -19,6 +19,8 @@ parameters:
         # FluentCRM classes
         - ../../../fchub-playground/wp-content/plugins/fluent-crm/app
         - ../../../fchub-playground/wp-content/plugins/fluent-crm/vendor/wpfluent
+    scanFiles:
+        - lib/GitHubUpdater.php
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: false
     ignoreErrors:

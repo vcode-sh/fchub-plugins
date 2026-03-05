@@ -457,6 +457,29 @@
     border-radius: 4px;
 }
 
+.fchub-wishlist-pagination {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.fchub-wishlist-pagination__link {
+    color: #111827;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.fchub-wishlist-pagination__link:hover {
+    text-decoration: underline;
+}
+
+.fchub-wishlist-pagination__meta {
+    font-size: 13px;
+    color: #6b7280;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 640px) {

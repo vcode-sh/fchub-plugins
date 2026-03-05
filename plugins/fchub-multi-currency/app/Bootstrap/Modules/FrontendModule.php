@@ -14,6 +14,7 @@ use FChubMultiCurrency\Support\Constants;
 use FChubMultiCurrency\Support\FeatureFlags;
 use FChubMultiCurrency\Support\Hooks;
 use FluentCart\Api\CurrencySettings;
+use FluentCart\App\Helpers\CurrenciesHelper;
 
 defined('ABSPATH') || exit;
 
@@ -149,6 +150,26 @@ final class FrontendModule implements ModuleContract
 
         if (empty($currencies)) {
             return '';
+        }
+
+        // Ensure the store's base currency is always available in the switcher
+        $baseCode = $context->baseCurrency->code;
+        $basePresent = false;
+        foreach ($currencies as $currency) {
+            if (is_array($currency) && ($currency['code'] ?? '') === $baseCode) {
+                $basePresent = true;
+                break;
+            }
+        }
+        if (!$basePresent) {
+            // Look up proper name/symbol from FluentCart's catalogue (context fallback may only have the code)
+            $allCurrencies = CurrenciesHelper::getCurrencies();
+            $allSigns = CurrenciesHelper::getCurrencySigns();
+            array_unshift($currencies, [
+                'code'   => $baseCode,
+                'name'   => $allCurrencies[$baseCode] ?? $baseCode,
+                'symbol' => $allSigns[$baseCode] ?? $baseCode,
+            ]);
         }
 
         $currentFlag = CurrencyCatalogueController::codeToFlag($currentCode);

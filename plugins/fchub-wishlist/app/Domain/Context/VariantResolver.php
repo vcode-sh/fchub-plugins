@@ -24,24 +24,6 @@ class VariantResolver
     }
 
     /**
-     * Validate that a variant exists and is active.
-     */
-    public function validate(int $variantId): bool
-    {
-        if ($variantId <= 0) {
-            return false;
-        }
-
-        global $wpdb;
-        $variationsTable = $wpdb->prefix . 'fct_product_variations';
-
-        return (bool) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$variationsTable} WHERE id = %d AND item_status = 'active'",
-            $variantId
-        ));
-    }
-
-    /**
      * Get the default variant for a product.
      *
      * First checks fct_product_details.default_variation_id,
@@ -54,9 +36,15 @@ class VariantResolver
         $detailsTable = $wpdb->prefix . 'fct_product_details';
         $variationsTable = $wpdb->prefix . 'fct_product_variations';
 
-        // Try default_variation_id from product details
+        // Try default_variation_id from product details, but only if the variant is still active.
         $defaultId = $wpdb->get_var($wpdb->prepare(
-            "SELECT default_variation_id FROM {$detailsTable} WHERE post_id = %d",
+            "SELECT v.id
+             FROM {$detailsTable} d
+             INNER JOIN {$variationsTable} v
+                ON v.id = d.default_variation_id
+               AND v.item_status = 'active'
+             WHERE d.post_id = %d
+             LIMIT 1",
             $productId
         ));
 

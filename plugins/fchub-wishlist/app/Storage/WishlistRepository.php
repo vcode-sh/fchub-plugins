@@ -9,11 +9,13 @@ defined('ABSPATH') || exit;
 class WishlistRepository
 {
     private string $table;
+    private WishlistRepositoryMaintenance $maintenance;
 
     public function __construct()
     {
         global $wpdb;
         $this->table = $wpdb->prefix . 'fchub_wishlist_lists';
+        $this->maintenance = new WishlistRepositoryMaintenance($this->table);
     }
 
     public function find(int $id): ?array
@@ -75,7 +77,11 @@ class WishlistRepository
             'updated_at'   => $now,
         ];
 
-        $wpdb->insert($this->table, $insert);
+        $result = $wpdb->insert($this->table, $insert);
+        if ($result === false) {
+            return 0;
+        }
+
         return (int) $wpdb->insert_id;
     }
 
@@ -156,29 +162,7 @@ class WishlistRepository
 
     public function deleteBySessionHash(string $hash): int
     {
-        global $wpdb;
-
-        // First delete all items belonging to wishlists with this session hash
-        $wishlistIds = $wpdb->get_col($wpdb->prepare(
-            "SELECT id FROM {$this->table} WHERE session_hash = %s AND user_id IS NULL",
-            $hash
-        ));
-
-        if ($wishlistIds) {
-            $itemsTable = $wpdb->prefix . 'fchub_wishlist_items';
-            $placeholders = implode(',', array_fill(0, count($wishlistIds), '%d'));
-            // phpcs:disable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- dynamic placeholder count
-            $wpdb->query($wpdb->prepare(
-                "DELETE FROM {$itemsTable} WHERE wishlist_id IN ({$placeholders})",
-                ...$wishlistIds
-            ));
-            // phpcs:enable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
-        }
-
-        return (int) $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$this->table} WHERE session_hash = %s AND user_id IS NULL",
-            $hash
-        ));
+        return $this->maintenance->deleteBySessionHash($hash);
     }
 
     /**
@@ -186,18 +170,19 @@ class WishlistRepository
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getOrphanedGuestLists(int $olderThanDays): array
+    public function getOrphanedGuestLists(int $olderThanDays, int $limit = 0): array
     {
-        global $wpdb;
+        return array_map([$this, 'hydrate'], $this->maintenance->getOrphanedGuestLists($olderThanDays, $limit));
+    }
 
-        $cutoff = gmdate('Y-m-d H:i:s', time() - ($olderThanDays * DAY_IN_SECONDS));
+    public function deleteByIds(array $wishlistIds): int
+    {
+        return $this->maintenance->deleteByIds($wishlistIds);
+    }
 
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table} WHERE user_id IS NULL AND session_hash IS NOT NULL AND updated_at < %s",
-            $cutoff
-        ), ARRAY_A);
-
-        return array_map([$this, 'hydrate'], $rows ?: []);
+    public function getItemCount(int $id): int
+    {
+        return $this->maintenance->getItemCount($id);
     }
 
     private function hydrate(array $row): array

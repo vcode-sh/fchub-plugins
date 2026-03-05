@@ -8,10 +8,16 @@ defined('ABSPATH') || exit;
 
 use FChubWishlist\Support\Constants;
 use FChubWishlist\Support\Hooks;
+use FChubWishlist\Storage\WishlistItemRepository;
 use FChubWishlist\Storage\WishlistRepository;
 
 class FluentCrmSync
 {
+    private const TAG_CACHE_KEY_PREFIX = 'fchub_wishlist_fcrm_tag_';
+
+    /** @var array<string, int> */
+    private array $tagIdCache = [];
+
     public function register(): void
     {
         if (!defined('FLUENTCRM') || !function_exists('FluentCrmApi')) {
@@ -55,11 +61,38 @@ class FluentCrmSync
         }
 
         $wishlist = (new WishlistRepository())->findByUserId($userId);
-        if ($wishlist && $wishlist['item_count'] > 0) {
+        if ($wishlist && (new WishlistItemRepository())->countByWishlistId((int) $wishlist['id']) > 0) {
             return;
         }
 
-        $contact = $this->getContact($userId);
+        $contact = $this->getExistingContact($userId);
+        if (!$contact) {
+            return;
+        }
+
+        $settings = Hooks::getSettings();
+        $tagPrefix = $settings['fluentcrm_tag_prefix'] ?? 'wishlist:';
+        $tagName = $tagPrefix . 'active';
+
+        $tagId = $this->findTagByTitle($tagName);
+        if ($tagId) {
+            $contact->detachTags([$tagId]);
+        }
+    }
+
+    public static function detachActiveTagForUser(int $userId): void
+    {
+        if (!$userId || !defined('FLUENTCRM') || !function_exists('FluentCrmApi')) {
+            return;
+        }
+
+        $sync = new self();
+        $sync->detachActiveTag($userId);
+    }
+
+    private function detachActiveTag(int $userId): void
+    {
+        $contact = $this->getExistingContact($userId);
         if (!$contact) {
             return;
         }
@@ -94,6 +127,11 @@ class FluentCrmSync
         ]);
     }
 
+    private function getExistingContact(int $userId): ?object
+    {
+        return FluentCrmApi('contacts')->getContactByUserRef($userId);
+    }
+
     private function ensureTag(string $tagName, array $settings): ?int
     {
         $existing = $this->findTagByTitle($tagName);
@@ -110,7 +148,12 @@ class FluentCrmSync
         ]);
 
         if (!empty($result) && isset($result[0])) {
-            return $result[0]->id ?? null;
+            $tagId = (int) ($result[0]->id ?? 0);
+            if ($tagId > 0) {
+                $this->tagIdCache[$tagName] = $tagId;
+                set_transient(self::TAG_CACHE_KEY_PREFIX . md5($tagName), $tagId, HOUR_IN_SECONDS);
+                return $tagId;
+            }
         }
 
         return $this->findTagByTitle($tagName);
@@ -118,10 +161,26 @@ class FluentCrmSync
 
     private function findTagByTitle(string $title): ?int
     {
+        if (array_key_exists($title, $this->tagIdCache)) {
+            return $this->tagIdCache[$title] > 0 ? $this->tagIdCache[$title] : null;
+        }
+
+        $transientKey = self::TAG_CACHE_KEY_PREFIX . md5($title);
+        $cachedId = get_transient($transientKey);
+        if ($cachedId !== false) {
+            $cached = (int) $cachedId;
+            $this->tagIdCache[$title] = $cached;
+            return $cached > 0 ? $cached : null;
+        }
+
         $tag = FluentCrmApi('tags')->getInstance()->newQuery()
             ->where('title', $title)
             ->first();
 
-        return $tag ? (int) $tag->id : null;
+        $tagId = $tag ? (int) $tag->id : 0;
+        $this->tagIdCache[$title] = $tagId;
+        set_transient($transientKey, $tagId, HOUR_IN_SECONDS);
+
+        return $tagId > 0 ? $tagId : null;
     }
 }

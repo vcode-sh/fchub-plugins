@@ -10,9 +10,16 @@ defined('ABSPATH') || exit;
 
 final class DashboardWidget
 {
+    private const CACHE_KEY = 'fchub_wishlist_dashboard_total_items';
+
     public static function register(): void
     {
         add_filter('fluent_cart/dashboard_stats', [self::class, 'addStatCard']);
+        add_action('fchub_wishlist/item_added', [self::class, 'flushCache']);
+        add_action('fchub_wishlist/item_removed', [self::class, 'flushCache']);
+        add_action('fchub_wishlist/wishlist_cleared', [self::class, 'flushCache']);
+        add_action('fchub_wishlist/items_auto_removed', [self::class, 'flushCache']);
+        add_action('fchub_wishlist/wishlist_merged', [self::class, 'flushCache']);
     }
 
     /**
@@ -21,11 +28,16 @@ final class DashboardWidget
      */
     public static function addStatCard(array $stats): array
     {
-        $itemRepo = new WishlistItemRepository();
+        $count = get_transient(self::CACHE_KEY);
+        if ($count === false) {
+            $itemRepo = new WishlistItemRepository();
+            $count = $itemRepo->totalCount();
+            set_transient(self::CACHE_KEY, (int) $count, 5 * MINUTE_IN_SECONDS);
+        }
 
         $stats[] = [
             'title'         => __('Wishlisted Items', 'fchub-wishlist'),
-            'current_count' => $itemRepo->totalCount(),
+            'current_count' => (int) $count,
             'icon'          => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
                 . 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
                 . 'stroke-linejoin="round" width="24" height="24">'
@@ -37,5 +49,10 @@ final class DashboardWidget
         ];
 
         return $stats;
+    }
+
+    public static function flushCache(): void
+    {
+        delete_transient(self::CACHE_KEY);
     }
 }

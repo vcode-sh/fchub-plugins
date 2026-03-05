@@ -126,7 +126,15 @@ const ApiClient = {
      * @returns {Promise<object>}
      */
     _handleResponse(response) {
-        return response.json().then(function (data) {
+        return response.text().then(function (text) {
+            var data = {};
+
+            try {
+                data = text ? JSON.parse(text) : {};
+            } catch (_e) {
+                data = {};
+            }
+
             if (!response.ok) {
                 return Promise.reject(data);
             }

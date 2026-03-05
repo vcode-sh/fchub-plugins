@@ -63,6 +63,7 @@ class FluentCrmSyncTest extends TestCase
             'created_at'   => '2025-01-01 00:00:00',
             'updated_at'   => '2025-01-01 00:00:00',
         ]);
+        $this->setWpdbMockVar('5');
 
         $sync = new FluentCrmSync();
         $sync->onItemRemoved(42, 100, 200, 1);

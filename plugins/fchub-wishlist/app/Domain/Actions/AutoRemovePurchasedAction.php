@@ -40,22 +40,34 @@ class AutoRemovePurchasedAction
             return 0;
         }
 
-        $removedCount = 0;
-        $removedProductIds = [];
-
-        foreach ($purchasedItems as $purchased) {
-            $productId = (int) $purchased['product_id'];
-            $variantId = (int) $purchased['variant_id'];
-
-            $item = $this->items->findByProductAndVariant($wishlist['id'], $productId, $variantId);
-
-            if ($item) {
-                $this->items->delete($item['id']);
-                $removedCount++;
-                $removedProductIds[] = $productId;
-            }
+        $wishlistItems = $this->items->findByWishlistId($wishlist['id']);
+        if (empty($wishlistItems)) {
+            return 0;
         }
 
+        $purchasedKeys = [];
+        foreach ($purchasedItems as $purchased) {
+            $purchasedKeys[$this->pairKey((int) $purchased['product_id'], (int) $purchased['variant_id'])] = true;
+        }
+
+        $itemIdsToDelete = [];
+        $removedProductIds = [];
+
+        foreach ($wishlistItems as $wishlistItem) {
+            $key = $this->pairKey((int) $wishlistItem['product_id'], (int) $wishlistItem['variant_id']);
+            if (!isset($purchasedKeys[$key])) {
+                continue;
+            }
+
+            $itemIdsToDelete[] = (int) $wishlistItem['id'];
+            $removedProductIds[] = (int) $wishlistItem['product_id'];
+        }
+
+        if (empty($itemIdsToDelete)) {
+            return 0;
+        }
+
+        $removedCount = $this->items->deleteByIds($itemIdsToDelete);
         if ($removedCount > 0) {
             $this->wishlists->recalculateItemCount($wishlist['id']);
 
@@ -76,5 +88,10 @@ class AutoRemovePurchasedAction
         }
 
         return $removedCount;
+    }
+
+    private function pairKey(int $productId, int $variantId): string
+    {
+        return $productId . ':' . $variantId;
     }
 }

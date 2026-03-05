@@ -10,125 +10,33 @@ class WishlistItemsQuery
 {
     private string $itemsTable;
     private string $listsTable;
+    private string $variationsTable;
+    private string $detailsTable;
 
     public function __construct()
     {
         global $wpdb;
         $this->itemsTable = $wpdb->prefix . 'fchub_wishlist_items';
         $this->listsTable = $wpdb->prefix . 'fchub_wishlist_lists';
+        $this->variationsTable = $wpdb->prefix . 'fct_product_variations';
+        $this->detailsTable = $wpdb->prefix . 'fct_product_details';
     }
 
-    /**
-     * Get items with full product data for a user, with pagination.
-     *
-     * @return array{items: array<int, array<string, mixed>>, total: int}
-     */
     public function getItemsForUser(int $userId, int $page = 1, int $perPage = 20): array
     {
-        global $wpdb;
-
-        $postsTable = $wpdb->posts;
-        $variationsTable = $wpdb->prefix . 'fct_product_variations';
-
-        $total = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*)
-             FROM {$this->itemsTable} i
-             INNER JOIN {$this->listsTable} l ON i.wishlist_id = l.id
-             WHERE l.user_id = %d",
-            $userId
-        ));
-
-        $offset = ($page - 1) * $perPage;
-
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT
-                i.*,
-                p.post_title AS product_title,
-                p.post_status AS product_status,
-                p.post_name AS product_slug,
-                v.variation_title AS variant_title,
-                v.item_price AS current_price,
-                v.item_status AS variant_status,
-                v.sku AS variant_sku
-             FROM {$this->itemsTable} i
-             INNER JOIN {$this->listsTable} l ON i.wishlist_id = l.id
-             LEFT JOIN {$postsTable} p ON i.product_id = p.ID
-             LEFT JOIN {$variationsTable} v ON v.id = COALESCE(
-                 NULLIF(i.variant_id, 0),
-                 (SELECT dv.id FROM {$variationsTable} dv WHERE dv.post_id = i.product_id AND dv.item_status = 'active' ORDER BY dv.serial_index ASC LIMIT 1)
-             )
-             WHERE l.user_id = %d
-             ORDER BY i.created_at DESC
-             LIMIT %d OFFSET %d",
-            $userId,
-            $perPage,
-            $offset
-        ), ARRAY_A);
-
-        return [
-            'items' => array_map([$this, 'hydrateWithProduct'], $rows ?: []),
-            'total' => $total,
-        ];
+        return $this->getItemsForListOwner('l.user_id = %d', [$userId], $page, $perPage);
     }
 
-    /**
-     * Get items for a guest session hash with full product data.
-     *
-     * @return array{items: array<int, array<string, mixed>>, total: int}
-     */
     public function getItemsForGuest(string $sessionHash, int $page = 1, int $perPage = 20): array
     {
-        global $wpdb;
-
-        $postsTable = $wpdb->posts;
-        $variationsTable = $wpdb->prefix . 'fct_product_variations';
-
-        $total = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*)
-             FROM {$this->itemsTable} i
-             INNER JOIN {$this->listsTable} l ON i.wishlist_id = l.id
-             WHERE l.session_hash = %s AND l.user_id IS NULL",
-            $sessionHash
-        ));
-
-        $offset = ($page - 1) * $perPage;
-
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT
-                i.*,
-                p.post_title AS product_title,
-                p.post_status AS product_status,
-                p.post_name AS product_slug,
-                v.variation_title AS variant_title,
-                v.item_price AS current_price,
-                v.item_status AS variant_status,
-                v.sku AS variant_sku
-             FROM {$this->itemsTable} i
-             INNER JOIN {$this->listsTable} l ON i.wishlist_id = l.id
-             LEFT JOIN {$postsTable} p ON i.product_id = p.ID
-             LEFT JOIN {$variationsTable} v ON v.id = COALESCE(
-                 NULLIF(i.variant_id, 0),
-                 (SELECT dv.id FROM {$variationsTable} dv WHERE dv.post_id = i.product_id AND dv.item_status = 'active' ORDER BY dv.serial_index ASC LIMIT 1)
-             )
-             WHERE l.session_hash = %s AND l.user_id IS NULL
-             ORDER BY i.created_at DESC
-             LIMIT %d OFFSET %d",
-            $sessionHash,
-            $perPage,
-            $offset
-        ), ARRAY_A);
-
-        return [
-            'items' => array_map([$this, 'hydrateWithProduct'], $rows ?: []),
-            'total' => $total,
-        ];
+        return $this->getItemsForListOwner(
+            'l.session_hash = %s AND l.user_id IS NULL',
+            [$sessionHash],
+            $page,
+            $perPage
+        );
     }
 
-    /**
-     * Get product IDs that exist in a specific wishlist (for status checks).
-     *
-     * @return array<int, array{product_id: int, variant_id: int}>
-     */
     public function getProductIdsInWishlist(int $wishlistId): array
     {
         global $wpdb;
@@ -146,17 +54,58 @@ class WishlistItemsQuery
         }, $rows ?: []);
     }
 
-    /**
-     * Get wishlist items with joined product and variant data.
-     *
-     * @return array<int, array<string, mixed>>
-     */
     public function getItemsWithProductData(int $wishlistId): array
     {
+        return $this->getItemsForWishlist($wishlistId, 1, 0)['items'];
+    }
+
+    public function getItemsWithProductDataPaginated(int $wishlistId, int $page = 1, int $perPage = 20): array
+    {
+        return $this->getItemsForWishlist($wishlistId, $page, $perPage);
+    }
+
+    private function getItemsForListOwner(string $whereClause, array $params, int $page, int $perPage): array
+    {
+        $fromClause = "{$this->itemsTable} i INNER JOIN {$this->listsTable} l ON i.wishlist_id = l.id";
+
+        return $this->runItemsQuery($fromClause, $whereClause, $params, $page, $perPage, false);
+    }
+
+    private function getItemsForWishlist(int $wishlistId, int $page, int $perPage): array
+    {
+        return $this->runItemsQuery(
+            "{$this->itemsTable} i",
+            'i.wishlist_id = %d',
+            [$wishlistId],
+            $page,
+            $perPage,
+            true
+        );
+    }
+
+    private function runItemsQuery(
+        string $fromClause,
+        string $whereClause,
+        array $whereParams,
+        int $page,
+        int $perPage,
+        bool $applyItemFilter
+    ): array {
         global $wpdb;
 
-        $postsTable = $wpdb->posts;
-        $variationsTable = $wpdb->prefix . 'fct_product_variations';
+        $total = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$fromClause} WHERE {$whereClause}",
+            ...$whereParams
+        ));
+
+        $queryParams = $whereParams;
+        $limitClause = '';
+        if ($perPage > 0) {
+            $offset = max(0, ($page - 1) * $perPage);
+            $limitClause = ' LIMIT %d OFFSET %d';
+            $queryParams[] = $perPage;
+            $queryParams[] = $offset;
+        }
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT
@@ -168,21 +117,59 @@ class WishlistItemsQuery
                 v.item_price AS current_price,
                 v.item_status AS variant_status,
                 v.sku AS variant_sku
-             FROM {$this->itemsTable} i
-             LEFT JOIN {$postsTable} p ON i.product_id = p.ID
-             LEFT JOIN {$variationsTable} v ON v.id = COALESCE(
-                 NULLIF(i.variant_id, 0),
-                 (SELECT dv.id FROM {$variationsTable} dv WHERE dv.post_id = i.product_id AND dv.item_status = 'active' ORDER BY dv.serial_index ASC LIMIT 1)
-             )
-             WHERE i.wishlist_id = %d
-             ORDER BY i.created_at DESC",
-            $wishlistId
+             FROM {$fromClause}
+             LEFT JOIN {$wpdb->posts} p ON i.product_id = p.ID
+             {$this->getVariantJoinClause()}
+             WHERE {$whereClause}
+             ORDER BY i.created_at DESC{$limitClause}",
+            ...$queryParams
         ), ARRAY_A);
 
-        return array_map(function (array $row): array {
+        return [
+            'items' => $this->mapRows($rows ?: [], $applyItemFilter),
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function mapRows(array $rows, bool $applyItemFilter): array
+    {
+        return array_map(function (array $row) use ($applyItemFilter): array {
             $item = $this->hydrateWithProduct($row);
+
+            if (!$applyItemFilter) {
+                return $item;
+            }
+
             return apply_filters('fchub_wishlist/item_data', $item);
-        }, $rows ?: []);
+        }, $rows);
+    }
+
+    private function getVariantJoinClause(): string
+    {
+        return "LEFT JOIN {$this->detailsTable} pd ON pd.post_id = i.product_id
+             LEFT JOIN (
+                 SELECT picked.post_id, MIN(picked.id) AS id
+                 FROM {$this->variationsTable} picked
+                 INNER JOIN (
+                     SELECT post_id, MIN(serial_index) AS min_serial_index
+                     FROM {$this->variationsTable}
+                     WHERE item_status = 'active'
+                     GROUP BY post_id
+                 ) first_active
+                     ON first_active.post_id = picked.post_id
+                    AND first_active.min_serial_index = picked.serial_index
+                 WHERE picked.item_status = 'active'
+                 GROUP BY picked.post_id
+             ) dv ON dv.post_id = i.product_id
+             LEFT JOIN {$this->variationsTable} v ON v.id = COALESCE(
+                 NULLIF(i.variant_id, 0),
+                 NULLIF(pd.default_variation_id, 0),
+                 dv.id
+             )";
     }
 
     private function hydrateWithProduct(array $row): array

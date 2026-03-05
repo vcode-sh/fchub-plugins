@@ -1,8 +1,9 @@
 /**
  * FCHub Wishlist — Admin settings page for FluentCart's SPA.
  *
- * Registers a /wishlist route via the fluent_cart_routes filter so the UI
- * lives inside FluentCart's admin shell (sidebar, header, dark-mode toggle).
+ * Registers a /settings/wishlist child route via the fluent_cart_routes filter
+ * and injects a sidebar nav item into the settings page, matching FluentCart's
+ * native settings page pattern (identical to multi-currency).
  *
  * No build step required — uses Options API with runtime template strings
  * and FluentCart's globally registered Element Plus components.
@@ -52,108 +53,196 @@
         name: 'GeneralSettings',
         props: { settings: { type: Object, required: true } },
         template: '\
-<el-form label-position="top">\
-    <el-form-item label="Wishlist Enabled">\
-        <el-select v-model="settings.enabled">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-    </el-form-item>\
-    <el-form-item label="Guest Wishlist">\
-        <el-select v-model="settings.guest_wishlist_enabled">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-        <p class="fchub-tip">Allow non-logged-in visitors to use wishlists via cookies.</p>\
-    </el-form-item>\
-    <el-form-item label="Auto-remove Purchased Items">\
-        <el-select v-model="settings.auto_remove_purchased">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-        <p class="fchub-tip">Automatically remove items from the wishlist when purchased.</p>\
-    </el-form-item>\
-    <el-form-item label="Max Items per Wishlist">\
-        <el-input-number v-model="settings.max_items_per_list" :min="1" :max="500" />\
-    </el-form-item>\
-    <el-form-item label="Guest Cleanup (days)">\
-        <el-input-number v-model="settings.guest_cleanup_days" :min="7" :max="365" />\
-        <p class="fchub-tip">Guest wishlists older than this will be removed by the daily cleanup job.</p>\
-    </el-form-item>\
-    <el-form-item label="Remove Data on Uninstall">\
-        <el-select v-model="settings.uninstall_remove_data">\
-            <el-option label="No (keep data)" value="no" />\
-            <el-option label="Yes (delete all)" value="yes" />\
-        </el-select>\
-        <p class="fchub-tip">If enabled, all wishlist tables and settings will be removed when the plugin is uninstalled.</p>\
-    </el-form-item>\
-</el-form>',
+<div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Wishlist Enabled</span>\
+            <div class="form-note">Master switch for the wishlist feature across the store.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Guest Wishlist</span>\
+            <div class="form-note">Allow non-logged-in visitors to use wishlists via cookies.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.guest_wishlist_enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Auto-remove Purchased Items</span>\
+            <div class="form-note">Automatically remove items from the wishlist when purchased.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.auto_remove_purchased">\
+                <el-radio label="Yes" value="yes" />\
+                <el-radio label="No" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Max Items per Wishlist</span>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-input-number v-model="settings.max_items_per_list" :min="1" :max="500" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Guest Cleanup (days)</span>\
+            <div class="form-note">Guest wishlists older than this will be removed by the daily cleanup job.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-input-number v-model="settings.guest_cleanup_days" :min="7" :max="365" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Remove Data on Uninstall</span>\
+            <div class="form-note">If enabled, all wishlist tables and settings will be removed when the plugin is uninstalled.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.uninstall_remove_data">\
+                <el-radio label="No (keep data)" value="no" />\
+                <el-radio label="Yes (delete all)" value="yes" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+</div>',
     };
 
     var UiSettings = {
         name: 'UiSettings',
         props: { settings: { type: Object, required: true } },
         template: '\
-<el-form label-position="top">\
-    <el-form-item label="Show Heart on Product Cards">\
-        <el-select v-model="settings.show_on_product_cards">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-    </el-form-item>\
-    <el-form-item label="Show Button on Single Product">\
-        <el-select v-model="settings.show_on_single_product">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-    </el-form-item>\
-    <el-form-item label="Icon Style">\
-        <el-select v-model="settings.icon_style">\
-            <el-option label="Heart" value="heart" />\
-            <el-option label="Bookmark" value="bookmark" />\
-            <el-option label="Star" value="star" />\
-        </el-select>\
-    </el-form-item>\
-    <el-form-item label="Button Text (Add)">\
-        <el-input v-model="settings.button_text" />\
-    </el-form-item>\
-    <el-form-item label="Button Text (Remove)">\
-        <el-input v-model="settings.button_text_remove" />\
-    </el-form-item>\
-    <el-form-item label="Counter Badge in Header">\
-        <el-select v-model="settings.counter_badge_enabled">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-        <p class="fchub-tip">Show a wishlist item count badge via the [fchub_wishlist_count] shortcode or wp_footer hook.</p>\
-    </el-form-item>\
-</el-form>',
+<div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Show Heart on Product Cards</span>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.show_on_product_cards">\
+                <el-radio label="Yes" value="yes" />\
+                <el-radio label="No" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Show Button on Single Product</span>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.show_on_single_product">\
+                <el-radio label="Yes" value="yes" />\
+                <el-radio label="No" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Icon Style</span>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-select v-model="settings.icon_style" style="max-width:200px">\
+                <el-option label="Heart" value="heart" />\
+                <el-option label="Bookmark" value="bookmark" />\
+                <el-option label="Star" value="star" />\
+            </el-select>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Button Text (Add)</span>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-input v-model="settings.button_text" style="max-width:320px" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Button Text (Remove)</span>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-input v-model="settings.button_text_remove" style="max-width:320px" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Counter Badge in Header</span>\
+            <div class="form-note">Show a wishlist item count badge via the [fchub_wishlist_count] shortcode or wp_footer hook.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.counter_badge_enabled">\
+                <el-radio label="Yes" value="yes" />\
+                <el-radio label="No" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+</div>',
     };
 
     var FluentCrmSettings = {
         name: 'FluentCrmSettings',
         props: { settings: { type: Object, required: true } },
         template: '\
-<el-form label-position="top">\
-    <el-form-item label="FluentCRM Tag Sync">\
-        <el-select v-model="settings.fluentcrm_enabled">\
-            <el-option label="Enabled" value="yes" />\
-            <el-option label="Disabled" value="no" />\
-        </el-select>\
-        <p class="fchub-tip">When enabled, tags are automatically applied/removed in FluentCRM based on wishlist activity.</p>\
-    </el-form-item>\
-    <el-form-item label="Tag Prefix">\
-        <el-input v-model="settings.fluentcrm_tag_prefix" placeholder="wishlist:" />\
-        <p class="fchub-tip">Prefix for auto-created tags (e.g. &ldquo;wishlist:active&rdquo;).</p>\
-    </el-form-item>\
-    <el-form-item label="Auto-create Tags">\
-        <el-select v-model="settings.fluentcrm_auto_create_tags">\
-            <el-option label="Yes" value="yes" />\
-            <el-option label="No" value="no" />\
-        </el-select>\
-        <p class="fchub-tip">Automatically create tags in FluentCRM if they do not already exist.</p>\
-    </el-form-item>\
-</el-form>',
+<div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">FluentCRM Tag Sync</span>\
+            <div class="form-note">When enabled, tags are automatically applied/removed in FluentCRM based on wishlist activity.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.fluentcrm_enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Tag Prefix</span>\
+            <div class="form-note">Prefix for auto-created tags (e.g. \u201cwishlist:active\u201d).</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-input v-model="settings.fluentcrm_tag_prefix" placeholder="wishlist:" style="max-width:200px" autocomplete="one-time-code" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-wl-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Auto-create Tags</span>\
+            <div class="form-note">Automatically create tags in FluentCRM if they do not already exist.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.fluentcrm_auto_create_tags">\
+                <el-radio label="Yes" value="yes" />\
+                <el-radio label="No" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+</div>',
     };
 
     var StatsView = {
@@ -311,39 +400,41 @@
             },
         },
         template: '\
-<div class="fchub-wishlist-page fct-layout-width">\
-    <div class="page-heading-wrap">\
-        <h1 class="page-title">Wishlist</h1>\
-        <div class="actions">\
-            <el-button type="primary" :loading="saving" @click="saveSettings">\
-                <span v-if="!saving" class="cmd block leading-none">\u2318S</span>\
-                {{ saving ? "Saving..." : "Save Settings" }}\
+<div class="setting-wrap fchub-wishlist-page">\
+    <div class="fct-setting-header">\
+        <div class="fct-setting-header-content">\
+            <h3 class="fct-setting-head-title">Wishlist</h3>\
+        </div>\
+        <div class="fct-setting-header-action">\
+            <el-button type="primary" size="small" :loading="saving" @click="saveSettings">\
+                <span v-if="!saving" class="cmd">\u2318S</span>\
+                {{ saving ? "Saving..." : "Save" }}\
             </el-button>\
         </div>\
     </div>\
-    <div class="fct-card">\
-        <div class="fct-card-body">\
-            <el-tabs v-model="activeTab">\
-                <el-tab-pane label="General" name="general">\
-                    <div v-loading="loading" class="fchub-settings-wrap">\
-                        <general-settings :settings="settings" />\
-                    </div>\
-                </el-tab-pane>\
-                <el-tab-pane label="Display" name="display">\
-                    <div v-loading="loading" class="fchub-settings-wrap">\
-                        <ui-settings :settings="settings" />\
-                    </div>\
-                </el-tab-pane>\
-                <el-tab-pane label="FluentCRM" name="fluentcrm">\
-                    <div v-loading="loading" class="fchub-settings-wrap">\
-                        <fluent-crm-settings :settings="settings" />\
-                    </div>\
-                </el-tab-pane>\
-                <el-tab-pane label="Statistics" name="stats">\
+    <div class="setting-wrap-inner">\
+        <el-tabs v-model="activeTab">\
+            <el-tab-pane label="General" name="general">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body" v-loading="loading">\
+                    <general-settings :settings="settings" />\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="Display" name="display">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body" v-loading="loading">\
+                    <ui-settings :settings="settings" />\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="FluentCRM" name="fluentcrm">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body" v-loading="loading">\
+                    <fluent-crm-settings :settings="settings" />\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="Statistics" name="stats">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body">\
                     <stats-view :stats="stats" :loading="statsLoading" />\
-                </el-tab-pane>\
-            </el-tabs>\
-        </div>\
+                </div></div></div>\
+            </el-tab-pane>\
+        </el-tabs>\
     </div>\
 </div>',
     };
@@ -356,64 +447,120 @@
         'fluent_cart_routes',
         'fchub_wishlist',
         function (routes) {
-            routes.fchub_wishlist = {
-                name: 'fchub_wishlist',
-                path: '/wishlist',
-                component: WishlistPage,
-                meta: {
-                    active_menu: 'fchub_wishlist',
-                    title: 'Wishlist',
-                },
-            };
+            if (routes.settings && routes.settings.children) {
+                routes.settings.children.push({
+                    name: 'fchub_wishlist',
+                    path: 'wishlist',
+                    component: WishlistPage,
+                    meta: {
+                        active_menu: 'settings',
+                        title: 'Wishlist',
+                    },
+                });
+            }
             return routes;
         }
     );
 
     /* ------------------------------------------------------------------ */
-    /*  Inject "Wishlist" into the More dropdown (DOM)                     */
-    /*  FluentCart hard-codes the More children after the PHP filter runs, */
-    /*  so we append the item client-side once the menu is in the DOM.     */
+    /*  Inject "Wishlist" into the settings sidebar (DOM)                   */
+    /*  Inserts a nav item into the settings sidebar, matching the same    */
+    /*  pattern used by multi-currency and other FluentCart settings pages. */
     /* ------------------------------------------------------------------ */
 
-    function injectMoreMenuItem() {
-        var moreMenu = document.querySelector('.fct_menu_item.has-child .fct_menu_child');
-        if (!moreMenu || moreMenu.querySelector('.fct_menu_child_item_wishlist')) return;
+    var WL_HASH = '#/settings/wishlist';
+    var WL_ICON = '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 17.5s-7-4.35-7-9.15A3.82 3.82 0 0 1 6.85 4.5c1.52 0 2.5.77 3.15 1.58C10.65 5.27 11.63 4.5 13.15 4.5A3.82 3.82 0 0 1 17 8.35c0 4.8-7 9.15-7 9.15z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var WL_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 14" fill="none"><path d="M1 13L6.29289 7.70711C6.62623 7.37377 6.79289 7.20711 6.79289 7C6.79289 6.79289 6.62623 6.62623 6.29289 6.29289L1 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-        var li = document.createElement('li');
-        li.className = 'fct_menu_child_item fct_menu_child_item_wishlist';
-        var a = document.createElement('a');
-        a.setAttribute('type', 'button');
-        a.setAttribute('aria-label', 'Wishlist');
-        var dashboardLink = document.querySelector('.fct_menu_item a[href*="fluent-cart"]');
-        a.href = dashboardLink
-            ? dashboardLink.href.split('#')[0] + '#/wishlist'
-            : 'admin.php?page=fluent-cart#/wishlist';
-        a.textContent = 'Wishlist';
-        li.appendChild(a);
-        moreMenu.appendChild(li);
-
-        // Also inject into the mobile off-canvas menu
-        var offcanvas = document.querySelector('.fct-offcanvas-menu-list');
-        if (offcanvas && !offcanvas.querySelector('[href*="#/wishlist"]')) {
-            var div = document.createElement('div');
-            div.className = 'fct-offcanvas-menu-item';
-            div.innerHTML = '<div class="fct-offcanvas-menu-label"><a href="' + a.href + '">Wishlist</a></div>';
-            offcanvas.appendChild(div);
-        }
+    function isWishlistRoute() {
+        return window.location.hash.indexOf('/settings/wishlist') !== -1;
     }
 
-    function tryInject() {
-        if (document.querySelector('.fct_menu_item.has-child .fct_menu_child')) {
-            injectMoreMenuItem();
+    function updateActiveState(navItem) {
+        if (isWishlistRoute()) {
+            navItem.classList.add('fct-settings-nav-item-active');
         } else {
-            requestAnimationFrame(tryInject);
+            navItem.classList.remove('fct-settings-nav-item-active');
         }
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() { tryInject(1); });
-    } else {
-        tryInject(1);
+    function injectSettingsSidebarItem() {
+        var navList = document.querySelector('.fct-settings-nav');
+        if (!navList) return false;
+
+        if (navList.querySelector('.fct-settings-nav-item-wishlist')) return true;
+
+        var navItem = document.createElement('li');
+        navItem.className = 'fct-settings-nav-item fct-settings-nav-item-wishlist';
+        if (isWishlistRoute()) {
+            navItem.classList.add('fct-settings-nav-item-active');
+        }
+
+        var link = document.createElement('a');
+        link.className = 'fct-settings-nav-link';
+        link.href = WL_HASH;
+
+        var iconDiv = document.createElement('div');
+        iconDiv.className = 'icon';
+        iconDiv.innerHTML = WL_ICON;
+
+        var labelSpan = document.createElement('span');
+        labelSpan.className = 'fct-settings-nav-link-text';
+        labelSpan.textContent = 'Wishlist';
+
+        var chevronDiv = document.createElement('div');
+        chevronDiv.className = 'icon fct-settings-nav-link-icon';
+        chevronDiv.innerHTML = WL_CHEVRON;
+        labelSpan.appendChild(chevronDiv);
+
+        link.appendChild(iconDiv);
+        link.appendChild(labelSpan);
+        navItem.appendChild(link);
+
+        // Insert before "Tax & Duties"
+        var inserted = false;
+        var items = navList.querySelectorAll(':scope > .fct-settings-nav-item');
+        for (var i = 0; i < items.length; i++) {
+            var text = items[i].querySelector('.fct-settings-nav-link-text');
+            if (text && text.firstChild && text.firstChild.textContent.trim() === 'Tax & Duties') {
+                navList.insertBefore(navItem, items[i]);
+                inserted = true;
+                break;
+            }
+        }
+        if (!inserted) {
+            navList.appendChild(navItem);
+        }
+
+        window.addEventListener('hashchange', function () {
+            updateActiveState(navItem);
+        });
+
+        return true;
+    }
+
+    function tryInjectSidebar() {
+        if (!injectSettingsSidebarItem()) {
+            requestAnimationFrame(tryInjectSidebar);
+        }
+    }
+
+    function onHashChange() {
+        if (window.location.hash.indexOf('#/settings') === 0) {
+            tryInjectSidebar();
+        }
+    }
+
+    window.addEventListener('hashchange', onHashChange);
+
+    if (window.location.hash.indexOf('#/settings') === 0) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () {
+                tryInjectSidebar();
+            });
+        } else {
+            tryInjectSidebar();
+        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -422,12 +569,13 @@
 
     var style = document.createElement('style');
     style.textContent = [
-        '.fchub-settings-wrap { max-width: 560px; padding: 8px 0; }',
-        '.fchub-tip { font-size: 12px; color: #909399; margin: 4px 0 0; line-height: 1.4; }',
+        '.fchub-wishlist-page .form-section { padding: 0; }',
+        '.fchub-wl-row { display: grid; gap: 0.5rem; grid-template-columns: 1fr; padding: 4px 0; }',
+        '@media (min-width: 1024px) { .fchub-wl-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } .fchub-wl-row .setting-fields-inner { grid-column: span 2 / span 2; } }',
+        '.fchub-wishlist-page .cmd { display: inline-block; font-size: 11px; margin-right: 4px; padding: 1px 5px; border: 1px solid rgba(255,255,255,.3); border-radius: 3px; line-height: 1; }',
         '.fchub-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }',
         '.fchub-stat-value { font-size: 32px; font-weight: 600; line-height: 1.2; }',
         '.fchub-stat-label { font-size: 13px; color: #909399; margin-top: 4px; }',
-        '.fchub-wishlist-page .cmd { display: inline-block; font-size: 11px; margin-right: 4px; padding: 1px 5px; border: 1px solid rgba(255,255,255,.3); border-radius: 3px; line-height: 1; }',
     ].join('\n');
     document.head.appendChild(style);
 })();

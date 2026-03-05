@@ -10,6 +10,27 @@ import CounterSync from './counter-sync.js';
 var _debounceTimers = new Map();
 var DEBOUNCE_MS = 300;
 
+function getErrorMessage(error) {
+    if (error && typeof error.message === 'string' && error.message.trim() !== '') {
+        return error.message;
+    }
+
+    var i18n = (window.fchubWishlistVars && window.fchubWishlistVars.i18n) || {};
+    return i18n.error || 'Something went wrong. Please try again.';
+}
+
+function notifyError(error) {
+    var message = getErrorMessage(error);
+
+    document.dispatchEvent(new CustomEvent('fchub_wishlist:error', {
+        detail: { message: message },
+    }));
+
+    if (typeof window.alert === 'function') {
+        window.alert(message);
+    }
+}
+
 var ToggleHandler = {
     /**
      * Initialise event delegation on document for all wishlist toggle buttons.
@@ -61,7 +82,7 @@ var ToggleHandler = {
                 var data = res.data || res;
                 CounterSync.update(data.count != null ? data.count : UiState.getCount());
             })
-            .catch(function () {
+            .catch(function (error) {
                 // Rollback on error
                 if (wasActive) {
                     UiState.add(productId, variantId);
@@ -69,6 +90,7 @@ var ToggleHandler = {
                     UiState.remove(productId, variantId);
                 }
                 CounterSync.update(UiState.getCount());
+                notifyError(error);
             });
     },
 };

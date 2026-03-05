@@ -46,8 +46,6 @@ class AddItemActionTest extends TestCase
         $variantResolver = $this->createStub(VariantResolver::class);
         $variantResolver->method('resolve')
             ->willReturn(200);
-        $variantResolver->method('validate')
-            ->willReturn(true);
 
         $wishlistRules = $this->createStub(WishlistRules::class);
         $wishlistRules->method('isDuplicate')
@@ -95,19 +93,17 @@ class AddItemActionTest extends TestCase
 
         $productRules = $this->createStub(ProductRules::class);
         $productRules->method('validate')
-            ->willReturn(['valid' => true, 'error' => '']);
+            ->willReturn(['valid' => false, 'error' => 'Variant does not exist or is not active.']);
 
         $variantResolver = $this->createStub(VariantResolver::class);
         $variantResolver->method('resolve')
             ->willReturn(200);
-        $variantResolver->method('validate')
-            ->willReturn(false);
 
         $action = $this->makeAction(null, null, $productRules, null, $variantResolver);
         $result = $action->execute($wishlist, 100, 200);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('Resolved variant is not active.', $result['error']);
+        $this->assertSame('Variant does not exist or is not active.', $result['error']);
     }
 
     #[Test]
@@ -122,14 +118,15 @@ class AddItemActionTest extends TestCase
         $variantResolver = $this->createStub(VariantResolver::class);
         $variantResolver->method('resolve')
             ->willReturn(200);
-        $variantResolver->method('validate')
-            ->willReturn(true);
 
         $wishlistRules = $this->createStub(WishlistRules::class);
-        $wishlistRules->method('isDuplicate')
-            ->willReturn(true);
+        $wishlistRules->method('isDuplicate')->willReturn(true);
+        $wishlistRules->method('isAtMaxItems')->willReturn(false);
 
-        $action = $this->makeAction(null, null, $productRules, $wishlistRules, $variantResolver);
+        $items = $this->createStub(WishlistItemRepository::class);
+        $items->method('create')->willReturn(0);
+
+        $action = $this->makeAction($items, null, $productRules, $wishlistRules, $variantResolver);
         $result = $action->execute($wishlist, 100, 200);
 
         $this->assertFalse($result['success']);
@@ -148,8 +145,6 @@ class AddItemActionTest extends TestCase
         $variantResolver = $this->createStub(VariantResolver::class);
         $variantResolver->method('resolve')
             ->willReturn(200);
-        $variantResolver->method('validate')
-            ->willReturn(true);
 
         $wishlistRules = $this->createStub(WishlistRules::class);
         $wishlistRules->method('isDuplicate')
@@ -180,8 +175,6 @@ class AddItemActionTest extends TestCase
         $variantResolver = $this->createStub(VariantResolver::class);
         $variantResolver->method('resolve')
             ->willReturn(200);
-        $variantResolver->method('validate')
-            ->willReturn(true);
 
         $wishlistRules = $this->createStub(WishlistRules::class);
         $wishlistRules->method('isDuplicate')
@@ -217,8 +210,6 @@ class AddItemActionTest extends TestCase
         $variantResolver = $this->createStub(VariantResolver::class);
         $variantResolver->method('resolve')
             ->willReturn(200);
-        $variantResolver->method('validate')
-            ->willReturn(true);
 
         $wishlistRules = $this->createStub(WishlistRules::class);
         $wishlistRules->method('isDuplicate')
@@ -260,7 +251,8 @@ class AddItemActionTest extends TestCase
             ->method('resolve')
             ->with(100, 0)
             ->willReturn(300);
-        $variantResolver->method('validate')
+
+        $productRules->method('variantExists')
             ->willReturn(true);
 
         $wishlistRules = $this->createStub(WishlistRules::class);
@@ -282,7 +274,7 @@ class AddItemActionTest extends TestCase
     }
 
     #[Test]
-    public function testVariantResolveReturnsZeroFails(): void
+    public function testVariantResolveReturnsNegativeFails(): void
     {
         $wishlist = MockBuilder::wishlist(['item_count' => 0]);
 
@@ -292,7 +284,7 @@ class AddItemActionTest extends TestCase
 
         $variantResolver = $this->createStub(VariantResolver::class);
         $variantResolver->method('resolve')
-            ->willReturn(0);
+            ->willReturn(-1);
 
         $action = $this->makeAction(null, null, $productRules, null, $variantResolver);
         $result = $action->execute($wishlist, 100, 0);
@@ -315,8 +307,6 @@ class AddItemActionTest extends TestCase
         $variantResolver = $this->createStub(VariantResolver::class);
         $variantResolver->method('resolve')
             ->willReturn(200);
-        $variantResolver->method('validate')
-            ->willReturn(true);
 
         $wishlistRules = $this->createStub(WishlistRules::class);
         $wishlistRules->method('isDuplicate')

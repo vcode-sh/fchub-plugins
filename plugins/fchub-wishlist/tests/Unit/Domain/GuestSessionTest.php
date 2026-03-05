@@ -11,12 +11,12 @@ use PHPUnit\Framework\Attributes\Test;
 class GuestSessionTest extends TestCase
 {
     #[Test]
-    public function testGenerateHashReturnsMd5String(): void
+    public function testGenerateHashReturnsHexString(): void
     {
         $hash = GuestSession::generateHash();
 
-        $this->assertSame(32, strlen($hash));
-        $this->assertMatchesRegularExpression('/^[a-f0-9]{32}$/', $hash);
+        $this->assertContains(strlen($hash), [40, 64]);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]+$/', $hash);
     }
 
     #[Test]

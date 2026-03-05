@@ -24,7 +24,7 @@ final class ItemsController
 
         $wishlist = WishlistMutationGuard::resolveWishlist();
         if (!$wishlist) {
-            return new \WP_REST_Response(['success' => false, 'message' => __('Could not resolve wishlist.', 'fchub-wishlist')], 500);
+            return new \WP_REST_Response(['success' => false, 'message' => __('Wishlist not found.', 'fchub-wishlist')], 404);
         }
 
         $productId = ItemRequest::getProductId($request);
@@ -40,7 +40,7 @@ final class ItemsController
         return new \WP_REST_Response([
             'success' => true,
             'data'    => [
-                'item'  => $result['item'] ?? null,
+                'item'  => ItemResponseMapper::sanitize($result['item'] ?? null),
                 'count' => $service->getItemCount($wishlist['id']),
             ],
         ]);
@@ -59,7 +59,7 @@ final class ItemsController
 
         $wishlist = WishlistMutationGuard::resolveWishlist();
         if (!$wishlist) {
-            return new \WP_REST_Response(['success' => false, 'message' => __('Could not resolve wishlist.', 'fchub-wishlist')], 500);
+            return new \WP_REST_Response(['success' => false, 'message' => __('Wishlist not found.', 'fchub-wishlist')], 404);
         }
 
         $productId = ItemRequest::getProductId($request);
@@ -90,7 +90,7 @@ final class ItemsController
 
         $wishlist = WishlistMutationGuard::resolveWishlist();
         if (!$wishlist) {
-            return new \WP_REST_Response(['success' => false, 'message' => __('Could not resolve wishlist.', 'fchub-wishlist')], 500);
+            return new \WP_REST_Response(['success' => false, 'message' => __('Wishlist not found.', 'fchub-wishlist')], 404);
         }
 
         $productId = ItemRequest::getProductId($request);
@@ -107,7 +107,7 @@ final class ItemsController
             'success' => true,
             'data'    => [
                 'action' => $result['action'],
-                'item'   => $result['item'] ?? null,
+                'item'   => ItemResponseMapper::sanitize($result['item'] ?? null),
                 'count'  => $service->getItemCount($wishlist['id']),
             ],
         ]);
@@ -121,7 +121,7 @@ final class ItemsController
 
         $wishlist = WishlistMutationGuard::resolveWishlist();
         if (!$wishlist) {
-            return new \WP_REST_Response(['success' => false, 'message' => __('Could not resolve wishlist.', 'fchub-wishlist')], 500);
+            return new \WP_REST_Response(['success' => false, 'message' => __('Wishlist not found.', 'fchub-wishlist')], 404);
         }
 
         $service = WishlistService::make();
@@ -135,4 +135,5 @@ final class ItemsController
             ],
         ]);
     }
+
 }

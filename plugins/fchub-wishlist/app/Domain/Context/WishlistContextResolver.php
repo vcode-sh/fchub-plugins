@@ -51,7 +51,7 @@ class WishlistContextResolver
     /**
      * Get or create a wishlist for a logged-in user.
      */
-    public function getOrCreateForUser(int $userId): array
+    public function getOrCreateForUser(int $userId): ?array
     {
         $wishlist = $this->wishlists->findByUserId($userId);
 
@@ -60,21 +60,37 @@ class WishlistContextResolver
         }
 
         $customerId = Hooks::getCustomerId($userId);
+        if ($customerId) {
+            $customerWishlist = $this->wishlists->findByCustomerId($customerId);
+            if ($customerWishlist) {
+                $transferred = $this->wishlists->transferToUser((int) $customerWishlist['id'], $userId, $customerId);
+                if ($transferred) {
+                    return $this->wishlists->find((int) $customerWishlist['id']);
+                }
+            }
+        }
 
         $id = $this->wishlists->create([
             'user_id'     => $userId,
             'customer_id' => $customerId,
         ]);
 
-        do_action('fchub_wishlist/wishlist_created', $id, $userId, false);
+        if ($id <= 0) {
+            return null;
+        }
 
-        return $this->wishlists->find($id);
+        $created = $this->wishlists->find($id);
+        if ($created) {
+            do_action('fchub_wishlist/wishlist_created', $id, $userId, false);
+        }
+
+        return $created;
     }
 
     /**
      * Get or create a wishlist for a guest session hash.
      */
-    public function getOrCreateForGuest(string $hash): array
+    public function getOrCreateForGuest(string $hash): ?array
     {
         $wishlist = $this->wishlists->findBySessionHash($hash);
 
@@ -86,9 +102,16 @@ class WishlistContextResolver
             'session_hash' => $hash,
         ]);
 
-        do_action('fchub_wishlist/wishlist_created', $id, 0, true);
+        if ($id <= 0) {
+            return null;
+        }
 
-        return $this->wishlists->find($id);
+        $created = $this->wishlists->find($id);
+        if ($created) {
+            do_action('fchub_wishlist/wishlist_created', $id, 0, true);
+        }
+
+        return $created;
     }
 
     /**

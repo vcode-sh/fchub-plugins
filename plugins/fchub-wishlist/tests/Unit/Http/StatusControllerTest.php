@@ -113,6 +113,7 @@ class StatusControllerTest extends TestCase
                 'variant_sku' => 'SKU-1',
             ],
         ]);
+        $this->setWpdbMockVar('1');
 
         $response = \FChubWishlist\Http\Controllers\Pub\StatusController::items(new \WP_REST_Request('GET', '/items'));
 

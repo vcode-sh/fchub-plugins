@@ -6,6 +6,23 @@
 
 import UiState from './ui-state.js';
 
+function syncButtonsForProduct(productId) {
+    var buttons = document.querySelectorAll(
+        '[data-fchub-wishlist-toggle][data-product-id="' + productId + '"]'
+    );
+
+    for (var i = 0; i < buttons.length; i++) {
+        var vid = parseInt(buttons[i].getAttribute('data-variant-id'), 10) || 0;
+        if (UiState.has(productId, vid)) {
+            buttons[i].classList.add('is-active');
+            buttons[i].setAttribute('aria-pressed', 'true');
+        } else {
+            buttons[i].classList.remove('is-active');
+            buttons[i].setAttribute('aria-pressed', 'false');
+        }
+    }
+}
+
 var VariantSync = {
     /**
      * Initialise event listeners for FluentCart variant and modal events.
@@ -45,23 +62,25 @@ var VariantSync = {
 
             if (!productId) return;
 
-            // Small delay to let the modal render its content (hooks fire inside)
-            setTimeout(function () {
-                var buttons = document.querySelectorAll(
-                    '[data-fchub-wishlist-toggle][data-product-id="' + productId + '"]'
-                );
+            var observer = new MutationObserver(function () {
+                syncButtonsForProduct(productId);
 
-                for (var i = 0; i < buttons.length; i++) {
-                    var vid = parseInt(buttons[i].getAttribute('data-variant-id'), 10) || 0;
-                    if (UiState.has(productId, vid)) {
-                        buttons[i].classList.add('is-active');
-                        buttons[i].setAttribute('aria-pressed', 'true');
-                    } else {
-                        buttons[i].classList.remove('is-active');
-                        buttons[i].setAttribute('aria-pressed', 'false');
-                    }
+                if (document.querySelector('[data-fchub-wishlist-toggle][data-product-id="' + productId + '"]')) {
+                    observer.disconnect();
                 }
-            }, 100);
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+
+            syncButtonsForProduct(productId);
+
+            // Safety net: disconnect after 3 seconds.
+            setTimeout(function () {
+                observer.disconnect();
+            }, 3000);
         });
     },
 };

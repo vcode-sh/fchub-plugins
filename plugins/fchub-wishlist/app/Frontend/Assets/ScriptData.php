@@ -23,6 +23,10 @@ final class ScriptData
             'restUrl' => esc_url_raw(rest_url(Constants::REST_NAMESPACE . '/')),
             'nonce'   => wp_create_nonce('wp_rest'),
             'ajaxUrl' => admin_url('admin-ajax.php'),
+            'cartAjax' => [
+                'action'          => (string) apply_filters('fchub_wishlist/cart_ajax_action', 'fluent_cart_checkout_routes'),
+                'checkout_action' => (string) apply_filters('fchub_wishlist/cart_ajax_checkout_action', 'fluent_cart_cart_update'),
+            ],
             'i18n'    => [
                 'add'     => $addLabel !== '' ? $addLabel : __('Add to Wishlist', 'fchub-wishlist'),
                 'remove'  => $removeLabel !== '' ? $removeLabel : __('Remove from Wishlist', 'fchub-wishlist'),

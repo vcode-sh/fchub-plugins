@@ -30,7 +30,7 @@ final class WishlistServiceFactory
 
         $addItem = new AddItemAction($items, $wishlists, $productRules, $wishlistRules, $variantResolver);
         $removeItem = new RemoveItemAction($items, $wishlists);
-        $toggleItem = new ToggleItemAction($addItem, $removeItem, $items);
+        $toggleItem = new ToggleItemAction($addItem, $removeItem, $wishlists);
         $addAllToCart = new AddAllToCartAction($items, $productRules);
 
         return new WishlistService($addItem, $removeItem, $toggleItem, $addAllToCart, $context, $wishlists, $items);

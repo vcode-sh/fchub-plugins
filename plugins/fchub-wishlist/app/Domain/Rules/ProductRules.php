@@ -76,13 +76,6 @@ class ProductRules
      */
     public function isVariantPurchasable(int $variantId): bool
     {
-        global $wpdb;
-
-        $variationsTable = $wpdb->prefix . 'fct_product_variations';
-
-        return (bool) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$variationsTable} WHERE id = %d AND item_status = 'active'",
-            $variantId
-        ));
+        return $this->variantExists($variantId);
     }
 }

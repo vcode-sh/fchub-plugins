@@ -14,6 +14,7 @@ class WishlistItemRepository
     private string $table;
     private WishlistItemsQuery $itemsQuery;
     private WishlistStatsQuery $statsQuery;
+    private WishlistItemBulkOperations $bulkOps;
 
     public function __construct()
     {
@@ -21,6 +22,7 @@ class WishlistItemRepository
         $this->table = $wpdb->prefix . 'fchub_wishlist_items';
         $this->itemsQuery = new WishlistItemsQuery();
         $this->statsQuery = new WishlistStatsQuery();
+        $this->bulkOps = new WishlistItemBulkOperations($this->table);
     }
 
     public function find(int $id): ?array
@@ -34,9 +36,6 @@ class WishlistItemRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     public function findByWishlistId(int $wishlistId): array
     {
         global $wpdb;
@@ -48,9 +47,6 @@ class WishlistItemRepository
         return array_map([$this, 'hydrate'], $rows ?: []);
     }
 
-    /**
-     * @return array{items: array<int, array<string, mixed>>, total: int, page: int, per_page: int}
-     */
     public function findByWishlistIdPaginated(int $wishlistId, int $page, int $perPage): array
     {
         global $wpdb;
@@ -90,7 +86,6 @@ class WishlistItemRepository
     public function create(array $data): int
     {
         global $wpdb;
-
         $insert = [
             'wishlist_id'      => (int) $data['wishlist_id'],
             'product_id'       => (int) $data['product_id'],
@@ -157,9 +152,11 @@ class WishlistItemRepository
         return $this->itemsQuery->getItemsWithProductData($wishlistId);
     }
 
-    /**
-     * Bulk delete items by product IDs (used for auto-remove after purchase).
-     */
+    public function getItemsWithProductDataPaginated(int $wishlistId, int $page = 1, int $perPage = 20): array
+    {
+        return $this->itemsQuery->getItemsWithProductDataPaginated($wishlistId, $page, $perPage);
+    }
+
     public function deleteByProductIds(int $wishlistId, array $productIds): int
     {
         global $wpdb;
@@ -190,13 +187,25 @@ class WishlistItemRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    /**
-     * Get total count of all wishlist items across all wishlists.
-     */
     public function totalCount(): int
     {
         global $wpdb;
         return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$this->table}");
+    }
+
+    public function countByWishlistId(int $wishlistId): int
+    {
+        return $this->bulkOps->countByWishlistId($wishlistId);
+    }
+
+    public function deleteByIds(array $itemIds): int
+    {
+        return $this->bulkOps->deleteByIds($itemIds);
+    }
+
+    public function deleteByWishlistIds(array $wishlistIds): int
+    {
+        return $this->bulkOps->deleteByWishlistIds($wishlistIds);
     }
 
     private function hydrate(array $row): array

@@ -62,7 +62,11 @@ class GuestSession
 
     public static function generateHash(): string
     {
-        return md5('fchub_wishlist_' . wp_generate_uuid4() . time());
+        try {
+            return bin2hex(random_bytes(32));
+        } catch (\Throwable $e) {
+            return sha1('fchub_wishlist_' . wp_generate_uuid4() . time());
+        }
     }
 
     public static function onUserLogin(string $userLogin, \WP_User $user): void
@@ -96,17 +100,31 @@ class GuestSession
     {
         $defaultDays = (int) Hooks::getSetting('guest_cleanup_days', Constants::COOKIE_DAYS);
         $days = (int) apply_filters('fchub_wishlist/guest_cleanup_days', $defaultDays);
+        $batchSize = max(1, (int) apply_filters('fchub_wishlist/guest_cleanup_batch_size', 500));
+
         $repo = new WishlistRepository();
         $itemRepo = new WishlistItemRepository();
-        $expired = $repo->getOrphanedGuestLists($days);
 
-        foreach ($expired as $wishlist) {
-            $itemRepo->deleteByWishlistId($wishlist['id']);
-            $repo->delete($wishlist['id']);
-        }
+        $removed = 0;
+        $batches = 0;
 
-        if (!empty($expired)) {
-            Logger::info('Cleaned up expired guest wishlists', ['count' => count($expired)]);
+        do {
+            $expired = $repo->getOrphanedGuestLists($days, $batchSize);
+            if (empty($expired)) {
+                break;
+            }
+
+            $wishlistIds = array_map('intval', array_column($expired, 'id'));
+            $itemRepo->deleteByWishlistIds($wishlistIds);
+            $removed += $repo->deleteByIds($wishlistIds);
+            $batches++;
+        } while (count($expired) === $batchSize);
+
+        if ($removed > 0) {
+            Logger::info('Cleaned up expired guest wishlists', [
+                'count'   => $removed,
+                'batches' => $batches,
+            ]);
         }
     }
 
@@ -118,9 +136,8 @@ class GuestSession
         }
 
         $wishlists = new WishlistRepository();
-        $items = new WishlistItemRepository();
         $context = new WishlistContextResolver($wishlists);
-        $merger = new MergeGuestWishlistAction($wishlists, $items, $context);
+        $merger = new MergeGuestWishlistAction($wishlists, $context);
 
         $merger->execute($hash, $userId);
         self::deleteHash();

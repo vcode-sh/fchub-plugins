@@ -7,7 +7,7 @@ namespace FChubWishlist\Tests\Unit\Actions;
 use FChubWishlist\Domain\Actions\AddItemAction;
 use FChubWishlist\Domain\Actions\RemoveItemAction;
 use FChubWishlist\Domain\Actions\ToggleItemAction;
-use FChubWishlist\Storage\WishlistItemRepository;
+use FChubWishlist\Storage\WishlistRepository;
 use FChubWishlist\Tests\Support\MockBuilder;
 use FChubWishlist\Tests\Support\TestCase;
 use PHPUnit\Framework\Attributes\Test;
@@ -19,10 +19,6 @@ class ToggleItemActionTest extends TestCase
     {
         $wishlist = MockBuilder::wishlist(['id' => 1, 'item_count' => 2]);
 
-        $items = $this->createStub(WishlistItemRepository::class);
-        $items->method('exists')
-            ->willReturn(false);
-
         $addItem = $this->createStub(AddItemAction::class);
         $addItem->method('execute')
             ->willReturn([
@@ -33,8 +29,9 @@ class ToggleItemActionTest extends TestCase
             ]);
 
         $removeItem = $this->createStub(RemoveItemAction::class);
+        $wishlists = $this->createStub(WishlistRepository::class);
 
-        $action = new ToggleItemAction($addItem, $removeItem, $items);
+        $action = new ToggleItemAction($addItem, $removeItem, $wishlists);
         $result = $action->execute($wishlist, 100, 200);
 
         $this->assertSame('added', $result['action']);
@@ -48,17 +45,22 @@ class ToggleItemActionTest extends TestCase
     {
         $wishlist = MockBuilder::wishlist(['id' => 1, 'item_count' => 3]);
 
-        $items = $this->createStub(WishlistItemRepository::class);
-        $items->method('exists')
-            ->willReturn(true);
+        $addItem = $this->createStub(AddItemAction::class);
+        $addItem->method('execute')
+            ->willReturn([
+                'success' => false,
+                'item'    => null,
+                'count'   => 3,
+                'error'   => AddItemAction::ERROR_DUPLICATE,
+            ]);
 
         $removeItem = $this->createStub(RemoveItemAction::class);
         $removeItem->method('execute')
             ->willReturn(true);
+        $wishlists = $this->createStub(WishlistRepository::class);
+        $wishlists->method('getItemCount')->willReturn(2);
 
-        $addItem = $this->createStub(AddItemAction::class);
-
-        $action = new ToggleItemAction($addItem, $removeItem, $items);
+        $action = new ToggleItemAction($addItem, $removeItem, $wishlists);
         $result = $action->execute($wishlist, 100, 200);
 
         $this->assertSame('removed', $result['action']);
@@ -72,10 +74,6 @@ class ToggleItemActionTest extends TestCase
     {
         $wishlist = MockBuilder::wishlist(['id' => 1, 'item_count' => 100]);
 
-        $items = $this->createStub(WishlistItemRepository::class);
-        $items->method('exists')
-            ->willReturn(false);
-
         $addItem = $this->createStub(AddItemAction::class);
         $addItem->method('execute')
             ->willReturn([
@@ -86,8 +84,9 @@ class ToggleItemActionTest extends TestCase
             ]);
 
         $removeItem = $this->createStub(RemoveItemAction::class);
+        $wishlists = $this->createStub(WishlistRepository::class);
 
-        $action = new ToggleItemAction($addItem, $removeItem, $items);
+        $action = new ToggleItemAction($addItem, $removeItem, $wishlists);
         $result = $action->execute($wishlist, 100, 200);
 
         $this->assertSame('failed', $result['action']);
@@ -100,22 +99,27 @@ class ToggleItemActionTest extends TestCase
     {
         $wishlist = MockBuilder::wishlist(['id' => 1, 'item_count' => 3]);
 
-        $items = $this->createStub(WishlistItemRepository::class);
-        $items->method('exists')
-            ->willReturn(true);
+        $addItem = $this->createStub(AddItemAction::class);
+        $addItem->method('execute')
+            ->willReturn([
+                'success' => false,
+                'item'    => null,
+                'count'   => 3,
+                'error'   => AddItemAction::ERROR_DUPLICATE,
+            ]);
 
         // Remove returns false (item not found internally)
         $removeItem = $this->createStub(RemoveItemAction::class);
         $removeItem->method('execute')
             ->willReturn(false);
+        $wishlists = $this->createStub(WishlistRepository::class);
+        $wishlists->method('getItemCount')->willReturn(3);
 
-        $addItem = $this->createStub(AddItemAction::class);
-
-        $action = new ToggleItemAction($addItem, $removeItem, $items);
+        $action = new ToggleItemAction($addItem, $removeItem, $wishlists);
         $result = $action->execute($wishlist, 100, 200);
 
-        // Still returns 'removed' action, count stays same since remove returned false
-        $this->assertSame('removed', $result['action']);
+        $this->assertSame('failed', $result['action']);
         $this->assertSame(3, $result['count']);
+        $this->assertSame('Could not remove wishlist item.', $result['error']);
     }
 }
