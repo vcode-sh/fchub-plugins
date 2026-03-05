@@ -154,6 +154,16 @@ Examples of bad tone:
 - "There's a null pointer dereference in the AbstractPaymentGateway::processCallback() at L142" (nobody outside the codebase knows what this means)
 - Anything condescending, dismissive, or overly technical without explanation.
 
+## Step 10: Clean Up the Trigger Label
+
+If the issue has a `claude` label (used to trigger re-triage), remove it when you're done:
+
+```bash
+gh issue edit <number> --remove-label "claude" --repo vcode-sh/fchub-plugins
+```
+
+This keeps the issue timeline clean. Only triage labels should remain.
+
 ## Labels Reference
 
 Apply labels as you go. Here's the full set you might use:
