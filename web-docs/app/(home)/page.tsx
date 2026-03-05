@@ -8,6 +8,7 @@ import {
   Braces,
   CreditCard,
   Download,
+  Flame,
   Globe,
   Heart,
   Home,
@@ -42,6 +43,7 @@ type Plugin = {
   docsHref: string;
   downloadUrl?: string;
   comingSoon?: boolean;
+  hot?: boolean;
 };
 
 const communityPlugins: Plugin[] = [
@@ -76,6 +78,15 @@ const communityPlugins: Plugin[] = [
 ];
 
 const cartPlugins: Plugin[] = [
+  {
+    title: "Multi-Currency",
+    description:
+      "Automatic currency conversion. Show prices in your customer's currency so they can complain in their own language.",
+    icon: Globe,
+    docsHref: "/docs/fchub-multi-currency",
+    downloadUrl: versions["fchub-multi-currency"].releaseUrl,
+    hot: true,
+  },
   {
     title: "Przelewy24",
     description: "Polish payment gateway. Because Stripe doesn't speak Polish.",
@@ -113,14 +124,6 @@ const cartPlugins: Plugin[] = [
       "Wishlists for FluentCart. Let customers hoard things they'll never buy.",
     icon: Heart,
     docsHref: "/docs/fchub-wishlist",
-    comingSoon: true,
-  },
-  {
-    title: "Multi-Currency",
-    description:
-      "Automatic currency conversion. Show prices in your customer's currency so they can complain in their own language.",
-    icon: Globe,
-    docsHref: "/docs/fchub-multi-currency",
     comingSoon: true,
   },
   {
@@ -206,6 +209,12 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
         <div className="flex items-center gap-2">
           <Icon className="size-4" />
           <CardTitle>{plugin.title}</CardTitle>
+          {plugin.hot && (
+            <Badge className="ml-auto text-[10px] h-4 bg-orange-500/15 text-orange-500 border-transparent">
+              <Flame size={10} />
+              Hot
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="pt-4 pb-6">

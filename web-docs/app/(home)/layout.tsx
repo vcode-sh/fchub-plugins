@@ -65,7 +65,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
               icon: <ArrowRightLeft size={16} />,
             },
             { text: "Wishlist", url: "#", icon: <Heart size={16} /> },
-            { text: "Multi-Currency", url: "#", icon: <Globe size={16} /> },
+            { text: "Multi-Currency", url: "/docs/fchub-multi-currency", icon: <Globe size={16} /> },
             { text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
             {
               text: "FCHub Stream",
@@ -159,16 +159,16 @@ export default function Layout({ children }: LayoutProps<"/">) {
                       Soon
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-1.5 rounded-sm p-2 text-sm text-muted-foreground/50 pointer-events-none [&_svg:not([class*='size-'])]:size-4">
+                  <NavigationMenuLink
+                    render={<Link href="/docs/fchub-multi-currency" />}
+                  >
                     <Globe size={16} />
                     Multi-Currency
-                    <Badge
-                      variant="secondary"
-                      className="ml-auto text-[10px] h-4 opacity-60"
-                    >
-                      Soon
+                    <Badge className="ml-auto text-[10px] h-4 bg-orange-500/15 text-orange-500 border-transparent">
+                      <Flame size={10} />
+                      Hot
                     </Badge>
-                  </div>
+                  </NavigationMenuLink>
                 </div>
                 <div className="space-y-1 p-2">
                   <div className="px-2 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
