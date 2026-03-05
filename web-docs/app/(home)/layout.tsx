@@ -64,8 +64,16 @@ export default function Layout({ children }: LayoutProps<"/">) {
               url: "/docs/wc-fc",
               icon: <ArrowRightLeft size={16} />,
             },
-            { text: "Wishlist", url: "/docs/fchub-wishlist", icon: <Heart size={16} /> },
-            { text: "Multi-Currency", url: "/docs/fchub-multi-currency", icon: <Globe size={16} /> },
+            {
+              text: "Wishlist",
+              url: "/docs/fchub-wishlist",
+              icon: <Heart size={16} />,
+            },
+            {
+              text: "Multi-Currency",
+              url: "/docs/fchub-multi-currency",
+              icon: <Globe size={16} />,
+            },
             { text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
             {
               text: "FCHub Stream",

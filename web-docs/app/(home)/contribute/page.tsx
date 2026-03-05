@@ -86,8 +86,8 @@ export default function ContributePage() {
         <p className="text-lg text-muted-foreground mb-4 max-w-2xl mx-auto text-balance">
           FCHub is not just my plugins — it&apos;s a platform for yours too.
           Built something for FluentCart or FluentCommunity? A payment gateway
-          for your region, a shipping connector, something beautifully niche?
-          It probably belongs here.
+          for your region, a shipping connector, something beautifully niche? It
+          probably belongs here.
         </p>
       </motion.div>
 
@@ -115,10 +115,11 @@ export default function ContributePage() {
                 <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
                   plugins/
                 </code>{" "}
-                and gets the full treatment — CI, automated releases, distribution
-                ZIPs, docs on the site, and other developers helping maintain it.
-                The trade-off: your code follows the repo&apos;s conventions and
-                anyone can send PRs. That&apos;s not a bug. That&apos;s the point.
+                and gets the full treatment — CI, automated releases,
+                distribution ZIPs, docs on the site, and other developers
+                helping maintain it. The trade-off: your code follows the
+                repo&apos;s conventions and anyone can send PRs. That&apos;s not
+                a bug. That&apos;s the point.
               </p>
             </div>
             <div className="border rounded-md p-6 space-y-3">
@@ -129,10 +130,10 @@ export default function ContributePage() {
                 <h3 className="font-medium">Community listing</h3>
               </div>
               <p className="text-sm text-muted-foreground text-balance">
-                Keep it in your own repo, on your own terms. FCHub lists it
-                on the site as a community plugin — you stay in control, we
-                give you visibility. For people who want the audience without
-                the code reviews.
+                Keep it in your own repo, on your own terms. FCHub lists it on
+                the site as a community plugin — you stay in control, we give
+                you visibility. For people who want the audience without the
+                code reviews.
               </p>
             </div>
           </div>
@@ -211,9 +212,7 @@ export default function ContributePage() {
               <div className="flex items-center justify-center size-8 border rounded-sm bg-muted">
                 <Code className="size-4" />
               </div>
-              <h3 className="font-medium">
-                The usual drill, no surprises
-              </h3>
+              <h3 className="font-medium">The usual drill, no surprises</h3>
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">

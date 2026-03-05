@@ -35,6 +35,9 @@ export const blogPosts = defineCollections({
     tags: z.array(z.string()).default([]),
     image: z.string().optional(),
     video: z.string().optional(),
+    featured: z.boolean().default(false),
+    pinned: z.boolean().default(false),
+    pinOrder: z.number().optional(),
   }),
 });
 
