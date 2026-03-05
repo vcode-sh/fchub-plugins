@@ -2,7 +2,7 @@
 .gitignore
 .distignore
 node_modules/
-vendor/
+/vendor/
 tests/
 docs/
 .phpunit.cache/

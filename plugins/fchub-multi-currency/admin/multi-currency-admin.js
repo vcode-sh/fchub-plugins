@@ -184,7 +184,43 @@
 				return catalogue.filter((c) => !added[c.code]);
 			},
 		},
+		mounted: function () {
+			this.$nextTick(this.initSortable);
+		},
+		updated: function () {
+			this.$nextTick(this.initSortable);
+		},
+		beforeUnmount: function () {
+			if (this._sortable) {
+				this._sortable.destroy();
+				this._sortable = null;
+			}
+		},
 		methods: {
+			initSortable: function () {
+				var el = this.$refs.sortableBody;
+				if (!el || !window.Sortable) return;
+				if (this._sortable) return;
+				this._sortable = window.Sortable.create(el, {
+					handle: ".fchub-mc-drag-handle",
+					animation: 200,
+					ghostClass: "fchub-mc-ghost",
+					chosenClass: "fchub-mc-chosen",
+					onEnd: (evt) => {
+						if (evt.oldIndex === evt.newIndex) return;
+						var item = evt.item;
+						var from = evt.from;
+						if (evt.oldIndex < evt.newIndex) {
+							from.insertBefore(item, from.children[evt.oldIndex]);
+						} else {
+							from.insertBefore(item, from.children[evt.oldIndex + 1]);
+						}
+						var arr = this.settings.display_currencies;
+						var moved = arr.splice(evt.oldIndex, 1)[0];
+						arr.splice(evt.newIndex, 0, moved);
+					},
+				});
+			},
 			onPick: function (code) {
 				if (!code) return;
 				var entry = catalogueMap[code];
@@ -200,9 +236,17 @@
 					position: "left",
 				});
 				this.pickerValue = "";
+				if (this._sortable) {
+					this._sortable.destroy();
+					this._sortable = null;
+				}
 			},
 			removeCurrency: function (index) {
 				this.settings.display_currencies.splice(index, 1);
+				if (this._sortable) {
+					this._sortable.destroy();
+					this._sortable = null;
+				}
 			},
 		},
 		template:
@@ -224,36 +268,43 @@
             />\
         </el-select>\
     </div>\
-    <el-table v-if="settings.display_currencies && settings.display_currencies.length" :data="settings.display_currencies" stripe size="small">\
-        <el-table-column label="Currency" min-width="180">\
-            <template v-slot="scope">\
-                <span class="fchub-mc-flag">{{ (catalogueMap[scope.row.code] || {}).flag }}</span>\
-                <strong>{{ scope.row.code }}</strong>\
-                <span style="margin-left:4px;color:#909399">{{ scope.row.name }}</span>\
-            </template>\
-        </el-table-column>\
-        <el-table-column label="Symbol" width="90" align="center">\
-            <template v-slot="scope">\
-                <span v-html="scope.row.symbol"></span>\
-            </template>\
-        </el-table-column>\
-        <el-table-column prop="decimals" label="Decimals" width="90" align="center" />\
-        <el-table-column label="Position" width="180">\
-            <template v-slot="scope">\
-                <el-select v-model="scope.row.position" size="small">\
-                    <el-option label="Left ($100)" value="left" />\
-                    <el-option label="Right (100$)" value="right" />\
-                    <el-option label="Left space ($ 100)" value="left_space" />\
-                    <el-option label="Right space (100 $)" value="right_space" />\
-                </el-select>\
-            </template>\
-        </el-table-column>\
-        <el-table-column label="" width="60" align="center">\
-            <template v-slot="scope">\
-                <el-button type="danger" size="small" text @click="removeCurrency(scope.$index)">&times;</el-button>\
-            </template>\
-        </el-table-column>\
-    </el-table>\
+    <div v-if="settings.display_currencies && settings.display_currencies.length" class="fchub-mc-currency-list">\
+        <div class="fchub-mc-currency-header">\
+            <div class="fchub-mc-col-handle"></div>\
+            <div class="fchub-mc-col-currency">Currency</div>\
+            <div class="fchub-mc-col-symbol">Symbol</div>\
+            <div class="fchub-mc-col-decimals">Decimals</div>\
+            <div class="fchub-mc-col-position">Position</div>\
+            <div class="fchub-mc-col-action"></div>\
+        </div>\
+        <div ref="sortableBody" class="fchub-mc-currency-body">\
+            <div v-for="(row, index) in settings.display_currencies" :key="row.code" class="fchub-mc-currency-row">\
+                <div class="fchub-mc-col-handle">\
+                    <span class="fchub-mc-drag-handle" title="Drag to reorder">\
+                        <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/><circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/></svg>\
+                    </span>\
+                </div>\
+                <div class="fchub-mc-col-currency">\
+                    <span class="fchub-mc-flag">{{ (catalogueMap[row.code] || {}).flag }}</span>\
+                    <strong>{{ row.code }}</strong>\
+                    <span style="margin-left:4px;color:#909399">{{ row.name }}</span>\
+                </div>\
+                <div class="fchub-mc-col-symbol"><span v-html="row.symbol"></span></div>\
+                <div class="fchub-mc-col-decimals">{{ row.decimals }}</div>\
+                <div class="fchub-mc-col-position">\
+                    <el-select v-model="row.position" size="small">\
+                        <el-option label="Left ($100)" value="left" />\
+                        <el-option label="Right (100$)" value="right" />\
+                        <el-option label="Left space ($ 100)" value="left_space" />\
+                        <el-option label="Right space (100 $)" value="right_space" />\
+                    </el-select>\
+                </div>\
+                <div class="fchub-mc-col-action">\
+                    <el-button type="danger" size="small" text @click="removeCurrency(index)">&times;</el-button>\
+                </div>\
+            </div>\
+        </div>\
+    </div>\
     <div v-else style="padding:40px;text-align:center;color:#909399">\
         No display currencies added yet. Use the picker above to add currencies.\
     </div>\
@@ -857,6 +908,24 @@
 		".fchub-mc-diag-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--el-border-color-lighter); font-size: 13px; }",
 		".fchub-mc-diag-row:last-child { border-bottom: none; }",
 		".fchub-mc-flag { font-size: 1.2em; margin-right: 6px; vertical-align: middle; }",
+		/* Currency list — drag-and-drop */
+		".fchub-mc-currency-list { border: 1px solid var(--el-border-color-lighter); border-radius: 6px; overflow: hidden; }",
+		".fchub-mc-currency-header, .fchub-mc-currency-row { display: flex; align-items: center; padding: 0 12px; font-size: 13px; }",
+		".fchub-mc-currency-header { background: var(--el-fill-color-light); font-weight: 600; color: var(--el-text-color-secondary); height: 40px; border-bottom: 1px solid var(--el-border-color-lighter); }",
+		".fchub-mc-currency-row { min-height: 48px; border-bottom: 1px solid var(--el-border-color-lighter); background: var(--el-bg-color); transition: background .15s; }",
+		".fchub-mc-currency-row:last-child { border-bottom: none; }",
+		".fchub-mc-currency-row:nth-child(even) { background: var(--el-fill-color-blank); }",
+		".fchub-mc-currency-row:hover { background: var(--el-fill-color); }",
+		".fchub-mc-col-handle { width: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }",
+		".fchub-mc-col-currency { flex: 1; min-width: 0; display: flex; align-items: center; }",
+		".fchub-mc-col-symbol { width: 90px; flex-shrink: 0; text-align: center; }",
+		".fchub-mc-col-decimals { width: 90px; flex-shrink: 0; text-align: center; }",
+		".fchub-mc-col-position { width: 180px; flex-shrink: 0; }",
+		".fchub-mc-col-action { width: 60px; flex-shrink: 0; text-align: center; }",
+		".fchub-mc-drag-handle { cursor: grab; color: var(--el-text-color-placeholder); display: inline-flex; padding: 4px; border-radius: 4px; transition: color .15s, background .15s; }",
+		".fchub-mc-drag-handle:hover { color: var(--el-text-color-regular); background: var(--el-fill-color); }",
+		".fchub-mc-ghost { opacity: 0.4; border: 2px dashed var(--el-color-primary); border-radius: 4px; }",
+		".fchub-mc-chosen { box-shadow: 0 2px 12px rgba(0,0,0,.1); }",
 	].join("\n");
 	document.head.appendChild(style);
 })();
