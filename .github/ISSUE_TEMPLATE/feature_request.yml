@@ -8,11 +8,15 @@ body:
       label: Which plugin?
       description: Which plugin should this feature live in?
       options:
-        - fchub-p24
-        - fchub-fakturownia
-        - fchub-memberships
-        - fchub-stream
-        - wc-fc
+        - Przelewy24 (fchub-p24)
+        - Fakturownia (fchub-fakturownia)
+        - Memberships (fchub-memberships)
+        - Stream (fchub-stream)
+        - Wishlist (fchub-wishlist)
+        - Multi-Currency (fchub-multi-currency)
+        - Portal Extender (fchub-portal-extender)
+        - WC Migrator (wc-fc)
+        - FluentCart MCP Server (fluentcart-mcp)
         - New plugin / not sure
     validations:
       required: true
