@@ -33,6 +33,8 @@ export const blogPosts = defineCollections({
       .enum(["fluentcart", "fluentcommunity", "general"])
       .default("general"),
     tags: z.array(z.string()).default([]),
+    image: z.string().optional(),
+    video: z.string().optional(),
   }),
 });
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { ArrowRight, Calendar, Tag, User } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Tag, User } from "lucide-react";
 import { motion } from "motion/react";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,9 @@ type BlogPost = {
   date: string;
   category: string;
   tags: string[];
+  image?: string;
+  video?: string;
+  readingTime: number;
 };
 
 const containerVariants = {
@@ -78,6 +82,85 @@ const categoryColors: Record<string, string> = {
 };
 
 function PostCard({ post }: { post: BlogPost }) {
+  const hasMedia = post.image || post.video;
+
+  if (hasMedia) {
+    return (
+      <Link href={post.url} className="group block">
+        <article className="rounded-xl border border-foreground/10 bg-card overflow-hidden transition-all hover:border-primary/30 hover:shadow-sm">
+          <div className="flex flex-col sm:flex-row">
+            <div className="relative sm:w-72 shrink-0 aspect-[16/9] sm:aspect-auto sm:h-auto overflow-hidden bg-muted">
+              {post.video ? (
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                  src={post.video}
+                />
+              ) : post.image ? (
+                <Image
+                  src={post.image}
+                  alt={post.title}
+                  fill
+                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  sizes="(max-width: 640px) 100vw, 288px"
+                />
+              ) : null}
+            </div>
+            <div className="flex flex-col justify-between p-5 sm:p-6 min-w-0">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <Badge className={categoryColors[post.category]}>
+                    {categoryLabels[post.category] ?? post.category}
+                  </Badge>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Calendar size={12} />
+                    {format(parseISO(post.date), "d MMM yyyy")}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock size={12} />
+                    {post.readingTime} min read
+                  </span>
+                </div>
+
+                <h2 className="text-xl font-semibold tracking-tight mb-2 group-hover:text-primary transition-colors">
+                  {post.title}
+                </h2>
+
+                <p className="text-muted-foreground leading-relaxed mb-4 line-clamp-2">
+                  {post.description}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between">
+                {post.tags.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Tag size={12} className="text-muted-foreground" />
+                    {post.tags.slice(0, 3).map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="text-[10px] h-4"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <span className="ml-auto flex items-center gap-1 text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                  Read
+                  <ArrowRight size={14} />
+                </span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </Link>
+    );
+  }
+
   return (
     <Link href={post.url} className="group block">
       <article className="rounded-xl border border-foreground/10 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-sm">
@@ -88,6 +171,10 @@ function PostCard({ post }: { post: BlogPost }) {
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Calendar size={12} />
             {format(parseISO(post.date), "d MMM yyyy")}
+          </span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock size={12} />
+            {post.readingTime} min read
           </span>
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <User size={12} />

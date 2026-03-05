@@ -2,8 +2,9 @@ import { format, parseISO } from "date-fns";
 import { TOCItems } from "fumadocs-ui/components/toc/clerk";
 import { TOCProvider, TOCScrollArea } from "fumadocs-ui/components/toc/index";
 import { DocsBody } from "fumadocs-ui/page";
-import { ArrowLeft, Calendar, Tag, Text, User } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Tag, Text, User } from "lucide-react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,11 @@ const categoryColors: Record<string, string> = {
   general: "bg-green-500/15 text-green-500 border-transparent",
 };
 
+function estimateReadingTime(text: string): number {
+  const words = text.trim().split(/\s+/).length;
+  return Math.max(1, Math.round(words / 230));
+}
+
 export default async function BlogPostPage({
   params,
 }: {
@@ -32,9 +38,12 @@ export default async function BlogPostPage({
   if (!page) notFound();
 
   const MDXContent = page.data.body;
-  const { category, author, date, tags } = page.data;
-
+  const { category, author, date, tags, image, video } = page.data;
   const hasToc = page.data.toc.length > 0;
+  const rawText = await page.data.getText("raw");
+  const readingTime = estimateReadingTime(rawText);
+
+  const hasHero = image || video;
 
   return (
     <TOCProvider toc={page.data.toc}>
@@ -49,7 +58,7 @@ export default async function BlogPostPage({
           </Link>
 
           <header className="mb-10">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
               <Badge className={categoryColors[category]}>
                 {categoryLabels[category] ?? category}
               </Badge>
@@ -63,6 +72,10 @@ export default async function BlogPostPage({
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <User size={14} />
                 {author}
+              </span>
+              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Clock size={14} />
+                {readingTime} min read
               </span>
             </div>
 
@@ -87,6 +100,32 @@ export default async function BlogPostPage({
               </div>
             )}
           </header>
+
+          {hasHero && (
+            <div className="mb-10 -mx-4 sm:mx-0">
+              {video ? (
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full rounded-xl border"
+                  src={video}
+                />
+              ) : image ? (
+                <div className="relative aspect-[16/9] overflow-hidden rounded-xl border">
+                  <Image
+                    src={image}
+                    alt={page.data.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 768px"
+                    priority
+                  />
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <DocsBody>
             <MDXContent components={getMDXComponents()} />
@@ -133,7 +172,7 @@ export async function generateMetadata({
       title: page.data.title,
       description: page.data.description ?? undefined,
       type: "article",
-      images: [{ url: image.url }],
+      images: [{ url: page.data.image ?? image.url }],
     },
   };
 }

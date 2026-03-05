@@ -53,19 +53,19 @@ const heroVariants = {
 };
 
 const monorepoChecks = [
-  "Extends FluentCart or FluentCommunity (not generic WP plugins)",
+  "Extends FluentCart or FluentCommunity — no generic WordPress plugins, we're not wp.org",
   "GPL-compatible licence (GPLv2 or later preferred)",
-  "Follows repo code style (PSR-12, strict types, no unnecessary abstractions)",
-  "Has tests if the plugin does anything non-trivial",
-  "No external service dependencies without clear docs",
-  "You're OK with shared maintenance — others may send PRs to your plugin",
+  "Follows the repo code style — PSR-12, strict types, no unnecessary abstractions",
+  "Has tests if the plugin does anything non-trivial (if it touches money, it has tests)",
+  "No external service dependencies without clear docs — surprise API calls are not a feature",
+  "You're OK with shared maintenance — others may send PRs to your plugin, that's the deal",
 ];
 
 const communityChecks = [
   "Extends FluentCart or FluentCommunity",
   "GPL-compatible licence",
-  "Has a public GitHub repo with a README",
-  "Actively maintained (responds to issues)",
+  "Has a public GitHub repo with a README that explains what the thing actually does",
+  "Actively maintained — or at least you respond to issues before they grow cobwebs",
 ];
 
 export default function ContributePage() {
@@ -84,9 +84,10 @@ export default function ContributePage() {
           nobody else will
         </h1>
         <p className="text-lg text-muted-foreground mb-4 max-w-2xl mx-auto text-balance">
-          FCHub is open source, community-driven, and perpetually short-staffed.
-          If you&apos;ve built something for FluentCart or FluentCommunity, it
-          probably belongs here.
+          FCHub is not just my plugins — it&apos;s a platform for yours too.
+          Built something for FluentCart or FluentCommunity? A payment gateway
+          for your region, a shipping connector, something beautifully niche?
+          It probably belongs here.
         </p>
       </motion.div>
 
@@ -110,13 +111,14 @@ export default function ContributePage() {
                 <h3 className="font-medium">Merge into monorepo</h3>
               </div>
               <p className="text-sm text-muted-foreground text-balance">
-                Your plugin gets added to{" "}
+                Your plugin moves into{" "}
                 <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
                   plugins/
-                </code>
-                , maintained alongside the existing ones, and released via the
-                shared build system. You get CI, distribution ZIPs, and
-                collective maintenance for free.
+                </code>{" "}
+                and gets the full treatment — CI, automated releases, distribution
+                ZIPs, docs on the site, and other developers helping maintain it.
+                The trade-off: your code follows the repo&apos;s conventions and
+                anyone can send PRs. That&apos;s not a bug. That&apos;s the point.
               </p>
             </div>
             <div className="border rounded-md p-6 space-y-3">
@@ -127,9 +129,10 @@ export default function ContributePage() {
                 <h3 className="font-medium">Community listing</h3>
               </div>
               <p className="text-sm text-muted-foreground text-balance">
-                Keep the plugin in your own repo, on your own terms. FCHub links
-                to it on the homepage as a &ldquo;community plugin&rdquo;. You
-                stay in control, we give you visibility.
+                Keep it in your own repo, on your own terms. FCHub lists it
+                on the site as a community plugin — you stay in control, we
+                give you visibility. For people who want the audience without
+                the code reviews.
               </p>
             </div>
           </div>
@@ -154,8 +157,12 @@ export default function ContributePage() {
         {/* Acceptance Criteria */}
         <motion.section variants={itemVariants}>
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-6">
-            Plugin Acceptance Criteria
+            The Bar You Need to Clear
           </h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Not trying to be gatekeepers. Just trying to keep the repo from
+            turning into a graveyard of abandoned experiments.
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h3 className="font-medium flex items-center gap-2">
@@ -204,7 +211,9 @@ export default function ContributePage() {
               <div className="flex items-center justify-center size-8 border rounded-sm bg-muted">
                 <Code className="size-4" />
               </div>
-              <h3 className="font-medium">The usual drill</h3>
+              <h3 className="font-medium">
+                The usual drill, no surprises
+              </h3>
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
@@ -213,12 +222,13 @@ export default function ContributePage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-muted-foreground font-mono">2.</span>
-                One thing per PR — no drive-by refactors
+                One thing per PR — no drive-by refactors, no &ldquo;while
+                I&apos;m here&rdquo; cleanups
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-muted-foreground font-mono">3.</span>
                 Follow existing patterns — PSR-12, strict types, Vue 3
-                Composition API
+                Composition API. Read the code before rewriting it.
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-muted-foreground font-mono">4.</span>
@@ -226,7 +236,7 @@ export default function ContributePage() {
                 <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
                   main
                 </code>
-                . That&apos;s it.
+                . That&apos;s it. No cover letter required.
               </li>
             </ul>
             <div className="flex gap-3 pt-2">
@@ -272,13 +282,13 @@ export default function ContributePage() {
               <div className="flex items-center justify-center size-8 border rounded-sm bg-muted">
                 <Languages className="size-4" />
               </div>
-              <h3 className="font-medium">Help localise FluentCart</h3>
+              <h3 className="font-medium">Help localise FCHub plugins</h3>
             </div>
             <p className="text-sm text-muted-foreground text-balance">
               Polish is at ~96% because someone had to do it. Other languages
               are at a round 0%. If you speak something other than English and
               fancy translating payment gateway strings for fun, we&apos;d love
-              the help.
+              the help. No coding required — just language skills and patience.
             </p>
             <div className="pt-2">
               <Button

@@ -1,0 +1,105 @@
+---
+title: "Open Source Means Contributing, Not Shoplifting"
+description: "FCHub is a project, not a product catalogue. The plugins are free. The repo is public. That's an invitation to contribute, not a shopping aisle."
+author: "Vibe Code"
+date: "2026-03-05"
+category: "general"
+tags: ["open-source", "fchub", "community", "meta"]
+image: "https://files.vcode.sh/fchub/fchub-share.webp"
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+
+The code is free. The repo is public. This is not an accident.
+
+FCHub is a growing collection of plugins for FluentCart and FluentCommunity. Payment gateways, invoicing, memberships, wishlists — the bits that platforms need but don't ship with. Most of them are free and open source, sitting in a [public GitHub repo](https://github.com/vcode-sh/fchub-plugins) for anyone to see, fork, and improve.
+
+That's the pitch. No nag screens, no crippled free tiers, no "upgrade to unlock the button that actually does the thing."
+
+## Why Most of It Is Free
+
+Because charging for glue code feels gross.
+
+Most FCHub plugins are integrations — they extend other people's platforms. FluentCart already costs money. FluentCommunity already costs money. Slapping a $49/year licence on top of that — for the privilege of connecting two products that should probably talk to each other natively — is the kind of move that makes the WordPress ecosystem the joyless tollbooth it sometimes is.
+
+So the integrations are free. Source code, updates, support docs. Revolutionary concept: not monetising everything that moves.
+
+This started the way most decent side projects start — I needed something, it didn't exist, so I built it. Then I thought, well, someone else probably needs it too. So I open-sourced it. Not for clout. Not for a portfolio piece. Just because keeping it private felt pointlessly selfish for code that solves a common problem.
+
+**But** — and here's the honest bit — some plugins take months to build. The ones with their own database schemas, admin UIs, complex lifecycle management, and enough edge cases to fill a spreadsheet. Those might carry a price tag. Not because I've suddenly discovered greed, but because "maintained" and "free" and "one developer" is a triangle where you can only pick two. I'd rather charge fairly for something I keep improving than abandon it when the motivation runs out. That's the deal — and I think it's a fair one.
+
+## The Public Repo Isn't a Shopping Aisle
+
+Here's where the tone shifts slightly.
+
+The repo is public. The licence is GPL. That means you can fork it, modify it, redistribute it. Legally, you can do whatever you like. But "can" and "should" are different verbs with very different energy.
+
+There's a pattern I've seen more than once in the WordPress world. It goes like this:
+
+1. Find an open-source plugin that solves a real problem
+2. Fork the repo
+3. Change 20 lines — usually the plugin name, the author URI, and the colour of a button
+4. Repackage it as a "premium" plugin
+5. Sell it to people who don't know the original exists
+
+That's not contributing. That's not extending. That's not even creatively stealing. It's just... photocopying someone's homework and charging for it. The licence allows it. Your mum would say you shouldn't.
+
+And look — the GPL exists for good reasons. I chose it on purpose. If someone forks FCHub and builds something genuinely new on top of it, something that adds real value, something that takes the code in a direction I never thought of — brilliant. That's the whole point. That's open source working as intended.
+
+But renaming a plugin and listing it on a marketplace for $39 isn't that. It's the software equivalent of reheating someone else's cooking and calling yourself a chef.
+
+## What "Contributing" Actually Looks Like
+
+Right, enough roasting. Here's the bit where I ask for help without making it weird.
+
+FCHub is a project. Not my project — a project. The kind of thing that gets better when more people care about it. And "contributing" doesn't mean you need to mass-produce pull requests or rewrite the codebase in Rust.
+
+<Accordions type="single">
+  <Accordion title="Ways to contribute (seriously, any of these count)">
+    | Contribution | What it means |
+    |-------------|---------------|
+    | **Bug reports** | Found something broken? Open an issue. That's contribution. Genuinely. |
+    | **Feature requests** | Got an idea? Drop it in discussions. Even bad ideas spark good ones. |
+    | **Code** | PRs welcome. Fix a bug, add a feature, improve a test. The bar is "does it work and does it follow the patterns." |
+    | **Translations** | The plugins need them. If you speak a language other than English, you can help. |
+    | **Documentation** | Found something confusing? Improve the docs. Write the guide you wish existed when you started. |
+    | **Just using it** | Install it. Use it. Tell someone about it. Word of mouth is free — unlike the knockoff versions. |
+  </Accordion>
+</Accordions>
+
+You don't need to be a senior developer. You don't need to mass-produce PRs. You need to give a damn about keeping free things free and making them better for everyone who uses them.
+
+## Bring Your Plugin
+
+This is the bit most open-source projects don't say out loud, so I'll say it: **FCHub is not just my plugins. It's a platform for yours too.**
+
+Built something for FluentCart or FluentCommunity? A payment gateway for your region, a shipping integration, an invoicing connector for a service I've never heard of? Brilliant. FCHub wants it. There are two ways in:
+
+**Merge into the monorepo** — your plugin lives in `plugins/` alongside the rest. You get CI, automated releases, distribution ZIPs, docs hosting, and collective maintenance. The trade-off: it follows the repo's code style and other developers might send PRs to it. That's not a bug, that's the point.
+
+**Community listing** — keep it in your own repo, on your own terms. FCHub links to it on the site. You stay in control, we give you visibility.
+
+Either way, more plugins means a stronger ecosystem. And "I built a thing, want to share it" is a better origin story than most plugins on wp.org can claim.
+
+<Callout type="info" title="Submit Your Plugin">
+  Head to the [Contribute page](/contribute) for the full details, acceptance criteria, and a big friendly button to open a GitHub issue. Or don't. I'm not your manager.
+</Callout>
+
+## The Implicit Deal
+
+Here's what FCHub is, stripped of all the sarcasm for exactly one paragraph:
+
+I build plugins. Most are free and open source — use them, fork them, improve them. Some bigger ones will cost money, because rent exists and so does burnout. Either way, the code is out there, the project is real, and contributions make everything better for everyone. If you fork the free ones and sell them, the licence allows it. But if you do, at least have the decency to add something original. Build on top of the work. Don't just photocopy it.
+
+Right, sarcasm back on.
+
+The WordPress ecosystem has 60,000 plugins. Half are abandoned. A quarter are duplicates of each other. The rest are split between "actually good" and "SEO-optimised garbage that ranks first on Google." FCHub isn't trying to be a plugin empire. It's trying to be a handful of plugins that work properly and stay maintained — some free, some paid, all honest about which is which.
+
+That's it. That's the manifesto. No merch, no Discord with 47 announcement channels, no "become a founding member" tier.
+
+Worst case, I'm a bloke who gave away free code and wrote a blog post about it. There are worse hills to die on.
+
+---
+
+*Now if you'll excuse me, I need to go open-source something else before the urge to monetise kicks in.*
