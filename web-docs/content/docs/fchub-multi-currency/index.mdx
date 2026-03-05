@@ -25,34 +25,22 @@ The customer sees prices in their local currency. At checkout, a disclosure noti
 
 <Cards>
   <Card title="Currency Switcher Widget">
-    A polished dropdown widget with flag emojis, keyboard navigation, and ARIA accessibility. Drop it anywhere with the `[fchub_currency_switcher]` shortcode. Not your average native `<select>` element.
+    Custom dropdown with flag emojis, keyboard navigation, and ARIA accessibility. Place anywhere with `[fchub_currency_switcher]`.
+  </Card>
+  <Card title="Real-Time Price Projection">
+    JavaScript engine rewrites all FluentCart prices on the page — product cards, cart drawer, checkout totals, pricing tables — without a page reload.
   </Card>
   <Card title="Automatic Exchange Rates">
-    Rates refresh automatically from your chosen provider — Exchange Rate API, Open Exchange Rates, or the European Central Bank (free, no API key). Manual rates are also supported for the control enthusiasts.
+    Four providers (Exchange Rate API, Open Exchange Rates, ECB, Manual), configurable cron refresh, 90-day history, and stale rate detection with admin warnings.
   </Card>
-  <Card title="Price Projection">
-    A JavaScript engine rewrites all FluentCart prices on the page in real time. Product cards, cart drawer, checkout totals, pricing tables — everything gets projected into the display currency without a page reload.
-  </Card>
-  <Card title="Checkout Disclosure">
-    Configurable notice at checkout telling the customer what currency they'll actually be charged in. Compliant, clear, and customisable with template tokens.
+  <Card title="Checkout Disclosure & Snapshots">
+    Configurable notice at checkout explaining the actual charge currency. Display currency, rate, and base currency saved to order metadata on payment.
   </Card>
   <Card title="Smart Context Resolution">
-    The plugin figures out which currency to show through a priority chain: URL parameter, user preference, cookie, geolocation (optional), or fallback default. First match wins.
+    Priority chain: URL parameter, user preference, cookie, geolocation (optional), fallback default. First match wins. Persists across sessions.
   </Card>
-  <Card title="Order Snapshots">
-    When an order is paid, the display currency, base currency, and exchange rate are saved to order metadata. Your records always show what the customer saw at checkout.
-  </Card>
-  <Card title="FluentCRM Sync">
-    Automatically tag contacts with their preferred currency, update custom fields on context switch and order payment. Build currency-segmented automation flows.
-  </Card>
-  <Card title="FluentCommunity Sync">
-    Writes the visitor's preferred currency to their community profile meta. Useful if you want to personalise community content by region.
-  </Card>
-  <Card title="GDPR Compliant">
-    Personal data exporter and eraser registered with WordPress privacy tools. Currency preferences and event logs are included in data export requests and deleted on erasure requests.
-  </Card>
-  <Card title="Rate Freshness Monitoring">
-    Stale rate detection with admin notices and a configurable threshold. The currency switcher widget shows a "Rates updated X ago" badge so visitors know the rates are current.
+  <Card title="FluentCRM & Community Sync">
+    Auto-tag contacts by currency, update custom fields on switch and order payment. Community profile meta sync. GDPR exporter and eraser included.
   </Card>
 </Cards>
 
