@@ -1,6 +1,6 @@
 ---
 title: FCHub Multi-Currency
-description: Display-layer multi-currency for FluentCart with automatic exchange rates, a polished currency switcher, checkout disclosure, and FluentCRM/FluentCommunity sync.
+description: Display-layer multi-currency for FluentCart. Show prices in your visitors' local currency, handle exchange rates automatically, and keep checkout transparent.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
@@ -9,38 +9,40 @@ import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-FCHub Multi-Currency lets your FluentCart store display prices in your visitors' preferred currency. The actual payment still happens in your base currency — this is a display-layer system, not a multi-gateway setup. Visitors see prices in EUR, GBP, or whatever you've configured, and the plugin handles the conversion, rounding, and disclosure automatically.
+Your store charges in one currency. Your customers think in dozens. FCHub Multi-Currency bridges that gap — visitors see prices in their local currency, you still get paid in yours.
 
-No payment gateway changes. No currency-per-product headaches. One base currency, many display options.
+No second payment gateway. No per-product price lists. No spreadsheets with exchange rates you forgot to update three months ago. The plugin handles conversion, rounding, and disclosure so you can focus on selling things.
 
-## Why Display-Layer?
+## Why Bother?
 
-Payment gateways are complicated enough without adding currency arbitrage into the mix. Display-layer multi-currency gives your international customers a familiar price experience without requiring you to maintain separate price lists, negotiate multi-currency merchant accounts, or deal with settlement in five different currencies.
+A customer from Berlin lands on your store and sees `$49.99`. They have to open a new tab, google "49.99 USD in EUR", squint at the result, and decide if they're okay with whatever that is. Some of them — probably the ones you wanted — just leave.
 
-The customer sees prices in their local currency. At checkout, a disclosure notice explains the actual charge currency. The exchange rate and display currency are recorded on the order for your records. Simple.
+With Multi-Currency enabled, that same customer sees `€45.97` the moment they arrive. No mental math, no tab-switching, no existential currency crisis. They know what they're paying. They buy more. Revolutionary concept, really.
+
+The actual charge still happens in your base currency. At checkout, a clear notice explains exactly what currency they'll be billed in and what rate was used. Transparent, compliant, and nobody gets surprised on their bank statement.
 
 <Separator className="my-8" />
 
-## Feature Overview
+## What You Get
 
 <Cards>
-  <Card title="Currency Switcher Widget">
-    Custom dropdown with flag emojis, keyboard navigation, and ARIA accessibility. Place anywhere with `[fchub_currency_switcher]`.
+  <Card title="Currency Switcher" href="/docs/fchub-multi-currency/currency-switcher">
+    A proper dropdown with flag emojis — not a sad native `<select>`. Fully keyboard-accessible, works anywhere via shortcode, shows when rates were last updated.
   </Card>
-  <Card title="Real-Time Price Projection">
-    JavaScript engine rewrites all FluentCart prices on the page — product cards, cart drawer, checkout totals, pricing tables — without a page reload.
+  <Card title="Automatic Exchange Rates" href="/docs/fchub-multi-currency/exchange-rates">
+    Pick a provider, enter an API key (or use the free ECB option), and rates refresh on autopilot. Stale rate detection warns you before your customers notice.
   </Card>
-  <Card title="Automatic Exchange Rates">
-    Four providers (Exchange Rate API, Open Exchange Rates, ECB, Manual), configurable cron refresh, 90-day history, and stale rate detection with admin warnings.
+  <Card title="Instant Price Conversion" href="/docs/fchub-multi-currency/checkout">
+    Every price on the page updates instantly — product cards, cart, checkout totals, pricing tables. No page reload needed. Cart updates? Re-converted automatically.
   </Card>
-  <Card title="Checkout Disclosure & Snapshots">
-    Configurable notice at checkout explaining the actual charge currency. Display currency, rate, and base currency saved to order metadata on payment.
+  <Card title="Checkout Transparency" href="/docs/fchub-multi-currency/checkout">
+    A customisable notice tells customers the exact charge currency. The display currency and rate are saved on every order so you always know what the customer saw.
   </Card>
-  <Card title="Smart Context Resolution">
-    Priority chain: URL parameter, user preference, cookie, geolocation (optional), fallback default. First match wins. Persists across sessions.
+  <Card title="CRM Integration" href="/docs/fchub-multi-currency/fluentcrm">
+    FluentCRM contacts get tagged by currency automatically. Custom fields update on every switch and purchase. Segment by currency, trigger automations, the usual.
   </Card>
-  <Card title="FluentCRM & Community Sync">
-    Auto-tag contacts by currency, update custom fields on switch and order payment. Community profile meta sync. GDPR exporter and eraser included.
+  <Card title="Remembers Preferences">
+    Visitors pick a currency once. The plugin remembers it via cookie, user account, or URL parameter — whatever sticks. Come back next week, still in EUR.
   </Card>
 </Cards>
 
@@ -48,108 +50,87 @@ The customer sees prices in their local currency. At checkout, a disclosure noti
 
 ## How It Works
 
+The short version — five steps, no jargon:
+
 <Steps>
   <Step>
-    **Visitor Arrives**
+    **Visitor lands on your store**
 
-    The plugin resolves which currency to display by running through the resolver chain: URL parameter (`?currency=EUR`), logged-in user preference, cookie, geolocation, or the configured default. First resolver to return a valid code wins.
+    The plugin figures out which currency to show. If the visitor picked one before, it uses that. If not, it falls back to your configured default. You can also send people directly to a specific currency with a URL like `yourstore.com/shop?currency=GBP`.
   </Step>
   <Step>
-    **Prices Are Projected**
+    **Prices convert automatically**
 
-    A JavaScript engine scans the page for FluentCart price elements and rewrites them using the current exchange rate. This happens client-side — no server round-trips, no page reloads. A MutationObserver watches for DOM changes (AJAX cart updates, drawer opens) and re-projects automatically.
+    Every FluentCart price on the page — product cards, "From" prices, compare prices, cart totals, the lot — gets converted to the visitor's currency using the latest exchange rate. This happens instantly, before the visitor even notices.
   </Step>
   <Step>
-    **Customer Switches Currency**
+    **Visitor switches currency (optional)**
 
-    The currency switcher widget sends a REST API call to save the preference (cookie + user meta for logged-in users), then reloads the page. The new currency persists across page views.
+    The currency switcher dropdown lets visitors pick a different currency. One click, page refreshes, new prices everywhere. Their choice is saved for next time.
   </Step>
   <Step>
-    **Checkout Disclosure**
+    **Checkout is transparent**
 
-    At checkout, a notice explains that prices are approximate and the actual charge will be in the base currency. The text is configurable with `{base_currency}`, `{display_currency}`, and `{rate}` tokens.
+    A notice at checkout explains: "Prices shown in EUR are approximate. You will be charged in USD." Fully customisable text. No surprises, no chargebacks from confused customers.
   </Step>
   <Step>
-    **Order Paid**
+    **Order records everything**
 
-    When the order is paid, the plugin writes the display currency, base currency, exchange rate, and plugin version to order metadata. This snapshot is permanent — it survives rate changes.
+    When the order is paid, the plugin saves which currency the customer was viewing and what exchange rate was active. Your order history always shows the full picture, even if rates change later.
   </Step>
 </Steps>
 
 <Separator className="my-8" />
 
-## Architecture
+## Supported Rate Providers
 
-<Accordions type="single">
-  <Accordion title="Resolver Chain">
-    Currency context resolution follows a priority chain. Each resolver checks one source and either returns a valid currency code or passes to the next:
+You pick one. The plugin fetches rates on a schedule you set.
 
-    | Priority | Source | Condition |
-    |---|---|---|
-    | 1 | URL parameter | `url_param_enabled` is `yes` |
-    | 2 | User meta | Logged-in users only |
-    | 3 | Cookie | `cookie_enabled` is `yes` |
-    | 4 | Geolocation | `geo_enabled` is `yes` + feature flag |
-    | 5 | Default fallback | Always runs |
+| Provider | API Key? | Notes |
+|---|---|---|
+| **Exchange Rate API** | Yes | Default. Wide currency coverage, generous free tier. |
+| **Open Exchange Rates** | Yes | Alternative provider, slightly different coverage. |
+| **European Central Bank** | No | Free. No API key, no rate limits. ~30 major currencies. |
+| **Manual** | No | Set your own rates. For when you trust nobody but yourself. |
 
-    Every resolved code is validated against your configured display currencies whitelist. Invalid codes are silently skipped.
-  </Accordion>
-  <Accordion title="Price Projection Engine">
-    The JavaScript projection engine targets FluentCart's price CSS classes and data attributes. It parses the base-currency amount from the DOM, applies `bcmul`-equivalent multiplication with the exchange rate, rounds according to your settings, and reformats with the display currency's symbol, decimals, and position.
-
-    It handles price ranges (`$11.00 – $12.30`), "From" prefixes, strikethrough compare prices, variant buttons, cart totals, and checkout subtotals. Totals get an `≈` prefix to signal they're approximate.
-
-    A 50ms-debounced MutationObserver catches all DOM mutations so AJAX cart updates, drawer toggles, and FluentCart fragment replacements trigger re-projection automatically.
-  </Accordion>
-  <Accordion title="Rate Management">
-    Exchange rates are stored in a custom database table (`fchub_mc_rate_history`) with full history. The latest rate per currency pair is cached in WordPress object cache (group `fchub_mc_rates`, 1-hour TTL). A configurable WP-Cron job refreshes rates from your chosen provider.
-
-    Stale rate detection compares the `fetched_at` timestamp against the configurable threshold. When rates are stale, the admin sees a warning notice, the switcher badge turns red, and the plugin falls back to either the base currency or the last known rate (configurable).
-
-    Rate history older than 90 days is automatically pruned by the cron job.
-  </Accordion>
-  <Accordion title="FluentCart Integration">
-    The plugin registers as a FluentCart addon through the standard integration system. It extends the store settings API, injects checkout data fragments, hooks into `order_paid_done` for order snapshots, and adds a settings route inside FluentCart's admin SPA.
-  </Accordion>
-</Accordions>
+Rates refresh automatically (default: every 6 hours). If a rate goes stale, you get an admin warning and the switcher badge turns red. Old rate history is pruned after 90 days.
 
 <Separator className="my-8" />
 
 ## Requirements
 
-| Requirement | Minimum Version |
+| Requirement | Version |
 |---|---|
 | WordPress | 6.7+ |
 | PHP | 8.3+ |
 | FluentCart | Latest version |
-| bcmath extension | Recommended (falls back to native float math) |
 
 <Callout type="warn" title="FluentCart Required">
-FCHub Multi-Currency is a FluentCart extension. It requires FluentCart to be installed and active. Without FluentCart, the plugin displays an admin notice and stays dormant.
+This is a FluentCart extension. Without FluentCart, the plugin politely does nothing.
 </Callout>
 
-Optional integrations:
+**Optional extras** — not required, but nice to have:
 
-| Plugin | What It Enables |
+| Plugin | What It Adds |
 |---|---|
-| **FluentCRM** | Contact tagging, custom field sync on currency switch and order payment |
-| **FluentCommunity** | User meta sync with preferred currency |
+| **FluentCRM** | Automatic currency tags on contacts, custom field sync on switch and purchase |
+| **FluentCommunity** | Preferred currency saved to community profiles |
 
 <Separator className="my-8" />
 
-## What's Next
+## Get Started
 
 <Cards>
   <Card title="Installation" href="/docs/fchub-multi-currency/installation">
-    Download, install, and activate the plugin.
+    Download, install, activate. The usual WordPress ritual.
   </Card>
   <Card title="Configuration" href="/docs/fchub-multi-currency/configuration">
-    Set up currencies, exchange rates, checkout disclosure, and CRM sync.
+    Add currencies, pick a rate provider, customise the checkout notice.
   </Card>
   <Card title="Currency Switcher" href="/docs/fchub-multi-currency/currency-switcher">
-    Learn how the frontend widget works, shortcode usage, and keyboard accessibility.
+    The shortcode, the widget, the flags, the keyboard shortcuts.
   </Card>
   <Card title="Developer Reference" href="/docs/fchub-multi-currency/developer-reference">
-    REST API, hooks, PHP API, feature flags, and order metadata reference.
+    REST API, hooks, feature flags, database schema. For the curious.
   </Card>
 </Cards>
