@@ -43,6 +43,6 @@ final readonly class ExchangeRate
             return true;
         }
 
-        return (time() - $fetchedTimestamp) > $maxAgeSeconds;
+        return (current_time('timestamp') - $fetchedTimestamp) > $maxAgeSeconds;
     }
 }

@@ -63,7 +63,7 @@ final class ContextModule implements ModuleContract
         }
     }
 
-    private static function buildResolverChain(OptionStore $optionStore): ResolverChain
+    public static function buildResolverChain(OptionStore $optionStore): ResolverChain
     {
         $settings = $optionStore->all();
         $rateRepo = new ExchangeRateRepository();

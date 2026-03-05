@@ -38,6 +38,23 @@ final class RatesCacheStore
         ], self::CACHE_GROUP, self::TTL);
     }
 
+    public function delete(string $baseCurrency, string $quoteCurrency): bool
+    {
+        $key = self::cacheKey($baseCurrency, $quoteCurrency);
+
+        return wp_cache_delete($key, self::CACHE_GROUP);
+    }
+
+    /**
+     * @param array<string> $quoteCurrencies
+     */
+    public function deleteMany(string $baseCurrency, array $quoteCurrencies): void
+    {
+        foreach ($quoteCurrencies as $quote) {
+            $this->delete($baseCurrency, $quote);
+        }
+    }
+
     public function flush(): void
     {
         if (function_exists('wp_cache_flush_group')) {

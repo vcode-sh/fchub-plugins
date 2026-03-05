@@ -314,7 +314,10 @@
 	 * Placed after checkout order summary and inside cart drawer.
 	 */
 	function injectDisclosures() {
-		const text = `Prices shown in ${displayCode} are approximate. You will be charged in ${baseCode}.`;
+		if (cfg.disclosureEnabled === false) return;
+		const text =
+			cfg.disclosureText ||
+			`Prices shown in ${displayCode} are approximate. You will be charged in ${baseCode}.`;
 
 		const makeNotice = (extraClass) => {
 			const el = document.createElement("div");

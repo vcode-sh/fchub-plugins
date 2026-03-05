@@ -27,10 +27,10 @@ final class SaveOrderSnapshotActionTest extends TestCase
 
         $contextService = new CurrencyContextService($chain, new OptionStore());
         $action = new SaveOrderSnapshotAction($contextService);
-        $order = (object) ['id' => 1];
+        $order = $this->createMockOrder(1);
         $action->execute($order);
 
-        $this->assertEmpty($GLOBALS['wp_mock_post_meta']);
+        $this->assertEmpty($order->meta);
     }
 
     #[Test]
@@ -45,10 +45,27 @@ final class SaveOrderSnapshotActionTest extends TestCase
 
         $contextService = new CurrencyContextService($chain, new OptionStore());
         $action = new SaveOrderSnapshotAction($contextService);
-        $order = (object) ['id' => 42];
+        $order = $this->createMockOrder(42);
         $action->execute($order);
 
-        $this->assertSame('EUR', $GLOBALS['wp_mock_post_meta'][42]['_fchub_mc_display_currency']);
-        $this->assertSame('USD', $GLOBALS['wp_mock_post_meta'][42]['_fchub_mc_base_currency']);
+        $this->assertSame('EUR', $order->meta['_fchub_mc_display_currency']);
+        $this->assertSame('USD', $order->meta['_fchub_mc_base_currency']);
+    }
+
+    private function createMockOrder(int $id): object
+    {
+        return new class($id) {
+            /** @var array<string, mixed> */
+            public array $meta = [];
+
+            public function __construct(public int $id)
+            {
+            }
+
+            public function updateMeta(string $key, mixed $value): void
+            {
+                $this->meta[$key] = $value;
+            }
+        };
     }
 }

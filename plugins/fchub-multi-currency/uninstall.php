@@ -28,6 +28,7 @@ if ($fchub_mc_remove) {
 
     // Delete user meta
     $wpdb->query("DELETE FROM {$wpdb->usermeta} WHERE meta_key = '_fchub_mc_currency'");
+    $wpdb->query("DELETE FROM {$wpdb->usermeta} WHERE meta_key = '_fcom_preferred_currency'");
 
     // Clean up scheduled hooks
     wp_clear_scheduled_hook('fchub_mc_refresh_rates');

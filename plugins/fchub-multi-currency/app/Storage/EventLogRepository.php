@@ -8,6 +8,8 @@ use FChubMultiCurrency\Support\Constants;
 
 defined('ABSPATH') || exit;
 
+// TODO: Logging infrastructure is ready but not yet wired up.
+// Call log() from key actions (rate refresh, currency switch) when event tracking is needed.
 final class EventLogRepository
 {
     public function log(string $event, ?int $userId, ?string $ipHash, ?array $payload): void

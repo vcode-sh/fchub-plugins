@@ -16,7 +16,6 @@ final class ModuleRegistry
         $modules = [
             Modules\SettingsModule::class,
             Modules\CoreModule::class,
-            Modules\RatesModule::class,
             Modules\ContextModule::class,
             Modules\FrontendModule::class,
             Modules\CheckoutModule::class,

@@ -23,12 +23,12 @@ final class RefreshRatesAction
     ) {
     }
 
-    public function execute(): void
+    public function execute(): bool
     {
         $lockKey = 'fchub_mc_rate_refresh_lock';
 
         if (wp_cache_get($lockKey)) {
-            return;
+            return false;
         }
 
         wp_cache_set($lockKey, true, '', 120);
@@ -40,22 +40,53 @@ final class RefreshRatesAction
             $displayCurrencies = $settings['display_currencies'] ?? [];
 
             $provider = ProviderRegistry::resolve($optionStore);
-            $rates = $provider->fetchRates($baseCurrency);
+
+            try {
+                $rates = $provider->fetchRates($baseCurrency);
+            } catch (\Throwable $e) {
+                Logger::error('Rate refresh failed: provider threw an exception', [
+                    'provider' => $provider->name(),
+                    'error'    => $e->getMessage(),
+                ]);
+                return false;
+            }
 
             if (empty($rates)) {
                 Logger::error('Rate refresh returned empty rates', [
                     'provider' => $provider->name(),
                 ]);
-                return;
+                return false;
             }
 
             $now = current_time('mysql');
             $providerEnum = RateProvider::tryFrom($provider->name()) ?? RateProvider::Manual;
 
+            // Collect quote codes we're about to refresh so we can invalidate them first
+            $quoteCodes = [];
+            foreach ($displayCurrencies as $currency) {
+                $code = is_array($currency) ? ($currency['code'] ?? '') : $currency;
+                if ($code !== '' && $code !== $baseCurrency) {
+                    $quoteCodes[] = $code;
+                }
+            }
+
+            // Delete existing cache entries before writing new ones
+            $this->cache->deleteMany($baseCurrency, $quoteCodes);
+
             foreach ($displayCurrencies as $currency) {
                 $code = is_array($currency) ? ($currency['code'] ?? '') : $currency;
 
                 if ($code === '' || $code === $baseCurrency || !isset($rates[$code])) {
+                    continue;
+                }
+
+                // Guard against zero or negative rates from provider
+                if (bccomp((string) $rates[$code], '0', 10) <= 0) {
+                    Logger::error('Skipping invalid rate (zero or negative)', [
+                        'currency' => $code,
+                        'rate'     => $rates[$code],
+                        'provider' => $provider->name(),
+                    ]);
                     continue;
                 }
 
@@ -76,6 +107,8 @@ final class RefreshRatesAction
                 'provider' => $provider->name(),
                 'count'    => count($rates),
             ]);
+
+            return true;
         } finally {
             wp_cache_delete($lockKey);
         }

@@ -51,7 +51,16 @@ final class RatesAdminController
             new RatesCacheStore(),
         );
 
-        $action->execute();
+        $success = $action->execute();
+
+        if (!$success) {
+            return new \WP_REST_Response([
+                'data' => [
+                    'message' => 'Failed to refresh exchange rates. Check the logs for details.',
+                    'status'  => false,
+                ],
+            ], 500);
+        }
 
         return new \WP_REST_Response([
             'data' => [

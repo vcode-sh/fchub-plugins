@@ -34,7 +34,7 @@ final class ModuleRegistryTest extends TestCase
         $classNames = array_map(fn($c) => basename(str_replace('\\', '/', $c)), $classes);
 
         $expected = [
-            'SettingsModule', 'CoreModule', 'RatesModule', 'ContextModule',
+            'SettingsModule', 'CoreModule', 'ContextModule',
             'FrontendModule', 'CheckoutModule', 'AdminModule', 'RestModule',
             'FluentCrmModule', 'FluentCommunityModule', 'DiagnosticsModule',
         ];

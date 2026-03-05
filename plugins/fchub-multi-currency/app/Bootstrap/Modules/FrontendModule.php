@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Bootstrap\Modules;
 
 use FChubMultiCurrency\Bootstrap\ModuleContract;
+use FChubMultiCurrency\Domain\Services\CheckoutDisclosureService;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
-use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
 use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
 use FChubMultiCurrency\Http\Controllers\Admin\CurrencyCatalogueController;
 use FChubMultiCurrency\Storage\OptionStore;
@@ -33,7 +33,7 @@ final class FrontendModule implements ModuleContract
         }
 
         $optionStore = new OptionStore();
-        $contextService = new CurrencyContextService(new ResolverChain(), $optionStore);
+        $contextService = new CurrencyContextService(ContextModule::buildResolverChain($optionStore), $optionStore);
         $context = $contextService->resolve();
 
         // Read FluentCart's base currency formatting config (before any filter)
@@ -69,6 +69,11 @@ final class FrontendModule implements ModuleContract
             },
             'baseDecimals'          => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
         ];
+
+        $disclosureService = new CheckoutDisclosureService($optionStore);
+        $disclosure = $disclosureService->getDisclosure($context);
+        $config['disclosureEnabled'] = $disclosure !== null;
+        $config['disclosureText'] = $disclosure;
 
         if (FeatureFlags::isEnabled('js_projection')) {
             $projectionPath = FCHUB_MC_PATH . 'assets/js/currency-projection.js';
@@ -119,7 +124,7 @@ final class FrontendModule implements ModuleContract
             return '';
         }
 
-        $ago = human_time_diff($fetchedTimestamp, time());
+        $ago = human_time_diff($fetchedTimestamp, current_time('timestamp'));
         $class = 'fchub-mc-rate-badge' . ($isStale ? ' fchub-mc-rate-badge--stale' : '');
         $text = esc_html(
             /* translators: %s: human-readable time difference, e.g. "2 hours" */
@@ -144,7 +149,7 @@ final class FrontendModule implements ModuleContract
 
         $optionStore = new OptionStore();
         $currencies = $optionStore->get('display_currencies', []);
-        $contextService = new CurrencyContextService(new ResolverChain(), $optionStore);
+        $contextService = new CurrencyContextService(ContextModule::buildResolverChain($optionStore), $optionStore);
         $context = $contextService->resolve();
         $currentCode = $context->displayCurrency->code;
 

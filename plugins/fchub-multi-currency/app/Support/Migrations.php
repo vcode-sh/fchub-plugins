@@ -6,7 +6,7 @@ namespace FChubMultiCurrency\Support;
 
 defined('ABSPATH') || exit;
 
-class Migrations
+final class Migrations
 {
     public static function run(): void
     {

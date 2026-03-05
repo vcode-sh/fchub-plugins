@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Plugin Name: FCHub - Multi-Currency
  * Plugin URI: https://fchub.co
@@ -124,6 +126,8 @@ add_action('fchub_mc_refresh_rates', function () {
         new FChubMultiCurrency\Storage\ExchangeRateRepository(),
         new FChubMultiCurrency\Storage\RatesCacheStore(),
     ))->execute();
+
+    (new FChubMultiCurrency\Storage\Queries\RateHistoryQuery())->pruneOlderThan(90);
 });
 
 /**
@@ -164,7 +168,7 @@ function fchub_mc_format_price(float $basePrice): string
 
     $optionStore = new FChubMultiCurrency\Storage\OptionStore();
     $contextService = new FChubMultiCurrency\Domain\Services\CurrencyContextService(
-        new FChubMultiCurrency\Domain\Resolvers\ResolverChain(),
+        FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore),
         $optionStore,
     );
     $context = $contextService->resolve();
@@ -178,7 +182,6 @@ function fchub_mc_format_price(float $basePrice): string
     $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::from(
         $optionStore->get('rounding_mode', 'half_up'),
     );
-    $precision = (int) $optionStore->get('rounding_precision', 0);
     $decimals = $context->displayCurrency->decimals;
 
     $rounded = match ($roundingMode) {

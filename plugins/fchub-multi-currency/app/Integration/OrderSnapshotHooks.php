@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Integration;
 
+use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Actions\SaveOrderSnapshotAction;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
-use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
 use FChubMultiCurrency\Storage\OptionStore;
 
 defined('ABSPATH') || exit;
@@ -22,7 +22,7 @@ final class OrderSnapshotHooks
     {
         $optionStore = new OptionStore();
         $contextService = new CurrencyContextService(
-            new ResolverChain(),
+            ContextModule::buildResolverChain($optionStore),
             $optionStore,
         );
 

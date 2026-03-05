@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Http\Controllers\Pub;
 
+use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Actions\PersistContextAction;
-use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
@@ -18,7 +18,7 @@ final class ContextController
     {
         $optionStore = new OptionStore();
         $contextService = new CurrencyContextService(
-            new ResolverChain(),
+            ContextModule::buildResolverChain($optionStore),
             $optionStore,
         );
 
@@ -59,7 +59,7 @@ final class ContextController
             ], 422);
         }
 
-        $action = new PersistContextAction(new PreferenceRepository());
+        $action = new PersistContextAction(new PreferenceRepository(), $optionStore);
         $action->execute($currencyCode);
 
         CurrencyContextService::reset();

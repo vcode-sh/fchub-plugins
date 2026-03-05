@@ -104,7 +104,7 @@ final class PersonalDataHandler
 
         return [
             'items_removed'  => $itemsRemoved,
-            'items_retained' => false,
+            'items_retained' => 0,
             'messages'       => [],
             'done'           => true,
         ];

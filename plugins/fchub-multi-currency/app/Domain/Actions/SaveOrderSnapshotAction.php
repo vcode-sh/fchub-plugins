@@ -23,12 +23,9 @@ final class SaveOrderSnapshotAction
             return;
         }
 
-        $orderId = (int) $order->id;
-
-        // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- order meta write on purchase
-        update_post_meta($orderId, '_fchub_mc_display_currency', $context->displayCurrency->code);
-        update_post_meta($orderId, '_fchub_mc_base_currency', $context->baseCurrency->code);
-        update_post_meta($orderId, '_fchub_mc_rate', $context->rate->rate);
-        update_post_meta($orderId, '_fchub_mc_disclosure_version', FCHUB_MC_VERSION);
+        $order->updateMeta('_fchub_mc_display_currency', $context->displayCurrency->code);
+        $order->updateMeta('_fchub_mc_base_currency', $context->baseCurrency->code);
+        $order->updateMeta('_fchub_mc_rate', $context->rate->rate);
+        $order->updateMeta('_fchub_mc_disclosure_version', FCHUB_MC_VERSION);
     }
 }

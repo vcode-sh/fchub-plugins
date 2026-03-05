@@ -41,6 +41,14 @@ final class EcbProvider implements ProviderContract
         // ECB always uses EUR as base — cross-rate if needed
         if (strtoupper($baseCurrency) !== 'EUR' && isset($rates[strtoupper($baseCurrency)])) {
             $baseRate = $rates[strtoupper($baseCurrency)];
+
+            if ($baseRate === '' || $baseRate === '0' || bccomp($baseRate, '0', 8) === 0) {
+                Logger::error('ECB base rate is zero — cannot rebase', [
+                    'base_currency' => $baseCurrency,
+                ]);
+                return [];
+            }
+
             $rebased = [];
 
             foreach ($rates as $code => $rate) {

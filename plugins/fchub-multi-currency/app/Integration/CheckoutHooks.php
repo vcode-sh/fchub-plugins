@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Integration;
 
+use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Services\CheckoutDisclosureService;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Storage\OptionStore;
@@ -23,7 +24,7 @@ final class CheckoutHooks
         $disclosureService = new CheckoutDisclosureService($optionStore);
 
         $contextService = new CurrencyContextService(
-            new \FChubMultiCurrency\Domain\Resolvers\ResolverChain(),
+            ContextModule::buildResolverChain($optionStore),
             $optionStore,
         );
 

@@ -10,20 +10,19 @@ defined('ABSPATH') || exit;
 
 final class PreferenceRepository
 {
-    public function saveCookie(string $currencyCode): void
+    public function saveCookie(string $currencyCode, int $lifetimeDays = Constants::COOKIE_DAYS): void
     {
-        $expire = time() + (Constants::COOKIE_DAYS * DAY_IN_SECONDS);
+        $expire = time() + ($lifetimeDays * DAY_IN_SECONDS);
 
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- cookie value is sanitized ISO code
-        setcookie(
-            Constants::COOKIE_KEY,
-            strtoupper($currencyCode),
-            $expire,
-            COOKIEPATH,
-            COOKIE_DOMAIN,
-            is_ssl(),
-            true,
-        );
+        setcookie(Constants::COOKIE_KEY, strtoupper($currencyCode), [
+            'expires'  => $expire,
+            'path'     => COOKIEPATH,
+            'domain'   => COOKIE_DOMAIN,
+            'secure'   => is_ssl(),
+            'httponly'  => true,
+            'samesite' => 'Lax',
+        ]);
     }
 
     public function saveUserMeta(int $userId, string $currencyCode): void

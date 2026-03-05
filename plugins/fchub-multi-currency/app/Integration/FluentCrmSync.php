@@ -86,8 +86,8 @@ final class FluentCrmSync
                 return;
             }
 
-            $displayCurrency = get_post_meta($order->id, '_fchub_mc_display_currency', true);
-            $rate = get_post_meta($order->id, '_fchub_mc_rate', true);
+            $displayCurrency = $order->getMeta('_fchub_mc_display_currency');
+            $rate = $order->getMeta('_fchub_mc_rate');
 
             if ($displayCurrency) {
                 $fieldKey = $settings['fluentcrm_field_last_order'] ?? 'last_order_display_currency';
