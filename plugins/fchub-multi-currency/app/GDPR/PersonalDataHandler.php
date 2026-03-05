@@ -42,26 +42,33 @@ final class PersonalDataHandler
     {
         $user = get_user_by('email', $emailAddress);
         $exportItems = [];
+        $page = max(1, $page);
+        $pageSize = 50;
+        $offset = ($page - 1) * $pageSize;
+        $done = true;
 
         if ($user) {
-            $preference = get_user_meta($user->ID, Constants::USER_META_KEY, true);
+            if ($page === 1) {
+                $preference = get_user_meta($user->ID, Constants::USER_META_KEY, true);
 
-            if ($preference) {
-                $exportItems[] = [
-                    'group_id'    => 'fchub-multi-currency',
-                    'group_label' => __('Multi-Currency Preferences', 'fchub-multi-currency'),
-                    'item_id'     => 'fchub-mc-pref-' . $user->ID,
-                    'data'        => [
-                        [
-                            'name'  => __('Preferred Currency', 'fchub-multi-currency'),
-                            'value' => $preference,
+                if ($preference) {
+                    $exportItems[] = [
+                        'group_id'    => 'fchub-multi-currency',
+                        'group_label' => __('Multi-Currency Preferences', 'fchub-multi-currency'),
+                        'item_id'     => 'fchub-mc-pref-' . $user->ID,
+                        'data'        => [
+                            [
+                                'name'  => __('Preferred Currency', 'fchub-multi-currency'),
+                                'value' => $preference,
+                            ],
                         ],
-                    ],
-                ];
+                    ];
+                }
             }
 
             $eventLogRepo = new EventLogRepository();
-            $events = $eventLogRepo->findByUser($user->ID);
+            $events = $eventLogRepo->findByUser($user->ID, $pageSize, $offset);
+            $done = count($events) < $pageSize;
 
             foreach ($events as $event) {
                 $exportItems[] = [
@@ -84,7 +91,7 @@ final class PersonalDataHandler
 
         return [
             'data' => $exportItems,
-            'done' => true,
+            'done' => $done,
         ];
     }
 

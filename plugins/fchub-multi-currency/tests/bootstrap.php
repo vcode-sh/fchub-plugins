@@ -139,6 +139,18 @@ if (!function_exists('update_option')) {
     }
 }
 
+if (!function_exists('add_option')) {
+    function add_option($key, $value = '', $deprecated = '', $autoload = 'yes')
+    {
+        if (array_key_exists($key, $GLOBALS['wp_options'])) {
+            return false;
+        }
+
+        $GLOBALS['wp_options'][$key] = $value;
+        return true;
+    }
+}
+
 if (!function_exists('delete_option')) {
     function delete_option($key)
     {
@@ -231,6 +243,13 @@ if (!function_exists('sanitize_text_field')) {
     }
 }
 
+if (!function_exists('sanitize_textarea_field')) {
+    function sanitize_textarea_field($str)
+    {
+        return trim(strip_tags((string) $str));
+    }
+}
+
 if (!function_exists('sanitize_title')) {
     function sanitize_title($title, $fallback_title = '', $context = 'save')
     {
@@ -273,6 +292,20 @@ if (!function_exists('esc_url')) {
     function esc_url($url)
     {
         return filter_var($url, FILTER_SANITIZE_URL) ?: '';
+    }
+}
+
+if (!function_exists('esc_url_raw')) {
+    function esc_url_raw($url)
+    {
+        return filter_var($url, FILTER_SANITIZE_URL) ?: '';
+    }
+}
+
+if (!function_exists('wp_kses_post')) {
+    function wp_kses_post($text)
+    {
+        return (string) $text;
     }
 }
 
@@ -648,9 +681,9 @@ if (!class_exists('WP_REST_Request')) {
             $this->jsonBody = $params;
         }
 
-        public function get_json_params(): array
+        public function get_json_params()
         {
-            return $this->jsonBody ?? [];
+            return $this->jsonBody;
         }
     }
 }
@@ -693,6 +726,7 @@ if (!class_exists('WP_User')) {
 
 // Include FluentCRM stubs
 require_once __DIR__ . '/stubs/fluentcrm-stubs.php';
+require_once __DIR__ . '/stubs/fluentcart-stubs.php';
 
 // Plugin class autoloader
 spl_autoload_register(function ($class) {

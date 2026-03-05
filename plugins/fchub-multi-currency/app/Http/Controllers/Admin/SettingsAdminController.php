@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Http\Controllers\Admin;
 
 use FChubMultiCurrency\Domain\Enums\CurrencyPosition;
+use FChubMultiCurrency\Domain\Enums\RateProvider;
+use FChubMultiCurrency\Domain\Enums\RoundingMode;
 use FChubMultiCurrency\Storage\OptionStore;
 use FluentCart\App\Helpers\CurrenciesHelper;
 
@@ -26,6 +28,14 @@ final class SettingsAdminController
     public function save(\WP_REST_Request $request): \WP_REST_Response
     {
         $params = $request->get_json_params();
+        if (!is_array($params)) {
+            return new \WP_REST_Response([
+                'data' => [
+                    'message' => 'Invalid JSON payload.',
+                ],
+            ], 400);
+        }
+
         $optionStore = new OptionStore();
 
         $previousInterval = (int) $optionStore->get('rate_refresh_interval_hrs', 6);
@@ -40,14 +50,30 @@ final class SettingsAdminController
 
             $value = $params[$key];
 
-            if ($key === 'display_currencies' && is_array($value)) {
-                $value = self::sanitizeDisplayCurrencies($value);
-            }
-
-            $sanitized[$key] = match (true) {
-                is_array($value) => $value,
-                is_int($value)   => $value,
-                default          => sanitize_text_field((string) $value),
+            $sanitized[$key] = match ($key) {
+                'display_currencies' => is_array($value) ? self::sanitizeDisplayCurrencies($value) : [],
+                'enabled',
+                'url_param_enabled',
+                'cookie_enabled',
+                'geo_enabled',
+                'checkout_disclosure_enabled',
+                'show_rate_freshness_badge',
+                'fluentcrm_enabled',
+                'fluentcrm_auto_create_tags',
+                'fluentcommunity_enabled',
+                'uninstall_remove_data' => self::sanitizeYesNo($value),
+                'base_currency',
+                'default_display_currency' => strtoupper(sanitize_text_field((string) $value)),
+                'url_param_key' => self::sanitizeUrlParamKey((string) $value),
+                'rate_provider' => self::sanitizeEnum((string) $value, array_column(RateProvider::cases(), 'value'), 'exchange_rate_api'),
+                'stale_fallback' => self::sanitizeEnum((string) $value, ['base', 'last_known'], 'base'),
+                'rounding_mode' => self::sanitizeEnum((string) $value, array_column(RoundingMode::cases(), 'value'), 'half_up'),
+                'cookie_lifetime_days' => max(1, min(365, (int) $value)),
+                'rate_refresh_interval_hrs' => max(1, min(168, (int) $value)),
+                'stale_threshold_hrs' => max(1, min(720, (int) $value)),
+                'rounding_precision' => max(0, min(4, (int) $value)),
+                'checkout_disclosure_text' => sanitize_textarea_field((string) $value),
+                default => sanitize_text_field((string) $value),
             };
         }
 
@@ -112,6 +138,31 @@ final class SettingsAdminController
                 'decimals' => $decimals,
                 'position' => $position,
             ];
+        }
+
+        return $clean;
+    }
+
+    private static function sanitizeYesNo(mixed $value): string
+    {
+        return ((string) $value === 'yes') ? 'yes' : 'no';
+    }
+
+    /**
+     * @param array<int, string> $allowed
+     */
+    private static function sanitizeEnum(string $value, array $allowed, string $default): string
+    {
+        $value = sanitize_text_field($value);
+
+        return in_array($value, $allowed, true) ? $value : $default;
+    }
+
+    private static function sanitizeUrlParamKey(string $value): string
+    {
+        $clean = preg_replace('/[^a-zA-Z0-9_-]/', '', sanitize_text_field($value));
+        if (!is_string($clean) || $clean === '') {
+            return 'currency';
         }
 
         return $clean;

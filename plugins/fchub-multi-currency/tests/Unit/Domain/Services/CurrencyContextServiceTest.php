@@ -66,4 +66,22 @@ final class CurrencyContextServiceTest extends TestCase
         $service->resolve();
         $this->assertSame(2, $callCount, 'Chain should be called again after reset');
     }
+
+    #[Test]
+    public function testResolveHandlesInvalidDisplayCurrenciesShape(): void
+    {
+        $chain = new ResolverChain();
+        $chain->add(ResolverSource::Fallback, fn() => null);
+
+        $this->setOption('fchub_mc_settings', [
+            'base_currency'      => 'USD',
+            'display_currencies' => 'not-an-array',
+        ]);
+
+        $service = new CurrencyContextService($chain, new OptionStore());
+        $context = $service->resolve();
+
+        $this->assertTrue($context->isBaseDisplay);
+        $this->assertSame('USD', $context->displayCurrency->code);
+    }
 }

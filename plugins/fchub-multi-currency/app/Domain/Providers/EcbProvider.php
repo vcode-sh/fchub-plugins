@@ -42,7 +42,11 @@ final class EcbProvider implements ProviderContract
         if (strtoupper($baseCurrency) !== 'EUR' && isset($rates[strtoupper($baseCurrency)])) {
             $baseRate = $rates[strtoupper($baseCurrency)];
 
-            if ($baseRate === '' || $baseRate === '0' || bccomp($baseRate, '0', 8) === 0) {
+            $isZeroBase = function_exists('bccomp')
+                ? (bccomp($baseRate, '0', 8) === 0)
+                : ((float) $baseRate === 0.0);
+
+            if ($baseRate === '' || $baseRate === '0' || $isZeroBase) {
                 Logger::error('ECB base rate is zero — cannot rebase', [
                     'base_currency' => $baseCurrency,
                 ]);
@@ -52,7 +56,9 @@ final class EcbProvider implements ProviderContract
             $rebased = [];
 
             foreach ($rates as $code => $rate) {
-                $rebased[$code] = bcdiv($rate, $baseRate, 8);
+                $rebased[$code] = function_exists('bcdiv')
+                    ? bcdiv($rate, $baseRate, 8)
+                    : number_format(((float) $rate / (float) $baseRate), 8, '.', '');
             }
 
             return $rebased;

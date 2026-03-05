@@ -72,7 +72,7 @@ final class MultiCurrencySettings
                     'type'  => 'link',
                     'label' => __('Full Settings', 'fchub-multi-currency'),
                     'tips'  => __('Configure currencies, exchange rates, checkout disclosure, and more.', 'fchub-multi-currency'),
-                    'url'   => admin_url('admin.php?page=fchub-multi-currency'),
+                    'url'   => admin_url('admin.php?page=fluent-cart#/settings/multi-currency'),
                 ],
             ],
         ];

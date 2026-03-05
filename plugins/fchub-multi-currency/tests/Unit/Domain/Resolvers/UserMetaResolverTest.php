@@ -43,4 +43,16 @@ final class UserMetaResolverTest extends TestCase
 
         $this->assertNull($result);
     }
+
+    #[Test]
+    public function testAllowsBaseCurrencyEvenWhenNotInDisplayList(): void
+    {
+        $this->setCurrentUserId(42);
+        $this->setUserMeta(42, '_fchub_mc_currency', 'USD');
+        $resolver = new UserMetaResolver();
+
+        $result = $resolver->resolve('USD', [['code' => 'EUR']]);
+
+        $this->assertSame('USD', $result);
+    }
 }

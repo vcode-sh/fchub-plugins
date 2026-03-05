@@ -42,15 +42,17 @@ final class ExchangeRateRepository
 
         $results = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT rh.* FROM {$table} rh
-                INNER JOIN (
-                    SELECT quote_currency, MAX(fetched_at) as max_fetched
-                    FROM {$table}
-                    WHERE base_currency = %s
-                    GROUP BY quote_currency
-                ) latest ON rh.quote_currency = latest.quote_currency AND rh.fetched_at = latest.max_fetched
-                WHERE rh.base_currency = %s",
-                strtoupper($baseCurrency),
+                "SELECT rh.*
+                FROM {$table} rh
+                WHERE rh.base_currency = %s
+                  AND rh.id = (
+                      SELECT rh2.id
+                      FROM {$table} rh2
+                      WHERE rh2.base_currency = rh.base_currency
+                        AND rh2.quote_currency = rh.quote_currency
+                      ORDER BY rh2.fetched_at DESC, rh2.id DESC
+                      LIMIT 1
+                  )",
                 strtoupper($baseCurrency),
             ),
             ARRAY_A,

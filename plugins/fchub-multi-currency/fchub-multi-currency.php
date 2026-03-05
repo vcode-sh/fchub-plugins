@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * Plugin Name: FCHub - Multi-Currency
  * Plugin URI: https://fchub.co
@@ -18,6 +16,8 @@ declare(strict_types=1);
  * Requires PHP: 8.3
  * Update URI: https://fchub.co/fchub-multi-currency
  */
+
+declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
@@ -177,7 +177,9 @@ function fchub_mc_format_price(float $basePrice): string
         return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
     }
 
-    $converted = (float) bcmul((string) $basePrice, $context->rate->rate, 8);
+    $converted = function_exists('bcmul')
+        ? (float) bcmul((string) $basePrice, $context->rate->rate, 8)
+        : ((float) $basePrice * (float) $context->rate->rate);
 
     $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::from(
         $optionStore->get('rounding_mode', 'half_up'),

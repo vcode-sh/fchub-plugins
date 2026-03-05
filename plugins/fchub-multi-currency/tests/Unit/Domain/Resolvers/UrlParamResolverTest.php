@@ -46,4 +46,17 @@ final class UrlParamResolverTest extends TestCase
 
         unset($_GET['currency']);
     }
+
+    #[Test]
+    public function testAllowsBaseCurrencyEvenWhenNotInDisplayList(): void
+    {
+        $_GET['currency'] = 'usd';
+        $resolver = new UrlParamResolver();
+
+        $result = $resolver->resolve('USD', [['code' => 'EUR']]);
+
+        $this->assertSame('USD', $result);
+
+        unset($_GET['currency']);
+    }
 }

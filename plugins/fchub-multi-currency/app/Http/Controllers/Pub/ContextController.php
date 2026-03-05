@@ -38,6 +38,12 @@ final class ContextController
     public function set(\WP_REST_Request $request): \WP_REST_Response
     {
         $params = $request->get_json_params();
+        if (!is_array($params)) {
+            return new \WP_REST_Response([
+                'data' => ['message' => 'Invalid JSON payload.'],
+            ], 400);
+        }
+
         $currencyCode = isset($params['currency']) ? sanitize_text_field($params['currency']) : '';
 
         if ($currencyCode === '') {
@@ -49,9 +55,20 @@ final class ContextController
         $currencyCode = strtoupper($currencyCode);
 
         $optionStore = new OptionStore();
-        /** @var array<int, array{code: string}> $displayCurrencies */
+        $baseCurrency = strtoupper((string) $optionStore->get('base_currency', 'USD'));
         $displayCurrencies = $optionStore->get('display_currencies', []);
-        $validCodes = array_column($displayCurrencies, 'code');
+        if (!is_array($displayCurrencies)) {
+            $displayCurrencies = [];
+        }
+
+        $validCodes = [$baseCurrency];
+        foreach ($displayCurrencies as $currency) {
+            if (!is_array($currency) || empty($currency['code'])) {
+                continue;
+            }
+
+            $validCodes[] = strtoupper((string) $currency['code']);
+        }
 
         if (!in_array($currencyCode, $validCodes, true)) {
             return new \WP_REST_Response([

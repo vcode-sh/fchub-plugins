@@ -46,4 +46,17 @@ final class CookieResolverTest extends TestCase
 
         unset($_COOKIE['fchub_mc_currency']);
     }
+
+    #[Test]
+    public function testAllowsBaseCurrencyEvenWhenNotInDisplayList(): void
+    {
+        $_COOKIE['fchub_mc_currency'] = 'usd';
+        $resolver = new CookieResolver();
+
+        $result = $resolver->resolve('USD', [['code' => 'EUR']]);
+
+        $this->assertSame('USD', $result);
+
+        unset($_COOKIE['fchub_mc_currency']);
+    }
 }

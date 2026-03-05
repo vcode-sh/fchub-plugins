@@ -12,8 +12,11 @@ parameters:
     bootstrapFiles:
         - vendor/autoload.php
         - phpstan-bootstrap.php
+    scanFiles:
+        - lib/GitHubUpdater.php
     scanDirectories:
         - ../../../fchub-playground/wp-content/plugins/fluent-cart/app
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/api
         - ../../../fchub-playground/wp-content/plugins/fluent-cart/vendor/wpfluent
         - ../../../fchub-playground/wp-content/plugins/fluent-crm/app
         - ../../../fchub-playground/wp-content/plugins/fluent-crm/vendor/wpfluent

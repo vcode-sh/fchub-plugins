@@ -30,6 +30,9 @@ final class CurrencyContextService
         $settings = $this->optionStore->all();
         $baseCurrencyCode = $settings['base_currency'] ?? 'USD';
         $enabledCurrencies = $settings['display_currencies'] ?? [];
+        if (!is_array($enabledCurrencies)) {
+            $enabledCurrencies = [];
+        }
 
         $resolved = $this->resolverChain->resolve($baseCurrencyCode, $enabledCurrencies);
 

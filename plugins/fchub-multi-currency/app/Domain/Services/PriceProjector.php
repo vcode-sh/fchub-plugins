@@ -25,7 +25,9 @@ final class PriceProjector
             );
         }
 
-        $converted = bcmul((string) $baseMinorUnits, $rate->rate, 8);
+        $converted = function_exists('bcmul')
+            ? bcmul((string) $baseMinorUnits, $rate->rate, 8)
+            : (string) ((float) $baseMinorUnits * (float) $rate->rate);
         $rounded = $this->roundingPolicy->apply($converted);
 
         return new MoneyAmount(

@@ -125,7 +125,16 @@ final class ContextModule implements ModuleContract
         string $staleFallback,
         ResolverSource $source,
     ): callable {
-        return function (string $baseCurrencyCode, array $enabledCurrencies) use ($resolver, $rateService, $rateRepo, $staleFallback, $source): ?CurrencyContext {
+        return function (
+            string $baseCurrencyCode,
+            array $enabledCurrencies
+        ) use (
+            $resolver,
+            $rateService,
+            $rateRepo,
+            $staleFallback,
+            $source
+        ): ?CurrencyContext {
             $code = $resolver->resolve($baseCurrencyCode, $enabledCurrencies);
 
             if ($code === null) {

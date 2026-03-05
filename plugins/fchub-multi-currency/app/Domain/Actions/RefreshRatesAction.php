@@ -25,13 +25,9 @@ final class RefreshRatesAction
 
     public function execute(): bool
     {
-        $lockKey = 'fchub_mc_rate_refresh_lock';
-
-        if (wp_cache_get($lockKey)) {
+        if (!$this->acquireLock()) {
             return false;
         }
-
-        wp_cache_set($lockKey, true, '', 120);
 
         try {
             $optionStore = new OptionStore();
@@ -81,7 +77,11 @@ final class RefreshRatesAction
                 }
 
                 // Guard against zero or negative rates from provider
-                if (bccomp((string) $rates[$code], '0', 10) <= 0) {
+                $isInvalidRate = function_exists('bccomp')
+                    ? (bccomp((string) $rates[$code], '0', 10) <= 0)
+                    : ((float) $rates[$code] <= 0.0);
+
+                if ($isInvalidRate) {
                     Logger::error('Skipping invalid rate (zero or negative)', [
                         'currency' => $code,
                         'rate'     => $rates[$code],
@@ -110,7 +110,30 @@ final class RefreshRatesAction
 
             return true;
         } finally {
-            wp_cache_delete($lockKey);
+            $this->releaseLock();
         }
+    }
+
+    private function acquireLock(): bool
+    {
+        $lockKey = 'fchub_mc_rate_refresh_lock';
+        $ttl = 120;
+
+        $currentLock = get_option($lockKey, false);
+        if ($currentLock !== false) {
+            $age = time() - (int) $currentLock;
+            if ($age < $ttl) {
+                return false;
+            }
+
+            delete_option($lockKey);
+        }
+
+        return add_option($lockKey, (string) time(), '', false);
+    }
+
+    private function releaseLock(): void
+    {
+        delete_option('fchub_mc_rate_refresh_lock');
     }
 }

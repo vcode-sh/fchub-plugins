@@ -29,16 +29,20 @@ final class EventLogRepository
     /**
      * @return array<object>
      */
-    public function findByUser(int $userId, int $limit = 50): array
+    public function findByUser(int $userId, int $limit = 50, int $offset = 0): array
     {
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_EVENT_LOG;
 
+        $limit = max(1, $limit);
+        $offset = max(0, $offset);
+
         return $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE user_id = %d ORDER BY created_at DESC LIMIT %d",
+                "SELECT * FROM {$table} WHERE user_id = %d ORDER BY created_at DESC LIMIT %d OFFSET %d",
                 $userId,
                 $limit,
+                $offset,
             ),
         );
     }

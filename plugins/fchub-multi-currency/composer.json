@@ -36,7 +36,7 @@
         "phpcbf": "phpcbf --standard=phpcs.xml",
         "lint": "composer phpcs",
         "fix": "composer phpcbf",
-        "analyse": "phpstan analyse --configuration=phpstan.neon",
+        "analyse": "phpstan analyse --configuration=phpstan.neon --memory-limit=512M",
         "check": ["@lint", "@analyse", "@test"]
     }
 }

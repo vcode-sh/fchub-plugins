@@ -15,8 +15,8 @@ final class RefreshRatesActionTest extends TestCase
     #[Test]
     public function testSkipsWhenLocked(): void
     {
-        // Simulate lock via wp_cache
-        $GLOBALS['wp_cache_store']['']['fchub_mc_rate_refresh_lock'] = true;
+        // Simulate existing lock option.
+        $this->setOption('fchub_mc_rate_refresh_lock', (string) time());
 
         $action = new RefreshRatesAction(new ExchangeRateRepository(), new RatesCacheStore());
         $action->execute();
@@ -55,7 +55,7 @@ final class RefreshRatesActionTest extends TestCase
 
         // Lock should be released after execution
         $this->assertFalse(
-            wp_cache_get('fchub_mc_rate_refresh_lock'),
+            get_option('fchub_mc_rate_refresh_lock', false),
             'Lock should be released after execution',
         );
     }
@@ -82,7 +82,7 @@ final class RefreshRatesActionTest extends TestCase
 
         // Lock should still be released
         $this->assertFalse(
-            wp_cache_get('fchub_mc_rate_refresh_lock'),
+            get_option('fchub_mc_rate_refresh_lock', false),
             'Lock should be released even when rates are empty',
         );
     }
