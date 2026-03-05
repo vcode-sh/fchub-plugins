@@ -1,0 +1,57 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+
+jobs:
+  triage:
+    # Run on new issues (skip bots, skip already-triaged)
+    # Run on labeled events only when 'claude' label is added (re-triage)
+    # Run on comments only when @claude is mentioned
+    if: >
+      (
+        github.event_name == 'issues' &&
+        github.event.action == 'opened' &&
+        github.event.issue.user.type != 'Bot' &&
+        !contains(join(github.event.issue.labels.*.name, ','), 'plugin/')
+      ) ||
+      (
+        github.event_name == 'issues' &&
+        github.event.action == 'labeled' &&
+        github.event.label.name == 'claude'
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude')
+      )
+    runs-on: [self-hosted, linux, x64, vps]
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          trigger_phrase: "@claude"
+          label_trigger: "claude"
+          prompt: |
+            Read .github/triage-instructions.md for your instructions.
+
+            REPO: ${{ github.repository }}
+            ISSUE_NUMBER: ${{ github.event.issue.number }}
+            TITLE: ${{ github.event.issue.title }}
+            BODY: ${{ github.event.issue.body }}
+            AUTHOR: ${{ github.event.issue.user.login }}
+            EXISTING_LABELS: ${{ join(github.event.issue.labels.*.name, ', ') }}
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 12
+            --allowedTools "Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh issue view:*),Bash(gh search issues:*),Bash(gh issue list:*),Read,Glob,Grep"
