@@ -139,3 +139,55 @@ add_action('admin_notices', function () {
         esc_html__('FCHub Multi-Currency requires FluentCart to be installed and activated.', 'fchub-multi-currency')
     );
 });
+
+/**
+ * Public API: Format a base-currency price in the visitor's display currency.
+ *
+ * Other FCHub plugins can call this to render multi-currency aware prices:
+ *   fchub_mc_format_price(9.99) → "€9.34"
+ *
+ * Falls back to FluentCart's default formatting when multi-currency is inactive
+ * or the visitor is browsing in the base currency.
+ *
+ * @param float $basePrice Price in the store's base currency
+ * @return string Formatted price HTML
+ */
+function fchub_mc_format_price(float $basePrice): string
+{
+    if (!defined('FLUENTCART_VERSION')) {
+        return (string) $basePrice;
+    }
+
+    if (!FChubMultiCurrency\Support\Hooks::isEnabled()) {
+        return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
+    }
+
+    $optionStore = new FChubMultiCurrency\Storage\OptionStore();
+    $contextService = new FChubMultiCurrency\Domain\Services\CurrencyContextService(
+        new FChubMultiCurrency\Domain\Resolvers\ResolverChain(),
+        $optionStore,
+    );
+    $context = $contextService->resolve();
+
+    if ($context->isBaseDisplay) {
+        return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
+    }
+
+    $converted = (float) bcmul((string) $basePrice, $context->rate->rate, 8);
+
+    $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::from(
+        $optionStore->get('rounding_mode', 'half_up'),
+    );
+    $precision = (int) $optionStore->get('rounding_precision', 0);
+    $decimals = $context->displayCurrency->decimals;
+
+    $rounded = match ($roundingMode) {
+        FChubMultiCurrency\Domain\Enums\RoundingMode::None     => $converted,
+        FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp   => round($converted, $decimals, PHP_ROUND_HALF_UP),
+        FChubMultiCurrency\Domain\Enums\RoundingMode::HalfDown => round($converted, $decimals, PHP_ROUND_HALF_DOWN),
+        FChubMultiCurrency\Domain\Enums\RoundingMode::Ceil     => (float) (ceil($converted * (10 ** $decimals)) / (10 ** $decimals)),
+        FChubMultiCurrency\Domain\Enums\RoundingMode::Floor    => (float) (floor($converted * (10 ** $decimals)) / (10 ** $decimals)),
+    };
+
+    return \FluentCart\Api\CurrencySettings::getPriceHtml($rounded, $context->displayCurrency->code);
+}

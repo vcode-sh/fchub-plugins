@@ -60,7 +60,11 @@ defined('ABSPATH') || exit;
 
                     <div class="fchub-wishlist-portal__item-price">
                         <?php if ($item['current_price'] > 0) : ?>
-                            <?= wp_kses_post(\FluentCart\Api\CurrencySettings::getPriceHtml($item['current_price'])) ?>
+                            <?= wp_kses_post(
+                                function_exists('fchub_mc_format_price')
+                                    ? fchub_mc_format_price((float) $item['current_price'])
+                                    : \FluentCart\Api\CurrencySettings::getPriceHtml($item['current_price'])
+                            ) ?>
                         <?php endif; ?>
                     </div>
 

@@ -366,9 +366,9 @@
 		},
 
 		_pushToCart: function (cartItemId) {
-			if (window.FluentCartCart && window.FluentCartCart.addProduct) {
+			if (window.fluentCartCart && window.fluentCartCart.addProduct) {
 				try {
-					var result = window.FluentCartCart.addProduct(cartItemId, 1);
+					var result = window.fluentCartCart.addProduct(cartItemId, 1);
 					return Promise.resolve(result);
 				} catch (e) {
 					return Promise.reject(e);
