@@ -1,0 +1,22 @@
+name: Claude OAuth Login
+
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: "Authorization code (leave empty for login URL)"
+        required: false
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  login:
+    runs-on: [self-hosted, linux, x64, vps]
+    steps:
+      - uses: grll/claude-code-login@v1
+        with:
+          code: ${{ inputs.code }}
+          secrets_admin_pat: ${{ secrets.SECRETS_ADMIN_PAT }}
