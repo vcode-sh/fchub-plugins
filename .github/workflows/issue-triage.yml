@@ -32,7 +32,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,11 +39,10 @@ jobs:
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_ACCESS_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           trigger_phrase: "@claude"
           label_trigger: "claude"
           allowed_non_write_users: "*"
-          show_full_output: true
           prompt: |
             Read .github/triage-instructions.md for your instructions.
 
