@@ -69,6 +69,7 @@
 		".fct_line_item_price",
 		".fct_line_item_total",
 		".fct_promo_price",
+		".fct_item_payment_info",
 		"[data-fluent-cart-checkout-estimated-total]",
 		"[data-fluent-cart-checkout-subtotal]",
 		".shipping-method-amount",
@@ -93,6 +94,17 @@
 	const escSign = baseSign.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const escCode = baseCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const stripRegex = new RegExp(`(${escSign}|${escCode})`, "g");
+
+	// Regex to match a formatted base-currency price within a larger string.
+	// Captures the full price token (sign/code + digits + separators + decimals)
+	// so we can replace just that portion while preserving surrounding text.
+	const escThousandSep = baseThousandSep
+		? baseThousandSep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+		: "";
+	const escDecSep = baseDecSep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const basePriceRegex = new RegExp(
+		`(?:${escSign}|${escCode})?\\s*\\d[\\d${escThousandSep}]*(?:${escDecSep}\\d+)?\\s*(?:${escSign}|${escCode})?`,
+	);
 
 	const ATTR_PROJECTED = "data-fchub-mc-projected";
 	const ATTR_BASE = "data-fchub-mc-base";
@@ -237,7 +249,21 @@
 	}
 
 	/**
+	 * Check if an element has mixed content (child elements like <sup>,
+	 * <span class="repeat-interval">) that would be destroyed by setting
+	 * textContent on the parent.
+	 */
+	function hasMixedContent(el) {
+		if (el.querySelector("sup")) return true;
+		if (el.querySelector("span.repeat-interval")) return true;
+		return false;
+	}
+
+	/**
 	 * Find the deepest element that contains the price text.
+	 * For elements with mixed content (e.g. <sup>$</sup>12.00<span>...),
+	 * returns a { textNode, mixed: true } wrapper so the caller can modify
+	 * only the text node instead of clobbering innerHTML.
 	 */
 	function findPriceTarget(el) {
 		const spans = el.querySelectorAll("span[aria-hidden]");
@@ -248,7 +274,34 @@
 		if (dels.length === 1 && looksLikePrice(dels[0].textContent)) {
 			return dels[0];
 		}
+
+		// If the element has child markup we'd destroy with textContent,
+		// find the bare text node that holds the numeric price
+		if (hasMixedContent(el)) {
+			for (const node of el.childNodes) {
+				if (node.nodeType === 3 && looksLikePrice(node.textContent)) {
+					return { textNode: node, mixed: true };
+				}
+			}
+		}
+
 		return el;
+	}
+
+	/**
+	 * Replace only the price portion in a text string, preserving any suffix
+	 * like "per month, until cancel". Returns the modified string, or null
+	 * if no price was found.
+	 */
+	function replaceInlinePrice(text) {
+		const match = text.match(basePriceRegex);
+		if (!match) return null;
+
+		const baseAmount = parseBasePrice(match[0]);
+		if (Number.isNaN(baseAmount)) return null;
+
+		const converted = formatPrice(applyRounding(baseAmount * rate));
+		return text.replace(match[0], converted);
 	}
 
 	/**
@@ -276,9 +329,9 @@
 		for (let j = 0; j < childNodes.length; j++) {
 			const node = childNodes[j];
 			if (node.nodeType === 3 && looksLikePrice(node.textContent)) {
-				const textAmount = parseBasePrice(node.textContent.trim());
-				if (!Number.isNaN(textAmount)) {
-					node.textContent = ` ${formatPrice(applyRounding(textAmount * rate))} `;
+				const converted = replaceInlinePrice(node.textContent);
+				if (converted !== null) {
+					node.textContent = converted;
 					count++;
 				}
 			}
@@ -371,8 +424,43 @@
 	 */
 	function projectSinglePrice(el) {
 		const target = findPriceTarget(el);
+
+		// Mixed content (e.g. <sup>$</sup>12.00<span class="repeat-interval">...)
+		// Modify only the text node containing the price, preserving sibling markup.
+		if (target.mixed) {
+			const node = target.textNode;
+			if (!el.getAttribute(ATTR_ORIGINAL)) {
+				el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
+			}
+			const converted = replaceInlinePrice(node.textContent);
+			if (converted === null) return 0;
+
+			// Replace <sup> currency sign with display currency sign
+			const sup = el.querySelector("sup");
+			if (sup) {
+				sup.textContent = symbol;
+			}
+
+			node.textContent = converted;
+			el.setAttribute(ATTR_PROJECTED, "1");
+			return 1;
+		}
+
 		const rawText = target.textContent;
 		if (!looksLikePrice(rawText)) return 0;
+
+		// For elements with subscription text (e.g. ".fct_item_payment_info"),
+		// replace only the price portion, preserving suffix like "per month, until cancel"
+		if (el.classList.contains("fct_item_payment_info")) {
+			if (!el.getAttribute(ATTR_ORIGINAL)) {
+				el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
+			}
+			const converted = replaceInlinePrice(rawText);
+			if (converted === null) return 0;
+			target.textContent = converted;
+			el.setAttribute(ATTR_PROJECTED, "1");
+			return 1;
+		}
 
 		let baseAmount;
 		let prefix = "";
@@ -555,23 +643,49 @@
 
 	/**
 	 * Listen for FluentCart's custom events that signal content updates.
+	 *
+	 * FluentCart dispatches all its custom events on `window` (not `document`),
+	 * and custom events do NOT bubble from window to document.
 	 */
 	function listenForFluentCartEvents() {
-		const events = [
+		// FluentCart events — dispatched on window
+		const windowEvents = [
 			"fluentCartFragmentsReplaced",
 			"fluentCartNotifySummaryViewUpdated",
 			"fluentCartNotifyCartDrawerItemChanged",
-			"fchub_mc:context_changed",
 		];
 
-		for (const eventName of events) {
-			document.addEventListener(eventName, () => {
+		for (const eventName of windowEvents) {
+			window.addEventListener(eventName, () => {
 				setTimeout(() => {
 					clearProjectionMarkers();
 					projectPrices();
 				}, 100);
 			});
 		}
+
+		// Modal/variant events need a longer delay for FluentCart to finish rendering
+		const delayedWindowEvents = [
+			"fluentCartSingleProductModalOpened",
+			"fluentCartSingleProductVariationChanged",
+		];
+
+		for (const eventName of delayedWindowEvents) {
+			window.addEventListener(eventName, () => {
+				setTimeout(() => {
+					clearProjectionMarkers();
+					projectPrices();
+				}, 200);
+			});
+		}
+
+		// Our own event — dispatched on window by the switcher
+		window.addEventListener("fchub_mc:context_changed", () => {
+			setTimeout(() => {
+				clearProjectionMarkers();
+				projectPrices();
+			}, 100);
+		});
 	}
 
 	// Add FOUC prevention class immediately

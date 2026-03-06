@@ -1,3 +1,44 @@
+### v1.1.5
+
+*Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.5)
+
+The price projection engine was architecturally deaf. Every dynamic price update — cart changes, variant switches, modal opens — was broken. Hat tip to [@ManniGH](https://github.com/ManniGH) for the bug reports that exposed the full extent of the carnage.
+
+#### Critical
+
+- **Price projection engine was deaf to FluentCart** — all event listeners were attached to `document`, but FluentCart dispatches every event on `window`. Custom events don't bubble across event targets. The projection engine never received cart updates, variant changes, or modal opens. Every dynamic price update was broken in production. Fixed by moving all listeners to `window`, where FluentCart has been shouting into the void this whole time.
+
+#### High
+
+- **Variant switching left prices in base currency** — missing `fluentCartSingleProductVariationChanged` listener. The engine simply didn't know variants existed. Now listens and re-projects with a 200ms delay for FluentCart to finish rendering.
+- **"View Options" modal prices stuck in base currency** — missing `fluentCartSingleProductModalOpened` listener. Same problem, same fix, same facepalm.
+- **Checkout subscription renewal line not converted** — `.fct_item_payment_info` wasn't in the price selector list. It is now. Subscriptions showing "$9.99/month" next to "€8.72 total" was not the vibe.
+- **Subscription text destroyed during projection** — "per month, until cancel" was getting obliterated because the projection replaced entire text nodes. Now uses regex to surgically replace only the price portion, leaving the suffix text intact.
+- **Pricing table elements destroyed** — `<sup>` currency signs and `<span class="repeat-interval">` were being vaporised by `textContent` replacement. Now detects mixed content and modifies only the text node containing the price, because destroying DOM elements is not a currency conversion strategy.
+- **`fchub_mc_format_price()` fatal error** — `$optionStore` was undefined when the currency context was already cached. Every call after the first page load would crash. The function that formats prices couldn't format prices. Brilliant.
+
+#### Security
+
+- **Rate limiting added to public POST `/context`** — unauthenticated endpoint could trigger unlimited FluentCRM API calls and DB writes. Now limited to 30 requests/minute per IP. Your store is no longer a free DDoS relay.
+- **Provider names removed from public `/rates` response** — was leaking which exchange rate API the store uses. Nobody needs to know that.
+- **Checkout disclosure text now sanitised on output** — admin-configurable template now runs through `wp_kses()` because trusting raw HTML from a settings field is how XSS happens.
+
+#### Features
+
+- **SVG flag icons** — bundled 50 SVG country flags from flag-icons (MIT licensed). Windows users no longer see mysterious two-letter codes where flags should be.
+- **Shortcode `label` attribute** — `[fchub_currency_switcher label="Select currency:"]` renders a text label next to the dropdown. For those who believe in accessibility, or just labelling things.
+- **Shortcode `align` attribute** — `[fchub_currency_switcher align="right"]` supports right and centre alignment.
+- **Per-currency decimal/thousand separators** — display currencies can now have explicit separator config instead of the position-based heuristic that thought all right-positioned currencies use commas.
+
+#### Code Quality
+
+- **Resolver chain cached** — `buildResolverChain()` no longer creates fresh objects on every call. Object creation is not a hobby.
+- **Duplicated `isAllowedCurrency()` extracted to trait** — was copy-pasted across 4 resolver classes. DRY exists for a reason.
+- **Race condition in stale lock handling fixed** — `delete_option` + `add_option` replaced with atomic `update_option`. TOCTOU bugs: the gift that keeps on giving.
+- **`current_time('mysql')` replaced** — deprecated WordPress function replaced with `wp_date()` in 2 more files. WordPress has been asking nicely since 5.3.
+
+<Separator className="my-8" />
+
 ### v1.1.4
 
 *Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.4)

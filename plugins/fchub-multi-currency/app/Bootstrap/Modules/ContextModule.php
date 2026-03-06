@@ -25,6 +25,8 @@ defined('ABSPATH') || exit;
 
 final class ContextModule implements ModuleContract
 {
+    private static ?ResolverChain $cachedChain = null;
+
     public function register(): void
     {
         add_action('wp', [self::class, 'resolveContext'], 1);
@@ -65,6 +67,10 @@ final class ContextModule implements ModuleContract
 
     public static function buildResolverChain(OptionStore $optionStore): ResolverChain
     {
+        if (self::$cachedChain !== null) {
+            return self::$cachedChain;
+        }
+
         $settings = $optionStore->all();
         $rateRepo = new ExchangeRateRepository();
         $rateService = new ExchangeRateService(
@@ -126,6 +132,8 @@ final class ContextModule implements ModuleContract
                 ResolverSource::Fallback,
             );
         });
+
+        self::$cachedChain = $chain;
 
         return $chain;
     }

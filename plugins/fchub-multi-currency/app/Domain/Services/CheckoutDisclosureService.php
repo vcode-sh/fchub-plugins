@@ -31,10 +31,21 @@ final class CheckoutDisclosureService
         $template = $settings['checkout_disclosure_text']
             ?? 'Your payment will be processed in {base_currency}.';
 
-        return str_replace(
+        $text = str_replace(
             ['{base_currency}', '{display_currency}', '{rate}'],
-            [$context->baseCurrency->code, $context->displayCurrency->code, $context->rate->rate],
+            [
+                esc_html($context->baseCurrency->code),
+                esc_html($context->displayCurrency->code),
+                esc_html($context->rate->rate),
+            ],
             $template,
         );
+
+        return wp_kses($text, [
+            'strong' => [],
+            'em'     => [],
+            'br'     => [],
+            'span'   => ['class' => true],
+        ]);
     }
 }

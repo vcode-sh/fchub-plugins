@@ -54,7 +54,7 @@ final class RefreshRatesAction
                 return false;
             }
 
-            $now = current_time('mysql');
+            $now = wp_date('Y-m-d H:i:s');
             $providerEnum = RateProvider::tryFrom($provider->name()) ?? RateProvider::Manual;
 
             // Collect quote codes we're about to refresh so we can invalidate them first
@@ -135,9 +135,9 @@ final class RefreshRatesAction
 
         $age = time() - (int) $currentLock;
         if ($age >= $ttl) {
-            // Stale lock — delete and try to re-acquire atomically
-            delete_option($lockKey);
-            return add_option($lockKey, (string) time(), '', false);
+            // Stale lock — overwrite with update_option (atomic, no TOCTOU gap)
+            update_option($lockKey, (string) time(), false);
+            return true;
         }
 
         return false;

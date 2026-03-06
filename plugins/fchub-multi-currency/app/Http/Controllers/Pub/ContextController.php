@@ -37,6 +37,19 @@ final class ContextController
 
     public function set(\WP_REST_Request $request): \WP_REST_Response
     {
+        // Rate limit: 30 requests per minute per IP
+        $ip = $request->get_header('X-Forwarded-For') ?: ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        $rateLimitKey = 'fchub_mc_rl_' . substr(md5($ip), 0, 12);
+        $hits = (int) get_transient($rateLimitKey);
+
+        if ($hits >= 30) {
+            return new \WP_REST_Response([
+                'data' => ['message' => 'Too many requests. Please try again later.'],
+            ], 429);
+        }
+
+        set_transient($rateLimitKey, $hits + 1, MINUTE_IN_SECONDS);
+
         $params = $request->get_json_params();
         if (!is_array($params)) {
             return new \WP_REST_Response([

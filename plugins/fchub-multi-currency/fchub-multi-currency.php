@@ -4,7 +4,7 @@
  * Plugin Name: FCHub - Multi-Currency
  * Plugin URI: https://fchub.co
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.1.4
+ * Version: 1.1.5
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -21,7 +21,7 @@ declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.1.4');
+define('FCHUB_MC_VERSION', '1.1.5');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));
@@ -171,12 +171,13 @@ function fchub_mc_format_price(float $basePrice): string
         return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
     }
 
+    $optionStore = new FChubMultiCurrency\Storage\OptionStore();
+
     // Reuse the already-resolved context if available (avoids rebuilding the full
     // resolver chain + DB queries on every call in a product listing loop)
     $context = FChubMultiCurrency\Domain\Services\CurrencyContextService::getResolved();
 
     if ($context === null) {
-        $optionStore = new FChubMultiCurrency\Storage\OptionStore();
         $contextService = new FChubMultiCurrency\Domain\Services\CurrencyContextService(
             FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore),
             $optionStore,

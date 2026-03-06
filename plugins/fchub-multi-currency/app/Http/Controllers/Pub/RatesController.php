@@ -27,7 +27,6 @@ final class RatesController
                 'base_currency'  => $rate->baseCurrency,
                 'quote_currency' => $rate->quoteCurrency,
                 'rate'           => $rate->rate,
-                'provider'       => $rate->provider->value,
                 'fetched_at'     => $rate->fetchedAt,
             ];
         }

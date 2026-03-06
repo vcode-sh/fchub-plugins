@@ -53,6 +53,7 @@ final class FrontendModule implements ModuleContract
             'restUrl'           => rest_url(Constants::REST_NAMESPACE),
             'nonce'             => wp_create_nonce('wp_rest'),
             'currencies'        => $optionStore->get('display_currencies', []),
+            'flagBaseUrl'       => FCHUB_MC_URL . 'assets/flags/4x3/',
             // Base currency formatting info for JS price parsing
             'baseCurrencySign'      => html_entity_decode($fcSettings['currency_sign'] ?? '$', ENT_QUOTES, 'UTF-8'),
             'baseCurrencyPosition'  => $fcSettings['currency_position'] ?? 'before',
@@ -68,14 +69,14 @@ final class FrontendModule implements ModuleContract
                 default       => ',',
             },
             'baseDecimals'          => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
-            'displayDecSep'         => match ($context->displayCurrency->position->value) {
+            'displayDecSep'         => self::resolveDisplaySep($context, $optionStore, 'decimal_separator', match ($context->displayCurrency->position->value) {
                 'right', 'right_space' => ',',
                 default                => '.',
-            },
-            'displayThousandSep'    => match ($context->displayCurrency->position->value) {
+            }),
+            'displayThousandSep'    => self::resolveDisplaySep($context, $optionStore, 'thousand_separator', match ($context->displayCurrency->position->value) {
                 'right', 'right_space' => '.',
                 default                => ',',
-            },
+            }),
         ];
 
         $disclosureService = new CheckoutDisclosureService($optionStore);
@@ -117,6 +118,30 @@ final class FrontendModule implements ModuleContract
         );
     }
 
+    private static function resolveDisplaySep(
+        \FChubMultiCurrency\Domain\ValueObjects\CurrencyContext $context,
+        OptionStore $optionStore,
+        string $field,
+        string $fallback,
+    ): string {
+        $currencies = $optionStore->get('display_currencies', []);
+        if (!is_array($currencies)) {
+            return $fallback;
+        }
+
+        foreach ($currencies as $currency) {
+            if (!is_array($currency)) {
+                continue;
+            }
+            if (strtoupper($currency['code'] ?? '') === $context->displayCurrency->code) {
+                $value = $currency[$field] ?? '';
+                return $value !== '' ? $value : $fallback;
+            }
+        }
+
+        return $fallback;
+    }
+
     private static function renderRateBadge(OptionStore $optionStore, ExchangeRate $rate): string
     {
         if ($optionStore->get('show_rate_freshness_badge', 'yes') !== 'yes') {
@@ -155,6 +180,11 @@ final class FrontendModule implements ModuleContract
             return '';
         }
 
+        $atts = shortcode_atts([
+            'label' => '',
+            'align' => 'left',
+        ], $atts, 'fchub_currency_switcher');
+
         $optionStore = new OptionStore();
         $currencies = $optionStore->get('display_currencies', []);
         $contextService = new CurrencyContextService(ContextModule::buildResolverChain($optionStore), $optionStore);
@@ -185,11 +215,22 @@ final class FrontendModule implements ModuleContract
             ]);
         }
 
-        $currentFlag = CurrencyCatalogueController::codeToFlag($currentCode);
+        $currentFlag = CurrencyCatalogueController::codeToFlagImg($currentCode);
 
         // Use only inline elements (<span>) to prevent wpautop from injecting <p> tags.
         // ARIA roles (listbox, option) handle semantics; CSS handles layout.
-        $html = '<span class="fchub-mc-switcher" data-fchub-mc-switcher>';
+        $alignClass = match ($atts['align']) {
+            'right'  => ' fchub-mc-switcher--right',
+            'center' => ' fchub-mc-switcher--center',
+            default  => '',
+        };
+        $html = '<span class="fchub-mc-switcher' . $alignClass . '" data-fchub-mc-switcher>';
+
+        $label = sanitize_text_field($atts['label']);
+        if ($label !== '') {
+            $html .= '<span class="fchub-mc-switcher__label">' . esc_html($label) . '</span>';
+        }
+
         $html .= '<button type="button" class="fchub-mc-switcher__trigger" data-fchub-mc-trigger>';
         $html .= '<span class="fchub-mc-switcher__flag">' . $currentFlag . '</span>';
         $html .= '<span class="fchub-mc-switcher__code">' . esc_html($currentCode) . '</span>';
@@ -207,7 +248,7 @@ final class FrontendModule implements ModuleContract
             }
             $code = esc_attr($currency['code']);
             $name = esc_html($currency['name'] ?? $code);
-            $flag = CurrencyCatalogueController::codeToFlag($currency['code']);
+            $flag = CurrencyCatalogueController::codeToFlagImg($currency['code']);
             $isActive = ($code === $currentCode);
             $activeClass = $isActive ? ' fchub-mc-switcher__option--active' : '';
             $ariaSelected = $isActive ? 'true' : 'false';

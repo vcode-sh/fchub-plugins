@@ -9,6 +9,31 @@
 	const config = window.fchubMcConfig || {};
 	const restUrl = config.restUrl || "/wp-json/fchub-mc/v1";
 	const nonce = config.nonce || "";
+	const flagBaseUrl = config.flagBaseUrl || "";
+
+	const currencyFlagMap = {
+		USD: "us", EUR: "eu", GBP: "gb", JPY: "jp", CHF: "ch", CAD: "ca",
+		AUD: "au", NZD: "nz", SEK: "se", NOK: "no", DKK: "dk", PLN: "pl",
+		CZK: "cz", HUF: "hu", RON: "ro", BGN: "bg", HRK: "hr", ISK: "is",
+		TRY: "tr", RUB: "ru", UAH: "ua", BRL: "br", MXN: "mx", ARS: "ar",
+		CLP: "cl", COP: "co", PEN: "pe", CNY: "cn", HKD: "hk", SGD: "sg",
+		TWD: "tw", KRW: "kr", INR: "in", IDR: "id", MYR: "my", PHP: "ph",
+		THB: "th", VND: "vn", AED: "ae", SAR: "sa", QAR: "qa", KWD: "kw",
+		BHD: "bh", OMR: "om", ILS: "il", EGP: "eg", ZAR: "za", NGN: "ng",
+		KES: "ke", GHS: "gh",
+	};
+
+	function buildFlagImg(currencyCode) {
+		const country = currencyFlagMap[currencyCode.toUpperCase()];
+		if (!country || !flagBaseUrl) return null;
+		const img = document.createElement("img");
+		img.src = flagBaseUrl + country + ".svg";
+		img.alt = currencyCode;
+		img.className = "fchub-mc-flag";
+		img.width = 20;
+		img.height = 15;
+		return img;
+	}
 
 	let idCounter = 0;
 
@@ -23,7 +48,7 @@
 		})
 			.then((response) => response.json())
 			.then((data) => {
-				document.dispatchEvent(
+				window.dispatchEvent(
 					new CustomEvent("fchub_mc:context_changed", {
 						detail: { currency: currencyCode, response: data },
 					}),
@@ -121,10 +146,18 @@
 			// Update trigger display
 			const triggerFlag = trigger.querySelector(".fchub-mc-switcher__flag");
 			const triggerCode = trigger.querySelector(".fchub-mc-switcher__code");
-			const optionFlag = target.querySelector(".fchub-mc-switcher__flag");
 			const optionCode = target.querySelector(".fchub-mc-switcher__option-code");
-			if (triggerFlag && optionFlag) {
-				triggerFlag.textContent = optionFlag.textContent;
+			if (triggerFlag) {
+				const flagImg = buildFlagImg(value);
+				if (flagImg) {
+					triggerFlag.textContent = "";
+					triggerFlag.appendChild(flagImg);
+				} else {
+					const optionFlag = target.querySelector(".fchub-mc-switcher__flag");
+					if (optionFlag) {
+						triggerFlag.innerHTML = optionFlag.innerHTML;
+					}
+				}
 			}
 			if (triggerCode && optionCode) {
 				triggerCode.textContent = optionCode.textContent;

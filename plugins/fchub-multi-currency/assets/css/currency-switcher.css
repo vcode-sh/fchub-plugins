@@ -56,6 +56,15 @@
     line-height: 1;
 }
 
+.fchub-mc-flag {
+    display: inline-block;
+    vertical-align: middle;
+    width: 20px;
+    height: 15px;
+    object-fit: cover;
+    border-radius: 2px;
+}
+
 .fchub-mc-switcher__code {
     font-weight: 600;
 }
@@ -181,6 +190,29 @@
 
 .fchub-mc-rate-badge--stale .fchub-mc-rate-badge__dot {
     background: var(--fchub-mc-badge-stale);
+}
+
+/* ----- Label ----- */
+.fchub-mc-switcher__label {
+    display: inline-block;
+    margin-right: 0.5rem;
+    color: var(--fchub-mc-text-secondary);
+    font-size: 0.875rem;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* ----- Alignment ----- */
+.fchub-mc-switcher--right {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.fchub-mc-switcher--center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 /* ----- Loading state ----- */

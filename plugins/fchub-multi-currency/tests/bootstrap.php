@@ -2,7 +2,7 @@
 
 define('FCHUB_TESTING', true);
 define('ABSPATH', '/tmp/wordpress/');
-define('FCHUB_MC_VERSION', '1.1.4');
+define('FCHUB_MC_VERSION', '1.1.5');
 define('FCHUB_MC_PATH', dirname(__DIR__) . '/');
 define('FCHUB_MC_URL', 'http://localhost/wp-content/plugins/fchub-multi-currency/');
 define('FCHUB_MC_DB_VERSION', '1.0.0');
@@ -166,6 +166,32 @@ if (!function_exists('current_time')) {
             return time();
         }
         return date('Y-m-d H:i:s');
+    }
+}
+
+if (!function_exists('wp_date')) {
+    function wp_date(string $format, ?int $timestamp = null): string
+    {
+        return date($format, $timestamp ?? time());
+    }
+}
+
+if (!function_exists('wp_kses')) {
+    function wp_kses(string $content, $allowed_html = [], $allowed_protocols = []): string
+    {
+        return strip_tags($content, array_map(fn($tag) => "<{$tag}>", array_keys(is_array($allowed_html) ? $allowed_html : [])));
+    }
+}
+
+if (!function_exists('shortcode_atts')) {
+    function shortcode_atts(array $defaults, $atts, string $shortcode = ''): array
+    {
+        $atts = (array) $atts;
+        $out = [];
+        foreach ($defaults as $name => $default) {
+            $out[$name] = array_key_exists($name, $atts) ? $atts[$name] : $default;
+        }
+        return $out;
     }
 }
 
@@ -684,6 +710,7 @@ if (!class_exists('WP_REST_Request')) {
     {
         private array $params = [];
         private ?array $jsonBody = null;
+        private array $headers = [];
 
         public function __construct(string $method = 'GET', string $route = '') {}
 
@@ -710,6 +737,16 @@ if (!class_exists('WP_REST_Request')) {
         public function get_json_params()
         {
             return $this->jsonBody;
+        }
+
+        public function set_header(string $key, string $value): void
+        {
+            $this->headers[strtolower($key)] = $value;
+        }
+
+        public function get_header(string $key): ?string
+        {
+            return $this->headers[strtolower($key)] ?? null;
         }
     }
 }
@@ -783,3 +820,52 @@ spl_autoload_register(function ($class) {
         require_once $file;
     }
 });
+
+// Public API function (defined in fchub-multi-currency.php, replicated here for tests)
+if (!function_exists('fchub_mc_format_price')) {
+    function fchub_mc_format_price(float $basePrice): string
+    {
+        if (!defined('FLUENTCART_VERSION')) {
+            return (string) $basePrice;
+        }
+
+        if (!FChubMultiCurrency\Support\Hooks::isEnabled()) {
+            return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
+        }
+
+        $optionStore = new FChubMultiCurrency\Storage\OptionStore();
+
+        $context = FChubMultiCurrency\Domain\Services\CurrencyContextService::getResolved();
+
+        if ($context === null) {
+            $contextService = new FChubMultiCurrency\Domain\Services\CurrencyContextService(
+                FChubMultiCurrency\Bootstrap\Modules\ContextModule::buildResolverChain($optionStore),
+                $optionStore,
+            );
+            $context = $contextService->resolve();
+        }
+
+        if ($context->isBaseDisplay) {
+            return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
+        }
+
+        $converted = function_exists('bcmul')
+            ? (float) bcmul((string) $basePrice, $context->rate->rate, 8)
+            : ((float) $basePrice * (float) $context->rate->rate);
+
+        $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::from(
+            $optionStore->get('rounding_mode', 'half_up'),
+        );
+        $decimals = $context->displayCurrency->decimals;
+
+        $rounded = match ($roundingMode) {
+            FChubMultiCurrency\Domain\Enums\RoundingMode::None     => $converted,
+            FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp   => round($converted, $decimals, PHP_ROUND_HALF_UP),
+            FChubMultiCurrency\Domain\Enums\RoundingMode::HalfDown => round($converted, $decimals, PHP_ROUND_HALF_DOWN),
+            FChubMultiCurrency\Domain\Enums\RoundingMode::Ceil     => (float) (ceil($converted * (10 ** $decimals)) / (10 ** $decimals)),
+            FChubMultiCurrency\Domain\Enums\RoundingMode::Floor    => (float) (floor($converted * (10 ** $decimals)) / (10 ** $decimals)),
+        };
+
+        return \FluentCart\Api\CurrencySettings::getPriceHtml($rounded, $context->displayCurrency->code);
+    }
+}

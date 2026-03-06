@@ -26,6 +26,27 @@ final class CurrencyCatalogueController
         'XPF' => '',
     ];
 
+    /**
+     * Currency codes that have bundled SVG flag files.
+     *
+     * Maps ISO 4217 currency code → ISO 3166-1 alpha-2 country code (lowercase).
+     */
+    private const SVG_FLAG_MAP = [
+        'USD' => 'us', 'EUR' => 'eu', 'GBP' => 'gb', 'JPY' => 'jp',
+        'CHF' => 'ch', 'CAD' => 'ca', 'AUD' => 'au', 'NZD' => 'nz',
+        'SEK' => 'se', 'NOK' => 'no', 'DKK' => 'dk', 'PLN' => 'pl',
+        'CZK' => 'cz', 'HUF' => 'hu', 'RON' => 'ro', 'BGN' => 'bg',
+        'HRK' => 'hr', 'ISK' => 'is', 'TRY' => 'tr', 'RUB' => 'ru',
+        'UAH' => 'ua', 'BRL' => 'br', 'MXN' => 'mx', 'ARS' => 'ar',
+        'CLP' => 'cl', 'COP' => 'co', 'PEN' => 'pe', 'CNY' => 'cn',
+        'HKD' => 'hk', 'SGD' => 'sg', 'TWD' => 'tw', 'KRW' => 'kr',
+        'INR' => 'in', 'IDR' => 'id', 'MYR' => 'my', 'PHP' => 'ph',
+        'THB' => 'th', 'VND' => 'vn', 'AED' => 'ae', 'SAR' => 'sa',
+        'QAR' => 'qa', 'KWD' => 'kw', 'BHD' => 'bh', 'OMR' => 'om',
+        'ILS' => 'il', 'EGP' => 'eg', 'ZAR' => 'za', 'NGN' => 'ng',
+        'KES' => 'ke', 'GHS' => 'gh',
+    ];
+
     public function index(\WP_REST_Request $request): \WP_REST_Response
     {
         return new \WP_REST_Response([
@@ -83,5 +104,26 @@ final class CurrencyCatalogueController
         $second = mb_chr(0x1F1E6 + ord($countryCode[1]) - ord('A'));
 
         return $first . $second;
+    }
+
+    /**
+     * Convert an ISO 4217 currency code to an SVG flag <img> tag.
+     *
+     * Falls back to emoji via codeToFlag() if no bundled SVG exists.
+     */
+    public static function codeToFlagImg(string $currencyCode): string
+    {
+        $countryCode = self::SVG_FLAG_MAP[strtoupper($currencyCode)] ?? null;
+
+        if ($countryCode === null) {
+            return self::codeToFlag($currencyCode);
+        }
+
+        $url = FCHUB_MC_URL . 'assets/flags/4x3/' . $countryCode . '.svg';
+
+        return '<img src="' . esc_url($url) . '"'
+            . ' alt="' . esc_attr($currencyCode) . '"'
+            . ' class="fchub-mc-flag"'
+            . ' width="20" height="15" />';
     }
 }

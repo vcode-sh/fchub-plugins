@@ -8,6 +8,8 @@ defined('ABSPATH') || exit;
 
 final class CookieResolver
 {
+    use AllowedCurrencyCheck;
+
     public function resolve(string $baseCurrencyCode, array $enabledCurrencies): ?string
     {
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- cookie read for currency preference
@@ -26,26 +28,4 @@ final class CookieResolver
         return $code;
     }
 
-    /**
-     * @param array<int|string, mixed> $enabledCurrencies
-     */
-    private function isAllowedCurrency(string $code, string $baseCurrencyCode, array $enabledCurrencies): bool
-    {
-        if ($code === strtoupper($baseCurrencyCode)) {
-            return true;
-        }
-
-        foreach ($enabledCurrencies as $currency) {
-            if (!is_array($currency)) {
-                continue;
-            }
-
-            $enabledCode = strtoupper((string) ($currency['code'] ?? ''));
-            if ($enabledCode === $code) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

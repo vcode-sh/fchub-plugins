@@ -24,6 +24,16 @@ final class PublicRoutes
                 'methods'             => 'POST',
                 'callback'            => [new ContextController(), 'set'],
                 'permission_callback' => '__return_true',
+                'args'                => [
+                    'currency' => [
+                        'required'          => true,
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_text_field',
+                        'validate_callback' => static function ($value): bool {
+                            return is_string($value) && preg_match('/^[A-Za-z]{3}$/', $value) === 1;
+                        },
+                    ],
+                ],
             ],
         ]);
 

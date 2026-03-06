@@ -29,7 +29,7 @@ final readonly class CurrencyContext
                 quoteCurrency: $base->code,
                 rate: '1.00000000',
                 provider: \FChubMultiCurrency\Domain\Enums\RateProvider::Manual,
-                fetchedAt: current_time('mysql'),
+                fetchedAt: wp_date('Y-m-d H:i:s') ?: gmdate('Y-m-d H:i:s'),
             ),
             source: ResolverSource::Fallback,
             isBaseDisplay: true,
