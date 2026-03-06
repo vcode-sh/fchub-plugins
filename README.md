@@ -6,9 +6,9 @@ Everything's open source. Not because I'm noble. Because vendor lock-in is a per
 
 **[The full rant →](https://fchub.co/blog/fchub-manifesto)**
 
-<iframe src="https://github.com/sponsors/vcode-sh/button" title="Sponsor vcode-sh" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
+[![Sponsor vcode-sh](https://img.shields.io/badge/sponsor-vcode--sh-ea4aaa?style=for-the-badge&logo=github-sponsors&logoColor=white)](https://github.com/sponsors/vcode-sh)
 
-This whole thing runs on caffeine and spite. If any of these plugins saved you from writing code, hiring a developer, or having a conversation with your accountant — consider sponsoring. Or don't. I'll keep shipping anyway. Just slower. And angrier.
+This whole thing runs on caffeine and spite. If any of these plugins saved you from writing code, hiring a developer, or having a conversation with your accountant — [consider sponsoring](https://github.com/sponsors/vcode-sh). Or don't. I'll keep shipping anyway. Just slower. And angrier.
 
 ---
 
