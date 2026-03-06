@@ -44,6 +44,7 @@ jobs:
           trigger_phrase: "@claude"
           label_trigger: "claude"
           allowed_non_write_users: "*"
+          show_full_output: true
           prompt: |
             Read .github/triage-instructions.md for your instructions.
 
