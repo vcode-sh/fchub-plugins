@@ -1,152 +1,110 @@
 # FCHub Plugins
 
-The WordPress plugins that FluentCart and FluentCommunity should've shipped but didn't. One monorepo, nine plugins, an MCP server, and a mass exodus tool from WooCommerce. All open source because vendor lock-in is a personality disorder. Read [the manifesto](https://fchub.co/blog/fchub-manifesto) if you want the full rant.
+All plugins, one MCP server, and a WooCommerce escape hatch — all crammed into a monorepo because FluentCart shipped a brilliant e-commerce platform and then left the ecosystem as empty as a WordPress plugin review queue on a Friday.
 
-<a href="https://fchub.co">
-  <img src="https://img.shields.io/badge/docs-fchub.co-blue?style=flat-square" alt="Docs">
-</a>
+Everything's open source. Not because I'm noble. Because vendor lock-in is a personality disorder and I refuse to participate.
+
+**[The full rant →](https://fchub.co/blog/fchub-manifesto)**
 
 <iframe src="https://github.com/sponsors/vcode-sh/button" title="Sponsor vcode-sh" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
 
-Running this operation on caffeine and stubbornness. If any of these plugins saved you time, money, or a conversation with your accountant — consider sponsoring. Or don't. I'll keep building anyway, but slower and angrier.
+This whole thing runs on caffeine and spite. If any of these plugins saved you from writing code, hiring a developer, or having a conversation with your accountant — consider sponsoring. Or don't. I'll keep shipping anyway. Just slower. And angrier.
 
-## Plugins
+---
 
-| Plugin | What it does | Requires |
-|--------|-------------|----------|
-| [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway — because Stripe doesn't speak Polish | FluentCart |
-| [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0 — automate paperwork before the tax office automates you | FluentCart |
-| [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling — 15k lines of PHP and Vue so people can pay to read your blog | FluentCart |
-| [fchub-multi-currency](plugins/fchub-multi-currency/) | Display-layer multi-currency with exchange rates — because not everyone lives in USD-land | FluentCart |
-| [fchub-portal-extender](plugins/fchub-portal-extender/) | Custom portal pages without writing PHP — for the "I'm not a developer" crowd | FluentCart |
-| [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net — because the WP media library and video is a war crime | FluentCommunity |
-| [fchub-thank-you](plugins/fchub-thank-you/) | Per-product post-payment redirects — because "Thank you for your order" is not a personality | FluentCart |
-| [fchub-wishlist](plugins/fchub-wishlist/) | Wishlists with guest sessions, portal support, and FluentCRM automations | FluentCart |
-| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator — products, orders, subscriptions, customers, coupons. Your escape hatch | FluentCart + WooCommerce |
+## The plugins
 
-WordPress 6.7+. PHP 8.3+. Patience optional. Full docs, install guides, and changelogs at **[fchub.co](https://fchub.co)**.
+| Plugin | The damage | Needs |
+|--------|-----------|-------|
+| [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway. Stripe doesn't speak Polish, someone had to | FluentCart |
+| [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0. Automate the paperwork before the tax office automates you | FluentCart |
+| [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling. 15k lines of PHP and Vue so people can pay to read your blog | FluentCart |
+| [fchub-multi-currency](plugins/fchub-multi-currency/) | Display-layer multi-currency with exchange rates. Not everyone lives in USD-land, shocking I know | FluentCart |
+| [fchub-portal-extender](plugins/fchub-portal-extender/) | Custom portal pages without writing PHP. For the "I'm not a developer" crowd, and fair enough | FluentCart |
+| [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net. The WP media library handling video is a war crime | FluentCommunity |
+| [fchub-thank-you](plugins/fchub-thank-you/) | Per-product post-payment redirects. "Thank you for your order" is not a personality | FluentCart |
+| [fchub-wishlist](plugins/fchub-wishlist/) | Wishlists with guest sessions, portal support, FluentCRM automations. The basics, done properly | FluentCart |
+| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator. Products, orders, subscriptions, customers, coupons. Your escape hatch | Both |
 
-## FluentCart MCP Server
+WordPress 6.7+. PHP 8.3+. Patience optional.
 
-An [MCP server](fluentcart-mcp/) that lets AI agents talk to FluentCart's REST API. Orders, products, customers, subscriptions — the whole shop, controlled by a robot. Published on npm as `fluentcart-mcp`. Docs and setup at **[fchub.co/fluentcart-mcp](https://fchub.co/fluentcart-mcp)**.
+Docs, install guides, changelogs, screenshots — all at **[fchub.co](https://fchub.co)**. This README is not a documentation site and it's not going to pretend to be one.
 
-Because if you're going to let AI run your business, at least give it proper tooling.
+---
 
-## Downloads
+## FluentCart MCP server
 
-Grab ZIPs from [GitHub Releases](https://github.com/vcode-sh/fchub-plugins/releases) or visit **[fchub.co](https://fchub.co)** for docs, install guides, and per-plugin pages with changelogs and screenshots.
+An [MCP server](fluentcart-mcp/) that lets AI agents talk to your FluentCart store. Orders, products, customers, subscriptions — the whole shop, remote-controlled by a robot. On npm as `fluentcart-mcp`. Docs at **[fchub.co/fluentcart-mcp](https://fchub.co/fluentcart-mcp)**.
+
+If you're going to let AI run your business, at least give it proper tooling.
+
+---
+
+## Get the plugins
+
+ZIPs on [GitHub Releases](https://github.com/vcode-sh/fchub-plugins/releases). Or go to **[fchub.co](https://fchub.co)** like a civilised person and use the install guides.
 
 ## Translations
 
-| Language | Coverage | Path |
-|----------|----------|------|
-| [Polish (pl_PL)](translations/fluent-cart/) | ~96% | `translations/fluent-cart/` |
+Translated FluentCart into Polish (~96%) because nobody else was going to. PRs welcome if you fancy finishing the last 4%. Files in `translations/fluent-cart/`.
 
-Translated FluentCart into Polish because nobody else was going to. PRs welcome if you fancy finishing the last 4%.
+---
 
-## Build
+## Why does this exist
 
+FluentCart is genuinely great software with the ecosystem of a brand new SaaS that launched yesterday. No payment gateways for half of Europe. No invoicing. No memberships. No video. No wishlists. No WooCommerce migration path for the millions of shops that might actually want to switch.
+
+So I built all of it.
+
+**[Read the manifesto →](https://fchub.co/blog/fchub-manifesto)** if you want to understand why someone would write nine plugins for a platform most WordPress developers haven't heard of yet.
+
+---
+
+## Dev stuff
+
+Everything lives in `plugins/{slug}/`. That's the source of truth. Edit there or cry later.
+
+**Build ZIPs:**
 ```bash
-./build.sh                    # all plugins
+./build.sh                    # all of them
 ./build.sh fchub-p24          # just one
 ```
 
-ZIPs land in `dist/`. Correct directory structure, ready for WordPress upload.
-
-## Release
-
-Tag per plugin. Push. CI builds the ZIP and publishes the release. Disagree with the version in the plugin header and the build fails loudly. You deserve it.
-
+**Tag & release:** Tag per plugin, push, CI builds the ZIP and publishes the release. Get the version wrong and the build fails loudly. You deserve it.
 ```bash
 git tag fchub-p24/v1.0.1
 git push origin fchub-p24/v1.0.1
 ```
 
-MCP server has its own tag pattern: `fluentcart-mcp/v1.1.0` → npm publish + GitHub Release + Docker image to GHCR and Docker Hub.
+MCP server: `fluentcart-mcp/v1.1.0` → npm publish + GitHub Release + Docker to GHCR & Docker Hub.
 
-## CI
-
-PRs touching `plugins/` get:
-
-- **PHPUnit** — fchub-p24, fchub-memberships, fchub-stream, fchub-wishlist, fchub-multi-currency, fchub-thank-you
-- **LOC budget** — fchub-wishlist architecture guard (`scripts/check-loc.sh`)
-- **Vite build** — fchub-memberships, fchub-portal-extender, fchub-stream (making sure the Vue apps didn't spontaneously combust)
-
-PRs touching `fluentcart-mcp/` get their own CI pipeline. PRs touching `web-docs/` trigger docs-ci. There's also an AI-powered issue triage workflow because even GitHub Issues need a bouncer.
-
-## Development
-
-Everything lives in `plugins/{slug}/`. Edit there. That's the source of truth.
-
-### Docker
-
-Use a companion dev repo with volume mounts:
-
-```yaml
-volumes:
-  - ../fchub-plugins/plugins/fchub-p24:/var/www/html/wp-content/plugins/fchub-p24
-  # ... you get the idea
+**Tests:**
+```bash
+cd plugins/fchub-p24 && composer install && ./vendor/bin/phpunit
 ```
 
-Edit file. Refresh browser. See change. Revolutionary.
-
-### Tests & builds
-
+**Vue apps:**
 ```bash
-# PHP tests
-cd plugins/fchub-p24 && composer install && ./vendor/bin/phpunit
-
-# Vue admin app (memberships)
 cd plugins/fchub-memberships && npm install && npm run dev
-
-# Vue admin app (portal extender)
 cd plugins/fchub-portal-extender && npm install && npm run dev
-
-# Vue apps (stream)
 cd plugins/fchub-stream/admin-app && npm install && npm run dev
 cd plugins/fchub-stream/portal-app && npm install && npm run dev
 ```
 
-## Repo structure
+**Docker:** Volume-mount plugins from this repo into a WordPress container. Edit file, refresh browser, see change. Revolutionary.
 
-```
-plugins/
-  fchub-p24/              Przelewy24 gateway
-  fchub-fakturownia/      Fakturownia invoices
-  fchub-memberships/      Membership system
-  fchub-multi-currency/   Multi-currency display layer
-  fchub-portal-extender/  Custom portal endpoints
-  fchub-stream/           Video streaming for FluentCommunity
-  fchub-thank-you/        Custom thank you pages
-  fchub-wishlist/         Wishlist system
-  wc-fc/                  WooCommerce migrator
-fluentcart-mcp/           MCP server for FluentCart API
-translations/
-  fluent-cart/            Polish translation
-web-docs/                 fchub.co documentation site
-.github/workflows/
-  release.yml             Tag → ZIP → GitHub Release
-  ci.yml                  PR checks (plugins)
-  mcp-release.yml         FluentCart MCP npm + GitHub Release
-  mcp-docker.yml          FluentCart MCP Docker image
-  mcp-ci.yml              FluentCart MCP PR checks
-  docs-ci.yml             Docs site checks
-```
+**CI on PRs:** PHPUnit, Vite builds, LOC budget guard. Separate pipelines for plugins, MCP server, and docs. There's also an AI-powered issue triage because even GitHub Issues need a bouncer.
 
-## Why this exists
-
-Short version: FluentCart is great, its ecosystem is empty.
-
-Long version: **[The FCHub Manifesto](https://fchub.co/blog/fchub-manifesto)**. Read it if you want to understand why someone would build nine plugins for a platform most WordPress developers haven't heard of yet.
+---
 
 ## Contributing
 
-Plugin submissions, bug fixes, translations — all welcome. If you've built something for FluentCart or FluentCommunity, it probably belongs here.
+Plugin submissions, bug fixes, translations — all welcome. Built something for FluentCart or FluentCommunity? It probably belongs here.
 
-- **[fchub.co/contribute](https://fchub.co/contribute)** — full contributor guide and plugin submission process
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — code contribution guidelines
-- Plugin submissions accepted via [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues/new?title=Plugin+submission:+&labels=plugin-submission)
+- **[fchub.co/contribute](https://fchub.co/contribute)** — contributor guide and plugin submission process
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — the code bits
+- Submit plugins via [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues/new?title=Plugin+submission:+&labels=plugin-submission)
 
-## License
+---
 
-GPLv2 or later. Built by [Vibe Code](https://x.com/vcode_sh). Documented at [fchub.co](https://fchub.co).
+GPLv2 or later. Built by [Vibe Code](https://x.com/vcode_sh). Documented at **[fchub.co](https://fchub.co)**.
