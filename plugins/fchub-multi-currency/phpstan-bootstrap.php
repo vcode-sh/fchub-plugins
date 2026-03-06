@@ -1,6 +1,6 @@
 <?php
 
-define('FCHUB_MC_VERSION', '1.1.0');
+define('FCHUB_MC_VERSION', '1.1.2');
 define('FCHUB_MC_FILE', __DIR__ . '/fchub-multi-currency.php');
 define('FCHUB_MC_PATH', __DIR__ . '/');
 define('FCHUB_MC_URL', 'https://example.com/wp-content/plugins/fchub-multi-currency/');

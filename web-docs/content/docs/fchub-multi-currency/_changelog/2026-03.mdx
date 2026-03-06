@@ -1,3 +1,11 @@
+### v1.1.2
+
+*Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.2)
+
+Fixed exchange rate cron going missing after deactivation/reactivation cycles. The refresh event was only scheduled inside `register_activation_hook` — if WordPress cleared it for any reason, rates would go stale with no way to recover. The `init` hook now re-schedules the cron automatically when it detects it's missing.
+
+<Separator className="my-8" />
+
 ### v1.1.1
 
 *Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.1)
