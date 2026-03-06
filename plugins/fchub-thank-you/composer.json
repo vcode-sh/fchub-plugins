@@ -1,0 +1,33 @@
+{
+    "name": "fchub/thank-you",
+    "description": "Per-product post-payment redirect pages for FluentCart.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": "^8.3"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^13.0",
+        "squizlabs/php_codesniffer": "^3.13"
+    },
+    "autoload": {
+        "psr-4": {
+            "FchubThankYou\\": "app/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "FchubThankYou\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "lint": "phpcs",
+        "lint:fix": "phpcbf",
+        "analyze": "phpstan analyse"
+    }
+}

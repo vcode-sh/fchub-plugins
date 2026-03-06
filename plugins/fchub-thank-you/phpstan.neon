@@ -1,0 +1,20 @@
+parameters:
+    level: 8
+    phpVersion: 80300
+    treatPhpDocTypesAsCertain: false
+    paths:
+        - app
+        - fchub-thank-you.php
+    bootstrapFiles:
+        - tests/stubs/wp-stubs.php
+    scanFiles:
+        - tests/stubs/wp-stubs.php
+    excludePaths:
+        analyse:
+            - vendor/*
+            - tests/*
+    ignoreErrors:
+        - identifier: requireOnce.fileNotFound
+          reportUnmatched: false
+        - message: '#FluentCart\\#'
+          identifier: class.notFound
