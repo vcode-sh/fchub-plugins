@@ -7,51 +7,51 @@
       "mcpbFilename": "fluentcart-mcp.mcpb"
     },
     "fchub-p24": {
-      "version": "1.0.2",
-      "tagName": "fchub-p24/v1.0.2",
-      "zipFilename": "fchub-p24-1.0.2.zip",
+      "version": "1.0.3",
+      "tagName": "fchub-p24/v1.0.3",
+      "zipFilename": "fchub-p24-1.0.3.zip",
       "mcpbFilename": null
     },
     "fchub-fakturownia": {
-      "version": "1.0.2",
-      "tagName": "fchub-fakturownia/v1.0.2",
-      "zipFilename": "fchub-fakturownia-1.0.2.zip",
+      "version": "1.0.3",
+      "tagName": "fchub-fakturownia/v1.0.3",
+      "zipFilename": "fchub-fakturownia-1.0.3.zip",
       "mcpbFilename": null
     },
     "fchub-memberships": {
-      "version": "1.0.2",
-      "tagName": "fchub-memberships/v1.0.2",
-      "zipFilename": "fchub-memberships-1.0.2.zip",
+      "version": "1.0.3",
+      "tagName": "fchub-memberships/v1.0.3",
+      "zipFilename": "fchub-memberships-1.0.3.zip",
       "mcpbFilename": null
     },
     "fchub-portal-extender": {
-      "version": "1.0.2",
-      "tagName": "fchub-portal-extender/v1.0.2",
-      "zipFilename": "fchub-portal-extender-1.0.2.zip",
+      "version": "1.0.3",
+      "tagName": "fchub-portal-extender/v1.0.3",
+      "zipFilename": "fchub-portal-extender-1.0.3.zip",
       "mcpbFilename": null
     },
     "fchub-wishlist": {
-      "version": "1.0.0",
-      "tagName": "fchub-wishlist/v1.0.0",
-      "zipFilename": "fchub-wishlist-1.0.0.zip",
+      "version": "1.0.1",
+      "tagName": "fchub-wishlist/v1.0.1",
+      "zipFilename": "fchub-wishlist-1.0.1.zip",
       "mcpbFilename": null
     },
     "fchub-multi-currency": {
-      "version": "1.1.0",
-      "tagName": "fchub-multi-currency/v1.1.0",
-      "zipFilename": "fchub-multi-currency-1.1.0.zip",
+      "version": "1.1.1",
+      "tagName": "fchub-multi-currency/v1.1.1",
+      "zipFilename": "fchub-multi-currency-1.1.1.zip",
       "mcpbFilename": null
     },
     "fchub-stream": {
-      "version": "1.0.1",
-      "tagName": "fchub-stream/v1.0.1",
-      "zipFilename": "fchub-stream-1.0.1.zip",
+      "version": "1.0.2",
+      "tagName": "fchub-stream/v1.0.2",
+      "zipFilename": "fchub-stream-1.0.2.zip",
       "mcpbFilename": null
     },
     "wc-fc": {
-      "version": "1.0.2",
-      "tagName": "wc-fc/v1.0.2",
-      "zipFilename": "wc-fc-1.0.2.zip",
+      "version": "1.0.3",
+      "tagName": "wc-fc/v1.0.3",
+      "zipFilename": "wc-fc-1.0.3.zip",
       "mcpbFilename": null
     }
   },

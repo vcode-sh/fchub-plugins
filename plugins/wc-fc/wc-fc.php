@@ -3,7 +3,7 @@
  * Plugin Name: FCHub - WC Migrator
  * Plugin URI: https://fchub.co
  * Description: Migrate WooCommerce data (products, customers, orders, subscriptions, coupons) to FluentCart.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -19,7 +19,7 @@
 
 defined('ABSPATH') or die;
 
-define('WCFC_VERSION', '1.0.2');
+define('WCFC_VERSION', '1.0.3');
 define('WCFC_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('WCFC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WCFC_PLUGIN_FILE', __FILE__);

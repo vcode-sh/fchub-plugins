@@ -1,3 +1,11 @@
+### v1.0.3
+
+*Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.3)
+
+Fixed a fatal error when multiple FCHub plugins are active at the same time. The shared `GitHubUpdater` class used a `class_exists` guard that PHP's OPcache cheerfully ignored during early class binding — so the second plugin to load would redeclare the class and take the site down. Wrapped the class inside the conditional so OPcache actually respects it.
+
+<Separator className="my-8" />
+
 ### v1.0.2
 
 *Released 3 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.2)

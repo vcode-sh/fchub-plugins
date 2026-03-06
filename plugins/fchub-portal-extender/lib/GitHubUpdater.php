@@ -13,9 +13,7 @@
  * @package FCHub
  */
 
-if (class_exists('FCHub_GitHub_Updater')) {
-    return;
-}
+if (!class_exists('FCHub_GitHub_Updater')) {
 
 class FCHub_GitHub_Updater
 {
@@ -352,3 +350,5 @@ class FCHub_GitHub_Updater
         return wp_kses_post($html);
     }
 }
+
+} // end class_exists guard

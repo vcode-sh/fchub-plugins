@@ -3,7 +3,7 @@
  * Plugin Name: FCHub - Stream
  * Plugin URI: https://github.com/vcode-sh/fchub-plugins
  * Description: Video streaming for FluentCommunity. Direct uploads to Cloudflare Stream or Bunny.net. Built because WordPress media library and video don't mix.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @since 0.0.1
  */
-define( 'FCHUB_STREAM_VERSION', '1.0.1' );
+define( 'FCHUB_STREAM_VERSION', '1.0.2' );
 
 /**
  * Plugin mode (production/development).
