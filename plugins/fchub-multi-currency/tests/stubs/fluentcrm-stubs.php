@@ -59,6 +59,14 @@ if (!class_exists('FluentCrm_Mock_Contact')) {
             $GLOBALS['fluentcrm_custom_field_updates'][] = ['slug' => $slug, 'value' => $value];
         }
 
+        public function syncCustomFieldValues(array $fields, bool $detachAll = true): void
+        {
+            foreach ($fields as $slug => $value) {
+                $this->custom_fields[$slug] = $value;
+                $GLOBALS['fluentcrm_custom_field_updates'][] = ['slug' => $slug, 'value' => $value];
+            }
+        }
+
         public function attachTags(array $tagIds): void
         {
             $this->attached_tags = array_merge($this->attached_tags, $tagIds);

@@ -62,4 +62,36 @@ final class ExchangeRateTest extends TestCase
 
         $this->assertFalse($rate->isStale(3600));
     }
+
+    #[Test]
+    public function testFromWithUnknownProviderFallsBackToManual(): void
+    {
+        $rate = ExchangeRate::from([
+            'base_currency'  => 'USD',
+            'quote_currency' => 'EUR',
+            'rate'           => '0.92',
+            'provider'       => 'deleted_provider',
+            'fetched_at'     => '2026-01-01 12:00:00',
+        ]);
+
+        $this->assertSame(RateProvider::Manual, $rate->provider);
+    }
+
+    #[Test]
+    public function testIsStaleUsesCurrentTimestamp(): void
+    {
+        $rate = ExchangeRate::from([
+            'base_currency'  => 'USD',
+            'quote_currency' => 'EUR',
+            'rate'           => '0.92',
+            'provider'       => 'manual',
+            'fetched_at'     => date('Y-m-d H:i:s', time() - 7200), // 2 hours ago
+        ]);
+
+        // Stale if threshold is 1 hour
+        $this->assertTrue($rate->isStale(3600));
+
+        // Not stale if threshold is 3 hours
+        $this->assertFalse($rate->isStale(10800));
+    }
 }

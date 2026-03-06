@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Integration;
 
-use FChubMultiCurrency\Support\Constants;
+use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Logger;
 
 defined('ABSPATH') || exit;
@@ -27,7 +27,7 @@ final class FluentCrmSync
             return;
         }
 
-        $settings = get_option(Constants::OPTION_SETTINGS, []);
+        $settings = (new OptionStore())->all();
 
         if (($settings['fluentcrm_enabled'] ?? 'yes') !== 'yes') {
             return;
@@ -66,7 +66,7 @@ final class FluentCrmSync
 
     public static function onOrderPaid($order): void
     {
-        $settings = get_option(Constants::OPTION_SETTINGS, []);
+        $settings = (new OptionStore())->all();
 
         if (($settings['fluentcrm_enabled'] ?? 'yes') !== 'yes') {
             return;

@@ -52,4 +52,47 @@ final class ExchangeRateRepositoryTest extends TestCase
 
         $this->assertStringContainsString('INSERT INTO', $GLOBALS['wpdb']->queries[0] ?? '');
     }
+
+    #[Test]
+    public function testFindAllLatestReturnsEmptyArrayWhenNoResults(): void
+    {
+        $this->setWpdbMockResults([]);
+
+        $repo = new ExchangeRateRepository();
+        $result = $repo->findAllLatest('USD');
+
+        $this->assertSame([], $result);
+    }
+
+    #[Test]
+    public function testFindAllLatestReturnsExchangeRateArray(): void
+    {
+        $this->setWpdbMockResults([
+            [
+                'base_currency'  => 'USD',
+                'quote_currency' => 'EUR',
+                'rate'           => '0.92000000',
+                'provider'       => 'manual',
+                'fetched_at'     => '2026-01-01 12:00:00',
+            ],
+            [
+                'base_currency'  => 'USD',
+                'quote_currency' => 'GBP',
+                'rate'           => '0.79000000',
+                'provider'       => 'manual',
+                'fetched_at'     => '2026-01-01 12:00:00',
+            ],
+        ]);
+
+        $repo = new ExchangeRateRepository();
+        $result = $repo->findAllLatest('USD');
+
+        $this->assertCount(2, $result);
+        $this->assertSame('USD', $result[0]->baseCurrency);
+        $this->assertSame('EUR', $result[0]->quoteCurrency);
+        $this->assertSame('0.92000000', $result[0]->rate);
+        $this->assertSame('USD', $result[1]->baseCurrency);
+        $this->assertSame('GBP', $result[1]->quoteCurrency);
+        $this->assertSame('0.79000000', $result[1]->rate);
+    }
 }

@@ -42,7 +42,7 @@ final class RateHistoryQuery
 
         // fetched_at is stored using current_time('mysql') (site timezone), so
         // compute the cutoff in the same timezone basis to avoid mismatches.
-        $cutoff = date('Y-m-d H:i:s', current_time('timestamp') - ($days * DAY_IN_SECONDS));
+        $cutoff = wp_date('Y-m-d H:i:s', time() - ($days * DAY_IN_SECONDS));
 
         return (int) $wpdb->query(
             $wpdb->prepare(

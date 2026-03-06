@@ -52,6 +52,11 @@ final class CurrencyContextService
         return self::$resolved;
     }
 
+    public static function getResolved(): ?CurrencyContext
+    {
+        return self::$resolved;
+    }
+
     public static function reset(): void
     {
         self::$resolved = null;

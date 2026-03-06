@@ -40,6 +40,10 @@
 	const baseDecSep = cfg.baseDecimalSep || ".";
 	const baseThousandSep = cfg.baseThousandSep || ",";
 
+	// Display currency formatting config (for output)
+	const displayDecSep = cfg.displayDecSep || ".";
+	const displayThousandSep = cfg.displayThousandSep || ",";
+
 	// Flag to suppress MutationObserver during our own DOM changes
 	let projecting = false;
 
@@ -114,11 +118,11 @@
 	 * Returns { prefix: string, priceText: string }.
 	 */
 	function extractPrefix(text) {
-		const match = text.match(/^([^\d]*?\s+)(\d.*)$/);
+		const match = text.match(/^([^\d]*?\s+)(\S*\d.*)$/);
 		if (match) {
 			const stripped = match[1].replace(stripRegex, "").trim();
 			if (stripped.length > 0) {
-				return { prefix: match[1], priceText: match[2] };
+				return { prefix: stripped + " ", priceText: match[2] };
 			}
 		}
 		return { prefix: "", priceText: text };
@@ -174,8 +178,10 @@
 				return Math.ceil(scaled) / factor;
 			case "floor":
 				return Math.floor(scaled) / factor;
-			case "half_down":
-				return Math.round(scaled * (1 - Number.EPSILON)) / factor;
+			case "half_down": {
+				const floored = Math.floor(scaled);
+				return ((scaled - floored) > 0.5 ? Math.ceil(scaled) : floored) / factor;
+			}
 			case "none":
 				return amount;
 			default:
@@ -191,12 +197,6 @@
 		const parts = fixed.split(".");
 		let intPart = parts[0];
 		const decPart = parts[1] || "";
-
-		let displayThousandSep = baseDecSep === "," ? "." : ",";
-		if (baseThousandSep === "" || baseThousandSep === " ") {
-			displayThousandSep = baseThousandSep;
-		}
-		const displayDecSep = baseDecSep;
 
 		if (displayThousandSep) {
 			intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, displayThousandSep);
@@ -244,6 +244,10 @@
 		if (spans.length === 1 && looksLikePrice(spans[0].textContent)) {
 			return spans[0];
 		}
+		const dels = el.querySelectorAll("del");
+		if (dels.length === 1 && looksLikePrice(dels[0].textContent)) {
+			return dels[0];
+		}
 		return el;
 	}
 
@@ -282,6 +286,11 @@
 
 		if (count > 0) {
 			el.setAttribute(ATTR_PROJECTED, "1");
+			// Mark child compare-price elements as projected to prevent double-conversion
+			const childCompare = el.querySelectorAll(".fct-compare-price");
+			for (const cp of childCompare) {
+				cp.setAttribute(ATTR_PROJECTED, "1");
+			}
 		}
 		return count;
 	}

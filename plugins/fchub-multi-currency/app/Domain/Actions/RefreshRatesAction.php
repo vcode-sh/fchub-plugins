@@ -119,17 +119,28 @@ final class RefreshRatesAction
         $lockKey = 'fchub_mc_rate_refresh_lock';
         $ttl = 120;
 
-        $currentLock = get_option($lockKey, false);
-        if ($currentLock !== false) {
-            $age = time() - (int) $currentLock;
-            if ($age < $ttl) {
-                return false;
-            }
+        // Attempt atomic lock acquisition — add_option returns false if key exists
+        $acquired = add_option($lockKey, (string) time(), '', false);
 
-            delete_option($lockKey);
+        if ($acquired) {
+            return true;
         }
 
-        return add_option($lockKey, (string) time(), '', false);
+        // Lock exists — check if it's stale (process died without releasing)
+        $currentLock = get_option($lockKey, false);
+        if ($currentLock === false) {
+            // Option was deleted between add_option and get_option — retry once
+            return add_option($lockKey, (string) time(), '', false);
+        }
+
+        $age = time() - (int) $currentLock;
+        if ($age >= $ttl) {
+            // Stale lock — delete and try to re-acquire atomically
+            delete_option($lockKey);
+            return add_option($lockKey, (string) time(), '', false);
+        }
+
+        return false;
     }
 
     private function releaseLock(): void

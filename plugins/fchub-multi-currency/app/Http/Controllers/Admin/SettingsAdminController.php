@@ -134,7 +134,7 @@ final class SettingsAdminController
             $clean[] = [
                 'code'     => $code,
                 'name'     => sanitize_text_field((string) ($entry['name'] ?? $validCodes[$code])),
-                'symbol'   => wp_kses_post((string) ($entry['symbol'] ?? $code)),
+                'symbol'   => sanitize_text_field((string) ($entry['symbol'] ?? $code)),
                 'decimals' => $decimals,
                 'position' => $position,
             ];

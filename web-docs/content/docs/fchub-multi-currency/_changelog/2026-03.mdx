@@ -1,3 +1,37 @@
+### v1.1.4
+
+*Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.4)
+
+Twelve bugs walked into the codebase. None of them survived the code review.
+
+- **EUR prices now actually look like EUR prices** — `formatNumber()` was borrowing the base currency's decimal and thousand separators when formatting display currency prices. EUR showing as `1,234.56€` instead of `1.234,56€`. Every right-positioned currency was wrong. Every single one. Fixed.
+- **`half_down` rounding no longer lies** — the `Math.round(x * (1-EPSILON))` trick doesn't hold for all values, as it turns out mathematics hasn't changed. Replaced with a proper floor-based comparison that behaves correctly instead of mostly correctly.
+- **`fchub_mc_format_price()` stops rebuilding the universe on every call** — the function was spinning up the full resolver chain plus DB queries each time it was invoked. It now reuses the cached context like a reasonable piece of software.
+- **Stale rate warning stops interrogating the database on every admin page load** — now cached via transient with a 5-minute TTL. Your DB server sends its regards.
+- **`ExchangeRate::from()` no longer throws a fatal on unknown providers** — if a provider string in the DB didn't match the enum, you got a crash. It now falls back to Manual and carries on with its life.
+- **Currency switcher `fetch()` now handles network failures** — previously had no `.catch()`, so a network error would silently kill the loading spinner forever. Errors are now caught and surfaced like adults.
+- **Rate refresh lock fixed** — TOCTOU race condition on `get_option`/`add_option`. Now uses atomic `add_option` first, so two concurrent refreshes can't both think they won the lock.
+- **Currency symbol no longer sanitized with `wp_kses_post`** — allows HTML. A currency symbol field. Tightened to `sanitize_text_field` because `€` is not a `<script>` tag.
+- **`current_time('timestamp')` replaced with `time()`** — deprecated across 3 files. WordPress has been politely suggesting this for years.
+- **FluentCrmSync and FluentCommunitySync now go through OptionStore** — they were calling settings directly, bypassing the default settings merge. Fixed.
+- **Rounding precision fallback aligned** — `FrontendModule` said `0`, `Constants` said `2`. They now agree on `2`, which is the number of decimal places a price should have.
+- **Sortable drag-and-drop DOM restoration fixed** — the logic for restoring DOM order during downward drags was inverted. Moving a currency down would put it up. Philosophy aside, this is not ideal.
+- **Admin sidebar `requestAnimationFrame` loop bounded** — the injection would keep looping forever if FluentCart's markup changed. Now it gives up gracefully instead of melting the browser tab.
+
+<Separator className="my-8" />
+
+### v1.1.3
+
+*Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.3)
+
+Three bugs walked into a price projector. None of them walked out.
+
+- **Strikethrough prices restored** — the projection engine was cheerfully nuking `<del>` tags when converting compare prices, turning "~~$100.00~~ $80.00" into just "€74.40" with no visual hint that it used to cost more. `findPriceTarget()` now recognises `<del>` elements, so your sale prices actually look like sale prices again.
+- **"From" prices on shop cards now convert** — "From $80.00" on product cards was silently ignored because the regex couldn't handle a currency symbol wedged between the prefix text and the digits. Affected every left-positioned currency (USD, GBP, JPY…) — which is, you know, most of them.
+- **Double-conversion edge case fixed** — compare prices inside variant containers could get converted twice when the display currency used a right-positioned symbol (e.g. `93.00€` → `parseFloat` would happily parse it again). Child compare-price elements are now marked as projected after the parent variant processes them.
+
+<Separator className="my-8" />
+
 ### v1.1.2
 
 *Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.2)

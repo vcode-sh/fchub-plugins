@@ -25,7 +25,7 @@ final readonly class ExchangeRate
             baseCurrency: strtoupper($data['base_currency']),
             quoteCurrency: strtoupper($data['quote_currency']),
             rate: (string) $data['rate'],
-            provider: RateProvider::from($data['provider'] ?? 'manual'),
+            provider: RateProvider::tryFrom($data['provider'] ?? 'manual') ?? RateProvider::Manual,
             fetchedAt: $data['fetched_at'] ?? current_time('mysql'),
         );
     }
@@ -43,6 +43,6 @@ final readonly class ExchangeRate
             return true;
         }
 
-        return (current_time('timestamp') - $fetchedTimestamp) > $maxAgeSeconds;
+        return (time() - $fetchedTimestamp) > $maxAgeSeconds;
     }
 }

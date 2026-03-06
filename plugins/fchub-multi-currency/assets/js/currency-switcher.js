@@ -29,6 +29,12 @@
 					}),
 				);
 				window.location.reload();
+			})
+			.catch((err) => {
+				console.warn("[fchub-mc] Currency switch failed:", err);
+				document.querySelectorAll(".fchub-mc-switcher--loading").forEach((el) => {
+					el.classList.remove("fchub-mc-switcher--loading");
+				});
 			});
 	}
 

@@ -33,24 +33,37 @@ final class DiagnosticsModule implements ModuleContract
         $staleThresholdHrs = (int) ($settings['stale_threshold_hrs'] ?? 24);
         $staleThresholdSeconds = $staleThresholdHrs * 3600;
 
-        $baseCurrency = $settings['base_currency'] ?? 'USD';
-        $repository = new ExchangeRateRepository();
-        $rates = $repository->findAllLatest($baseCurrency);
+        // Cache the stale check for 5 minutes to avoid a DB query on every admin page
+        $cacheKey = 'fchub_mc_has_stale_rates';
+        $cached = get_transient($cacheKey);
 
-        if (empty($rates)) {
+        if ($cached === 'no') {
             return;
         }
 
-        $hasStale = false;
-        foreach ($rates as $rate) {
-            if ($rate->isStale($staleThresholdSeconds)) {
-                $hasStale = true;
-                break;
+        if ($cached !== 'yes') {
+            $baseCurrency = $settings['base_currency'] ?? 'USD';
+            $repository = new ExchangeRateRepository();
+            $rates = $repository->findAllLatest($baseCurrency);
+
+            if (empty($rates)) {
+                set_transient($cacheKey, 'no', 5 * MINUTE_IN_SECONDS);
+                return;
             }
-        }
 
-        if (!$hasStale) {
-            return;
+            $hasStale = false;
+            foreach ($rates as $rate) {
+                if ($rate->isStale($staleThresholdSeconds)) {
+                    $hasStale = true;
+                    break;
+                }
+            }
+
+            set_transient($cacheKey, $hasStale ? 'yes' : 'no', 5 * MINUTE_IN_SECONDS);
+
+            if (!$hasStale) {
+                return;
+            }
         }
 
         printf(

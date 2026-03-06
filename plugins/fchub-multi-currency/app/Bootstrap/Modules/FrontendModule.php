@@ -49,7 +49,7 @@ final class FrontendModule implements ModuleContract
             'position'          => $context->displayCurrency->position->value,
             'isBaseDisplay'     => $context->isBaseDisplay,
             'roundingMode'      => $optionStore->get('rounding_mode', 'half_up'),
-            'roundingPrecision' => (int) $optionStore->get('rounding_precision', 0),
+            'roundingPrecision' => (int) $optionStore->get('rounding_precision', 2),
             'restUrl'           => rest_url(Constants::REST_NAMESPACE),
             'nonce'             => wp_create_nonce('wp_rest'),
             'currencies'        => $optionStore->get('display_currencies', []),
@@ -68,6 +68,14 @@ final class FrontendModule implements ModuleContract
                 default       => ',',
             },
             'baseDecimals'          => ($fcSettings['is_zero_decimal'] ?? false) ? 0 : 2,
+            'displayDecSep'         => match ($context->displayCurrency->position->value) {
+                'right', 'right_space' => ',',
+                default                => '.',
+            },
+            'displayThousandSep'    => match ($context->displayCurrency->position->value) {
+                'right', 'right_space' => '.',
+                default                => ',',
+            },
         ];
 
         $disclosureService = new CheckoutDisclosureService($optionStore);
@@ -124,7 +132,7 @@ final class FrontendModule implements ModuleContract
             return '';
         }
 
-        $ago = human_time_diff($fetchedTimestamp, current_time('timestamp'));
+        $ago = human_time_diff($fetchedTimestamp, time());
         $class = 'fchub-mc-rate-badge' . ($isStale ? ' fchub-mc-rate-badge--stale' : '');
         $text = esc_html(
             /* translators: %s: human-readable time difference, e.g. "2 hours" */

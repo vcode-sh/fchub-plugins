@@ -210,11 +210,8 @@
 						if (evt.oldIndex === evt.newIndex) return;
 						var item = evt.item;
 						var from = evt.from;
-						if (evt.oldIndex < evt.newIndex) {
-							from.insertBefore(item, from.children[evt.oldIndex]);
-						} else {
-							from.insertBefore(item, from.children[evt.oldIndex + 1]);
-						}
+						from.removeChild(item);
+						from.insertBefore(item, from.children[evt.oldIndex] || null);
 						var arr = this.settings.display_currencies;
 						var moved = arr.splice(evt.oldIndex, 1)[0];
 						arr.splice(evt.newIndex, 0, moved);
@@ -869,8 +866,9 @@
 		return true;
 	}
 
+	var sidebarRetries = 0;
 	function tryInjectSidebar() {
-		if (!injectSettingsSidebarItem()) {
+		if (!injectSettingsSidebarItem() && sidebarRetries++ < 100) {
 			requestAnimationFrame(tryInjectSidebar);
 		}
 	}
