@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Domain\Actions;
 
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
+use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
 
 defined('ABSPATH') || exit;
 
@@ -15,9 +16,9 @@ final class SaveOrderSnapshotAction
     ) {
     }
 
-    public function execute(object $order): void
+    public function execute(object $order, ?CurrencyContext $context = null): void
     {
-        $context = $this->contextService->resolve();
+        $context = $context ?? $this->contextService->resolve();
 
         if ($context->isBaseDisplay) {
             return;

@@ -93,7 +93,11 @@ final class CurrencyCatalogueController
         $countryCode = self::FLAG_OVERRIDES[$currencyCode]
             ?? substr($currencyCode, 0, 2);
 
-        if ($countryCode === '') {
+        if ($countryCode === '' || strlen($countryCode) < 2) {
+            return '';
+        }
+
+        if (!function_exists('mb_chr')) {
             return '';
         }
 

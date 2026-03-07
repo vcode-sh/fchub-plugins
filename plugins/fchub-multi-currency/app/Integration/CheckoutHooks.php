@@ -8,6 +8,7 @@ use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Services\CheckoutDisclosureService;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Storage\OptionStore;
+use FChubMultiCurrency\Support\Hooks;
 
 defined('ABSPATH') || exit;
 
@@ -20,6 +21,10 @@ final class CheckoutHooks
 
     public static function addDisclosure(array $fragments, $allData): array
     {
+        if (!Hooks::isEnabled()) {
+            return $fragments;
+        }
+
         $optionStore = new OptionStore();
         $disclosureService = new CheckoutDisclosureService($optionStore);
 

@@ -26,7 +26,7 @@ final readonly class ExchangeRate
             quoteCurrency: strtoupper($data['quote_currency']),
             rate: (string) $data['rate'],
             provider: RateProvider::tryFrom($data['provider'] ?? 'manual') ?? RateProvider::Manual,
-            fetchedAt: $data['fetched_at'] ?? current_time('mysql'),
+            fetchedAt: $data['fetched_at'] ?? gmdate('Y-m-d H:i:s'),
         );
     }
 
@@ -37,9 +37,14 @@ final readonly class ExchangeRate
 
     public function isStale(int $maxAgeSeconds): bool
     {
-        $fetchedTimestamp = strtotime($this->fetchedAt);
+        $fetchedTimestamp = strtotime($this->fetchedAt . ' UTC');
 
         if ($fetchedTimestamp === false) {
+            return true;
+        }
+
+        // Future dates are suspicious — treat as stale
+        if ($fetchedTimestamp > time()) {
             return true;
         }
 

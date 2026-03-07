@@ -17,7 +17,7 @@ enum RoundingMode: string
     public function label(): string
     {
         return match ($this) {
-            self::None     => 'No rounding',
+            self::None     => 'Truncate (no rounding)',
             self::HalfUp   => 'Round half up (standard)',
             self::HalfDown => 'Round half down',
             self::Ceil     => 'Always round up',

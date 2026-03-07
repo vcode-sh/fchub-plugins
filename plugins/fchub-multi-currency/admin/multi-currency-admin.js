@@ -156,6 +156,19 @@
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row fchub-mc-coming-soon-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Geolocation <span class="fchub-mc-badge-soon">Coming Soon</span></span>\
+            <div class="form-note">Automatically detect visitor currency based on their country. Requires a geolocation provider.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.geo_enabled" disabled>\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
             <span class="setting-label">Remove Data on Uninstall</span>\
@@ -384,7 +397,7 @@
         </div>\
         <div class="setting-fields-inner">\
             <el-select v-model="settings.rounding_mode">\
-                <el-option label="No rounding" value="none" />\
+                <el-option label="Truncate (no rounding)" value="none" />\
                 <el-option label="Round half up (standard)" value="half_up" />\
                 <el-option label="Round half down" value="half_down" />\
                 <el-option label="Always round up" value="ceil" />\
@@ -924,6 +937,9 @@
 		".fchub-mc-drag-handle:hover { color: var(--el-text-color-regular); background: var(--el-fill-color); }",
 		".fchub-mc-ghost { opacity: 0.4; border: 2px dashed var(--el-color-primary); border-radius: 4px; }",
 		".fchub-mc-chosen { box-shadow: 0 2px 12px rgba(0,0,0,.1); }",
+		/* Coming Soon */
+		".fchub-mc-coming-soon-row { opacity: 0.5; pointer-events: none; }",
+		".fchub-mc-badge-soon { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 7px; margin-left: 8px; border-radius: 4px; background: var(--el-color-info-light-7, #e6e8eb); color: var(--el-text-color-secondary, #909399); vertical-align: middle; line-height: 1.4; }",
 	].join("\n");
 	document.head.appendChild(style);
 })();

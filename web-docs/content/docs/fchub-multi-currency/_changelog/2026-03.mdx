@@ -1,3 +1,74 @@
+### v1.2.0
+
+*Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.0)
+
+A deep audit found things hiding in the codebase that no single pair of eyes would have caught. This is the "we actually read every line" release. A second pass found the P1 we missed — order snapshots were reading the ambient request context instead of the customer's. Which means admin-completed orders, webhook payments, and guest checkouts could all get the wrong currency. Lovely.
+
+#### Critical
+
+- **Order snapshots now captured at checkout, not payment** — `saveSnapshot()` ran on `order_paid_done`, which fires via Action Scheduler — no cookies, no logged-in user, no shopper context. The earlier fallback to user meta was insufficient because the ambient context could be the admin's preference, guest orders had no user_id at all, and disabled currencies weren't validated. Now captures the snapshot during `checkout/prepare_other_data` while the customer's HTTP request is still warm. The `order_paid_done` hook stays as a fallback for manual/API orders, but validates against enabled currencies first. No context? No snapshot. Better than wrong.
+
+#### Security
+
+- **Rate limiter IP spoofing fixed** — the rate limiter was trusting the `X-Forwarded-For` header, which is user-controllable. Your visitors were writing their own hall passes. Now uses `REMOTE_ADDR` exclusively.
+- **Enabled switch actually enforced** — setting Multi-Currency to "disabled" didn't actually disable the public `/context` endpoint, checkout disclosure injection, or order snapshot recording. The off switch was decorative. Now returns 403, skips disclosure, and skips snapshots when disabled.
+- **Rate limiter no longer punishes invalid requests** — the counter incremented before JSON parsing and currency validation. An attacker could burn your rate limit bucket with garbage requests, locking out real users. Counter now increments only after validation passes.
+
+#### Fixed
+
+- **Order snapshots lost on webhook/IPN payments** — `SaveOrderSnapshotAction` resolved currency from the ambient request (cookies, logged-in user). In webhook, IPN, or admin-paid flows there's no shopper context, so snapshots silently disappeared — and CRM sync with them. Now falls back to the order customer's stored currency preference when ambient context is empty.
+- **Modal checkout prices not converted** — `.fct-modal-cs-line-price` wasn't in the selector list. Modal users saw base currency prices while the rest of the page was converted.
+- **Coupon discount amounts stuck in base currency** — `.fct_coupon_price` and `.fct-coupon-price` selectors were missing. Your "– $25.00" coupon discount stayed in dollars while everything else was in euros.
+- **Thank you page prices not converted** — total, line items, and payment info selectors were all missing. Customers completed an order in EUR and got a receipt in USD. Confidence-inspiring.
+- **Pricing table payment type text stuck in base currency** — "300.00zł per year for 12 cycles + 100.00zł setup fee" lived in a sibling element, not a child. The engine never knew it existed.
+- **`stripRegex` alternating results** — `RegExp.test()` with the `g` flag advances `lastIndex` between calls, so the bare-number guard returned different results on consecutive calls with the same input. JavaScript: where stateful regex is a feature, not a bug.
+- **Timezone drift in staleness detection** — `fetchedAt` stored in local time, compared against UTC. Off by your timezone offset. All timestamps now use `gmdate()` consistently, and `strtotime()` explicitly appends `' UTC'` so rogue plugins changing PHP's default timezone can't break staleness checks.
+- **Future timestamps made rates permanently fresh** — a future `fetched_at` (clock skew, data corruption) produced a negative age, so `isStale()` always returned false. Now treats future dates as stale.
+- **`RoundingMode::None` showing 15 decimal places** — "None" meant "no rounding at all", which meant raw floating point output. Now rounds to the currency's declared decimal count, because `€93.4217000000001` is not a price.
+- **Corrupted enum values crashed the site** — `CurrencyPosition::from()` and `RoundingMode::from()` throw `ValueError` on unrecognised values. A corrupted option row would take the entire site down. Now uses `tryFrom()` with safe defaults.
+- **Non-numeric API rates crashed cron** — if an exchange rate provider returned `"Infinity"` or `"NaN"`, `bccomp()` would throw a `ValueError`. Now validates with `is_numeric()` before comparison.
+- **ECB provider returned wrong rates for non-EUR base** — if the store's base currency wasn't in ECB's data, rates were returned relative to EUR without rebasing. Every price on the site would be wrong. Now returns empty and logs a warning.
+- **Infinite rate crashed the projection engine** — a rate of `Infinity` passed the guard (`!Infinity` is `false`), rendering every price as `"$Infinity"`. Now uses `Number.isFinite()`.
+- **Negative decimals crashed price formatting** — `toFixed(-1)` throws a `RangeError` that killed all price projection. Now clamped to 0–20.
+- **Missing JS asset triggered PHP warning** — `filemtime()` on a deleted file returned `false` with a warning. Now suppressed with fallback to the plugin version string.
+- **Refresh lock race condition** — between `get_option()` and `update_option()`, another process could acquire the lock. Replaced with atomic compare-and-swap. TOCTOU: third time's the charm.
+- **Checkout data changes ignored** — `fluentCartCheckoutDataChanged` event (dispatched from 6 places in FluentCart) had no listener. Coupon application, shipping changes, and quantity updates at checkout didn't trigger re-projection.
+- **Price flicker on rapid events** — each event handler had its own `setTimeout`, so rapid events caused multiple clear+reproject cycles. Now uses a shared debounce timer — last event wins.
+- **Flag emoji crashed without mbstring** — `mb_chr()` was called without checking if the extension exists. Hosts without `mbstring` got a fatal error loading the currency catalogue. Now falls back gracefully to empty string, and malformed 1-character country codes no longer cause undefined string offsets.
+- **Cookie persistence ignored the cookie_enabled setting** — you could disable cookies in settings and the plugin would cheerfully set one anyway. The setting was decorative, the cookie was eternal.
+- **Guest currency preference merged on login even with cookies disabled** — `mergeGuestPreference()` read the cookie regardless of the `cookie_enabled` setting. If you disabled cookies, the cookie you already had would still haunt you on next login.
+- **Scientific notation rates crashed BCMath** — a rate of `1e3` from a provider passes `is_numeric()` but makes `bccomp()` throw a `ValueError`. Because PHP thinks `1e3` is a perfectly reasonable number, and BCMath disagrees. Now rejected at the gate.
+- **`RoundingMode::None` rounded instead of truncating** — "None" was calling `round()`, which is... rounding. 33.337 became 33.34 instead of 33.33. Now truncates towards zero, which is what "no rounding" actually means.
+
+#### Cleanup
+
+- **Uninstall now cleans up properly** — `fchub_mc_rate_refresh_lock` option and `fchub_mc_rl_*` rate limiter transients were orphaned on uninstall. Your database was collecting souvenirs.
+- **Uninstall now multisite-aware** — single-site installs would clean up fine, but multisite would only hit the main blog. The diagnostics transient and object cache group were also orphaned. Your database was collecting memories.
+- **`rounding_precision` setting removed** — was saved, validated, and even sent to the browser, but never consumed by anything. Per-currency `decimals` controls display precision. Dead weight is dead weight.
+- **Geolocation shown as "Coming Soon" in admin** — the resolver exists behind a feature flag, the settings exist in the backend. Now the General tab shows a faded geolocation section so it's visible but clearly not ready yet.
+
+<Separator className="my-8" />
+
+### v1.1.6
+
+*Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.6)
+
+Three bugs walked into the price projection engine. One was our fault, two were always there.
+
+#### Regression
+
+- **Variant price line hidden by Buy Now button** — the v1.1.5 refactor of `replaceInlinePrice()` removed explicit whitespace padding around converted prices. The `basePriceRegex` captures surrounding whitespace via `\s*`, and `text.replace(match[0], converted)` consumed it without restoring it. The layout collapsed and the Buy Now button swallowed the price line. Now preserves leading and trailing whitespace from the original regex match.
+
+#### Bugs
+
+- **Variant option button prices stuck in base currency** — variant buttons render prices in `.fct-product-variant-item-price > span` and `.fct-product-variant-compare-price > del > span`. These classes aren't in the main price selector list, and `projectVariantButtons()` only converted the invisible `data-item-price` / `data-compare-price` attributes. The visible `<span>` text stayed in base currency. Now converts both the data attributes and the visible span text.
+- **Subscription variant prices stuck in base currency** — subscription products wrap the price text inside a nested `.fct-product-payment-type` div instead of using direct text nodes. `projectVariantPrice()` only checked direct child text nodes and never found the price. Now descends into the payment type child when no direct text nodes contain a price. Additionally, switching between billing interval tabs (Monthly/Half Yearly/Yearly) caused the converted price to flash then vanish — `clearProjectionMarkers()` was restoring innerHTML from initial render, which re-applied stale `is-hidden` classes and hid the active tab's price. Now syncs child visibility with the parent's current state after restoration.
+- **Variant compare price blocked actual price conversion** — when a variant has both a compare/reference price and an actual price, converting the `<del>` compare price incremented the internal counter, which then prevented the code from descending into the payment type child to convert the actual price text node. All one-time tier prices and installment prices stayed in base currency while the strikethrough compare price was correctly converted. Removed the counter guard so both are always converted.
+- **Installment setup fee stuck in base currency** — text like "300.00zł per year for 12 cycles + 100.00zł one-time setup fee" contains two prices in one text node. `replaceInlinePrice()` only replaced the first match. New `replaceAllInlinePrices()` uses a global regex callback to convert all prices in a single pass, while skipping bare numbers like "12" in "12 cycles".
+- **Min/max price filter sidebar shows unconverted numbers** — `projectCurrencySigns()` swapped the currency symbol but left the `<input>` values untouched. A `$100` filter became `€100` instead of `€93`. New `projectPriceFilterInputs()` converts the displayed value while preserving the original base-currency value in a data attribute for re-conversion on slider changes.
+
+<Separator className="my-8" />
+
 ### v1.1.5
 
 *Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.5)

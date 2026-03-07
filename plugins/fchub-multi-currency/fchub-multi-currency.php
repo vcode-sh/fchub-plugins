@@ -4,7 +4,7 @@
  * Plugin Name: FCHub - Multi-Currency
  * Plugin URI: https://fchub.co
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.1.5
+ * Version: 1.2.0
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -21,7 +21,7 @@ declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.1.5');
+define('FCHUB_MC_VERSION', '1.2.0');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));
@@ -193,13 +193,13 @@ function fchub_mc_format_price(float $basePrice): string
         ? (float) bcmul((string) $basePrice, $context->rate->rate, 8)
         : ((float) $basePrice * (float) $context->rate->rate);
 
-    $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::from(
+    $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::tryFrom(
         $optionStore->get('rounding_mode', 'half_up'),
-    );
+    ) ?? FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp;
     $decimals = $context->displayCurrency->decimals;
 
     $rounded = match ($roundingMode) {
-        FChubMultiCurrency\Domain\Enums\RoundingMode::None     => $converted,
+        FChubMultiCurrency\Domain\Enums\RoundingMode::None     => (float) (($converted >= 0 ? floor($converted * (10 ** $decimals)) : ceil($converted * (10 ** $decimals))) / (10 ** $decimals)),
         FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp   => round($converted, $decimals, PHP_ROUND_HALF_UP),
         FChubMultiCurrency\Domain\Enums\RoundingMode::HalfDown => round($converted, $decimals, PHP_ROUND_HALF_DOWN),
         FChubMultiCurrency\Domain\Enums\RoundingMode::Ceil     => (float) (ceil($converted * (10 ** $decimals)) / (10 ** $decimals)),

@@ -51,6 +51,11 @@ final class ContextModule implements ModuleContract
             return;
         }
 
+        $optionStore = new OptionStore();
+        if ($optionStore->get('cookie_enabled', 'yes') !== 'yes') {
+            return;
+        }
+
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
         $guestCurrency = isset($_COOKIE['fchub_mc_currency']) ? sanitize_text_field(wp_unslash($_COOKIE['fchub_mc_currency'])) : '';
 

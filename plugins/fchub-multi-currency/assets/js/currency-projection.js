@@ -25,10 +25,10 @@
 	if (!cfg.displayCurrency || !cfg.baseCurrency) return;
 	if (cfg.isBaseDisplay) return;
 	if (cfg.displayCurrency === cfg.baseCurrency) return;
-	if (!rate || rate === 1 || Number.isNaN(rate)) return;
+	if (!rate || !Number.isFinite(rate) || rate === 1) return;
 
 	// Display currency config
-	const decimals = parseInt(cfg.decimals || "2", 10);
+	const decimals = Math.max(0, Math.min(20, parseInt(cfg.decimals, 10) || 2));
 	const symbol = cfg.symbol || cfg.displayCurrency;
 	const position = cfg.position || "left";
 	const roundingMode = cfg.roundingMode || "half_up";
@@ -76,6 +76,15 @@
 		// Pricing table
 		".fluent-cart-pricing-table-variant-price",
 		".fluent-cart-pricing-table-variant-compare-price",
+		// Modal checkout
+		".fct-modal-cs-line-price",
+		// Coupon discount
+		".fct_coupon_price",
+		".fct-coupon-price",
+		// Thank you / receipt page
+		".fct-thank-you-page-order-items-total-value",
+		".fct-thank-you-page-order-items-list-price-inner",
+		".fct-thank-you-page-order-items-list-payment-info",
 		// Explicit opt-in elements
 		"[data-fchub-mc-base]",
 	].join(",");
@@ -194,8 +203,10 @@
 				const floored = Math.floor(scaled);
 				return ((scaled - floored) > 0.5 ? Math.ceil(scaled) : floored) / factor;
 			}
-			case "none":
-				return amount;
+			case "none": {
+				const truncated = Math.trunc(scaled);
+				return truncated / factor;
+			}
 			default:
 				return Math.round(scaled) / factor;
 		}
@@ -301,7 +312,39 @@
 		if (Number.isNaN(baseAmount)) return null;
 
 		const converted = formatPrice(applyRounding(baseAmount * rate));
-		return text.replace(match[0], converted);
+
+		// Preserve whitespace that the regex captured around the price
+		const leading = match[0].match(/^\s*/)[0];
+		const trailing = match[0].match(/\s*$/)[0];
+		return text.replace(match[0], leading + converted + trailing);
+	}
+
+	/**
+	 * Replace ALL base-currency prices in a text string (single pass).
+	 * Handles text with multiple prices like "300.00zł per year + 100.00zł setup fee".
+	 * Skips bare numbers (e.g. "12" in "12 cycles") that aren't prices.
+	 */
+	function replaceAllInlinePrices(text) {
+		const globalRegex = new RegExp(basePriceRegex.source, "g");
+		let changed = false;
+		const result = text.replace(globalRegex, (match) => {
+			// Skip bare numbers without currency indicator or decimal portion
+			// to avoid converting "12" in "for 12 cycles"
+			stripRegex.lastIndex = 0;
+			if (!stripRegex.test(match) && !/\d[.,]\d/.test(match.trim())) {
+				return match;
+			}
+
+			const baseAmount = parseBasePrice(match);
+			if (Number.isNaN(baseAmount)) return match;
+
+			const converted = formatPrice(applyRounding(baseAmount * rate));
+			const leading = match.match(/^\s*/)[0];
+			const trailing = match.match(/\s*$/)[0];
+			changed = true;
+			return leading + converted + trailing;
+		});
+		return changed ? result : null;
 	}
 
 	/**
@@ -314,6 +357,14 @@
 
 		if (!el.getAttribute(ATTR_ORIGINAL)) {
 			el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
+		}
+
+		// clearProjectionMarkers restores innerHTML from the initial render, which may
+		// contain stale is-hidden classes. Sync child variation-content visibility with
+		// the parent's current state so FluentCart's tab toggling isn't undone.
+		const parentHidden = el.classList.contains("is-hidden");
+		for (const child of el.querySelectorAll(".fluent-cart-product-variation-content")) {
+			child.classList.toggle("is-hidden", parentHidden);
 		}
 
 		const del = el.querySelector("del");
@@ -333,6 +384,22 @@
 				if (converted !== null) {
 					node.textContent = converted;
 					count++;
+				}
+			}
+		}
+
+		// Subscription/installment products wrap price text in a child
+		// .fct-product-payment-type div. Text nodes there can contain multiple prices
+		// (e.g. "300.00zł per year for 12 cycles + 100.00zł one-time setup fee").
+		const paymentType = el.querySelector(".fct-product-payment-type");
+		if (paymentType) {
+			for (const node of paymentType.childNodes) {
+				if (node.nodeType === 3 && looksLikePrice(node.textContent)) {
+					const converted = replaceAllInlinePrices(node.textContent);
+					if (converted !== null) {
+						node.textContent = converted;
+						count++;
+					}
 				}
 			}
 		}
@@ -462,6 +529,18 @@
 			return 1;
 		}
 
+		// Thank you page payment info — may contain multiple inline prices
+		if (el.classList.contains("fct-thank-you-page-order-items-list-payment-info")) {
+			if (!el.getAttribute(ATTR_ORIGINAL)) {
+				el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
+			}
+			const converted = replaceAllInlinePrices(rawText);
+			if (converted === null) return 0;
+			target.textContent = converted;
+			el.setAttribute(ATTR_PROJECTED, "1");
+			return 1;
+		}
+
 		let baseAmount;
 		let prefix = "";
 
@@ -538,7 +617,72 @@
 				}
 			}
 
+			// Convert visible price text in variant button spans
+			const priceSpan = btn.querySelector(".fct-product-variant-item-price span");
+			if (priceSpan && looksLikePrice(priceSpan.textContent)) {
+				const amount = parseBasePrice(priceSpan.textContent);
+				if (!Number.isNaN(amount)) {
+					priceSpan.textContent = formatPrice(applyRounding(amount * rate));
+				}
+			}
+
+			const compareSpan = btn.querySelector(".fct-product-variant-compare-price span");
+			if (compareSpan && looksLikePrice(compareSpan.textContent)) {
+				const amount = parseBasePrice(compareSpan.textContent);
+				if (!Number.isNaN(amount)) {
+					compareSpan.textContent = formatPrice(applyRounding(amount * rate));
+				}
+			}
+
 			btn.setAttribute(ATTR_PROJECTED, "1");
+		}
+	}
+
+	/**
+	 * Project price filter input values in the shop sidebar.
+	 */
+	function projectPriceFilterInputs(root) {
+		for (const input of root.querySelectorAll(".fc_price_range_input")) {
+			// Store original base-currency value on first encounter
+			if (!input.getAttribute(ATTR_BASE)) {
+				input.setAttribute(ATTR_BASE, input.value);
+			}
+
+			const baseVal = parseFloat(input.getAttribute(ATTR_BASE));
+			if (Number.isNaN(baseVal)) continue;
+
+			const converted = applyRounding(baseVal * rate);
+			input.value = formatNumber(converted);
+		}
+	}
+
+	/**
+	 * Project pricing table payment type labels (sibling of the price wrap).
+	 * Contains spans with inline prices like "300.00zł per year for 12 cycles".
+	 */
+	function projectPricingTablePaymentTypes(root) {
+		const elements = root.querySelectorAll(
+			".fluent-cart-pricing-table-variant-payment-type",
+		);
+		for (const el of elements) {
+			if (el.getAttribute(ATTR_PROJECTED)) continue;
+
+			if (!el.getAttribute(ATTR_ORIGINAL)) {
+				el.setAttribute(ATTR_ORIGINAL, el.innerHTML);
+			}
+
+			let count = 0;
+			for (const span of el.querySelectorAll("span")) {
+				const converted = replaceAllInlinePrices(span.textContent);
+				if (converted !== null) {
+					span.textContent = converted;
+					count++;
+				}
+			}
+
+			if (count > 0) {
+				el.setAttribute(ATTR_PROJECTED, "1");
+			}
 		}
 	}
 
@@ -563,6 +707,8 @@
 
 		projectCurrencySigns(root);
 		projectVariantButtons(root);
+		projectPriceFilterInputs(root);
+		projectPricingTablePaymentTypes(root);
 
 		if (projected > 0) {
 			document.dispatchEvent(
@@ -648,44 +794,37 @@
 	 * and custom events do NOT bubble from window to document.
 	 */
 	function listenForFluentCartEvents() {
-		// FluentCart events — dispatched on window
+		let eventDebounceTimer;
+
+		const reproject = (delay) => {
+			clearTimeout(eventDebounceTimer);
+			eventDebounceTimer = setTimeout(() => {
+				clearProjectionMarkers();
+				projectPrices();
+			}, delay);
+		};
+
 		const windowEvents = [
 			"fluentCartFragmentsReplaced",
 			"fluentCartNotifySummaryViewUpdated",
 			"fluentCartNotifyCartDrawerItemChanged",
+			"fluentCartCheckoutDataChanged",
 		];
 
 		for (const eventName of windowEvents) {
-			window.addEventListener(eventName, () => {
-				setTimeout(() => {
-					clearProjectionMarkers();
-					projectPrices();
-				}, 100);
-			});
+			window.addEventListener(eventName, () => reproject(100));
 		}
 
-		// Modal/variant events need a longer delay for FluentCart to finish rendering
 		const delayedWindowEvents = [
 			"fluentCartSingleProductModalOpened",
 			"fluentCartSingleProductVariationChanged",
 		];
 
 		for (const eventName of delayedWindowEvents) {
-			window.addEventListener(eventName, () => {
-				setTimeout(() => {
-					clearProjectionMarkers();
-					projectPrices();
-				}, 200);
-			});
+			window.addEventListener(eventName, () => reproject(200));
 		}
 
-		// Our own event — dispatched on window by the switcher
-		window.addEventListener("fchub_mc:context_changed", () => {
-			setTimeout(() => {
-				clearProjectionMarkers();
-				projectPrices();
-			}, 100);
-		});
+		window.addEventListener("fchub_mc:context_changed", () => reproject(100));
 	}
 
 	// Add FOUC prevention class immediately

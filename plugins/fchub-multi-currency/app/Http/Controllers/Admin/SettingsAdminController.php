@@ -71,7 +71,6 @@ final class SettingsAdminController
                 'cookie_lifetime_days' => max(1, min(365, (int) $value)),
                 'rate_refresh_interval_hrs' => max(1, min(168, (int) $value)),
                 'stale_threshold_hrs' => max(1, min(720, (int) $value)),
-                'rounding_precision' => max(0, min(4, (int) $value)),
                 'checkout_disclosure_text' => sanitize_textarea_field((string) $value),
                 default => sanitize_text_field((string) $value),
             };

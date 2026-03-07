@@ -54,7 +54,7 @@ final class RefreshRatesAction
                 return false;
             }
 
-            $now = wp_date('Y-m-d H:i:s');
+            $now = gmdate('Y-m-d H:i:s');
             $providerEnum = RateProvider::tryFrom($provider->name()) ?? RateProvider::Manual;
 
             // Collect quote codes we're about to refresh so we can invalidate them first
@@ -76,10 +76,21 @@ final class RefreshRatesAction
                     continue;
                 }
 
+                // Guard against non-numeric rates (NaN, Infinity, strings)
+                $rateStr = (string) $rates[$code];
+                if (!is_numeric($rateStr) || preg_match('/[eE]/', $rateStr)) {
+                    Logger::error('Skipping non-numeric rate', [
+                        'currency' => $code,
+                        'rate'     => $rates[$code],
+                        'provider' => $provider->name(),
+                    ]);
+                    continue;
+                }
+
                 // Guard against zero or negative rates from provider
                 $isInvalidRate = function_exists('bccomp')
-                    ? (bccomp((string) $rates[$code], '0', 10) <= 0)
-                    : ((float) $rates[$code] <= 0.0);
+                    ? (bccomp($rateStr, '0', 10) <= 0)
+                    : ((float) $rateStr <= 0.0);
 
                 if ($isInvalidRate) {
                     Logger::error('Skipping invalid rate (zero or negative)', [
@@ -119,25 +130,28 @@ final class RefreshRatesAction
         $lockKey = 'fchub_mc_rate_refresh_lock';
         $ttl = 120;
 
-        // Attempt atomic lock acquisition — add_option returns false if key exists
+        // Attempt atomic lock acquisition
         $acquired = add_option($lockKey, (string) time(), '', false);
-
         if ($acquired) {
             return true;
         }
 
-        // Lock exists — check if it's stale (process died without releasing)
+        // Lock exists — check if stale
         $currentLock = get_option($lockKey, false);
         if ($currentLock === false) {
-            // Option was deleted between add_option and get_option — retry once
             return add_option($lockKey, (string) time(), '', false);
         }
 
         $age = time() - (int) $currentLock;
         if ($age >= $ttl) {
-            // Stale lock — overwrite with update_option (atomic, no TOCTOU gap)
-            update_option($lockKey, (string) time(), false);
-            return true;
+            // Atomic compare-and-swap: only overwrite if value hasn't changed
+            global $wpdb;
+            $updated = $wpdb->update(
+                $wpdb->options,
+                ['option_value' => (string) time()],
+                ['option_name' => $lockKey, 'option_value' => $currentLock],
+            );
+            return $updated > 0;
         }
 
         return false;

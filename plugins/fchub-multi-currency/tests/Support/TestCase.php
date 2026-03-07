@@ -28,12 +28,18 @@ abstract class TestCase extends BaseTestCase
         $GLOBALS['wp_mock_post_meta'] = [];
         $GLOBALS['wp_cache_store'] = [];
 
+        // Reset multisite mock state
+        $GLOBALS['wp_mock_is_multisite'] = false;
+        $GLOBALS['wp_mock_sites'] = [];
+        $GLOBALS['wp_mock_current_blog_id'] = 1;
+
         // Reset wpdb mock state
         $GLOBALS['wpdb_mock_results'] = [];
         $GLOBALS['wpdb_mock_row'] = null;
         $GLOBALS['wpdb_mock_var'] = null;
         $GLOBALS['wpdb_mock_col'] = [];
         $GLOBALS['wpdb_mock_query_result'] = true;
+        $GLOBALS['wpdb_mock_update_result'] = 1;
         $GLOBALS['wpdb']->resetQueries();
 
         // Reset FluentCRM mock state

@@ -26,7 +26,7 @@ final class ExchangeRateService
                 quoteCurrency: $quoteCurrency,
                 rate: '1.00000000',
                 provider: \FChubMultiCurrency\Domain\Enums\RateProvider::Manual,
-                fetchedAt: current_time('mysql'),
+                fetchedAt: gmdate('Y-m-d H:i:s'),
             );
         }
 

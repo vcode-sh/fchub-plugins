@@ -2,7 +2,7 @@
 
 define('FCHUB_TESTING', true);
 define('ABSPATH', '/tmp/wordpress/');
-define('FCHUB_MC_VERSION', '1.1.5');
+define('FCHUB_MC_VERSION', '1.2.0');
 define('FCHUB_MC_PATH', dirname(__DIR__) . '/');
 define('FCHUB_MC_URL', 'http://localhost/wp-content/plugins/fchub-multi-currency/');
 define('FCHUB_MC_DB_VERSION', '1.0.0');
@@ -24,6 +24,7 @@ if (!isset($GLOBALS['wpdb'])) {
     $GLOBALS['wpdb'] = new class {
         public string $prefix = 'wp_';
         public string $posts = 'wp_posts';
+        public string $options = 'wp_options';
         public string $usermeta = 'wp_usermeta';
         public int $insert_id = 0;
         /** @var array<int, string> */
@@ -69,7 +70,7 @@ if (!isset($GLOBALS['wpdb'])) {
         public function update($table, $data, $where, $format = null, $where_format = null)
         {
             $this->queries[] = "UPDATE {$table}";
-            return 1;
+            return $GLOBALS['wpdb_mock_update_result'] ?? 1;
         }
 
         public function delete($table, $where, $where_format = null)
@@ -123,6 +124,7 @@ $GLOBALS['wpdb_mock_row'] = null;
 $GLOBALS['wpdb_mock_var'] = null;
 $GLOBALS['wpdb_mock_col'] = [];
 $GLOBALS['wpdb_mock_query_result'] = true;
+$GLOBALS['wpdb_mock_update_result'] = 1;
 
 if (!function_exists('get_option')) {
     function get_option($key, $default = false)
@@ -787,6 +789,41 @@ if (!class_exists('WP_User')) {
     }
 }
 
+// Multisite mock globals
+$GLOBALS['wp_mock_is_multisite'] = false;
+$GLOBALS['wp_mock_sites'] = [];
+$GLOBALS['wp_mock_current_blog_id'] = 1;
+
+if (!function_exists('is_multisite')) {
+    function is_multisite()
+    {
+        return $GLOBALS['wp_mock_is_multisite'] ?? false;
+    }
+}
+
+if (!function_exists('get_sites')) {
+    function get_sites($args = [])
+    {
+        return $GLOBALS['wp_mock_sites'] ?? [];
+    }
+}
+
+if (!function_exists('switch_to_blog')) {
+    function switch_to_blog($blog_id)
+    {
+        $GLOBALS['wp_mock_current_blog_id'] = $blog_id;
+        return true;
+    }
+}
+
+if (!function_exists('restore_current_blog')) {
+    function restore_current_blog()
+    {
+        $GLOBALS['wp_mock_current_blog_id'] = 1;
+        return true;
+    }
+}
+
 // Include FluentCRM stubs
 require_once __DIR__ . '/stubs/fluentcrm-stubs.php';
 require_once __DIR__ . '/stubs/fluentcart-stubs.php';
@@ -853,13 +890,13 @@ if (!function_exists('fchub_mc_format_price')) {
             ? (float) bcmul((string) $basePrice, $context->rate->rate, 8)
             : ((float) $basePrice * (float) $context->rate->rate);
 
-        $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::from(
+        $roundingMode = FChubMultiCurrency\Domain\Enums\RoundingMode::tryFrom(
             $optionStore->get('rounding_mode', 'half_up'),
-        );
+        ) ?? FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp;
         $decimals = $context->displayCurrency->decimals;
 
         $rounded = match ($roundingMode) {
-            FChubMultiCurrency\Domain\Enums\RoundingMode::None     => $converted,
+            FChubMultiCurrency\Domain\Enums\RoundingMode::None     => (float) (($converted >= 0 ? floor($converted * (10 ** $decimals)) : ceil($converted * (10 ** $decimals))) / (10 ** $decimals)),
             FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp   => round($converted, $decimals, PHP_ROUND_HALF_UP),
             FChubMultiCurrency\Domain\Enums\RoundingMode::HalfDown => round($converted, $decimals, PHP_ROUND_HALF_DOWN),
             FChubMultiCurrency\Domain\Enums\RoundingMode::Ceil     => (float) (ceil($converted * (10 ** $decimals)) / (10 ** $decimals)),

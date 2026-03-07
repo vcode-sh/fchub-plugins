@@ -49,7 +49,6 @@ final class FrontendModule implements ModuleContract
             'position'          => $context->displayCurrency->position->value,
             'isBaseDisplay'     => $context->isBaseDisplay,
             'roundingMode'      => $optionStore->get('rounding_mode', 'half_up'),
-            'roundingPrecision' => (int) $optionStore->get('rounding_precision', 2),
             'restUrl'           => rest_url(Constants::REST_NAMESPACE),
             'nonce'             => wp_create_nonce('wp_rest'),
             'currencies'        => $optionStore->get('display_currencies', []),
@@ -90,7 +89,7 @@ final class FrontendModule implements ModuleContract
                 'fchub-mc-projection',
                 FCHUB_MC_URL . 'assets/js/currency-projection.js',
                 [],
-                (string) filemtime($projectionPath),
+                (string) (@filemtime($projectionPath) ?: FCHUB_MC_VERSION),
                 true,
             );
             wp_localize_script('fchub-mc-projection', 'fchubMcConfig', $config);
@@ -101,7 +100,7 @@ final class FrontendModule implements ModuleContract
             'fchub-mc-switcher',
             FCHUB_MC_URL . 'assets/js/currency-switcher.js',
             [],
-            (string) filemtime($switcherJsPath),
+            (string) (@filemtime($switcherJsPath) ?: FCHUB_MC_VERSION),
             true,
         );
 
@@ -114,7 +113,7 @@ final class FrontendModule implements ModuleContract
             'fchub-mc-switcher',
             FCHUB_MC_URL . 'assets/css/currency-switcher.css',
             [],
-            (string) filemtime($switcherCssPath),
+            (string) (@filemtime($switcherCssPath) ?: FCHUB_MC_VERSION),
         );
     }
 
@@ -152,7 +151,7 @@ final class FrontendModule implements ModuleContract
         $staleThresholdSeconds = $staleThresholdHrs * 3600;
         $isStale = $rate->isStale($staleThresholdSeconds);
 
-        $fetchedTimestamp = strtotime($rate->fetchedAt);
+        $fetchedTimestamp = strtotime($rate->fetchedAt . ' UTC');
         if ($fetchedTimestamp === false) {
             return '';
         }

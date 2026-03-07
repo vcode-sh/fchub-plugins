@@ -26,7 +26,7 @@ final readonly class Currency
             name: $data['name'],
             symbol: $data['symbol'],
             decimals: (int) ($data['decimals'] ?? 2),
-            position: CurrencyPosition::from($data['position'] ?? 'left'),
+            position: CurrencyPosition::tryFrom($data['position'] ?? 'left') ?? CurrencyPosition::Left,
         );
     }
 

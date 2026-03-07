@@ -34,7 +34,7 @@ final class MockBuilder
             'quote_currency' => 'EUR',
             'rate'           => '0.92000000',
             'provider'       => 'manual',
-            'fetched_at'     => date('Y-m-d H:i:s'),
+            'fetched_at'     => gmdate('Y-m-d H:i:s'),
         ];
 
         return ExchangeRate::from(array_merge($defaults, $overrides));

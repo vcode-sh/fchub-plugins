@@ -19,8 +19,12 @@ final class PersistContextAction
 
     public function execute(string $currencyCode): void
     {
-        $lifetimeDays = (int) $this->optionStore->get('cookie_lifetime_days', 90);
-        $this->repository->saveCookie($currencyCode, $lifetimeDays);
+        $cookieEnabled = $this->optionStore->get('cookie_enabled', 'yes') === 'yes';
+
+        if ($cookieEnabled) {
+            $lifetimeDays = (int) $this->optionStore->get('cookie_lifetime_days', 90);
+            $this->repository->saveCookie($currencyCode, $lifetimeDays);
+        }
 
         $userId = get_current_user_id();
 

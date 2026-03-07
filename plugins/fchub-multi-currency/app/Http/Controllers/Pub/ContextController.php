@@ -9,6 +9,7 @@ use FChubMultiCurrency\Domain\Actions\PersistContextAction;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
+use FChubMultiCurrency\Support\Hooks;
 
 defined('ABSPATH') || exit;
 
@@ -37,8 +38,14 @@ final class ContextController
 
     public function set(\WP_REST_Request $request): \WP_REST_Response
     {
+        if (!Hooks::isEnabled()) {
+            return new \WP_REST_Response([
+                'data' => ['message' => 'Multi-Currency is disabled.'],
+            ], 403);
+        }
+
         // Rate limit: 30 requests per minute per IP
-        $ip = $request->get_header('X-Forwarded-For') ?: ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         $rateLimitKey = 'fchub_mc_rl_' . substr(md5($ip), 0, 12);
         $hits = (int) get_transient($rateLimitKey);
 
@@ -47,8 +54,6 @@ final class ContextController
                 'data' => ['message' => 'Too many requests. Please try again later.'],
             ], 429);
         }
-
-        set_transient($rateLimitKey, $hits + 1, MINUTE_IN_SECONDS);
 
         $params = $request->get_json_params();
         if (!is_array($params)) {
@@ -88,6 +93,9 @@ final class ContextController
                 'data' => ['message' => 'Invalid currency code.'],
             ], 422);
         }
+
+        // Increment rate limit only after validation passes
+        set_transient($rateLimitKey, $hits + 1, MINUTE_IN_SECONDS);
 
         $action = new PersistContextAction(new PreferenceRepository(), $optionStore);
         $action->execute($currencyCode);
