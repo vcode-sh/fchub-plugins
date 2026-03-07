@@ -1,3 +1,15 @@
+### v1.2.3
+
+*Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.3)
+
+Improved SortableJS asset delivery for environments where v1.2.2's handle fix wasn't sufficient.
+
+#### Fixed
+
+- **SortableJS not loading on some hosting configurations** — certain server environments with aggressive static asset caching or non-standard `plugin_dir_url()` resolution could prevent the vendored `Sortable.min.js` from being served, even after the handle collision fix in v1.2.2. Hardened the asset pipeline to ensure the library reaches the browser regardless of hosting quirks. If drag-and-drop wasn't working for you after updating to v1.2.2, this one's for you.
+
+<Separator className="my-8" />
+
 ### v1.2.2
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.2)
