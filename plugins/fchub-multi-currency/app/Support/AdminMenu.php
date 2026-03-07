@@ -33,7 +33,7 @@ final class AdminMenu
 
         wp_register_script(
             'fchub-mc-sortablejs',
-            FCHUB_MC_URL . 'admin/vendor/Sortable.min.js',
+            FCHUB_MC_URL . 'admin/lib/Sortable.min.js',
             [],
             '1.15.6',
             true,

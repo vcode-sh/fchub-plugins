@@ -1,3 +1,15 @@
+### v1.2.4
+
+*Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.4)
+
+Turns out many managed WordPress hosts (Rocket.net, Cloudways, GridPane, etc.) block HTTP requests to any path containing `/vendor/` — a blanket security rule to prevent direct access to Composer dependencies. Reasonable policy, collateral damage on our third-party library. Moved SortableJS out of `admin/vendor/` to `admin/lib/` so it stops getting caught in the crossfire.
+
+#### Fixed
+
+- **SortableJS blocked by server-level `/vendor/` path rules** — managed hosting platforms commonly deny requests to any URL containing `/vendor/` to prevent exposure of Composer packages. Our vendored `Sortable.min.js` lived at `admin/vendor/Sortable.min.js` — a perfectly innocent path that looked guilty by association. The server returned a 403 HTML page instead of JavaScript, which the browser parsed as `Unexpected token '<'`. Relocated to `admin/lib/Sortable.min.js` where no security rule will touch it.
+
+<Separator className="my-8" />
+
 ### v1.2.3
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.3)
