@@ -32,7 +32,7 @@ final class AdminMenu
         }
 
         wp_register_script(
-            'sortablejs',
+            'fchub-mc-sortablejs',
             FCHUB_MC_URL . 'admin/vendor/Sortable.min.js',
             [],
             '1.15.6',
@@ -42,7 +42,7 @@ final class AdminMenu
         wp_enqueue_script(
             'fchub-mc-admin',
             FCHUB_MC_URL . 'admin/multi-currency-admin.js',
-            ['fluent-cart_global_admin_hooks', 'sortablejs'],
+            ['fluent-cart_global_admin_hooks', 'fchub-mc-sortablejs'],
             (string) filemtime($bundlePath),
             true,
         );

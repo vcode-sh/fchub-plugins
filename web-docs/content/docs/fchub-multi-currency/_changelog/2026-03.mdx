@@ -1,3 +1,24 @@
+### v1.2.2
+
+*Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.2)
+
+Turns out the drag-and-drop currency reordering was silently broken for some users and we couldn't reproduce it. The SortableJS script handle was registered as `sortablejs` — a name generic enough that any other plugin registering the same handle first would silently hijack ours. WordPress doesn't throw, doesn't warn, just uses whoever registered first and moves on. The grab cursor worked (pure CSS), but the actual drag library never loaded. Classic WordPress script handle collision — the kind of bug that works perfectly on every dev machine and breaks in production.
+
+#### Fixed
+
+- **Drag-and-drop currency reordering broken on some installs** — the `sortablejs` script handle could collide with other plugins registering the same handle. WordPress silently drops duplicate `wp_register_script` calls, so our `Sortable.min.js` never loaded while the CSS `cursor: grab` kept pretending everything was fine. Renamed to `fchub-mc-sortablejs` so it can't be stolen. Also added a console warning when SortableJS fails to load, because silent failure is not a debugging strategy.
+
+<video
+  autoPlay
+  loop
+  muted
+  playsInline
+  className="rounded-xl border my-6"
+  src="https://files.vcode.sh/fchub/docs/multi-currency/fchub-multi-currency-dnd.mp4"
+/>
+
+<Separator className="my-8" />
+
 ### v1.2.1
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.1)

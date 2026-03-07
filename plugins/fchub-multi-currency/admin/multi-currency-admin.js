@@ -212,7 +212,11 @@
 		methods: {
 			initSortable: function () {
 				var el = this.$refs.sortableBody;
-				if (!el || !window.Sortable) return;
+				if (!el) return;
+				if (!window.Sortable) {
+					console.warn("[fchub-mc] SortableJS not loaded — drag-and-drop disabled");
+					return;
+				}
 				if (this._sortable) return;
 				this._sortable = window.Sortable.create(el, {
 					handle: ".fchub-mc-drag-handle",
