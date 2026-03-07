@@ -1,3 +1,15 @@
+### v1.2.1
+
+*Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.1)
+
+One bug, one symptom: every price in the checkout order summary rendered 50% larger and lighter after switching currency. Turns out `textContent` is a wrecking ball.
+
+#### Fixed
+
+- **Checkout prices rendered at wrong font size after currency switch** — `findPriceTarget()` didn't recognise FluentCart's nested price structure (`.fct_line_item_total` inside `.fct_line_item_price`). Setting `textContent` on the parent destroyed the styled inner `<span>` and its `text-sm font-medium` classes. Prices jumped from 14px/500 to the body's 21px/300. Now drills into `.fct_line_item_total`, `.fct_summary_value`, and `.fct_coupon_price` child elements before falling back to the parent. Also marks the inner target as projected to prevent the selector loop from re-processing it. Your checkout no longer looks like it's shouting the prices at you.
+
+<Separator className="my-8" />
+
 ### v1.2.0
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.0)

@@ -286,6 +286,14 @@
 			return dels[0];
 		}
 
+		// Drill into styled child spans that FluentCart uses for price formatting
+		// (e.g. .fct_line_item_total inside .fct_line_item_price). Setting textContent
+		// on the parent would destroy these inner elements and lose their styling.
+		const styledChild = el.querySelector(".fct_line_item_total, .fct_summary_value, .fct_coupon_price");
+		if (styledChild && looksLikePrice(styledChild.textContent)) {
+			return styledChild;
+		}
+
 		// If the element has child markup we'd destroy with textContent,
 		// find the bare text node that holds the numeric price
 		if (hasMixedContent(el)) {
@@ -581,6 +589,14 @@
 		}
 
 		el.setAttribute(ATTR_PROJECTED, converted.toString());
+
+		// When the target is a styled child element (e.g. .fct_line_item_total
+		// inside .fct_line_item_price), mark it as projected too so the selector
+		// loop doesn't re-process it and attempt a double-conversion.
+		if (target !== el && target.setAttribute) {
+			target.setAttribute(ATTR_PROJECTED, "1");
+		}
+
 		return 1;
 	}
 
