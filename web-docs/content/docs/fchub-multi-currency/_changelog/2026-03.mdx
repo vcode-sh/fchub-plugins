@@ -1,3 +1,37 @@
+### v1.3.0
+
+*Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.3.0)
+
+The Gutenberg glow-up. The shortcode still works, but now it has a proper block-shaped colleague with six outfits and a whole family of friends.
+
+<video
+  autoPlay
+  loop
+  muted
+  playsInline
+  className="rounded-xl border my-6"
+  src="https://files.vcode.sh/fchub/docs/multi-currency/switcher/switcher-in-settings.mp4"
+/>
+
+#### Features
+
+- **Currency Switcher Gutenberg block** — a proper block with six style presets (Default, Pill, Minimal, Subtle, Glass, Contrast), 20+ inspector controls, live editor preview, and shortcode transform. Drop it in headers, footers, template parts, synced patterns — anywhere blocks go. The shortcode era isn't over, but it has company now.
+- **Current Currency block** — inline display of the active currency. Flag + code, code only, or full name. For sticky status bars and utility rows.
+- **Exchange Rate block** — "1 PLN = 0.2350 EUR" with configurable precision. For the transparency enthusiasts.
+- **Currency Context Notice block** — "Viewing prices in USD. Checkout charged in PLN." Trust-building disclosure without a dropdown.
+- **Currency Selector Buttons block** — one button per currency, no dropdown. For stores with 3-4 currencies that don't need the ceremony.
+- **Currency Showcase pattern** — all five blocks on the page in one click. Because manually assembling test pages is nobody's idea of fun.
+- **Admin live preview** — the Switcher settings tab now has a sticky preview widget at the top. Same CSS classes, same SVG flags, instant updates. Change a preset, toggle a flag, see it move. No more save-refresh-squint-repeat.
+- **No-JS fallback that actually works** — the old one was a trigger button with delusions of interactivity. Replaced with a real `<form>` that POSTs with a nonce, validates the currency server-side, persists, and redirects back. Affects 0.3% of visitors and 100% of your accessibility audit.
+
+#### Fixed
+
+- **Pill preset dropdown was oval** — `--fchub-mc-radius: 999px` flowed uncapped into the dropdown container and option rows, producing beautifully rounded ovals instead of a rectangular list. Trigger stays pill-shaped, dropdown and options now capped at sensible radii.
+- **Glass preset looked identical to Default in admin and editor** — `backdrop-filter: blur(14px)` was technically applied, but the preview backgrounds were solid white. Nothing behind it to blur = no glass effect. Both previews now swap to a colourful gradient background when glass is active, giving the blur something to work with.
+- **Viewport-aware dropdown positioning** — the dropdown now measures available space in every direction and picks the least-bad position instead of blindly trusting the preferred alignment. No more dropdowns vanishing off-screen or clipping behind the block toolbar.
+
+<Separator className="my-8" />
+
 ### v1.2.4
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.4)
