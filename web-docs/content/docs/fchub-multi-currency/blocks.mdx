@@ -1,0 +1,80 @@
+---
+title: Currency Blocks
+description: "The full block family for FCHub Multi-Currency: switchers, buttons, current currency, exchange rate, and context notices."
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Multi-Currency is no longer just one switcher block. It now ships as a small currency UI system for block themes, content layouts, utility bars, and checkout-adjacent pages.
+
+## Available Blocks
+
+<Cards>
+  <Card title="Currency Switcher" href="/docs/fchub-multi-currency/currency-switcher">
+    The main dropdown switcher. Supports presets, trigger controls, option-row controls, search mode, favorites, context footer, and global defaults.
+  </Card>
+  <Card title="Current Currency">
+    Displays the current display currency in compact formats like code, symbol, name, or flag + code.
+  </Card>
+  <Card title="Exchange Rate">
+    Shows the current exchange rate between the store base currency and the visitor display currency.
+  </Card>
+  <Card title="Currency Context Notice">
+    Shows currency context like “Viewing prices in USD. Checkout in EUR.”
+  </Card>
+  <Card title="Currency Selector Buttons">
+    A button-group alternative to the dropdown for stores with just a few core currencies.
+  </Card>
+</Cards>
+
+<Separator className="my-8" />
+
+## Why Multiple Blocks?
+
+Different placements need different behavior:
+
+- a header needs something compact
+- a footer can afford something more descriptive
+- a landing page may need a trust-building rate or notice block without a selector
+- some stores only need 3 currencies and are better served by buttons than a dropdown
+
+That is why the plugin now treats currency UI as a block family, not a single control wearing too many hats.
+
+<Separator className="my-8" />
+
+## Global Defaults vs Block Overrides
+
+The **Switcher** block can inherit global defaults from the admin settings or use its own instance-level configuration.
+
+Use global defaults when:
+
+- the switcher appears in multiple places
+- you want one consistent header/footer experience
+- your team edits templates but not block settings
+
+Use per-block overrides when:
+
+- one switcher lives in the header and another in the footer
+- you want a compact selector in one place and a descriptive one elsewhere
+
+<Separator className="my-8" />
+
+## Best Uses
+
+| Placement | Best Block |
+|---|---|
+| Header / utility bar | Currency Switcher or Currency Selector Buttons |
+| Footer | Currency Switcher with descriptive footer context |
+| Product or sales page | Currency Context Notice, Exchange Rate |
+| Sticky mini status area | Current Currency |
+| Mobile top bar | Currency Selector Buttons or compact Currency Switcher |
+
+<Separator className="my-8" />
+
+## Recommended Starting Setup
+
+1. Set **Switcher Defaults** in the Multi-Currency admin settings
+2. Add one **Currency Switcher** block to your main template/header
+3. Add **Current Currency** or **Currency Context Notice** where trust or clarity matters
+4. Use **Currency Selector Buttons** only when you have a small, curated set of currencies

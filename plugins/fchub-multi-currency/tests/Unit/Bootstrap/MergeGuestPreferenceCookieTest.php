@@ -58,4 +58,23 @@ final class MergeGuestPreferenceCookieTest extends TestCase
         // User meta should be written
         $this->assertSame('EUR', get_user_meta(42, '_fchub_mc_currency', true));
     }
+
+    #[Test]
+    public function testMergeSkippedWhenAccountPersistenceDisabled(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'enabled' => 'yes',
+            'cookie_enabled' => 'yes',
+            'account_persistence_enabled' => 'no',
+        ]);
+
+        $_COOKIE['fchub_mc_currency'] = 'EUR';
+
+        $user = new \WP_User();
+        $user->ID = 42;
+
+        ContextModule::mergeGuestPreference('testuser', $user);
+
+        $this->assertSame('', get_user_meta(42, '_fchub_mc_currency', true));
+    }
 }

@@ -1,0 +1,155 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fchub-multi-currency/switcher",
+  "version": "1.2.1",
+  "title": "Currency Switcher",
+  "category": "widgets",
+  "icon": "money-alt",
+  "description": "Display the FCHub Multi-Currency switcher in posts, pages, templates, and template parts.",
+  "keywords": ["currency", "switcher", "multi-currency", "exchange", "money"],
+  "textdomain": "fchub-multi-currency",
+  "attributes": {
+    "useGlobalDefaults": {
+      "type": "boolean",
+      "default": true
+    },
+    "preset": {
+      "type": "string",
+      "default": "default"
+    },
+    "label": {
+      "type": "string",
+      "default": ""
+    },
+    "align": {
+      "type": "string",
+      "default": "left"
+    },
+    "labelPosition": {
+      "type": "string",
+      "default": "before"
+    },
+    "showFlag": {
+      "type": "boolean",
+      "default": true
+    },
+    "showCode": {
+      "type": "boolean",
+      "default": true
+    },
+    "showSymbol": {
+      "type": "boolean",
+      "default": false
+    },
+    "showName": {
+      "type": "boolean",
+      "default": false
+    },
+    "showRateBadge": {
+      "type": "boolean",
+      "default": true
+    },
+    "showOptionFlags": {
+      "type": "boolean",
+      "default": true
+    },
+    "showOptionCodes": {
+      "type": "boolean",
+      "default": true
+    },
+    "showOptionSymbols": {
+      "type": "boolean",
+      "default": false
+    },
+    "showOptionNames": {
+      "type": "boolean",
+      "default": true
+    },
+    "showActiveIndicator": {
+      "type": "boolean",
+      "default": true
+    },
+    "showContextNote": {
+      "type": "boolean",
+      "default": false
+    },
+    "showRateValue": {
+      "type": "boolean",
+      "default": false
+    },
+    "searchMode": {
+      "type": "string",
+      "default": "off"
+    },
+    "favoriteCurrencies": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "showFavoritesFirst": {
+      "type": "boolean",
+      "default": true
+    },
+    "size": {
+      "type": "string",
+      "default": "md"
+    },
+    "widthMode": {
+      "type": "string",
+      "default": "auto"
+    },
+    "dropdownPosition": {
+      "type": "string",
+      "default": "auto"
+    },
+    "dropdownDirection": {
+      "type": "string",
+      "default": "auto"
+    }
+  },
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "customClassName": true,
+    "spacing": {
+      "margin": true,
+      "padding": true
+    },
+    "typography": {
+      "fontSize": true,
+      "lineHeight": true
+    }
+  },
+  "styles": [
+    {
+      "name": "default",
+      "label": "Default",
+      "isDefault": true
+    },
+    {
+      "name": "pill",
+      "label": "Pill"
+    },
+    {
+      "name": "minimal",
+      "label": "Minimal"
+    },
+    {
+      "name": "subtle",
+      "label": "Subtle"
+    },
+    {
+      "name": "glass",
+      "label": "Glass"
+    },
+    {
+      "name": "contrast",
+      "label": "Contrast"
+    }
+  ],
+  "style": "fchub-mc-switcher",
+  "viewScript": "fchub-mc-switcher"
+}

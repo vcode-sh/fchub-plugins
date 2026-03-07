@@ -61,5 +61,6 @@ final class ContextControllerTest extends TestCase
 
         $this->assertSame(200, $response->get_status());
         $this->assertSame('USD', $data['data']['currency']);
+        $this->assertStringContainsString('wp_fchub_mc_event_log', implode(' ', $GLOBALS['wpdb']->queries));
     }
 }

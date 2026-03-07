@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Http\Controllers\Admin;
 
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
+use FChubMultiCurrency\Storage\EventLogRepository;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\FeatureFlags;
 
@@ -20,6 +21,7 @@ final class DiagnosticsController
 
         $repository = new ExchangeRateRepository();
         $rates = $repository->findAllLatest($baseCurrency);
+        $eventLogRepository = new EventLogRepository();
         $staleThreshold = ((int) ($settings['stale_threshold_hrs'] ?? 24)) * 3600;
 
         $staleRates = [];
@@ -38,6 +40,8 @@ final class DiagnosticsController
                 'rate_count'        => count($rates),
                 'stale_rates'       => $staleRates,
                 'feature_flags'     => FeatureFlags::all(),
+                'event_counts'      => $eventLogRepository->countByEvent(),
+                'top_switched_currencies' => $eventLogRepository->topCurrenciesForEvent('context_switched', 5),
                 'fluentcart_version' => defined('FLUENTCART_VERSION') ? FLUENTCART_VERSION : 'not installed',
                 'fluentcrm_active'  => defined('FLUENTCRM'),
                 'php_version'       => PHP_VERSION,

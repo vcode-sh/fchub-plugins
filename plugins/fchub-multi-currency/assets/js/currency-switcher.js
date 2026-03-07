@@ -71,8 +71,10 @@
 
 		const trigger = root.querySelector("[data-fchub-mc-trigger]");
 		const dropdown = root.querySelector("[data-fchub-mc-dropdown]");
+		const searchInput = root.querySelector("[data-fchub-mc-search]");
 		const listbox = dropdown.querySelector("[role='listbox']");
 		const options = () => [...listbox.querySelectorAll("[role='option']")];
+		const viewportPadding = 12;
 
 		// ARIA linkage
 		const uid = `fchub-mc-${++idCounter}`;
@@ -85,8 +87,87 @@
 
 		let activeIndex = -1;
 
+		function resetDropdownFit() {
+			dropdown.style.left = "";
+			dropdown.style.right = "";
+			dropdown.style.top = "";
+			dropdown.style.bottom = "";
+			dropdown.style.maxWidth = "";
+		}
+
+		function applyDropdownFit() {
+			resetDropdownFit();
+			dropdown.style.maxWidth = `calc(100vw - ${viewportPadding * 2}px)`;
+
+			const rootRect = root.getBoundingClientRect();
+			const dropdownRect = dropdown.getBoundingClientRect();
+			const preferredHorizontal = root.classList.contains("fchub-mc-switcher--dropdown-start")
+				? "start"
+				: root.classList.contains("fchub-mc-switcher--dropdown-end")
+					? "end"
+					: "auto";
+			const preferredVertical = root.classList.contains("fchub-mc-switcher--direction-up")
+				? "up"
+				: root.classList.contains("fchub-mc-switcher--direction-down")
+					? "down"
+					: "auto";
+
+			const availableDown = window.innerHeight - rootRect.bottom - viewportPadding;
+			const availableUp = rootRect.top - viewportPadding;
+
+			let vertical = preferredVertical === "auto"
+				? (availableDown >= availableUp ? "down" : "up")
+				: preferredVertical;
+			if (preferredVertical === "down" && availableDown < dropdownRect.height && availableUp > availableDown) {
+				vertical = "up";
+			}
+			if (preferredVertical === "up" && availableUp < dropdownRect.height && availableDown > availableUp) {
+				vertical = "down";
+			}
+
+			if (vertical === "up") {
+				dropdown.style.top = "auto";
+				dropdown.style.bottom = "calc(100% + 4px)";
+			} else {
+				dropdown.style.top = "calc(100% + 4px)";
+				dropdown.style.bottom = "auto";
+			}
+
+			const width = dropdownRect.width;
+			const candidateStart = rootRect.left;
+			const candidateEnd = rootRect.right - width;
+
+			function overflowScore(left) {
+				const overflowLeft = Math.max(0, viewportPadding - left);
+				const overflowRight = Math.max(0, left + width - (window.innerWidth - viewportPadding));
+				return overflowLeft + overflowRight;
+			}
+
+			let left = preferredHorizontal === "start"
+				? candidateStart
+				: preferredHorizontal === "end"
+					? candidateEnd
+					: candidateStart;
+			const alternateLeft = preferredHorizontal === "start"
+				? candidateEnd
+				: preferredHorizontal === "end"
+					? candidateStart
+					: candidateEnd;
+			if (preferredHorizontal === "auto" || overflowScore(alternateLeft) < overflowScore(left)) {
+				left = alternateLeft;
+			}
+
+			const clampedLeft = Math.min(
+				Math.max(left, viewportPadding),
+				Math.max(viewportPadding, window.innerWidth - viewportPadding - width),
+			);
+
+			dropdown.style.left = `${clampedLeft - rootRect.left}px`;
+			dropdown.style.right = "auto";
+		}
+
 		function getActiveIndex() {
-			const items = options();
+			const items = options().filter((option) => option.style.display !== "none");
 			const idx = items.findIndex((o) => o.getAttribute("aria-selected") === "true");
 			return idx >= 0 ? idx : 0;
 		}
@@ -97,6 +178,7 @@
 			trigger.setAttribute("aria-expanded", "true");
 			activeIndex = getActiveIndex();
 			setActiveOption(activeIndex);
+			applyDropdownFit();
 		}
 
 		function close() {
@@ -104,6 +186,7 @@
 			root.classList.remove("fchub-mc-switcher--open");
 			trigger.setAttribute("aria-expanded", "false");
 			trigger.removeAttribute("aria-activedescendant");
+			resetDropdownFit();
 			trigger.focus();
 		}
 
@@ -116,7 +199,7 @@
 		}
 
 		function setActiveOption(index) {
-			const items = options();
+			const items = options().filter((option) => option.style.display !== "none");
 			if (items.length === 0) return;
 			activeIndex = ((index % items.length) + items.length) % items.length;
 			for (const item of items) {
@@ -130,7 +213,7 @@
 		}
 
 		function selectOption(index) {
-			const items = options();
+			const items = options().filter((option) => option.style.display !== "none");
 			const target = items[index];
 			if (!target) return;
 
@@ -146,7 +229,11 @@
 			// Update trigger display
 			const triggerFlag = trigger.querySelector(".fchub-mc-switcher__flag");
 			const triggerCode = trigger.querySelector(".fchub-mc-switcher__code");
+			const triggerSymbol = trigger.querySelector(".fchub-mc-switcher__symbol");
+			const triggerName = trigger.querySelector(".fchub-mc-switcher__name");
 			const optionCode = target.querySelector(".fchub-mc-switcher__option-code");
+			const optionSymbol = target.querySelector(".fchub-mc-switcher__option-symbol");
+			const optionName = target.querySelector(".fchub-mc-switcher__option-name");
 			if (triggerFlag) {
 				const flagImg = buildFlagImg(value);
 				if (flagImg) {
@@ -161,6 +248,12 @@
 			}
 			if (triggerCode && optionCode) {
 				triggerCode.textContent = optionCode.textContent;
+			}
+			if (triggerSymbol && optionSymbol) {
+				triggerSymbol.textContent = optionSymbol.textContent;
+			}
+			if (triggerName && optionName) {
+				triggerName.textContent = optionName.textContent;
 			}
 
 			close();
@@ -231,8 +324,11 @@
 		// Option click
 		listbox.addEventListener("click", (e) => {
 			const option = e.target.closest("[role='option']");
+			if (option && option.style.display === "none") {
+				return;
+			}
 			if (!option) return;
-			const items = options();
+			const items = options().filter((item) => item.style.display !== "none");
 			const idx = items.indexOf(option);
 			if (idx >= 0) {
 				selectOption(idx);
@@ -254,6 +350,32 @@
 				}
 			});
 		});
+
+		if (searchInput) {
+			searchInput.addEventListener("input", () => {
+				const query = searchInput.value.trim().toLowerCase();
+				for (const option of options()) {
+					const text = option.textContent ? option.textContent.toLowerCase() : "";
+					option.style.display = query === "" || text.includes(query) ? "" : "none";
+				}
+				activeIndex = getActiveIndex();
+				if (!dropdown.hidden) {
+					applyDropdownFit();
+				}
+			});
+		}
+
+		window.addEventListener("resize", () => {
+			if (!dropdown.hidden) {
+				applyDropdownFit();
+			}
+		});
+
+		window.addEventListener("scroll", () => {
+			if (!dropdown.hidden) {
+				applyDropdownFit();
+			}
+		}, true);
 	}
 
 	function initAll() {
@@ -261,6 +383,26 @@
 		for (const widget of widgets) {
 			initSwitcher(widget);
 		}
+
+		document.querySelectorAll("[data-fchub-mc-button-switcher]").forEach((root) => {
+			if (root.hasAttribute("data-fchub-mc-enhanced")) {
+				return;
+			}
+			root.setAttribute("data-fchub-mc-enhanced", "");
+			root.addEventListener("click", (event) => {
+				const button = event.target.closest("[data-value]");
+				if (!button) {
+					return;
+				}
+
+				event.preventDefault();
+				root.querySelectorAll(".is-active").forEach((activeButton) => {
+					activeButton.classList.remove("is-active");
+				});
+				button.classList.add("is-active");
+				switchCurrency(button.dataset.value || "");
+			});
+		});
 	}
 
 	if (document.readyState === "loading") {

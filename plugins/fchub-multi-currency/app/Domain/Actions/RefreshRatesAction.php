@@ -11,6 +11,7 @@ use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
 use FChubMultiCurrency\Storage\ExchangeRateRepository;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\RatesCacheStore;
+use FChubMultiCurrency\Support\EventLogger;
 use FChubMultiCurrency\Support\Logger;
 
 defined('ABSPATH') || exit;
@@ -26,6 +27,7 @@ final class RefreshRatesAction
     public function execute(): bool
     {
         if (!$this->acquireLock()) {
+            EventLogger::log('rates_refresh_skipped_lock', get_current_user_id());
             return false;
         }
 
@@ -44,12 +46,20 @@ final class RefreshRatesAction
                     'provider' => $provider->name(),
                     'error'    => $e->getMessage(),
                 ]);
+                EventLogger::log('rates_refresh_failed', get_current_user_id(), [
+                    'provider' => $provider->name(),
+                    'reason' => 'exception',
+                ]);
                 return false;
             }
 
             if (empty($rates)) {
                 Logger::error('Rate refresh returned empty rates', [
                     'provider' => $provider->name(),
+                ]);
+                EventLogger::log('rates_refresh_failed', get_current_user_id(), [
+                    'provider' => $provider->name(),
+                    'reason' => 'empty',
                 ]);
                 return false;
             }
@@ -114,6 +124,11 @@ final class RefreshRatesAction
             }
 
             do_action('fchub_mc/rates_refreshed', $baseCurrency, count($rates));
+            EventLogger::log('rates_refreshed', get_current_user_id(), [
+                'base_currency' => $baseCurrency,
+                'provider' => $provider->name(),
+                'count' => count($rates),
+            ]);
             Logger::info('Rates refreshed successfully', [
                 'provider' => $provider->name(),
                 'count'    => count($rates),

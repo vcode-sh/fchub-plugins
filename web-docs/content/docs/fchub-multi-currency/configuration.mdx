@@ -1,6 +1,6 @@
 ---
 title: Configuration
-description: Set up currencies, exchange rates, checkout notices, and CRM sync. Six tabs, five minutes, zero spreadsheets.
+description: Set up currencies, exchange rates, switcher defaults, checkout notices, and CRM sync. More control, same plugin.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
@@ -10,7 +10,7 @@ import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-Everything lives in one place: **FluentCart → Settings → Multi-Currency**. Six tabs, each doing exactly one thing. You can also get there directly via:
+Everything lives in one place: **FluentCart → Settings → Multi-Currency**. The settings now include a dedicated **Switcher** tab for global switcher defaults. Seven tabs, each with a specific job. You can also get there directly via:
 
 ```text
 /wp-admin/admin.php?page=fluent-cart#/settings/multi-currency
@@ -62,6 +62,15 @@ Should the plugin remember which currency a visitor picked? When enabled, their 
 
 When disabled, every page load starts fresh from the default display currency. Most stores want this **on**.
 
+### Account Persistence
+
+Separate from browser cookies, this controls whether logged-in users keep their preference in their account metadata.
+
+- **Enabled** — logged-in users keep their selected currency across sessions
+- **Disabled** — logged-in users behave like a fresh session unless another resolver wins
+
+This is useful when you want to test or demo the site as an authenticated user without your old preference overriding the configured default display currency.
+
 ### Remove Data on Uninstall
 
 Leave this on **Keep data** unless you're absolutely sure you're done with the plugin. When set to **Delete all**, removing the plugin wipes everything — rate history, settings, saved currency preferences. There's no undo.
@@ -82,7 +91,15 @@ Use the search field at the top to find currencies from FluentCart's catalogue (
 - **Decimals** — how many decimal places to show (usually 2)
 - **Position** — where the symbol goes: before the number ($100), after (100€), or with a space
 
-You can customise the symbol, decimals, and position for each currency individually. Hit the red **x** to remove one.
+You can customise:
+
+- symbol
+- decimals
+- position
+- decimal separator
+- thousand separator
+
+for each currency individually. Hit the red **x** to remove one.
 
 Drag currencies up or down to control the order they appear in the [currency switcher](/docs/fchub-multi-currency/currency-switcher). The order you set here is the order your visitors see.
 
@@ -97,6 +114,74 @@ Drag currencies up or down to control the order they appear in the [currency swi
 
 <Callout type="info" title="Don't Forget Your Base Currency">
 If your base currency is USD and you want visitors to be able to switch *back* to USD from the switcher, add USD to this list too. The switcher only shows currencies that appear here.
+</Callout>
+
+<Separator className="my-8" />
+
+## Switcher
+
+This tab defines the global defaults used by switcher blocks that inherit from admin settings.
+
+### Preset
+
+Pick the default visual treatment:
+
+- Default
+- Pill
+- Minimal
+- Subtle
+- Glass
+- Contrast
+
+### Trigger Defaults
+
+Choose what the closed switcher button shows:
+
+- flag
+- code
+- symbol
+- name
+
+### Dropdown Defaults
+
+Choose what each option row shows:
+
+- flags
+- codes
+- symbols
+- names
+- active checkmark
+
+### Favorites and Search
+
+You can define:
+
+- inline search as the default search mode
+- favorite currencies via comma-separated ISO codes
+- whether favorites should appear first
+
+### Layout Defaults
+
+Set the baseline behavior for inheriting blocks:
+
+- label position
+- size
+- width mode
+- dropdown position
+- dropdown direction
+
+### Footer Context
+
+You can enable any combination of:
+
+- freshness badge
+- exchange rate line
+- checkout/base-currency note
+
+This is useful when you want trust-building context without manually configuring every block instance.
+
+<Callout type="info" title="Fast QA Setup">
+If you want a ready-made page that includes the block family, use the **Currency Showcase** block pattern. It inserts the switcher, current currency, exchange rate, context notice, and selector buttons in one shot.
 </Callout>
 
 <Separator className="my-8" />

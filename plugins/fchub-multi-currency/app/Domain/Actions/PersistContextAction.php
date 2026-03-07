@@ -20,6 +20,7 @@ final class PersistContextAction
     public function execute(string $currencyCode): void
     {
         $cookieEnabled = $this->optionStore->get('cookie_enabled', 'yes') === 'yes';
+        $accountPersistenceEnabled = $this->optionStore->get('account_persistence_enabled', 'yes') === 'yes';
 
         if ($cookieEnabled) {
             $lifetimeDays = (int) $this->optionStore->get('cookie_lifetime_days', 90);
@@ -28,7 +29,7 @@ final class PersistContextAction
 
         $userId = get_current_user_id();
 
-        if ($userId > 0) {
+        if ($userId > 0 && $accountPersistenceEnabled) {
             $this->repository->saveUserMeta($userId, $currencyCode);
         }
     }

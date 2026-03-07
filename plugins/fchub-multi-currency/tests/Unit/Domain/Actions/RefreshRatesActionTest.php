@@ -52,6 +52,7 @@ final class RefreshRatesActionTest extends TestCase
         $action->execute();
 
         $this->assertHookFired('fchub_mc/rates_refreshed');
+        $this->assertStringContainsString('wp_fchub_mc_event_log', implode(' ', $GLOBALS['wpdb']->queries));
 
         // Lock should be released after execution
         $this->assertFalse(

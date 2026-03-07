@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fchub-multi-currency/selector-buttons",
+  "version": "1.2.1",
+  "title": "Currency Selector Buttons",
+  "category": "widgets",
+  "icon": "button",
+  "description": "A button-group alternative to the dropdown switcher for stores with a few main currencies.",
+  "keywords": ["currency", "selector", "buttons", "toggle"],
+  "textdomain": "fchub-multi-currency",
+  "attributes": {
+    "favoriteCurrencies": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "showFavoritesFirst": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "supports": {
+    "html": false,
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "style": "fchub-mc-switcher"
+}

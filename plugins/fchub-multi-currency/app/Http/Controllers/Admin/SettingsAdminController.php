@@ -8,6 +8,7 @@ use FChubMultiCurrency\Domain\Enums\CurrencyPosition;
 use FChubMultiCurrency\Domain\Enums\RateProvider;
 use FChubMultiCurrency\Domain\Enums\RoundingMode;
 use FChubMultiCurrency\Storage\OptionStore;
+use FChubMultiCurrency\Support\Constants;
 use FluentCart\App\Helpers\CurrenciesHelper;
 
 defined('ABSPATH') || exit;
@@ -40,7 +41,7 @@ final class SettingsAdminController
 
         $previousInterval = (int) $optionStore->get('rate_refresh_interval_hrs', 6);
 
-        $allowedKeys = array_keys(\FChubMultiCurrency\Support\Constants::DEFAULT_SETTINGS);
+        $allowedKeys = array_keys(Constants::DEFAULT_SETTINGS);
         $sanitized = [];
 
         foreach ($allowedKeys as $key) {
@@ -52,9 +53,11 @@ final class SettingsAdminController
 
             $sanitized[$key] = match ($key) {
                 'display_currencies' => is_array($value) ? self::sanitizeDisplayCurrencies($value) : [],
+                'switcher_defaults' => is_array($value) ? self::sanitizeSwitcherDefaults($value) : Constants::SWITCHER_DEFAULTS,
                 'enabled',
                 'url_param_enabled',
                 'cookie_enabled',
+                'account_persistence_enabled',
                 'geo_enabled',
                 'checkout_disclosure_enabled',
                 'show_rate_freshness_badge',
@@ -97,7 +100,15 @@ final class SettingsAdminController
      * Validate and sanitize display_currencies entries.
      *
      * @param array<int, mixed> $currencies
-     * @return array<int, array{code: string, name: string, symbol: string, decimals: int, position: string}>
+     * @return array<int, array{
+     *     code: string,
+     *     name: string,
+     *     symbol: string,
+     *     decimals: int,
+     *     position: string,
+     *     decimal_separator: string,
+     *     thousand_separator: string
+     * }>
      */
     private static function sanitizeDisplayCurrencies(array $currencies): array
     {
@@ -133,13 +144,75 @@ final class SettingsAdminController
             $clean[] = [
                 'code'     => $code,
                 'name'     => sanitize_text_field((string) ($entry['name'] ?? $validCodes[$code])),
-                'symbol'   => sanitize_text_field((string) ($entry['symbol'] ?? $code)),
+                'symbol'   => sanitize_text_field(
+                    html_entity_decode((string) ($entry['symbol'] ?? $code), ENT_QUOTES, 'UTF-8'),
+                ),
                 'decimals' => $decimals,
                 'position' => $position,
+                'decimal_separator' => self::sanitizeDecimalSeparator($entry['decimal_separator'] ?? ''),
+                'thousand_separator' => self::sanitizeThousandSeparator($entry['thousand_separator'] ?? ''),
             ];
         }
 
         return $clean;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private static function sanitizeSwitcherDefaults(array $values): array
+    {
+        $validCodes = CurrenciesHelper::getCurrencies();
+        $favoriteCurrencies = [];
+        foreach (($values['favorite_currencies'] ?? []) as $currencyCode) {
+            if (!is_string($currencyCode)) {
+                continue;
+            }
+
+            $code = strtoupper(sanitize_text_field($currencyCode));
+            if (preg_match('/^[A-Z]{3}$/', $code) !== 1 || !isset($validCodes[$code])) {
+                continue;
+            }
+
+            $favoriteCurrencies[] = $code;
+        }
+
+        return [
+            'preset'                => self::sanitizeEnum(
+                (string) ($values['preset'] ?? 'default'),
+                ['default', 'pill', 'minimal', 'subtle', 'glass', 'contrast'],
+                'default',
+            ),
+            'label_position'        => self::sanitizeEnum(
+                (string) ($values['label_position'] ?? 'before'),
+                ['before', 'after', 'above', 'below'],
+                'before',
+            ),
+            'show_flag'             => self::sanitizeYesNo($values['show_flag'] ?? 'yes'),
+            'show_code'             => self::sanitizeYesNo($values['show_code'] ?? 'yes'),
+            'show_symbol'           => self::sanitizeYesNo($values['show_symbol'] ?? 'no'),
+            'show_name'             => self::sanitizeYesNo($values['show_name'] ?? 'no'),
+            'show_option_flags'     => self::sanitizeYesNo($values['show_option_flags'] ?? 'yes'),
+            'show_option_codes'     => self::sanitizeYesNo($values['show_option_codes'] ?? 'yes'),
+            'show_option_symbols'   => self::sanitizeYesNo($values['show_option_symbols'] ?? 'no'),
+            'show_option_names'     => self::sanitizeYesNo($values['show_option_names'] ?? 'yes'),
+            'show_active_indicator' => self::sanitizeYesNo($values['show_active_indicator'] ?? 'yes'),
+            'show_rate_badge'       => self::sanitizeYesNo($values['show_rate_badge'] ?? 'yes'),
+            'show_rate_value'       => self::sanitizeYesNo($values['show_rate_value'] ?? 'no'),
+            'show_context_note'     => self::sanitizeYesNo($values['show_context_note'] ?? 'no'),
+            'search_mode'           => self::sanitizeEnum(
+                (string) ($values['search_mode'] ?? 'off'),
+                ['off', 'inline'],
+                'off',
+            ),
+            'favorite_currencies'   => array_values(array_unique($favoriteCurrencies)),
+            'show_favorites_first'  => self::sanitizeYesNo($values['show_favorites_first'] ?? 'yes'),
+            'size'                  => self::sanitizeEnum((string) ($values['size'] ?? 'md'), ['sm', 'md', 'lg'], 'md'),
+            'width_mode'            => self::sanitizeEnum((string) ($values['width_mode'] ?? 'auto'), ['auto', 'full'], 'auto'),
+            'dropdown_position'     => self::sanitizeEnum((string) ($values['dropdown_position'] ?? 'auto'), ['auto', 'start', 'end'], 'auto'),
+            'dropdown_direction'    => self::sanitizeEnum((string) ($values['dropdown_direction'] ?? 'auto'), ['auto', 'down', 'up'], 'auto'),
+        ];
     }
 
     private static function sanitizeYesNo(mixed $value): string
@@ -165,5 +238,17 @@ final class SettingsAdminController
         }
 
         return $clean;
+    }
+
+    private static function sanitizeDecimalSeparator(mixed $value): string
+    {
+        $value = (string) $value;
+        return in_array($value, ['', '.', ','], true) ? $value : '';
+    }
+
+    private static function sanitizeThousandSeparator(mixed $value): string
+    {
+        $value = (string) $value;
+        return in_array($value, ['', '.', ',', ' ', 'none'], true) ? $value : '';
     }
 }

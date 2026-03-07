@@ -47,6 +47,14 @@ final class CurrencyCatalogueController
         'KES' => 'ke', 'GHS' => 'gh',
     ];
 
+    /**
+     * @return array<string, string>
+     */
+    public static function getSvgFlagMap(): array
+    {
+        return self::SVG_FLAG_MAP;
+    }
+
     public function index(\WP_REST_Request $request): \WP_REST_Response
     {
         return new \WP_REST_Response([
@@ -73,7 +81,7 @@ final class CurrencyCatalogueController
             $catalogue[] = [
                 'code'     => $code,
                 'name'     => $name,
-                'symbol'   => $signs[$code] ?? $code,
+                'symbol'   => html_entity_decode((string) ($signs[$code] ?? $code), ENT_QUOTES, 'UTF-8'),
                 'decimals' => isset($zeroDecimals[$code]) ? 0 : 2,
                 'flag'     => self::codeToFlag($code),
             ];

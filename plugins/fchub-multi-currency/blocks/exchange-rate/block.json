@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fchub-multi-currency/exchange-rate",
+  "version": "1.2.1",
+  "title": "Exchange Rate",
+  "category": "widgets",
+  "icon": "chart-line",
+  "description": "Display the current exchange rate between the store base currency and the visitor display currency.",
+  "keywords": ["exchange", "rate", "fx", "currency"],
+  "textdomain": "fchub-multi-currency",
+  "attributes": {
+    "format": {
+      "type": "string",
+      "default": "compact"
+    },
+    "precision": {
+      "type": "number",
+      "default": 4
+    },
+    "hideWhenBaseDisplay": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "spacing": {
+      "margin": true,
+      "padding": true
+    },
+    "typography": {
+      "fontSize": true
+    }
+  },
+  "style": "fchub-mc-switcher"
+}

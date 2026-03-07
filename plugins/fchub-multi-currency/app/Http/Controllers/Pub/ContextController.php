@@ -9,6 +9,7 @@ use FChubMultiCurrency\Domain\Actions\PersistContextAction;
 use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
+use FChubMultiCurrency\Support\EventLogger;
 use FChubMultiCurrency\Support\Hooks;
 
 defined('ABSPATH') || exit;
@@ -45,7 +46,9 @@ final class ContextController
         }
 
         // Rate limit: 30 requests per minute per IP
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $ip = isset($_SERVER['REMOTE_ADDR'])
+            ? sanitize_text_field(wp_unslash((string) $_SERVER['REMOTE_ADDR']))
+            : 'unknown';
         $rateLimitKey = 'fchub_mc_rl_' . substr(md5($ip), 0, 12);
         $hits = (int) get_transient($rateLimitKey);
 
@@ -104,6 +107,10 @@ final class ContextController
 
         $userId = get_current_user_id();
         do_action('fchub_mc/context_switched', $currencyCode, $userId);
+        EventLogger::log('context_switched', $userId, [
+            'currency' => $currencyCode,
+            'source' => 'rest',
+        ]);
 
         return new \WP_REST_Response([
             'data' => [

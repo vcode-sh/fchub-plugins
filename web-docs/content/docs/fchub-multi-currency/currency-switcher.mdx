@@ -1,30 +1,115 @@
 ---
 title: Currency Switcher
-description: A polished dropdown with flag emojis, keyboard navigation, and a rate freshness badge. Drop it anywhere with one shortcode.
+description: A polished dropdown with flag icons, keyboard navigation, style presets, and both block and shortcode support.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Separator } from '@/components/ui/separator';
 
-The currency switcher is how your visitors pick their currency. Not a sad native browser dropdown — a proper custom widget with country flags, smooth animations, and a little green dot that says "yes, these rates are fresh." One shortcode, works anywhere.
+The currency switcher is how your visitors pick their currency. Not a sad native browser dropdown — a proper custom widget with flag icons, keyboard navigation, multiple size modes, style presets, and a little freshness badge that says "yes, these rates are current." It now ships as both a Gutenberg block and a shortcode, so it works in classic themes, block themes, and Full Site Editing layouts.
 
 Currencies appear in the order you've set in [Settings → Currencies](/docs/fchub-multi-currency/configuration#currencies). Drag them to rearrange.
 
 ## Add It to Your Site
 
+### Gutenberg Block
+
+Open the block inserter and search for **Currency Switcher**. Add it to:
+
+- pages and posts
+- headers and footers in the Site Editor
+- template parts
+- synced patterns
+- sidebars or utility rows built with blocks
+
+If you just want a fast sandbox for testing, insert the **Currency Showcase** pattern first and work from there.
+
+The block supports:
+
+- optional label text
+- label placement before, after, above, or below the switcher
+- trigger visibility toggles for flag, code, symbol, and currency name
+- dropdown visibility toggles for flags, codes, symbols, names, and active checkmark
+- optional rate line and checkout context note inside the dropdown footer
+- small, medium, and large trigger sizes
+- auto or full-width layout
+- start or end dropdown alignment
+- dropdown opening up or down
+- style presets: Default, Pill, Minimal, Subtle, Glass, and Contrast
+
+Editor preview now uses your configured currency list and the configured default display currency, instead of always pretending the first currency in the list is active.
+
+### Shortcode
+
 ```text
 [fchub_currency_switcher]
 ```
 
-Paste this shortcode into any page, post, widget area, or template file. That's the entire setup. No attributes, no parameters, no configuration needed — the widget pulls everything from your [plugin settings](/docs/fchub-multi-currency/configuration).
+The shortcode is still fully supported for classic themes, widget areas, PHP templates, or legacy content. Existing installs do not need to migrate anything.
 
-If the plugin is disabled or you haven't added any currencies yet, the shortcode outputs nothing. No broken markup, no empty boxes.
+Optional shortcode attributes:
+
+```text
+[fchub_currency_switcher label="Select currency" align="right" show_symbol="yes" show_option_symbols="yes" dropdown_direction="up" size="lg"]
+```
+
+Supported attributes:
+
+**Layout**
+
+| Attribute | Values | Default |
+|-----------|--------|---------|
+| `label` | any text | *(none)* |
+| `label_position` | `before`, `after`, `above`, `below` | `before` |
+| `align` | `left`, `center`, `right` | `left` |
+| `size` | `sm`, `md`, `lg` | `md` |
+| `width_mode` | `auto`, `full` | `auto` |
+| `dropdown_position` | `start`, `end` | `start` |
+| `dropdown_direction` | `down`, `up` | `down` |
+
+**Trigger elements**
+
+| Attribute | Values | Default |
+|-----------|--------|---------|
+| `show_flag` | `yes` / `no` | `yes` |
+| `show_code` | `yes` / `no` | `yes` |
+| `show_symbol` | `yes` / `no` | `no` |
+| `show_name` | `yes` / `no` | `no` |
+
+**Dropdown options**
+
+| Attribute | Values | Default |
+|-----------|--------|---------|
+| `show_option_flags` | `yes` / `no` | `yes` |
+| `show_option_codes` | `yes` / `no` | `yes` |
+| `show_option_symbols` | `yes` / `no` | `no` |
+| `show_option_names` | `yes` / `no` | `yes` |
+| `show_active_indicator` | `yes` / `no` | `yes` |
+
+**Footer context**
+
+| Attribute | Values | Default |
+|-----------|--------|---------|
+| `show_rate_badge` | `yes` / `no` | `yes` |
+| `show_rate_value` | `yes` / `no` | `no` |
+| `show_context_note` | `yes` / `no` | `no` |
+
+If the plugin is disabled or you haven't added any currencies yet, both the block and the shortcode output nothing. No broken markup, no empty boxes.
 
 You can also place it multiple times on the same page — header and footer, for example. Each instance works independently.
 
 <Separator className="my-8" />
 
 ## How It Looks
+
+<video
+  autoPlay
+  loop
+  muted
+  playsInline
+  className="rounded-xl border my-6"
+  src="https://files.vcode.sh/fchub/docs/multi-currency/switcher/switcher-in-settings.mp4"
+/>
 
 When closed, the switcher sits as a compact button showing the visitor's current currency with its flag:
 
@@ -62,6 +147,42 @@ The active currency is highlighted in blue. At the bottom, a rate freshness badg
 
 <Separator className="my-8" />
 
+## Block Style Presets
+
+The block includes six built-in visual presets:
+
+- **Default** — neutral, close to the classic switcher look
+- **Pill** — fully rounded trigger, good for headers and utility bars
+- **Minimal** — lower visual weight, lighter borders, cleaner dropdown
+- **Subtle** — softer background and gentler contrast
+- **Glass** — translucent trigger and dropdown with blur, good for layered headers
+- **Contrast** — dark high-contrast preset for bold headers, utility bars, or darker brand accents
+
+Use presets for overall appearance, then use the block settings for content and layout. That keeps the editor flexible without turning the inspector into a control panel from a fighter jet.
+
+<Separator className="my-8" />
+
+## Advanced Display Controls
+
+The switcher now lets you tune the trigger and the dropdown independently.
+
+Examples:
+
+- compact header mode: flag + code, no label, no badge
+- more descriptive footer mode: stacked label, code + symbol + name
+- minimalist utility bar: name only in trigger, symbols only in dropdown
+- dense mobile row: small size, full width, dropdown opening upward
+
+That separation matters. The trigger is about what the visitor sees before opening it. The dropdown is about how much context they need to make the right choice.
+
+<Separator className="my-8" />
+
+## Smart Dropdown Fit
+
+On the frontend, the dropdown now tries to stay inside the viewport instead of blindly trusting the preferred side when there isn't enough room. It still respects your configured alignment and direction as the first choice, but will clamp or flip when the available space says "absolutely not."
+
+<Separator className="my-8" />
+
 ## Rate Freshness Badge
 
 The little footer inside the dropdown that reads "Rates updated 2 hours ago" with a coloured dot.
@@ -89,10 +210,12 @@ The switcher is fully keyboard-accessible — you can navigate the whole thing w
 
 ## No JavaScript? No Problem
 
-If a visitor has JavaScript disabled (rare, but it happens), they get a plain native dropdown as a fallback. Same currencies, same functionality, just less pretty.
+If a visitor has JavaScript disabled (rare, but it happens), they get a plain fallback form with a native `<select>` and submit button. Same currencies, same result, just less pretty. The preference is still saved when possible, so the site does not fall apart the moment JavaScript takes the day off.
 
 <Separator className="my-8" />
 
 ## Matching Your Theme
 
 The switcher ships with clean, neutral styling that works with most themes out of the box. If you need to tweak colours, border radius, or shadow to match your brand — see the [CSS custom properties reference](/docs/fchub-multi-currency/developer-reference#javascript-configuration-object) in the Developer Reference.
+
+In block themes, the block can also live comfortably inside template parts and layout containers without resorting to a shortcode block, which is the entire point of living in the present.

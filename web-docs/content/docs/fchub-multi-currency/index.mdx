@@ -36,7 +36,10 @@ The actual charge still happens in your base currency. At checkout, a clear noti
 
 <Cards>
   <Card title="Currency Switcher" href="/docs/fchub-multi-currency/currency-switcher">
-    A proper dropdown with flag emojis — not a sad native `<select>`. Fully keyboard-accessible, works anywhere via shortcode, shows when rates were last updated.
+    A proper dropdown with flag icons — not a sad native `<select>`. Fully keyboard-accessible, available as both a Gutenberg block and shortcode, with style presets and a rate freshness badge.
+  </Card>
+  <Card title="Currency Blocks" href="/docs/fchub-multi-currency/blocks">
+    A small block family for current currency, exchange rate, context notices, and selector buttons — not just one dropdown trying to do everything.
   </Card>
   <Card title="Automatic Exchange Rates" href="/docs/fchub-multi-currency/exchange-rates">
     Pick a provider, enter an API key (or use the free ECB option), and rates refresh on autopilot. Stale rate detection warns you before your customers notice.
@@ -75,7 +78,7 @@ The short version — five steps, no jargon:
   <Step>
     **Visitor switches currency (optional)**
 
-    The currency switcher dropdown lets visitors pick a different currency. One click, page refreshes, new prices everywhere. Their choice is saved for next time.
+    The currency switcher block or shortcode lets visitors pick a different currency. One click, page refreshes, new prices everywhere. Their choice is saved for next time.
   </Step>
   <Step>
     **Checkout is transparent**
@@ -137,7 +140,7 @@ This is a FluentCart extension. Without FluentCart, the plugin politely does not
     Add currencies, pick a rate provider, customise the checkout notice.
   </Card>
   <Card title="Currency Switcher" href="/docs/fchub-multi-currency/currency-switcher">
-    The shortcode, the widget, the flags, the keyboard shortcuts.
+    The block, the shortcode, the style presets, the flags, the keyboard shortcuts.
   </Card>
   <Card title="Developer Reference" href="/docs/fchub-multi-currency/developer-reference">
     REST API, hooks, feature flags, database schema. For the curious.

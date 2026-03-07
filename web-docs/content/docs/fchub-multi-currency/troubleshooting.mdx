@@ -87,9 +87,9 @@ import { Separator } from '@/components/ui/separator';
 
 <Accordions>
   <Accordion title="Switcher not appearing">
-    1. **Shortcode placed?** — make sure `[fchub_currency_switcher]` is in a page, post, or widget area that's rendered on the current page
-    2. **Plugin disabled?** — the shortcode returns empty when the plugin is off
-    3. **No display currencies?** — the shortcode returns empty when no currencies are configured
+    1. **Block or shortcode placed?** — make sure the Currency Switcher block or `[fchub_currency_switcher]` shortcode is in content that actually renders on the current page
+    2. **Plugin disabled?** — the block and shortcode both return empty when the plugin is off
+    3. **No display currencies?** — the block and shortcode both return empty when no currencies are configured
     4. **Theme conflict** — check if another element is overlapping the switcher (z-index issue). The dropdown uses `z-index: 9999`
   </Accordion>
   <Accordion title="Switcher dropdown doesn't open">
@@ -106,6 +106,13 @@ import { Separator } from '@/components/ui/separator';
     2. **REST API error** — the `POST /context` call may be failing. Check the Network tab
     3. **Cache serving stale HTML** — full page cache may serve the old page. Clear cache or exclude the cookie
     4. **Nonce expired** — if the page was open for a long time, the WP REST nonce may have expired. Reload the page and try again
+  </Accordion>
+  <Accordion title="No-JS fallback works, but does not remember the selection">
+    The fallback form submits without JavaScript, but it still needs some persistence path.
+
+    1. **Cookies disabled for guests** — if guest cookies are disabled in plugin settings, a guest visitor has nowhere to store the preference after the request completes
+    2. **Form blocked by aggressive HTML filtering** — some builders or security plugins strip `<noscript>` or form markup
+    3. **Nonce caching issue** — if your cache serves stale HTML for too long, the fallback nonce can go stale too. Purge cache and reload
   </Accordion>
   <Accordion title="Rate badge shows wrong time">
     The badge uses WordPress's `human_time_diff()` with the site's configured timezone. If the time seems off:

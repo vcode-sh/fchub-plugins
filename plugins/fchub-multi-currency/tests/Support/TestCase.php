@@ -27,6 +27,14 @@ abstract class TestCase extends BaseTestCase
         $GLOBALS['wp_mock_user_meta'] = [];
         $GLOBALS['wp_mock_post_meta'] = [];
         $GLOBALS['wp_cache_store'] = [];
+        $GLOBALS['wp_registered_scripts'] = [];
+        $GLOBALS['wp_registered_styles'] = [];
+        $GLOBALS['wp_enqueued_scripts'] = [];
+        $GLOBALS['wp_enqueued_styles'] = [];
+        $GLOBALS['wp_localized_scripts'] = [];
+        $GLOBALS['wp_registered_blocks'] = [];
+        $GLOBALS['wp_registered_block_patterns'] = [];
+        $GLOBALS['wp_registered_block_pattern_categories'] = [];
 
         // Reset multisite mock state
         $GLOBALS['wp_mock_is_multisite'] = false;
@@ -54,6 +62,11 @@ abstract class TestCase extends BaseTestCase
 
         // Reset CurrencyContextService singleton
         \FChubMultiCurrency\Domain\Services\CurrencyContextService::reset();
+
+        $_GET = [];
+        $_POST = [];
+        $_COOKIE = [];
+        $_SERVER['REQUEST_METHOD'] = 'GET';
     }
 
     protected function tearDown(): void
@@ -125,5 +138,15 @@ abstract class TestCase extends BaseTestCase
     {
         $queries = $GLOBALS['wpdb']->queries;
         return end($queries) ?: '';
+    }
+
+    protected function assertScriptEnqueued(string $handle): void
+    {
+        $this->assertContains($handle, $GLOBALS['wp_enqueued_scripts'], "Expected script '{$handle}' to be enqueued.");
+    }
+
+    protected function assertStyleEnqueued(string $handle): void
+    {
+        $this->assertContains($handle, $GLOBALS['wp_enqueued_styles'], "Expected style '{$handle}' to be enqueued.");
     }
 }

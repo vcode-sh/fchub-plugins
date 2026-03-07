@@ -1,0 +1,156 @@
+/**
+ * FCHub Multi-Currency — Admin Switcher Preview
+ *
+ * Scoping styles so the frontend switcher CSS renders correctly
+ * inside FluentCart's admin shell without clashes.
+ */
+
+.fchub-mc-admin-preview {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	margin: -20px -20px 20px;
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.fchub-mc-admin-preview__header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 12px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--el-text-color-secondary, #909399);
+}
+
+.fchub-mc-admin-preview__note {
+	margin-bottom: 10px;
+	font-size: 12px;
+	color: var(--el-text-color-secondary, #909399);
+	font-style: italic;
+}
+
+.fchub-mc-admin-preview__stage {
+	position: relative;
+	display: flex;
+	align-items: flex-start;
+	width: 100%;
+	padding: 20px 16px;
+	border: 1px dashed #cbd5e1;
+	border-radius: 12px;
+	background:
+		radial-gradient(circle at top left, rgba(148, 163, 184, 0.08), transparent 35%),
+		linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	overflow: visible;
+	/* Reset admin font leakage */
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	font-size: 14px;
+	line-height: 1.5;
+	box-sizing: border-box;
+}
+
+.fchub-mc-admin-preview__stage *,
+.fchub-mc-admin-preview__stage *::before,
+.fchub-mc-admin-preview__stage *::after {
+	box-sizing: border-box;
+}
+
+/*
+ * Stack trigger + dropdown vertically in normal flow so the stage
+ * naturally contains the full widget. No absolute positioning escape.
+ */
+.fchub-mc-admin-preview .fchub-mc-switcher {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: stretch;
+	max-width: min(480px, 100%);
+}
+
+.fchub-mc-admin-preview .fchub-mc-switcher__trigger {
+	cursor: default;
+	align-self: flex-start;
+}
+
+/* Dropdown flows in-place instead of absolute */
+.fchub-mc-admin-preview .fchub-mc-switcher__dropdown {
+	display: block !important;
+	position: static !important;
+	opacity: 1 !important;
+	transform: none !important;
+	pointer-events: none;
+	margin-top: 4px;
+	min-width: 220px;
+	max-width: min(480px, 100%);
+	width: max-content;
+	/* Cap border-radius so pill preset doesn't produce an oval dropdown */
+	border-radius: min(var(--fchub-mc-radius, 6px), 12px);
+}
+
+.fchub-mc-admin-preview .fchub-mc-switcher__option {
+	cursor: default;
+}
+
+/* Stage alignment */
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--left {
+	justify-content: flex-start;
+}
+
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--center {
+	justify-content: center;
+}
+
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--right {
+	justify-content: flex-end;
+}
+
+/* Stage label positioning */
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-after {
+	flex-direction: row-reverse;
+}
+
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-above,
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-below {
+	flex-direction: column;
+	align-items: flex-start;
+}
+
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-below {
+	flex-direction: column-reverse;
+}
+
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-above.fchub-mc-switcher-stage--center,
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-below.fchub-mc-switcher-stage--center {
+	align-items: center;
+}
+
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-above.fchub-mc-switcher-stage--right,
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-below.fchub-mc-switcher-stage--right,
+.fchub-mc-admin-preview__stage.fchub-mc-switcher-stage--label-after.fchub-mc-switcher-stage--right {
+	align-items: flex-end;
+}
+
+/* Glass preset: colourful stage background so backdrop-filter has something to blur */
+.fchub-mc-admin-preview:has(.fchub-mc-switcher--preset-glass) .fchub-mc-admin-preview__stage {
+	background:
+		linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.12) 35%, rgba(236, 72, 153, 0.10) 65%, rgba(59, 130, 246, 0.12) 100%),
+		linear-gradient(180deg, #ffffff 0%, #f0f4ff 100%);
+	border-color: rgba(99, 102, 241, 0.2);
+}
+
+/* Pill preset: keep trigger pill-shaped, but cap dropdown + option radii */
+.fchub-mc-admin-preview .fchub-mc-switcher--preset-pill .fchub-mc-switcher__option,
+.fchub-mc-admin-preview .fchub-mc-switcher--preset-pill .fchub-mc-switcher__footer {
+	border-radius: 4px;
+}
+
+.fchub-mc-admin-preview .fchub-mc-switcher--width-full {
+	width: min(100%, 360px);
+}
+
+.fchub-mc-admin-preview .fchub-mc-switcher--width-full .fchub-mc-switcher__trigger {
+	align-self: stretch;
+}

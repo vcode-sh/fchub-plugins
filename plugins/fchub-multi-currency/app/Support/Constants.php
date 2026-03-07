@@ -28,6 +28,30 @@ final class Constants
 
     public const CRON_REFRESH_RATES = 'fchub_mc_refresh_rates';
 
+    public const SWITCHER_DEFAULTS = [
+        'preset'                => 'default',
+        'label_position'        => 'before',
+        'show_flag'             => 'yes',
+        'show_code'             => 'yes',
+        'show_symbol'           => 'no',
+        'show_name'             => 'no',
+        'show_option_flags'     => 'yes',
+        'show_option_codes'     => 'yes',
+        'show_option_symbols'   => 'no',
+        'show_option_names'     => 'yes',
+        'show_active_indicator' => 'yes',
+        'show_rate_badge'       => 'yes',
+        'show_rate_value'       => 'no',
+        'show_context_note'     => 'no',
+        'search_mode'           => 'off',
+        'favorite_currencies'   => [],
+        'show_favorites_first'  => 'yes',
+        'size'                  => 'md',
+        'width_mode'            => 'auto',
+        'dropdown_position'     => 'auto',
+        'dropdown_direction'    => 'auto',
+    ];
+
     public const DEFAULT_SETTINGS = [
         'enabled'                     => 'yes',
         'base_currency'               => 'USD',
@@ -36,6 +60,7 @@ final class Constants
         'url_param_enabled'           => 'yes',
         'url_param_key'               => 'currency',
         'cookie_enabled'              => 'yes',
+        'account_persistence_enabled' => 'yes',
         'cookie_lifetime_days'        => 90,
         'geo_enabled'                 => 'no',
         'geo_provider'                => 'ip_api',
@@ -56,6 +81,7 @@ final class Constants
         'fluentcrm_field_last_order'  => 'last_order_display_currency',
         'fluentcrm_field_last_rate'   => 'last_order_fx_rate',
         'fluentcommunity_enabled'     => 'yes',
+        'switcher_defaults'           => self::SWITCHER_DEFAULTS,
         'uninstall_remove_data'       => 'no',
     ];
 }

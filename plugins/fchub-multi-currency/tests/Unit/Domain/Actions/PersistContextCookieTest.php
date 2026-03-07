@@ -87,4 +87,21 @@ final class PersistContextCookieTest extends TestCase
         // User meta should be saved
         $this->assertSame('GBP', $GLOBALS['wp_mock_user_meta'][42]['_fchub_mc_currency'] ?? '');
     }
+
+    #[Test]
+    public function testUserMetaSkippedWhenAccountPersistenceDisabled(): void
+    {
+        $this->setCurrentUserId(42);
+
+        $this->setOption('fchub_mc_settings', [
+            'cookie_enabled' => 'yes',
+            'account_persistence_enabled' => 'no',
+        ]);
+
+        $repo = new PreferenceRepository();
+        $action = new PersistContextAction($repo, new OptionStore());
+        @$action->execute('EUR');
+
+        $this->assertSame('', $GLOBALS['wp_mock_user_meta'][42]['_fchub_mc_currency'] ?? '');
+    }
 }

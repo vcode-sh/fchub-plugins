@@ -93,4 +93,20 @@ final class CurrencyCatalogueControllerTest extends TestCase
         $this->assertNotNull($jpyEntry, 'JPY should be in catalogue');
         $this->assertSame(0, $jpyEntry['decimals']);
     }
+
+    public function testGetCatalogueDecodesHtmlEntitiesInSymbols(): void
+    {
+        $catalogue = CurrencyCatalogueController::getCatalogue();
+        $eurEntry = null;
+
+        foreach ($catalogue as $entry) {
+            if ($entry['code'] === 'EUR') {
+                $eurEntry = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($eurEntry, 'EUR should be in catalogue');
+        $this->assertSame('€', $eurEntry['symbol']);
+    }
 }

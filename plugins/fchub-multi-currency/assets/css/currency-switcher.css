@@ -2,6 +2,51 @@
  * FCHub Multi-Currency — Switcher Widget Styles
  */
 
+/* ----- Stage wrapper ----- */
+.fchub-mc-switcher-stage {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.fchub-mc-switcher-stage--left {
+    justify-content: flex-start;
+}
+
+.fchub-mc-switcher-stage--center {
+    justify-content: center;
+}
+
+.fchub-mc-switcher-stage--right {
+    justify-content: flex-end;
+}
+
+.fchub-mc-switcher-stage--label-after {
+    flex-direction: row-reverse;
+}
+
+.fchub-mc-switcher-stage--label-above,
+.fchub-mc-switcher-stage--label-below {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.fchub-mc-switcher-stage--label-below {
+    flex-direction: column-reverse;
+}
+
+.fchub-mc-switcher-stage--label-above.fchub-mc-switcher-stage--center,
+.fchub-mc-switcher-stage--label-below.fchub-mc-switcher-stage--center {
+    align-items: center;
+}
+
+.fchub-mc-switcher-stage--label-above.fchub-mc-switcher-stage--right,
+.fchub-mc-switcher-stage--label-below.fchub-mc-switcher-stage--right,
+.fchub-mc-switcher-stage--label-after.fchub-mc-switcher-stage--right {
+    align-items: flex-end;
+}
+
 /* ----- Custom properties ----- */
 .fchub-mc-switcher {
     --fchub-mc-radius: 6px;
@@ -18,10 +63,13 @@
     --fchub-mc-badge-stale: #f04438;
 
     position: relative;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     font-family: inherit;
     font-size: 0.875rem;
     line-height: 1.5;
+    vertical-align: middle;
 }
 
 /* ----- Trigger button ----- */
@@ -37,7 +85,8 @@
     font: inherit;
     cursor: pointer;
     transition: border-color var(--fchub-mc-transition),
-                box-shadow var(--fchub-mc-transition);
+                box-shadow var(--fchub-mc-transition),
+                background-color var(--fchub-mc-transition);
     white-space: nowrap;
     line-height: 1.5;
 }
@@ -69,6 +118,16 @@
     font-weight: 600;
 }
 
+.fchub-mc-switcher__name {
+    color: var(--fchub-mc-text-secondary);
+    font-weight: 500;
+}
+
+.fchub-mc-switcher__symbol {
+    color: var(--fchub-mc-text-secondary);
+    font-weight: 600;
+}
+
 .fchub-mc-switcher__caret {
     font-size: 0.625em;
     transition: transform var(--fchub-mc-transition);
@@ -90,7 +149,7 @@
     width: max-content;
     background: var(--fchub-mc-bg);
     border: 1px solid var(--fchub-mc-border-color);
-    border-radius: var(--fchub-mc-radius);
+    border-radius: min(var(--fchub-mc-radius), 12px);
     box-shadow: var(--fchub-mc-shadow);
     opacity: 0;
     transform: translateY(-4px);
@@ -105,9 +164,44 @@
     pointer-events: auto;
 }
 
+.fchub-mc-switcher__search-wrap {
+    display: block;
+    padding: 0.5rem 0.75rem 0;
+}
+
+.fchub-mc-switcher__search {
+    width: 100%;
+    border: 1px solid var(--fchub-mc-border-color);
+    border-radius: calc(var(--fchub-mc-radius) - 2px);
+    background: var(--fchub-mc-bg);
+    color: var(--fchub-mc-text);
+    font: inherit;
+    padding: 0.4rem 0.55rem;
+}
+
+.fchub-mc-switcher__search:focus-visible {
+    outline: 2px solid var(--fchub-mc-active-color);
+    outline-offset: 2px;
+}
+
 /* Override the hidden attribute when open so CSS transitions work */
 .fchub-mc-switcher--open .fchub-mc-switcher__dropdown[hidden] {
     display: block;
+}
+
+.fchub-mc-switcher--dropdown-start .fchub-mc-switcher__dropdown {
+    left: 0;
+    right: auto;
+}
+
+.fchub-mc-switcher--dropdown-end .fchub-mc-switcher__dropdown {
+    left: auto;
+    right: 0;
+}
+
+.fchub-mc-switcher--direction-up .fchub-mc-switcher__dropdown {
+    top: auto;
+    bottom: calc(100% + 4px);
 }
 
 /* ----- Option list ----- */
@@ -115,8 +209,7 @@
     display: block;
     margin: 0;
     padding: 0.25rem 0;
-    max-height: 240px;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .fchub-mc-switcher__option {
@@ -154,14 +247,27 @@
     font-size: 0.75em;
 }
 
+.fchub-mc-switcher__option-symbol {
+    color: var(--fchub-mc-text-secondary);
+    font-weight: 600;
+}
+
 .fchub-mc-switcher__option-name {
     color: var(--fchub-mc-text-secondary);
     font-weight: 400;
 }
 
+.fchub-mc-switcher__option-check {
+    margin-left: auto;
+    color: var(--fchub-mc-active-color);
+    font-weight: 700;
+}
+
 /* ----- Rate badge footer ----- */
 .fchub-mc-switcher__footer {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
     padding: 0.375rem 0.75rem;
     border-top: 1px solid var(--fchub-mc-border-color);
 }
@@ -192,27 +298,64 @@
     background: var(--fchub-mc-badge-stale);
 }
 
+.fchub-mc-rate-context {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--fchub-mc-text-secondary);
+    line-height: 1.45;
+}
+
 /* ----- Label ----- */
 .fchub-mc-switcher__label {
     display: inline-block;
-    margin-right: 0.5rem;
     color: var(--fchub-mc-text-secondary);
     font-size: 0.875rem;
     vertical-align: middle;
     white-space: nowrap;
 }
 
-/* ----- Alignment ----- */
-.fchub-mc-switcher--right {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
+/* ----- Size variants ----- */
+.fchub-mc-switcher--size-sm {
+    font-size: 0.8125rem;
 }
 
-.fchub-mc-switcher--center {
+.fchub-mc-switcher--size-sm .fchub-mc-switcher__trigger {
+    padding: 0.25rem 0.5rem;
+    gap: 0.3125rem;
+}
+
+.fchub-mc-switcher--size-sm .fchub-mc-flag {
+    width: 18px;
+    height: 13px;
+}
+
+.fchub-mc-switcher--size-lg {
+    font-size: 0.9375rem;
+}
+
+.fchub-mc-switcher--size-lg .fchub-mc-switcher__trigger {
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+}
+
+.fchub-mc-switcher--size-lg .fchub-mc-flag {
+    width: 22px;
+    height: 16px;
+}
+
+/* ----- Width modes ----- */
+.fchub-mc-switcher--width-full {
     display: flex;
-    justify-content: center;
-    align-items: center;
+    width: 100%;
+}
+
+.fchub-mc-switcher--width-full .fchub-mc-switcher__trigger,
+.fchub-mc-switcher--width-full .fchub-mc-switcher__dropdown {
+    width: 100%;
+}
+
+.fchub-mc-switcher--width-full .fchub-mc-switcher__trigger {
+    justify-content: space-between;
 }
 
 /* ----- Loading state ----- */
@@ -222,6 +365,18 @@
 }
 
 /* ----- No-JS fallback ----- */
+.fchub-mc-switcher-fallback-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.fchub-mc-switcher-fallback-label {
+    font-size: 0.8125rem;
+    color: #475467;
+}
+
 .fchub-mc-switcher-fallback {
     padding: 0.25rem 0.5rem;
     border: 1px solid #ccc;
@@ -229,6 +384,153 @@
     font-size: 0.875rem;
     background: #fff;
     cursor: pointer;
+}
+
+.fchub-mc-switcher-fallback-submit {
+    padding: 0.25rem 0.625rem;
+    border: 1px solid #98a2b3;
+    border-radius: 4px;
+    background: #fff;
+    color: #344054;
+    font: inherit;
+    cursor: pointer;
+}
+
+/* ----- Inline currency blocks ----- */
+.fchub-mc-inline-block {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+}
+
+.fchub-mc-inline-current,
+.fchub-mc-inline-rate,
+.fchub-mc-inline-notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--fchub-mc-border-color);
+    border-radius: calc(var(--fchub-mc-radius) + 2px);
+    background: var(--fchub-mc-bg);
+    color: var(--fchub-mc-text);
+    line-height: 1.45;
+}
+
+.fchub-mc-inline-current__text {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.fchub-mc-inline-block--notice .fchub-mc-inline-notice {
+    background: #f8fafc;
+    color: #334155;
+}
+
+/* ----- Selector buttons block ----- */
+.fchub-mc-selector-buttons {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.fchub-mc-selector-buttons__button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--fchub-mc-border-color);
+    border-radius: 999px;
+    background: var(--fchub-mc-bg);
+    color: var(--fchub-mc-text);
+    font: inherit;
+    cursor: pointer;
+    transition: border-color var(--fchub-mc-transition), background-color var(--fchub-mc-transition), color var(--fchub-mc-transition);
+}
+
+.fchub-mc-selector-buttons__button:hover {
+    border-color: #98a2b3;
+}
+
+.fchub-mc-selector-buttons__button.is-active {
+    background: var(--fchub-mc-active-bg);
+    color: var(--fchub-mc-active-color);
+    border-color: color-mix(in srgb, var(--fchub-mc-active-color) 35%, var(--fchub-mc-border-color));
+}
+
+.fchub-mc-selector-buttons__flag {
+    font-size: 1.05em;
+    line-height: 1;
+}
+
+/* ----- Block style presets ----- */
+.wp-block-fchub-multi-currency-switcher.is-style-pill,
+.fchub-mc-switcher--preset-pill {
+    --fchub-mc-radius: 999px;
+    --fchub-mc-shadow: none;
+}
+
+.wp-block-fchub-multi-currency-switcher.is-style-pill .fchub-mc-switcher__option,
+.wp-block-fchub-multi-currency-switcher.is-style-pill .fchub-mc-switcher__footer,
+.fchub-mc-switcher--preset-pill .fchub-mc-switcher__option,
+.fchub-mc-switcher--preset-pill .fchub-mc-switcher__footer {
+    border-radius: 4px;
+}
+
+.wp-block-fchub-multi-currency-switcher.is-style-minimal,
+.fchub-mc-switcher--preset-minimal {
+    --fchub-mc-border-color: transparent;
+    --fchub-mc-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+    --fchub-mc-hover-bg: rgba(15, 23, 42, 0.05);
+}
+
+.wp-block-fchub-multi-currency-switcher.is-style-minimal .fchub-mc-switcher__trigger,
+.fchub-mc-switcher--preset-minimal .fchub-mc-switcher__trigger {
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+.wp-block-fchub-multi-currency-switcher.is-style-subtle,
+.fchub-mc-switcher--preset-subtle {
+    --fchub-mc-bg: #f8fafc;
+    --fchub-mc-border-color: #e2e8f0;
+    --fchub-mc-hover-bg: #eef2f7;
+    --fchub-mc-active-bg: #e8f0ff;
+    --fchub-mc-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.wp-block-fchub-multi-currency-switcher.is-style-subtle .fchub-mc-switcher__trigger,
+.fchub-mc-switcher--preset-subtle .fchub-mc-switcher__trigger {
+    backdrop-filter: saturate(160%) blur(6px);
+}
+
+.wp-block-fchub-multi-currency-switcher.is-style-glass,
+.fchub-mc-switcher--preset-glass {
+    --fchub-mc-bg: rgba(255, 255, 255, 0.72);
+    --fchub-mc-border-color: rgba(255, 255, 255, 0.55);
+    --fchub-mc-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
+    --fchub-mc-hover-bg: rgba(255, 255, 255, 0.88);
+}
+
+.wp-block-fchub-multi-currency-switcher.is-style-glass .fchub-mc-switcher__trigger,
+.wp-block-fchub-multi-currency-switcher.is-style-glass .fchub-mc-switcher__dropdown,
+.fchub-mc-switcher--preset-glass .fchub-mc-switcher__trigger,
+.fchub-mc-switcher--preset-glass .fchub-mc-switcher__dropdown {
+    backdrop-filter: blur(14px) saturate(160%);
+}
+
+.wp-block-fchub-multi-currency-switcher.is-style-contrast,
+.fchub-mc-switcher--preset-contrast {
+    --fchub-mc-bg: #0f172a;
+    --fchub-mc-border-color: #1e293b;
+    --fchub-mc-shadow: 0 18px 36px rgba(15, 23, 42, 0.24);
+    --fchub-mc-hover-bg: #111c33;
+    --fchub-mc-active-bg: #172554;
+    --fchub-mc-active-color: #93c5fd;
+    --fchub-mc-text: #f8fafc;
+    --fchub-mc-text-secondary: #cbd5e1;
+    --fchub-mc-badge-ok: #22c55e;
+    --fchub-mc-badge-stale: #f87171;
 }
 
 /* ----- Disclosure notice ----- */

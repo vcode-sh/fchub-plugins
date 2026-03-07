@@ -1,0 +1,191 @@
+.fchub-mc-switcher-editor-host {
+	padding: 12px;
+	border: 1px solid #d0d7de;
+	border-radius: 8px;
+	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	overflow: visible;
+}
+
+.fchub-mc-switcher-editor-host .components-notice {
+	margin: 0 0 12px;
+}
+
+.fchub-mc-switcher-editor-preview-shell {
+	padding: 20px 12px;
+	border: 1px dashed #cbd5e1;
+	border-radius: 12px;
+	background:
+		radial-gradient(circle at top left, rgba(148, 163, 184, 0.08), transparent 35%),
+		linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	overflow: visible;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage {
+	position: relative;
+	display: flex;
+	width: 100%;
+	min-height: 320px;
+	padding: 12px;
+	overflow: visible;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--left {
+	justify-content: flex-start;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--center {
+	justify-content: center;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--right {
+	justify-content: flex-end;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-before,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-after {
+	align-items: flex-start;
+	gap: 10px;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-after {
+	flex-direction: row-reverse;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-above,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-below {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-below {
+	flex-direction: column-reverse;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-above.fchub-mc-switcher-stage--center,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-below.fchub-mc-switcher-stage--center {
+	align-items: center;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-above.fchub-mc-switcher-stage--right,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-below.fchub-mc-switcher-stage--right,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--label-after.fchub-mc-switcher-stage--right {
+	align-items: flex-end;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--preview-up {
+	align-items: flex-end;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--preview-up.fchub-mc-switcher-stage--label-above,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--preview-up.fchub-mc-switcher-stage--label-below {
+	justify-content: flex-end;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher {
+	display: inline-flex;
+	max-width: min(480px, calc(100vw - 96px));
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher__dropdown {
+	left: 0;
+	right: auto;
+	width: max-content;
+	min-width: 220px;
+	max-width: min(480px, calc(100vw - 96px));
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher--preview-open .fchub-mc-switcher__dropdown {
+	display: block;
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher--preview-open .fchub-mc-switcher__dropdown[hidden] {
+	display: block;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher__trigger {
+	cursor: default;
+	max-width: 100%;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher__option {
+	white-space: normal;
+	align-items: flex-start;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher__option-name,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher__name {
+	overflow-wrap: anywhere;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher__option-check {
+	flex-shrink: 0;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher--direction-up .fchub-mc-switcher__dropdown {
+	top: auto;
+	bottom: calc(100% + 4px);
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--left .fchub-mc-switcher--dropdown-end .fchub-mc-switcher__dropdown {
+	left: 0;
+	right: auto;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--left .fchub-mc-switcher--dropdown-auto .fchub-mc-switcher__dropdown,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--center .fchub-mc-switcher--dropdown-auto .fchub-mc-switcher__dropdown {
+	left: 0;
+	right: auto;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--right .fchub-mc-switcher--dropdown-start .fchub-mc-switcher__dropdown {
+	left: auto;
+	right: 0;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--right .fchub-mc-switcher--dropdown-end .fchub-mc-switcher__dropdown,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--right .fchub-mc-switcher--dropdown-auto .fchub-mc-switcher__dropdown {
+	left: auto;
+	right: 0;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--center .fchub-mc-switcher--dropdown-start .fchub-mc-switcher__dropdown {
+	left: 0;
+	right: auto;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher-stage--center .fchub-mc-switcher--dropdown-end .fchub-mc-switcher__dropdown {
+	left: auto;
+	right: 0;
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher--width-full {
+	display: flex;
+	width: min(100%, 360px);
+}
+
+.fchub-mc-switcher-editor-host .fchub-mc-switcher--width-full .fchub-mc-switcher__trigger,
+.fchub-mc-switcher-editor-host .fchub-mc-switcher--width-full .fchub-mc-switcher__dropdown {
+	width: 100%;
+}
+
+/* Pill preset: cap dropdown radius so 999px doesn't produce an oval */
+.fchub-mc-switcher-editor-host .fchub-mc-switcher__dropdown {
+	border-radius: min(var(--fchub-mc-radius, 6px), 12px);
+}
+
+.fchub-mc-switcher-editor-host .is-style-pill .fchub-mc-switcher__option,
+.fchub-mc-switcher-editor-host .is-style-pill .fchub-mc-switcher__footer {
+	border-radius: 4px;
+}
+
+/* Glass preset: colourful stage background so backdrop-filter has something to blur */
+.fchub-mc-switcher-editor-host:has(.is-style-glass) .fchub-mc-switcher-editor-preview-shell {
+	background:
+		linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.12) 35%, rgba(236, 72, 153, 0.10) 65%, rgba(59, 130, 246, 0.12) 100%),
+		linear-gradient(180deg, #ffffff 0%, #f0f4ff 100%);
+	border-color: rgba(99, 102, 241, 0.2);
+}

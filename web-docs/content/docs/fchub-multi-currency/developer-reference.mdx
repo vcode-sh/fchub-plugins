@@ -128,6 +128,8 @@ Returns FluentCart's full currency catalogue with flag emojis.
 
 Returns plugin health information: versions, bcmath status, FluentCart/CRM status, rate counts, stale currencies, feature flags.
 
+Also includes event counts and the most-switched currencies when event logging has data.
+
 </Tab>
 </Tabs>
 
@@ -198,6 +200,16 @@ window.fchubMcProjectPrices(document.getElementById('my-container'));
 <Separator className="my-8" />
 
 ## Currency Switcher Widget
+
+### Block Family
+
+The plugin now exposes a small set of currency-related blocks:
+
+- `fchub-multi-currency/switcher`
+- `fchub-multi-currency/current-currency`
+- `fchub-multi-currency/exchange-rate`
+- `fchub-multi-currency/context-notice`
+- `fchub-multi-currency/selector-buttons`
 
 ### CSS Custom Properties
 

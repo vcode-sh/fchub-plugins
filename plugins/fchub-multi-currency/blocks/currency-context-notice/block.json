@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fchub-multi-currency/context-notice",
+  "version": "1.2.1",
+  "title": "Currency Context Notice",
+  "category": "widgets",
+  "icon": "info-outline",
+  "description": "Show a currency context note such as display currency vs checkout currency.",
+  "keywords": ["currency", "notice", "checkout", "context"],
+  "textdomain": "fchub-multi-currency",
+  "attributes": {
+    "mode": {
+      "type": "string",
+      "default": "compact"
+    },
+    "hideWhenBaseDisplay": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "supports": {
+    "html": false,
+    "spacing": {
+      "margin": true,
+      "padding": true
+    },
+    "typography": {
+      "fontSize": true
+    }
+  },
+  "style": "fchub-mc-switcher"
+}

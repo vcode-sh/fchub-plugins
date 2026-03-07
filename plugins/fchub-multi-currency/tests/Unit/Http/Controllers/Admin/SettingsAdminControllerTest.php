@@ -39,6 +39,8 @@ final class SettingsAdminControllerTest extends TestCase
                     'symbol'   => '€',
                     'decimals' => 9,
                     'position' => 'left',
+                    'decimal_separator' => ',',
+                    'thousand_separator' => 'none',
                 ],
                 [
                     'code'     => 'EUR',
@@ -50,6 +52,15 @@ final class SettingsAdminControllerTest extends TestCase
                 [
                     'code' => 'XXX',
                 ],
+            ],
+            'switcher_defaults' => [
+                'preset' => 'contrast',
+                'label_position' => 'below',
+                'show_symbol' => 'yes',
+                'search_mode' => 'inline',
+                'favorite_currencies' => [' eur ', 'usd', 'BAD'],
+                'dropdown_position' => 'auto',
+                'dropdown_direction' => 'auto',
             ],
         ]);
 
@@ -65,5 +76,12 @@ final class SettingsAdminControllerTest extends TestCase
         $this->assertCount(1, $settings['display_currencies']);
         $this->assertSame('EUR', $settings['display_currencies'][0]['code']);
         $this->assertSame(4, $settings['display_currencies'][0]['decimals']);
+        $this->assertSame(',', $settings['display_currencies'][0]['decimal_separator']);
+        $this->assertSame('none', $settings['display_currencies'][0]['thousand_separator']);
+        $this->assertSame('contrast', $settings['switcher_defaults']['preset']);
+        $this->assertSame('below', $settings['switcher_defaults']['label_position']);
+        $this->assertSame('yes', $settings['switcher_defaults']['show_symbol']);
+        $this->assertSame('inline', $settings['switcher_defaults']['search_mode']);
+        $this->assertSame(['EUR', 'USD'], $settings['switcher_defaults']['favorite_currencies']);
     }
 }

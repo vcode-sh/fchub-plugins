@@ -18,6 +18,7 @@ final class ModuleRegistry
             Modules\CoreModule::class,
             Modules\ContextModule::class,
             Modules\FrontendModule::class,
+            Modules\BlocksModule::class,
             Modules\CheckoutModule::class,
             Modules\AdminModule::class,
             Modules\RestModule::class,

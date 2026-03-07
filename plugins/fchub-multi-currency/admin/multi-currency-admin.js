@@ -156,6 +156,19 @@
         </div>\
     </div>\
     <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Account Persistence</span>\
+            <div class="form-note">Remember currency preference in the logged-in user account. Disable this if you want logged-in sessions to respect the default display currency on every fresh visit.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="settings.account_persistence_enabled">\
+                <el-radio label="Enabled" value="yes" />\
+                <el-radio label="Disabled" value="no" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
     <div class="fchub-mc-row fchub-mc-coming-soon-row">\
         <div class="setting-html-wrapper">\
             <span class="setting-label">Geolocation <span class="fchub-mc-badge-soon">Coming Soon</span></span>\
@@ -248,6 +261,8 @@
 					symbol: entry.symbol,
 					decimals: entry.decimals,
 					position: "left",
+					decimal_separator: "",
+					thousand_separator: "",
 				});
 				this.pickerValue = "";
 				if (this._sortable) {
@@ -288,6 +303,8 @@
             <div class="fchub-mc-col-currency">Currency</div>\
             <div class="fchub-mc-col-symbol">Symbol</div>\
             <div class="fchub-mc-col-decimals">Decimals</div>\
+            <div class="fchub-mc-col-separator">Decimal</div>\
+            <div class="fchub-mc-col-separator">Thousands</div>\
             <div class="fchub-mc-col-position">Position</div>\
             <div class="fchub-mc-col-action"></div>\
         </div>\
@@ -303,8 +320,28 @@
                     <strong>{{ row.code }}</strong>\
                     <span style="margin-left:4px;color:#909399">{{ row.name }}</span>\
                 </div>\
-                <div class="fchub-mc-col-symbol"><span v-html="row.symbol"></span></div>\
-                <div class="fchub-mc-col-decimals">{{ row.decimals }}</div>\
+                <div class="fchub-mc-col-symbol">\
+                    <el-input v-model="row.symbol" size="small" autocomplete="one-time-code" />\
+                </div>\
+                <div class="fchub-mc-col-decimals">\
+                    <el-input-number v-model="row.decimals" size="small" :min="0" :max="4" />\
+                </div>\
+                <div class="fchub-mc-col-separator">\
+                    <el-select v-model="row.decimal_separator" size="small">\
+                        <el-option label="Auto" value="" />\
+                        <el-option label="Dot (.)" value="." />\
+                        <el-option label="Comma (,)" value="," />\
+                    </el-select>\
+                </div>\
+                <div class="fchub-mc-col-separator">\
+                    <el-select v-model="row.thousand_separator" size="small">\
+                        <el-option label="Auto" value="" />\
+                        <el-option label="Comma (,)" value="," />\
+                        <el-option label="Dot (.)" value="." />\
+                        <el-option label="Space" value=" " />\
+                        <el-option label="None" value="none" />\
+                    </el-select>\
+                </div>\
                 <div class="fchub-mc-col-position">\
                     <el-select v-model="row.position" size="small">\
                         <el-option label="Left ($100)" value="left" />\
@@ -321,6 +358,162 @@
     </div>\
     <div v-else style="padding:40px;text-align:center;color:#909399">\
         No display currencies added yet. Use the picker above to add currencies.\
+    </div>\
+</div>',
+	};
+
+	var SwitcherSettings = {
+		name: "SwitcherSettings",
+		components: { SwitcherPreview: window.FchubMcSwitcherPreview },
+		props: { settings: { type: Object, required: true } },
+		computed: {
+			switcherDefaults: function () {
+				if (!this.settings.switcher_defaults) {
+					this.settings.switcher_defaults = {};
+				}
+				return this.settings.switcher_defaults;
+			},
+			favoriteCurrenciesCsv: {
+				get: function () {
+					return (this.switcherDefaults.favorite_currencies || []).join(", ");
+				},
+				set: function (value) {
+					this.switcherDefaults.favorite_currencies = value
+						.split(",")
+						.map((item) => item.trim().toUpperCase())
+						.filter((item) => /^[A-Z]{3}$/.test(item));
+				},
+			},
+		},
+		template:
+			'\
+<div>\
+    <switcher-preview :settings="switcherDefaults" :currencies="settings.display_currencies" />\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Default Preset</span>\
+            <div class="form-note">Visual style used by switcher blocks that inherit global defaults.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-select v-model="switcherDefaults.preset" style="max-width:260px">\
+                <el-option label="Default" value="default" />\
+                <el-option label="Pill" value="pill" />\
+                <el-option label="Minimal" value="minimal" />\
+                <el-option label="Subtle" value="subtle" />\
+                <el-option label="Glass" value="glass" />\
+                <el-option label="Contrast" value="contrast" />\
+            </el-select>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Label Position</span>\
+            <div class="form-note">Where the optional label should sit relative to the switcher.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-select v-model="switcherDefaults.label_position" style="max-width:260px">\
+                <el-option label="Before" value="before" />\
+                <el-option label="After" value="after" />\
+                <el-option label="Above" value="above" />\
+                <el-option label="Below" value="below" />\
+            </el-select>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <h3 style="font-size:14px;font-weight:600;margin:16px 0 12px">Trigger Content</h3>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Trigger Elements</span>\
+            <div class="form-note">Choose what appears in the closed switcher button.</div>\
+        </div>\
+        <div class="setting-fields-inner fchub-mc-switcher-toggle-grid">\
+            <el-switch v-model="switcherDefaults.show_flag" active-value="yes" inactive-value="no" active-text="Flag" />\
+            <el-switch v-model="switcherDefaults.show_code" active-value="yes" inactive-value="no" active-text="Code" />\
+            <el-switch v-model="switcherDefaults.show_symbol" active-value="yes" inactive-value="no" active-text="Symbol" />\
+            <el-switch v-model="switcherDefaults.show_name" active-value="yes" inactive-value="no" active-text="Name" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <h3 style="font-size:14px;font-weight:600;margin:16px 0 12px">Dropdown Content</h3>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Option Elements</span>\
+            <div class="form-note">Choose what each currency row displays inside the dropdown.</div>\
+        </div>\
+        <div class="setting-fields-inner fchub-mc-switcher-toggle-grid">\
+            <el-switch v-model="switcherDefaults.show_option_flags" active-value="yes" inactive-value="no" active-text="Flags" />\
+            <el-switch v-model="switcherDefaults.show_option_codes" active-value="yes" inactive-value="no" active-text="Codes" />\
+            <el-switch v-model="switcherDefaults.show_option_symbols" active-value="yes" inactive-value="no" active-text="Symbols" />\
+            <el-switch v-model="switcherDefaults.show_option_names" active-value="yes" inactive-value="no" active-text="Names" />\
+            <el-switch v-model="switcherDefaults.show_active_indicator" active-value="yes" inactive-value="no" active-text="Active check" />\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Search Mode</span>\
+            <div class="form-note">Useful when you expose more than a handful of currencies.</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-radio-group v-model="switcherDefaults.search_mode">\
+                <el-radio label="Off" value="off" />\
+                <el-radio label="Inline search" value="inline" />\
+            </el-radio-group>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Favorite Currencies</span>\
+            <div class="form-note">Comma-separated ISO codes pinned above the rest, for example: EUR, USD, GBP</div>\
+        </div>\
+        <div class="setting-fields-inner">\
+            <el-input v-model="favoriteCurrenciesCsv" placeholder="EUR, USD, GBP" style="max-width:320px" autocomplete="one-time-code" />\
+            <div style="margin-top:10px">\
+                <el-switch v-model="switcherDefaults.show_favorites_first" active-value="yes" inactive-value="no" active-text="Show favorites first" />\
+            </div>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Layout Defaults</span>\
+            <div class="form-note">Baseline geometry for inheriting switcher blocks.</div>\
+        </div>\
+        <div class="setting-fields-inner fchub-mc-switcher-select-grid">\
+            <el-select v-model="switcherDefaults.size" style="max-width:180px">\
+                <el-option label="Small" value="sm" />\
+                <el-option label="Medium" value="md" />\
+                <el-option label="Large" value="lg" />\
+            </el-select>\
+            <el-select v-model="switcherDefaults.width_mode" style="max-width:180px">\
+                <el-option label="Auto width" value="auto" />\
+                <el-option label="Full width" value="full" />\
+            </el-select>\
+            <el-select v-model="switcherDefaults.dropdown_position" style="max-width:180px">\
+                <el-option label="Auto position" value="auto" />\
+                <el-option label="Start" value="start" />\
+                <el-option label="End" value="end" />\
+            </el-select>\
+            <el-select v-model="switcherDefaults.dropdown_direction" style="max-width:180px">\
+                <el-option label="Auto direction" value="auto" />\
+                <el-option label="Down" value="down" />\
+                <el-option label="Up" value="up" />\
+            </el-select>\
+        </div>\
+    </div>\
+    <div class="setting-html-wrapper"><hr class="settings-divider"></div>\
+    <div class="fchub-mc-row">\
+        <div class="setting-html-wrapper">\
+            <span class="setting-label">Footer Context</span>\
+            <div class="form-note">Optional trust-building context shown at the bottom of the dropdown.</div>\
+        </div>\
+        <div class="setting-fields-inner fchub-mc-switcher-toggle-grid">\
+            <el-switch v-model="switcherDefaults.show_rate_badge" active-value="yes" inactive-value="no" active-text="Freshness badge" />\
+            <el-switch v-model="switcherDefaults.show_rate_value" active-value="yes" inactive-value="no" active-text="Rate value" />\
+            <el-switch v-model="switcherDefaults.show_context_note" active-value="yes" inactive-value="no" active-text="Checkout context" />\
+        </div>\
     </div>\
 </div>',
 	};
@@ -609,6 +802,30 @@
                 </div>\
             </div>\
         </div>\
+        <div class="fct-card fct-card-border">\
+            <div class="fct-card-body">\
+                <h4 style="margin:0 0 12px;font-size:14px;font-weight:500">Switcher Events</h4>\
+                <div v-for="(val, key) in diagnostics.event_counts" :key="key" class="fchub-mc-diag-row">\
+                    <span>{{ key }}</span>\
+                    <span>{{ val }}</span>\
+                </div>\
+                <div v-if="!diagnostics.event_counts || !Object.keys(diagnostics.event_counts).length" style="color:#909399;font-size:13px">\
+                    No event data yet.\
+                </div>\
+            </div>\
+        </div>\
+        <div class="fct-card fct-card-border">\
+            <div class="fct-card-body">\
+                <h4 style="margin:0 0 12px;font-size:14px;font-weight:500">Top Switched Currencies</h4>\
+                <div v-for="row in diagnostics.top_switched_currencies" :key="row.currency" class="fchub-mc-diag-row">\
+                    <span>{{ row.currency }}</span>\
+                    <span>{{ row.total }}</span>\
+                </div>\
+                <div v-if="!diagnostics.top_switched_currencies || !diagnostics.top_switched_currencies.length" style="color:#909399;font-size:13px">\
+                    No switch data yet.\
+                </div>\
+            </div>\
+        </div>\
     </div>\
     <div v-else-if="!loading" style="padding:40px;text-align:center;color:#909399">\
         No diagnostics data.\
@@ -625,6 +842,7 @@
 		components: {
 			GeneralSettings: GeneralSettings,
 			CurrencySettings: CurrencySettings,
+			SwitcherSettings: SwitcherSettings,
 			RateSettings: RateSettings,
 			CheckoutSettings: CheckoutSettings,
 			CrmSettings: CrmSettings,
@@ -756,6 +974,11 @@
             <el-tab-pane label="Exchange Rates" name="rates">\
                 <div class="form-section"><div class="fct-card"><div class="fct-card-body">\
                     <rate-settings :settings="settings" :rates="rates" :rates-loading="ratesLoading" @refresh-rates="refreshRates" />\
+                </div></div></div>\
+            </el-tab-pane>\
+            <el-tab-pane label="Switcher" name="switcher">\
+                <div class="form-section"><div class="fct-card"><div class="fct-card-body" v-loading="loading">\
+                    <switcher-settings :settings="settings" />\
                 </div></div></div>\
             </el-tab-pane>\
             <el-tab-pane label="Checkout" name="checkout">\
@@ -933,10 +1156,13 @@
 		".fchub-mc-currency-row:hover { background: var(--el-fill-color); }",
 		".fchub-mc-col-handle { width: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }",
 		".fchub-mc-col-currency { flex: 1; min-width: 0; display: flex; align-items: center; }",
-		".fchub-mc-col-symbol { width: 90px; flex-shrink: 0; text-align: center; }",
-		".fchub-mc-col-decimals { width: 90px; flex-shrink: 0; text-align: center; }",
+		".fchub-mc-col-symbol { width: 110px; flex-shrink: 0; text-align: center; }",
+		".fchub-mc-col-decimals { width: 110px; flex-shrink: 0; text-align: center; }",
+		".fchub-mc-col-separator { width: 120px; flex-shrink: 0; }",
 		".fchub-mc-col-position { width: 180px; flex-shrink: 0; }",
 		".fchub-mc-col-action { width: 60px; flex-shrink: 0; text-align: center; }",
+		".fchub-mc-switcher-toggle-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 18px; align-items:center; }",
+		".fchub-mc-switcher-select-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }",
 		".fchub-mc-drag-handle { cursor: grab; color: var(--el-text-color-placeholder); display: inline-flex; padding: 4px; border-radius: 4px; transition: color .15s, background .15s; }",
 		".fchub-mc-drag-handle:hover { color: var(--el-text-color-regular); background: var(--el-fill-color); }",
 		".fchub-mc-ghost { opacity: 0.4; border: 2px dashed var(--el-color-primary); border-radius: 4px; }",
