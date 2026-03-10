@@ -10,6 +10,7 @@ use FChubMultiCurrency\Domain\Services\CurrencyContextService;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
+use FChubMultiCurrency\Support\FluentCartEvent;
 use FChubMultiCurrency\Support\Hooks;
 
 defined('ABSPATH') || exit;
@@ -57,9 +58,14 @@ final class OrderSnapshotHooks
         }
     }
 
-    public static function saveSnapshot($order): void
+    public static function saveSnapshot($eventData): void
     {
         if (!Hooks::isEnabled()) {
+            return;
+        }
+
+        $order = FluentCartEvent::extractOrder($eventData);
+        if ($order === null) {
             return;
         }
 

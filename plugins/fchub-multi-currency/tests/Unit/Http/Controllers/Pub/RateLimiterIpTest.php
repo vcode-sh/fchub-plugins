@@ -57,13 +57,13 @@ final class RateLimiterIpTest extends TestCase
     }
 
     #[Test]
-    public function testRateLimiterIgnoresXForwardedForHeader(): void
+    public function testRateLimiterPrefersXForwardedForOverRemoteAddr(): void
     {
         $_SERVER['REMOTE_ADDR'] = '10.0.0.1';
         $_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.50';
 
-        $realIpKey = 'fchub_mc_rl_' . substr(md5('10.0.0.1'), 0, 12);
-        $spoofedKey = 'fchub_mc_rl_' . substr(md5('203.0.113.50'), 0, 12);
+        $proxyKey = 'fchub_mc_rl_' . substr(md5('10.0.0.1'), 0, 12);
+        $clientKey = 'fchub_mc_rl_' . substr(md5('203.0.113.50'), 0, 12);
 
         $controller = new ContextController();
         $request = new \WP_REST_Request('POST', '/');
@@ -71,9 +71,47 @@ final class RateLimiterIpTest extends TestCase
 
         $controller->set($request);
 
-        // Rate limit key should be based on REMOTE_ADDR, not X-Forwarded-For
-        $this->assertArrayHasKey($realIpKey, $GLOBALS['wp_transients']);
-        $this->assertArrayNotHasKey($spoofedKey, $GLOBALS['wp_transients']);
+        // Rate limit key should be based on X-Forwarded-For (real client IP), not REMOTE_ADDR (proxy)
+        $this->assertArrayHasKey($clientKey, $GLOBALS['wp_transients']);
+        $this->assertArrayNotHasKey($proxyKey, $GLOBALS['wp_transients']);
+    }
+
+    #[Test]
+    public function testRateLimiterPrefersCfConnectingIpOverAll(): void
+    {
+        $_SERVER['REMOTE_ADDR'] = '10.0.0.1';
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.50';
+        $_SERVER['HTTP_CF_CONNECTING_IP'] = '198.51.100.25';
+
+        $cfKey = 'fchub_mc_rl_' . substr(md5('198.51.100.25'), 0, 12);
+
+        $controller = new ContextController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['currency' => 'EUR']);
+
+        $controller->set($request);
+
+        // CF-Connecting-IP has highest priority
+        $this->assertArrayHasKey($cfKey, $GLOBALS['wp_transients']);
+    }
+
+    #[Test]
+    public function testRateLimiterExtractsFirstIpFromXForwardedFor(): void
+    {
+        unset($_SERVER['HTTP_CF_CONNECTING_IP']);
+        $_SERVER['REMOTE_ADDR'] = '10.0.0.1';
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.50, 10.0.0.1, 172.16.0.1';
+
+        $clientKey = 'fchub_mc_rl_' . substr(md5('203.0.113.50'), 0, 12);
+
+        $controller = new ContextController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['currency' => 'EUR']);
+
+        $controller->set($request);
+
+        // Should use the first IP (client) from the comma-separated list
+        $this->assertArrayHasKey($clientKey, $GLOBALS['wp_transients']);
     }
 
     #[Test]

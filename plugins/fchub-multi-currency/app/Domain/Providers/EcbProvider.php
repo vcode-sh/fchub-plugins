@@ -64,7 +64,9 @@ final class EcbProvider implements ProviderContract
             return $rebased;
         } elseif (strtoupper($baseCurrency) !== 'EUR') {
             // Base currency not available from ECB — can't rebase
-            error_log('[fchub-mc] ECB does not provide rate for base currency: ' . strtoupper($baseCurrency));
+            Logger::error('ECB does not provide rate for base currency', [
+                'base_currency' => strtoupper($baseCurrency),
+            ]);
             return [];
         }
 

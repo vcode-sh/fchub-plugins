@@ -107,6 +107,29 @@ final class FluentCrmSyncTest extends TestCase
     }
 
     #[Test]
+    public function testOnOrderPaidAcceptsFluentCartEventPayload(): void
+    {
+        $GLOBALS['fluentcrm_mock_contact'] = new \FluentCrm_Mock_Contact();
+
+        $order = new class {
+            public int $user_id = 1;
+            private array $meta = ['_fchub_mc_display_currency' => 'EUR', '_fchub_mc_rate' => '0.92'];
+            public function getMeta(string $key) { return $this->meta[$key] ?? null; }
+        };
+
+        FluentCrmSync::onOrderPaid([
+            'order' => $order,
+        ]);
+
+        $updates = $GLOBALS['fluentcrm_custom_field_updates'];
+        $currencyUpdate = array_filter($updates, fn($u) => $u['slug'] === 'last_order_display_currency' && $u['value'] === 'EUR');
+        $rateUpdate = array_filter($updates, fn($u) => $u['slug'] === 'last_order_fx_rate' && $u['value'] === '0.92');
+
+        $this->assertNotEmpty($currencyUpdate, 'Expected event payload order currency sync.');
+        $this->assertNotEmpty($rateUpdate, 'Expected event payload FX rate sync.');
+    }
+
+    #[Test]
     public function testOnOrderPaidSkipsForGuestOrder(): void
     {
         $GLOBALS['fluentcrm_mock_contact'] = new \FluentCrm_Mock_Contact();

@@ -91,7 +91,7 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         // Set cookie to EUR — if saveSnapshot runs, it would overwrite with EUR
         $_COOKIE['fchub_mc_currency'] = 'EUR';
 
-        OrderSnapshotHooks::saveSnapshot($this->order);
+        OrderSnapshotHooks::saveSnapshot(['order' => $this->order]);
 
         // Should still be GBP — not overwritten
         $this->assertSame('GBP', $this->order->getMeta('_fchub_mc_display_currency'));
@@ -132,7 +132,7 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         $this->setCurrentUserId(99);
         $this->setUserMeta(99, '_fchub_mc_currency', 'EUR');
 
-        OrderSnapshotHooks::saveSnapshot($this->order);
+        OrderSnapshotHooks::saveSnapshot(['order' => $this->order]);
 
         // Should still be GBP from checkout capture, not EUR from admin
         $this->assertSame('GBP', $this->order->getMeta('_fchub_mc_display_currency'));
@@ -154,9 +154,23 @@ final class OrderSnapshotCheckoutCaptureTest extends TestCase
         $this->setUserMeta(42, '_fchub_mc_currency', 'GBP');
 
         // No checkout capture ran — simulate a manual order
-        OrderSnapshotHooks::saveSnapshot($this->order);
+        OrderSnapshotHooks::saveSnapshot(['order' => $this->order]);
 
         // GBP is not enabled, so no snapshot should be written
         $this->assertSame('', $this->order->getMeta('_fchub_mc_display_currency', ''));
+    }
+
+    #[Test]
+    public function testOrderPaidDoneAcceptsFluentCartEventPayloadForFallbackCapture(): void
+    {
+        $this->configureMultiCurrency('GBP');
+        $this->order->user_id = 42;
+        $this->setUserMeta(42, '_fchub_mc_currency', 'GBP');
+
+        OrderSnapshotHooks::saveSnapshot(['order' => $this->order]);
+
+        $this->assertSame('GBP', $this->order->getMeta('_fchub_mc_display_currency'));
+        $this->assertSame('USD', $this->order->getMeta('_fchub_mc_base_currency'));
+        $this->assertNotEmpty($this->order->getMeta('_fchub_mc_rate'));
     }
 }

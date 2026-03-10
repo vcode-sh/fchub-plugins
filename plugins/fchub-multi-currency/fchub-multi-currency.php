@@ -4,7 +4,7 @@
  * Plugin Name: FCHub - Multi-Currency
  * Plugin URI: https://fchub.co
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -21,7 +21,7 @@ declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.3.0');
+define('FCHUB_MC_VERSION', '1.4.0');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));
@@ -207,4 +207,62 @@ function fchub_mc_format_price(float $basePrice): string
     };
 
     return \FluentCart\Api\CurrencySettings::getPriceHtml($rounded, $context->displayCurrency->code);
+}
+
+/**
+ * Get the display currency code for a specific order.
+ *
+ * Returns the currency the customer was browsing in when they placed the order,
+ * or null if the order has no multicurrency data (base currency order).
+ *
+ * @param int $orderId FluentCart order ID
+ * @return string|null Currency code (e.g., 'EUR') or null
+ */
+function fchub_mc_get_order_display_currency(int $orderId): ?string
+{
+    if (!defined('FLUENTCART_VERSION')) {
+        return null;
+    }
+
+    $order = \FluentCart\App\Models\Order::find($orderId);
+    if (!$order) {
+        return null;
+    }
+
+    $currency = $order->getMeta('_fchub_mc_display_currency');
+    return ($currency && $currency !== '') ? (string) $currency : null;
+}
+
+/**
+ * Format a base-currency price using a specific order's display currency.
+ *
+ * Uses the exchange rate that was captured at checkout time for that order.
+ * Falls back to base currency formatting if no multicurrency data exists.
+ *
+ *   fchub_mc_format_order_price(99.99, 42) → "€84.99"
+ *
+ * @param float $basePrice Price in the store's base currency (decimal, not cents)
+ * @param int $orderId FluentCart order ID
+ * @return string Formatted price HTML
+ */
+function fchub_mc_format_order_price(float $basePrice, int $orderId): string
+{
+    if (!defined('FLUENTCART_VERSION')) {
+        return (string) $basePrice;
+    }
+
+    $order = \FluentCart\App\Models\Order::find($orderId);
+    if (!$order) {
+        return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
+    }
+
+    $displayCurrency = $order->getMeta('_fchub_mc_display_currency');
+    $rate = $order->getMeta('_fchub_mc_rate');
+
+    if (!$displayCurrency || !$rate) {
+        return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
+    }
+
+    $converted = $basePrice * (float) $rate;
+    return \FluentCart\Api\CurrencySettings::getPriceHtml(round($converted, 2), $displayCurrency);
 }

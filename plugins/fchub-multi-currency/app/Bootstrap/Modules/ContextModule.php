@@ -129,8 +129,20 @@ final class ContextModule implements ModuleContract
         $existingPref = get_user_meta($user->ID, '_fchub_mc_currency', true);
 
         if (!$existingPref) {
-            update_user_meta($user->ID, '_fchub_mc_currency', strtoupper($guestCurrency));
+            $allowedCodes = CurrencySwitcherRenderer::allowedCurrencyCodes($optionStore);
+            $code = strtoupper($guestCurrency);
+
+            if (!in_array($code, $allowedCodes, true)) {
+                return;
+            }
+
+            update_user_meta($user->ID, '_fchub_mc_currency', $code);
         }
+    }
+
+    public static function resetChain(): void
+    {
+        self::$cachedChain = null;
     }
 
     public static function buildResolverChain(OptionStore $optionStore): ResolverChain

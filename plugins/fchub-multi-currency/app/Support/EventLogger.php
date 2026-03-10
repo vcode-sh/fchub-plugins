@@ -29,8 +29,8 @@ final class EventLogger
 
     private static function hashIp(?string $ip = null): ?string
     {
-        $ip = $ip ?? (isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash((string) $_SERVER['REMOTE_ADDR'])) : '');
-        if ($ip === '') {
+        $ip = $ip ?? IpResolver::resolve();
+        if ($ip === '' || $ip === 'unknown') {
             return null;
         }
 

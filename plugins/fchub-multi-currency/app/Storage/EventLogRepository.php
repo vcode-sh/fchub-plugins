@@ -20,7 +20,7 @@ final class EventLogRepository
             'user_id'    => $userId,
             'ip_hash'    => $ipHash,
             'payload'    => $payload !== null ? wp_json_encode($payload) : null,
-            'created_at' => current_time('mysql'),
+            'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
     }
 

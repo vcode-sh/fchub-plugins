@@ -6,6 +6,7 @@ namespace FChubMultiCurrency\Storage;
 
 use FChubMultiCurrency\Domain\ValueObjects\ExchangeRate;
 use FChubMultiCurrency\Support\Constants;
+use FChubMultiCurrency\Support\Logger;
 
 defined('ABSPATH') || exit;
 
@@ -64,17 +65,27 @@ final class ExchangeRateRepository
         );
     }
 
-    public function insert(ExchangeRate $rate): void
+    public function insert(ExchangeRate $rate): bool
     {
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_RATE_HISTORY;
 
-        $wpdb->insert($table, [
+        $result = $wpdb->insert($table, [
             'base_currency'  => $rate->baseCurrency,
             'quote_currency' => $rate->quoteCurrency,
             'rate'           => $rate->rate,
             'provider'       => $rate->provider->value,
             'fetched_at'     => $rate->fetchedAt,
         ]);
+
+        if ($result === false) {
+            Logger::error('Failed to insert exchange rate', [
+                'currency'  => $rate->quoteCurrency,
+                'db_error'  => $wpdb->last_error,
+            ]);
+            return false;
+        }
+
+        return true;
     }
 }

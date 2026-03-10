@@ -34,12 +34,16 @@
 		if (body) {
 			opts.body = JSON.stringify(body);
 		}
-		return fetch(restUrl(path), opts).then((res) =>
-			res.json().then((json) => {
-				if (!res.ok) throw json;
-				return json.data || json;
-			}),
-		);
+		return fetch(restUrl(path), opts)
+			.catch(() => {
+				throw { message: "Network error. Please check your connection." };
+			})
+			.then((res) =>
+				res.json().then((json) => {
+					if (!res.ok) throw json;
+					return json.data || json;
+				}),
+			);
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -784,6 +788,15 @@
                 <h4 style="margin:0 0 12px;font-size:14px;font-weight:500">Dependencies</h4>\
                 <div class="fchub-mc-diag-row"><span>FluentCart</span><el-tag :type="diagnostics.fluentcart_version && diagnostics.fluentcart_version !== \'not installed\' ? \'success\' : \'danger\'" size="small">{{ diagnostics.fluentcart_version && diagnostics.fluentcart_version !== \'not installed\' ? diagnostics.fluentcart_version : "Missing" }}</el-tag></div>\
                 <div class="fchub-mc-diag-row"><span>FluentCRM</span><el-tag :type="diagnostics.fluentcrm_active ? \'success\' : \'info\'" size="small">{{ diagnostics.fluentcrm_active ? "Active" : "Not found" }}</el-tag></div>\
+                <template v-if="diagnostics.fluentcrm_fields_status">\
+                    <div style="margin-top:8px;font-size:12px;color:#909399;font-weight:500">FluentCRM Custom Fields</div>\
+                    <div v-for="(exists, fieldKey) in diagnostics.fluentcrm_fields_status" :key="fieldKey" class="fchub-mc-diag-row">\
+                        <span style="padding-left:8px">{{ fieldKey }}</span>\
+                        <el-tag v-if="exists === true" type="success" size="small">Found</el-tag>\
+                        <el-tag v-else-if="exists === false" type="danger" size="small">Missing</el-tag>\
+                        <el-tag v-else type="info" size="small">Unknown</el-tag>\
+                    </div>\
+                </template>\
             </div>\
         </div>\
         <div class="fct-card fct-card-border">\
@@ -885,8 +898,8 @@
 					.then((data) => {
 						this.settings = data.settings || data;
 					})
-					.catch(() => {
-						this.$message.error("Failed to load settings.");
+					.catch((err) => {
+						this.$message.error((err && err.message) || "Failed to load settings.");
 					})
 					.finally(() => {
 						this.loading = false;
@@ -898,6 +911,9 @@
 					.then((data) => {
 						this.rates = data.rates || [];
 					})
+					.catch((err) => {
+						this.$message.error((err && err.message) || "Failed to load exchange rates.");
+					})
 					.finally(() => {
 						this.ratesLoading = false;
 					});
@@ -907,6 +923,9 @@
 				request("GET", "admin/diagnostics")
 					.then((data) => {
 						this.diagnostics = data;
+					})
+					.catch((err) => {
+						this.$message.error((err && err.message) || "Failed to load diagnostics.");
 					})
 					.finally(() => {
 						this.diagLoading = false;
@@ -919,8 +938,8 @@
 						this.$message.success("Rates refreshed.");
 						this.loadRates();
 					})
-					.catch(() => {
-						this.$message.error("Rate refresh failed.");
+					.catch((err) => {
+						this.$message.error((err && err.message) || "Rate refresh failed.");
 						this.ratesLoading = false;
 					});
 			},
@@ -931,8 +950,8 @@
 						this.settings = data.settings || data;
 						this.$message.success("Settings saved.");
 					})
-					.catch(() => {
-						this.$message.error("Failed to save settings.");
+					.catch((err) => {
+						this.$message.error((err && err.message) || "Failed to save settings.");
 					})
 					.finally(() => {
 						this.saving = false;

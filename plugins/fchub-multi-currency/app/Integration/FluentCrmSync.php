@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMultiCurrency\Integration;
 
 use FChubMultiCurrency\Storage\OptionStore;
+use FChubMultiCurrency\Support\FluentCartEvent;
 use FChubMultiCurrency\Support\Logger;
 
 defined('ABSPATH') || exit;
@@ -38,6 +39,7 @@ final class FluentCrmSync
             $contact = $contactApi->getContactByUserId($userId);
 
             if (!$contact) {
+                Logger::debug('FluentCRM contact not found for user', ['user_id' => $userId]);
                 return;
             }
 
@@ -64,7 +66,7 @@ final class FluentCrmSync
         }
     }
 
-    public static function onOrderPaid($order): void
+    public static function onOrderPaid($eventData): void
     {
         $settings = (new OptionStore())->all();
 
@@ -73,6 +75,11 @@ final class FluentCrmSync
         }
 
         try {
+            $order = FluentCartEvent::extractOrder($eventData);
+            if ($order === null) {
+                return;
+            }
+
             $userId = (int) ($order->user_id ?? 0);
 
             if ($userId === 0) {
@@ -83,6 +90,7 @@ final class FluentCrmSync
             $contact = $contactApi->getContactByUserId($userId);
 
             if (!$contact) {
+                Logger::debug('FluentCRM contact not found for order user', ['user_id' => $userId, 'order_id' => $order->id ?? 'unknown']);
                 return;
             }
 
@@ -101,8 +109,9 @@ final class FluentCrmSync
         } catch (\Throwable $e) {
             Logger::error('FluentCRM sync failed on order paid', [
                 'error'    => $e->getMessage(),
-                'order_id' => $order->id ?? 'unknown',
+                'order_id' => is_object($order ?? null) ? ($order->id ?? 'unknown') : 'unknown',
             ]);
         }
     }
+
 }

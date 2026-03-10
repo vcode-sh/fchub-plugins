@@ -1,3 +1,37 @@
+### v1.4.0
+
+*Released 10 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.0)
+
+The "post-payment automations silently do nothing" release. If you had multicurrency active and wondered why FluentCRM contacts weren't being tagged, FluentCommunity spaces weren't being populated, and membership grants weren't being created — this is why, and this is the fix.
+
+#### Critical
+
+- **Post-payment integrations killed by multicurrency plugin** — FluentCart fires `order_paid_done` with an event array (`['order' => $order, 'customer' => $customer, ...]`), not a raw Order object. Two multicurrency handlers at priority 10 — `OrderSnapshotHooks::saveSnapshot()` and `FluentCrmSync::onOrderPaid()` — were treating the array as an Order and calling `->getMeta()` on it. That throws a `TypeError`, which is `\Throwable` but not `\Exception`. FluentCart's integration runner catches `\Exception` only, so the `TypeError` killed the entire hook chain at priority 10 — before FluentCart's integration feeds at priority 11 could execute. Every FluentCRM tag, every FluentCommunity enrollment, every membership grant, every Fakturownia invoice — silently dead. Payment succeeded, everything else didn't. Both handlers now extract the Order from either payload shape via a shared `FluentCartEvent::extractOrder()` helper.
+- **FluentCart settings page killed by `wp_send_json()` inside a filter** — `MultiCurrencySettings::getGlobalFields()` was registered as a WordPress filter callback but called `wp_send_json()`, which calls `die()`. Filters are supposed to return a value and let the caller decide what to do with it. Instead, the entire PHP process terminated mid-filter. FluentCart's own response wrapper and field defaults never ran. The settings page worked by accident — the response format was close enough that the Vue component didn't complain. Now returns the field array properly and lets FluentCart handle the response.
+- **Save settings response wrapped incorrectly** — `saveGlobalSettings()` wrapped the response in `{data: {message, status}}` but FluentCart expects `{message, status}` directly. The extra `data` wrapper meant the success toast might not show in all FluentCart versions. Removed the wrapper.
+
+#### Security
+
+- **Rate limiter and event log used proxy IP behind Cloudflare** — `REMOTE_ADDR` behind a Cloudflare tunnel is the edge server IP, not the client's. Every visitor shared the same rate limit bucket (30 requests/minute total), and every event log entry had the same IP hash. One legitimate user could burn the limit for everyone. New `IpResolver` checks `CF-Connecting-IP` first (Cloudflare), then `X-Forwarded-For` (generic proxy), then `REMOTE_ADDR` (direct). Multi-IP `X-Forwarded-For` headers are parsed correctly — first IP wins.
+
+#### Fixed
+
+- **Exchange rate insert failures silently ignored** — `ExchangeRateRepository::insert()` didn't check the return value of `$wpdb->insert()`. If the insert failed (table missing, disk full, connection error), the caller cached a rate that was never persisted. On the next cache miss, the rate vanished. Now returns `bool` and logs the DB error on failure.
+- **Resolver chain cached forever within a request** — `ContextModule::$cachedChain` was set once and never reset. If admin settings changed mid-request (e.g. saving settings and then resolving context), the stale chain with old configuration was used. `CurrencyContextService::reset()` now also clears the cached resolver chain.
+- **Event log timestamps in local time, rate history in UTC** — `EventLogRepository` used `current_time('mysql')` (local timezone), while rate history used `gmdate()` (UTC). Cross-table queries and admin dashboards showed mismatched timestamps. GDPR exports also returned local-time timestamps. Now uses `gmdate()` consistently.
+- **ECB provider used raw `error_log()` instead of Logger** — one stray `error_log()` call bypassed the plugin's log level controls and would write to the PHP error log even with debug mode off. Now uses `Logger::error()` like everything else.
+- **Guest currency preference saved without validation on login** — `mergeGuestPreference()` saved the cookie value to user meta without checking if the currency was still enabled. A stale cookie with a disabled currency code would persist indefinitely, retried on every page load. Now validates against the enabled currency list before saving.
+- **Admin panel swallowed REST errors in silence** — exchange rate loading, diagnostics refresh, and several other admin AJAX calls had no `.catch()` handlers. A failed request would leave the loading spinner spinning indefinitely with no indication that anything went wrong. All REST API calls now surface proper error toasts via FluentCart's notification system, because a spinner that never stops is not an error message.
+- **FluentCRM contact-not-found logged at wrong level** — when a customer had no matching FluentCRM contact, the sync logged it at the same level as actual failures. Noisy logs full of expected non-events made real problems harder to spot. Now logs at debug level, where it belongs.
+- **FluentCRM custom field existence unchecked** — the diagnostics tab checked for FluentCRM's presence but never verified that the required custom fields (`preferred_currency`, `last_order_currency`) actually existed. Missing fields would cause silent sync failures with no admin-visible explanation. Diagnostics now includes a custom field health check that tells you exactly which fields are missing and need creating.
+
+#### Features
+
+- **FluentCRM Smart Codes** — new `mc_order.*` smart code group for FluentCRM automation emails. Six codes: `display_currency`, `base_currency`, `display_total`, `display_subtotal`, `exchange_rate`, and `charged_notice`. Your post-purchase automations can now show amounts in the customer's display currency instead of blindly defaulting to the store's base currency. Because sending "You paid $93.42" to someone who checked out in euros is how you lose trust in one email.
+- **Public API** — two new helper functions for theme and plugin developers: `fchub_mc_get_order_display_currency()` returns the display currency from a past order's snapshot, and `fchub_mc_format_order_price()` formats a price using that order's stored currency and exchange rate. For anyone building custom order templates, receipts, or invoices who was tired of reverse-engineering the snapshot meta keys.
+
+<Separator className="my-8" />
+
 ### v1.3.0
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.3.0)

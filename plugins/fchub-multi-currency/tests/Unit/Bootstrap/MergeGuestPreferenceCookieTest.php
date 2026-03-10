@@ -44,8 +44,10 @@ final class MergeGuestPreferenceCookieTest extends TestCase
     public function testMergeWorksWhenCookieEnabled(): void
     {
         $this->setOption('fchub_mc_settings', [
-            'enabled'        => 'yes',
-            'cookie_enabled' => 'yes',
+            'enabled'             => 'yes',
+            'cookie_enabled'      => 'yes',
+            'base_currency'       => 'USD',
+            'display_currencies'  => [['code' => 'EUR'], ['code' => 'GBP']],
         ]);
 
         $_COOKIE['fchub_mc_currency'] = 'EUR';

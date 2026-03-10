@@ -1020,3 +1020,44 @@ if (!function_exists('fchub_mc_format_price')) {
         return \FluentCart\Api\CurrencySettings::getPriceHtml($rounded, $context->displayCurrency->code);
     }
 }
+
+if (!function_exists('fchub_mc_get_order_display_currency')) {
+    function fchub_mc_get_order_display_currency(int $orderId): ?string
+    {
+        if (!defined('FLUENTCART_VERSION')) {
+            return null;
+        }
+
+        $order = \FluentCart\App\Models\Order::find($orderId);
+        if (!$order) {
+            return null;
+        }
+
+        $currency = $order->getMeta('_fchub_mc_display_currency');
+        return ($currency && $currency !== '') ? (string) $currency : null;
+    }
+}
+
+if (!function_exists('fchub_mc_format_order_price')) {
+    function fchub_mc_format_order_price(float $basePrice, int $orderId): string
+    {
+        if (!defined('FLUENTCART_VERSION')) {
+            return (string) $basePrice;
+        }
+
+        $order = \FluentCart\App\Models\Order::find($orderId);
+        if (!$order) {
+            return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
+        }
+
+        $displayCurrency = $order->getMeta('_fchub_mc_display_currency');
+        $rate = $order->getMeta('_fchub_mc_rate');
+
+        if (!$displayCurrency || !$rate) {
+            return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
+        }
+
+        $converted = $basePrice * (float) $rate;
+        return \FluentCart\Api\CurrencySettings::getPriceHtml(round($converted, 2), $displayCurrency);
+    }
+}

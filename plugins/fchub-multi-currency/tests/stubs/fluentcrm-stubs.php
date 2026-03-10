@@ -43,6 +43,51 @@ if (!class_exists('FluentCrm\App\Models\Tag')) {
     class_alias('FluentCrm_App_Models_Tag', 'FluentCrm\App\Models\Tag');
 }
 
+// FunnelSubscriber model stub
+if (!class_exists('FluentCrm\App\Models\FunnelSubscriber')) {
+    // phpcs:ignore
+    class FluentCrm_App_Models_FunnelSubscriber
+    {
+        /** @var array<int, array<string, mixed>> */
+        private static array $mockData = [];
+
+        /** @param array<int, array<string, mixed>> $data */
+        public static function setMockData(array $data): void
+        {
+            self::$mockData = $data;
+        }
+
+        public static function resetMockData(): void
+        {
+            self::$mockData = [];
+        }
+
+        public static function where(string $field, $value): object
+        {
+            $data = self::$mockData[$value] ?? null;
+
+            return new class ($data) {
+                /** @var array<string, mixed>|null */
+                private ?array $data;
+
+                /** @param array<string, mixed>|null $data */
+                public function __construct(?array $data)
+                {
+                    $this->data = $data;
+                }
+
+                /** @return array<string, mixed>|null */
+                public function first(): ?array
+                {
+                    return $this->data;
+                }
+            };
+        }
+    }
+
+    class_alias('FluentCrm_App_Models_FunnelSubscriber', 'FluentCrm\App\Models\FunnelSubscriber');
+}
+
 // FluentCRM contact stub
 if (!class_exists('FluentCrm_Mock_Contact')) {
     class FluentCrm_Mock_Contact

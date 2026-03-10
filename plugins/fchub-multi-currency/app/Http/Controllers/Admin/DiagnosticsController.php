@@ -32,6 +32,30 @@ final class DiagnosticsController
             }
         }
 
+        $fluentcrmFieldsStatus = null;
+
+        if (defined('FLUENTCRM')) {
+            $fieldSlugs = [
+                'preferred_currency'        => $settings['fluentcrm_field_preferred'] ?? 'preferred_currency',
+                'last_order_display_currency' => $settings['fluentcrm_field_last_order'] ?? 'last_order_display_currency',
+                'last_order_fx_rate'        => $settings['fluentcrm_field_last_rate'] ?? 'last_order_fx_rate',
+            ];
+
+            $fluentcrmFieldsStatus = [];
+
+            foreach ($fieldSlugs as $key => $slug) {
+                try {
+                    if (class_exists(\FluentCrm\App\Models\CustomContactField::class)) {
+                        $fluentcrmFieldsStatus[$key] = \FluentCrm\App\Models\CustomContactField::where('slug', $slug)->exists();
+                    } else {
+                        $fluentcrmFieldsStatus[$key] = null;
+                    }
+                } catch (\Throwable $e) {
+                    $fluentcrmFieldsStatus[$key] = null;
+                }
+            }
+        }
+
         return new \WP_REST_Response([
             'data' => [
                 'plugin_version'    => FCHUB_MC_VERSION,
@@ -44,6 +68,7 @@ final class DiagnosticsController
                 'top_switched_currencies' => $eventLogRepository->topCurrenciesForEvent('context_switched', 5),
                 'fluentcart_version' => defined('FLUENTCART_VERSION') ? FLUENTCART_VERSION : 'not installed',
                 'fluentcrm_active'  => defined('FLUENTCRM'),
+                'fluentcrm_fields_status' => $fluentcrmFieldsStatus,
                 'php_version'       => PHP_VERSION,
                 'bcmath_available'  => extension_loaded('bcmath'),
             ],

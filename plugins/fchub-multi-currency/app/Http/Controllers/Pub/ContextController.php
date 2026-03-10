@@ -11,6 +11,7 @@ use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Storage\PreferenceRepository;
 use FChubMultiCurrency\Support\EventLogger;
 use FChubMultiCurrency\Support\Hooks;
+use FChubMultiCurrency\Support\IpResolver;
 
 defined('ABSPATH') || exit;
 
@@ -46,9 +47,7 @@ final class ContextController
         }
 
         // Rate limit: 30 requests per minute per IP
-        $ip = isset($_SERVER['REMOTE_ADDR'])
-            ? sanitize_text_field(wp_unslash((string) $_SERVER['REMOTE_ADDR']))
-            : 'unknown';
+        $ip = IpResolver::resolve();
         $rateLimitKey = 'fchub_mc_rl_' . substr(md5($ip), 0, 12);
         $hits = (int) get_transient($rateLimitKey);
 

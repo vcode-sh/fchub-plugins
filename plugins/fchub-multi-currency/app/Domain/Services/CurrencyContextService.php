@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMultiCurrency\Domain\Services;
 
+use FChubMultiCurrency\Bootstrap\Modules\ContextModule;
 use FChubMultiCurrency\Domain\Resolvers\ResolverChain;
 use FChubMultiCurrency\Domain\ValueObjects\Currency;
 use FChubMultiCurrency\Domain\ValueObjects\CurrencyContext;
@@ -60,5 +61,6 @@ final class CurrencyContextService
     public static function reset(): void
     {
         self::$resolved = null;
+        ContextModule::resetChain();
     }
 }

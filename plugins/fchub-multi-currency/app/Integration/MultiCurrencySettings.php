@@ -77,12 +77,7 @@ final class MultiCurrencySettings
             ],
         ];
 
-        wp_send_json([
-            'data' => [
-                'integration' => self::getSettings(),
-                'settings'    => $fieldSettings,
-            ],
-        ], 200);
+        return $fieldSettings;
     }
 
     public static function saveGlobalSettings($args): void
@@ -96,10 +91,8 @@ final class MultiCurrencySettings
         update_option(Constants::OPTION_SETTINGS, $settings);
 
         wp_send_json([
-            'data' => [
-                'message' => __('Multi-Currency settings saved.', 'fchub-multi-currency'),
-                'status'  => true,
-            ],
+            'message' => __('Multi-Currency settings saved.', 'fchub-multi-currency'),
+            'status'  => true,
         ], 200);
     }
 }
