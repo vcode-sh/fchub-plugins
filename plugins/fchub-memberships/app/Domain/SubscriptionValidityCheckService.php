@@ -32,6 +32,12 @@ final class SubscriptionValidityCheckService
             $this->checkSubscription((int) $subscriptionId);
         }
 
+        // Anchor grants must be paused before the generic expiry runs
+        $anchorPaused = $this->grantService->pauseOverdueAnchorGrants();
+        if ($anchorPaused > 0) {
+            Logger::log('Validity check', sprintf('%d overdue anchor grants paused', $anchorPaused));
+        }
+
         $this->grantService->revokeExpiredGracePeriodGrants();
         $expired = $this->grantService->expireOverdueGrantsWithHooks();
 

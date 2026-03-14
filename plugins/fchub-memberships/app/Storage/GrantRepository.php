@@ -548,6 +548,7 @@ class GrantRepository
 
     /**
      * Get active grants whose expires_at has passed (overdue for expiration).
+     * Excludes anchor grants — those get paused, not expired.
      */
     public function getOverdueGrants(): array
     {
@@ -558,8 +559,10 @@ class GrantRepository
             "SELECT * FROM {$this->table}
              WHERE status = 'active'
                AND expires_at IS NOT NULL
-               AND expires_at <= %s",
-            $now
+               AND expires_at <= %s
+               AND (meta IS NULL OR meta NOT LIKE %s)",
+            $now,
+            '%"billing_anchor_day"%'
         ), ARRAY_A);
 
         return array_map([$this, 'hydrate'], $rows ?: []);
@@ -567,6 +570,7 @@ class GrantRepository
 
     /**
      * Bulk expire grants whose expires_at has passed.
+     * Excludes anchor grants — those get paused, not expired.
      */
     public function expireOverdueGrants(): int
     {
@@ -578,10 +582,34 @@ class GrantRepository
              SET status = 'expired', updated_at = %s
              WHERE status = 'active'
                AND expires_at IS NOT NULL
-               AND expires_at <= %s",
+               AND expires_at <= %s
+               AND (meta IS NULL OR meta NOT LIKE %s)",
             $now,
-            $now
+            $now,
+            '%"billing_anchor_day"%'
         ));
+    }
+
+    /**
+     * Get active anchor grants whose expires_at has passed.
+     * These should be paused (recoverable), not expired (terminal).
+     */
+    public function getOverdueAnchorGrants(): array
+    {
+        global $wpdb;
+        $now = current_time('mysql');
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE status = 'active'
+               AND expires_at IS NOT NULL
+               AND expires_at <= %s
+               AND meta LIKE %s",
+            $now,
+            '%"billing_anchor_day"%'
+        ), ARRAY_A);
+
+        return array_map([$this, 'hydrate'], $rows ?: []);
     }
 
     /**

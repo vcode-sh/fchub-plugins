@@ -75,7 +75,7 @@ The core event hooks are:
 </Accordion>
 <Accordion title="FluentCart Integration">
 
-The plugin registers as a FluentCart integration module through `BaseIntegrationManager`. This means it appears in the FluentCart integration feeds editor alongside other integrations. You create a feed, select a membership plan, choose a validity mode (lifetime, fixed duration, or mirror subscription), and the feed handles granting access when orders are paid.
+The plugin registers as a FluentCart integration module through `BaseIntegrationManager`. This means it appears in the FluentCart integration feeds editor alongside other integrations. You create a feed, select a membership plan, choose a validity mode (lifetime, fixed duration, mirror subscription, or fixed billing anchor), and the feed handles granting access when orders are paid.
 
 Revocation works the same way — when an order is cancelled or refunded, the feed can automatically revoke access immediately or defer to the subscription validity watcher.
 

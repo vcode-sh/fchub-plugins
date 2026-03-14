@@ -2,6 +2,7 @@
 
 namespace FChubMemberships\Domain;
 
+use FChubMemberships\Domain\Grant\AnchorDateCalculator;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 
@@ -43,6 +44,13 @@ final class GrantPlanContextService
 
             if ($durationType === 'fixed_days' && ($plan['duration_days'] ?? 0) > 0) {
                 $context['expires_at'] = date('Y-m-d H:i:s', strtotime('+' . (int) $plan['duration_days'] . ' days'));
+            } elseif ($durationType === 'fixed_anchor') {
+                $planMeta = $plan['meta'] ?? [];
+                $anchorDay = (int) ($planMeta['billing_anchor_day'] ?? 1);
+                $context['expires_at'] = AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
+                $context['meta'] = array_merge($context['meta'] ?? [], [
+                    'billing_anchor_day' => $anchorDay,
+                ]);
             } elseif ($durationType === 'lifetime') {
                 $context['expires_at'] = null;
             }

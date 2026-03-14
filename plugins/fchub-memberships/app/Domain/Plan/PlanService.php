@@ -83,6 +83,11 @@ class PlanService
             }
         }
 
+        // Merge incoming meta with existing to avoid wiping unrelated keys
+        if (array_key_exists('meta', $data)) {
+            $data['meta'] = array_merge($existing['meta'] ?? [], $data['meta'] ?? []);
+        }
+
         // Check for circular references in includes_plan_ids
         if (isset($data['includes_plan_ids'])) {
             $cycle = $this->detectCycle($id, $data['includes_plan_ids']);

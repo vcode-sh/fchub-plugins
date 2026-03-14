@@ -90,13 +90,14 @@
           <el-divider content-position="left">Duration & Trial</el-divider>
 
           <el-form-item label="Duration Type" prop="duration_type">
-            <el-select v-model="form.duration_type" style="width: 280px">
+            <el-select v-model="form.duration_type" style="width: 340px">
               <el-option label="Lifetime (never expires)" value="lifetime" />
               <el-option label="Fixed Duration (X days)" value="fixed_days" />
               <el-option label="Mirror Subscription" value="subscription_mirror" />
+              <el-option label="Fixed Billing Anchor (monthly due date)" value="fixed_anchor" />
             </el-select>
             <div class="field-hint">
-              Determines how long membership access lasts. Applies to all linked products unless overridden.
+              Determines how long membership access lasts. Fixed Billing Anchor ties access to a calendar day each month. Applies to all linked products unless overridden.
             </div>
           </el-form-item>
 
@@ -114,6 +115,24 @@
               style="width: 200px"
             />
             <div class="field-hint">Number of days the membership remains active after purchase.</div>
+          </el-form-item>
+
+          <el-form-item
+            v-if="form.duration_type === 'fixed_anchor'"
+            label="Billing Anchor Day"
+            prop="meta.billing_anchor_day"
+            :rules="[{ required: true, message: 'Required for anchor billing', trigger: 'blur' }]"
+          >
+            <el-input-number
+              v-model="form.meta.billing_anchor_day"
+              :min="1"
+              :max="31"
+              controls-position="right"
+              style="width: 200px"
+            />
+            <div class="field-hint">
+              Day of the month when payment is due (1-31). Access suspends if unpaid by this date. For months with fewer days (e.g. Feb), the anchor clamps to the last day.
+            </div>
           </el-form-item>
 
           <el-form-item label="Trial Period (days)" prop="trial_days">
@@ -473,6 +492,9 @@ const form = reactive({
   trial_days: 0,
   grace_period_days: 0,
   level: 0,
+  meta: {
+    billing_anchor_day: null,
+  },
 })
 
 const rules = {
@@ -712,6 +734,10 @@ async function loadPlan(id) {
     form.trial_days = plan.trial_days ?? 0
     form.grace_period_days = plan.grace_period_days ?? 0
 
+    // Load anchor billing meta
+    const planMeta = plan.meta || {}
+    form.meta.billing_anchor_day = planMeta.billing_anchor_day ?? null
+
     // T17: load schedule
     schedule.scheduled_status = plan.scheduled_status || null
     schedule.scheduled_at = plan.scheduled_at || null
@@ -772,6 +798,11 @@ async function savePlan() {
 
   saving.value = true
   try {
+    // Build meta: only include billing_anchor_day for fixed_anchor
+    const meta = form.duration_type === 'fixed_anchor'
+      ? { billing_anchor_day: form.meta.billing_anchor_day }
+      : {}
+
     const payload = {
       title: form.title,
       slug: form.slug,
@@ -783,6 +814,7 @@ async function savePlan() {
       trial_days: form.trial_days,
       grace_period_days: form.grace_period_days,
       level: form.level,
+      meta,
       rules: form.rules.map((r) => {
         const rule = {
           resource_type: r.resource_type,

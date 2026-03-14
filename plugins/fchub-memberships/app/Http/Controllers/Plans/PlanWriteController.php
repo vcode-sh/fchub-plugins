@@ -19,11 +19,17 @@ final class PlanWriteController
         }
 
         $durationType = $data['duration_type'] ?? 'lifetime';
-        if (!in_array($durationType, ['lifetime', 'fixed_days', 'subscription_mirror'], true)) {
+        if (!in_array($durationType, ['lifetime', 'fixed_days', 'subscription_mirror', 'fixed_anchor'], true)) {
             return new \WP_REST_Response(['message' => __('Invalid duration type.', 'fchub-memberships')], 422);
         }
         if ($durationType === 'fixed_days' && empty($data['duration_days'])) {
             return new \WP_REST_Response(['message' => __('Duration days is required for fixed duration plans.', 'fchub-memberships')], 422);
+        }
+        if ($durationType === 'fixed_anchor') {
+            $anchorDay = (int) ($data['meta']['billing_anchor_day'] ?? 0);
+            if ($anchorDay < 1 || $anchorDay > 31) {
+                return new \WP_REST_Response(['message' => __('Billing anchor day must be between 1 and 31.', 'fchub-memberships')], 422);
+            }
         }
 
         $validation = new PlanRuleValidationService();
@@ -104,10 +110,17 @@ final class PlanWriteController
             $updateData['rules'] = $validation->prepareForStorage($data['rules']);
         }
         if (isset($data['duration_type'])) {
-            if (!in_array($data['duration_type'], ['lifetime', 'fixed_days', 'subscription_mirror'], true)) {
+            if (!in_array($data['duration_type'], ['lifetime', 'fixed_days', 'subscription_mirror', 'fixed_anchor'], true)) {
                 return new \WP_REST_Response(['message' => __('Invalid duration type.', 'fchub-memberships')], 422);
             }
             $updateData['duration_type'] = $data['duration_type'];
+
+            if ($data['duration_type'] === 'fixed_anchor') {
+                $anchorDay = (int) ($data['meta']['billing_anchor_day'] ?? 0);
+                if ($anchorDay < 1 || $anchorDay > 31) {
+                    return new \WP_REST_Response(['message' => __('Billing anchor day must be between 1 and 31.', 'fchub-memberships')], 422);
+                }
+            }
         }
         foreach (['duration_days', 'trial_days', 'grace_period_days'] as $field) {
             if (isset($data[$field])) {

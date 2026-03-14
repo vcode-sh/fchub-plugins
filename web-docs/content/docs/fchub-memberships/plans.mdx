@@ -29,8 +29,9 @@ Go to **Memberships > Plans** and click **Create Plan**. Each plan has these fie
 
 | Field | Description |
 |---|---|
-| **Duration Type** | `lifetime` (never expires), `fixed_days` (expires after X days), or subscription mirror |
+| **Duration Type** | `lifetime` (never expires), `fixed_days` (expires after X days), `subscription_mirror`, or `fixed_anchor` (monthly due date) |
 | **Duration Days** | Number of days for fixed duration. Only used when duration type is `fixed_days` |
+| **Billing Anchor Day** | Day of the month (1-31) when payment is due. Only used when duration type is `fixed_anchor` |
 | **Trial Days** | Free trial period in days. 0 = no trial |
 | **Grace Period Days** | Days to keep access after cancellation or failed renewal. 0 = immediate revocation |
 
@@ -57,6 +58,33 @@ For example, with this setup:
 A member with the Enterprise plan gets access to all content across all three plans. The `AccessEvaluator` resolves this by checking the member's plan, then checking all plans included via `includes_plan_ids`.
 
 Set up hierarchy in the plan editor by selecting included plans from the multi-select dropdown.
+
+## Fixed Billing Anchor <Badge>v1.2.0</Badge>
+
+Some businesses charge dues by a calendar date — the 20th of every month, say — and access should suspend if they don't pay by that date. FluentCart's subscriptions use rolling billing, which shifts the next due date when someone pays late. That's fine for Netflix. It's a problem when your dance school expects fees on the same day each month regardless of when the last payment landed.
+
+Fixed Billing Anchor solves this. Set `duration_type` to `fixed_anchor` and choose a billing anchor day (1-31). The membership plugin becomes the authority on access timing — it ignores FluentCart's `next_billing_date` and uses the anchor day instead.
+
+### How it works
+
+1. **Initial grant** — Member pays on March 5, anchor day is 20. Access expires March 20 at 23:59:59.
+2. **On-time renewal** — Member pays on March 18. Access extends to April 20. The anchor never shifts.
+3. **Overdue** — March 21, no payment. The 5-minute cron pauses the grant (not expires — this is recoverable). FluentCRM, webhooks, and community integrations all get notified via `fchub_memberships/grant_paused`.
+4. **Late payment** — Member pays March 25. Grant resumes, access restores, next expiry is April 20. Not April 25. The anchor holds.
+
+### Short months
+
+Anchor day 31 in February becomes the 28th (or 29th in leap years). April becomes the 30th. When the next month has 31 days again, the anchor restores to 31. The calculator clamps per-month, not permanently.
+
+### Grant-level immutability
+
+The anchor day is baked into each grant's `meta.billing_anchor_day` at creation time. If you change the plan's anchor day later, existing grants keep their original value. New grants pick up the new one. This prevents a bulk anchor shift from breaking every existing member's billing cycle.
+
+<Callout type="info" title="Paused, not expired">
+Anchor grants that go overdue are **paused** — a recoverable state. Standard grants that expire are **expired** — terminal. This distinction means a late-paying anchor member can always recover access when they pay, whereas a fixed-duration member whose time ran out needs a new grant.
+</Callout>
+
+<Separator />
 
 ## Content Rules
 
@@ -149,7 +177,7 @@ Under the **Integrations** tab, add a new feed and select **Memberships**.
 **Configure the feed**
 
 - **Membership Plan** — select your plan from the dropdown (populated via the `fluent_cart/integration/integration_options_plan_id` filter)
-- **Validity Mode** — lifetime, fixed duration (with days), or mirror subscription
+- **Validity Mode** — lifetime, fixed duration (with days), mirror subscription, or fixed billing anchor (with anchor day)
 - **Grace Period** — days to keep access after cancellation
 - **Cancellation Behavior** — revoke immediately or wait until validity expires
 - **Auto-Create User** — create a WordPress user from the order email if one doesn't exist

@@ -50,7 +50,7 @@ class AccessGrantService
         $this->creation = new GrantCreationService($grantRepo, $sourceRepo, $dripRepo, $adapters);
         $this->revocation = new GrantRevocationService($grantRepo, $sourceRepo, $dripRepo, $adapters, $notifications);
         $this->status = new GrantStatusService($grantRepo, $notifications);
-        $this->maintenance = new GrantMaintenanceService($grantRepo, $sourceRepo);
+        $this->maintenance = new GrantMaintenanceService($grantRepo, $sourceRepo, $this->status);
         $this->locks = new GrantLockService($lockRepo);
         $this->planGrant = new PlanGrantExecutionService(
             $ruleResolver,
@@ -141,6 +141,11 @@ class AccessGrantService
         }
 
         return $results;
+    }
+
+    public function pauseOverdueAnchorGrants(): int
+    {
+        return $this->maintenance->pauseOverdueAnchorGrants();
     }
 
     public function expireOverdueGrantsWithHooks(): int

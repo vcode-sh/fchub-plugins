@@ -5,15 +5,20 @@ namespace FChubMemberships\Domain\Grant;
 use FChubMemberships\Domain\AuditLogger;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\GrantSourceRepository;
+use FChubMemberships\Domain\Grant\GrantStatusService;
 
 defined('ABSPATH') || exit;
 
 final class GrantMaintenanceService
 {
+    private ?GrantStatusService $statusService;
+
     public function __construct(
         private GrantRepository $grants,
-        private GrantSourceRepository $sources
+        private GrantSourceRepository $sources,
+        ?GrantStatusService $statusService = null
     ) {
+        $this->statusService = $statusService;
     }
 
     public function extendExpiry(int $userId, int $planId, string $newExpiresAt, ?int $renewalSourceId = null): int
@@ -38,6 +43,40 @@ final class GrantMaintenanceService
         }
 
         return $extended;
+    }
+
+    /**
+     * Pause overdue anchor grants instead of expiring them.
+     * Anchor grants are recoverable — late payment resumes access.
+     */
+    public function pauseOverdueAnchorGrants(): int
+    {
+        $overdueGrants = $this->grants->getOverdueAnchorGrants();
+        if (empty($overdueGrants)) {
+            return 0;
+        }
+
+        $statusService = $this->statusService;
+        $count = 0;
+
+        foreach ($overdueGrants as $grant) {
+            if ($statusService) {
+                $statusService->pauseGrant($grant['id'], 'Anchor billing date overdue');
+            } else {
+                $this->grants->update($grant['id'], [
+                    'status' => 'paused',
+                    'meta' => array_merge($grant['meta'], [
+                        'paused_at' => current_time('mysql'),
+                        'pause_reason' => 'Anchor billing date overdue',
+                    ]),
+                ]);
+                AuditLogger::logGrantChange($grant['id'], 'paused', $grant, ['status' => 'paused'], 'Anchor billing date overdue');
+                do_action('fchub_memberships/grant_paused', $grant, 'Anchor billing date overdue');
+            }
+            $count++;
+        }
+
+        return $count;
     }
 
     public function expireOverdueGrantsWithHooks(): int

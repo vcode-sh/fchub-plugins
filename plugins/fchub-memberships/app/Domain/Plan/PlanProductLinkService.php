@@ -133,12 +133,20 @@ final class PlanProductLinkService
             }
         }
 
+        $validityModeMap = [
+            'fixed_days'          => 'fixed_duration',
+            'subscription_mirror' => 'mirror_subscription',
+            'fixed_anchor'        => 'anchor_billing',
+        ];
+        $durationType = $plan['duration_type'] ?? 'lifetime';
+        $validityMode = $validityModeMap[$durationType] ?? 'lifetime';
+
         $feedSettings = [
             'name'                   => sprintf('%s - %s', $plan['title'], $product['title']),
             'enabled'                => 'yes',
             'plan_id'                => $planId,
             'plan_slug'              => $plan['slug'],
-            'validity_mode'          => $plan['duration_type'] === 'fixed_days' ? 'fixed_duration' : ($plan['duration_type'] === 'subscription_mirror' ? 'mirror_subscription' : 'lifetime'),
+            'validity_mode'          => $validityMode,
             'validity_days'          => $plan['duration_days'] ?? 0,
             'grace_period_days'      => $plan['grace_period_days'] ?? 0,
             'watch_on_access_revoke' => 'yes',
@@ -147,6 +155,11 @@ final class PlanProductLinkService
             'event_trigger'          => ['order_paid_done'],
             'triggers'               => ['order_paid_done'],
         ];
+
+        if ($durationType === 'fixed_anchor') {
+            $planMeta = $plan['meta'] ?? [];
+            $feedSettings['billing_anchor_day'] = (int) ($planMeta['billing_anchor_day'] ?? 1);
+        }
 
         $this->wpdb->insert($this->metaTable, [
             'object_id'   => $productId,

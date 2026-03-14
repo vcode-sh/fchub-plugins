@@ -4,6 +4,7 @@ namespace FChubMemberships\Integration;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Domain\Grant\AnchorDateCalculator;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Support\Logger;
@@ -92,6 +93,7 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                     'lifetime'             => __('Lifetime (never expires)', 'fchub-memberships'),
                     'fixed_duration'       => __('Fixed Duration (X days)', 'fchub-memberships'),
                     'mirror_subscription'  => __('Mirror Subscription (expires with subscription)', 'fchub-memberships'),
+                    'anchor_billing'       => __('Fixed Billing Anchor (monthly due date)', 'fchub-memberships'),
                 ],
                 'inline_tip' => __('How long the membership access should last.', 'fchub-memberships'),
             ],
@@ -104,6 +106,18 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                 'dependency'  => [
                     'depends_on' => 'validity_mode',
                     'value'      => 'fixed_duration',
+                    'operator'   => '=',
+                ],
+            ],
+            [
+                'key'         => 'billing_anchor_day',
+                'label'       => __('Billing Anchor Day', 'fchub-memberships'),
+                'component'   => 'number',
+                'placeholder' => '20',
+                'inline_tip'  => __('Day of the month (1-31) when payment is due. Access suspends if unpaid by this date. Short months clamp to the last valid day.', 'fchub-memberships'),
+                'dependency'  => [
+                    'depends_on' => 'validity_mode',
+                    'value'      => 'anchor_billing',
                     'operator'   => '=',
                 ],
             ],
@@ -219,6 +233,19 @@ class MembershipAccessIntegration extends BaseIntegrationManager
             $context['expires_at'] = $expiresAt;
         }
 
+        // Inject billing_anchor_day into grant meta for fixed_anchor plans
+        $planDurationType = $plan['duration_type'] ?? 'lifetime';
+        if ($planDurationType === 'fixed_anchor') {
+            $planMeta = $plan['meta'] ?? [];
+            $context['meta'] = array_merge($context['meta'] ?? [], [
+                'billing_anchor_day' => (int) ($planMeta['billing_anchor_day'] ?? 1),
+            ]);
+        } elseif ($validityMode === 'anchor_billing') {
+            $context['meta'] = array_merge($context['meta'] ?? [], [
+                'billing_anchor_day' => (int) Arr::get($settings, 'billing_anchor_day', 1),
+            ]);
+        }
+
         $grantService = new \FChubMemberships\Domain\AccessGrantService();
         $result = $grantService->grantPlan($userId, $planId, $context);
 
@@ -327,6 +354,11 @@ class MembershipAccessIntegration extends BaseIntegrationManager
             if ($planDurationType === 'fixed_days' && !empty($plan['duration_days'])) {
                 return date('Y-m-d H:i:s', strtotime('+' . (int) $plan['duration_days'] . ' days'));
             }
+            if ($planDurationType === 'fixed_anchor') {
+                $planMeta = $plan['meta'] ?? [];
+                $anchorDay = (int) ($planMeta['billing_anchor_day'] ?? 1);
+                return AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
+            }
             if ($planDurationType === 'lifetime') {
                 return null;
             }
@@ -341,6 +373,10 @@ class MembershipAccessIntegration extends BaseIntegrationManager
 
             case 'mirror_subscription':
                 return $this->getSubscriptionNextBillingDate($order);
+
+            case 'anchor_billing':
+                $anchorDay = (int) Arr::get($settings, 'billing_anchor_day', 1);
+                return AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
 
             case 'lifetime':
             default:

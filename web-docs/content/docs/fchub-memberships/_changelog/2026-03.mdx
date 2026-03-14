@@ -1,3 +1,25 @@
+### v1.2.0
+
+*Released March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.2.0)
+
+New duration type: Fixed Billing Anchor. Because some businesses charge dues by a calendar date, and FluentCart's rolling billing had other ideas.
+
+#### Fixed Billing Anchor
+
+Added `fixed_anchor` as the 4th plan duration type. Set a billing anchor day (1-31), and the membership plugin takes over access timing — ignoring FluentCart's `next_billing_date` entirely. Students, gym members, or anyone on monthly dues can now have a consistent due date that doesn't drift when they pay late.
+
+- **Anchor day stored per-grant** — immutable after creation, so changing the plan's anchor day doesn't retroactively shuffle every existing member's billing cycle
+- **Overdue grants pause, not expire** — recoverable on late payment. The 5-minute cron detects overdue anchor grants and pauses them, triggering all the usual FluentCRM/webhook notifications
+- **Late payment resumes and snaps** — when a late payment comes in, the grant resumes and the next expiry snaps to the following month's anchor. No date drift, ever
+- **Short month clamping** — day 31 in February becomes the 28th (29th in leap years), restores to 31 when the next month allows it
+- **Full feed support** — `anchor_billing` validity mode available in integration feeds, and auto-linked when creating product feeds from anchor plans
+
+#### Plan meta merge fix
+
+Plan updates now merge incoming `meta` with existing values instead of wholesale replacement. Previously, saving a plan from the editor would silently nuke any meta keys that weren't part of the form. Harmless before this release (nothing else used plan meta), but would have been a delightful surprise later.
+
+<Separator className="my-8" />
+
 ### v1.1.0
 
 *Released 14 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.1.0)

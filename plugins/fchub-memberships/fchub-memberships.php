@@ -3,7 +3,7 @@
  * Plugin Name: FCHub - Memberships
  * Plugin URI: https://fchub.co
  * Description: Complete membership system for FluentCart with plan management, content access control, content drip scheduling, and analytics
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -18,7 +18,7 @@
 
 defined('ABSPATH') || exit;
 
-defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.1.0');
+defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.2.0');
 defined('FCHUB_MEMBERSHIPS_FILE') || define('FCHUB_MEMBERSHIPS_FILE', __FILE__);
 defined('FCHUB_MEMBERSHIPS_PATH') || define('FCHUB_MEMBERSHIPS_PATH', plugin_dir_path(__FILE__));
 defined('FCHUB_MEMBERSHIPS_URL') || define('FCHUB_MEMBERSHIPS_URL', plugin_dir_url(__FILE__));
