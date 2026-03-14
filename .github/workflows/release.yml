@@ -10,7 +10,7 @@ on:
       - 'fchub-stream/v*'
       - 'fchub-wishlist/v*'
       - 'fchub-multi-currency/v*'
-      - 'wc-fc/v*'
+      - 'cartshift/v*'
 
 permissions:
   contents: write

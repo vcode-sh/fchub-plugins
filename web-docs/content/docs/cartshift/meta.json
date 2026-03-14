@@ -1,0 +1,17 @@
+{
+  "title": "CartShift",
+  "root": true,
+  "description": "Migrate WooCommerce data to FluentCart.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "---Migration---",
+    "preflight",
+    "migration-guide",
+    "rollback",
+    "---Reference---",
+    "troubleshooting",
+    "changelog"
+  ]
+}

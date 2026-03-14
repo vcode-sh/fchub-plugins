@@ -4,7 +4,7 @@
 
 ## Which plugin?
 
-<!-- fchub-p24 / fchub-fakturownia / fchub-memberships / wc-fc / repo-level -->
+<!-- fchub-p24 / fchub-fakturownia / fchub-memberships / cartshift / repo-level -->
 
 ## Why?
 

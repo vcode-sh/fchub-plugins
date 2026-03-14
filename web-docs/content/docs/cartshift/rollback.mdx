@@ -1,0 +1,171 @@
+---
+title: Rollback
+description: Undo a migration by removing all FluentCart records created by the migrator. Rollback uses the ID map to delete records in reverse dependency order.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+If a migration produced unexpected results or you need to start over, the rollback feature removes all FluentCart records that were created by the migrator. It uses the ID mapping table to identify exactly which records to delete.
+
+<Callout type="warn" title="Rollback does NOT restore WooCommerce data">
+Rollback only deletes FluentCart records created during migration. It does not modify or restore your WooCommerce data in any way. If you need to restore WooCommerce data, use your database backup. That is why backing up before migration is non-negotiable.
+</Callout>
+
+## When to Rollback
+
+Rollback is appropriate when:
+
+- The migration completed but the data in FluentCart does not look right
+- You want to start a fresh migration after fixing issues found in the migration log
+- You ran a real migration instead of a dry run by accident
+- You migrated the wrong entity types and want to redo it
+
+Rollback is **not** needed when:
+
+- You ran a dry run — dry runs do not write any data to FluentCart
+- You cancelled a migration and want to resume — you can re-run the migration and already-migrated records will be skipped automatically
+
+## Running a Rollback
+
+<Steps>
+  <Step>
+    **Confirm you have a backup**
+
+    Before rolling back, make sure you have a database backup. While rollback only deletes FluentCart records (not WooCommerce data), having a safety net is always prudent.
+  </Step>
+
+  <Step>
+    **Execute the rollback**
+
+    Call the rollback endpoint:
+
+    ```bash
+    curl -X POST "https://yoursite.com/wp-json/cartshift/v1/rollback" \
+      -H "X-WP-Nonce: YOUR_NONCE"
+    ```
+
+    Or use the rollback button in the admin UI at **Tools > CartShift**.
+  </Step>
+
+  <Step>
+    **Review the response**
+
+    The rollback returns a summary of what was deleted:
+
+    ```json
+    {
+      "status": "rolled_back",
+      "deleted": {
+        "subscription": 94,
+        "order_transaction": 3285,
+        "order_address": 6340,
+        "order_item": 5102,
+        "order": 3241,
+        "coupon": 27,
+        "customer_address": 1580,
+        "customer": 856,
+        "variation": 298,
+        "product_detail": 142,
+        "product": 142,
+        "category": 12
+      }
+    }
+    ```
+
+    Each key shows the entity type and the number of records deleted.
+  </Step>
+
+  <Step>
+    **Verify in FluentCart**
+
+    After rollback, check FluentCart to confirm the migrated records have been removed. If FluentCart had existing data before migration, those records are untouched — rollback only removes records that were tracked in the ID map.
+  </Step>
+</Steps>
+
+<Separator className="my-8" />
+
+## Rollback Order
+
+Records are deleted in reverse dependency order to maintain referential integrity:
+
+1. **Subscriptions** — Removed first since they reference orders, products, and customers
+2. **Order transactions** — Payment and refund transactions
+3. **Order addresses** — Billing and shipping addresses attached to orders
+4. **Order items** — Line items from orders
+5. **Orders** — The order records themselves
+6. **Coupons** — Independent records
+7. **Customer addresses** — Addresses attached to customers
+8. **Customers** — Customer records
+9. **Variations** — Product variations
+10. **Product details** — Product detail rows (`fct_product_details`)
+11. **Products** — Product posts (`fluent-products` CPT)
+12. **Categories** — Product category terms (`product-categories` taxonomy)
+
+This order ensures that child records are deleted before their parents, avoiding foreign key or orphan record issues.
+
+<Separator className="my-8" />
+
+## What Rollback Does
+
+For each entity type, rollback:
+
+1. Retrieves all ID mappings from the `cartshift_id_map` table
+2. Deletes the corresponding FluentCart record from the appropriate table
+3. Removes the ID mapping entries for that entity type
+4. Resets the migration state (clears the `cartshift_migration_state` option)
+
+**Table deletion targets:**
+
+| Entity Type | FluentCart Table |
+|---|---|
+| `category` | WordPress terms (`product-categories` taxonomy) |
+| `product` | `wp_posts` (CPT: `fluent-products`) |
+| `product_detail` | `fct_product_details` |
+| `variation` | `fct_product_variations` |
+| `customer` | `fct_customers` |
+| `customer_address` | `fct_customer_addresses` |
+| `order` | `fct_orders` |
+| `order_item` | `fct_order_items` |
+| `order_address` | `fct_order_addresses` |
+| `order_transaction` | `fct_order_transactions` |
+| `coupon` | `fct_coupons` |
+| `subscription` | `fct_subscriptions` |
+
+## What Rollback Does NOT Do
+
+- **Does not restore WooCommerce data** — Your WC products, orders, customers, etc. are never modified by the migrator. Rollback only touches FluentCart tables.
+- **Does not preserve the migration log** — The log entries remain in the `cartshift_migration_log` table for auditing purposes. Only the ID map entries and migration state are cleared.
+- **Does not delete records that existed before migration** — If FluentCart had data before you ran the migration, those records are untouched. Rollback only knows about records tracked in the ID map.
+
+## Reviewing the Migration Log After Rollback
+
+Even after rollback, the migration log is preserved. You can review what happened during the previous migration:
+
+```bash
+curl -X GET "https://yoursite.com/wp-json/cartshift/v1/log?per_page=100" \
+  -H "X-WP-Nonce: YOUR_NONCE"
+```
+
+This is useful for:
+
+- Understanding what went wrong before re-running the migration
+- Identifying records that had errors and need attention
+- Documenting the migration for audit purposes
+
+<Callout type="info" title="Re-running after rollback">
+After a rollback, the ID map is cleared and the migration state is reset. You can start a new migration immediately. The migrator will treat FluentCart as if no previous migration occurred (because all migrated records have been deleted).
+</Callout>
+
+## Nuclear Option: Database Restore
+
+If rollback does not fully resolve your situation — or if you need to restore WooCommerce data as well — restore your database backup:
+
+1. Deactivate CartShift
+2. Restore your database backup using your hosting panel, WP-CLI (`wp db import backup.sql`), or phpMyAdmin
+3. Reactivate the plugins you need
+4. Start the migration process from the beginning
+
+This is the most thorough reset but requires you to have made a backup before migration. Which you did, because you read the warning at the top of this page.

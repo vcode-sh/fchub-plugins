@@ -28,7 +28,7 @@ if (!empty($updates->response)) {
 echo "\n=== FCHub plugins checked, confirmed up to date ===\n";
 if (!empty($updates->no_update)) {
     foreach ($updates->no_update as $file => $data) {
-        if (strpos($file, 'fchub') !== false || strpos($file, 'wc-fc') !== false) {
+        if (strpos($file, 'fchub') !== false || strpos($file, 'cartshift') !== false) {
             $v = is_object($data) ? ($data->new_version ?? '?') : '?';
             echo "  {$file} (v{$v})\n";
         }

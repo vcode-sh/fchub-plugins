@@ -24,7 +24,7 @@ This whole thing runs on caffeine and spite. If any of these plugins saved you f
 | [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net. The WP media library handling video is a war crime | FluentCommunity |
 | [fchub-thank-you](plugins/fchub-thank-you/) | Per-product post-payment redirects. "Thank you for your order" is not a personality | FluentCart |
 | [fchub-wishlist](plugins/fchub-wishlist/) | Wishlists with guest sessions, portal support, FluentCRM automations. The basics, done properly | FluentCart |
-| [wc-fc](plugins/wc-fc/) | WooCommerce → FluentCart migrator. Products, orders, subscriptions, customers, coupons. Your escape hatch | Both |
+| [CartShift](plugins/cartshift/) | WooCommerce → FluentCart migrator. Products, orders, subscriptions, customers, coupons. Your escape hatch | Both |
 
 WordPress 6.7+. PHP 8.3+. Patience optional.
 

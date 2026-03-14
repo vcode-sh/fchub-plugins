@@ -80,7 +80,7 @@ cd admin-app && npm install && npm run dev
 cd portal-app && npm install && npm run dev
 ```
 
-### wc-fc
+### cartshift
 No build step. Just PHP doing PHP things.
 
 ### Docker (optional)

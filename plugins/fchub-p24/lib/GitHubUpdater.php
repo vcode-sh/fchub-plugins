@@ -30,7 +30,7 @@ class FCHub_GitHub_Updater
         'fchub-wishlist',
         'fchub-stream',
         'fchub-multi-currency',
-        'wc-fc',
+        'cartshift',
     ];
 
     /** @var array<string, array{file: string, version: string}> */
@@ -291,7 +291,7 @@ class FCHub_GitHub_Updater
      * Derive plugin slug from the plugin file basename.
      *
      * "fchub-p24/fchub-p24.php" → "fchub-p24"
-     * "wc-fc/wc-fc.php" → "wc-fc"
+     * "cartshift/cartshift.php" → "cartshift"
      */
     private static function slugFromFile(string $pluginFile): ?string
     {

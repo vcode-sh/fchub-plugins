@@ -14,7 +14,7 @@ web-docs/lib/versions.json
 
 This file is the **single source of truth** for all plugins in this repo. Parse the `plugins` object to get every plugin slug and its current version. Never hardcode the plugin list — always read it fresh.
 
-Each key in `plugins` is a slug (e.g. `fchub-p24`, `fchub-memberships`, `wc-fc`). The `version` field tells you the latest released version.
+Each key in `plugins` is a slug (e.g. `fchub-p24`, `fchub-memberships`, `cartshift`). The `version` field tells you the latest released version.
 
 ## Step 2: Identify the Affected Plugin
 

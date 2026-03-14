@@ -60,8 +60,8 @@ export default function Layout({ children }: LayoutProps<"/">) {
               icon: <LayoutDashboard size={16} />,
             },
             {
-              text: "WC Migrator",
-              url: "/docs/wc-fc",
+              text: "CartShift",
+              url: "/docs/cartshift",
               icon: <ArrowRightLeft size={16} />,
             },
             {
@@ -147,9 +147,9 @@ export default function Layout({ children }: LayoutProps<"/">) {
                       New
                     </Badge>
                   </NavigationMenuLink>
-                  <NavigationMenuLink render={<Link href="/docs/wc-fc" />}>
+                  <NavigationMenuLink render={<Link href="/docs/cartshift" />}>
                     <ArrowRightLeft size={16} />
-                    WC Migrator
+                    CartShift
                     <Badge
                       variant="secondary"
                       className="ml-auto text-[10px] h-4"

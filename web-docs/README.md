@@ -32,7 +32,7 @@ web-docs/
 │   ├── fchub-p24/        # Przelewy24 payment gateway
 │   ├── fchub-fakturownia/# Invoice automation
 │   ├── fchub-memberships/# Membership plans
-│   └── wc-fc/            # WooCommerce migration tool
+│   └── cartshift/        # WooCommerce migration tool
 ├── lib/                  # Utilities and shared config
 ├── public/               # Static assets
 └── source.config.ts      # Fumadocs MDX config

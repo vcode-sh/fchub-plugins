@@ -48,10 +48,10 @@
       "zipFilename": "fchub-stream-1.0.2.zip",
       "mcpbFilename": null
     },
-    "wc-fc": {
+    "cartshift": {
       "version": "1.0.3",
-      "tagName": "wc-fc/v1.0.3",
-      "zipFilename": "wc-fc-1.0.3.zip",
+      "tagName": "cartshift/v1.0.3",
+      "zipFilename": "cartshift-1.0.3.zip",
       "mcpbFilename": null
     }
   },

@@ -33,7 +33,7 @@ When asked to modify code:
 
 - **Payment Gateway** (fchub-p24): Extends `AbstractPaymentGateway`, registered via `fluent_cart/register_payment_methods`
 - **Integration Module** (fchub-fakturownia, fchub-memberships): Extends `BaseIntegrationManager`, dual registration required (backend + UI)
-- **Autoloading**: fchub-p24 = manual require, fchub-fakturownia/memberships/wc-fc = SPL, fchub-stream = Composer
+- **Autoloading**: fchub-p24 = manual require, fchub-fakturownia/memberships/cartshift = SPL, fchub-stream = Composer
 - **Tests**: fchub-p24, fchub-memberships, fchub-stream, fchub-wishlist have PHPUnit tests
 - **Vue apps**: fchub-memberships (Element Plus), fchub-stream (admin-app + portal-app)
 - **Response wrapping**: FluentCart Vue expects `{data: {...}}` wrapper on all success responses

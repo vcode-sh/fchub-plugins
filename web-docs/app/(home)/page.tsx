@@ -128,12 +128,12 @@ const cartPlugins: Plugin[] = [
     downloadUrl: versions["fchub-portal-extender"].releaseUrl,
   },
   {
-    title: "WC Migrator",
+    title: "CartShift",
     description:
       "Products, orders, subscriptions, customers. Your WooCommerce escape hatch.",
     icon: ArrowRightLeft,
-    docsHref: "/docs/wc-fc",
-    downloadUrl: versions["wc-fc"].releaseUrl,
+    docsHref: "/docs/cartshift",
+    downloadUrl: versions["cartshift"].releaseUrl,
   },
 ];
 

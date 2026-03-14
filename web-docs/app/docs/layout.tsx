@@ -50,7 +50,7 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
               "/docs/fchub-portal-extender": <LayoutDashboard size={16} />,
               "/docs/fchub-wishlist": <Heart size={16} />,
               "/docs/fchub-multi-currency": <Globe size={16} />,
-              "/docs/wc-fc": <ArrowRightLeft size={16} />,
+              "/docs/cartshift": <ArrowRightLeft size={16} />,
               "/docs/fluentcart-api": <Braces size={16} />,
               "/docs/fluentcart-mcp": <Bot size={16} />,
             };
@@ -66,7 +66,7 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
               "/docs/fchub-portal-extender": "FluentCart",
               "/docs/fchub-wishlist": "FluentCart",
               "/docs/fchub-multi-currency": "FluentCart",
-              "/docs/wc-fc": "FluentCart",
+              "/docs/cartshift": "FluentCart",
               "/docs/fluentcart-api": "Tools & Extra",
               "/docs/fluentcart-mcp": "Tools & Extra",
             };

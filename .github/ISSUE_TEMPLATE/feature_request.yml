@@ -15,7 +15,7 @@ body:
         - Wishlist (fchub-wishlist)
         - Multi-Currency (fchub-multi-currency)
         - Portal Extender (fchub-portal-extender)
-        - WC Migrator (wc-fc)
+        - CartShift (cartshift)
         - FluentCart MCP Server (fluentcart-mcp)
         - New plugin / not sure
     validations:

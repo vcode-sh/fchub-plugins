@@ -12,7 +12,7 @@ if [ ! -f "$SOURCE" ]; then
     exit 1
 fi
 
-for dir in "$ROOT_DIR"/plugins/fchub-* "$ROOT_DIR"/plugins/wc-fc; do
+for dir in "$ROOT_DIR"/plugins/fchub-* "$ROOT_DIR"/plugins/cartshift; do
     if [ -d "$dir" ]; then
         mkdir -p "$dir/lib"
         cp "$SOURCE" "$dir/lib/GitHubUpdater.php"
