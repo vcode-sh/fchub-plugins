@@ -19,6 +19,7 @@ Thumbs.db
 
 # Local build output
 /dist/
+!plugins/fchub-memberships/assets/dist/
 
 # Next.js / Fumadocs (web-docs)
 .next/

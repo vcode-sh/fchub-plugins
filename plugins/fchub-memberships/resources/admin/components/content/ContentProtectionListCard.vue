@@ -165,7 +165,7 @@
         :total="total"
         layout="prev, pager, next"
         background
-        small
+        size="small"
         @update:current-page="$emit('update:page', $event)"
         @current-change="$emit('page-change')"
       />
