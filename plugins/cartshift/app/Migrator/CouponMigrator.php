@@ -1,30 +1,56 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CartShift\Migrator;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
-use CartShift\Mapper\CouponMapper;
+use CartShift\Domain\Mapping\CouponMapper;
+use CartShift\State\MigrationState;
+use CartShift\Storage\IdMapRepository;
+use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\Constants;
 use FluentCart\App\Models\Coupon;
 
-class CouponMigrator extends AbstractMigrator
+final class CouponMigrator extends AbstractMigrator
 {
-    protected string $entityType = 'coupons';
+    private readonly CouponMapper $couponMapper;
 
+    public function __construct(
+        IdMapRepository $idMap,
+        MigrationLogRepository $log,
+        MigrationState $migrationState,
+        string $migrationId,
+        int $batchSize = Constants::DEFAULT_BATCH_SIZE,
+    ) {
+        parent::__construct($idMap, $log, $migrationState, $migrationId, $batchSize);
+
+        $currency = get_woocommerce_currency();
+        $this->couponMapper = new CouponMapper($currency);
+    }
+
+    #[\Override]
+    protected function getEntityType(): string
+    {
+        return Constants::ENTITY_COUPON;
+    }
+
+    #[\Override]
     protected function countTotal(): int
     {
         $counts = wp_count_posts('shop_coupon');
+
         return (int) $counts->publish + (int) $counts->draft + (int) $counts->private;
     }
 
-    protected function fetchBatch(int $page): array
+    #[\Override]
+    protected function fetchBatch(int $offset, int $limit): array
     {
-        $offset = ($page - 1) * $this->batchSize;
-
         $couponIds = get_posts([
             'post_type'      => 'shop_coupon',
             'post_status'    => ['publish', 'draft', 'private'],
-            'posts_per_page' => $this->batchSize,
+            'posts_per_page' => $limit,
             'offset'         => $offset,
             'orderby'        => 'ID',
             'order'          => 'ASC',
@@ -45,46 +71,47 @@ class CouponMigrator extends AbstractMigrator
     /**
      * @param \WC_Coupon $coupon
      */
-    protected function processRecord($coupon)
+    #[\Override]
+    protected function processRecord(mixed $coupon): int|false
     {
         $wcId = $coupon->get_id();
 
-        // Skip if already migrated.
-        if ($this->idMap->getFcId('coupon', $wcId)) {
-            $this->log($wcId, 'skipped', 'Already migrated.');
+        if ($this->idMap->getFcId(Constants::ENTITY_COUPON, (string) $wcId)) {
+            $this->writeLog($wcId, 'skipped', 'Already migrated.');
             return false;
         }
 
-        // Check if FC already has a coupon with this code.
+        // FIX C9: when mapping existing FC coupon, store with created_by_migration=false.
         $code = strtoupper($coupon->get_code());
         $existing = Coupon::query()->where('code', $code)->first();
         if ($existing) {
-            $this->idMap->store('coupon', $wcId, $existing->id);
-            $this->log($wcId, 'skipped', sprintf('Coupon code "%s" already exists in FluentCart.', $code));
+            $this->idMap->store(
+                Constants::ENTITY_COUPON,
+                (string) $wcId,
+                $existing->id,
+                $this->migrationId,
+                false,
+            );
+            $this->writeLog($wcId, 'skipped', sprintf('Coupon code "%s" already exists in FluentCart.', $code));
             return false;
         }
 
-        $mapped = CouponMapper::map($coupon);
-
-        if ($this->dryRun) {
-            $this->log($wcId, 'success', sprintf(
-                '[DRY RUN] Would migrate coupon "%s" - Type: %s, Amount: %s.',
-                $code,
-                $mapped['type'],
-                $mapped['amount']
-            ));
-            return 0;
-        }
+        $mapped = $this->couponMapper->map($coupon);
 
         $fcCoupon = Coupon::query()->create($mapped);
-        $this->idMap->store('coupon', $wcId, $fcCoupon->id);
+        $this->idMap->store(
+            Constants::ENTITY_COUPON,
+            (string) $wcId,
+            $fcCoupon->id,
+            $this->migrationId,
+            true,
+        );
 
-        $this->log($wcId, 'success', sprintf(
-            'Migrated coupon "%s" (FC ID: %d) - Type: %s, Amount: %s.',
+        $this->writeLog($wcId, 'success', sprintf(
+            'Migrated coupon "%s" (FC ID: %d) - Type: %s.',
             $code,
             $fcCoupon->id,
             $mapped['type'],
-            $mapped['amount']
         ));
 
         return $fcCoupon->id;

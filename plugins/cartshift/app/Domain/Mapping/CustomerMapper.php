@@ -1,18 +1,25 @@
 <?php
 
-namespace CartShift\Mapper;
+declare(strict_types=1);
+
+namespace CartShift\Domain\Mapping;
 
 defined('ABSPATH') or die;
 
-class CustomerMapper
+use CartShift\Storage\IdMapRepository;
+
+final class CustomerMapper
 {
+    public function __construct(
+        private readonly IdMapRepository $idMap,
+    ) {}
+
     /**
      * Map a WP_User (WC customer) to FluentCart customer data.
      *
-     * @param \WP_User $user
      * @return array{customer: array, addresses: array}
      */
-    public static function mapRegistered(\WP_User $user): array
+    public function mapRegistered(\WP_User $user): array
     {
         $customer = [
             'user_id'    => $user->ID,
@@ -29,31 +36,31 @@ class CustomerMapper
 
         $addresses = [];
 
-        // Billing address.
-        $billingAddress = self::buildAddressFromUserMeta($user->ID, 'billing');
+        $billingAddress = $this->buildAddressFromUserMeta($user->ID, 'billing');
         if ($billingAddress) {
             $addresses[] = $billingAddress;
         }
 
-        // Shipping address.
-        $shippingAddress = self::buildAddressFromUserMeta($user->ID, 'shipping');
+        $shippingAddress = $this->buildAddressFromUserMeta($user->ID, 'shipping');
         if ($shippingAddress) {
             $addresses[] = $shippingAddress;
         }
 
-        return [
+        $mapped = [
             'customer'  => $customer,
             'addresses' => $addresses,
         ];
+
+        /** @see 'cartshift/mapper/customer' */
+        return apply_filters('cartshift/mapper/customer', $mapped, $user);
     }
 
     /**
      * Map a guest order to FluentCart customer data.
      *
-     * @param \WC_Order $order
      * @return array{customer: array, addresses: array}
      */
-    public static function mapGuest(\WC_Order $order): array
+    public function mapGuest(\WC_Order $order): array
     {
         $customer = [
             'user_id'    => null,
@@ -80,29 +87,31 @@ class CustomerMapper
             $addresses[] = $shippingAddress;
         }
 
-        return [
+        $mapped = [
             'customer'  => $customer,
             'addresses' => $addresses,
         ];
+
+        /** @see 'cartshift/mapper/guest_customer' */
+        return apply_filters('cartshift/mapper/guest_customer', $mapped, $order->get_billing_email(), $order);
     }
 
     /**
      * Build an address array from WP user meta.
      */
-    private static function buildAddressFromUserMeta(int $userId, string $type): ?array
+    private function buildAddressFromUserMeta(int $userId, string $type): ?array
     {
         $firstName = get_user_meta($userId, "{$type}_first_name", true);
         $lastName  = get_user_meta($userId, "{$type}_last_name", true);
         $address1  = get_user_meta($userId, "{$type}_address_1", true);
         $country   = get_user_meta($userId, "{$type}_country", true);
 
-        // Skip if no meaningful address data.
         if (empty($firstName) && empty($address1) && empty($country)) {
             return null;
         }
 
-        $name = trim("{$firstName} {$lastName}");
-        $phone = get_user_meta($userId, "{$type}_phone", true);
+        $name    = trim("{$firstName} {$lastName}");
+        $phone   = get_user_meta($userId, "{$type}_phone", true);
         $company = get_user_meta($userId, "{$type}_company", true);
 
         $meta = [];
@@ -127,7 +136,7 @@ class CustomerMapper
             'country'    => $country ?: '',
             'phone'      => $phone ?: '',
             'email'      => get_user_meta($userId, "{$type}_email", true) ?: '',
-            'meta'       => !empty($meta) ? json_encode($meta) : null,
+            'meta'       => !empty($meta) ? $meta : null,
         ];
     }
 
@@ -147,8 +156,8 @@ class CustomerMapper
             return null;
         }
 
-        $name  = trim("{$firstName} {$lastName}");
-        $phone = '';
+        $name    = trim("{$firstName} {$lastName}");
+        $phone   = '';
         $company = '';
 
         if ($type === 'billing') {
@@ -180,7 +189,7 @@ class CustomerMapper
             'country'    => $country ?: '',
             'phone'      => $phone ?: '',
             'email'      => $type === 'billing' ? $order->get_billing_email() : '',
-            'meta'       => !empty($meta) ? json_encode($meta) : null,
+            'meta'       => !empty($meta) ? $meta : null,
         ];
     }
 }

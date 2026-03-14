@@ -1,39 +1,67 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CartShift\Migrator;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
-use CartShift\Mapper\SubscriptionMapper;
+use CartShift\Domain\Mapping\SubscriptionMapper;
+use CartShift\State\MigrationState;
+use CartShift\Storage\IdMapRepository;
+use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\Constants;
 use FluentCart\App\Models\Subscription;
 
-class SubscriptionMigrator extends AbstractMigrator
+final class SubscriptionMigrator extends AbstractMigrator
 {
-    protected string $entityType = 'subscriptions';
+    private readonly SubscriptionMapper $subscriptionMapper;
 
+    public function __construct(
+        IdMapRepository $idMap,
+        MigrationLogRepository $log,
+        MigrationState $migrationState,
+        string $migrationId,
+        int $batchSize = Constants::DEFAULT_BATCH_SIZE,
+    ) {
+        parent::__construct($idMap, $log, $migrationState, $migrationId, $batchSize);
+        $this->subscriptionMapper = new SubscriptionMapper($idMap, get_woocommerce_currency());
+    }
+
+    #[\Override]
+    protected function getEntityType(): string
+    {
+        return Constants::ENTITY_SUBSCRIPTION;
+    }
+
+    /**
+     * FIX H2: use COUNT(*) query, not loading all full subscription objects.
+     */
+    #[\Override]
     protected function countTotal(): int
     {
         if (!function_exists('wcs_get_subscriptions')) {
             return 0;
         }
 
-        $subs = wcs_get_subscriptions([
-            'subscriptions_per_page' => -1,
-        ]);
+        global $wpdb;
 
-        return count($subs);
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(*)
+             FROM {$wpdb->prefix}wc_orders
+             WHERE type = 'shop_subscription'",
+        );
     }
 
-    protected function fetchBatch(int $page): array
+    #[\Override]
+    protected function fetchBatch(int $offset, int $limit): array
     {
         if (!function_exists('wcs_get_subscriptions')) {
             return [];
         }
 
-        $offset = ($page - 1) * $this->batchSize;
-
         $subs = wcs_get_subscriptions([
-            'subscriptions_per_page' => $this->batchSize,
+            'subscriptions_per_page' => $limit,
             'offset'                 => $offset,
             'orderby'                => 'ID',
             'order'                  => 'ASC',
@@ -45,40 +73,95 @@ class SubscriptionMigrator extends AbstractMigrator
     /**
      * @param \WC_Subscription $subscription
      */
-    protected function processRecord($subscription)
+    #[\Override]
+    protected function processRecord(mixed $subscription): int|false
     {
         $wcId = $subscription->get_id();
 
-        // Skip if already migrated.
-        if ($this->idMap->getFcId('subscription', $wcId)) {
-            $this->log($wcId, 'skipped', 'Already migrated.');
+        if ($this->idMap->getFcId(Constants::ENTITY_SUBSCRIPTION, (string) $wcId)) {
+            $this->writeLog($wcId, 'skipped', 'Already migrated.');
             return false;
         }
 
-        $mapped = SubscriptionMapper::map($subscription, $this->idMap);
-
-        if ($this->dryRun) {
-            $this->log($wcId, 'success', sprintf(
-                '[DRY RUN] Would migrate subscription #%d - Status: %s, Interval: %s.',
-                $wcId,
-                $mapped['status'],
-                $mapped['billing_interval']
-            ));
-            return 0;
+        // FIX C4: validate customer_id before creating.
+        $wcCustomerId = $subscription->get_customer_id();
+        if ($wcCustomerId > 0) {
+            $fcCustomerId = $this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $wcCustomerId);
+            if (!$fcCustomerId) {
+                $this->writeLog(
+                    $wcId,
+                    'warning',
+                    sprintf('Customer ID %d not found in ID map. Skipping subscription.', $wcCustomerId),
+                );
+                return false;
+            }
         }
 
-        // Create FC subscription.
-        $fcSubscription = Subscription::query()->create($mapped);
-        $this->idMap->store('subscription', $wcId, $fcSubscription->id);
+        // FIX C4: validate product_id and variation_id before creating.
+        $missingRefs = $this->validateProductReferences($subscription, $wcId);
+        if ($missingRefs) {
+            return false;
+        }
 
-        $this->log($wcId, 'success', sprintf(
-            'Migrated subscription #%d (FC ID: %d) - Status: %s, Interval: %s.',
+        $mapped = $this->subscriptionMapper->map($subscription);
+
+        $fcSubscription = Subscription::query()->create($mapped);
+        $this->idMap->store(
+            Constants::ENTITY_SUBSCRIPTION,
+            (string) $wcId,
+            $fcSubscription->id,
+            $this->migrationId,
+            true,
+        );
+
+        $this->writeLog($wcId, 'success', sprintf(
+            'Migrated subscription #%d (FC ID: %d) - Status: %s.',
             $wcId,
             $fcSubscription->id,
             $mapped['status'],
-            $mapped['billing_interval']
         ));
 
         return $fcSubscription->id;
+    }
+
+    /**
+     * FIX C4: validate that product and variation references exist in the ID map.
+     * Returns true if references are missing (should skip), false if all valid.
+     */
+    private function validateProductReferences(mixed $subscription, int $wcId): bool
+    {
+        foreach ($subscription->get_items() as $item) {
+            /** @var \WC_Order_Item_Product $item */
+            $wcProductId = $item->get_product_id();
+            $wcVariationId = $item->get_variation_id();
+
+            if ($wcProductId > 0 && !$this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcProductId)) {
+                $this->writeLog(
+                    $wcId,
+                    'warning',
+                    sprintf('Product ID %d not found in ID map. Skipping subscription.', $wcProductId),
+                );
+                return true;
+            }
+
+            if ($wcVariationId > 0) {
+                $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcVariationId);
+                if (!$fcVariationId) {
+                    $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcProductId);
+                }
+                if (!$fcVariationId) {
+                    $this->writeLog(
+                        $wcId,
+                        'warning',
+                        sprintf('Variation ID %d not found in ID map. Skipping subscription.', $wcVariationId),
+                    );
+                    return true;
+                }
+            }
+
+            break; // Only check the first item.
+        }
+
+        return false;
     }
 }

@@ -1,287 +1,335 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CartShift\Migrator;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
-use CartShift\Mapper\CustomerMapper;
+use CartShift\Domain\Mapping\CustomerMapper;
+use CartShift\State\MigrationState;
+use CartShift\Storage\IdMapRepository;
+use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\Constants;
 use FluentCart\App\Models\Customer;
 use FluentCart\App\Models\CustomerAddresses;
 
-class CustomerMigrator extends AbstractMigrator
+final class CustomerMigrator extends AbstractMigrator
 {
-    protected string $entityType = 'customers';
+    private readonly CustomerMapper $customerMapper;
 
-    /** @var array Tracks guest emails already processed. */
-    private array $processedGuestEmails = [];
+    /** @var int|null Cached registered customer count */
+    private ?int $registeredCount = null;
 
-    protected function countTotal(): int
-    {
-        $registered = count(get_users([
-            'role'   => 'customer',
-            'fields' => 'ID',
-        ]));
-
-        $guests = $this->countGuestCustomers();
-
-        return $registered + $guests;
+    public function __construct(
+        IdMapRepository $idMap,
+        MigrationLogRepository $log,
+        MigrationState $migrationState,
+        string $migrationId,
+        int $batchSize = Constants::DEFAULT_BATCH_SIZE,
+    ) {
+        parent::__construct($idMap, $log, $migrationState, $migrationId, $batchSize);
+        $this->customerMapper = new CustomerMapper($idMap);
     }
 
-    protected function fetchBatch(int $page): array
+    #[\Override]
+    protected function getEntityType(): string
     {
-        $offset = ($page - 1) * $this->batchSize;
+        return Constants::ENTITY_CUSTOMER;
+    }
+
+    /**
+     * FIX H4: query users by order history, not just 'customer' role.
+     * FIX H5: count unique guest emails directly via SQL.
+     */
+    #[\Override]
+    protected function countTotal(): int
+    {
+        return $this->countRegisteredCustomers() + $this->countGuestCustomers();
+    }
+
+    #[\Override]
+    protected function fetchBatch(int $offset, int $limit): array
+    {
         $batch = [];
+        $registeredTotal = $this->countRegisteredCustomers();
 
-        // First: registered customers.
-        $users = get_users([
-            'role'    => 'customer',
-            'number'  => $this->batchSize,
-            'offset'  => $offset,
-            'orderby' => 'ID',
-            'order'   => 'ASC',
-        ]);
+        if ($offset < $registeredTotal) {
+            $batch = $this->fetchRegisteredBatch($offset, $limit);
 
-        foreach ($users as $user) {
-            $batch[] = ['type' => 'registered', 'data' => $user];
-        }
-
-        // If we got a full batch of registered users, return them.
-        if (count($users) >= $this->batchSize) {
-            return $batch;
-        }
-
-        // Otherwise, fill remaining slots with guest customers.
-        $remaining = $this->batchSize - count($users);
-        $guestOffset = max(0, $offset - $this->countRegistered());
-
-        if ($guestOffset < 0) {
-            $guestOffset = 0;
-        }
-
-        $guestOrders = $this->fetchGuestOrders($remaining, $guestOffset);
-
-        foreach ($guestOrders as $order) {
-            $email = $order->get_billing_email();
-            if (empty($email) || in_array($email, $this->processedGuestEmails, true)) {
-                continue;
+            if (count($batch) >= $limit) {
+                return $batch;
             }
-            $this->processedGuestEmails[] = $email;
-            $batch[] = ['type' => 'guest', 'data' => $order];
         }
+
+        $remaining = $limit - count($batch);
+        $guestOffset = max(0, $offset - $registeredTotal);
+
+        $guestBatch = $this->fetchGuestBatch($guestOffset, $remaining);
+        $batch = array_merge($batch, $guestBatch);
 
         return $batch;
     }
 
-    protected function processRecord($record)
+    #[\Override]
+    protected function processRecord(mixed $record): int|false
     {
         $type = $record['type'];
         $data = $record['data'];
 
-        if ($type === 'registered') {
-            return $this->processRegistered($data);
-        }
-
-        return $this->processGuest($data);
+        return match ($type) {
+            'registered' => $this->processRegistered($data),
+            'guest'      => $this->processGuest($data),
+            default      => false,
+        };
     }
 
-    protected function getRecordId($record): int
+    #[\Override]
+    protected function getRecordId(mixed $record): string
     {
         if ($record['type'] === 'registered') {
-            return $record['data']->ID;
+            return (string) $record['data']['user_id'];
         }
-        return $record['data']->get_id();
+
+        return $record['data']['email'];
     }
 
     /**
      * Process a registered WP customer user.
      */
-    private function processRegistered(\WP_User $user): int
+    private function processRegistered(array $userData): int|false
     {
-        // Skip if already migrated.
-        if ($this->idMap->getFcId('customer', $user->ID)) {
-            $this->log($user->ID, 'skipped', 'Already migrated.');
+        $userId = (int) $userData['user_id'];
+
+        if ($this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $userId)) {
+            $this->writeLog($userId, 'skipped', 'Already migrated.');
             return false;
         }
 
-        // Check if FC already has this customer by email.
+        $user = get_userdata($userId);
+        if (!$user) {
+            $this->writeLog($userId, 'error', 'User not found.');
+            return false;
+        }
+
+        // FIX C9: when mapping existing FC customer, store with created_by_migration=false.
         $existing = Customer::query()->where('email', $user->user_email)->first();
         if ($existing) {
-            $this->idMap->store('customer', $user->ID, $existing->id);
-            $this->log($user->ID, 'skipped', 'Customer already exists in FluentCart.');
+            $this->idMap->store(
+                Constants::ENTITY_CUSTOMER,
+                (string) $userId,
+                $existing->id,
+                $this->migrationId,
+                false,
+            );
+            $this->writeLog($userId, 'skipped', 'Customer already exists in FluentCart.');
             return false;
         }
 
-        $mapped = CustomerMapper::mapRegistered($user);
-
-        if ($this->dryRun) {
-            $this->log($user->ID, 'success', sprintf(
-                '[DRY RUN] Would migrate customer "%s" with %d address(es).',
-                $user->user_email,
-                count($mapped['addresses'])
-            ));
-            return 0;
-        }
+        $mapped = $this->customerMapper->mapRegistered($user);
 
         $customer = Customer::query()->create($mapped['customer']);
-        $this->idMap->store('customer', $user->ID, $customer->id);
+        $this->idMap->store(
+            Constants::ENTITY_CUSTOMER,
+            (string) $userId,
+            $customer->id,
+            $this->migrationId,
+            true,
+        );
 
-        // Create addresses.
+        // FIX C7: compound keys for addresses.
         foreach ($mapped['addresses'] as $addressData) {
             $addressData['customer_id'] = $customer->id;
             $address = CustomerAddresses::query()->create($addressData);
-            $this->idMap->store('customer_address', $user->ID, $address->id);
+            $addressKey = "{$userId}_{$addressData['type']}";
+            $this->idMap->store(
+                Constants::ENTITY_CUSTOMER_ADDRESS,
+                $addressKey,
+                $address->id,
+                $this->migrationId,
+                true,
+            );
         }
 
-        $this->log($user->ID, 'success', sprintf(
+        $this->writeLog($userId, 'success', sprintf(
             'Migrated customer "%s" (FC ID: %d).',
             $user->user_email,
-            $customer->id
+            $customer->id,
         ));
 
         return $customer->id;
     }
 
     /**
-     * Process a guest customer from an order.
+     * Process a guest customer.
+     * FIX C6: use email string as wc_id (VARCHAR), not crc32 hash.
      */
-    private function processGuest(\WC_Order $order): int
+    private function processGuest(array $guestData): int|false
     {
-        $email = $order->get_billing_email();
-        $guestKey = crc32($email);
+        $email = $guestData['email'];
 
-        // Skip if already migrated.
-        if ($this->idMap->getFcId('guest_customer', $guestKey)) {
-            $this->log($order->get_id(), 'skipped', 'Guest customer already migrated.');
+        if ($this->idMap->getFcId(Constants::ENTITY_GUEST_CUSTOMER, $email)) {
+            $this->writeLog($email, 'skipped', 'Guest customer already migrated.');
             return false;
         }
 
-        // Check if FC already has this customer by email.
+        // FIX C9: when mapping existing FC customer, store with created_by_migration=false.
         $existing = Customer::query()->where('email', $email)->first();
         if ($existing) {
-            $this->idMap->store('guest_customer', $guestKey, $existing->id);
-            $this->log($order->get_id(), 'skipped', 'Guest customer already exists in FluentCart.');
+            $this->idMap->store(
+                Constants::ENTITY_GUEST_CUSTOMER,
+                $email,
+                $existing->id,
+                $this->migrationId,
+                false,
+            );
+            $this->writeLog($email, 'skipped', 'Guest customer already exists in FluentCart.');
             return false;
         }
 
-        $mapped = CustomerMapper::mapGuest($order);
-
-        if ($this->dryRun) {
-            $this->log($order->get_id(), 'success', sprintf(
-                '[DRY RUN] Would migrate guest customer "%s" with %d address(es).',
-                $email,
-                count($mapped['addresses'])
-            ));
-            return 0;
+        // Find the first order for this guest to build mapped data.
+        $order = $this->findFirstGuestOrder($email);
+        if (!$order) {
+            $this->writeLog($email, 'error', 'No order found for guest email.');
+            return false;
         }
 
-        $customer = Customer::query()->create($mapped['customer']);
-        $this->idMap->store('guest_customer', $guestKey, $customer->id);
+        $mapped = $this->customerMapper->mapGuest($order);
 
-        // Create addresses.
+        $customer = Customer::query()->create($mapped['customer']);
+        $this->idMap->store(
+            Constants::ENTITY_GUEST_CUSTOMER,
+            $email,
+            $customer->id,
+            $this->migrationId,
+            true,
+        );
+
+        // FIX C7: compound keys for addresses.
         foreach ($mapped['addresses'] as $addressData) {
             $addressData['customer_id'] = $customer->id;
             $address = CustomerAddresses::query()->create($addressData);
-            $this->idMap->store('customer_address', $order->get_id(), $address->id);
+            $addressKey = "{$email}_{$addressData['type']}";
+            $this->idMap->store(
+                Constants::ENTITY_CUSTOMER_ADDRESS,
+                $addressKey,
+                $address->id,
+                $this->migrationId,
+                true,
+            );
         }
 
-        $this->log($order->get_id(), 'success', sprintf(
+        $this->writeLog($email, 'success', sprintf(
             'Migrated guest customer "%s" (FC ID: %d).',
             $email,
-            $customer->id
+            $customer->id,
         ));
 
         return $customer->id;
     }
 
     /**
-     * Count registered customers.
+     * FIX H4: count registered customers by order history, not just 'customer' role.
+     * Users who have placed orders (customer_id > 0 in wc_orders).
      */
-    private function countRegistered(): int
+    private function countRegisteredCustomers(): int
     {
-        return count(get_users([
-            'role'   => 'customer',
-            'fields' => 'ID',
-        ]));
+        if ($this->registeredCount !== null) {
+            return $this->registeredCount;
+        }
+
+        global $wpdb;
+
+        $this->registeredCount = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT customer_id)
+             FROM {$wpdb->prefix}wc_orders
+             WHERE customer_id > 0
+               AND type = 'shop_order'",
+        );
+
+        return $this->registeredCount;
     }
 
     /**
-     * Count unique guest emails (HPOS + legacy compatible).
+     * FIX H5: count unique guest emails directly via SQL.
      */
     private function countGuestCustomers(): int
     {
         global $wpdb;
 
-        $hposTable = $wpdb->prefix . 'wc_orders';
-        $hposExists = $wpdb->get_var("SHOW TABLES LIKE '{$hposTable}'");
-
-        if ($hposExists) {
-            return (int) $wpdb->get_var(
-                "SELECT COUNT(DISTINCT billing_email)
-                 FROM {$hposTable}
-                 WHERE type = 'shop_order'
-                   AND billing_email != ''
-                   AND (customer_id IS NULL OR customer_id = 0)"
-            );
-        }
-
         return (int) $wpdb->get_var(
-            "SELECT COUNT(DISTINCT pm.meta_value)
-             FROM {$wpdb->postmeta} pm
-             INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
-             WHERE p.post_type = 'shop_order'
-               AND pm.meta_key = '_billing_email'
-               AND pm.post_id NOT IN (
-                   SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_customer_user' AND meta_value > 0
-               )"
+            "SELECT COUNT(DISTINCT billing_email)
+             FROM {$wpdb->prefix}wc_orders
+             WHERE (customer_id IS NULL OR customer_id = 0)
+               AND billing_email != ''
+               AND type = 'shop_order'",
         );
     }
 
     /**
-     * Fetch guest orders (HPOS + legacy compatible).
+     * FIX H4: fetch registered customers by order history with LIMIT/OFFSET.
      */
-    private function fetchGuestOrders(int $limit, int $offset): array
+    private function fetchRegisteredBatch(int $offset, int $limit): array
     {
         global $wpdb;
 
-        $hposTable = $wpdb->prefix . 'wc_orders';
-        $hposExists = $wpdb->get_var("SHOW TABLES LIKE '{$hposTable}'");
+        $userIds = $wpdb->get_col($wpdb->prepare(
+            "SELECT DISTINCT customer_id
+             FROM {$wpdb->prefix}wc_orders
+             WHERE customer_id > 0
+               AND type = 'shop_order'
+             ORDER BY customer_id ASC
+             LIMIT %d OFFSET %d",
+            $limit,
+            $offset,
+        ));
 
-        if ($hposExists) {
-            $orderIds = $wpdb->get_col($wpdb->prepare(
-                "SELECT id FROM {$hposTable}
-                 WHERE type = 'shop_order'
-                   AND billing_email != ''
-                   AND (customer_id IS NULL OR customer_id = 0)
-                 ORDER BY id ASC
-                 LIMIT %d OFFSET %d",
-                $limit,
-                $offset
-            ));
-        } else {
-            $orderIds = $wpdb->get_col($wpdb->prepare(
-                "SELECT DISTINCT p.ID
-                 FROM {$wpdb->posts} p
-                 INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_billing_email'
-                 WHERE p.post_type = 'shop_order'
-                   AND p.ID NOT IN (
-                       SELECT post_id FROM {$wpdb->postmeta}
-                       WHERE meta_key = '_customer_user' AND meta_value > 0
-                   )
-                 ORDER BY p.ID ASC
-                 LIMIT %d OFFSET %d",
-                $limit,
-                $offset
-            ));
-        }
+        return array_map(
+            fn (string $id): array => ['type' => 'registered', 'data' => ['user_id' => (int) $id]],
+            $userIds,
+        );
+    }
 
-        $orders = [];
-        foreach ($orderIds as $orderId) {
-            $order = wc_get_order($orderId);
-            if ($order) {
-                $orders[] = $order;
-            }
-        }
+    /**
+     * FIX H5: fetch unique guest emails directly via SQL with LIMIT/OFFSET.
+     * Uses isset() for O(1) dedup instead of in_array().
+     */
+    private function fetchGuestBatch(int $offset, int $limit): array
+    {
+        global $wpdb;
 
-        return $orders;
+        $emails = $wpdb->get_col($wpdb->prepare(
+            "SELECT DISTINCT billing_email
+             FROM {$wpdb->prefix}wc_orders
+             WHERE (customer_id IS NULL OR customer_id = 0)
+               AND billing_email != ''
+               AND type = 'shop_order'
+             ORDER BY billing_email ASC
+             LIMIT %d OFFSET %d",
+            $limit,
+            $offset,
+        ));
+
+        return array_map(
+            fn (string $email): array => ['type' => 'guest', 'data' => ['email' => $email]],
+            $emails,
+        );
+    }
+
+    /**
+     * Find the first WC order for a guest email to extract customer data.
+     */
+    private function findFirstGuestOrder(string $email): ?\WC_Order
+    {
+        $orders = wc_get_orders([
+            'billing_email' => $email,
+            'customer_id'   => 0,
+            'limit'         => 1,
+            'orderby'       => 'ID',
+            'order'         => 'ASC',
+            'type'          => 'shop_order',
+        ]);
+
+        return $orders[0] ?? null;
     }
 }

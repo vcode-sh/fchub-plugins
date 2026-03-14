@@ -20,6 +20,7 @@
 defined('ABSPATH') or die;
 
 define('CARTSHIFT_VERSION', '1.0.3');
+define('CARTSHIFT_DB_VERSION', '1');
 define('CARTSHIFT_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CARTSHIFT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CARTSHIFT_PLUGIN_FILE', __FILE__);
@@ -61,11 +62,10 @@ add_action('plugins_loaded', function () {
 });
 
 /**
- * Activation: create migration tables.
+ * Activation: run versioned database migrations.
  */
 register_activation_hook(__FILE__, function () {
-    $migration = new \CartShift\Database\CreateMigrationTables();
-    $migration->up();
+    \CartShift\Support\Migrations::run();
 });
 
 /**
@@ -76,21 +76,13 @@ register_deactivation_hook(__FILE__, function () {
 });
 
 /**
- * Bootstrap admin functionality.
+ * Bootstrap the plugin via the module system.
  *
  * WordPress enforces `Requires Plugins: woocommerce, fluent-cart` at activation.
  * Dependency checks happen in the preflight endpoint, not here.
  */
-add_action('init', function () {
-    if (!is_admin()) {
-        return;
-    }
+add_action('plugins_loaded', fn () => \CartShift\Core\PluginBootstrap::boot(), 20);
 
-    $adminMenu = new \CartShift\Admin\AdminMenu();
-    $adminMenu->register();
-}, 20);
-
-add_action('rest_api_init', function () {
-    $controller = new \CartShift\Admin\AdminController();
-    $controller->registerRoutes();
-});
+if (defined('WP_CLI') && WP_CLI) {
+    \CartShift\CLI\MigrateCommand::register();
+}

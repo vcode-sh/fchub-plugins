@@ -1,29 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CartShift\Migrator;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
+use CartShift\Domain\Migration\Contracts\MigratorInterface;
 use CartShift\State\MigrationState;
-use CartShift\State\IdMap;
+use CartShift\Storage\IdMapRepository;
+use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\Constants;
 
-abstract class AbstractMigrator
+abstract class AbstractMigrator implements MigratorInterface
 {
-    /** @var int Records per batch */
-    protected int $batchSize = 50;
-
-    /** @var string Entity type identifier (products, customers, orders, etc.) */
-    protected string $entityType = '';
-
-    /** @var MigrationState */
-    protected MigrationState $migrationState;
-
-    /** @var IdMap */
-    protected IdMap $idMap;
-
-    /** @var string UUID of the current migration run */
-    protected string $migrationId;
-
     /** @var int Running counter of processed records */
     protected int $processed = 0;
 
@@ -33,53 +23,58 @@ abstract class AbstractMigrator
     /** @var int Running counter of error records */
     protected int $errors = 0;
 
-    /** @var bool When true, validate records without writing to FC */
-    protected bool $dryRun = false;
+    public function __construct(
+        protected readonly IdMapRepository $idMap,
+        protected readonly MigrationLogRepository $log,
+        protected readonly MigrationState $migrationState,
+        protected readonly string $migrationId,
+        protected readonly int $batchSize = Constants::DEFAULT_BATCH_SIZE,
+    ) {}
 
-    public function __construct(MigrationState $state, IdMap $idMap, string $migrationId, bool $dryRun = false)
+    #[\Override]
+    public function entityType(): string
     {
-        $this->migrationState = $state;
-        $this->idMap = $idMap;
-        $this->migrationId = $migrationId;
-        $this->dryRun = $dryRun;
+        return $this->getEntityType();
     }
 
-    /**
-     * Whether this is a dry run (validation only, no writes).
-     */
-    public function isDryRun(): bool
+    #[\Override]
+    public function count(): int
     {
-        return $this->dryRun;
+        return $this->countTotal();
     }
 
-    /**
-     * Main migration loop.
-     */
+    #[\Override]
     public function run(): void
     {
+        $effectiveBatchSize = (int) apply_filters(
+            'cartshift/migration/batch_size',
+            $this->batchSize,
+            $this->getEntityType(),
+        );
+
         $total = $this->countTotal();
 
         $this->migrationState->updateProgress(
-            $this->entityType,
+            $this->getEntityType(),
             0,
             $total,
             0,
-            0
+            0,
         );
 
         if ($total === 0) {
-            $this->migrationState->completeEntity($this->entityType);
+            $this->migrationState->completeEntity($this->getEntityType());
             return;
         }
 
-        $page = 1;
+        $offset = 0;
 
         while (true) {
             if ($this->shouldCancel()) {
                 break;
             }
 
-            $batch = $this->fetchBatch($page);
+            $batch = $this->fetchBatch($offset, $effectiveBatchSize);
 
             if (empty($batch)) {
                 break;
@@ -97,32 +92,51 @@ abstract class AbstractMigrator
                         $this->skipped++;
                     } else {
                         $this->processed++;
+
+                        /** @see 'cartshift/migration/record_migrated' */
+                        do_action(
+                            'cartshift/migration/record_migrated',
+                            $this->getEntityType(),
+                            $this->getRecordId($record),
+                            $result,
+                            $this->migrationId,
+                        );
                     }
                 } catch (\Throwable $e) {
                     $this->errors++;
                     $wcId = $this->getRecordId($record);
-                    $this->log($wcId, 'error', $e->getMessage());
+                    $this->log->write(
+                        $this->migrationId,
+                        $this->getEntityType(),
+                        $wcId,
+                        'error',
+                        $e->getMessage(),
+                    );
                 }
 
                 $this->migrationState->updateProgress(
-                    $this->entityType,
+                    $this->getEntityType(),
                     $this->processed,
                     $total,
                     $this->skipped,
-                    $this->errors
+                    $this->errors,
                 );
             }
 
-            $page++;
+            $offset += count($batch);
 
-            // Safety: if batch is smaller than batch size, we are done.
-            if (count($batch) < $this->batchSize) {
+            if (count($batch) < $effectiveBatchSize) {
                 break;
             }
         }
 
-        $this->migrationState->completeEntity($this->entityType);
+        $this->migrationState->completeEntity($this->getEntityType());
     }
+
+    /**
+     * The entity type constant this migrator handles.
+     */
+    abstract protected function getEntityType(): string;
 
     /**
      * Return the total number of WC records to migrate.
@@ -130,55 +144,44 @@ abstract class AbstractMigrator
     abstract protected function countTotal(): int;
 
     /**
-     * Fetch a batch of WC records for the given page.
-     *
-     * @return array
+     * Fetch a batch of WC records at the given offset.
      */
-    abstract protected function fetchBatch(int $page): array;
+    abstract protected function fetchBatch(int $offset, int $limit): array;
 
     /**
      * Process a single WC record. Return false to mark as skipped.
-     *
-     * @param mixed $record
-     * @return bool|int False if skipped, otherwise the FC id.
      */
-    abstract protected function processRecord($record);
+    abstract protected function processRecord(mixed $record): int|false;
 
     /**
      * Get the WC ID from a record (for logging).
      */
-    protected function getRecordId($record): int
+    protected function getRecordId(mixed $record): string
     {
         if (is_object($record) && method_exists($record, 'get_id')) {
-            return $record->get_id();
+            return (string) $record->get_id();
         }
         if (is_object($record) && property_exists($record, 'ID')) {
-            return $record->ID;
+            return (string) $record->ID;
         }
         if (is_object($record) && property_exists($record, 'id')) {
-            return $record->id;
+            return (string) $record->id;
         }
-        return 0;
+
+        return '0';
     }
 
     /**
-     * Write an entry to the migration log table.
+     * Convenience: write a log entry via the repository.
      */
-    protected function log(int $wcId, string $status, string $message = ''): void
+    protected function writeLog(string|int $wcId, string $status, string $message = ''): void
     {
-        global $wpdb;
-
-        $wpdb->insert(
-            $wpdb->prefix . 'cartshift_migration_log',
-            [
-                'migration_id' => $this->migrationId,
-                'entity_type'  => $this->entityType,
-                'wc_id'        => $wcId,
-                'status'       => $status,
-                'message'      => $message,
-                'created_at'   => gmdate('Y-m-d H:i:s'),
-            ],
-            ['%s', '%s', '%d', '%s', '%s', '%s']
+        $this->log->write(
+            $this->migrationId,
+            $this->getEntityType(),
+            $wcId,
+            $status,
+            $message,
         );
     }
 
@@ -187,7 +190,6 @@ abstract class AbstractMigrator
      */
     protected function shouldCancel(): bool
     {
-        $state = $this->migrationState->getCurrent();
-        return $state && $state['status'] === 'cancelled';
+        return $this->migrationState->isCancelled();
     }
 }

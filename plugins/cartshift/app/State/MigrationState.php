@@ -108,6 +108,33 @@ class MigrationState
     }
 
     /**
+     * Check whether the migration has been cancelled.
+     */
+    public function isCancelled(): bool
+    {
+        $state = $this->getCurrent();
+
+        return $state !== null && $state['status'] === 'cancelled';
+    }
+
+    /**
+     * Mark the migration as failed with an error message.
+     */
+    public function setFailed(string $message): void
+    {
+        $state = $this->getCurrent();
+        if (!$state) {
+            return;
+        }
+
+        $state['status'] = 'failed';
+        $state['error'] = $message;
+        $state['completed_at'] = gmdate('Y-m-d H:i:s');
+
+        update_option(self::OPTION_KEY, $state, false);
+    }
+
+    /**
      * Get the current migration state.
      *
      * @return array|null

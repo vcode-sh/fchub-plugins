@@ -1,21 +1,22 @@
 <?php
 
-namespace CartShift\Admin;
+declare(strict_types=1);
 
-defined('ABSPATH') or die;
+namespace CartShift\Support;
 
-class AdminMenu
+use CartShift\Core\FeatureFlags;
+
+defined('ABSPATH') || exit();
+
+final class AdminMenu
 {
-    const MENU_SLUG = 'cartshift-migrator';
+    public const string MENU_SLUG = 'cartshift-migrator';
 
-    /** @var string The hook suffix returned by add_management_page. */
     private string $hookSuffix = '';
 
-    public function register(): void
-    {
-        add_action('admin_menu', [$this, 'addMenuPage']);
-        add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
-    }
+    public function __construct(
+        private readonly FeatureFlags $flags,
+    ) {}
 
     public function addMenuPage(): void
     {
@@ -24,13 +25,10 @@ class AdminMenu
             __('CartShift', 'cartshift'),
             'manage_options',
             self::MENU_SLUG,
-            [$this, 'renderPage']
+            [$this, 'renderPage'],
         );
     }
 
-    /**
-     * Enqueue assets only on our plugin page.
-     */
     public function enqueueAssets(string $hookSuffix): void
     {
         if ($hookSuffix !== $this->hookSuffix) {
@@ -41,7 +39,7 @@ class AdminMenu
             'cartshift-admin',
             CARTSHIFT_PLUGIN_URL . 'resources/admin/style.css',
             [],
-            (string) filemtime(CARTSHIFT_PLUGIN_PATH . 'resources/admin/style.css')
+            (string) filemtime(CARTSHIFT_PLUGIN_PATH . 'resources/admin/style.css'),
         );
 
         wp_enqueue_script(
@@ -49,12 +47,14 @@ class AdminMenu
             CARTSHIFT_PLUGIN_URL . 'resources/admin/app.js',
             [],
             (string) filemtime(CARTSHIFT_PLUGIN_PATH . 'resources/admin/app.js'),
-            true
+            true,
         );
 
         wp_localize_script('cartshift-admin', 'cartshift', [
-            'restUrl' => rest_url('cartshift/v1/'),
-            'nonce'   => wp_create_nonce('wp_rest'),
+            'restUrl'  => rest_url('cartshift/v1/'),
+            'nonce'    => wp_create_nonce('wp_rest'),
+            'version'  => CARTSHIFT_VERSION,
+            'features' => $this->flags->all(),
         ]);
     }
 

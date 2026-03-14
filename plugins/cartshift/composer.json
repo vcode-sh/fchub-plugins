@@ -1,0 +1,26 @@
+{
+    "name": "vcode-sh/cartshift",
+    "description": "CartShift plugin development tooling",
+    "license": "GPL-2.0-or-later",
+    "type": "project",
+    "require": {},
+    "require-dev": {
+        "phpunit/phpunit": "^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "CartShift\\": "app/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CartShift\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

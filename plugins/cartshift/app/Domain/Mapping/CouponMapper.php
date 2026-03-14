@@ -1,38 +1,41 @@
 <?php
 
-namespace CartShift\Mapper;
+declare(strict_types=1);
+
+namespace CartShift\Domain\Mapping;
 
 defined('ABSPATH') or die;
 
-class CouponMapper
+use CartShift\Support\MoneyHelper;
+
+final class CouponMapper
 {
+    public function __construct(
+        private readonly string $currency,
+    ) {}
+
     /**
-     * Map a WC coupon (WP_Post or WC_Coupon) to FluentCart coupon data.
-     *
-     * @param \WC_Coupon $coupon
-     * @return array
+     * Map a WC_Coupon to FluentCart coupon data.
      */
-    public static function map(\WC_Coupon $coupon): array
+    public function map(\WC_Coupon $coupon): array
     {
         $wcType = $coupon->get_discount_type();
-        $fcType = StatusMapper::couponType($wcType);
+        $fcType = self::couponType($wcType);
 
-        // For fixed types, convert to cents. For percentage, keep as-is.
         $amount = $fcType === 'fixed'
-            ? ProductMapper::toCents($coupon->get_amount())
+            ? MoneyHelper::toCents($coupon->get_amount(), $this->currency)
             : floatval($coupon->get_amount());
 
-        // Build conditions from WC coupon settings.
         $conditions = [];
 
         $minAmount = $coupon->get_minimum_amount();
         if ($minAmount) {
-            $conditions['minimum_amount'] = ProductMapper::toCents($minAmount);
+            $conditions['minimum_amount'] = MoneyHelper::toCents($minAmount, $this->currency);
         }
 
         $maxAmount = $coupon->get_maximum_amount();
         if ($maxAmount) {
-            $conditions['maximum_amount'] = ProductMapper::toCents($maxAmount);
+            $conditions['maximum_amount'] = MoneyHelper::toCents($maxAmount, $this->currency);
         }
 
         $usageLimit = $coupon->get_usage_limit();
@@ -45,30 +48,27 @@ class CouponMapper
             $conditions['max_per_customer'] = (int) $usageLimitPerUser;
         }
 
-        $excludeSaleItems = $coupon->get_exclude_sale_items();
-        if ($excludeSaleItems) {
+        if ($coupon->get_exclude_sale_items()) {
             $conditions['exclude_sale_items'] = true;
         }
 
-        // Free shipping flag.
         if ($coupon->get_free_shipping()) {
             $conditions['free_shipping'] = true;
         }
 
-        // Status.
-        $status = 'active';
+        $status     = 'active';
         $expiryDate = $coupon->get_date_expires();
         if ($expiryDate && $expiryDate->getTimestamp() < time()) {
             $status = 'expired';
         }
 
-        return [
+        $mapped = [
             'title'            => $coupon->get_code(),
             'code'             => strtoupper($coupon->get_code()),
             'status'           => $status,
             'type'             => $fcType,
             'amount'           => $amount,
-            'conditions'       => !empty($conditions) ? json_encode($conditions) : null,
+            'conditions'       => !empty($conditions) ? $conditions : null,
             'stackable'        => $coupon->get_individual_use() ? 'no' : 'yes',
             'priority'         => 10,
             'use_count'        => (int) $coupon->get_usage_count(),
@@ -81,5 +81,22 @@ class CouponMapper
                 ? $expiryDate->date('Y-m-d H:i:s')
                 : null,
         ];
+
+        /** @see 'cartshift/mapper/coupon' */
+        return apply_filters('cartshift/mapper/coupon', $mapped, $coupon);
+    }
+
+    /**
+     * Map WC coupon discount type to FC coupon type.
+     */
+    private static function couponType(string $wcType): string
+    {
+        return match ($wcType) {
+            'percent'                              => 'percent',
+            'fixed_cart', 'fixed_product'           => 'fixed',
+            'recurring_fee', 'recurring_percent',
+            'sign_up_fee', 'sign_up_fee_percent'   => 'percent',
+            default                                => 'percent',
+        };
     }
 }

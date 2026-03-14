@@ -1,85 +1,89 @@
 <?php
 
-namespace CartShift\Mapper;
+declare(strict_types=1);
+
+namespace CartShift\Domain\Mapping;
 
 defined('ABSPATH') or die;
 
-use CartShift\State\IdMap;
+use CartShift\Storage\IdMapRepository;
+use CartShift\Support\Enums\FcBillingInterval;
+use CartShift\Support\Enums\FcOrderStatus;
+use CartShift\Support\Enums\FcOrderType;
+use CartShift\Support\Enums\FcPaymentStatus;
+use CartShift\Support\MoneyHelper;
 
-class OrderMapper
+final class OrderMapper
 {
+    public function __construct(
+        private readonly IdMapRepository $idMap,
+        private readonly string $currency,
+    ) {}
+
     /**
      * Map a WC_Order to FluentCart order + related data arrays.
      *
-     * @param \WC_Order $order
-     * @param IdMap     $idMap
      * @return array{order: array, items: array, addresses: array, transaction: array|null}
      */
-    public static function map(\WC_Order $order, IdMap $idMap): array
+    public function map(\WC_Order $order): array
     {
-        $wcStatus = $order->get_status();
-        $customerId = self::resolveCustomerId($order, $idMap);
+        $wcStatus   = $order->get_status();
+        $customerId = $this->resolveCustomerId($order);
 
         $orderData = [
-            'customer_id'          => $customerId,
-            'parent_id'            => self::resolveParentOrderId($order, $idMap),
-            'type'                 => self::getOrderType($order),
-            'status'               => StatusMapper::orderStatus($wcStatus),
-            'payment_status'       => StatusMapper::paymentStatus($wcStatus),
-            'payment_method'       => $order->get_payment_method() ?: 'wc_migrated',
-            'payment_method_title' => $order->get_payment_method_title() ?: 'WooCommerce (migrated)',
-            'currency'             => $order->get_currency(),
-            'subtotal'             => ProductMapper::toCents($order->get_subtotal()),
-            'discount_tax'         => 0,
-            'manual_discount_total'=> 0,
-            'coupon_discount_total'=> ProductMapper::toCents($order->get_discount_total()),
-            'shipping_tax'         => ProductMapper::toCents($order->get_shipping_tax()),
-            'shipping_total'       => ProductMapper::toCents($order->get_shipping_total()),
-            'tax_total'            => ProductMapper::toCents($order->get_total_tax()),
-            'tax_behavior'         => $order->get_prices_include_tax() ? 1 : 0,
-            'total_amount'         => ProductMapper::toCents($order->get_total()),
-            'total_paid'           => self::getTotalPaid($order),
-            'total_refund'         => ProductMapper::toCents($order->get_total_refunded()),
-            'rate'                 => 1,
-            'note'                 => $order->get_customer_note() ?: '',
-            'ip_address'           => $order->get_customer_ip_address() ?: '',
-            'mode'                 => 'live',
-            'fulfillment_type'     => self::guessFulfillmentType($order),
-            'shipping_status'      => 'unshipped',
-            'uuid'                 => wp_generate_uuid4(),
-            'config'               => [
+            'customer_id'           => $customerId,
+            'parent_id'             => $this->resolveParentOrderId($order),
+            'type'                  => $this->getOrderType($order),
+            'status'                => FcOrderStatus::fromWooCommerce($wcStatus)->value,
+            'payment_status'        => FcPaymentStatus::fromWooCommerce($wcStatus)->value,
+            'payment_method'        => $order->get_payment_method() ?: 'wc_migrated',
+            'payment_method_title'  => $order->get_payment_method_title() ?: 'WooCommerce (migrated)',
+            'currency'              => $order->get_currency(),
+            'subtotal'              => MoneyHelper::toCents($order->get_subtotal(), $this->currency),
+            'discount_tax'          => 0,
+            'manual_discount_total' => 0,
+            'coupon_discount_total' => MoneyHelper::toCents($order->get_discount_total(), $this->currency),
+            'shipping_tax'          => MoneyHelper::toCents($order->get_shipping_tax(), $this->currency),
+            'shipping_total'        => MoneyHelper::toCents($order->get_shipping_total(), $this->currency),
+            'tax_total'             => MoneyHelper::toCents($order->get_total_tax(), $this->currency),
+            'tax_behavior'          => $this->getTaxBehavior($order),
+            'total_amount'          => MoneyHelper::toCents($order->get_total(), $this->currency),
+            'total_paid'            => $this->getTotalPaid($order),
+            'total_refund'          => MoneyHelper::toCents($order->get_total_refunded(), $this->currency),
+            'rate'                  => 1,
+            'note'                  => $order->get_customer_note() ?: '',
+            'ip_address'            => $order->get_customer_ip_address() ?: '',
+            'mode'                  => 'live',
+            'fulfillment_type'      => self::guessFulfillmentType($order),
+            'shipping_status'       => 'unshipped',
+            'uuid'                  => wp_generate_uuid4(),
+            'config'                => [
                 'wc_order_id' => $order->get_id(),
                 'migrated'    => true,
             ],
-            'created_at'           => $order->get_date_created()
+            'created_at'            => $order->get_date_created()
                 ? $order->get_date_created()->date('Y-m-d H:i:s')
                 : gmdate('Y-m-d H:i:s'),
-            'completed_at'         => $order->get_date_completed()
+            'completed_at'          => $order->get_date_completed()
                 ? $order->get_date_completed()->date('Y-m-d H:i:s')
                 : null,
         ];
 
-        // Order items.
-        $items = self::mapItems($order, $idMap);
-
-        // Order addresses.
-        $addresses = self::mapAddresses($order);
-
-        // Order transaction.
-        $transaction = self::mapTransaction($order);
-
-        return [
+        $mapped = [
             'order'       => $orderData,
-            'items'       => $items,
-            'addresses'   => $addresses,
-            'transaction' => $transaction,
+            'items'       => $this->mapItems($order),
+            'addresses'   => self::mapAddresses($order),
+            'transaction' => $this->mapTransaction($order),
         ];
+
+        /** @see 'cartshift/mapper/order' */
+        return apply_filters('cartshift/mapper/order', $mapped, $order);
     }
 
     /**
      * Map order line items.
      */
-    private static function mapItems(\WC_Order $order, IdMap $idMap): array
+    private function mapItems(\WC_Order $order): array
     {
         $items = [];
 
@@ -93,17 +97,15 @@ class OrderMapper
             $wcVariationId = $item->get_variation_id();
             $product       = $item->get_product();
 
-            // Resolve FC product and variation IDs.
-            $fcProductId   = $idMap->getFcId('product', $wcProductId);
+            $fcProductId   = $this->idMap->getFcId('product', (string) $wcProductId);
             $fcVariationId = null;
 
             if ($wcVariationId) {
-                $fcVariationId = $idMap->getFcId('variation', $wcVariationId);
+                $fcVariationId = $this->idMap->getFcId('variation', (string) $wcVariationId);
             }
 
-            // Fallback: try using the simple product's first variation.
             if (!$fcVariationId && $fcProductId) {
-                $fcVariationId = $idMap->getFcId('variation', $wcProductId);
+                $fcVariationId = $this->idMap->getFcId('variation', (string) $wcProductId);
             }
 
             $paymentType = 'onetime';
@@ -111,26 +113,31 @@ class OrderMapper
 
             if ($product && class_exists('WC_Subscriptions_Product') && \WC_Subscriptions_Product::is_subscription($product)) {
                 $paymentType = 'subscription';
-                $period = $product->get_meta('_subscription_period') ?: 'month';
+                $period   = $product->get_meta('_subscription_period') ?: 'month';
+                $interval = (int) ($product->get_meta('_subscription_period_interval') ?: 1);
+
                 $otherInfo['payment_type']    = 'subscription';
-                $otherInfo['repeat_interval'] = StatusMapper::billingInterval($period);
+                $otherInfo['repeat_interval'] = FcBillingInterval::fromWooCommerce($period, $interval)->value;
                 $otherInfo['times']           = (int) ($product->get_meta('_subscription_length') ?: 0);
                 $otherInfo['trial_days']      = (int) ($product->get_meta('_subscription_trial_length') ?: 0);
             }
 
             $fulfillmentType = 'physical';
             if ($product) {
-                if ($product->is_downloadable()) {
-                    $fulfillmentType = 'digital';
-                } elseif ($product->is_virtual()) {
-                    $fulfillmentType = 'service';
-                }
+                $fulfillmentType = match (true) {
+                    $product->is_downloadable() => 'digital',
+                    $product->is_virtual()      => 'service',
+                    default                     => 'physical',
+                };
             }
 
-            $lineTotal = ProductMapper::toCents($item->get_total());
-            $unitPrice = $item->get_quantity() > 0
-                ? intval(round($lineTotal / $item->get_quantity()))
-                : $lineTotal;
+            $quantity  = $item->get_quantity();
+            $subtotal  = MoneyHelper::toCents($item->get_subtotal(), $this->currency);
+            $unitPrice = $quantity > 0
+                ? intval(round($subtotal / $quantity))
+                : $subtotal;
+
+            $lineTotal = MoneyHelper::toCents($item->get_total(), $this->currency);
 
             $items[] = [
                 'post_id'          => $fcProductId ?: 0,
@@ -138,12 +145,15 @@ class OrderMapper
                 'post_title'       => $item->get_name(),
                 'title'            => $item->get_name(),
                 'fulfillment_type' => $fulfillmentType,
-                'quantity'         => $item->get_quantity(),
+                'quantity'         => $quantity,
                 'unit_price'       => $unitPrice,
                 'cost'             => 0,
-                'subtotal'         => ProductMapper::toCents($item->get_subtotal()),
-                'tax_amount'       => ProductMapper::toCents($item->get_total_tax()),
-                'discount_total'   => ProductMapper::toCents($item->get_subtotal() - $item->get_total()),
+                'subtotal'         => $subtotal,
+                'tax_amount'       => MoneyHelper::toCents($item->get_total_tax(), $this->currency),
+                'discount_total'   => MoneyHelper::toCents(
+                    $item->get_subtotal() - $item->get_total(),
+                    $this->currency,
+                ),
                 'refund_total'     => 0,
                 'line_total'       => $lineTotal,
                 'rate'             => 1,
@@ -166,7 +176,6 @@ class OrderMapper
     {
         $addresses = [];
 
-        // Billing address.
         $billingName = trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
         $billingMeta = [];
         if ($order->get_billing_phone()) {
@@ -185,10 +194,9 @@ class OrderMapper
             'state'     => $order->get_billing_state(),
             'postcode'  => $order->get_billing_postcode(),
             'country'   => $order->get_billing_country(),
-            'meta'      => !empty($billingMeta) ? json_encode($billingMeta) : '[]',
+            'meta'      => !empty($billingMeta) ? $billingMeta : [],
         ];
 
-        // Shipping address (if present).
         $shippingFirst = $order->get_shipping_first_name();
         if ($shippingFirst) {
             $shippingName = trim($shippingFirst . ' ' . $order->get_shipping_last_name());
@@ -206,7 +214,7 @@ class OrderMapper
                 'state'     => $order->get_shipping_state(),
                 'postcode'  => $order->get_shipping_postcode(),
                 'country'   => $order->get_shipping_country(),
-                'meta'      => !empty($shippingMeta) ? json_encode($shippingMeta) : '[]',
+                'meta'      => !empty($shippingMeta) ? $shippingMeta : [],
             ];
         }
 
@@ -216,22 +224,20 @@ class OrderMapper
     /**
      * Map the primary payment transaction.
      */
-    private static function mapTransaction(\WC_Order $order): ?array
+    private function mapTransaction(\WC_Order $order): ?array
     {
-        $total = ProductMapper::toCents($order->get_total());
+        $total = MoneyHelper::toCents($order->get_total(), $this->currency);
         if ($total <= 0) {
             return null;
         }
 
-        $status = 'pending';
         $wcStatus = $order->get_status();
-        if (in_array($wcStatus, ['processing', 'completed'], true)) {
-            $status = 'succeeded';
-        } elseif ($wcStatus === 'refunded') {
-            $status = 'refunded';
-        } elseif (in_array($wcStatus, ['failed', 'cancelled'], true)) {
-            $status = 'failed';
-        }
+        $status = match (true) {
+            in_array($wcStatus, ['processing', 'completed'], true) => 'succeeded',
+            $wcStatus === 'refunded'                               => 'refunded',
+            in_array($wcStatus, ['failed', 'cancelled'], true)    => 'failed',
+            default                                                => 'pending',
+        };
 
         return [
             'order_type'          => 'order',
@@ -244,10 +250,10 @@ class OrderMapper
             'status'              => $status,
             'total'               => $total,
             'rate'                => 1,
-            'meta'                => json_encode([
-                'wc_order_id'     => $order->get_id(),
-                'wc_transaction'  => $order->get_transaction_id(),
-            ]),
+            'meta'                => [
+                'wc_order_id'    => $order->get_id(),
+                'wc_transaction' => $order->get_transaction_id(),
+            ],
             'created_at'          => $order->get_date_paid()
                 ? $order->get_date_paid()->date('Y-m-d H:i:s')
                 : ($order->get_date_created()
@@ -259,21 +265,20 @@ class OrderMapper
     /**
      * Resolve the FC customer ID for an order.
      */
-    private static function resolveCustomerId(\WC_Order $order, IdMap $idMap): ?int
+    private function resolveCustomerId(\WC_Order $order): ?int
     {
         $wcCustomerId = $order->get_customer_id();
 
         if ($wcCustomerId > 0) {
-            $fcId = $idMap->getFcId('customer', $wcCustomerId);
+            $fcId = $this->idMap->getFcId('customer', (string) $wcCustomerId);
             if ($fcId) {
                 return $fcId;
             }
         }
 
-        // For guests, try by email.
         $email = $order->get_billing_email();
         if ($email) {
-            $fcId = $idMap->getFcId('guest_customer', crc32($email));
+            $fcId = $this->idMap->getFcId('guest_customer', $email);
             if ($fcId) {
                 return $fcId;
             }
@@ -283,51 +288,68 @@ class OrderMapper
     }
 
     /**
-     * Resolve parent order ID for renewals/refunds.
+     * Resolve parent order ID for renewals.
      */
-    private static function resolveParentOrderId(\WC_Order $order, IdMap $idMap): ?int
+    private function resolveParentOrderId(\WC_Order $order): ?int
     {
         $parentId = $order->get_parent_id();
         if ($parentId) {
-            return $idMap->getFcId('order', $parentId);
+            return $this->idMap->getFcId('order', (string) $parentId);
         }
+
         return null;
     }
 
     /**
-     * Determine the order type.
+     * Determine the order type using FcOrderType enum.
+     * FIX C3: Never returns 'refund'. Parent orders with renewals = renewal,
+     * subscription orders = subscription, everything else = payment.
      */
-    private static function getOrderType(\WC_Order $order): string
+    private function getOrderType(\WC_Order $order): string
     {
         if ($order->get_parent_id() > 0) {
-            // Check if this is a WCS renewal.
             if (function_exists('wcs_order_contains_renewal') && wcs_order_contains_renewal($order)) {
-                return 'renewal';
+                return FcOrderType::Renewal->value;
             }
-            return 'refund';
+
+            return FcOrderType::Payment->value;
         }
 
-        // Check if the order contains subscription products.
         if (function_exists('wcs_order_contains_subscription') && wcs_order_contains_subscription($order)) {
-            return 'subscription';
+            return FcOrderType::Subscription->value;
         }
 
-        return 'onetime';
+        return FcOrderType::Payment->value;
     }
 
     /**
      * Calculate total paid amount.
      */
-    private static function getTotalPaid(\WC_Order $order): int
+    private function getTotalPaid(\WC_Order $order): int
     {
         $wcStatus = $order->get_status();
+
         if (in_array($wcStatus, ['processing', 'completed'], true)) {
-            return ProductMapper::toCents($order->get_total()) - ProductMapper::toCents($order->get_total_refunded());
+            return MoneyHelper::toCents($order->get_total(), $this->currency)
+                - MoneyHelper::toCents($order->get_total_refunded(), $this->currency);
         }
-        if ($wcStatus === 'refunded') {
+
+        return 0;
+    }
+
+    /**
+     * Determine tax_behavior: 0=no tax, 1=exclusive, 2=inclusive.
+     * FIX H7: Properly distinguish no-tax, exclusive, and inclusive.
+     */
+    private function getTaxBehavior(\WC_Order $order): int
+    {
+        $totalTax = floatval($order->get_total_tax());
+
+        if ($totalTax <= 0) {
             return 0;
         }
-        return 0;
+
+        return $order->get_prices_include_tax() ? 2 : 1;
     }
 
     /**
@@ -359,6 +381,7 @@ class OrderMapper
         if ($hasDigital) {
             return 'digital';
         }
+
         return 'service';
     }
 }

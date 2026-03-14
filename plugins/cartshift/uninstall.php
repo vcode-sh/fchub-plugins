@@ -1,12 +1,12 @@
 <?php
-// If uninstall not called from WordPress, die.
+
 defined('WP_UNINSTALL_PLUGIN') || exit;
 
-global $wpdb;
+// Opt-in: only drop data if the user explicitly chose to.
+if (get_option('cartshift_delete_data_on_uninstall') !== 'yes') {
+    return;
+}
 
-// Drop custom tables
-$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}cartshift_id_map");
-$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}cartshift_migration_log");
+require_once __DIR__ . '/app/Support/Migrations.php';
 
-// Delete options
-delete_option('cartshift_migration_state');
+CartShift\Support\Migrations::dropAll();
