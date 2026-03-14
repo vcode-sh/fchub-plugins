@@ -9,14 +9,14 @@ final class PlanProductLinkService
     private PlanService $plans;
     private \wpdb $wpdb;
     private string $metaTable;
-    private string $productsTable;
+    private string $variationsTable;
 
     public function __construct(?PlanService $plans = null, ?\wpdb $wpdb = null)
     {
         $this->plans = $plans ?? new PlanService();
         $this->wpdb = $wpdb ?? $GLOBALS['wpdb'];
         $this->metaTable = $this->wpdb->prefix . 'fct_product_meta';
-        $this->productsTable = $this->wpdb->prefix . 'fct_products';
+        $this->variationsTable = $this->wpdb->prefix . 'fct_product_variations';
     }
 
     public function linkedProducts(int $planId): array
@@ -26,11 +26,13 @@ final class PlanProductLinkService
             return ['error' => __('Plan not found.', 'fchub-memberships')];
         }
 
+        $postsTable = $this->wpdb->prefix . 'posts';
+
         $feeds = $this->wpdb->get_results($this->wpdb->prepare(
             "SELECT m.id AS feed_id, m.object_id AS product_id, m.meta_value,
-                    p.title AS product_title
+                    p.post_title AS product_title
              FROM {$this->metaTable} m
-             LEFT JOIN {$this->productsTable} p ON m.object_id = p.id
+             LEFT JOIN {$postsTable} p ON m.object_id = p.ID
              WHERE m.object_type = 'product_integration'
                AND m.meta_key = %s",
             'memberships'
@@ -58,24 +60,34 @@ final class PlanProductLinkService
             ];
         }
 
+        // Fetch all variations for each product
         $productIds = array_filter(array_column($linked, 'product_id'));
         if (!empty($productIds)) {
             $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
-            $prices = $this->wpdb->get_results($this->wpdb->prepare(
-                "SELECT id, price, billing_period, billing_interval FROM {$this->productsTable} WHERE id IN ({$placeholders})",
+            $variations = $this->wpdb->get_results($this->wpdb->prepare(
+                "SELECT post_id, variation_title, item_price, payment_type
+                 FROM {$this->variationsTable}
+                 WHERE post_id IN ({$placeholders})
+                 ORDER BY COALESCE(serial_index, 0) ASC",
                 ...$productIds
             ), ARRAY_A);
 
-            $priceMap = [];
-            foreach ($prices as $price) {
-                $priceMap[(int) $price['id']] = $price;
+            $varMap = [];
+            foreach ($variations as $v) {
+                $pid = (int) $v['post_id'];
+                $varMap[$pid][] = [
+                    'title'        => $v['variation_title'],
+                    'price'        => (int) $v['item_price'],
+                    'payment_type' => $v['payment_type'],
+                ];
             }
 
             foreach ($linked as &$item) {
-                $pricing = $priceMap[$item['product_id']] ?? [];
-                $item['price'] = $pricing['price'] ?? null;
-                $item['billing_period'] = $pricing['billing_period'] ?? null;
-                $item['billing_interval'] = $pricing['billing_interval'] ?? null;
+                $vars = $varMap[$item['product_id']] ?? [];
+                $first = $vars[0] ?? [];
+                $item['price'] = $first['price'] ?? null;
+                $item['billing_period'] = $first['payment_type'] ?? null;
+                $item['variations'] = $vars;
             }
         }
 
@@ -93,8 +105,9 @@ final class PlanProductLinkService
             return ['error' => __('Product ID is required.', 'fchub-memberships'), 'status' => 422];
         }
 
+        $postsTable = $this->wpdb->prefix . 'posts';
         $product = $this->wpdb->get_row($this->wpdb->prepare(
-            "SELECT id, title FROM {$this->productsTable} WHERE id = %d",
+            "SELECT ID as id, post_title as title FROM {$postsTable} WHERE ID = %d",
             $productId
         ), ARRAY_A);
 
@@ -187,20 +200,56 @@ final class PlanProductLinkService
 
     public function searchProducts(string $search = ''): array
     {
+        $postsTable = $this->wpdb->prefix . 'posts';
         $search = sanitize_text_field($search);
 
+        $where = "p.post_type = 'fluent-products' AND p.post_status = 'publish'";
         if ($search !== '') {
-            $products = $this->wpdb->get_results($this->wpdb->prepare(
-                "SELECT id, title, price, billing_period, status FROM {$this->productsTable} WHERE title LIKE %s ORDER BY title ASC LIMIT 20",
-                '%' . $this->wpdb->esc_like($search) . '%'
-            ), ARRAY_A);
-        } else {
-            $products = $this->wpdb->get_results(
-                "SELECT id, title, price, billing_period, status FROM {$this->productsTable} ORDER BY title ASC LIMIT 20",
-                ARRAY_A
-            );
+            $where .= $this->wpdb->prepare(' AND p.post_title LIKE %s', '%' . $this->wpdb->esc_like($search) . '%');
         }
 
-        return ['data' => $products ?: []];
+        $posts = $this->wpdb->get_results(
+            "SELECT p.ID as id, p.post_title as title FROM {$postsTable} p WHERE {$where} ORDER BY p.post_title ASC LIMIT 20",
+            ARRAY_A
+        );
+
+        if (empty($posts)) {
+            return ['data' => []];
+        }
+
+        $postIds = array_column($posts, 'id');
+        $placeholders = implode(',', array_fill(0, count($postIds), '%d'));
+        $variations = $this->wpdb->get_results($this->wpdb->prepare(
+            "SELECT post_id, variation_title, item_price, payment_type
+             FROM {$this->variationsTable}
+             WHERE post_id IN ({$placeholders})
+             ORDER BY COALESCE(serial_index, 0) ASC",
+            ...$postIds
+        ), ARRAY_A);
+
+        $varMap = [];
+        foreach ($variations as $v) {
+            $varMap[(int) $v['post_id']][] = [
+                'title'        => $v['variation_title'],
+                'price'        => (int) $v['item_price'],
+                'payment_type' => $v['payment_type'],
+            ];
+        }
+
+        $products = [];
+        foreach ($posts as $post) {
+            $pid = (int) $post['id'];
+            $vars = $varMap[$pid] ?? [];
+            $firstVar = $vars[0] ?? [];
+            $products[] = [
+                'id'         => $pid,
+                'title'      => $post['title'],
+                'price'      => $firstVar['price'] ?? null,
+                'payment_type' => $firstVar['payment_type'] ?? null,
+                'variations' => $vars,
+            ];
+        }
+
+        return ['data' => $products];
     }
 }

@@ -859,16 +859,6 @@ async function searchProducts() {
 async function confirmLinkProduct() {
   if (!selectedProduct.value) return
 
-  try {
-    await ElMessageBox.confirm(
-      `This will create a FluentCart integration feed linking "${selectedProduct.value.title}" to this plan. Continue?`,
-      'Link Product',
-      { confirmButtonText: 'Link', cancelButtonText: 'Cancel', type: 'info' },
-    )
-  } catch {
-    return
-  }
-
   linkingProduct.value = true
   try {
     await plans.linkProduct(route.params.id, { product_id: selectedProduct.value.id })
@@ -884,16 +874,6 @@ async function confirmLinkProduct() {
 }
 
 async function confirmUnlinkProduct(row) {
-  try {
-    await ElMessageBox.confirm(
-      `Remove the integration feed linking "${row.product_title}" to this plan? This will not affect existing memberships.`,
-      'Unlink Product',
-      { confirmButtonText: 'Unlink', cancelButtonText: 'Cancel', type: 'warning' },
-    )
-  } catch {
-    return
-  }
-
   productsLoading.value = true
   try {
     await plans.unlinkProduct(route.params.id, row.feed_id)

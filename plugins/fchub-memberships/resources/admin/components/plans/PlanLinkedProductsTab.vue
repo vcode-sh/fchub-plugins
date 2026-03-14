@@ -10,14 +10,16 @@
     <el-table v-if="products.length > 0" :data="products" stripe>
       <el-table-column prop="product_title" label="Product" min-width="200" />
       <el-table-column prop="feed_title" label="Feed" min-width="160" />
-      <el-table-column prop="price" label="Price" width="120">
+      <el-table-column label="Pricing" min-width="200">
         <template #default="{ row }">
-          {{ row.price ? `$${(row.price / 100).toFixed(2)}` : '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="Billing" width="140">
-        <template #default="{ row }">
-          {{ row.billing_period ? `Every ${row.billing_interval || 1} ${row.billing_period}(s)` : 'One-time' }}
+          <template v-if="row.variations && row.variations.length > 0">
+            <div v-for="(v, i) in row.variations" :key="i" class="variation-row">
+              <span class="variation-name">{{ v.title }}</span>
+              <span class="variation-price">{{ formatCurrency(v.price / 100) }}</span>
+              <el-tag v-if="v.payment_type === 'subscription'" size="small" type="info">recurring</el-tag>
+            </div>
+          </template>
+          <span v-else>{{ row.price ? formatCurrency(row.price / 100) : '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="status" label="Status" width="100">
@@ -29,9 +31,18 @@
       </el-table-column>
       <el-table-column label="" width="80" align="center">
         <template #default="{ row }">
-          <el-button type="danger" text size="small" @click="$emit('unlink', row)">
-            <el-icon><Delete /></el-icon>
-          </el-button>
+          <el-popconfirm
+            title="Unlink this product?"
+            confirm-button-text="Unlink"
+            confirm-button-type="danger"
+            @confirm="$emit('unlink', row)"
+          >
+            <template #reference>
+              <el-button type="danger" text size="small">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </template>
+          </el-popconfirm>
         </template>
       </el-table-column>
     </el-table>
@@ -46,6 +57,7 @@
 
 <script setup>
 import { Delete, Plus } from '@element-plus/icons-vue'
+import { formatCurrency } from '@/utils/currency.js'
 
 defineProps({
   loading: {
@@ -77,5 +89,21 @@ defineEmits(['link', 'unlink'])
 
 .tab-header-row .tab-description {
   margin-bottom: 0;
+}
+
+.variation-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.variation-name {
+  color: var(--fchub-text-secondary);
+}
+
+.variation-price {
+  font-weight: 500;
 }
 </style>

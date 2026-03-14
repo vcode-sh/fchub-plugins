@@ -142,6 +142,9 @@ class AdminMenu
         }, 10, 2);
 
         // Inject config as inline script before the module (wp_localize_script doesn't work with modules)
+        // Pull currency settings from FluentCart if available
+        $currency = self::getCurrencyConfig();
+
         $config = wp_json_encode([
             'rest_url'   => esc_url_raw(rest_url('fchub-memberships/v1/')),
             'nonce'      => wp_create_nonce('wp_rest'),
@@ -151,7 +154,31 @@ class AdminMenu
             'locale'     => get_user_locale(),
             'date_format' => get_option('date_format'),
             'time_format' => get_option('time_format'),
+            'currency'   => $currency,
         ]);
         wp_add_inline_script('fchub-memberships-admin', "window.fchubMembershipsAdmin = {$config};", 'before');
+    }
+
+    private static function getCurrencyConfig(): array
+    {
+        $storeSettings = get_option('fluent_cart_store_settings', []);
+        $code = $storeSettings['currency'] ?? 'USD';
+        $position = $storeSettings['currency_position'] ?? 'before';
+        $decimalSep = ($storeSettings['decimal_separator'] ?? 'dot') === 'comma' ? ',' : '.';
+        $thousandSep = $decimalSep === ',' ? '.' : ',';
+
+        // Get symbol from FluentCart's CurrenciesHelper if available
+        $symbol = '$';
+        if (class_exists('\\FluentCart\\App\\Helpers\\CurrenciesHelper')) {
+            $symbol = html_entity_decode(\FluentCart\App\Helpers\CurrenciesHelper::getCurrencySign($code));
+        }
+
+        return [
+            'code'          => $code,
+            'symbol'        => $symbol,
+            'position'      => $position,
+            'decimal_sep'   => $decimalSep,
+            'thousand_sep'  => $thousandSep,
+        ];
     }
 }

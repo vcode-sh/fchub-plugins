@@ -4,17 +4,17 @@
       <div class="fchub-stat-widget">
         <div class="fchub-stat-icon blue"><el-icon :size="20"><Money /></el-icon></div>
         <div class="fchub-stat-title">MRR</div>
-        <div class="fchub-stat-value">${{ metrics.mrr.toFixed(2) }}</div>
+        <div class="fchub-stat-value">{{ formatCurrency(metrics.mrr) }}</div>
       </div>
       <div class="fchub-stat-widget">
         <div class="fchub-stat-icon orange"><el-icon :size="20"><UserFilled /></el-icon></div>
         <div class="fchub-stat-title">Avg Revenue Per Member</div>
-        <div class="fchub-stat-value">${{ metrics.arpm.toFixed(2) }}</div>
+        <div class="fchub-stat-value">{{ formatCurrency(metrics.arpm) }}</div>
       </div>
       <div class="fchub-stat-widget">
         <div class="fchub-stat-icon pink"><el-icon :size="20"><TrendCharts /></el-icon></div>
         <div class="fchub-stat-title">Lifetime Value</div>
-        <div class="fchub-stat-value">${{ metrics.ltv.toFixed(2) }}</div>
+        <div class="fchub-stat-value">{{ formatCurrency(metrics.ltv) }}</div>
       </div>
     </div>
 
@@ -31,6 +31,7 @@
 <script setup>
 import { Bar } from 'vue-chartjs'
 import { Money, TrendCharts, UserFilled } from '@element-plus/icons-vue'
+import { formatCurrency } from '@/utils/currency.js'
 
 defineProps({
   loading: Boolean,

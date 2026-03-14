@@ -75,6 +75,7 @@ import {
   Filler,
 } from 'chart.js'
 import { reports } from '@/api/index.js'
+import { currencyTickFormatter } from '@/utils/currency.js'
 import { formatReportPeriodLabel, wpDatePickerFormat } from '@/utils/wpDate.js'
 import ReportsOverviewTab from '@/components/reports/ReportsOverviewTab.vue'
 import ReportsPlansTab from '@/components/reports/ReportsPlansTab.vue'
@@ -251,7 +252,7 @@ const barChartOptions = {
     y: {
       beginAtZero: true,
       ticks: {
-        callback: (value) => '$' + value,
+        callback: currencyTickFormatter,
       },
     },
   },
