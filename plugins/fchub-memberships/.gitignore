@@ -2,6 +2,9 @@ node_modules/
 vendor/
 .phpunit.cache/
 coverage/
-assets/dist/
+# assets/dist/ is tracked — plugin works without a build step
+# only ignore new untracked files, not already-tracked ones
+assets/dist/*
+!assets/dist/.vite/
 .DS_Store
 *.log
