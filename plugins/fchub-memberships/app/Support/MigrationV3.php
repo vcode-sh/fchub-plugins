@@ -45,7 +45,7 @@ class MigrationV3
         $grants = $wpdb->get_results(
             "SELECT g.id, g.source_id AS order_id, g.source_ids, s.id AS subscription_id
              FROM {$grantsTable} g
-             INNER JOIN {$subscriptionsTable} s ON s.order_id = g.source_id
+             INNER JOIN {$subscriptionsTable} s ON s.parent_order_id = g.source_id
              WHERE g.source_type = 'order'
                AND g.source_id > 0",
             ARRAY_A
@@ -132,18 +132,19 @@ class MigrationV3
         ];
 
         foreach ($constraints as $fk) {
-            try {
-                $wpdb->query(
-                    "ALTER TABLE {$fk['table']}
-                     ADD CONSTRAINT {$fk['name']}
-                     FOREIGN KEY ({$fk['column']})
-                     REFERENCES {$fk['ref_table']}({$fk['ref_column']})
-                     ON DELETE {$fk['on_delete']}"
-                );
-                Logger::log('MigrationV3: FK added', "{$fk['name']} on {$fk['table']}");
-            } catch (\Throwable $e) {
-                Logger::error('MigrationV3: FK failed', "{$fk['name']} on {$fk['table']}: {$e->getMessage()}");
+            if (self::constraintExists($fk['table'], $fk['name'])) {
+                continue;
             }
+
+            $suppress = $wpdb->suppress_errors(true);
+            $wpdb->query(
+                "ALTER TABLE {$fk['table']}
+                 ADD CONSTRAINT {$fk['name']}
+                 FOREIGN KEY ({$fk['column']})
+                 REFERENCES {$fk['ref_table']}({$fk['ref_column']})
+                 ON DELETE {$fk['on_delete']}"
+            );
+            $wpdb->suppress_errors($suppress);
         }
     }
 
@@ -180,6 +181,31 @@ class MigrationV3
         }
     }
 
+    private static function constraintExists(string $table, string $name): bool
+    {
+        global $wpdb;
+        $dbName = $wpdb->dbname;
+        return (bool) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+             WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND CONSTRAINT_NAME = %s",
+            $dbName,
+            $table,
+            $name
+        ));
+    }
+
+    private static function indexExists(string $table, string $name): bool
+    {
+        global $wpdb;
+        $suppress = $wpdb->suppress_errors(true);
+        $result = $wpdb->get_results($wpdb->prepare(
+            "SHOW INDEX FROM {$table} WHERE Key_name = %s",
+            $name
+        ));
+        $wpdb->suppress_errors($suppress);
+        return !empty($result);
+    }
+
     private static function addIndexes(): void
     {
         global $wpdb;
@@ -209,14 +235,15 @@ class MigrationV3
         ];
 
         foreach ($indexes as $idx) {
-            try {
-                $wpdb->query(
-                    "ALTER TABLE {$idx['table']} ADD INDEX {$idx['name']} ({$idx['cols']})"
-                );
-                Logger::log('MigrationV3: Index added', "{$idx['name']} on {$idx['table']}");
-            } catch (\Throwable $e) {
-                Logger::error('MigrationV3: Index failed', "{$idx['name']} on {$idx['table']}: {$e->getMessage()}");
+            if (self::indexExists($idx['table'], $idx['name'])) {
+                continue;
             }
+
+            $suppress = $wpdb->suppress_errors(true);
+            $wpdb->query(
+                "ALTER TABLE {$idx['table']} ADD INDEX {$idx['name']} ({$idx['cols']})"
+            );
+            $wpdb->suppress_errors($suppress);
         }
     }
 }

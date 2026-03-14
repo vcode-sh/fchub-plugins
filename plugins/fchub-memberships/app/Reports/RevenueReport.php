@@ -45,7 +45,7 @@ class RevenueReport
                 DATE_FORMAT(g.created_at, '%%Y-%%m') AS month,
                 g.plan_id,
                 p.title AS plan_title,
-                COALESCE(SUM(o.total), 0) AS revenue
+                COALESCE(SUM(o.total_amount), 0) AS revenue
              FROM {$this->grantsTable} g
              JOIN {$this->ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
              LEFT JOIN {$this->plansTable} p ON g.plan_id = p.id
@@ -112,7 +112,7 @@ class RevenueReport
         }
 
         $totalRevenue = (int) $wpdb->get_var(
-            "SELECT COALESCE(SUM(o.total), 0)
+            "SELECT COALESCE(SUM(o.total_amount), 0)
              FROM {$this->grantsTable} g
              JOIN {$this->ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
              WHERE g.status = 'active'"
@@ -136,7 +136,7 @@ class RevenueReport
                 g.plan_id,
                 p.title AS plan_title,
                 COUNT(DISTINCT g.user_id) AS member_count,
-                COALESCE(SUM(o.total), 0) AS total_revenue
+                COALESCE(SUM(o.total_amount), 0) AS total_revenue
              FROM {$this->grantsTable} g
              JOIN {$this->ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
              LEFT JOIN {$this->plansTable} p ON g.plan_id = p.id

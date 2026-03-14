@@ -231,7 +231,7 @@ class MemberStatsReport
 
         if ($planId !== null) {
             $revenue = $wpdb->get_var($wpdb->prepare(
-                "SELECT COALESCE(SUM(o.total), 0)
+                "SELECT COALESCE(SUM(o.total_amount), 0)
                  FROM {$this->grantsTable} g
                  JOIN {$ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
                  WHERE g.plan_id = %d
@@ -243,7 +243,7 @@ class MemberStatsReport
             ));
         } else {
             $revenue = $wpdb->get_var($wpdb->prepare(
-                "SELECT COALESCE(SUM(o.total), 0)
+                "SELECT COALESCE(SUM(o.total_amount), 0)
                  FROM {$this->grantsTable} g
                  JOIN {$ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
                  WHERE g.created_at >= %s
