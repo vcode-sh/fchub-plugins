@@ -86,7 +86,7 @@ final class SubscriptionGrantLifecycleServiceTest extends PluginTestCase
         };
 
         $service = new SubscriptionGrantLifecycleService($grantService, $grantRepo);
-        $service->renew((object) ['id' => 55, 'next_billing_at' => '2026-04-01 00:00:00']);
+        $service->renew((object) ['id' => 55, 'next_billing_date' => '2026-04-01 00:00:00']);
 
         self::assertSame([[
             'user_id' => 10,

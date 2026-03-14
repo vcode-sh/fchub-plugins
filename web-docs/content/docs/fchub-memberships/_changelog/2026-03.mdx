@@ -1,3 +1,55 @@
+### v1.1.0
+
+*Released 14 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.1.0)
+
+Major refactor, plus the discovery that half the plugin's SQL was querying tables that don't exist. Rebuilt plugin structure, split admin components, reduced bundle size, expanded tests — and then fixed everything that was quietly broken underneath.
+
+#### Refactored
+
+Rebuilt the plugin's internal structure so the code is cleaner, smaller, and far less cursed to work on. Plans, members, reports, settings, and content tools are split into focused pieces instead of one enormous service. Admin bundle size cut dramatically. Proper local dev setup for tests and builds. Packaging and repo hygiene cleaned up.
+
+#### FluentCart integration fixes
+
+Every SQL query that touched FluentCart's product and integration feed data was pointing at the wrong tables. `fct_order_integration_feeds` doesn't exist — never has. FluentCart stores product integration feeds in `fct_product_meta` with `object_type='product_integration'`. Similarly, `fct_products` isn't a thing — products live in `wp_posts` with post type `fluent-products`, and pricing sits in `fct_product_variations`.
+
+This broke:
+- **Linked products tab** — showed nothing because the query silently returned empty
+- **Product search dialog** — same story
+- **Link and unlink operations** — inserted into and deleted from a void
+- **WP-CLI commands** — `backfill`, `sync --feed`, and `sync --plan` all failed immediately
+- **Subscription renewal** — used `next_billing_at` instead of the actual column name `next_billing_date`, so grants never got their expiry extended when a subscription renewed
+
+All queries have been rewritten against the correct FluentCart schema.
+
+#### Revenue reporting
+
+Revenue amounts were displayed in cents because FluentCart stores `total_amount` as a BIGINT in the smallest currency unit. A 99 zł order showed as 9900.00 zł. Now properly converted. The currency symbol, position, and separators are pulled from FluentCart's store settings instead of hardcoding `$`.
+
+#### FluentCRM integration
+
+`CheckoutUrlHelper::getLinkedProductId()` queried the non-existent feeds table, breaking the `{{membership.checkout_url}}` and `{{membership.upgrade_url}}` smart codes in automation emails. Fixed to query `fct_product_meta`.
+
+#### FluentCommunity badges
+
+The adapter's `grant()` and `revoke()` calls were missing the `$context` parameter that carries `plan_id`. Without it, `maybeAssignBadge()` and `maybeRevokeBadge()` couldn't look up badge mappings. Badges are now correctly assigned on grant and removed on revocation.
+
+#### Timezone and lifecycle fixes
+
+- Grace period calculation used `gmdate()` while queries used `current_time('mysql')` — grants expired at the wrong time depending on timezone offset. Standardised on `current_time()`.
+- Trial expiration checks had the same timezone mismatch.
+- Grant expiry maintenance fired hooks before the database update. If anything threw after the hook, the audit log said "expired" but the grant stayed active. DB update now runs first.
+- Grace period expiry logged as generic "revoked" — now uses distinct `grace_period_revoked` audit type.
+
+#### Admin UI
+
+- Four Vue pages used Element Plus icons without importing them — icons rendered as empty boxes.
+- Linking a product opened a confirmation dialog behind the link dialog, causing an overlay deadlock. Now uses a two-step flow inside a single dialog.
+- Unlinking uses inline popconfirm instead of a stacked modal.
+- Linked products tab shows all product variations (name, price, recurring/one-time) instead of just the first.
+- Revenue chart ticks and stat widgets use the store's currency formatter.
+
+<Separator className="my-8" />
+
 ### v1.0.3
 
 *Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.0.3)

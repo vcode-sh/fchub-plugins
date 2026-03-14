@@ -111,7 +111,7 @@ final class SubscriptionValidityCheckService
             return false;
         }
 
-        $nextBilling = $subscription->next_billing_date ?? null;
+        $nextBilling = $subscription->next_billing_date ?? $subscription->next_billing_at ?? null;
         if ($nextBilling) {
             return strtotime($nextBilling) > time();
         }

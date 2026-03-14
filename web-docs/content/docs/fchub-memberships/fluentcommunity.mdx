@@ -70,7 +70,7 @@ In the membership settings, under the FluentCommunity section:
 
 **Badge assigned on grant**
 
-When the `FluentCommunityAdapter::grant()` method runs, it calls `maybeAssignBadge()`. This checks if a badge mapping exists for the granted plan and assigns the badge via `Badge::assignToUser()`.
+When the `FluentCommunityAdapter::grant()` method runs, it calls `maybeAssignBadge()`. This checks if a badge mapping exists for the granted plan (using the `plan_id` from the grant context) and assigns the badge via `Badge::assignToUser()`.
 
 </Step>
 <Step>
@@ -103,6 +103,7 @@ The `FluentCommunitySync` class registers hooks to keep community membership in 
 |---|---|
 | Grant created | Add user to mapped spaces/groups, assign badge |
 | Grant revoked | Remove user from spaces/groups, revoke badge (if enabled) |
+| Grant expired | Remove user from spaces/groups, revoke badge (if enabled) |
 | Grant paused | No immediate community change (membership data preserved) |
 | Grant resumed | No immediate community change (user retains community access) |
 

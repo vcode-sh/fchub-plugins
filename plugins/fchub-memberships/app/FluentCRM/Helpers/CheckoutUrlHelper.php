@@ -144,8 +144,8 @@ class CheckoutUrlHelper
     /**
      * Get the linked FluentCart product ID for a membership plan.
      *
-     * Queries the fct_order_integration_feeds table for feeds with
-     * integration_key='memberships' that reference this plan.
+     * Queries fct_product_meta for integration feeds with
+     * meta_key='memberships' that reference this plan.
      *
      * @return int|null Product ID or null
      */
@@ -159,14 +159,22 @@ class CheckoutUrlHelper
             return null;
         }
 
-        $feedsTable = $wpdb->prefix . 'fct_order_integration_feeds';
+        $metaTable = $wpdb->prefix . 'fct_product_meta';
         $feeds = $wpdb->get_results($wpdb->prepare(
-            "SELECT product_id, settings FROM {$feedsTable} WHERE integration_key = %s AND enabled = 1",
+            "SELECT object_id AS product_id, meta_value FROM {$metaTable}
+             WHERE object_type = 'product_integration' AND meta_key = %s",
             'memberships'
         ), ARRAY_A);
 
         foreach ($feeds ?: [] as $feed) {
-            $settings = json_decode($feed['settings'] ?? '{}', true) ?: [];
+            $settings = is_string($feed['meta_value'])
+                ? (json_decode($feed['meta_value'], true) ?: [])
+                : ($feed['meta_value'] ?? []);
+
+            if (($settings['enabled'] ?? 'yes') !== 'yes') {
+                continue;
+            }
+
             $matchBySlug = ($settings['plan_slug'] ?? '') === $plan['slug'];
             $matchById = (int) ($settings['plan_id'] ?? 0) === $planId;
 

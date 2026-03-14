@@ -484,10 +484,11 @@ class GrantCommand
         $limit = (int) ($assoc_args['limit'] ?? 0);
 
         // Find membership feeds linked to this product
-        $feedsTable = $wpdb->prefix . 'fct_order_integration_feeds';
+        $metaTable = $wpdb->prefix . 'fct_product_meta';
         $feeds = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$feedsTable}
-             WHERE product_id = %d AND integration_key = 'memberships'",
+            "SELECT id, object_id AS product_id, meta_value AS settings
+             FROM {$metaTable}
+             WHERE object_id = %d AND object_type = 'product_integration' AND meta_key = 'memberships'",
             $productId
         ), ARRAY_A);
 
@@ -505,7 +506,9 @@ class GrantCommand
         $totalSkipped = 0;
 
         foreach ($feeds as $feed) {
-            $feedSettings = json_decode($feed['settings'] ?? '{}', true) ?: [];
+            $feedSettings = is_string($feed['settings'])
+                ? (json_decode($feed['settings'], true) ?: [])
+                : ($feed['settings'] ?? []);
             $planSlug = $feedSettings['plan_slug'] ?? '';
 
             if (!$planSlug) {
@@ -647,9 +650,11 @@ class GrantCommand
             return;
         }
 
-        $feedsTable = $wpdb->prefix . 'fct_order_integration_feeds';
+        $metaTable = $wpdb->prefix . 'fct_product_meta';
         $feed = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$feedsTable} WHERE id = %d AND integration_key = 'memberships'",
+            "SELECT id, object_id AS product_id, meta_value AS settings
+             FROM {$metaTable}
+             WHERE id = %d AND object_type = 'product_integration' AND meta_key = 'memberships'",
             $feedId
         ), ARRAY_A);
 
@@ -657,7 +662,9 @@ class GrantCommand
             WP_CLI::error(sprintf('Membership feed #%d not found.', $feedId));
         }
 
-        $feedSettings = json_decode($feed['settings'] ?? '{}', true) ?: [];
+        $feedSettings = is_string($feed['settings'])
+            ? (json_decode($feed['settings'], true) ?: [])
+            : ($feed['settings'] ?? []);
         $planSlug = $feedSettings['plan_slug'] ?? '';
 
         if (!$planSlug) {
@@ -722,9 +729,11 @@ class GrantCommand
             WP_CLI::error(sprintf('Plan "%s" not found.', $planSlug));
         }
 
-        $feedsTable = $wpdb->prefix . 'fct_order_integration_feeds';
+        $metaTable = $wpdb->prefix . 'fct_product_meta';
         $feeds = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$feedsTable} WHERE integration_key = %s",
+            "SELECT id, object_id AS product_id, meta_value AS settings
+             FROM {$metaTable}
+             WHERE object_type = 'product_integration' AND meta_key = %s",
             'memberships'
         ), ARRAY_A);
 
@@ -734,7 +743,9 @@ class GrantCommand
 
         $matchingFeedIds = [];
         foreach ($feeds as $feed) {
-            $settings = json_decode($feed['settings'] ?? '{}', true) ?: [];
+            $settings = is_string($feed['settings'])
+                ? (json_decode($feed['settings'], true) ?: [])
+                : ($feed['settings'] ?? []);
             if (($settings['plan_slug'] ?? '') === $plan['slug']) {
                 $matchingFeedIds[] = (int) $feed['id'];
             }

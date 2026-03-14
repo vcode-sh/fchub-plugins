@@ -100,7 +100,7 @@ final class GrantCreationService
 
         $adapter = $this->adapters->resolve($provider);
         if ($adapter) {
-            $adapter->grant($userId, $resourceType, $resourceId);
+            $adapter->grant($userId, $resourceType, $resourceId, $context);
         }
 
         return ['action' => 'created', 'grant_id' => $grantId];

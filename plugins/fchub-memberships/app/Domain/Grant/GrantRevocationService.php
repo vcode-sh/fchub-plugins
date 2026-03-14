@@ -64,14 +64,14 @@ final class GrantRevocationService
                 $this->grants->update($grant['id'], [
                     'source_ids' => [],
                     'cancellation_requested_at' => current_time('mysql'),
-                    'cancellation_effective_at' => gmdate('Y-m-d H:i:s', strtotime("+{$gracePeriodDays} days")),
+                    'cancellation_effective_at' => date('Y-m-d H:i:s', strtotime("+{$gracePeriodDays} days", current_time('timestamp'))),
                     'cancellation_reason' => $reason,
                     'meta' => array_merge($grant['meta'], ['revoke_reason' => $reason]),
                 ]);
                 $this->sources->removeAllByGrant($grant['id']);
 
                 AuditLogger::logGrantChange($grant['id'], 'grace_period_started', $grant, [
-                    'cancellation_effective_at' => gmdate('Y-m-d H:i:s', strtotime("+{$gracePeriodDays} days")),
+                    'cancellation_effective_at' => date('Y-m-d H:i:s', strtotime("+{$gracePeriodDays} days", current_time('timestamp'))),
                 ]);
             } else {
                 $this->grants->update($grant['id'], [
@@ -86,7 +86,7 @@ final class GrantRevocationService
 
                 $adapter = $this->adapters->resolve($grant['provider']);
                 if ($adapter) {
-                    $adapter->revoke($userId, $grant['resource_type'], $grant['resource_id']);
+                    $adapter->revoke($userId, $grant['resource_type'], $grant['resource_id'], ['plan_id' => $planId]);
                 }
 
                 AuditLogger::logGrantChange($grant['id'], 'revoked', $grant, ['status' => 'revoked']);
@@ -147,7 +147,7 @@ final class GrantRevocationService
 
             $adapter = $this->adapters->resolve($grant['provider']);
             if ($adapter) {
-                $adapter->revoke($grant['user_id'], $grant['resource_type'], $grant['resource_id']);
+                $adapter->revoke($grant['user_id'], $grant['resource_type'], $grant['resource_id'], ['plan_id' => $grant['plan_id'] ?? null]);
             }
 
             $revoked++;
@@ -175,10 +175,10 @@ final class GrantRevocationService
             $this->drips->deleteByGrantId($grant['id']);
             $adapter = $this->adapters->resolve($grant['provider']);
             if ($adapter) {
-                $adapter->revoke((int) $grant['user_id'], $grant['resource_type'], $grant['resource_id']);
+                $adapter->revoke((int) $grant['user_id'], $grant['resource_type'], $grant['resource_id'], ['plan_id' => $grant['plan_id'] ?? null]);
             }
 
-            AuditLogger::logGrantChange($grant['id'], 'revoked', $grant, ['status' => 'revoked']);
+            AuditLogger::logGrantChange($grant['id'], 'grace_period_revoked', $grant, ['status' => 'revoked']);
             do_action('fchub_memberships/grant_revoked', [$grant], (int) $grant['plan_id'], (int) $grant['user_id'], $reason);
             $revoked++;
         }

@@ -363,8 +363,8 @@ class MembershipAccessIntegration extends BaseIntegrationManager
 
         foreach ($subscriptions as $subscription) {
             $nextBilling = is_array($subscription)
-                ? Arr::get($subscription, 'next_billing_at')
-                : ($subscription->next_billing_at ?? null);
+                ? Arr::get($subscription, 'next_billing_date')
+                : ($subscription->next_billing_date ?? null);
 
             if ($nextBilling) {
                 return $nextBilling;

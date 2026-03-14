@@ -68,7 +68,7 @@ final class SubscriptionGrantLifecycleService
     public function renew(object $subscription): void
     {
         $grants = $this->grantRepo->getBySourceId((int) $subscription->id, 'subscription');
-        $nextBilling = $subscription->next_billing_at ?? null;
+        $nextBilling = $subscription->next_billing_date ?? null;
 
         foreach ($grants as $grant) {
             if ($grant['status'] === 'active' && $nextBilling) {

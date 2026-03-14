@@ -29,7 +29,7 @@ class TrialLifecycleService
      */
     public function checkTrialExpirations(): void
     {
-        $now = gmdate('Y-m-d H:i:s');
+        $now = current_time('mysql');
 
         $grants = $this->queries->getDueTrialExpirations($now);
 
@@ -56,8 +56,8 @@ class TrialLifecycleService
         $settings = get_option('fchub_memberships_settings', []);
         $noticeDays = (int) ($settings['trial_expiry_notice_days'] ?? 3);
 
-        $now = gmdate('Y-m-d H:i:s');
-        $cutoff = gmdate('Y-m-d H:i:s', strtotime("+{$noticeDays} days"));
+        $now = current_time('mysql');
+        $cutoff = date('Y-m-d H:i:s', strtotime("+{$noticeDays} days", current_time('timestamp')));
 
         $grants = $this->queries->getTrialExpiringSoon($now, $cutoff);
 
@@ -100,7 +100,7 @@ class TrialLifecycleService
             ]);
 
             // Mark as notified to avoid duplicates
-            $meta['trial_expiry_notified'] = gmdate('Y-m-d H:i:s');
+            $meta['trial_expiry_notified'] = current_time('mysql');
             $this->queries->markTrialExpiryNotified((int) $row['id'], $meta);
         }
     }

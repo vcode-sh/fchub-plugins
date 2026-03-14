@@ -68,7 +68,11 @@ Revenue tracking links membership grants to FluentCart order totals:
 | Daily Revenue | Sum of order totals for grants created that day |
 | Monthly Revenue | Aggregate revenue for the month |
 
-Revenue is calculated by joining the grants table with FluentCart's orders table (`fct_orders`) where `source_type = 'order'` and matching the grant's `source_id` to the order ID.
+Revenue is calculated by joining the grants table with FluentCart's orders table (`fct_orders`) where `source_type = 'order'` and matching the grant's `source_id` to the order ID. Amounts are converted from FluentCart's internal cent storage to whole currency units before display.
+
+<Callout type="info" title="Currency">
+Revenue figures use your FluentCart store currency — symbol, position, and decimal separator are all pulled from the store settings automatically. No hardcoded dollar signs.
+</Callout>
 
 <Callout type="info" title="Revenue Accuracy">
 Revenue figures reflect the total order amount at the time of grant creation. For subscriptions with multiple payments, only the initial order amount is captured in the grant. Subscription renewal revenue is tracked separately through FluentCart's own reporting.

@@ -47,11 +47,13 @@ final class GrantMaintenanceService
             return 0;
         }
 
+        $count = $this->grants->expireOverdueGrants();
+
         foreach ($overdueGrants as $grant) {
-            do_action('fchub_memberships/grant_expired', $grant);
             AuditLogger::logGrantChange($grant['id'], 'expired', $grant, ['status' => 'expired']);
+            do_action('fchub_memberships/grant_expired', $grant);
         }
 
-        return $this->grants->expireOverdueGrants();
+        return $count;
     }
 }
