@@ -1,3 +1,46 @@
+### v1.1.0
+
+*Released 14 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.0)
+
+A thorough audit of the entire plugin. The kind where you find out nothing actually worked. Invoice amounts were wrong, the settings page crashed, the checkout NIP field was invisible, and the order confirmation showed nothing. Eleven fixes, zero new features, one very long day.
+
+#### Fixed: invoices had wrong amounts
+
+Every invoice sent to Fakturownia was missing the VAT. A 123 zł order would generate a 100 zł invoice. Shipping tax was also hardcoded to 23% regardless of the actual rate. Both are now calculated correctly from the order data.
+
+#### Fixed: settings page didn't load
+
+Opening Fakturownia settings inside FluentCart's integration panel either showed a broken page or nothing at all. The settings form now loads and saves reliably.
+
+#### Fixed: invoice info missing from order confirmation
+
+The Fakturownia info block (invoice number, PDF link, KSeF status) never appeared on the thank-you page or the order admin view. It does now.
+
+#### Fixed: NIP field invisible at checkout
+
+The "I want a company invoice" checkbox and NIP field never rendered on the checkout page. Completely rewritten — the toggle and NIP input now appear correctly and hide/show as expected.
+
+#### Fixed: correction invoices on refund
+
+Refund corrections were sent to Fakturownia without proper line items, relying on undocumented behaviour. Now builds explicit correction positions from the original invoice. KSeF submission for corrections is also handled in a single step instead of two.
+
+#### Fixed: PDF link leaked your API credentials
+
+The invoice PDF download link contained your Fakturownia API token in plain text in the page HTML. PDF downloads now go through a secure proxy — your token stays on the server where it belongs.
+
+#### Fixed: KSeF status check ran forever
+
+If KSeF took a while to process an invoice, the status check would retry every 2 minutes — indefinitely. Now gives up after about an hour and logs a warning so you know to check Fakturownia manually.
+
+#### Other fixes
+
+- Invoice dates (`sell_date`, `issue_date`) are now set from the actual payment date instead of defaulting to whenever the cron job happened to run
+- Plugin uninstall now actually cleans up its settings from the correct database table
+- KSeF status checks no longer run if Fakturownia credentials are missing
+- Removed dead code from the checkout field registration
+
+<Separator className="my-8" />
+
 ### v1.0.3
 
 *Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.0.3)

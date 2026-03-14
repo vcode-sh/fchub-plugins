@@ -46,7 +46,18 @@ class RefundHandler
             $order->invoice_no ?: $order->id
         );
 
-        $result = $this->api->createCorrection((int) $originalInvoiceId, $reason);
+        $sendToKsef = FakturowniaSettings::isKsefAutoSend();
+
+        // Fetch original invoice to build explicit zero-out correction positions
+        $originalInvoice = $this->api->getInvoice((int) $originalInvoiceId);
+
+        if (!isset($originalInvoice['error']) && !empty($originalInvoice['positions'])) {
+            $positions = $this->buildZeroCorrectionPositions($originalInvoice);
+            $result = $this->api->createCorrection((int) $originalInvoiceId, $reason, $positions, $sendToKsef);
+        } else {
+            // Fallback: position-less correction (Fakturownia auto-zeroes)
+            $result = $this->api->createCorrection((int) $originalInvoiceId, $reason, [], $sendToKsef);
+        }
 
         if (isset($result['error'])) {
             $order->addLog(
@@ -62,14 +73,11 @@ class RefundHandler
         $order->updateMeta('_fakturownia_correction_id', Arr::get($result, 'id'));
         $order->updateMeta('_fakturownia_correction_number', Arr::get($result, 'number', ''));
 
-        // Send correction to KSeF if enabled
-        if (FakturowniaSettings::isKsefAutoSend()) {
-            $correctionId = Arr::get($result, 'id');
-            if ($correctionId) {
-                $ksefResult = $this->api->sendToKSeF((int) $correctionId);
-                if (!isset($ksefResult['error'])) {
-                    $order->updateMeta('_fakturownia_correction_ksef_status', Arr::get($ksefResult, 'gov_status', ''));
-                }
+        // Track KSeF status if submitted
+        if ($sendToKsef) {
+            $govStatus = Arr::get($result, 'gov_status');
+            if ($govStatus) {
+                $order->updateMeta('_fakturownia_correction_ksef_status', $govStatus);
             }
         }
 
@@ -85,5 +93,30 @@ class RefundHandler
         );
 
         return $result;
+    }
+
+    /**
+     * Build correction positions that zero out all original invoice items
+     */
+    private function buildZeroCorrectionPositions(array $originalInvoice): array
+    {
+        $positions = [];
+
+        foreach ($originalInvoice['positions'] as $position) {
+            $positions[] = [
+                'name'              => $position['name'] ?? __('Item', 'fchub-fakturownia'),
+                'quantity'          => 0,
+                'quantity_unit'     => $position['quantity_unit'] ?? 'szt',
+                'total_price_gross' => 0,
+                'tax'               => $position['tax'] ?? 23,
+                'correction_before_attributes' => [
+                    'quantity'          => $position['quantity'] ?? 1,
+                    'total_price_gross' => $position['total_price_gross'] ?? 0,
+                    'tax'               => $position['tax'] ?? 23,
+                ],
+            ];
+        }
+
+        return $positions;
     }
 }

@@ -18,71 +18,28 @@ class CheckoutFields
         }
 
         add_filter('fluent_cart/checkout_page_name_fields_schema', [self::class, 'addNipFields'], 20, 2);
-        add_filter('fluent_cart/fields/address_base_fields', [self::class, 'addNipToAddressFields'], 10, 2);
         add_action('wp_enqueue_scripts', [self::class, 'enqueueCheckoutScript']);
     }
 
     /**
-     * Add NIP toggle + field to checkout personal info section
+     * Add NIP text field to checkout personal info section.
+     * FluentCart's checkout Vue only renders 'text' and 'email' types,
+     * so the toggle checkbox is injected via JS instead.
      */
     public static function addNipFields($fields, $args = []): array
     {
-        // Add "I want a company invoice" toggle after company_name or at end
-        $fields['billing_wants_company_invoice'] = [
-            'name'        => 'billing_wants_company_invoice',
-            'id'          => 'billing_wants_company_invoice',
-            'type'        => 'checkbox',
-            'data-type'   => 'checkbox',
-            'label'       => esc_attr__('I want a company invoice', 'fchub-fakturownia'),
-            'required'    => '',
-            'value'       => '',
-            'aria-label'  => esc_attr__('I want a company invoice', 'fchub-fakturownia'),
-            'wrapper_class' => 'fchub-nip-toggle-wrapper',
-        ];
-
-        // Add NIP field (hidden by default, shown when toggle is checked)
         $fields['billing_nip'] = [
-            'name'        => 'billing_nip',
-            'id'          => 'billing_nip',
-            'type'        => 'text',
-            'data-type'   => 'text',
-            'label'       => '',
-            'required'    => '',
-            'placeholder' => esc_attr__('NIP (Tax ID)', 'fchub-fakturownia'),
-            'aria-label'  => esc_attr__('NIP Tax Identification Number', 'fchub-fakturownia'),
+            'name'         => 'billing_nip',
+            'id'           => 'billing_nip',
+            'type'         => 'text',
+            'data-type'    => 'text',
+            'label'        => '',
+            'required'     => '',
+            'placeholder'  => esc_attr__('NIP (Tax ID)', 'fchub-fakturownia'),
+            'aria-label'   => esc_attr__('NIP Tax Identification Number', 'fchub-fakturownia'),
             'autocomplete' => 'off',
-            'value'       => '',
+            'value'        => '',
             'wrapper_class' => 'fchub-nip-field-wrapper',
-            'wrapper_atts' => [
-                'style' => 'display:none',
-                'data-nip-field' => '1',
-            ],
-        ];
-
-        return $fields;
-    }
-
-    /**
-     * Add NIP to address fields for saved address display
-     */
-    public static function addNipToAddressFields($fields, $args = []): array
-    {
-        $config = $args['config'] ?? [];
-        $type = $config['type'] ?? 'billing';
-
-        if ($type !== 'billing') {
-            return $fields;
-        }
-
-        $fields['nip'] = [
-            'name'        => $type . '_nip',
-            'id'          => $type . '_nip',
-            'type'        => 'text',
-            'data-type'   => 'text',
-            'label'       => '',
-            'aria-label'  => esc_attr__('NIP', 'fchub-fakturownia'),
-            'placeholder' => esc_attr__('NIP (Tax ID)', 'fchub-fakturownia'),
-            'value'       => '',
         ];
 
         return $fields;
@@ -113,32 +70,52 @@ class CheckoutFields
     }
 
     /**
-     * JS for toggle show/hide NIP field
+     * JS that injects a toggle checkbox before the NIP field and handles show/hide.
+     * FluentCart's checkout Vue doesn't render checkbox fields, so we inject one via DOM.
      */
     private static function getToggleScript(): string
     {
-        return <<<'JS'
+        $toggleLabel = esc_js(__('I want a company invoice', 'fchub-fakturownia'));
+
+        return <<<JS
 (function() {
+    var TOGGLE_LABEL = '{$toggleLabel}';
+
     function initNipToggle() {
-        var toggle = document.getElementById('billing_wants_company_invoice');
-        if (!toggle) return;
+        var nipField = document.getElementById('billing_nip');
+        if (!nipField) return;
 
-        var nipWrapper = toggle.closest('form')
-            ? toggle.closest('form').querySelector('[data-nip-field]')
-            : document.querySelector('[data-nip-field]');
+        var wrapper = nipField.closest('.fchub-nip-field-wrapper') || nipField.parentElement;
+        if (!wrapper || wrapper.dataset.fchubNipInit) return;
+        wrapper.dataset.fchubNipInit = '1';
 
-        if (!nipWrapper) return;
+        // Hide NIP field by default
+        wrapper.style.display = 'none';
 
-        function updateVisibility() {
-            nipWrapper.style.display = toggle.checked ? '' : 'none';
-            var nipInput = nipWrapper.querySelector('input');
-            if (nipInput && !toggle.checked) {
-                nipInput.value = '';
+        // Inject toggle checkbox before the NIP wrapper
+        var toggleWrapper = document.createElement('div');
+        toggleWrapper.className = 'fchub-nip-toggle-wrapper';
+        toggleWrapper.style.cssText = 'padding: 4px 0;';
+
+        var label = document.createElement('label');
+        label.style.cssText = 'display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px;';
+
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = 'billing_wants_company_invoice';
+
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(TOGGLE_LABEL));
+        toggleWrapper.appendChild(label);
+
+        wrapper.parentNode.insertBefore(toggleWrapper, wrapper);
+
+        checkbox.addEventListener('change', function() {
+            wrapper.style.display = this.checked ? '' : 'none';
+            if (!this.checked) {
+                nipField.value = '';
             }
-        }
-
-        toggle.addEventListener('change', updateVisibility);
-        updateVisibility();
+        });
     }
 
     if (document.readyState === 'loading') {

@@ -143,11 +143,7 @@ class FakturowniaSettings
 
     /**
      * Return field definitions for the global settings form.
-     *
-     * Note: FluentCart's Vue component (GeneralIntegrationSettings) expects responses
-     * wrapped in a 'data' key (response.data.integration / response.data.settings)
-     * but Rest.js resolves with raw JSON. We send the complete response ourselves
-     * to work around this mismatch.
+     * FluentCart assembles the response from both settings + fields filters.
      */
     public static function getGlobalFields($fields, $args): array
     {
@@ -228,15 +224,7 @@ class FakturowniaSettings
             ],
         ];
 
-        // Send the complete response with 'data' wrapper expected by the Vue component
-        wp_send_json([
-            'data' => [
-                'integration' => self::getSettings(),
-                'settings'    => $fieldSettings,
-            ],
-        ], 200);
-
-        return $fieldSettings; // Never reached
+        return $fieldSettings;
     }
 
     /**

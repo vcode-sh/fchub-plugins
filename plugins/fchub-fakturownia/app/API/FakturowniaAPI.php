@@ -72,17 +72,36 @@ class FakturowniaAPI
     }
 
     /**
-     * Get invoice PDF URL
+     * Download invoice PDF content (server-side, token never exposed to browser)
      */
-    public function getInvoicePdfUrl(int $id): string
+    public function downloadInvoicePdf(int $id): array
     {
-        return $this->getBaseUrl() . '/invoices/' . $id . '.pdf?api_token=' . $this->apiToken;
+        $url = $this->getBaseUrl() . '/invoices/' . $id . '.pdf?api_token=' . urlencode($this->apiToken);
+
+        $response = wp_remote_get($url, [
+            'timeout' => 30,
+            'headers' => ['Accept' => 'application/pdf'],
+        ]);
+
+        if (is_wp_error($response)) {
+            return ['error' => $response->get_error_message()];
+        }
+
+        $statusCode = wp_remote_retrieve_response_code($response);
+        if ($statusCode >= 400) {
+            return ['error' => sprintf('PDF download failed (HTTP %d)', $statusCode)];
+        }
+
+        return [
+            'body'         => wp_remote_retrieve_body($response),
+            'content_type' => wp_remote_retrieve_header($response, 'content-type') ?: 'application/pdf',
+        ];
     }
 
     /**
-     * Create a correction invoice
+     * Create a correction invoice, optionally with explicit positions and KSeF submission
      */
-    public function createCorrection(int $originalInvoiceId, string $reason, array $positions = []): array
+    public function createCorrection(int $originalInvoiceId, string $reason, array $positions = [], bool $sendToKsef = false): array
     {
         $invoiceData = [
             'kind'              => 'correction',
@@ -94,10 +113,16 @@ class FakturowniaAPI
             $invoiceData['positions'] = $positions;
         }
 
-        return $this->request('POST', '/invoices.json', [
+        $params = [
             'api_token' => $this->apiToken,
             'invoice'   => $invoiceData,
-        ]);
+        ];
+
+        if ($sendToKsef) {
+            $params['gov_save_and_send'] = true;
+        }
+
+        return $this->request('POST', '/invoices.json', $params);
     }
 
     /**
@@ -156,8 +181,7 @@ class FakturowniaAPI
         $args = [
             'timeout' => 30,
             'headers' => [
-                'Accept'       => 'application/json',
-                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
             ],
         ];
 
@@ -165,6 +189,7 @@ class FakturowniaAPI
             $url = add_query_arg($params, $url);
             $response = wp_remote_get($url, $args);
         } else {
+            $args['headers']['Content-Type'] = 'application/json';
             $args['body'] = json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $response = wp_remote_post($url, $args);
         }

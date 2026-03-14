@@ -72,12 +72,17 @@ class InvoiceHandler
         $billingAddress = $order->billing_address;
         $customer = $order->customer;
 
+        $paidAt = $order->paid_at ?? $order->created_at ?? null;
+        $sellDate = $paidAt ? date('Y-m-d', strtotime($paidAt)) : date('Y-m-d');
+
         $invoice = [
             'kind'         => FakturowniaSettings::getInvoiceKind(),
             'payment_type' => $this->resolvePaymentType($order),
             'lang'         => FakturowniaSettings::getInvoiceLang(),
             'status'       => 'paid',
-            'paid_date'    => date('Y-m-d'),
+            'sell_date'    => $sellDate,
+            'issue_date'   => date('Y-m-d'),
+            'paid_date'    => $sellDate,
             'oid'          => $order->invoice_no ?: 'FC-' . $order->id,
             'oid_unique'   => 'yes',
         ];
@@ -187,7 +192,7 @@ class InvoiceHandler
                 'name'              => substr($item->title ?: $item->post_title ?: __('Product', 'fchub-fakturownia'), 0, 256),
                 'quantity'          => (int) $item->quantity,
                 'quantity_unit'     => 'szt',
-                'total_price_gross' => $this->centsToDecimal($item->line_total),
+                'total_price_gross' => $this->centsToDecimal($item->line_total + $item->tax_amount),
             ];
 
             // Calculate tax rate from amounts
@@ -218,7 +223,9 @@ class InvoiceHandler
                 'quantity'          => 1,
                 'quantity_unit'     => 'szt',
                 'total_price_gross' => $this->centsToDecimal($shippingGross),
-                'tax'               => $shippingTax > 0 ? 23 : 'zw',
+                'tax'               => ($shippingTax > 0 && $shippingTotal > 0)
+                    ? $this->normalizeVatRate(round(($shippingTax / $shippingTotal) * 100))
+                    : 'zw',
             ];
         }
 

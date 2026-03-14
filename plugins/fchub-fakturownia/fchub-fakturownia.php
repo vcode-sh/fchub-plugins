@@ -3,7 +3,7 @@
  * Plugin Name: FCHub - Fakturownia
  * Plugin URI: https://fchub.co
  * Description: Fakturownia invoice integration with KSeF 2.0 support for FluentCart
- * Version: 1.0.3
+ * Version: 1.1.0
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -18,7 +18,7 @@
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_FAKTUROWNIA_VERSION', '1.0.3');
+define('FCHUB_FAKTUROWNIA_VERSION', '1.1.0');
 define('FCHUB_FAKTUROWNIA_FILE', __FILE__);
 define('FCHUB_FAKTUROWNIA_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_FAKTUROWNIA_URL', plugin_dir_url(__FILE__));
@@ -94,6 +94,11 @@ add_action('fchub_fakturownia_check_ksef_status', function ($orderId, $fakturown
     }
 
     $settings = FChubFakturownia\Integration\FakturowniaSettings::getSettings();
+
+    if (empty($settings['domain']) || empty($settings['api_token'])) {
+        return;
+    }
+
     $api = new FChubFakturownia\API\FakturowniaAPI($settings['domain'], $settings['api_token']);
 
     $invoice = $api->getInvoice((int) $fakturowniaInvoiceId);
@@ -117,8 +122,19 @@ add_action('fchub_fakturownia_check_ksef_status', function ($orderId, $fakturown
         $order->updateMeta('_fakturownia_ksef_link', $govLink);
     }
 
-    // If still processing, check again in 2 minutes
+    // If still processing, retry with a cap (30 retries ~ 1 hour)
     if ($govStatus === 'processing') {
+        $retryCount = (int) $order->getMeta('_fakturownia_ksef_retry_count', 0);
+        if ($retryCount >= 30) {
+            $order->addLog(
+                __('Fakturownia: KSeF status check timed out', 'fchub-fakturownia'),
+                __('Gave up after 30 attempts (~1 hour). Check Fakturownia manually.', 'fchub-fakturownia'),
+                'warning',
+                'Fakturownia'
+            );
+            return;
+        }
+        $order->updateMeta('_fakturownia_ksef_retry_count', $retryCount + 1);
         wp_schedule_single_event(
             time() + 120,
             'fchub_fakturownia_check_ksef_status',
@@ -126,8 +142,9 @@ add_action('fchub_fakturownia_check_ksef_status', function ($orderId, $fakturown
         );
     }
 
-    // Log KSeF result
+    // Log KSeF result and clean up retry counter on terminal states
     if ($govStatus === 'ok' && $govId) {
+        $order->deleteMeta('_fakturownia_ksef_retry_count');
         $order->addLog(
             __('Fakturownia: KSeF submission successful', 'fchub-fakturownia'),
             sprintf(__('KSeF number: %s', 'fchub-fakturownia'), $govId),
@@ -135,6 +152,7 @@ add_action('fchub_fakturownia_check_ksef_status', function ($orderId, $fakturown
             'Fakturownia'
         );
     } elseif ($govStatus === 'send_error') {
+        $order->deleteMeta('_fakturownia_ksef_retry_count');
         $errors = $invoice['gov_error_messages'] ?? [];
         $errorText = is_array($errors) ? implode('; ', $errors) : (string) $errors;
         $order->addLog(
@@ -145,6 +163,53 @@ add_action('fchub_fakturownia_check_ksef_status', function ($orderId, $fakturown
         );
     }
 }, 10, 2);
+
+/**
+ * PDF proxy endpoint — streams invoice PDF without exposing API token in HTML
+ */
+add_action('rest_api_init', function () {
+    register_rest_route('fchub-fakturownia/v1', '/invoice-pdf/(?P<order_id>\d+)', [
+        'methods'             => 'GET',
+        'callback'            => function (\WP_REST_Request $request) {
+            $orderId = (int) $request->get_param('order_id');
+            $order = \FluentCart\App\Models\Order::find($orderId);
+
+            if (!$order) {
+                return new \WP_Error('not_found', 'Order not found', ['status' => 404]);
+            }
+
+            $invoiceId = $order->getMeta('_fakturownia_invoice_id');
+            if (!$invoiceId) {
+                return new \WP_Error('no_invoice', 'No invoice for this order', ['status' => 404]);
+            }
+
+            $settings = FChubFakturownia\Integration\FakturowniaSettings::getSettings();
+            if (empty($settings['domain']) || empty($settings['api_token'])) {
+                return new \WP_Error('not_configured', 'Fakturownia not configured', ['status' => 500]);
+            }
+
+            $api = new FChubFakturownia\API\FakturowniaAPI($settings['domain'], $settings['api_token']);
+            $pdf = $api->downloadInvoicePdf((int) $invoiceId);
+
+            if (isset($pdf['error'])) {
+                return new \WP_Error('pdf_error', $pdf['error'], ['status' => 502]);
+            }
+
+            $invoiceNumber = $order->getMeta('_fakturownia_invoice_number') ?: 'invoice';
+            $filename = sanitize_file_name($invoiceNumber) . '.pdf';
+
+            header('Content-Type: ' . $pdf['content_type']);
+            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Cache-Control: private, max-age=300');
+
+            echo $pdf['body']; // @codingStandardsIgnoreLine
+            exit;
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        },
+    ]);
+});
 
 /**
  * Admin notice if FluentCart is not active
@@ -196,7 +261,9 @@ JS;
 /**
  * Add Fakturownia info to order admin view
  */
-add_action('fluent_cart/after_receipt', function ($order) {
+add_action('fluent_cart/after_receipt', function ($data) {
+    // FluentCart passes an array ['order' => $order, 'is_first_time' => bool, ...]
+    $order = is_array($data) ? ($data['order'] ?? null) : $data;
     if (!$order || !is_object($order)) {
         return;
     }
@@ -226,13 +293,9 @@ add_action('fluent_cart/after_receipt', function ($order) {
             echo esc_html($invoiceNumber);
         }
 
-        // PDF link
-        $settings = FChubFakturownia\Integration\FakturowniaSettings::getSettings();
-        if (!empty($settings['domain']) && !empty($settings['api_token'])) {
-            $api = new FChubFakturownia\API\FakturowniaAPI($settings['domain'], $settings['api_token']);
-            $pdfUrl = $api->getInvoicePdfUrl((int) $invoiceId);
-            echo ' | <a href="' . esc_url($pdfUrl) . '" target="_blank">' . esc_html__('PDF', 'fchub-fakturownia') . '</a>';
-        }
+        // PDF link via proxy (API token never exposed in HTML)
+        $pdfUrl = rest_url('fchub-fakturownia/v1/invoice-pdf/' . $order->id);
+        echo ' | <a href="' . esc_url($pdfUrl) . '" target="_blank">' . esc_html__('PDF', 'fchub-fakturownia') . '</a>';
         echo '</p>';
     }
 
