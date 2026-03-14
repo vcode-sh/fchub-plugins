@@ -113,6 +113,20 @@ final class MigrationState
     }
 
     /**
+     * F7: Mark a specific entity type as cancelled (not completed).
+     */
+    public function setCancelled(string $entity): void
+    {
+        $state = $this->getCurrent();
+        if (!$state || !isset($state['entities'][$entity])) {
+            return;
+        }
+
+        $state['entities'][$entity]['status'] = 'cancelled';
+        update_option(self::OPTION_KEY, $state, false);
+    }
+
+    /**
      * Check whether the migration has been cancelled.
      */
     public function isCancelled(): bool

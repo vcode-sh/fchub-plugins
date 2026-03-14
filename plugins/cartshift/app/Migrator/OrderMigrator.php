@@ -12,6 +12,7 @@ use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\MoneyHelper;
+use FluentCart\App\Models\AppliedCoupon;
 use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderAddress;
 use FluentCart\App\Models\OrderItem;
@@ -138,11 +139,17 @@ final class OrderMigrator extends AbstractMigrator
             $this->processRefund($refund, $fcOrder->id, $wcId);
         }
 
+        // 5b. Store per-item refund amounts from WC refunds.
+        $this->applyPerItemRefunds($wcOrder, $fcOrder->id, $wcId);
+
         // 6. FIX M16: Detect partial refunds and update payment_status.
         $this->updatePartialRefundStatus($wcOrder, $fcOrder->id);
 
         // 7. FIX M7: Migrate WC order notes to FC order meta.
         $this->migrateOrderNotes($wcId, $fcOrder->id);
+
+        // 8. Migrate applied coupons to FC applied_coupons table.
+        $this->migrateAppliedCoupons($wcOrder, $fcOrder->id);
 
         $this->writeLog($wcId, 'success', sprintf(
             'Migrated order #%d (FC ID: %d) - Status: %s.',
@@ -211,6 +218,123 @@ final class OrderMigrator extends AbstractMigrator
                 ['payment_status' => 'partially_refunded'],
                 ['id' => $fcOrderId],
                 ['%s'],
+                ['%d'],
+            );
+        }
+    }
+
+    /**
+     * Migrate applied WC coupons to FC's fct_applied_coupons table.
+     */
+    private function migrateAppliedCoupons(\WC_Order $wcOrder, int $fcOrderId): void
+    {
+        $currency = $wcOrder->get_currency();
+
+        /** @var \WC_Order_Item_Coupon $couponItem */
+        foreach ($wcOrder->get_items('coupon') as $couponItem) {
+            $code     = $couponItem->get_code();
+            $discount = MoneyHelper::toCents($couponItem->get_discount(), $currency);
+
+            // Try to resolve the FC coupon ID from the WC coupon.
+            $wcCouponId = $couponItem->get_meta('coupon_id') ?: 0;
+            if (!$wcCouponId) {
+                // Fallback: look up by code via wc_get_coupon_id_by_code.
+                $wcCouponId = wc_get_coupon_id_by_code($code) ?: 0;
+            }
+
+            $fcCouponId = $wcCouponId
+                ? $this->idMap->getFcId(Constants::ENTITY_COUPON, (string) $wcCouponId)
+                : null;
+
+            AppliedCoupon::query()->create([
+                'order_id'  => $fcOrderId,
+                'coupon_id' => $fcCouponId ?: 0,
+                'code'      => $code,
+                'amount'    => $discount,
+            ]);
+        }
+    }
+
+    /**
+     * Apply per-item refund amounts from WC refunds to FC order items.
+     * Aggregates refund amounts across all refunds per product/variation.
+     */
+    private function applyPerItemRefunds(\WC_Order $wcOrder, int $fcOrderId, int $wcOrderId): void
+    {
+        $refunds = $wcOrder->get_refunds();
+
+        if (empty($refunds)) {
+            return;
+        }
+
+        $currency = $wcOrder->get_currency();
+
+        // Aggregate refund amounts per order item index.
+        // We match by iterating the parent order items in the same order as mapItems().
+        $parentItems = [];
+        $index = 0;
+        foreach ($wcOrder->get_items() as $item) {
+            if (!($item instanceof \WC_Order_Item_Product)) {
+                continue;
+            }
+            $parentItems[$item->get_id()] = $index;
+            $index++;
+        }
+
+        // Accumulate refunded cents per item index.
+        $refundByIndex = [];
+
+        foreach ($refunds as $refund) {
+            foreach ($refund->get_items() as $refundItem) {
+                if (!($refundItem instanceof \WC_Order_Item_Product)) {
+                    continue;
+                }
+
+                // WC refund items reference parent item via get_meta('_refunded_item_id')
+                // but more reliably, the refund item shares the same product/variation mapping.
+                $refundedItemId = (int) $refundItem->get_meta('_refunded_item_id');
+
+                if (!$refundedItemId || !isset($parentItems[$refundedItemId])) {
+                    continue;
+                }
+
+                $itemIndex = $parentItems[$refundedItemId];
+                $refundAmount = abs(floatval($refundItem->get_total()));
+
+                if ($refundAmount <= 0) {
+                    continue;
+                }
+
+                $refundCents = MoneyHelper::toCents($refundAmount, $currency);
+
+                if (!isset($refundByIndex[$itemIndex])) {
+                    $refundByIndex[$itemIndex] = 0;
+                }
+                $refundByIndex[$itemIndex] += $refundCents;
+            }
+        }
+
+        // Update each FC order item with accumulated refund_total.
+        if (empty($refundByIndex)) {
+            return;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'fct_order_items';
+
+        foreach ($refundByIndex as $itemIndex => $refundCents) {
+            $itemKey = "{$wcOrderId}_{$itemIndex}";
+            $fcItemId = $this->idMap->getFcId(Constants::ENTITY_ORDER_ITEM, $itemKey);
+
+            if (!$fcItemId) {
+                continue;
+            }
+
+            $wpdb->update(
+                $table,
+                ['refund_total' => $refundCents],
+                ['id' => $fcItemId],
+                ['%d'],
                 ['%d'],
             );
         }

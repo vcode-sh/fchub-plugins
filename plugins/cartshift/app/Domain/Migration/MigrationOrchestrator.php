@@ -66,7 +66,7 @@ final class MigrationOrchestrator
         @set_time_limit(0);
 
         if ($this->state->isCancelled()) {
-            return $this->buildResult(false);
+            return $this->buildCancelledResult();
         }
 
         if (!$this->state->isRunning()) {
@@ -136,17 +136,26 @@ final class MigrationOrchestrator
             $errors = $entityState['errors'] ?? 0;
             $total = $entityState['total'] ?? $migrator->count();
 
+            global $wpdb;
+
             foreach ($batch as $record) {
                 if ($this->state->isCancelled()) {
-                    return $this->buildResult(false);
+                    $this->state->setCancelled($currentType);
+
+                    return $this->buildCancelledResult();
                 }
+
+                // A2: Transaction wrapping prevents partial data on per-record failures.
+                $wpdb->query('START TRANSACTION');
 
                 try {
                     $result = $migrator->processRecord($record);
 
                     if ($result === false) {
+                        $wpdb->query('COMMIT');
                         $skipped++;
                     } else {
+                        $wpdb->query('COMMIT');
                         $processed++;
 
                         /** @see 'cartshift/migration/record_migrated' */
@@ -159,6 +168,7 @@ final class MigrationOrchestrator
                         );
                     }
                 } catch (\Throwable $e) {
+                    $wpdb->query('ROLLBACK');
                     $errors++;
                     $wcId = $migrator->getRecordId($record);
                     $this->log->write(
@@ -173,6 +183,15 @@ final class MigrationOrchestrator
 
             $this->state->updateProgress($currentType, $processed, $total, $skipped, $errors);
             $this->state->advanceOffset(count($batch));
+
+            // Flush object cache every 5 batches (250 records) to prevent memory exhaustion.
+            $newOffset = $this->state->getCurrentOffset();
+            if ($newOffset > 0 && ($newOffset / $batchSize) % 5 === 0) {
+                wp_cache_flush();
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+            }
 
             // If batch was smaller than batch size, entity is done.
             if (count($batch) < $batchSize) {
@@ -223,6 +242,19 @@ final class MigrationOrchestrator
     public function cancel(): void
     {
         $this->state->cancel();
+    }
+
+    /**
+     * F7: Build a result for a cancelled migration — status='cancelled', continue=false.
+     *
+     * @return array{continue: bool, migration_id: string|null, entity_type: string|null, offset: int, total: int, processed: int}
+     */
+    private function buildCancelledResult(): array
+    {
+        $result = $this->buildResult(false);
+        $result['status'] = 'cancelled';
+
+        return $result;
     }
 
     /**

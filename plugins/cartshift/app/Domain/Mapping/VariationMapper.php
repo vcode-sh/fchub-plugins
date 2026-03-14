@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CartShift\Domain\Mapping;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
 use CartShift\Support\Enums\FcBillingInterval;
 use CartShift\Support\MoneyHelper;
@@ -75,6 +75,8 @@ final class VariationMapper
             }
         }
         $variationTitle = !empty($titleParts) ? implode(' / ', $titleParts) : 'Default';
+
+        $otherInfo = self::mergeWeightDimensions($otherInfo, $variation);
 
         return [
             'serial_index'         => $index,
@@ -147,6 +149,7 @@ final class VariationMapper
 
         $fulfillmentType = ProductMapper::getFulfillmentType($product);
         $sku = $product->get_sku();
+        $otherInfo = self::mergeWeightDimensions($otherInfo, $product);
 
         return [
             'serial_index'         => 0,
@@ -173,6 +176,37 @@ final class VariationMapper
             'media_id'             => self::getMediaId($product),
             'other_info'           => !empty($otherInfo) ? $otherInfo : null,
         ];
+    }
+
+    /**
+     * Merge weight and dimension data into the other_info array.
+     */
+    private static function mergeWeightDimensions(array $otherInfo, \WC_Product $product): array
+    {
+        $weight = $product->get_weight();
+        $length = $product->get_length();
+        $width  = $product->get_width();
+        $height = $product->get_height();
+
+        if ($weight) {
+            $otherInfo['weight'] = $weight;
+        }
+        if ($length) {
+            $otherInfo['length'] = $length;
+        }
+        if ($width) {
+            $otherInfo['width'] = $width;
+        }
+        if ($height) {
+            $otherInfo['height'] = $height;
+        }
+
+        if ($weight || $length || $width || $height) {
+            $otherInfo['weight_unit']    = get_option('woocommerce_weight_unit', 'kg');
+            $otherInfo['dimension_unit'] = get_option('woocommerce_dimension_unit', 'cm');
+        }
+
+        return $otherInfo;
     }
 
     /**

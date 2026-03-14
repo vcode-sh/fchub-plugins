@@ -269,6 +269,20 @@ if (!function_exists('current_time')) {
     }
 }
 
+if (!function_exists('wp_json_encode')) {
+    function wp_json_encode(mixed $data, int $options = 0, int $depth = 512): string|false
+    {
+        return json_encode($data, $options, $depth);
+    }
+}
+
+if (!function_exists('wp_cache_flush')) {
+    function wp_cache_flush(): bool
+    {
+        return true;
+    }
+}
+
 if (!function_exists('wc_get_product')) {
     function wc_get_product(int $productId): mixed
     {
@@ -350,6 +364,9 @@ if (!class_exists('WC_Product')) {
         protected string $short_description = '';
         protected string $sku = '';
         protected string $weight = '';
+        protected string $length = '';
+        protected string $width = '';
+        protected string $height = '';
         protected array $downloads = [];
         protected string $type = 'simple';
         protected array $meta = [];
@@ -377,6 +394,9 @@ if (!class_exists('WC_Product')) {
         public function get_short_description(): string { return $this->short_description; }
         public function get_sku(): string { return $this->sku; }
         public function get_weight(): string { return $this->weight; }
+        public function get_length(): string { return $this->length; }
+        public function get_width(): string { return $this->width; }
+        public function get_height(): string { return $this->height; }
         public function get_downloads(): array { return $this->downloads; }
         public function get_type(): string { return $this->type; }
         public function get_meta(string $key, bool $single = true): mixed { return $this->meta[$key] ?? ''; }
@@ -419,6 +439,7 @@ if (!class_exists('WC_Order')) {
         protected string $total_refunded = '0';
         protected array $items = [];
         protected array $shipping_items = [];
+        protected array $fee_items = [];
         protected string $billing_first_name = '';
         protected string $billing_last_name = '';
         protected string $billing_address_1 = '';
@@ -466,6 +487,9 @@ if (!class_exists('WC_Order')) {
         {
             if ($type === 'shipping') {
                 return $this->shipping_items;
+            }
+            if ($type === 'fee') {
+                return $this->fee_items;
             }
             return $this->items;
         }
@@ -564,6 +588,7 @@ if (!class_exists('WC_Order_Item_Product')) {
         protected string $total_tax = '0';
         protected string $name = '';
         protected ?\WC_Product $product = null;
+        protected array $meta_data = [];
 
         public function get_product_id(): int { return $this->product_id; }
         public function get_variation_id(): int { return $this->variation_id; }
@@ -573,6 +598,7 @@ if (!class_exists('WC_Order_Item_Product')) {
         public function get_total_tax(): string { return $this->total_tax; }
         public function get_name(): string { return $this->name; }
         public function get_product(): ?\WC_Product { return $this->product; }
+        public function get_meta_data(): array { return $this->meta_data; }
     }
 }
 
@@ -584,6 +610,19 @@ if (!class_exists('WC_Order_Item_Shipping')) {
         protected string $total_tax = '0';
 
         public function get_method_title(): string { return $this->method_title; }
+        public function get_total(): string { return $this->total; }
+        public function get_total_tax(): string { return $this->total_tax; }
+    }
+}
+
+if (!class_exists('WC_Order_Item_Fee')) {
+    class WC_Order_Item_Fee
+    {
+        protected string $name = '';
+        protected string $total = '0';
+        protected string $total_tax = '0';
+
+        public function get_name(): string { return $this->name; }
         public function get_total(): string { return $this->total; }
         public function get_total_tax(): string { return $this->total_tax; }
     }

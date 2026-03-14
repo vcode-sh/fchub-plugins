@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CartShift\Domain\Mapping;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
 use CartShift\Storage\IdMapRepository;
 use CartShift\Support\Constants;

@@ -164,6 +164,28 @@ final class SubscriptionMapperTest extends PluginTestCase
         $this->assertSame('quarterly', $result['billing_interval']);
     }
 
+    public function testVendorIdsNullForUnknownGatewayWithWarning(): void
+    {
+        // Unknown gateways should return null vendor IDs and produce a warning.
+        $sub = $this->createSubscription([
+            'status' => 'active',
+            'total' => '39.99',
+            'payment_method' => 'unknown_gateway_xyz',
+            'meta' => [], // no stripe or paypal meta
+        ]);
+
+        $result = $this->mapper->map($sub);
+
+        $this->assertNull($result['vendor_customer_id']);
+        $this->assertNull($result['vendor_plan_id']);
+        $this->assertNull($result['vendor_subscription_id']);
+
+        $warnings = $this->mapper->getWarnings();
+        $this->assertNotEmpty($warnings, 'Unknown gateway should produce a warning');
+        $this->assertStringContainsString('unknown_gateway_xyz', $warnings[0]);
+        $this->assertStringContainsString('no vendor ID mapping', $warnings[0]);
+    }
+
     public function testHalfYearlyIntervalFromMonth6(): void
     {
         // M13: month + interval 6 = half_yearly.

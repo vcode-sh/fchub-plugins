@@ -128,7 +128,10 @@
         loading: false,
         migrating: false, // FIX F2: separate flag for migrate button
         batchError: null, // Track last batch error for retry
-        error: null
+        error: null,
+        finalized: false,
+        finalizing: false,
+        finalizeStats: null
     };
 
     // API helper
@@ -359,6 +362,9 @@
                 state.progress = null;
                 state.preflight = null;
                 state.migrating = false;
+                state.finalized = false;
+                state.finalizing = false;
+                state.finalizeStats = null;
                 render();
             });
             return;
@@ -402,7 +408,21 @@
             html += '<p style="margin-top:15px;"><button class="button button-secondary" id="cartshift-cancel">Cancel Migration</button></p>';
         } else {
             html += '<p style="margin-top:15px;">';
-            html += '<button class="button button-primary" id="cartshift-view-results">View Results & Log</button>';
+
+            if (!state.finalized && !p.dry_run) {
+                var finBtnDisabled = state.finalizing ? ' disabled' : '';
+                html += '<button class="button button-primary" id="cartshift-finalize"' + finBtnDisabled + '>';
+                html += state.finalizing ? '<span class="spinner is-active" style="float:none;margin:0 5px 0 0;"></span> Finalizing...' : 'Finalize Migration';
+                html += '</button> ';
+            }
+
+            if (state.finalized && state.finalizeStats) {
+                html += '<div class="notice notice-success inline" style="margin:10px 0;"><p>';
+                html += 'Finalization complete — ' + state.finalizeStats.customers_updated + ' customer stats recalculated, caches cleared.';
+                html += '</p></div>';
+            }
+
+            html += '<button class="button' + (state.finalized ? ' button-primary' : '') + '" id="cartshift-view-results">View Results & Log</button>';
             html += '</p>';
         }
 
@@ -410,6 +430,9 @@
 
         var cancelBtn = document.getElementById('cartshift-cancel');
         if (cancelBtn) cancelBtn.addEventListener('click', cancelMigration);
+
+        var finalizeBtn = document.getElementById('cartshift-finalize');
+        if (finalizeBtn) finalizeBtn.addEventListener('click', runFinalize);
 
         var resultsBtn = document.getElementById('cartshift-view-results');
         if (resultsBtn) resultsBtn.addEventListener('click', function () { state.screen = 'results'; loadLog(); render(); });
@@ -498,6 +521,9 @@
             state.log = [];
             state.selectedEntities = [];
             state.migrating = false;
+            state.finalized = false;
+            state.finalizing = false;
+            state.finalizeStats = null;
             render();
         });
         var rollbackBtn = document.getElementById('cartshift-rollback');
@@ -634,6 +660,30 @@
         }).catch(function () {
             render();
         });
+    }
+
+    function runFinalize() {
+        if (!state.progress || !state.progress.migration_id) {
+            alert('No migration ID found. Cannot finalize.');
+            return;
+        }
+
+        state.finalizing = true;
+        render();
+
+        api('POST', 'finalize', { migration_id: state.progress.migration_id })
+            .then(function (result) {
+                var data = result.data || result;
+                state.finalizing = false;
+                state.finalized = true;
+                state.finalizeStats = data.stats || data;
+                render();
+            })
+            .catch(function (err) {
+                state.finalizing = false;
+                alert('Finalization failed: ' + err.message);
+                render();
+            });
     }
 
     function startPolling() {

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace CartShift\Domain\Mapping;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
 use CartShift\Storage\IdMapRepository;
+use CartShift\Support\Constants;
 use CartShift\Support\Enums\FcBillingInterval;
 use CartShift\Support\Enums\FcOrderStatus;
 use CartShift\Support\Enums\FcOrderType;
@@ -61,6 +62,7 @@ final class OrderMapper
                 'wc_order_id'    => $order->get_id(),
                 'migrated'       => true,
                 'shipping_lines' => self::mapShippingLines($order) ?: null,
+                'fee_lines'      => self::mapFeeLines($order) ?: null,
             ]),
             'created_at'            => $order->get_date_created()
                 ? $order->get_date_created()->date('Y-m-d H:i:s')
@@ -98,15 +100,15 @@ final class OrderMapper
             $wcVariationId = $item->get_variation_id();
             $product       = $item->get_product();
 
-            $fcProductId   = $this->idMap->getFcId('product', (string) $wcProductId);
+            $fcProductId   = $this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcProductId);
             $fcVariationId = null;
 
             if ($wcVariationId) {
-                $fcVariationId = $this->idMap->getFcId('variation', (string) $wcVariationId);
+                $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcVariationId);
             }
 
             if (!$fcVariationId && $fcProductId) {
-                $fcVariationId = $this->idMap->getFcId('variation', (string) $wcProductId);
+                $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcProductId);
             }
 
             $paymentType = 'onetime';
@@ -160,7 +162,7 @@ final class OrderMapper
                 'rate'             => self::getExchangeRate($order),
                 'payment_type'     => $paymentType,
                 'other_info'       => !empty($otherInfo) ? $otherInfo : [],
-                'line_meta'        => [],
+                'line_meta'        => self::extractItemMeta($item),
                 'created_at'       => $order->get_date_created()
                     ? $order->get_date_created()->date('Y-m-d H:i:s')
                     : gmdate('Y-m-d H:i:s'),
@@ -274,7 +276,7 @@ final class OrderMapper
         $wcCustomerId = $order->get_customer_id();
 
         if ($wcCustomerId > 0) {
-            $fcId = $this->idMap->getFcId('customer', (string) $wcCustomerId);
+            $fcId = $this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $wcCustomerId);
             if ($fcId) {
                 return $fcId;
             }
@@ -282,7 +284,7 @@ final class OrderMapper
 
         $email = $order->get_billing_email();
         if ($email) {
-            $fcId = $this->idMap->getFcId('guest_customer', $email);
+            $fcId = $this->idMap->getFcId(Constants::ENTITY_GUEST_CUSTOMER, $email);
             if ($fcId) {
                 return $fcId;
             }
@@ -298,7 +300,7 @@ final class OrderMapper
     {
         $parentId = $order->get_parent_id();
         if ($parentId) {
-            return $this->idMap->getFcId('order', (string) $parentId);
+            return $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $parentId);
         }
 
         return null;
@@ -376,6 +378,59 @@ final class OrderMapper
         }
 
         return '1';
+    }
+
+    /**
+     * Map WC fee line items to a portable array.
+     *
+     * @return array<int, array{name: string, total: int, tax: int}>
+     */
+    private static function mapFeeLines(\WC_Order $order): array
+    {
+        $lines = [];
+        $currency = $order->get_currency();
+
+        /** @var \WC_Order_Item_Fee $fee */
+        foreach ($order->get_items('fee') as $fee) {
+            $lines[] = [
+                'name'  => $fee->get_name(),
+                'total' => MoneyHelper::toCents($fee->get_total(), $currency),
+                'tax'   => MoneyHelper::toCents($fee->get_total_tax(), $currency),
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Extract visible (non-internal) meta data from an order item.
+     *
+     * @return array<int, array{key: string, value: string}>
+     */
+    private static function extractItemMeta(\WC_Order_Item_Product $item): array
+    {
+        $meta = [];
+
+        foreach ($item->get_meta_data() as $metaObj) {
+            $key = $metaObj->key;
+
+            // Skip internal WC meta (prefixed with _).
+            if (str_starts_with($key, '_')) {
+                continue;
+            }
+
+            $value = $metaObj->value;
+            if (is_array($value) || is_object($value)) {
+                $value = wp_json_encode($value);
+            }
+
+            $meta[] = [
+                'key'   => $key,
+                'value' => (string) $value,
+            ];
+        }
+
+        return $meta;
     }
 
     /**

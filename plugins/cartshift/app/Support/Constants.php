@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CartShift\Support;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
 final class Constants
 {

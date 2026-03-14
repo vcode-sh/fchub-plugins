@@ -24,8 +24,11 @@ final class PreflightCheck
         $checks['max_execution_time'] = $this->checkMaxExecutionTime();
         $checks['product_types'] = $this->checkProductTypes();
         $checks['fc_data']     = $this->checkExistingFcData();
+        $checks['migration_tables'] = $this->checkMigrationTables();
 
-        $ready = $checks['woocommerce']['pass'] && $checks['fluentcart']['pass'];
+        $ready = $checks['woocommerce']['pass']
+            && $checks['fluentcart']['pass']
+            && $checks['migration_tables']['pass'];
 
         return [
             'checks' => $checks,
@@ -192,6 +195,46 @@ final class PreflightCheck
             'types'    => $types,
             'unsupported' => array_values($unsupported),
             'message'  => $message,
+        ];
+    }
+
+    /**
+     * F6: Verify CartShift migration tables exist. Missing tables mean the plugin
+     * wasn't activated properly — deactivate and reactivate to create them.
+     */
+    private function checkMigrationTables(): array
+    {
+        global $wpdb;
+
+        $idMapTable = $wpdb->prefix . 'cartshift_id_map';
+        $logTable   = $wpdb->prefix . 'cartshift_migration_log';
+
+        $hasIdMap = (bool) $wpdb->get_var(
+            $wpdb->prepare('SHOW TABLES LIKE %s', $idMapTable),
+        );
+        $hasLog = (bool) $wpdb->get_var(
+            $wpdb->prepare('SHOW TABLES LIKE %s', $logTable),
+        );
+
+        $pass = $hasIdMap && $hasLog;
+
+        $missing = [];
+        if (!$hasIdMap) {
+            $missing[] = $idMapTable;
+        }
+        if (!$hasLog) {
+            $missing[] = $logTable;
+        }
+
+        return [
+            'label'   => 'Migration Tables',
+            'pass'    => $pass,
+            'message' => $pass
+                ? 'Migration tables exist and are ready.'
+                : sprintf(
+                    'Missing tables: %s. Deactivate and reactivate CartShift to create them.',
+                    implode(', ', $missing),
+                ),
         ];
     }
 

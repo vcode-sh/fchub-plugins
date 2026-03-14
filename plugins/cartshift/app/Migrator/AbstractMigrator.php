@@ -79,6 +79,7 @@ abstract class AbstractMigrator implements MigratorInterface
         }
 
         $offset = 0;
+        $batchNumber = 0;
 
         while (true) {
             if ($this->shouldCancel()) {
@@ -96,12 +97,18 @@ abstract class AbstractMigrator implements MigratorInterface
                     break 2;
                 }
 
+                // A2: Transaction wrapping prevents partial data on per-record failures.
+                global $wpdb;
+                $wpdb->query('START TRANSACTION');
+
                 try {
                     $result = $this->processRecord($record);
 
                     if ($result === false) {
+                        $wpdb->query('COMMIT');
                         $this->skipped++;
                     } else {
+                        $wpdb->query('COMMIT');
                         $this->processed++;
 
                         /** @see 'cartshift/migration/record_migrated' */
@@ -114,6 +121,7 @@ abstract class AbstractMigrator implements MigratorInterface
                         );
                     }
                 } catch (\Throwable $e) {
+                    $wpdb->query('ROLLBACK');
                     $this->errors++;
                     $wcId = $this->getRecordId($record);
                     $this->log->write(
@@ -135,13 +143,27 @@ abstract class AbstractMigrator implements MigratorInterface
             }
 
             $offset += count($batch);
+            $batchNumber++;
+
+            // Flush object cache every 5 batches to prevent memory exhaustion.
+            if ($batchNumber % 5 === 0) {
+                wp_cache_flush();
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+            }
 
             if (count($batch) < $effectiveBatchSize) {
                 break;
             }
         }
 
-        $this->migrationState->completeEntity($this->getEntityType());
+        // F7: Only mark completed if migration wasn't cancelled mid-batch.
+        if ($this->shouldCancel()) {
+            $this->migrationState->setCancelled($this->getEntityType());
+        } else {
+            $this->migrationState->completeEntity($this->getEntityType());
+        }
     }
 
     /**

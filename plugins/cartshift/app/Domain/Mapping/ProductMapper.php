@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CartShift\Domain\Mapping;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
 use CartShift\Support\MoneyHelper;
 
@@ -53,9 +53,7 @@ final class ProductMapper
             'stock_availability'  => $product->is_in_stock() ? 'in-stock' : 'out-of-stock',
             'manage_stock'        => $product->get_manage_stock() ? 1 : 0,
             'manage_downloadable' => $product->is_downloadable() ? 1 : 0,
-            'other_info'          => [
-                'sold_individually' => $product->is_sold_individually() ? 'yes' : 'no',
-            ],
+            'other_info'          => self::buildDetailOtherInfo($product),
         ];
 
         $variationMapper = new VariationMapper($this->currency);
@@ -101,10 +99,43 @@ final class ProductMapper
             'stock_availability'  => $product->is_in_stock() ? 'in-stock' : 'out-of-stock',
             'manage_stock'        => $product->get_manage_stock() ? 1 : 0,
             'manage_downloadable' => $product->is_downloadable() ? 1 : 0,
-            'other_info'          => [
-                'sold_individually' => $product->is_sold_individually() ? 'yes' : 'no',
-            ],
+            'other_info'          => self::buildDetailOtherInfo($product),
         ];
+    }
+
+    /**
+     * Build the other_info array for product detail, including weight/dimensions when present.
+     */
+    private static function buildDetailOtherInfo(\WC_Product $product): array
+    {
+        $info = [
+            'sold_individually' => $product->is_sold_individually() ? 'yes' : 'no',
+        ];
+
+        $weight = $product->get_weight();
+        $length = $product->get_length();
+        $width  = $product->get_width();
+        $height = $product->get_height();
+
+        if ($weight) {
+            $info['weight'] = $weight;
+        }
+        if ($length) {
+            $info['length'] = $length;
+        }
+        if ($width) {
+            $info['width'] = $width;
+        }
+        if ($height) {
+            $info['height'] = $height;
+        }
+
+        if ($weight || $length || $width || $height) {
+            $info['weight_unit']    = get_option('woocommerce_weight_unit', 'kg');
+            $info['dimension_unit'] = get_option('woocommerce_dimension_unit', 'cm');
+        }
+
+        return $info;
     }
 
     /**

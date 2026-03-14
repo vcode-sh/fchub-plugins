@@ -249,6 +249,121 @@ final class OrderMapperTest extends PluginTestCase
         $this->assertSame('1', $result['order']['rate']);
     }
 
+    public function testShippingLinesIncludedInConfig(): void
+    {
+        // M9: Shipping method details preserved in config.shipping_lines.
+        $shippingItem = new \WC_Order_Item_Shipping();
+        $ref = new \ReflectionClass($shippingItem);
+        $ref->getProperty('method_title')->setValue($shippingItem, 'Flat Rate');
+        $ref->getProperty('total')->setValue($shippingItem, '10.00');
+        $ref->getProperty('total_tax')->setValue($shippingItem, '2.00');
+
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '60.00',
+            'shipping_total' => '10.00',
+            'shipping_items' => [$shippingItem],
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertArrayHasKey('shipping_lines', $result['order']['config']);
+        $this->assertCount(1, $result['order']['config']['shipping_lines']);
+        $this->assertSame('Flat Rate', $result['order']['config']['shipping_lines'][0]['method_title']);
+        $this->assertSame(1000, $result['order']['config']['shipping_lines'][0]['total']);
+        $this->assertSame(200, $result['order']['config']['shipping_lines'][0]['tax']);
+    }
+
+    public function testFeeLinesIncludedInConfig(): void
+    {
+        // Fee line items preserved in config.fee_lines.
+        $feeItem = new \WC_Order_Item_Fee();
+        $ref = new \ReflectionClass($feeItem);
+        $ref->getProperty('name')->setValue($feeItem, 'Gift Wrapping');
+        $ref->getProperty('total')->setValue($feeItem, '5.00');
+        $ref->getProperty('total_tax')->setValue($feeItem, '1.00');
+
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '55.00',
+            'fee_items' => [$feeItem],
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertArrayHasKey('fee_lines', $result['order']['config']);
+        $this->assertCount(1, $result['order']['config']['fee_lines']);
+        $this->assertSame('Gift Wrapping', $result['order']['config']['fee_lines'][0]['name']);
+        $this->assertSame(500, $result['order']['config']['fee_lines'][0]['total']);
+        $this->assertSame(100, $result['order']['config']['fee_lines'][0]['tax']);
+    }
+
+    public function testItemMetaFiltersInternalKeys(): void
+    {
+        // Internal WC meta (prefixed with _) must be stripped from line_meta.
+        $meta = [
+            (object) ['key' => '_internal_key', 'value' => 'hidden'],
+            (object) ['key' => '_qty', 'value' => '2'],
+            (object) ['key' => 'Colour', 'value' => 'Red'],
+        ];
+
+        $item = $this->createOrderItem([
+            'product_id' => 1,
+            'quantity' => 1,
+            'subtotal' => '20.00',
+            'total' => '20.00',
+            'total_tax' => '0',
+            'meta_data' => $meta,
+        ]);
+
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '20.00',
+            'items' => [$item],
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertNotEmpty($result['items']);
+        $lineMeta = $result['items'][0]['line_meta'];
+        $this->assertCount(1, $lineMeta, 'Only non-internal meta should remain');
+        $this->assertSame('Colour', $lineMeta[0]['key']);
+        $this->assertSame('Red', $lineMeta[0]['value']);
+    }
+
+    public function testItemMetaIncludesVisibleMeta(): void
+    {
+        // Visible meta data (no _ prefix) must be included in line_meta.
+        $meta = [
+            (object) ['key' => 'Size', 'value' => 'Large'],
+            (object) ['key' => 'Gift Message', 'value' => 'Happy Birthday'],
+        ];
+
+        $item = $this->createOrderItem([
+            'product_id' => 1,
+            'quantity' => 1,
+            'subtotal' => '30.00',
+            'total' => '30.00',
+            'total_tax' => '0',
+            'meta_data' => $meta,
+        ]);
+
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '30.00',
+            'items' => [$item],
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $lineMeta = $result['items'][0]['line_meta'];
+        $this->assertCount(2, $lineMeta);
+        $this->assertSame('Size', $lineMeta[0]['key']);
+        $this->assertSame('Large', $lineMeta[0]['value']);
+        $this->assertSame('Gift Message', $lineMeta[1]['key']);
+        $this->assertSame('Happy Birthday', $lineMeta[1]['value']);
+    }
+
     private function createOrder(array $overrides = []): \WC_Order
     {
         $order = new \WC_Order();

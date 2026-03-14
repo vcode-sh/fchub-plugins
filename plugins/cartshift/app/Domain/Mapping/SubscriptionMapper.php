@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace CartShift\Domain\Mapping;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
 use CartShift\Storage\IdMapRepository;
+use CartShift\Support\Constants;
 use CartShift\Support\Enums\FcBillingInterval;
 use CartShift\Support\Enums\FcSubscriptionStatus;
 use CartShift\Support\MoneyHelper;
@@ -33,13 +34,13 @@ final class SubscriptionMapper
         $parentOrderId = null;
         $wcParentId    = $subscription->get_parent_id();
         if ($wcParentId) {
-            $parentOrderId = $this->idMap->getFcId('order', (string) $wcParentId);
+            $parentOrderId = $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $wcParentId);
         }
 
         $customerId   = null;
         $wcCustomerId = $subscription->get_customer_id();
         if ($wcCustomerId) {
-            $customerId = $this->idMap->getFcId('customer', (string) $wcCustomerId);
+            $customerId = $this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $wcCustomerId);
         }
 
         $productId   = null;
@@ -67,13 +68,13 @@ final class SubscriptionMapper
             $wcProductId   = $firstItem->get_product_id();
             $wcVariationId = $firstItem->get_variation_id();
 
-            $productId = $this->idMap->getFcId('product', (string) $wcProductId);
+            $productId = $this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcProductId);
 
             if ($wcVariationId) {
-                $variationId = $this->idMap->getFcId('variation', (string) $wcVariationId);
+                $variationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcVariationId);
             }
             if (!$variationId && $wcProductId) {
-                $variationId = $this->idMap->getFcId('variation', (string) $wcProductId);
+                $variationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcProductId);
             }
 
             $itemName = $firstItem->get_name();

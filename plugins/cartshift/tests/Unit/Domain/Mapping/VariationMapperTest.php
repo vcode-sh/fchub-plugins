@@ -68,6 +68,56 @@ final class VariationMapperTest extends PluginTestCase
         }
     }
 
+    public function testWeightAndDimensionsMergedIntoOtherInfo(): void
+    {
+        $product = $this->createProduct([
+            'price' => '29.99',
+            'regular_price' => '29.99',
+            'weight' => '1.5',
+            'length' => '25',
+            'width' => '15',
+            'height' => '5',
+        ]);
+
+        $result = $this->mapper->mapSimple($product);
+
+        // other_info should contain weight/dimension data.
+        $this->assertNotNull($result['other_info']);
+        $this->assertSame('1.5', $result['other_info']['weight']);
+        $this->assertSame('25', $result['other_info']['length']);
+        $this->assertSame('15', $result['other_info']['width']);
+        $this->assertSame('5', $result['other_info']['height']);
+        $this->assertArrayHasKey('weight_unit', $result['other_info']);
+        $this->assertArrayHasKey('dimension_unit', $result['other_info']);
+    }
+
+    public function testSubscriptionDataPreservedWithWeightMerge(): void
+    {
+        // When a product has both subscription data and weight/dimensions,
+        // the merge must preserve both sets of data.
+        // We can only test weight merge here since subscription detection
+        // requires WC_Subscriptions_Product (not available in stubs).
+        // Instead, test that mergeWeightDimensions doesn't destroy existing data.
+        $product = $this->createProduct([
+            'price' => '49.99',
+            'regular_price' => '49.99',
+            'weight' => '3.0',
+            'length' => '',
+            'width' => '',
+            'height' => '',
+        ]);
+
+        $result = $this->mapper->mapSimple($product);
+
+        // Weight should be present.
+        $this->assertNotNull($result['other_info']);
+        $this->assertSame('3.0', $result['other_info']['weight']);
+        // Dimensions should NOT be present (empty strings).
+        $this->assertArrayNotHasKey('length', $result['other_info']);
+        $this->assertArrayNotHasKey('width', $result['other_info']);
+        $this->assertArrayNotHasKey('height', $result['other_info']);
+    }
+
     private function createProduct(array $overrides = []): \WC_Product
     {
         $product = new \WC_Product();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CartShift\Support\Enums;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
 enum FcOrderStatus: string
 {

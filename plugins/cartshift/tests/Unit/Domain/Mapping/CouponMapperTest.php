@@ -111,6 +111,42 @@ final class CouponMapperTest extends PluginTestCase
         $this->assertIsNotString($result['conditions']);
     }
 
+    public function testEmailRestrictionsIncludedInConditions(): void
+    {
+        $coupon = $this->createCoupon([
+            'code' => 'VIPONLY',
+            'discount_type' => 'percent',
+            'amount' => 20.0,
+            'email_restrictions' => ['vip@example.com', 'admin@example.com'],
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertNotNull($result['conditions']);
+        $this->assertArrayHasKey('email_restrictions', $result['conditions']);
+        $this->assertSame('vip@example.com,admin@example.com', $result['conditions']['email_restrictions']);
+    }
+
+    public function testEmptyProductIdsHandledGracefully(): void
+    {
+        // Empty product_ids array should not produce included_products key.
+        $coupon = $this->createCoupon([
+            'code' => 'NOPRODS',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'product_ids' => [],
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        if ($result['conditions'] !== null) {
+            $this->assertArrayNotHasKey('included_products', $result['conditions']);
+        } else {
+            // No conditions at all is also fine.
+            $this->assertNull($result['conditions']);
+        }
+    }
+
     public function testMapAppliesFilter(): void
     {
         $filterCalled = false;

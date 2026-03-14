@@ -94,6 +94,75 @@ final class ProductMapperTest extends PluginTestCase
         $this->assertArrayHasKey('sold_individually', $result['detail']['other_info']);
     }
 
+    public function testWeightAndDimensionsInOtherInfo(): void
+    {
+        $product = $this->createProduct([
+            'name' => 'Heavy Product',
+            'price' => '49.99',
+            'regular_price' => '49.99',
+            'weight' => '2.5',
+            'length' => '30',
+            'width' => '20',
+            'height' => '10',
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $otherInfo = $result['detail']['other_info'];
+        $this->assertSame('2.5', $otherInfo['weight']);
+        $this->assertSame('30', $otherInfo['length']);
+        $this->assertSame('20', $otherInfo['width']);
+        $this->assertSame('10', $otherInfo['height']);
+        $this->assertArrayHasKey('weight_unit', $otherInfo);
+        $this->assertArrayHasKey('dimension_unit', $otherInfo);
+    }
+
+    public function testWeightOmittedWhenEmpty(): void
+    {
+        $product = $this->createProduct([
+            'name' => 'Weightless Product',
+            'price' => '9.99',
+            'regular_price' => '9.99',
+            'weight' => '',
+            'length' => '',
+            'width' => '',
+            'height' => '',
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $otherInfo = $result['detail']['other_info'];
+        $this->assertArrayNotHasKey('weight', $otherInfo);
+        $this->assertArrayNotHasKey('length', $otherInfo);
+        $this->assertArrayNotHasKey('width', $otherInfo);
+        $this->assertArrayNotHasKey('height', $otherInfo);
+        $this->assertArrayNotHasKey('weight_unit', $otherInfo);
+        $this->assertArrayNotHasKey('dimension_unit', $otherInfo);
+    }
+
+    public function testDimensionUnitsIncluded(): void
+    {
+        // When any dimension is present, units must be included.
+        $GLOBALS['_cartshift_test_options']['woocommerce_weight_unit'] = 'lbs';
+        $GLOBALS['_cartshift_test_options']['woocommerce_dimension_unit'] = 'in';
+
+        $product = $this->createProduct([
+            'name' => 'US Product',
+            'price' => '19.99',
+            'regular_price' => '19.99',
+            'weight' => '1.0',
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $otherInfo = $result['detail']['other_info'];
+        $this->assertSame('lbs', $otherInfo['weight_unit']);
+        $this->assertSame('in', $otherInfo['dimension_unit']);
+    }
+
     public function testMapAppliesCartshiftMapperProductFilter(): void
     {
         $filterCalled = false;
