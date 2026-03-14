@@ -92,4 +92,34 @@ final class MoneyHelperTest extends PluginTestCase
     {
         $this->assertSame(1999, MoneyHelper::toCents(19.99));
     }
+
+    public function testToCentsWithCommaDecimalSeparator(): void
+    {
+        // PHP's floatval() treats comma as end-of-number, so "19,99" becomes 19.0
+        // This documents the actual behavior — comma-separated values don't work correctly.
+        $result = MoneyHelper::toCents('19,99', 'USD');
+        // floatval('19,99') = 19.0, so 19.0 * 100 = 1900
+        $this->assertSame(1900, $result);
+    }
+
+    public function testToCentsMaxIntBoundary(): void
+    {
+        // Very large price — verify no overflow or float precision catastrophe.
+        $result = MoneyHelper::toCents(999999.99, 'USD');
+        $this->assertSame(99999999, $result);
+    }
+
+    public function testToCentsStringZero(): void
+    {
+        // "0" and "0.00" should both return 0.
+        $this->assertSame(0, MoneyHelper::toCents('0', 'USD'));
+        $this->assertSame(0, MoneyHelper::toCents('0.00', 'USD'));
+    }
+
+    public function testToCentsWithWhitespace(): void
+    {
+        // Whitespace around the number — floatval handles leading whitespace.
+        $result = MoneyHelper::toCents(' 19.99 ', 'USD');
+        $this->assertSame(1999, $result);
+    }
 }

@@ -1,15 +1,27 @@
 {
     "name": "vcode-sh/cartshift",
-    "description": "CartShift plugin development tooling",
+    "description": "WooCommerce to FluentCart migration plugin",
+    "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
-    "type": "project",
-    "require": {},
+    "authors": [
+        {
+            "name": "Vibe Code",
+            "email": "hello@vcode.sh",
+            "homepage": "https://x.com/vcode_sh"
+        }
+    ],
+    "require": {
+        "php": ">=8.3"
+    },
     "require-dev": {
-        "phpunit/phpunit": "^13.0"
+        "phpunit/phpunit": "^13.0",
+        "php-stubs/wordpress-stubs": "^6.7",
+        "php-stubs/woocommerce-stubs": "^9.0"
     },
     "autoload": {
         "psr-4": {
-            "CartShift\\": "app/"
+            "CartShift\\": "app/",
+            "CartShift\\Database\\": "database/Migrations/"
         }
     },
     "autoload-dev": {
@@ -21,6 +33,7 @@
         "test": "phpunit"
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {}
     }
 }

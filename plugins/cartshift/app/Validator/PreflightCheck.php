@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CartShift\Validator;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
-class PreflightCheck
+final class PreflightCheck
 {
     /**
      * Run all preflight checks and return structured results.
@@ -19,6 +21,8 @@ class PreflightCheck
         $checks['fluentcart']  = $this->checkFluentCart();
         $checks['wc_subscriptions'] = $this->checkWcSubscriptions();
         $checks['php_memory']  = $this->checkPhpMemory();
+        $checks['max_execution_time'] = $this->checkMaxExecutionTime();
+        $checks['product_types'] = $this->checkProductTypes();
         $checks['fc_data']     = $this->checkExistingFcData();
 
         $ready = $checks['woocommerce']['pass'] && $checks['fluentcart']['pass'];
@@ -93,6 +97,104 @@ class PreflightCheck
         ];
     }
 
+    /**
+     * F5: Check max_execution_time — warn if too low, note that batched migration handles this.
+     */
+    private function checkMaxExecutionTime(): array
+    {
+        $maxTime = (int) ini_get('max_execution_time');
+        // 0 means unlimited
+        $adequate = ($maxTime === 0) || ($maxTime >= 300);
+
+        $message = match (true) {
+            $maxTime === 0 => 'max_execution_time is unlimited.',
+            $adequate      => sprintf('max_execution_time is %ds (adequate).', $maxTime),
+            default        => sprintf(
+                'max_execution_time is %ds (recommended: 300s+). Batched migration mitigates this, but consider increasing for safety.',
+                $maxTime,
+            ),
+        };
+
+        return [
+            'label'    => 'Max Execution Time',
+            'pass'     => true, // Never blocks — batched migration handles this.
+            'warning'  => !$adequate,
+            'optional' => true,
+            'value'    => $maxTime,
+            'message'  => $message,
+        ];
+    }
+
+    /**
+     * F4: Product type breakdown — report counts per WC product type and warn about unsupported types.
+     */
+    private function checkProductTypes(): array
+    {
+        if (!class_exists('WooCommerce')) {
+            return [
+                'label'    => 'Product Types',
+                'pass'     => true,
+                'optional' => true,
+                'types'    => [],
+                'message'  => 'WooCommerce not active. Skipping product type check.',
+            ];
+        }
+
+        global $wpdb;
+
+        $results = $wpdb->get_results(
+            "SELECT t.slug, COUNT(*) as count
+             FROM {$wpdb->term_relationships} tr
+             INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+             INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
+             INNER JOIN {$wpdb->posts} p ON p.ID = tr.object_id
+             WHERE tt.taxonomy = 'product_type'
+               AND p.post_type = 'product'
+               AND p.post_status IN ('publish', 'draft', 'private')
+             GROUP BY t.slug
+             ORDER BY count DESC",
+        );
+
+        $types = [];
+        foreach ($results as $row) {
+            $types[$row->slug] = (int) $row->count;
+        }
+
+        $supported = ['simple', 'variable', 'subscription', 'variable-subscription'];
+        $unsupported = array_diff(array_keys($types), $supported);
+        $unsupportedCount = 0;
+        foreach ($unsupported as $type) {
+            $unsupportedCount += $types[$type];
+        }
+
+        $hasWarning = $unsupportedCount > 0;
+
+        $parts = [];
+        foreach ($types as $slug => $count) {
+            $label = ucfirst(str_replace('-', ' ', $slug));
+            $marker = in_array($slug, $supported, true) ? '' : ' (unsupported)';
+            $parts[] = sprintf('%s: %d%s', $label, $count, $marker);
+        }
+
+        $message = empty($parts)
+            ? 'No WooCommerce products found.'
+            : implode(', ', $parts) . '.';
+
+        if ($hasWarning) {
+            $message .= sprintf(' %d product(s) with unsupported types will be skipped.', $unsupportedCount);
+        }
+
+        return [
+            'label'    => 'Product Types',
+            'pass'     => true, // Never blocks migration.
+            'warning'  => $hasWarning,
+            'optional' => true,
+            'types'    => $types,
+            'unsupported' => array_values($unsupported),
+            'message'  => $message,
+        ];
+    }
+
     private function checkExistingFcData(): array
     {
         global $wpdb;
@@ -109,7 +211,7 @@ class PreflightCheck
         foreach ($tables as $key => $table) {
             if ($key === 'products') {
                 $counts[$key] = (int) $wpdb->get_var(
-                    "SELECT COUNT(*) FROM {$table} WHERE post_type = 'fluent-products' AND post_status != 'auto-draft'"
+                    "SELECT COUNT(*) FROM {$table} WHERE post_type = 'fluent-products' AND post_status != 'auto-draft'",
                 );
             } else {
                 $tableExists = $wpdb->get_var("SHOW TABLES LIKE '{$table}'");

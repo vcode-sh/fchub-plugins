@@ -18,11 +18,16 @@ final class SubscriptionMapper
         private readonly string $currency,
     ) {}
 
+    /** @var string[] Warnings collected during the last map() call. */
+    private array $warnings = [];
+
     /**
      * Map a WC_Subscription to FluentCart subscription data.
      */
     public function map(mixed $subscription): array
     {
+        $this->warnings = [];
+
         $wcStatus = $subscription->get_status();
 
         $parentOrderId = null;
@@ -41,10 +46,26 @@ final class SubscriptionMapper
         $variationId = null;
         $itemName    = '';
 
-        foreach ($subscription->get_items() as $item) {
-            /** @var \WC_Order_Item_Product $item */
-            $wcProductId   = $item->get_product_id();
-            $wcVariationId = $item->get_variation_id();
+        // FIX M2: detect multi-item subscriptions — only the first item is migrated.
+        $items = array_values($subscription->get_items());
+        if (count($items) > 1) {
+            $droppedNames = array_map(
+                static fn ($item) => $item->get_name(),
+                array_slice($items, 1),
+            );
+            $this->warnings[] = sprintf(
+                'Subscription #%d has %d items — only the first will be migrated. Items dropped: [%s]',
+                $subscription->get_id(),
+                count($items),
+                implode(', ', $droppedNames),
+            );
+        }
+
+        if (!empty($items)) {
+            /** @var \WC_Order_Item_Product $firstItem */
+            $firstItem     = $items[0];
+            $wcProductId   = $firstItem->get_product_id();
+            $wcVariationId = $firstItem->get_variation_id();
 
             $productId = $this->idMap->getFcId('product', (string) $wcProductId);
 
@@ -55,8 +76,7 @@ final class SubscriptionMapper
                 $variationId = $this->idMap->getFcId('variation', (string) $wcProductId);
             }
 
-            $itemName = $item->get_name();
-            break;
+            $itemName = $firstItem->get_name();
         }
 
         $period   = $subscription->get_billing_period();
@@ -101,6 +121,13 @@ final class SubscriptionMapper
             }
         }
 
+        // FIX M1: map vendor IDs from WC subscription meta.
+        $paymentMethod = $subscription->get_payment_method() ?: '';
+        [$vendorCustomerId, $vendorPlanId, $vendorSubscriptionId] = $this->resolveVendorIds(
+            $subscription,
+            $paymentMethod,
+        );
+
         $mapped = [
             'customer_id'            => $customerId,
             'parent_order_id'        => $parentOrderId,
@@ -122,10 +149,10 @@ final class SubscriptionMapper
             'canceled_at'            => ($cancelledDate && $cancelledDate !== '0') ? $cancelledDate : null,
             'restored_at'            => null,
             'collection_method'      => 'automatic',
-            'vendor_customer_id'     => null,
-            'vendor_plan_id'         => null,
-            'vendor_subscription_id' => null,
-            'current_payment_method' => $subscription->get_payment_method() ?: 'wc_migrated',
+            'vendor_customer_id'     => $vendorCustomerId,
+            'vendor_plan_id'         => $vendorPlanId,
+            'vendor_subscription_id' => $vendorSubscriptionId,
+            'current_payment_method' => $paymentMethod ?: 'wc_migrated',
             'status'                 => FcSubscriptionStatus::fromWooCommerce($wcStatus)->value,
             'original_plan'          => null,
             'vendor_response'        => null,
@@ -140,5 +167,50 @@ final class SubscriptionMapper
 
         /** @see 'cartshift/mapper/subscription' */
         return apply_filters('cartshift/mapper/subscription', $mapped, $subscription);
+    }
+
+    /**
+     * Warnings collected during the last map() call.
+     *
+     * @return string[]
+     */
+    public function getWarnings(): array
+    {
+        return $this->warnings;
+    }
+
+    /**
+     * FIX M1: resolve gateway-specific vendor IDs from WC subscription meta.
+     *
+     * @return array{0: ?string, 1: ?string, 2: ?string} [customer, plan, subscription]
+     */
+    private function resolveVendorIds(mixed $subscription, string $paymentMethod): array
+    {
+        // Stripe.
+        $stripeCustomerId     = $subscription->get_meta('_stripe_customer_id') ?: null;
+        $stripePlanId         = $subscription->get_meta('_stripe_plan_id') ?: null;
+        $stripeSubscriptionId = $subscription->get_meta('_stripe_subscription_id') ?: null;
+
+        if ($stripeCustomerId || $stripeSubscriptionId) {
+            return [$stripeCustomerId, $stripePlanId, $stripeSubscriptionId];
+        }
+
+        // PayPal.
+        $paypalSubscriptionId = $subscription->get_meta('_paypal_subscription_id') ?: null;
+
+        if ($paypalSubscriptionId) {
+            return [$paypalSubscriptionId, null, $paypalSubscriptionId];
+        }
+
+        // Unknown gateway with a payment method set — log for visibility.
+        if ($paymentMethod && !in_array($paymentMethod, ['', 'manual', 'bacs', 'cheque', 'cod'], true)) {
+            $this->warnings[] = sprintf(
+                'Subscription #%d uses gateway "%s" — no vendor ID mapping defined. vendor_*_id fields left empty.',
+                $subscription->get_id(),
+                $paymentMethod,
+            );
+        }
+
+        return [null, null, null];
     }
 }

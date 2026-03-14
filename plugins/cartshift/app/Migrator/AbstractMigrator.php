@@ -43,9 +43,20 @@ abstract class AbstractMigrator implements MigratorInterface
         return $this->countTotal();
     }
 
+    /**
+     * Default no-op initialisation. Override in subclasses for pre-migration setup.
+     */
+    #[\Override]
+    public function initialize(): void
+    {
+        // No-op by default.
+    }
+
     #[\Override]
     public function run(): void
     {
+        $this->initialize();
+
         $effectiveBatchSize = (int) apply_filters(
             'cartshift/migration/batch_size',
             $this->batchSize,
@@ -145,18 +156,23 @@ abstract class AbstractMigrator implements MigratorInterface
 
     /**
      * Fetch a batch of WC records at the given offset.
+     *
+     * @return mixed[]
      */
-    abstract protected function fetchBatch(int $offset, int $limit): array;
+    #[\Override]
+    abstract public function fetchBatch(int $offset, int $limit): array;
 
     /**
      * Process a single WC record. Return false to mark as skipped.
      */
-    abstract protected function processRecord(mixed $record): int|false;
+    #[\Override]
+    abstract public function processRecord(mixed $record): int|false;
 
     /**
      * Get the WC ID from a record (for logging).
      */
-    protected function getRecordId(mixed $record): string
+    #[\Override]
+    public function getRecordId(mixed $record): string
     {
         if (is_object($record) && method_exists($record, 'get_id')) {
             return (string) $record->get_id();

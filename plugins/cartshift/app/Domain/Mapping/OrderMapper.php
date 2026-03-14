@@ -50,17 +50,18 @@ final class OrderMapper
             'total_amount'          => MoneyHelper::toCents($order->get_total(), $this->currency),
             'total_paid'            => $this->getTotalPaid($order),
             'total_refund'          => MoneyHelper::toCents($order->get_total_refunded(), $this->currency),
-            'rate'                  => 1,
+            'rate'                  => self::getExchangeRate($order),
             'note'                  => $order->get_customer_note() ?: '',
             'ip_address'            => $order->get_customer_ip_address() ?: '',
             'mode'                  => 'live',
             'fulfillment_type'      => self::guessFulfillmentType($order),
             'shipping_status'       => 'unshipped',
             'uuid'                  => wp_generate_uuid4(),
-            'config'                => [
-                'wc_order_id' => $order->get_id(),
-                'migrated'    => true,
-            ],
+            'config'                => array_filter([
+                'wc_order_id'    => $order->get_id(),
+                'migrated'       => true,
+                'shipping_lines' => self::mapShippingLines($order) ?: null,
+            ]),
             'created_at'            => $order->get_date_created()
                 ? $order->get_date_created()->date('Y-m-d H:i:s')
                 : gmdate('Y-m-d H:i:s'),
@@ -156,7 +157,7 @@ final class OrderMapper
                 ),
                 'refund_total'     => 0,
                 'line_total'       => $lineTotal,
-                'rate'             => 1,
+                'rate'             => self::getExchangeRate($order),
                 'payment_type'     => $paymentType,
                 'other_info'       => !empty($otherInfo) ? $otherInfo : [],
                 'line_meta'        => [],
@@ -223,15 +224,18 @@ final class OrderMapper
 
     /**
      * Map the primary payment transaction.
+     * FIX M8: Free completed/processing orders get a zero-amount succeeded transaction.
      */
     private function mapTransaction(\WC_Order $order): ?array
     {
-        $total = MoneyHelper::toCents($order->get_total(), $this->currency);
-        if ($total <= 0) {
+        $total    = MoneyHelper::toCents($order->get_total(), $this->currency);
+        $wcStatus = $order->get_status();
+
+        // Free order that was paid/completed still needs a transaction record.
+        if ($total <= 0 && !in_array($wcStatus, ['processing', 'completed'], true)) {
             return null;
         }
 
-        $wcStatus = $order->get_status();
         $status = match (true) {
             in_array($wcStatus, ['processing', 'completed'], true) => 'succeeded',
             $wcStatus === 'refunded'                               => 'refunded',
@@ -242,14 +246,14 @@ final class OrderMapper
         return [
             'order_type'          => 'order',
             'vendor_charge_id'    => $order->get_transaction_id() ?: '',
-            'payment_method'      => $order->get_payment_method() ?: 'wc_migrated',
+            'payment_method'      => $order->get_payment_method() ?: 'free',
             'payment_mode'        => 'live',
             'payment_method_type' => 'wc_migrated',
             'currency'            => $order->get_currency(),
             'transaction_type'    => 'charge',
             'status'              => $status,
             'total'               => $total,
-            'rate'                => 1,
+            'rate'                => self::getExchangeRate($order),
             'meta'                => [
                 'wc_order_id'    => $order->get_id(),
                 'wc_transaction' => $order->get_transaction_id(),
@@ -350,6 +354,51 @@ final class OrderMapper
         }
 
         return $order->get_prices_include_tax() ? 2 : 1;
+    }
+
+    /**
+     * Read the exchange rate from multi-currency plugin meta, falling back to '1'.
+     * Checks WCML, Aelia, and generic _currency_rate meta keys.
+     */
+    private static function getExchangeRate(\WC_Order $order): string
+    {
+        $metaKeys = [
+            '_wcml_order_currency_rate',
+            '_wc_aelia_exchange_rate',
+            '_currency_rate',
+        ];
+
+        foreach ($metaKeys as $key) {
+            $value = $order->get_meta($key);
+            if ($value !== '' && $value !== false && is_numeric($value)) {
+                return (string) $value;
+            }
+        }
+
+        return '1';
+    }
+
+    /**
+     * Map WC shipping line items to a portable array.
+     * FIX M9: Preserve shipping method details in config.
+     *
+     * @return array<int, array{method_title: string, total: int, tax: int}>
+     */
+    private static function mapShippingLines(\WC_Order $order): array
+    {
+        $lines = [];
+        $currency = $order->get_currency();
+
+        /** @var \WC_Order_Item_Shipping $shipping */
+        foreach ($order->get_items('shipping') as $shipping) {
+            $lines[] = [
+                'method_title' => $shipping->get_method_title(),
+                'total'        => MoneyHelper::toCents($shipping->get_total(), $currency),
+                'tax'          => MoneyHelper::toCents($shipping->get_total_tax(), $currency),
+            ];
+        }
+
+        return $lines;
     }
 
     /**

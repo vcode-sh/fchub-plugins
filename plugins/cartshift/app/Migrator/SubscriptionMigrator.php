@@ -54,7 +54,7 @@ final class SubscriptionMigrator extends AbstractMigrator
     }
 
     #[\Override]
-    protected function fetchBatch(int $offset, int $limit): array
+    public function fetchBatch(int $offset, int $limit): array
     {
         if (!function_exists('wcs_get_subscriptions')) {
             return [];
@@ -74,7 +74,7 @@ final class SubscriptionMigrator extends AbstractMigrator
      * @param \WC_Subscription $subscription
      */
     #[\Override]
-    protected function processRecord(mixed $subscription): int|false
+    public function processRecord(mixed $subscription): int|false
     {
         $wcId = $subscription->get_id();
 
@@ -104,6 +104,11 @@ final class SubscriptionMigrator extends AbstractMigrator
         }
 
         $mapped = $this->subscriptionMapper->map($subscription);
+
+        // FIX M1/M2: flush mapper warnings to the migration log.
+        foreach ($this->subscriptionMapper->getWarnings() as $warning) {
+            $this->writeLog($wcId, 'warning', $warning);
+        }
 
         $fcSubscription = Subscription::query()->create($mapped);
         $this->idMap->store(

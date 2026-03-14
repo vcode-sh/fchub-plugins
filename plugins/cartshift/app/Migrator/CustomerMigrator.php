@@ -49,7 +49,7 @@ final class CustomerMigrator extends AbstractMigrator
     }
 
     #[\Override]
-    protected function fetchBatch(int $offset, int $limit): array
+    public function fetchBatch(int $offset, int $limit): array
     {
         $batch = [];
         $registeredTotal = $this->countRegisteredCustomers();
@@ -72,7 +72,7 @@ final class CustomerMigrator extends AbstractMigrator
     }
 
     #[\Override]
-    protected function processRecord(mixed $record): int|false
+    public function processRecord(mixed $record): int|false
     {
         $type = $record['type'];
         $data = $record['data'];
@@ -85,7 +85,7 @@ final class CustomerMigrator extends AbstractMigrator
     }
 
     #[\Override]
-    protected function getRecordId(mixed $record): string
+    public function getRecordId(mixed $record): string
     {
         if ($record['type'] === 'registered') {
             return (string) $record['data']['user_id'];

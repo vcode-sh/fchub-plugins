@@ -262,6 +262,45 @@ if (!function_exists('load_plugin_textdomain')) {
     }
 }
 
+if (!function_exists('current_time')) {
+    function current_time(string $type, bool $gmt = false): string
+    {
+        return $gmt ? gmdate('Y-m-d H:i:s') : date('Y-m-d H:i:s');
+    }
+}
+
+if (!function_exists('wc_get_product')) {
+    function wc_get_product(int $productId): mixed
+    {
+        return $GLOBALS['_cartshift_test_wc_products'][$productId] ?? null;
+    }
+}
+
+if (!function_exists('get_term_by')) {
+    function get_term_by(string $field, string $value, string $taxonomy = ''): mixed
+    {
+        return $GLOBALS['_cartshift_test_terms'][$taxonomy][$value] ?? false;
+    }
+}
+
+if (!function_exists('sanitize_title')) {
+    function sanitize_title(string $title): string
+    {
+        return strtolower(preg_replace('/[^a-z0-9\-]/', '-', strtolower($title)));
+    }
+}
+
+if (!function_exists('get_user_meta')) {
+    function get_user_meta(int $userId, string $key = '', bool $single = false): mixed
+    {
+        return $GLOBALS['_cartshift_test_user_meta'][$userId][$key] ?? '';
+    }
+}
+
+if (!defined('DAY_IN_SECONDS')) {
+    define('DAY_IN_SECONDS', 86400);
+}
+
 // ──────────────────────────────────────────────
 // WordPress class stubs
 // ──────────────────────────────────────────────
@@ -302,6 +341,7 @@ if (!class_exists('WC_Product')) {
     {
         protected int $id = 0;
         protected string $name = '';
+        protected string $slug = '';
         protected string $status = 'publish';
         protected string $price = '';
         protected string $regular_price = '';
@@ -318,9 +358,17 @@ if (!class_exists('WC_Product')) {
         protected int $image_id = 0;
         protected array $gallery_image_ids = [];
         protected array $category_ids = [];
+        protected bool $in_stock = true;
+        protected bool $manage_stock = false;
+        protected bool $sold_individually = false;
+        protected array $children = [];
+        protected ?int $stock_quantity = null;
+        protected string $backorders = 'no';
+        protected ?object $date_created = null;
 
         public function get_id(): int { return $this->id; }
         public function get_name(): string { return $this->name; }
+        public function get_slug(): string { return $this->slug; }
         public function get_status(): string { return $this->status; }
         public function get_price(): string { return $this->price; }
         public function get_regular_price(): string { return $this->regular_price; }
@@ -337,6 +385,22 @@ if (!class_exists('WC_Product')) {
         public function get_image_id(): int { return $this->image_id; }
         public function get_gallery_image_ids(): array { return $this->gallery_image_ids; }
         public function get_category_ids(): array { return $this->category_ids; }
+        public function is_in_stock(): bool { return $this->in_stock; }
+        public function get_manage_stock(): bool { return $this->manage_stock; }
+        public function is_sold_individually(): bool { return $this->sold_individually; }
+        public function get_children(): array { return $this->children; }
+        public function get_stock_quantity(): ?int { return $this->stock_quantity; }
+        public function get_backorders(): string { return $this->backorders; }
+        public function get_date_created(): ?object { return $this->date_created; }
+    }
+}
+
+if (!class_exists('WC_Product_Variation')) {
+    class WC_Product_Variation extends WC_Product
+    {
+        protected array $attributes = [];
+
+        public function get_attributes(): array { return $this->attributes; }
     }
 }
 
@@ -347,10 +411,14 @@ if (!class_exists('WC_Order')) {
         protected string $status = '';
         protected string $billing_email = '';
         protected string $total = '0';
+        protected string $subtotal = '0';
         protected string $total_tax = '0';
         protected string $shipping_total = '0';
+        protected string $shipping_tax = '0';
         protected string $discount_total = '0';
+        protected string $total_refunded = '0';
         protected array $items = [];
+        protected array $shipping_items = [];
         protected string $billing_first_name = '';
         protected string $billing_last_name = '';
         protected string $billing_address_1 = '';
@@ -360,6 +428,7 @@ if (!class_exists('WC_Order')) {
         protected string $billing_postcode = '';
         protected string $billing_country = '';
         protected string $billing_phone = '';
+        protected string $billing_company = '';
         protected string $shipping_first_name = '';
         protected string $shipping_last_name = '';
         protected string $shipping_address_1 = '';
@@ -368,10 +437,17 @@ if (!class_exists('WC_Order')) {
         protected string $shipping_state = '';
         protected string $shipping_postcode = '';
         protected string $shipping_country = '';
+        protected string $shipping_company = '';
         protected string $payment_method = '';
+        protected string $payment_method_title = '';
+        protected string $transaction_id = '';
+        protected string $customer_note = '';
+        protected string $customer_ip_address = '';
         protected ?object $date_created = null;
         protected ?object $date_paid = null;
+        protected ?object $date_completed = null;
         protected int $customer_id = 0;
+        protected int $parent_id = 0;
         protected bool $prices_include_tax = false;
         protected string $currency = 'USD';
         protected array $meta = [];
@@ -380,10 +456,19 @@ if (!class_exists('WC_Order')) {
         public function get_status(): string { return $this->status; }
         public function get_billing_email(): string { return $this->billing_email; }
         public function get_total(): string { return $this->total; }
+        public function get_subtotal(): string { return $this->subtotal; }
         public function get_total_tax(): string { return $this->total_tax; }
         public function get_shipping_total(): string { return $this->shipping_total; }
+        public function get_shipping_tax(): string { return $this->shipping_tax; }
         public function get_discount_total(): string { return $this->discount_total; }
-        public function get_items(): array { return $this->items; }
+        public function get_total_refunded(): string { return $this->total_refunded; }
+        public function get_items(string $type = ''): array
+        {
+            if ($type === 'shipping') {
+                return $this->shipping_items;
+            }
+            return $this->items;
+        }
         public function get_billing_first_name(): string { return $this->billing_first_name; }
         public function get_billing_last_name(): string { return $this->billing_last_name; }
         public function get_billing_address_1(): string { return $this->billing_address_1; }
@@ -393,6 +478,7 @@ if (!class_exists('WC_Order')) {
         public function get_billing_postcode(): string { return $this->billing_postcode; }
         public function get_billing_country(): string { return $this->billing_country; }
         public function get_billing_phone(): string { return $this->billing_phone; }
+        public function get_billing_company(): string { return $this->billing_company; }
         public function get_shipping_first_name(): string { return $this->shipping_first_name; }
         public function get_shipping_last_name(): string { return $this->shipping_last_name; }
         public function get_shipping_address_1(): string { return $this->shipping_address_1; }
@@ -401,10 +487,17 @@ if (!class_exists('WC_Order')) {
         public function get_shipping_state(): string { return $this->shipping_state; }
         public function get_shipping_postcode(): string { return $this->shipping_postcode; }
         public function get_shipping_country(): string { return $this->shipping_country; }
+        public function get_shipping_company(): string { return $this->shipping_company; }
         public function get_payment_method(): string { return $this->payment_method; }
+        public function get_payment_method_title(): string { return $this->payment_method_title; }
+        public function get_transaction_id(): string { return $this->transaction_id; }
+        public function get_customer_note(): string { return $this->customer_note; }
+        public function get_customer_ip_address(): string { return $this->customer_ip_address; }
         public function get_date_created(): ?object { return $this->date_created; }
         public function get_date_paid(): ?object { return $this->date_paid; }
+        public function get_date_completed(): ?object { return $this->date_completed; }
         public function get_customer_id(): int { return $this->customer_id; }
+        public function get_parent_id(): int { return $this->parent_id; }
         public function get_prices_include_tax(): bool { return $this->prices_include_tax; }
         public function get_currency(): string { return $this->currency; }
         public function get_meta(string $key, bool $single = true): mixed { return $this->meta[$key] ?? ''; }
@@ -419,11 +512,21 @@ if (!class_exists('WC_Coupon')) {
         protected string $discount_type = '';
         protected float $amount = 0.0;
         protected ?object $date_expires = null;
+        protected ?object $date_created = null;
         protected int $usage_limit = 0;
+        protected int $usage_limit_per_user = 0;
         protected int $usage_count = 0;
         protected array $product_ids = [];
         protected array $excluded_product_ids = [];
+        protected array $product_categories = [];
+        protected array $excluded_product_categories = [];
         protected array $email_restrictions = [];
+        protected bool $individual_use = false;
+        protected bool $exclude_sale_items = false;
+        protected bool $free_shipping = false;
+        protected string $description = '';
+        protected float $minimum_amount = 0.0;
+        protected float $maximum_amount = 0.0;
         protected array $meta = [];
 
         public function get_id(): int { return $this->id; }
@@ -431,11 +534,21 @@ if (!class_exists('WC_Coupon')) {
         public function get_discount_type(): string { return $this->discount_type; }
         public function get_amount(): float { return $this->amount; }
         public function get_date_expires(): ?object { return $this->date_expires; }
+        public function get_date_created(): ?object { return $this->date_created; }
         public function get_usage_limit(): int { return $this->usage_limit; }
+        public function get_usage_limit_per_user(): int { return $this->usage_limit_per_user; }
         public function get_usage_count(): int { return $this->usage_count; }
         public function get_product_ids(): array { return $this->product_ids; }
         public function get_excluded_product_ids(): array { return $this->excluded_product_ids; }
+        public function get_product_categories(): array { return $this->product_categories; }
+        public function get_excluded_product_categories(): array { return $this->excluded_product_categories; }
         public function get_email_restrictions(): array { return $this->email_restrictions; }
+        public function get_individual_use(): bool { return $this->individual_use; }
+        public function get_exclude_sale_items(): bool { return $this->exclude_sale_items; }
+        public function get_free_shipping(): bool { return $this->free_shipping; }
+        public function get_description(): string { return $this->description; }
+        public function get_minimum_amount(): float { return $this->minimum_amount; }
+        public function get_maximum_amount(): float { return $this->maximum_amount; }
         public function get_meta(string $key, bool $single = true): mixed { return $this->meta[$key] ?? ''; }
     }
 }
@@ -450,6 +563,7 @@ if (!class_exists('WC_Order_Item_Product')) {
         protected string $subtotal = '0';
         protected string $total_tax = '0';
         protected string $name = '';
+        protected ?\WC_Product $product = null;
 
         public function get_product_id(): int { return $this->product_id; }
         public function get_variation_id(): int { return $this->variation_id; }
@@ -458,6 +572,20 @@ if (!class_exists('WC_Order_Item_Product')) {
         public function get_subtotal(): string { return $this->subtotal; }
         public function get_total_tax(): string { return $this->total_tax; }
         public function get_name(): string { return $this->name; }
+        public function get_product(): ?\WC_Product { return $this->product; }
+    }
+}
+
+if (!class_exists('WC_Order_Item_Shipping')) {
+    class WC_Order_Item_Shipping
+    {
+        protected string $method_title = '';
+        protected string $total = '0';
+        protected string $total_tax = '0';
+
+        public function get_method_title(): string { return $this->method_title; }
+        public function get_total(): string { return $this->total; }
+        public function get_total_tax(): string { return $this->total_tax; }
     }
 }
 
@@ -473,13 +601,32 @@ if (!class_exists('wpdb')) {
 
         public function prepare(string $query, mixed ...$args): string
         {
-            return $query;
+            if (empty($args)) {
+                return $query;
+            }
+
+            // Simple interpolation: replace %s and %d with actual values.
+            $i = 0;
+            return preg_replace_callback('/%[sd]/', function ($match) use ($args, &$i) {
+                $value = $args[$i] ?? '';
+                $i++;
+                if ($match[0] === '%d') {
+                    return (string) (int) $value;
+                }
+                return "'" . $value . "'";
+            }, $query);
         }
 
         public function get_var(string $query): string|int|float|null
         {
             $GLOBALS['_cartshift_test_queries'][] = ['get_var', $query];
-            return 0;
+
+            // Allow tests to configure return values via a callback.
+            if (isset($GLOBALS['_cartshift_test_get_var_callback'])) {
+                return ($GLOBALS['_cartshift_test_get_var_callback'])($query);
+            }
+
+            return $GLOBALS['_cartshift_test_get_var_return'] ?? 0;
         }
 
         public function get_col(string $query): array

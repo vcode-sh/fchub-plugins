@@ -1,28 +1,33 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CartShift\State;
 
-defined('ABSPATH') or die;
+defined('ABSPATH') || exit;
 
-class MigrationState
+final class MigrationState
 {
-    const OPTION_KEY = 'cartshift_migration_state';
+    private const string OPTION_KEY = 'cartshift_migration_state';
 
     /**
      * Start a new migration run.
      *
-     * @param array $entityTypes Entity types to migrate.
-     * @return array The new migration state.
+     * @param string[] $entityTypes Entity types to migrate.
+     * @return array<string, mixed> The new migration state.
      */
     public function start(array $entityTypes, bool $dryRun = false): array
     {
         $state = [
-            'migration_id' => wp_generate_uuid4(),
-            'status'       => 'running',
-            'dry_run'      => $dryRun,
-            'started_at'   => gmdate('Y-m-d H:i:s'),
-            'completed_at' => null,
-            'entities'     => [],
+            'migration_id'         => wp_generate_uuid4(),
+            'status'               => 'running',
+            'dry_run'              => $dryRun,
+            'started_at'           => gmdate('Y-m-d H:i:s'),
+            'completed_at'         => null,
+            'entity_types'         => array_values($entityTypes),
+            'current_entity_index' => 0,
+            'current_offset'       => 0,
+            'entities'             => [],
         ];
 
         foreach ($entityTypes as $type) {
@@ -135,18 +140,112 @@ class MigrationState
     }
 
     /**
+     * Get the current entity index in the batch sequence.
+     */
+    public function getCurrentEntityIndex(): int
+    {
+        $state = $this->getCurrent();
+
+        return $state['current_entity_index'] ?? 0;
+    }
+
+    /**
+     * Get the current offset within the current entity batch.
+     */
+    public function getCurrentOffset(): int
+    {
+        $state = $this->getCurrent();
+
+        return $state['current_offset'] ?? 0;
+    }
+
+    /**
+     * Get the ordered entity types for this migration.
+     *
+     * @return string[]
+     */
+    public function getEntityTypes(): array
+    {
+        $state = $this->getCurrent();
+
+        return $state['entity_types'] ?? [];
+    }
+
+    /**
+     * Advance the offset by a given amount.
+     */
+    public function advanceOffset(int $amount): void
+    {
+        $state = $this->getCurrent();
+        if (!$state) {
+            return;
+        }
+
+        $state['current_offset'] = ($state['current_offset'] ?? 0) + $amount;
+        update_option(self::OPTION_KEY, $state, false);
+    }
+
+    /**
+     * Move to the next entity type (reset offset to 0).
+     */
+    public function advanceEntity(): void
+    {
+        $state = $this->getCurrent();
+        if (!$state) {
+            return;
+        }
+
+        $state['current_entity_index'] = ($state['current_entity_index'] ?? 0) + 1;
+        $state['current_offset'] = 0;
+        update_option(self::OPTION_KEY, $state, false);
+    }
+
+    /**
+     * Check if the migration is currently running.
+     */
+    public function isRunning(): bool
+    {
+        $state = $this->getCurrent();
+
+        return $state !== null && $state['status'] === 'running';
+    }
+
+    /**
+     * Get the migration ID from the current state.
+     */
+    public function getMigrationId(): ?string
+    {
+        $state = $this->getCurrent();
+
+        return $state['migration_id'] ?? null;
+    }
+
+    /**
+     * Whether the current migration is a dry run.
+     */
+    public function isDryRun(): bool
+    {
+        $state = $this->getCurrent();
+
+        return !empty($state['dry_run']);
+    }
+
+    /**
      * Get the current migration state.
      *
-     * @return array|null
+     * @return array<string, mixed>|null
      */
     public function getCurrent(): ?array
     {
         $state = get_option(self::OPTION_KEY, null);
+
         return is_array($state) ? $state : null;
     }
 
     /**
      * Get progress summary.
+     *
+     * @return array<string, mixed>
      */
     public function getProgress(): array
     {

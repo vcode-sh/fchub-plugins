@@ -10,7 +10,7 @@ use CartShift\Domain\Migration\Contracts\MigratorInterface;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
-use CartShift\Support\Enums\MigrationStatus;
+use CartShift\Support\Constants;
 
 final class MigrationOrchestrator
 {
@@ -26,46 +26,169 @@ final class MigrationOrchestrator
     }
 
     /**
-     * Run migration for the given entity types.
+     * Initialise migration state and process the first batch.
      *
      * @param string[] $entityTypes Entity types to migrate (e.g. ['products', 'customers']).
-     * @return string The migration ID.
+     * @return array{continue: bool, migration_id: string, entity_type: string|null, offset: int, total: int, processed: int}
      */
-    public function run(array $entityTypes, bool $dryRun = false): string
+    public function startMigration(array $entityTypes, bool $dryRun = false): array
     {
-        $migrationId = wp_generate_uuid4();
-
         /** @see 'cartshift/migration/entity_types' */
         $entityTypes = apply_filters('cartshift/migration/entity_types', $entityTypes);
 
         $this->state->start($entityTypes, $dryRun);
 
+        $migrationId = $this->state->getMigrationId();
+
         /** @see 'cartshift/migration/started' */
         do_action('cartshift/migration/started', $migrationId, $entityTypes, $dryRun);
 
+        // Initialise entity totals so the progress UI has counts from the start.
+        foreach ($this->resolveMigrators($entityTypes) as $migrator) {
+            $total = $migrator->count();
+            $this->state->updateProgress($migrator->entityType(), 0, $total);
+        }
+
+        return $this->processBatch();
+    }
+
+    /**
+     * Process one batch of the current entity type.
+     *
+     * Reads current_entity_index and current_offset from state,
+     * processes up to DEFAULT_BATCH_SIZE records, advances state,
+     * and returns whether there is more work.
+     *
+     * @return array{continue: bool, migration_id: string|null, entity_type: string|null, offset: int, total: int, processed: int}
+     */
+    public function processBatch(): array
+    {
+        @set_time_limit(0);
+
+        if ($this->state->isCancelled()) {
+            return $this->buildResult(false);
+        }
+
+        if (!$this->state->isRunning()) {
+            return $this->buildResult(false);
+        }
+
+        $entityTypes = $this->state->getEntityTypes();
+        $entityIndex = $this->state->getCurrentEntityIndex();
+        $migrationId = $this->state->getMigrationId();
+
+        // All entities processed.
+        if ($entityIndex >= count($entityTypes)) {
+            $this->state->complete();
+
+            /** @see 'cartshift/migration/completed' */
+            do_action('cartshift/migration/completed', $migrationId);
+
+            return $this->buildResult(false);
+        }
+
+        $currentType = $entityTypes[$entityIndex];
+        $migrators = $this->resolveMigrators([$currentType]);
+
+        if (empty($migrators)) {
+            // Unknown entity type — skip to next.
+            $this->state->advanceEntity();
+
+            return $this->buildResult(true);
+        }
+
+        $migrator = $migrators[0];
+        $offset = $this->state->getCurrentOffset();
+
+        $batchSize = (int) apply_filters(
+            'cartshift/migration/batch_size',
+            Constants::DEFAULT_BATCH_SIZE,
+            $currentType,
+        );
+
         try {
-            foreach ($this->resolveMigrators($entityTypes) as $migrator) {
-                if ($this->state->isCancelled()) {
-                    break;
-                }
+            /** @see 'cartshift/migration/entity_started' */
+            if ($offset === 0) {
+                $migrator->initialize();
+                do_action('cartshift/migration/entity_started', $currentType, $migrationId);
+            }
 
-                $type = $migrator->entityType();
+            $batch = $migrator->fetchBatch($offset, $batchSize);
 
-                /** @see 'cartshift/migration/entity_started' */
-                do_action('cartshift/migration/entity_started', $type, $migrationId);
-
-                $migrator->run();
+            if (empty($batch)) {
+                // Entity is done.
+                $this->state->completeEntity($currentType);
 
                 /** @see 'cartshift/migration/entity_completed' */
-                do_action('cartshift/migration/entity_completed', $type, $migrationId);
+                do_action('cartshift/migration/entity_completed', $currentType, $migrationId);
+
+                $this->state->advanceEntity();
+
+                // Check if there are more entities.
+                $nextIndex = $this->state->getCurrentEntityIndex();
+
+                return $this->buildResult($nextIndex < count($entityTypes));
             }
 
-            if (!$this->state->isCancelled()) {
-                $this->state->complete();
+            $entityState = $this->state->getCurrent()['entities'][$currentType] ?? [];
+            $processed = $entityState['processed'] ?? 0;
+            $skipped = $entityState['skipped'] ?? 0;
+            $errors = $entityState['errors'] ?? 0;
+            $total = $entityState['total'] ?? $migrator->count();
 
-                /** @see 'cartshift/migration/completed' */
-                do_action('cartshift/migration/completed', $migrationId);
+            foreach ($batch as $record) {
+                if ($this->state->isCancelled()) {
+                    return $this->buildResult(false);
+                }
+
+                try {
+                    $result = $migrator->processRecord($record);
+
+                    if ($result === false) {
+                        $skipped++;
+                    } else {
+                        $processed++;
+
+                        /** @see 'cartshift/migration/record_migrated' */
+                        do_action(
+                            'cartshift/migration/record_migrated',
+                            $currentType,
+                            $migrator->getRecordId($record),
+                            $result,
+                            $migrationId,
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    $errors++;
+                    $wcId = $migrator->getRecordId($record);
+                    $this->log->write(
+                        $migrationId,
+                        $currentType,
+                        $wcId,
+                        'error',
+                        $e->getMessage(),
+                    );
+                }
             }
+
+            $this->state->updateProgress($currentType, $processed, $total, $skipped, $errors);
+            $this->state->advanceOffset(count($batch));
+
+            // If batch was smaller than batch size, entity is done.
+            if (count($batch) < $batchSize) {
+                $this->state->completeEntity($currentType);
+
+                /** @see 'cartshift/migration/entity_completed' */
+                do_action('cartshift/migration/entity_completed', $currentType, $migrationId);
+
+                $this->state->advanceEntity();
+
+                $nextIndex = $this->state->getCurrentEntityIndex();
+
+                return $this->buildResult($nextIndex < count($entityTypes));
+            }
+
+            return $this->buildResult(true);
         } catch (\Throwable $e) {
             $this->state->setFailed($e->getMessage());
 
@@ -79,9 +202,9 @@ final class MigrationOrchestrator
 
             /** @see 'cartshift/migration/failed' */
             do_action('cartshift/migration/failed', $migrationId, $e);
-        }
 
-        return $migrationId;
+            return $this->buildResult(false);
+        }
     }
 
     /**
@@ -100,6 +223,33 @@ final class MigrationOrchestrator
     public function cancel(): void
     {
         $this->state->cancel();
+    }
+
+    /**
+     * Build a standardised batch result array.
+     *
+     * @return array{continue: bool, migration_id: string|null, entity_type: string|null, offset: int, total: int, processed: int}
+     */
+    private function buildResult(bool $continue): array
+    {
+        $state = $this->state->getCurrent();
+        $entityTypes = $state['entity_types'] ?? [];
+        $entityIndex = $state['current_entity_index'] ?? 0;
+        $currentType = $entityTypes[$entityIndex] ?? null;
+        $entityData = $state['entities'][$currentType] ?? [];
+
+        return [
+            'continue'      => $continue,
+            'migration_id'  => $state['migration_id'] ?? null,
+            'status'        => $state['status'] ?? 'idle',
+            'entity_type'   => $currentType,
+            'entity_index'  => $entityIndex,
+            'entity_count'  => count($entityTypes),
+            'offset'        => $state['current_offset'] ?? 0,
+            'total'         => $entityData['total'] ?? 0,
+            'processed'     => $entityData['processed'] ?? 0,
+            'entities'      => $state['entities'] ?? [],
+        ];
     }
 
     /**

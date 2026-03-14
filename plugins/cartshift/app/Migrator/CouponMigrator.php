@@ -27,7 +27,7 @@ final class CouponMigrator extends AbstractMigrator
         parent::__construct($idMap, $log, $migrationState, $migrationId, $batchSize);
 
         $currency = get_woocommerce_currency();
-        $this->couponMapper = new CouponMapper($currency);
+        $this->couponMapper = new CouponMapper($idMap, $currency);
     }
 
     #[\Override]
@@ -45,7 +45,7 @@ final class CouponMigrator extends AbstractMigrator
     }
 
     #[\Override]
-    protected function fetchBatch(int $offset, int $limit): array
+    public function fetchBatch(int $offset, int $limit): array
     {
         $couponIds = get_posts([
             'post_type'      => 'shop_coupon',
@@ -72,7 +72,7 @@ final class CouponMigrator extends AbstractMigrator
      * @param \WC_Coupon $coupon
      */
     #[\Override]
-    protected function processRecord(mixed $coupon): int|false
+    public function processRecord(mixed $coupon): int|false
     {
         $wcId = $coupon->get_id();
 

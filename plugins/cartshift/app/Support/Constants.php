@@ -21,6 +21,9 @@ final class Constants
     public const string ENTITY_COUPON = 'coupon';
     public const string ENTITY_SUBSCRIPTION = 'subscription';
     public const string ENTITY_CATEGORY = 'category';
+    public const string ENTITY_BRAND = 'brand';
+    public const string ENTITY_ATTRIBUTE_GROUP = 'attribute_group';
+    public const string ENTITY_ATTRIBUTE_TERM = 'attribute_term';
 
     public const int DEFAULT_BATCH_SIZE = 50;
 
@@ -35,9 +38,12 @@ final class Constants
         self::ENTITY_CUSTOMER_ADDRESS,
         self::ENTITY_CUSTOMER,
         self::ENTITY_GUEST_CUSTOMER,
+        self::ENTITY_ATTRIBUTE_TERM,
+        self::ENTITY_ATTRIBUTE_GROUP,
         self::ENTITY_VARIATION,
         self::ENTITY_PRODUCT_DETAIL,
         self::ENTITY_PRODUCT,
         self::ENTITY_CATEGORY,
+        self::ENTITY_BRAND,
     ];
 }

@@ -15,6 +15,7 @@ use CartShift\Support\MoneyHelper;
 use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderAddress;
 use FluentCart\App\Models\OrderItem;
+use FluentCart\App\Models\OrderMeta;
 use FluentCart\App\Models\OrderTransaction;
 
 final class OrderMigrator extends AbstractMigrator
@@ -53,7 +54,7 @@ final class OrderMigrator extends AbstractMigrator
     }
 
     #[\Override]
-    protected function fetchBatch(int $offset, int $limit): array
+    public function fetchBatch(int $offset, int $limit): array
     {
         return wc_get_orders([
             'limit'   => $limit,
@@ -69,7 +70,7 @@ final class OrderMigrator extends AbstractMigrator
      * @param \WC_Order $wcOrder
      */
     #[\Override]
-    protected function processRecord(mixed $wcOrder): int|false
+    public function processRecord(mixed $wcOrder): int|false
     {
         $wcId = $wcOrder->get_id();
 
@@ -137,6 +138,12 @@ final class OrderMigrator extends AbstractMigrator
             $this->processRefund($refund, $fcOrder->id, $wcId);
         }
 
+        // 6. FIX M16: Detect partial refunds and update payment_status.
+        $this->updatePartialRefundStatus($wcOrder, $fcOrder->id);
+
+        // 7. FIX M7: Migrate WC order notes to FC order meta.
+        $this->migrateOrderNotes($wcId, $fcOrder->id);
+
         $this->writeLog($wcId, 'success', sprintf(
             'Migrated order #%d (FC ID: %d) - Status: %s.',
             $wcId,
@@ -185,5 +192,66 @@ final class OrderMigrator extends AbstractMigrator
         $fcTransaction = OrderTransaction::query()->create($transactionData);
         $transactionKey = "{$wcOrderId}_refund_{$refund->get_id()}";
         $this->idMap->store(Constants::ENTITY_ORDER_TRANSACTION, $transactionKey, $fcTransaction->id, $this->migrationId, true);
+    }
+
+    /**
+     * FIX M16: If the order has partial refunds (sum < total, sum > 0),
+     * update the FC order payment_status to 'partially_refunded'.
+     */
+    private function updatePartialRefundStatus(\WC_Order $wcOrder, int $fcOrderId): void
+    {
+        $currency     = $wcOrder->get_currency();
+        $totalRefund  = MoneyHelper::toCents($wcOrder->get_total_refunded(), $currency);
+        $orderTotal   = MoneyHelper::toCents($wcOrder->get_total(), $currency);
+
+        if ($totalRefund > 0 && $totalRefund < $orderTotal) {
+            global $wpdb;
+            $wpdb->update(
+                $wpdb->prefix . 'fct_orders',
+                ['payment_status' => 'partially_refunded'],
+                ['id' => $fcOrderId],
+                ['%s'],
+                ['%d'],
+            );
+        }
+    }
+
+    /**
+     * FIX M7: Migrate WooCommerce order notes to FC order meta.
+     * Each note is stored as a separate 'wc_note' meta entry.
+     */
+    private function migrateOrderNotes(int $wcOrderId, int $fcOrderId): void
+    {
+        global $wpdb;
+
+        // Query WC order notes directly from wp_comments (works regardless of HPOS).
+        $notes = $wpdb->get_results($wpdb->prepare(
+            "SELECT comment_content, comment_date_gmt, comment_author, comment_author_email
+             FROM {$wpdb->comments}
+             WHERE comment_post_ID = %d
+               AND comment_type IN ('order_note', '')
+               AND comment_approved = '1'
+             ORDER BY comment_date_gmt ASC",
+            $wcOrderId,
+        ));
+
+        if (empty($notes)) {
+            return;
+        }
+
+        foreach ($notes as $note) {
+            $isCustomerNote = ($note->comment_author_email === '' || $note->comment_author === __('WooCommerce', 'woocommerce'));
+
+            OrderMeta::query()->create([
+                'order_id'   => $fcOrderId,
+                'meta_key'   => 'wc_note',
+                'meta_value' => [
+                    'content'       => $note->comment_content,
+                    'added_by'      => $note->comment_author ?: 'system',
+                    'customer_note' => !$isCustomerNote,
+                    'date'          => $note->comment_date_gmt,
+                ],
+            ]);
+        }
     }
 }

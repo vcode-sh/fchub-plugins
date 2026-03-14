@@ -23,6 +23,9 @@ final class ConstantsTest extends PluginTestCase
         Constants::ENTITY_COUPON,
         Constants::ENTITY_SUBSCRIPTION,
         Constants::ENTITY_CATEGORY,
+        Constants::ENTITY_BRAND,
+        Constants::ENTITY_ATTRIBUTE_GROUP,
+        Constants::ENTITY_ATTRIBUTE_TERM,
     ];
 
     public function testRollbackOrderContainsAllEntityTypes(): void
@@ -59,5 +62,37 @@ final class ConstantsTest extends PluginTestCase
             $this->assertIsString($entity);
             $this->assertNotEmpty($entity);
         }
+    }
+
+    public function testRollbackOrderIncludesBrandAndAttributeTypes(): void
+    {
+        $this->assertContains(
+            Constants::ENTITY_BRAND,
+            Constants::ROLLBACK_ORDER,
+            'ROLLBACK_ORDER must include brand entity type',
+        );
+        $this->assertContains(
+            Constants::ENTITY_ATTRIBUTE_GROUP,
+            Constants::ROLLBACK_ORDER,
+            'ROLLBACK_ORDER must include attribute_group entity type',
+        );
+        $this->assertContains(
+            Constants::ENTITY_ATTRIBUTE_TERM,
+            Constants::ROLLBACK_ORDER,
+            'ROLLBACK_ORDER must include attribute_term entity type',
+        );
+    }
+
+    public function testAllEntityConstantsAreUnique(): void
+    {
+        $values = self::ALL_ENTITY_TYPES;
+        $unique = array_unique($values);
+
+        $this->assertCount(
+            count($values),
+            $unique,
+            'Entity constants must all have unique values. Duplicates: '
+            . implode(', ', array_diff_assoc($values, $unique)),
+        );
     }
 }

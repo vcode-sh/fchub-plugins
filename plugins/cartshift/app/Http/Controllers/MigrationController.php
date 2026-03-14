@@ -8,6 +8,11 @@ defined('ABSPATH') || exit;
 
 use CartShift\Core\Container;
 use CartShift\Domain\Migration\MigrationOrchestrator;
+use CartShift\Migrator\CouponMigrator;
+use CartShift\Migrator\CustomerMigrator;
+use CartShift\Migrator\OrderMigrator;
+use CartShift\Migrator\ProductMigrator;
+use CartShift\Migrator\SubscriptionMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -31,6 +36,12 @@ final class MigrationController
             'permission_callback' => [$this, 'checkPermission'],
         ]);
 
+        register_rest_route(self::NAMESPACE, '/migrate/batch', [
+            'methods'             => 'POST',
+            'callback'            => [$this, 'batch'],
+            'permission_callback' => [$this, 'checkPermission'],
+        ]);
+
         register_rest_route(self::NAMESPACE, '/progress', [
             'methods'             => 'GET',
             'callback'            => [$this, 'progress'],
@@ -44,6 +55,9 @@ final class MigrationController
         ]);
     }
 
+    /**
+     * POST /migrate — initialise migration and process first batch.
+     */
     public function migrate(WP_REST_Request $request): WP_REST_Response
     {
         $entityTypes = $request->get_param('entity_types') ?? [];
@@ -56,17 +70,33 @@ final class MigrationController
             );
         }
 
-        /** @var MigrationOrchestrator $orchestrator */
-        $orchestrator = $this->container->get(MigrationOrchestrator::class);
+        $orchestrator = $this->buildOrchestrator();
 
-        $migrationId = $orchestrator->run($entityTypes, $dryRun);
+        $result = $orchestrator->startMigration($entityTypes, $dryRun);
 
-        return new WP_REST_Response([
-            'data' => [
-                'migration_id' => $migrationId,
-                'message'      => 'Migration started.',
-            ],
-        ]);
+        return new WP_REST_Response(['data' => $result]);
+    }
+
+    /**
+     * POST /migrate/batch — process next batch.
+     */
+    public function batch(WP_REST_Request $request): WP_REST_Response
+    {
+        /** @var MigrationState $state */
+        $state = $this->container->get(MigrationState::class);
+
+        if (!$state->isRunning()) {
+            return new WP_REST_Response(
+                ['data' => ['continue' => false, 'message' => 'No migration is currently running.']],
+                422,
+            );
+        }
+
+        $orchestrator = $this->buildOrchestrator();
+
+        $result = $orchestrator->processBatch();
+
+        return new WP_REST_Response(['data' => $result]);
     }
 
     public function progress(WP_REST_Request $request): WP_REST_Response
@@ -92,5 +122,30 @@ final class MigrationController
     public function checkPermission(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    /**
+     * Build the MigrationOrchestrator with all registered migrators.
+     */
+    private function buildOrchestrator(): MigrationOrchestrator
+    {
+        /** @var MigrationState $state */
+        $state = $this->container->get(MigrationState::class);
+        /** @var IdMapRepository $idMap */
+        $idMap = $this->container->get(IdMapRepository::class);
+        /** @var MigrationLogRepository $log */
+        $log = $this->container->get(MigrationLogRepository::class);
+
+        $migrationId = $state->getMigrationId() ?? wp_generate_uuid4();
+
+        $migrators = [
+            new ProductMigrator($idMap, $log, $state, $migrationId),
+            new CustomerMigrator($idMap, $log, $state, $migrationId),
+            new CouponMigrator($idMap, $log, $state, $migrationId),
+            new OrderMigrator($idMap, $log, $state, $migrationId),
+            new SubscriptionMigrator($idMap, $log, $state, $migrationId),
+        ];
+
+        return new MigrationOrchestrator($migrators, $state, $idMap, $log);
     }
 }

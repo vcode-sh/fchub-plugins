@@ -110,6 +110,11 @@
     themeMode = readSavedMode();
     applyTheme(themeMode);
 
+    // FIX F1: clear polling interval on page unload.
+    window.addEventListener('beforeunload', function () {
+        stopPolling();
+    });
+
     // State
     var state = {
         screen: 'preflight', // preflight | select | progress | results
@@ -121,10 +126,13 @@
         logPage: 1,
         logPages: 1,
         loading: false,
+        migrating: false, // FIX F2: separate flag for migrate button
+        batchError: null, // Track last batch error for retry
         error: null
     };
 
     // API helper
+    // FIX F3: check Content-Type before calling res.json(), handle non-JSON gracefully.
     function api(method, endpoint, body) {
         var opts = {
             method: method,
@@ -137,8 +145,23 @@
             opts.body = JSON.stringify(body);
         }
         return fetch(restUrl + endpoint, opts).then(function (res) {
+            var contentType = res.headers.get('Content-Type') || '';
+            if (contentType.indexOf('application/json') === -1) {
+                if (!res.ok) {
+                    throw new Error('Server returned non-JSON response (HTTP ' + res.status + '). The server may have timed out or encountered a fatal error.');
+                }
+                // Try parsing anyway — some servers omit Content-Type.
+                return res.text().then(function (text) {
+                    try {
+                        var data = JSON.parse(text);
+                        return data;
+                    } catch (e) {
+                        throw new Error('Server returned non-JSON response. Check PHP error logs for details.');
+                    }
+                });
+            }
             return res.json().then(function (data) {
-                if (!res.ok) throw new Error(data.message || data.error || 'Request failed');
+                if (!res.ok) throw new Error(data.message || data.data && data.data.message || 'Request failed');
                 return data;
             });
         });
@@ -278,7 +301,9 @@
         html += '</div>';
 
         html += '<p style="margin-top:15px;">';
-        html += '<button class="button button-primary button-hero" id="cartshift-start">Start Migration</button> ';
+        // FIX F2: disable button when migrating.
+        var btnDisabled = state.migrating ? ' disabled' : '';
+        html += '<button class="button button-primary button-hero" id="cartshift-start"' + btnDisabled + '>Start Migration</button> ';
         html += '<button class="button" id="cartshift-back-preflight">Back</button>';
         html += '</p>';
 
@@ -305,14 +330,35 @@
 
         if (state.error) {
             html += '<div class="notice notice-error"><p>' + escHtml(state.error) + '</p></div>';
-            html += '<p><button class="button" id="cartshift-back-from-error">Back to Start</button></p>';
+
+            // Show retry button if the error was from a batch.
+            if (state.batchError) {
+                html += '<p>';
+                html += '<button class="button button-primary" id="cartshift-retry-batch">Retry Batch</button> ';
+                html += '<button class="button" id="cartshift-back-from-error">Back to Start</button>';
+                html += '</p>';
+            } else {
+                html += '<p><button class="button" id="cartshift-back-from-error">Back to Start</button></p>';
+            }
+
             root.innerHTML = html;
+
+            var retryBtn = document.getElementById('cartshift-retry-batch');
+            if (retryBtn) retryBtn.addEventListener('click', function () {
+                state.error = null;
+                state.batchError = null;
+                render();
+                runNextBatch();
+            });
+
             var backBtn = document.getElementById('cartshift-back-from-error');
             if (backBtn) backBtn.addEventListener('click', function () {
                 state.screen = 'preflight';
                 state.error = null;
+                state.batchError = null;
                 state.progress = null;
                 state.preflight = null;
+                state.migrating = false;
                 render();
             });
             return;
@@ -451,6 +497,7 @@
             state.progress = null;
             state.log = [];
             state.selectedEntities = [];
+            state.migrating = false;
             render();
         });
         var rollbackBtn = document.getElementById('cartshift-rollback');
@@ -483,6 +530,9 @@
             return;
         }
 
+        // FIX F2: disable migrate button immediately.
+        state.migrating = true;
+
         // Capture dry run BEFORE re-rendering (checkbox will be destroyed).
         var dryRunEl = document.getElementById('cartshift-dry-run');
         var dryRun = dryRunEl ? dryRunEl.checked : false;
@@ -503,31 +553,97 @@
         state.screen = 'progress';
         state.progress = null;
         state.error = null;
+        state.batchError = null;
         render();
 
         api('POST', 'migrate', { entity_types: selected, dry_run: dryRun })
             .then(function (result) {
-                state.progress = result;
-                stopPolling();
-                render();
+                var data = result.data || result;
+                updateProgressFromBatch(data);
+
+                if (data.continue) {
+                    runNextBatch();
+                } else {
+                    migrationFinished();
+                }
             })
             .catch(function (err) {
                 state.error = err.message;
-                stopPolling();
+                state.batchError = true;
+                state.migrating = false;
                 render();
             });
+    }
 
-        // Start polling for progress.
-        startPolling();
+    /**
+     * Self-calling batch loop: POST /migrate/batch until continue === false.
+     */
+    function runNextBatch() {
+        api('POST', 'migrate/batch')
+            .then(function (result) {
+                var data = result.data || result;
+                updateProgressFromBatch(data);
+
+                if (data.continue) {
+                    // Use setTimeout to avoid deep call stacks and let the browser breathe.
+                    setTimeout(runNextBatch, 50);
+                } else {
+                    migrationFinished();
+                }
+            })
+            .catch(function (err) {
+                state.error = err.message;
+                state.batchError = true;
+                // Fetch latest progress to display current state.
+                api('GET', 'progress').then(function (result) {
+                    var data = result.data || result;
+                    state.progress = data;
+                    render();
+                }).catch(function () {
+                    render();
+                });
+            });
+    }
+
+    /**
+     * Update local progress state from a batch response.
+     */
+    function updateProgressFromBatch(data) {
+        // Fetch full progress from the server to get the complete picture.
+        api('GET', 'progress').then(function (result) {
+            var progressData = result.data || result;
+            state.progress = progressData;
+            render();
+        }).catch(function () {
+            // Fallback: use the batch entities data if progress endpoint fails.
+            if (data.entities && state.progress) {
+                state.progress.entities = data.entities;
+                state.progress.status = data.status || state.progress.status;
+            }
+            render();
+        });
+    }
+
+    function migrationFinished() {
+        state.migrating = false;
+        // Final progress fetch.
+        api('GET', 'progress').then(function (result) {
+            var data = result.data || result;
+            state.progress = data;
+            render();
+        }).catch(function () {
+            render();
+        });
     }
 
     function startPolling() {
         if (pollingInterval) return;
         pollingInterval = setInterval(function () {
             api('GET', 'progress').then(function (result) {
-                state.progress = result;
+                var data = result.data || result;
+                state.progress = data;
                 render();
-                if (result.status !== 'running') {
+                if (data.status !== 'running') {
                     stopPolling();
                 }
             });
@@ -545,8 +661,10 @@
         if (!confirm('Are you sure you want to cancel the migration?')) return;
         api('POST', 'cancel').then(function () {
             stopPolling();
+            state.migrating = false;
             api('GET', 'progress').then(function (result) {
-                state.progress = result;
+                var data = result.data || result;
+                state.progress = data;
                 render();
             });
         });
@@ -554,8 +672,9 @@
 
     function loadLog() {
         api('GET', 'log?page=' + state.logPage).then(function (result) {
-            state.log = result.entries;
-            state.logPages = result.pages;
+            var data = result.data || result;
+            state.log = data.entries;
+            state.logPages = data.pages;
             render();
         });
     }
@@ -567,13 +686,15 @@
         render();
 
         api('POST', 'rollback').then(function (result) {
+            var data = result.data || result;
             state.loading = false;
-            alert('Rollback complete. Deleted records: ' + JSON.stringify(result.deleted));
+            alert('Rollback complete. Deleted records: ' + JSON.stringify(data.deleted));
             state.screen = 'preflight';
             state.preflight = null;
             state.counts = null;
             state.progress = null;
             state.log = [];
+            state.migrating = false;
             render();
         }).catch(function (err) {
             state.loading = false;
