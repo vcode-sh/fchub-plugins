@@ -343,7 +343,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { List } from '@element-plus/icons-vue'
+import { ArrowLeft, Calendar, CircleClose, Document, Key, List, Message, Plus, Timer } from '@element-plus/icons-vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { members as membersApi, plans } from '@/api/index.js'

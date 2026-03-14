@@ -4,6 +4,8 @@ namespace FChubMemberships\Storage;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Support\PlanStatus;
+
 class PlanRepository
 {
     private string $table;
@@ -112,7 +114,7 @@ class PlanRepository
             'title'               => $data['title'],
             'slug'                => $data['slug'],
             'description'         => $data['description'] ?? null,
-            'status'              => $data['status'] ?? 'active',
+            'status'              => PlanStatus::normalize($data['status'] ?? null, PlanStatus::ACTIVE),
             'level'               => (int) ($data['level'] ?? 0),
             'duration_type'       => $data['duration_type'] ?? 'lifetime',
             'duration_days'       => $data['duration_days'] ?? null,
@@ -137,11 +139,15 @@ class PlanRepository
 
         $update = ['updated_at' => current_time('mysql')];
 
-        $directFields = ['title', 'slug', 'description', 'status', 'duration_type', 'restriction_message', 'redirect_url'];
+        $directFields = ['title', 'slug', 'description', 'duration_type', 'restriction_message', 'redirect_url'];
         foreach ($directFields as $field) {
             if (array_key_exists($field, $data)) {
                 $update[$field] = $data[$field];
             }
+        }
+
+        if (array_key_exists('status', $data)) {
+            $update['status'] = PlanStatus::normalize($data['status'], PlanStatus::ACTIVE);
         }
 
         $intFields = ['level', 'duration_days', 'trial_days', 'grace_period_days'];
@@ -256,6 +262,7 @@ class PlanRepository
     {
         $row['id'] = (int) $row['id'];
         $row['level'] = (int) $row['level'];
+        $row['status'] = PlanStatus::normalize($row['status'] ?? null, PlanStatus::ACTIVE);
         $row['duration_type'] = $row['duration_type'] ?? 'lifetime';
         $row['duration_days'] = isset($row['duration_days']) ? (int) $row['duration_days'] : null;
         $row['trial_days'] = (int) ($row['trial_days'] ?? 0);

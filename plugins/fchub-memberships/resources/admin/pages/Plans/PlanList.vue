@@ -37,7 +37,7 @@
             @change="resetAndFetch"
           >
             <el-option label="Active" value="active" />
-            <el-option label="Draft" value="draft" />
+            <el-option label="Inactive" value="inactive" />
             <el-option label="Archived" value="archived" />
           </el-select>
         </div>
@@ -296,7 +296,7 @@ function resetAndFetch() {
 function statusTagType(status) {
   const map = {
     active: 'success',
-    draft: 'info',
+    inactive: 'info',
     archived: 'warning',
   }
   return map[status] || 'info'

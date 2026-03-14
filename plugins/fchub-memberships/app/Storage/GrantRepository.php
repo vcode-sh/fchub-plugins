@@ -617,6 +617,43 @@ class GrantRepository
     }
 
     /**
+     * @return int[]
+     */
+    public function getActiveSubscriptionSourceIds(): array
+    {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            "SELECT DISTINCT source_id
+             FROM {$this->table}
+             WHERE status = 'active'
+               AND source_type = 'subscription'
+               AND source_id > 0",
+            ARRAY_A
+        );
+
+        return array_map('intval', array_column($rows ?: [], 'source_id'));
+    }
+
+    public function getDueGracePeriodGrants(int $limit = 100): array
+    {
+        global $wpdb;
+        $now = current_time('mysql');
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE status = 'active'
+               AND cancellation_effective_at IS NOT NULL
+               AND cancellation_effective_at <= %s
+             LIMIT %d",
+            $now,
+            $limit
+        ), ARRAY_A);
+
+        return array_map([$this, 'hydrate'], $rows ?: []);
+    }
+
+    /**
      * Get all active resource IDs for a user, grouped by resource_type.
      *
      * @return array<string, string[]> e.g. ['post' => ['1','2'], 'page' => ['5'], ...]

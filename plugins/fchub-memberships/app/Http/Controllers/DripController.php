@@ -6,6 +6,7 @@ defined('ABSPATH') || exit;
 
 use FChubMemberships\Domain\Drip\DripScheduleService;
 use FChubMemberships\Domain\Drip\DripEvaluator;
+use FChubMemberships\Domain\Drip\DripAdminQueryService;
 
 class DripController
 {
@@ -46,39 +47,8 @@ class DripController
 
     public static function overview(\WP_REST_Request $request): \WP_REST_Response
     {
-        $service = new DripScheduleService();
-        $ruleRepo = new \FChubMemberships\Storage\PlanRuleRepository();
-        $dripRepo = new \FChubMemberships\Storage\DripScheduleRepository();
-
-        global $wpdb;
-        $table = $wpdb->prefix . 'fchub_membership_drip_notifications';
-
-        // Count total drip rules across all plans
-        $planRepo = new \FChubMemberships\Storage\PlanRepository();
-        $plans = $planRepo->getActivePlans();
-        $totalRules = 0;
-        foreach ($plans as $plan) {
-            $totalRules += count($ruleRepo->getDripRules($plan['id']));
-        }
-
-        $pending = $dripRepo->countPending();
-
-        $sentToday = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE status = 'sent' AND DATE(sent_at) = %s",
-            current_time('Y-m-d')
-        ));
-
-        $failed = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$table} WHERE status = 'failed'"
-        );
-
         return new \WP_REST_Response([
-            'data' => [
-                'total_rules' => $totalRules,
-                'pending'     => $pending,
-                'sent_today'  => $sentToday,
-                'failed'      => $failed,
-            ],
+            'data' => (new DripAdminQueryService())->overview(),
         ]);
     }
 
@@ -119,23 +89,7 @@ class DripController
             $item['scheduled_at'] = $item['notify_at'] ?? null;
         }
 
-        global $wpdb;
-        $table = $wpdb->prefix . 'fchub_membership_drip_notifications';
-
-        $where = ['1=1'];
-        $params = [];
-        if (!empty($filters['status'])) {
-            $where[] = 'status = %s';
-            $params[] = $filters['status'];
-        }
-        if (!empty($filters['user_id'])) {
-            $where[] = 'user_id = %d';
-            $params[] = (int) $filters['user_id'];
-        }
-        $countSql = "SELECT COUNT(*) FROM {$table} WHERE " . implode(' AND ', $where);
-        $total = $params
-            ? (int) $wpdb->get_var($wpdb->prepare($countSql, ...$params))
-            : (int) $wpdb->get_var($countSql);
+        $total = (new DripAdminQueryService())->notificationsTotal($filters);
 
         return new \WP_REST_Response([
             'data'  => $items,

@@ -181,31 +181,6 @@ class MigrationV3
         }
     }
 
-    private static function constraintExists(string $table, string $name): bool
-    {
-        global $wpdb;
-        $dbName = $wpdb->dbname;
-        return (bool) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-             WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND CONSTRAINT_NAME = %s",
-            $dbName,
-            $table,
-            $name
-        ));
-    }
-
-    private static function indexExists(string $table, string $name): bool
-    {
-        global $wpdb;
-        $suppress = $wpdb->suppress_errors(true);
-        $result = $wpdb->get_results($wpdb->prepare(
-            "SHOW INDEX FROM {$table} WHERE Key_name = %s",
-            $name
-        ));
-        $wpdb->suppress_errors($suppress);
-        return !empty($result);
-    }
-
     private static function addIndexes(): void
     {
         global $wpdb;
@@ -245,5 +220,32 @@ class MigrationV3
             );
             $wpdb->suppress_errors($suppress);
         }
+    }
+
+    private static function constraintExists(string $table, string $name): bool
+    {
+        global $wpdb;
+
+        return (bool) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+             WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND CONSTRAINT_NAME = %s",
+            $wpdb->dbname,
+            $table,
+            $name
+        ));
+    }
+
+    private static function indexExists(string $table, string $name): bool
+    {
+        global $wpdb;
+
+        $suppress = $wpdb->suppress_errors(true);
+        $result = $wpdb->get_results($wpdb->prepare(
+            "SHOW INDEX FROM {$table} WHERE Key_name = %s",
+            $name
+        ));
+        $wpdb->suppress_errors($suppress);
+
+        return !empty($result);
     }
 }

@@ -36,8 +36,8 @@
 
     <!-- Quick Actions -->
     <div class="quick-actions">
-      <router-link to="/plans/create">
-        <el-button type="primary" size="small"><el-icon><Plus /></el-icon> Create New Plan</el-button>
+      <router-link to="/plans/new">
+        <el-button type="primary"><el-icon><Plus /></el-icon> Create New Plan</el-button>
       </router-link>
       <router-link to="/members">
         <el-button size="small" text type="primary">View All Members →</el-button>
@@ -117,6 +117,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { Plus, RemoveFilled, TrendCharts, UserFilled } from '@element-plus/icons-vue'
 import { Line, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,

@@ -8,6 +8,7 @@ use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Domain\AccessGrantService;
 use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Domain\Drip\DripEvaluator;
+use FChubMemberships\Support\AdminRequestFilters;
 
 class MemberController
 {
@@ -109,14 +110,7 @@ class MemberController
     public static function index(\WP_REST_Request $request): \WP_REST_Response
     {
         $repo = new GrantRepository();
-        $filters = [
-            'status'      => $request->get_param('status'),
-            'plan_id'     => $request->get_param('plan_id'),
-            'search'      => $request->get_param('search'),
-            'source_type' => $request->get_param('source_type'),
-            'per_page'    => $request->get_param('per_page') ?: 20,
-            'page'        => $request->get_param('page') ?: 1,
-        ];
+        $filters = AdminRequestFilters::memberList($request);
 
         $members = $repo->getMembers($filters);
         $total = $repo->countMembers($filters);

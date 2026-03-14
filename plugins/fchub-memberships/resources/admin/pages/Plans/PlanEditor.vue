@@ -49,7 +49,7 @@
           <el-form-item label="Status" prop="status">
             <el-select v-model="form.status" style="width: 200px">
               <el-option label="Active" value="active" />
-              <el-option label="Draft" value="draft" />
+              <el-option label="Inactive" value="inactive" />
               <el-option label="Archived" value="archived" />
             </el-select>
           </el-form-item>
@@ -143,54 +143,20 @@
           </el-form-item>
 
           <!-- T17: Schedule Status Change -->
-          <template v-if="!isNew">
-            <el-divider content-position="left">Schedule Status Change</el-divider>
-
-            <div v-if="schedule.scheduled_status" class="schedule-current">
-              <el-tag type="warning" size="small">Scheduled</el-tag>
-              <span>
-                Status will change to <strong>{{ schedule.scheduled_status }}</strong>
-                on <strong>{{ formatWpDateTime(schedule.scheduled_at) }}</strong>
-              </span>
-              <el-button size="small" text type="danger" @click="clearSchedule" :loading="scheduleSaving">
-                Clear
-              </el-button>
-            </div>
-
-            <div class="schedule-form-row">
-              <el-form-item label="New Status">
-                <el-select v-model="schedule.new_status" placeholder="Select status..." style="width: 180px" clearable>
-                  <el-option label="Active" value="active" />
-                  <el-option label="Inactive" value="inactive" />
-                  <el-option label="Archived" value="archived" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="Date & Time">
-                <el-date-picker
-                  v-model="schedule.new_at"
-                  type="datetime"
-                  placeholder="Select date and time"
-                  :format="wpDateTimePickerFormat"
-                  value-format="YYYY-MM-DD HH:mm:ss"
-                  style="width: 240px"
-                />
-              </el-form-item>
-              <el-button
-                size="small"
-                type="primary"
-                plain
-                style="margin-top: 30px"
-                :disabled="!schedule.new_status || !schedule.new_at"
-                :loading="scheduleSaving"
-                @click="saveSchedule"
-              >
-                Set Schedule
-              </el-button>
-            </div>
-            <div class="field-hint" style="margin-top: -8px">
-              Schedule an automatic status change for this plan at a future date.
-            </div>
-          </template>
+          <PlanSchedulePanel
+            :is-new="isNew"
+            :scheduled-status="schedule.scheduled_status"
+            :scheduled-at="schedule.scheduled_at"
+            :new-status="schedule.new_status"
+            :new-at="schedule.new_at"
+            :loading="scheduleSaving"
+            :format-date-time="formatWpDateTime"
+            :date-time-picker-format="wpDateTimePickerFormat"
+            @update:new-status="schedule.new_status = $event"
+            @update:new-at="schedule.new_at = $event"
+            @save="saveSchedule"
+            @clear="clearSchedule"
+          />
         </el-tab-pane>
 
         <el-tab-pane label="Access Rules" name="rules">
@@ -379,98 +345,25 @@
         </el-tab-pane>
 
         <el-tab-pane v-if="!isNew" label="Linked Products" name="products" :lazy="true">
-          <div v-loading="productsLoading">
-            <div class="tab-header-row">
-              <p class="tab-description">FluentCart products and integration feeds linked to this plan.</p>
-              <el-button size="small" type="primary" plain @click="showLinkProductDialog">
-                <el-icon><Plus /></el-icon>
-                Link Product
-              </el-button>
-            </div>
-            <el-table v-if="linkedProducts.length > 0" :data="linkedProducts" stripe>
-              <el-table-column prop="product_title" label="Product" min-width="200" />
-              <el-table-column prop="feed_title" label="Feed" min-width="160" />
-              <el-table-column prop="price" label="Price" width="120">
-                <template #default="{ row }">
-                  {{ row.price ? `$${(row.price / 100).toFixed(2)}` : '-' }}
-                </template>
-              </el-table-column>
-              <el-table-column label="Billing" width="140">
-                <template #default="{ row }">
-                  {{ row.billing_period ? `Every ${row.billing_interval || 1} ${row.billing_period}(s)` : 'One-time' }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="status" label="Status" width="100">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
-                    {{ row.status }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="" width="80" align="center">
-                <template #default="{ row }">
-                  <el-button
-                    type="danger"
-                    text
-                    size="small"
-                    @click="confirmUnlinkProduct(row)"
-                  >
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-else description="No FluentCart products linked to this plan yet." :image-size="60">
-              <template #description>
-                <p>No FluentCart products linked to this plan yet.</p>
-                <p style="font-size: 12px; color: #909399">Click "Link Product" to create an integration feed.</p>
-              </template>
-            </el-empty>
-          </div>
+          <PlanLinkedProductsTab
+            :loading="productsLoading"
+            :products="linkedProducts"
+            @link="showLinkProductDialog"
+            @unlink="confirmUnlinkProduct"
+          />
         </el-tab-pane>
 
         <el-tab-pane v-if="!isNew" label="Members" name="members" :lazy="true">
-          <div v-loading="planMembersLoading">
-            <div class="tab-header-row">
-              <p class="tab-description">Members who have access through this plan.</p>
-              <router-link :to="`/members?plan=${route.params.id}`">
-                <el-button size="small" text type="primary">View All →</el-button>
-              </router-link>
-            </div>
-            <el-table v-if="planMembers.length > 0" :data="planMembers" stripe>
-              <el-table-column prop="user_email" label="Member" min-width="200" />
-              <el-table-column prop="status" label="Status" width="100">
-                <template #default="{ row }">
-                  <el-tag
-                    :type="row.status === 'active' ? 'success' : row.status === 'expired' ? 'info' : 'danger'"
-                    size="small"
-                  >
-                    {{ row.status }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="Granted" width="160">
-                <template #default="{ row }">
-                  {{ formatWpDate(row.created_at) }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="expires_at" label="Expires" width="160">
-                <template #default="{ row }">
-                  {{ row.expires_at ? formatWpDate(row.expires_at) : 'Never' }}
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-else description="No members have been granted this plan yet." :image-size="60" />
-            <el-pagination
-              v-if="planMembersTotal > planMembersPerPage"
-              :current-page="planMembersPage"
-              :page-size="planMembersPerPage"
-              :total="planMembersTotal"
-              layout="prev, pager, next"
-              style="margin-top: 16px; justify-content: flex-end"
-              @current-change="onMembersPageChange"
-            />
-          </div>
+          <PlanMembersTab
+            :loading="planMembersLoading"
+            :members="planMembers"
+            :total="planMembersTotal"
+            :page="planMembersPage"
+            :per-page="planMembersPerPage"
+            :format-date="formatWpDate"
+            :members-link="`/members?plan_id=${route.params.id}`"
+            @page-change="onMembersPageChange"
+          />
         </el-tab-pane>
       </el-tabs>
 
@@ -487,59 +380,33 @@
       </div>
     </el-form>
 
-    <!-- T15: Link Product Dialog -->
-    <el-dialog v-model="linkProductVisible" title="Link Product" width="520px" :close-on-click-modal="false">
-      <p style="font-size: 13px; color: var(--fchub-text-secondary); margin: 0 0 16px 0">
-        Search for a FluentCart product and create a membership integration feed.
-      </p>
-      <el-input
-        v-model="productSearchQuery"
-        placeholder="Search products..."
-        clearable
-        @input="debouncedSearchProducts"
-      />
-      <div v-loading="productSearchLoading" class="product-search-results">
-        <div
-          v-for="p in productSearchResults"
-          :key="p.id"
-          class="product-search-item"
-          :class="{ selected: selectedProduct?.id === p.id }"
-          @click="selectedProduct = p"
-        >
-          <div class="product-search-item-title">{{ p.title }}</div>
-          <div class="product-search-item-meta">
-            <span>{{ p.price ? `$${(p.price / 100).toFixed(2)}` : 'Free' }}</span>
-            <span v-if="p.billing_period"> / {{ p.billing_period }}</span>
-            <el-tag v-if="p.status" size="small" :type="p.status === 'active' ? 'success' : 'info'" style="margin-left: 8px">
-              {{ p.status }}
-            </el-tag>
-          </div>
-        </div>
-        <div v-if="!productSearchLoading && productSearchResults.length === 0 && productSearchQuery" class="product-search-empty">
-          No products found.
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="linkProductVisible = false">Cancel</el-button>
-        <el-button
-          type="primary"
-          :disabled="!selectedProduct"
-          :loading="linkingProduct"
-          @click="confirmLinkProduct"
-        >
-          Link Product
-        </el-button>
-      </template>
-    </el-dialog>
+    <PlanLinkProductDialog
+      :visible="linkProductVisible"
+      :query="productSearchQuery"
+      :results="productSearchResults"
+      :loading="productSearchLoading"
+      :selected-product="selectedProduct"
+      :linking="linkingProduct"
+      @close="linkProductVisible = false"
+      @update:query="productSearchQuery = $event"
+      @search="debouncedSearchProducts"
+      @select="selectedProduct = $event"
+      @confirm="confirmLinkProduct"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ArrowLeft, Delete, Plus, WarningFilled } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { plans, members, content } from '@/api/index.js'
 import { formatWpDate, formatWpDateTime, wpDatePickerFormat, wpDateTimePickerFormat } from '@/utils/wpDate.js'
+import PlanSchedulePanel from '@/components/plans/PlanSchedulePanel.vue'
+import PlanLinkedProductsTab from '@/components/plans/PlanLinkedProductsTab.vue'
+import PlanMembersTab from '@/components/plans/PlanMembersTab.vue'
+import PlanLinkProductDialog from '@/components/plans/PlanLinkProductDialog.vue'
 
 const props = defineProps({
   isNew: {
@@ -598,7 +465,7 @@ const form = reactive({
   title: '',
   slug: '',
   description: '',
-  status: 'draft',
+  status: 'inactive',
   includes_plan_ids: [],
   rules: [],
   duration_type: 'lifetime',
@@ -837,7 +704,7 @@ async function loadPlan(id) {
     form.title = plan.title || ''
     form.slug = plan.slug || ''
     form.description = plan.description || ''
-    form.status = plan.status || 'draft'
+    form.status = plan.status || 'inactive'
     form.level = plan.level ?? 0
     form.includes_plan_ids = plan.includes_plan_ids || []
     form.duration_type = plan.duration_type || 'lifetime'
@@ -1081,7 +948,7 @@ async function loadPlanMembers(page = 1) {
   planMembersLoading.value = true
   try {
     const res = await members.list({
-      plan: route.params.id,
+      plan_id: route.params.id,
       per_page: planMembersPerPage,
       page,
     })
@@ -1229,85 +1096,4 @@ onMounted(() => {
   border-radius: 0 0 var(--fchub-radius-card) var(--fchub-radius-card);
 }
 
-.tab-description {
-  font-size: 13px;
-  color: var(--fchub-text-secondary);
-  margin: 0 0 16px 0;
-}
-
-.tab-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.tab-header-row .tab-description {
-  margin-bottom: 0;
-}
-
-/* T15: Product search dialog */
-.product-search-results {
-  margin-top: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-  min-height: 60px;
-}
-
-.product-search-item {
-  padding: 10px 12px;
-  border: 1px solid var(--fchub-border-color);
-  border-radius: 6px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
-}
-
-.product-search-item:hover {
-  border-color: var(--el-color-primary-light-5);
-  background: var(--el-fill-color-lighter, #fafafa);
-}
-
-.product-search-item.selected {
-  border-color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-}
-
-.product-search-item-title {
-  font-weight: 500;
-  font-size: 14px;
-}
-
-.product-search-item-meta {
-  font-size: 12px;
-  color: var(--fchub-text-secondary);
-  margin-top: 4px;
-}
-
-.product-search-empty {
-  text-align: center;
-  padding: 20px 0;
-  color: var(--fchub-text-secondary);
-  font-size: 13px;
-}
-
-/* T17: Schedule section */
-.schedule-current {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--el-color-warning-light-9);
-  border: 1px solid var(--el-color-warning-light-5);
-  border-radius: 6px;
-  margin-bottom: 16px;
-  font-size: 13px;
-}
-
-.schedule-form-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  flex-wrap: wrap;
-}
 </style>

@@ -6,6 +6,7 @@ defined('ABSPATH') || exit;
 
 use FChubMemberships\Email\TrialConvertedEmail;
 use FChubMemberships\Email\TrialExpiringEmail;
+use FChubMemberships\Domain\Trial\TrialGrantQueryService;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Support\Logger;
@@ -14,11 +15,13 @@ class TrialLifecycleService
 {
     private GrantRepository $grantRepo;
     private PlanRepository $planRepo;
+    private TrialGrantQueryService $queries;
 
     public function __construct()
     {
         $this->grantRepo = new GrantRepository();
         $this->planRepo = new PlanRepository();
+        $this->queries = new TrialGrantQueryService();
     }
 
     /**
@@ -26,22 +29,9 @@ class TrialLifecycleService
      */
     public function checkTrialExpirations(): void
     {
-        global $wpdb;
-
-        $table = $wpdb->prefix . 'fchub_membership_grants';
         $now = gmdate('Y-m-d H:i:s');
 
-        // Find active grants whose trial has ended
-        $grants = $wpdb->get_results($wpdb->prepare(
-            "SELECT id, user_id, plan_id, trial_ends_at, source_id, source_ids, meta
-             FROM {$table}
-             WHERE trial_ends_at IS NOT NULL
-               AND trial_ends_at <= %s
-               AND status = 'active'
-             ORDER BY trial_ends_at ASC
-             LIMIT 100",
-            $now
-        ), ARRAY_A);
+        $grants = $this->queries->getDueTrialExpirations($now);
 
         if (empty($grants)) {
             return;
@@ -63,33 +53,17 @@ class TrialLifecycleService
      */
     public function sendTrialExpiringNotifications(): void
     {
-        global $wpdb;
-
         $settings = get_option('fchub_memberships_settings', []);
         $noticeDays = (int) ($settings['trial_expiry_notice_days'] ?? 3);
 
-        $table = $wpdb->prefix . 'fchub_membership_grants';
         $now = gmdate('Y-m-d H:i:s');
         $cutoff = gmdate('Y-m-d H:i:s', strtotime("+{$noticeDays} days"));
 
-        $grants = $wpdb->get_results($wpdb->prepare(
-            "SELECT id, user_id, plan_id, trial_ends_at, meta
-             FROM {$table}
-             WHERE trial_ends_at IS NOT NULL
-               AND trial_ends_at > %s
-               AND trial_ends_at <= %s
-               AND status = 'active'
-             ORDER BY trial_ends_at ASC
-             LIMIT 100",
-            $now,
-            $cutoff
-        ), ARRAY_A);
+        $grants = $this->queries->getTrialExpiringSoon($now, $cutoff);
 
         if (empty($grants)) {
             return;
         }
-
-        $plansTable = $wpdb->prefix . 'fchub_membership_plans';
 
         foreach ($grants as $row) {
             $meta = $row['meta'] ? json_decode($row['meta'], true) : [];
@@ -97,10 +71,7 @@ class TrialLifecycleService
                 continue;
             }
 
-            $plan = $wpdb->get_row($wpdb->prepare(
-                "SELECT title, slug FROM {$plansTable} WHERE id = %d",
-                (int) $row['plan_id']
-            ));
+            $plan = $this->queries->findPlanSummary((int) $row['plan_id']);
 
             $planTitle = $plan ? $plan->title : __('Membership', 'fchub-memberships');
             $upgradeUrl = $plan && !empty($plan->slug)
@@ -130,13 +101,7 @@ class TrialLifecycleService
 
             // Mark as notified to avoid duplicates
             $meta['trial_expiry_notified'] = gmdate('Y-m-d H:i:s');
-            $wpdb->update(
-                $table,
-                ['meta' => wp_json_encode($meta)],
-                ['id' => (int) $row['id']],
-                ['%s'],
-                ['%d']
-            );
+            $this->queries->markTrialExpiryNotified((int) $row['id'], $meta);
         }
     }
 

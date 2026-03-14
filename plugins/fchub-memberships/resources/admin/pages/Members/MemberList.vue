@@ -1,82 +1,26 @@
 <template>
   <div class="member-list-page">
-    <!-- Header -->
-    <div class="page-header">
-      <h2 class="fchub-page-title">Members</h2>
-      <div class="header-actions">
-        <el-button @click="handleExport" :loading="exporting">
-          <el-icon><Download /></el-icon>
-          Export CSV
-        </el-button>
-        <el-button @click="$router.push('/import')">
-          <el-icon><Upload /></el-icon>
-          Import Members
-        </el-button>
-        <el-button type="primary" @click="grantDialogVisible = true">
-          <el-icon><Plus /></el-icon>
-          Grant Access
-        </el-button>
-      </div>
-    </div>
+    <MemberListToolbar
+      :exporting="exporting"
+      :filters="filters"
+      :plan-options="planOptions"
+      @export="handleExport"
+      @import="$router.push('/import')"
+      @grant="grantDialogVisible = true"
+      @update:search="filters.search = $event"
+      @update:plan-id="filters.plan_id = $event"
+      @update:status="filters.status = $event"
+      @search-input="debouncedFetch"
+      @filter-change="resetAndFetch"
+    />
 
     <!-- Single card wrapping search + table (FC pattern) -->
     <el-card shadow="never" class="list-card">
-      <!-- Search & Filters -->
-      <div class="search-bar">
-        <el-input
-          v-model="filters.search"
-          placeholder="Search"
-          clearable
-          :prefix-icon="Search"
-          class="search-input"
-          @input="debouncedFetch"
-        />
-        <div class="filter-controls">
-          <el-select
-            v-model="filters.plan_id"
-            placeholder="All Plans"
-            clearable
-            @change="resetAndFetch"
-          >
-            <el-option
-              v-for="plan in planOptions"
-              :key="plan.id"
-              :label="plan.title"
-              :value="plan.id"
-            />
-          </el-select>
-          <el-select
-            v-model="filters.status"
-            placeholder="All Statuses"
-            clearable
-            @change="resetAndFetch"
-          >
-            <el-option label="Active" value="active" />
-            <el-option label="Paused" value="paused" />
-            <el-option label="Expired" value="expired" />
-            <el-option label="Revoked" value="revoked" />
-          </el-select>
-        </div>
-      </div>
-      <div class="search-hint">Search by name, email or user ID</div>
-
-      <div v-if="selectedRows.length > 0" class="bulk-actions">
-        <span class="bulk-count">{{ selectedRows.length }} selected</span>
-        <el-dropdown @command="handleBulkAction">
-          <el-button size="small">
-            Bulk Actions <el-icon><ArrowDown /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="grant">Grant Plan</el-dropdown-item>
-              <el-dropdown-item command="revoke">Revoke Plan</el-dropdown-item>
-              <el-dropdown-item command="extend">Extend Expiry</el-dropdown-item>
-              <el-dropdown-item command="export" divided>Export Selected</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <el-button size="small" text @click="clearSelection">Clear Selection</el-button>
-      </div>
+      <MemberBulkActionsBar
+        :selected-count="selectedRows.length"
+        @command="handleBulkAction"
+        @clear="clearSelection"
+      />
 
       <!-- Table -->
       <el-table
@@ -149,203 +93,60 @@
       </div>
     </el-card>
 
-    <!-- Grant Access Dialog -->
-    <el-dialog
-      v-model="grantDialogVisible"
-      title="Grant Access"
-      width="500px"
-      @close="resetGrantForm"
-    >
-      <el-form :model="grantForm" label-position="top">
-        <el-form-item label="User" required>
-          <el-select
-            v-model="grantForm.user_id"
-            filterable
-            remote
-            :remote-method="searchUsers"
-            :loading="searchingUsers"
-            placeholder="Search WordPress users..."
-            class="full-width"
-          >
-            <el-option
-              v-for="user in userResults"
-              :key="user.id"
-              :label="`${user.display_name} (${user.email})`"
-              :value="user.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Plan" required>
-          <el-select
-            v-model="grantForm.plan_id"
-            placeholder="Select plan..."
-            class="full-width"
-          >
-            <el-option
-              v-for="plan in planOptions"
-              :key="plan.id"
-              :label="plan.title"
-              :value="plan.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Expiry Date">
-          <el-date-picker
-            v-model="grantForm.expires_at"
-            type="date"
-            placeholder="Leave empty for plan default"
-            :format="wpDatePickerFormat"
-            value-format="YYYY-MM-DD"
-            class="full-width"
-          />
-        </el-form-item>
-        <el-form-item label="Reason">
-          <el-input
-            v-model="grantForm.reason"
-            type="textarea"
-            :rows="2"
-            placeholder="Optional reason for granting access"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="grantDialogVisible = false">Cancel</el-button>
-        <el-button
-          type="primary"
-          @click="handleGrant"
-          :loading="granting"
-          :disabled="!grantForm.user_id || !grantForm.plan_id"
-        >
-          Grant Access
-        </el-button>
-      </template>
-    </el-dialog>
+    <GrantAccessDialog
+      :visible="grantDialogVisible"
+      :form="grantForm"
+      :loading="granting"
+      :searching-users="searchingUsers"
+      :user-results="userResults"
+      :plan-options="planOptions"
+      :date-picker-format="wpDatePickerFormat"
+      :search-users="searchUsers"
+      @close="grantDialogVisible = false; resetGrantForm()"
+      @confirm="handleGrant"
+      @update:user-id="grantForm.user_id = $event"
+      @update:plan-id="grantForm.plan_id = $event"
+      @update:expires-at="grantForm.expires_at = $event"
+      @update:reason="grantForm.reason = $event"
+    />
 
-    <!-- Bulk Grant Dialog -->
-    <el-dialog
-      v-model="bulkGrantDialogVisible"
-      title="Bulk Grant Plan"
-      width="450px"
-    >
-      <p class="bulk-dialog-info">Grant a plan to {{ selectedRows.length }} selected members.</p>
-      <el-form label-position="top">
-        <el-form-item label="Plan" required>
-          <el-select
-            v-model="bulkForm.plan_id"
-            placeholder="Select plan..."
-            class="full-width"
-          >
-            <el-option
-              v-for="plan in planOptions"
-              :key="plan.id"
-              :label="plan.title"
-              :value="plan.id"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="bulkGrantDialogVisible = false">Cancel</el-button>
-        <el-button
-          type="primary"
-          @click="executeBulkGrant"
-          :loading="bulkLoading"
-          :disabled="!bulkForm.plan_id"
-        >
-          Grant to {{ selectedRows.length }} Members
-        </el-button>
-      </template>
-    </el-dialog>
+    <BulkGrantDialog
+      :visible="bulkGrantDialogVisible"
+      :selected-count="selectedRows.length"
+      :plan-id="bulkForm.plan_id"
+      :plan-options="planOptions"
+      :loading="bulkLoading"
+      @close="bulkGrantDialogVisible = false"
+      @confirm="executeBulkGrant"
+      @update:plan-id="bulkForm.plan_id = $event"
+    />
 
-    <!-- Bulk Revoke Dialog -->
-    <el-dialog
-      v-model="bulkRevokeDialogVisible"
-      title="Bulk Revoke Plan"
-      width="450px"
-    >
-      <p class="bulk-dialog-info">Revoke a plan from {{ selectedRows.length }} selected members.</p>
-      <el-form label-position="top">
-        <el-form-item label="Plan" required>
-          <el-select
-            v-model="bulkForm.plan_id"
-            placeholder="Select plan..."
-            class="full-width"
-          >
-            <el-option
-              v-for="plan in planOptions"
-              :key="plan.id"
-              :label="plan.title"
-              :value="plan.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Reason">
-          <el-input
-            v-model="bulkForm.reason"
-            type="textarea"
-            :rows="2"
-            placeholder="Optional reason for revoking"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="bulkRevokeDialogVisible = false">Cancel</el-button>
-        <el-button
-          type="danger"
-          @click="executeBulkRevoke"
-          :loading="bulkLoading"
-          :disabled="!bulkForm.plan_id"
-        >
-          Revoke from {{ selectedRows.length }} Members
-        </el-button>
-      </template>
-    </el-dialog>
+    <BulkRevokeDialog
+      :visible="bulkRevokeDialogVisible"
+      :selected-count="selectedRows.length"
+      :plan-id="bulkForm.plan_id"
+      :reason="bulkForm.reason"
+      :plan-options="planOptions"
+      :loading="bulkLoading"
+      @close="bulkRevokeDialogVisible = false"
+      @confirm="executeBulkRevoke"
+      @update:plan-id="bulkForm.plan_id = $event"
+      @update:reason="bulkForm.reason = $event"
+    />
 
-    <!-- Bulk Extend Dialog -->
-    <el-dialog
-      v-model="bulkExtendDialogVisible"
-      title="Bulk Extend Expiry"
-      width="450px"
-    >
-      <p class="bulk-dialog-info">Extend expiry for {{ selectedRows.length }} selected members.</p>
-      <el-form label-position="top">
-        <el-form-item label="Plan" required>
-          <el-select
-            v-model="bulkForm.plan_id"
-            placeholder="Select plan..."
-            class="full-width"
-          >
-            <el-option
-              v-for="plan in planOptions"
-              :key="plan.id"
-              :label="plan.title"
-              :value="plan.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="New Expiry Date" required>
-          <el-date-picker
-            v-model="bulkForm.expires_at"
-            type="date"
-            placeholder="Select new expiry date"
-            :format="wpDatePickerFormat"
-            value-format="YYYY-MM-DD"
-            class="full-width"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="bulkExtendDialogVisible = false">Cancel</el-button>
-        <el-button
-          type="primary"
-          @click="executeBulkExtend"
-          :loading="bulkLoading"
-          :disabled="!bulkForm.plan_id || !bulkForm.expires_at"
-        >
-          Extend {{ selectedRows.length }} Members
-        </el-button>
-      </template>
-    </el-dialog>
+    <BulkExtendDialog
+      :visible="bulkExtendDialogVisible"
+      :selected-count="selectedRows.length"
+      :plan-id="bulkForm.plan_id"
+      :expires-at="bulkForm.expires_at"
+      :plan-options="planOptions"
+      :loading="bulkLoading"
+      :date-picker-format="wpDatePickerFormat"
+      @close="bulkExtendDialogVisible = false"
+      @confirm="executeBulkExtend"
+      @update:plan-id="bulkForm.plan_id = $event"
+      @update:expires-at="bulkForm.expires_at = $event"
+    />
   </div>
 </template>
 
@@ -353,9 +154,14 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Search, ArrowDown, Download, Upload, Plus } from '@element-plus/icons-vue'
 import { members as membersApi, plans } from '@/api/index.js'
 import { formatWpDate, wpDatePickerFormat } from '@/utils/wpDate.js'
+import MemberListToolbar from '@/components/members/MemberListToolbar.vue'
+import MemberBulkActionsBar from '@/components/members/MemberBulkActionsBar.vue'
+import GrantAccessDialog from '@/components/members/GrantAccessDialog.vue'
+import BulkGrantDialog from '@/components/members/BulkGrantDialog.vue'
+import BulkRevokeDialog from '@/components/members/BulkRevokeDialog.vue'
+import BulkExtendDialog from '@/components/members/BulkExtendDialog.vue'
 
 const router = useRouter()
 
@@ -676,47 +482,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
 .list-card {
   margin-bottom: 20px;
-}
-
-/* Search bar — FC pattern: full-width search with filters on right */
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.search-input {
-  flex: 1;
-}
-
-.filter-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.filter-controls .el-select {
-  width: 150px;
-}
-
-.search-hint {
-  font-size: 12px;
-  color: var(--fchub-text-secondary);
-  margin-top: 6px;
-  margin-bottom: 16px;
 }
 
 /* Member cell with avatar — FC pattern */
@@ -778,29 +545,5 @@ onMounted(() => {
 
 .per-page-select {
   width: 120px;
-}
-
-.full-width {
-  width: 100%;
-}
-
-.bulk-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  margin-bottom: 8px;
-}
-
-.bulk-count {
-  font-size: 13px;
-  color: var(--el-color-primary);
-  font-weight: 500;
-}
-
-.bulk-dialog-info {
-  font-size: 14px;
-  color: var(--fchub-text-secondary);
-  margin-bottom: 16px;
 }
 </style>

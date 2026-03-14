@@ -58,6 +58,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
+import { Monitor, Moon, Setting, Sunny, UserFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 

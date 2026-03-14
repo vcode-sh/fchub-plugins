@@ -39,543 +39,70 @@
       </div>
     </div>
 
-    <!-- Protection Rules List -->
-    <el-card shadow="never" class="list-card">
-      <!-- Tabs -->
-      <el-tabs v-model="activeTab" @tab-change="onTabChange">
-        <el-tab-pane label="All" name="all" />
-        <el-tab-pane
-          v-for="group in groupTabs"
-          :key="group.key"
-          :label="group.label"
-          :name="group.key"
-        />
-      </el-tabs>
+    <ContentProtectionListCard
+      :active-tab="activeTab"
+      :group-tabs="groupTabs"
+      :filters="filters"
+      :plan-options="planOptions"
+      :resource-type-groups="resourceTypeGroups"
+      :selected-rows="selectedRows"
+      :loading="loading"
+      :items="items"
+      :has-active-filters="hasActiveFilters"
+      :total="total"
+      :total-pages="totalPages"
+      :format-date="formatDate"
+      :type-tag-color="typeTagColor"
+      @update:active-tab="activeTab = $event"
+      @update:search="filters.search = $event"
+      @update:plan-id="filters.plan_id = $event"
+      @update:resource-type="filters.resource_type = $event"
+      @update:per-page="filters.per_page = $event"
+      @update:page="filters.page = $event"
+      @tab-change="onTabChange"
+      @search-input="debouncedFetch"
+      @filter-change="resetAndFetch"
+      @selection-change="onSelectionChange"
+      @bulk-unprotect="handleBulkUnprotect"
+      @edit="openEditDrawer"
+      @unprotect="handleUnprotect"
+      @protect="openProtectWizard()"
+      @page-change="fetchContent"
+    />
 
-      <!-- Search & Filters -->
-      <div class="search-bar">
-        <el-input
-          v-model="filters.search"
-          placeholder="Search protected content..."
-          clearable
-          :prefix-icon="Search"
-          class="search-input"
-          @input="debouncedFetch"
-        />
-        <div class="filter-controls">
-          <el-select
-            v-model="filters.plan_id"
-            placeholder="All Plans"
-            clearable
-            @change="resetAndFetch"
-          >
-            <el-option
-              v-for="plan in planOptions"
-              :key="plan.id"
-              :label="plan.title"
-              :value="plan.id"
-            />
-          </el-select>
-          <el-select
-            v-model="filters.resource_type"
-            placeholder="All Types"
-            clearable
-            @change="resetAndFetch"
-          >
-            <el-option-group
-              v-for="group in resourceTypeGroups"
-              :key="group.label"
-              :label="group.label"
-            >
-              <el-option
-                v-for="opt in group.options"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-option-group>
-          </el-select>
-        </div>
-      </div>
+    <ContentProtectionWizard
+      :visible="wizardVisible"
+      :step="wizardStep"
+      :form="wizardForm"
+      :category-cards="wizardCategoryCards"
+      :category-types="wizardCategoryTypes"
+      :resource-loading="resourceSearchLoading"
+      :resource-options="resourceOptions"
+      :plan-options-loading="planOptionsLoading"
+      :plan-options="planOptions"
+      :plan-options-map="planOptionsMap"
+      :resource-display-name="wizardResourceDisplayName"
+      :can-advance="canAdvanceWizard"
+      :saving="protectLoading"
+      :search-resources="searchResources"
+      @close="wizardVisible = false; resetWizard()"
+      @back="wizardStep--"
+      @next="wizardStep++"
+      @submit="submitProtect"
+      @select-category="selectWizardCategory"
+      @type-change="onWizardTypeChange"
+      @comment-mode-change="onCommentModeChange"
+    />
 
-      <!-- Bulk actions bar -->
-      <div class="bulk-bar" v-if="selectedRows.length > 0">
-        <span class="bulk-count">{{ selectedRows.length }} selected</span>
-        <el-popconfirm
-          title="Remove protection from all selected items?"
-          confirm-button-text="Unprotect"
-          cancel-button-text="Cancel"
-          confirm-button-type="danger"
-          @confirm="handleBulkUnprotect"
-        >
-          <template #reference>
-            <el-button size="small" type="danger" plain>
-              <el-icon><Unlock /></el-icon>
-              Bulk Unprotect
-            </el-button>
-          </template>
-        </el-popconfirm>
-      </div>
-
-      <!-- Table -->
-      <el-table
-        ref="tableRef"
-        v-loading="loading"
-        :data="items"
-        @selection-change="onSelectionChange"
-        row-key="id"
-      >
-        <el-table-column type="selection" width="40" />
-
-        <el-table-column label="Resource" min-width="240">
-          <template #default="{ row }">
-            <div class="resource-cell">
-              <a v-if="row.edit_url" :href="row.edit_url" target="_blank" class="content-title-link">
-                {{ row.resource_title }}
-              </a>
-              <span v-else class="content-title-text">{{ row.resource_title }}</span>
-            </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="Type" width="140">
-          <template #default="{ row }">
-            <el-tag size="small" :type="typeTagColor(row.resource_type_group)">
-              {{ row.resource_type_label || row.resource_type }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="Plans" min-width="200">
-          <template #default="{ row }">
-            <div class="plans-cell" v-if="(row.plan_names || []).length > 0">
-              <el-tag
-                v-for="name in row.plan_names"
-                :key="name"
-                size="small"
-                type="info"
-                class="plan-tag"
-              >
-                {{ name }}
-              </el-tag>
-            </div>
-            <span v-else class="text-muted">-</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="Teaser" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.show_teaser === 'yes'" size="small" type="success">On</el-tag>
-            <span v-else class="text-muted">Off</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="Protected Since" width="140">
-          <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
-          </template>
-        </el-table-column>
-
-        <el-table-column label="Actions" width="140" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" text size="small" @click="openEditDrawer(row)">
-              Edit
-            </el-button>
-            <el-popconfirm
-              title="Remove content protection?"
-              confirm-button-text="Unprotect"
-              cancel-button-text="Cancel"
-              confirm-button-type="danger"
-              @confirm="handleUnprotect(row)"
-            >
-              <template #reference>
-                <el-button type="danger" text size="small">
-                  <el-icon><Unlock /></el-icon>
-                </el-button>
-              </template>
-            </el-popconfirm>
-            <a
-              v-if="row.edit_url"
-              :href="row.edit_url"
-              target="_blank"
-              class="view-link"
-            >
-              <el-button type="info" text size="small">
-                <el-icon><View /></el-icon>
-              </el-button>
-            </a>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- Empty State -->
-      <div v-if="!loading && items.length === 0 && !hasActiveFilters" class="empty-state">
-        <el-empty :image-size="80">
-          <template #description>
-            <h3 class="empty-title">No protected content yet</h3>
-            <p class="empty-text">Start protecting your content to restrict access for members only.</p>
-          </template>
-          <el-button type="primary" @click="openProtectWizard()">
-            <el-icon><Lock /></el-icon>
-            Get Started
-          </el-button>
-        </el-empty>
-      </div>
-      <el-empty v-else-if="!loading && items.length === 0 && hasActiveFilters" description="No protected content matches your filters" />
-
-      <!-- Pagination -->
-      <div class="pagination-bar" v-if="total > 0">
-        <div class="pagination-info">
-          <span>Page {{ filters.page }} of {{ totalPages }}</span>
-          <el-select v-model="filters.per_page" size="small" class="per-page-select" @change="resetAndFetch">
-            <el-option :value="10" label="10 / page" />
-            <el-option :value="20" label="20 / page" />
-            <el-option :value="50" label="50 / page" />
-          </el-select>
-          <span>Total {{ total }}</span>
-        </div>
-        <el-pagination
-          v-model:current-page="filters.page"
-          :page-size="filters.per_page"
-          :total="total"
-          layout="prev, pager, next"
-          @current-change="fetchContent"
-        />
-      </div>
-    </el-card>
-
-    <!-- Protect Content Wizard Dialog -->
-    <el-dialog
-      v-model="wizardVisible"
-      title="Protect Content"
-      width="640px"
-      :close-on-click-modal="false"
-      @close="resetWizard"
-      class="wizard-dialog"
-    >
-      <el-steps :active="wizardStep" align-center finish-status="success" class="wizard-steps">
-        <el-step title="Category" />
-        <el-step title="Resource" />
-        <el-step title="Configure" />
-        <el-step title="Review" />
-      </el-steps>
-
-      <div class="wizard-body">
-        <!-- Step 1: Choose Category -->
-        <div v-if="wizardStep === 0" class="wizard-step-content">
-          <p class="wizard-instruction">What type of content do you want to protect?</p>
-          <div class="wizard-category-grid">
-            <div
-              v-for="card in wizardCategoryCards"
-              :key="card.key"
-              class="wizard-category-card"
-              :class="{ selected: wizardForm.categoryKey === card.key }"
-              @click="selectWizardCategory(card)"
-            >
-              <el-icon :size="28"><component :is="card.icon" /></el-icon>
-              <span class="wizard-category-label">{{ card.label }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 2: Select Resource -->
-        <div v-if="wizardStep === 1" class="wizard-step-content">
-          <p class="wizard-instruction">Select the {{ wizardForm.categoryLabel }} to protect</p>
-
-          <!-- Resource type sub-select (if category has multiple types) -->
-          <el-form-item
-            v-if="wizardCategoryTypes.length > 1"
-            label="Resource Type"
-            class="wizard-form-item"
-          >
-            <el-select
-              v-model="wizardForm.resource_type"
-              placeholder="Select type"
-              style="width: 100%"
-              @change="onWizardTypeChange"
-            >
-              <el-option
-                v-for="t in wizardCategoryTypes"
-                :key="t.value"
-                :label="t.label"
-                :value="t.value"
-              />
-            </el-select>
-          </el-form-item>
-
-          <!-- URL Pattern input -->
-          <el-form-item
-            v-if="wizardForm.resource_type === 'url_pattern'"
-            label="URL Pattern"
-            class="wizard-form-item"
-          >
-            <el-input
-              v-model="wizardForm.resource_id"
-              placeholder="e.g. /members-only/* or /premium/*"
-            />
-            <div class="field-hint">Use * as wildcard. Example: /premium/* matches all URLs starting with /premium/</div>
-          </el-form-item>
-
-          <!-- Special page select -->
-          <el-form-item
-            v-else-if="wizardForm.resource_type === 'special_page'"
-            label="Special Page"
-            class="wizard-form-item"
-          >
-            <el-select
-              v-model="wizardForm.resource_id"
-              placeholder="Select a special page"
-              style="width: 100%"
-              :loading="resourceSearchLoading"
-            >
-              <el-option
-                v-for="item in resourceOptions"
-                :key="item.id"
-                :label="item.label || item.title"
-                :value="String(item.id)"
-              />
-            </el-select>
-          </el-form-item>
-
-          <!-- Comment type: wildcard or specific post -->
-          <el-form-item
-            v-else-if="wizardForm.resource_type === 'comment'"
-            label="Comment Protection"
-            class="wizard-form-item"
-          >
-            <el-radio-group v-model="wizardForm.commentMode" @change="onCommentModeChange">
-              <el-radio value="all">All protected content comments</el-radio>
-              <el-radio value="specific">Comments on a specific post</el-radio>
-            </el-radio-group>
-            <el-select
-              v-if="wizardForm.commentMode === 'specific'"
-              v-model="wizardForm.resource_id"
-              filterable
-              remote
-              :remote-method="searchResources"
-              :loading="resourceSearchLoading"
-              placeholder="Search for a post..."
-              style="width: 100%; margin-top: 8px"
-            >
-              <el-option
-                v-for="item in resourceOptions"
-                :key="item.id"
-                :label="item.label || item.title"
-                :value="String(item.id)"
-              />
-            </el-select>
-          </el-form-item>
-
-          <!-- Standard search select for searchable types -->
-          <el-form-item
-            v-else
-            label="Resource"
-            class="wizard-form-item"
-          >
-            <el-select
-              v-model="wizardForm.resource_id"
-              filterable
-              remote
-              :remote-method="searchResources"
-              :loading="resourceSearchLoading"
-              placeholder="Search for content..."
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in resourceOptions"
-                :key="item.id"
-                :label="item.label || item.title"
-                :value="String(item.id)"
-              />
-            </el-select>
-          </el-form-item>
-        </div>
-
-        <!-- Step 3: Configure Protection -->
-        <div v-if="wizardStep === 2" class="wizard-step-content">
-          <p class="wizard-instruction">Configure protection settings</p>
-
-          <el-form label-position="top">
-            <el-form-item label="Plans" required>
-              <el-select
-                v-model="wizardForm.plan_ids"
-                multiple
-                placeholder="Select plans that grant access"
-                style="width: 100%"
-                :loading="planOptionsLoading"
-              >
-                <el-option
-                  v-for="plan in planOptions"
-                  :key="plan.id"
-                  :label="plan.title"
-                  :value="plan.id"
-                />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item label="Show Teaser">
-              <el-select v-model="wizardForm.show_teaser" style="width: 200px">
-                <el-option label="No" value="no" />
-                <el-option label="Yes" value="yes" />
-              </el-select>
-              <div class="field-hint">Show a preview excerpt before the restriction message.</div>
-            </el-form-item>
-
-            <el-form-item label="Restriction Message">
-              <el-input
-                v-model="wizardForm.restriction_message"
-                type="textarea"
-                :rows="3"
-                placeholder="Custom message shown to non-members (leave empty for default)"
-              />
-            </el-form-item>
-
-            <el-form-item label="Redirect URL">
-              <el-input
-                v-model="wizardForm.redirect_url"
-                placeholder="https://example.com/upgrade (optional)"
-              />
-              <div class="field-hint">Redirect non-members to this URL instead of showing the restriction message.</div>
-            </el-form-item>
-          </el-form>
-        </div>
-
-        <!-- Step 4: Review -->
-        <div v-if="wizardStep === 3" class="wizard-step-content">
-          <p class="wizard-instruction">Review and confirm</p>
-
-          <div class="review-summary">
-            <div class="review-row">
-              <span class="review-label">Type</span>
-              <span class="review-value">
-                <el-tag size="small">{{ wizardForm.resource_type_label || wizardForm.resource_type }}</el-tag>
-              </span>
-            </div>
-            <div class="review-row">
-              <span class="review-label">Resource</span>
-              <span class="review-value">{{ wizardResourceDisplayName }}</span>
-            </div>
-            <div class="review-row">
-              <span class="review-label">Plans</span>
-              <span class="review-value">
-                <el-tag
-                  v-for="id in wizardForm.plan_ids"
-                  :key="id"
-                  size="small"
-                  type="info"
-                  class="plan-tag"
-                >
-                  {{ planOptionsMap[id] || `Plan #${id}` }}
-                </el-tag>
-              </span>
-            </div>
-            <div class="review-row">
-              <span class="review-label">Teaser</span>
-              <span class="review-value">{{ wizardForm.show_teaser === 'yes' ? 'Enabled' : 'Disabled' }}</span>
-            </div>
-            <div class="review-row" v-if="wizardForm.restriction_message">
-              <span class="review-label">Message</span>
-              <span class="review-value review-message">{{ wizardForm.restriction_message }}</span>
-            </div>
-            <div class="review-row" v-if="wizardForm.redirect_url">
-              <span class="review-label">Redirect</span>
-              <span class="review-value">{{ wizardForm.redirect_url }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="wizard-footer">
-          <el-button v-if="wizardStep > 0" @click="wizardStep--">Back</el-button>
-          <div class="wizard-footer-right">
-            <el-button @click="wizardVisible = false">Cancel</el-button>
-            <el-button
-              v-if="wizardStep < 3"
-              type="primary"
-              :disabled="!canAdvanceWizard"
-              @click="wizardStep++"
-            >
-              Next
-            </el-button>
-            <el-button
-              v-else
-              type="primary"
-              :loading="protectLoading"
-              @click="submitProtect"
-            >
-              Protect
-            </el-button>
-          </div>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- Edit Drawer -->
-    <el-drawer
-      v-model="editDrawerVisible"
-      title="Edit Protection Rule"
-      direction="rtl"
-      size="420px"
-      :close-on-click-modal="false"
-    >
-      <div v-if="editForm" class="edit-drawer-body">
-        <div class="edit-resource-header">
-          <el-tag size="small" :type="typeTagColor(editForm.resource_type_group)">
-            {{ editForm.resource_type_label || editForm.resource_type }}
-          </el-tag>
-          <h4 class="edit-resource-title">{{ editForm.resource_title }}</h4>
-        </div>
-
-        <el-form label-position="top">
-          <el-form-item label="Plans">
-            <el-select
-              v-model="editForm.plan_ids"
-              multiple
-              placeholder="Select plans"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="plan in planOptions"
-                :key="plan.id"
-                :label="plan.title"
-                :value="plan.id"
-              />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="Show Teaser">
-            <el-select v-model="editForm.show_teaser" style="width: 200px">
-              <el-option label="No" value="no" />
-              <el-option label="Yes" value="yes" />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="Restriction Message">
-            <el-input
-              v-model="editForm.restriction_message"
-              type="textarea"
-              :rows="3"
-              placeholder="Custom message (leave empty for default)"
-            />
-          </el-form-item>
-
-          <el-form-item label="Redirect URL">
-            <el-input
-              v-model="editForm.redirect_url"
-              placeholder="https://example.com/upgrade"
-            />
-          </el-form-item>
-        </el-form>
-      </div>
-
-      <template #footer>
-        <el-button @click="editDrawerVisible = false">Cancel</el-button>
-        <el-button type="primary" :loading="editSaving" @click="saveEdit">
-          Save Changes
-        </el-button>
-      </template>
-    </el-drawer>
+    <ContentProtectionEditDrawer
+      :visible="editDrawerVisible"
+      :form="editForm"
+      :plan-options="planOptions"
+      :saving="editSaving"
+      :type-tag-color="typeTagColor"
+      @close="editDrawerVisible = false"
+      @save="saveEdit"
+    />
   </div>
 </template>
 
@@ -589,6 +116,11 @@ import {
 } from '@element-plus/icons-vue'
 import { content, plans } from '@/api/index.js'
 import { formatWpDate } from '@/utils/wpDate.js'
+import ContentProtectionWizard from '@/components/content/ContentProtectionWizard.vue'
+import ContentProtectionEditDrawer from '@/components/content/ContentProtectionEditDrawer.vue'
+import ContentProtectionListCard from '@/components/content/ContentProtectionListCard.vue'
+import { useContentProtectionEditor } from '@/composables/content/useContentProtectionEditor.js'
+import { useContentProtectionWizard } from '@/composables/content/useContentProtectionWizard.js'
 
 // ─── State ───
 
@@ -952,232 +484,44 @@ async function handleBulkUnprotect() {
   }
 }
 
-// ─── Edit Drawer ───
+const {
+  editDrawerVisible,
+  editSaving,
+  editForm,
+  openEditDrawer,
+  saveEdit,
+} = useContentProtectionEditor({
+  contentApi: content,
+  fetchContent,
+})
 
-const editDrawerVisible = ref(false)
-const editSaving = ref(false)
-const editForm = ref(null)
-
-function openEditDrawer(row) {
-  editForm.value = {
-    id: row.id,
-    resource_title: row.resource_title,
-    resource_type: row.resource_type,
-    resource_type_label: row.resource_type_label,
-    resource_type_group: row.resource_type_group,
-    plan_ids: [...(row.plan_ids || [])],
-    show_teaser: row.show_teaser || 'no',
-    restriction_message: row.restriction_message || '',
-    redirect_url: row.redirect_url || '',
-  }
-  editDrawerVisible.value = true
-}
-
-async function saveEdit() {
-  if (!editForm.value) return
-  editSaving.value = true
-  try {
-    await content.update(editForm.value.id, {
-      plan_ids: editForm.value.plan_ids,
-      show_teaser: editForm.value.show_teaser,
-      restriction_message: editForm.value.restriction_message,
-      redirect_url: editForm.value.redirect_url,
-    })
-    ElMessage.success('Protection rule updated')
-    editDrawerVisible.value = false
-    await fetchContent()
-  } catch (err) {
-    ElMessage.error(err.message || 'Failed to update rule')
-  } finally {
-    editSaving.value = false
-  }
-}
-
-// ─── Protect Wizard ───
-
-const wizardVisible = ref(false)
-const wizardStep = ref(0)
-const protectLoading = ref(false)
-const resourceSearchLoading = ref(false)
-const resourceOptions = ref([])
-
-const wizardForm = reactive({
-  categoryKey: '',
-  categoryLabel: '',
-  resource_type: '',
-  resource_type_label: '',
-  resource_id: '',
-  plan_ids: [],
-  show_teaser: 'no',
-  restriction_message: '',
-  redirect_url: '',
-  commentMode: 'all',
+const {
+  wizardVisible,
+  wizardStep,
+  protectLoading,
+  resourceSearchLoading,
+  resourceOptions,
+  wizardForm,
+  wizardCategoryTypes,
+  wizardResourceDisplayName,
+  canAdvanceWizard,
+  openProtectWizard: openProtectWizardInternal,
+  selectWizardCategory,
+  onWizardTypeChange,
+  onCommentModeChange,
+  searchResources,
+  submitProtect,
+  resetWizard,
+} = useContentProtectionWizard({
+  contentApi: content,
+  fetchContent,
+  resourceTypes,
+  planOptionsMap,
+  planOptionsLoading,
 })
 
 function openProtectWizard(categoryKey) {
-  resetWizard()
-  wizardVisible.value = true
-  if (categoryKey) {
-    selectWizardCategory(wizardCategoryCards.value.find(c => c.key === categoryKey))
-  }
-}
-
-const wizardCategoryTypes = computed(() => {
-  if (!wizardForm.categoryKey) return []
-
-  const key = wizardForm.categoryKey
-  const allTypes = resourceTypes.value
-
-  switch (key) {
-    case 'posts_pages':
-      return allTypes.filter(t => ['post', 'page'].includes(t.key)).map(t => ({ value: t.key, label: t.label }))
-    case 'taxonomies':
-      return allTypes.filter(t => t.group === 'taxonomy').map(t => ({ value: t.key, label: t.label }))
-    case 'cpt':
-      return allTypes.filter(t => t.group === 'content' && !['post', 'page'].includes(t.key)).map(t => ({ value: t.key, label: t.label }))
-    case 'menu':
-      return allTypes.filter(t => t.key === 'menu_item').map(t => ({ value: t.key, label: t.label }))
-    case 'url':
-      return allTypes.filter(t => t.key === 'url_pattern').map(t => ({ value: t.key, label: t.label }))
-    case 'special':
-      return allTypes.filter(t => t.key === 'special_page').map(t => ({ value: t.key, label: t.label }))
-    case 'comments':
-      return allTypes.filter(t => t.key === 'comment').map(t => ({ value: t.key, label: t.label }))
-    default:
-      return []
-  }
-})
-
-function selectWizardCategory(card) {
-  if (!card) return
-  wizardForm.categoryKey = card.key
-  wizardForm.categoryLabel = card.label
-  wizardForm.resource_type = ''
-  wizardForm.resource_id = ''
-  resourceOptions.value = []
-
-  // Auto-select type if only one
-  const types = wizardCategoryTypes.value
-  if (types.length === 1) {
-    wizardForm.resource_type = types[0].value
-    wizardForm.resource_type_label = types[0].label
-    loadInitialResources()
-  }
-}
-
-function onWizardTypeChange() {
-  wizardForm.resource_id = ''
-  resourceOptions.value = []
-  const typeObj = wizardCategoryTypes.value.find(t => t.value === wizardForm.resource_type)
-  wizardForm.resource_type_label = typeObj ? typeObj.label : wizardForm.resource_type
-  loadInitialResources()
-}
-
-function onCommentModeChange() {
-  if (wizardForm.commentMode === 'all') {
-    wizardForm.resource_id = '*'
-  } else {
-    wizardForm.resource_id = ''
-  }
-}
-
-async function loadInitialResources() {
-  const type = wizardForm.resource_type
-  if (!type) return
-
-  // For special types, load all options immediately
-  if (type === 'special_page' || type === 'menu_item') {
-    resourceSearchLoading.value = true
-    try {
-      const res = await content.searchResources({ type, query: '' })
-      resourceOptions.value = res.data ?? res ?? []
-    } catch {
-      resourceOptions.value = []
-    } finally {
-      resourceSearchLoading.value = false
-    }
-  }
-
-  // For comment type, set initial mode
-  if (type === 'comment') {
-    wizardForm.commentMode = 'all'
-    wizardForm.resource_id = '*'
-  }
-}
-
-async function searchResources(query) {
-  const type = wizardForm.resource_type === 'comment' ? 'post' : wizardForm.resource_type
-  if (!query || !type) return
-  resourceSearchLoading.value = true
-  try {
-    const res = await content.searchResources({ type, query })
-    resourceOptions.value = res.data ?? res ?? []
-  } catch {
-    resourceOptions.value = []
-  } finally {
-    resourceSearchLoading.value = false
-  }
-}
-
-const wizardResourceDisplayName = computed(() => {
-  if (wizardForm.resource_type === 'url_pattern') {
-    return wizardForm.resource_id || '(not set)'
-  }
-  if (wizardForm.resource_type === 'comment' && wizardForm.resource_id === '*') {
-    return 'All Protected Content Comments'
-  }
-  const opt = resourceOptions.value.find(o => String(o.id) === String(wizardForm.resource_id))
-  return opt ? (opt.label || opt.title) : wizardForm.resource_id || '(not set)'
-})
-
-const canAdvanceWizard = computed(() => {
-  switch (wizardStep.value) {
-    case 0:
-      return !!wizardForm.categoryKey
-    case 1:
-      return !!wizardForm.resource_type && !!wizardForm.resource_id
-    case 2:
-      return wizardForm.plan_ids.length > 0
-    default:
-      return true
-  }
-})
-
-async function submitProtect() {
-  protectLoading.value = true
-  try {
-    await content.protect({
-      resource_type: wizardForm.resource_type,
-      resource_id: wizardForm.resource_id,
-      plan_ids: wizardForm.plan_ids,
-      show_teaser: wizardForm.show_teaser,
-      restriction_message: wizardForm.restriction_message,
-      redirect_url: wizardForm.redirect_url,
-    })
-    ElMessage.success('Content protected successfully')
-    wizardVisible.value = false
-    resetWizard()
-    await fetchContent()
-  } catch (err) {
-    ElMessage.error(err.message || 'Failed to protect content')
-  } finally {
-    protectLoading.value = false
-  }
-}
-
-function resetWizard() {
-  wizardStep.value = 0
-  wizardForm.categoryKey = ''
-  wizardForm.categoryLabel = ''
-  wizardForm.resource_type = ''
-  wizardForm.resource_type_label = ''
-  wizardForm.resource_id = ''
-  wizardForm.plan_ids = []
-  wizardForm.show_teaser = 'no'
-  wizardForm.restriction_message = ''
-  wizardForm.redirect_url = ''
-  wizardForm.commentMode = 'all'
-  resourceOptions.value = []
+  openProtectWizardInternal(categoryKey, wizardCategoryCards.value)
 }
 
 // ─── Helpers ───

@@ -1,27 +1,34 @@
+import path from 'node:path'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { resolve } from 'path'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
-  plugins: [vue()],
-  base: './',
-  build: {
-    outDir: 'assets/dist',
-    emptyOutDir: true,
-    manifest: true,
-    cssCodeSplit: false,
-    rollupOptions: {
-      input: resolve(__dirname, 'resources/admin/main.js'),
-      output: {
-        entryFileNames: 'fchub-memberships-admin-[hash].js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash][extname]',
-      },
-    },
-  },
+  plugins: [
+    vue(),
+    Components({
+      dts: false,
+      resolvers: [
+        ElementPlusResolver({
+          importStyle: 'css',
+          directives: true,
+        }),
+      ],
+    }),
+  ],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'resources/admin'),
+      '@': path.resolve(process.cwd(), 'resources/admin'),
+    },
+  },
+  base: './',
+  build: {
+    manifest: true,
+    outDir: 'assets/dist',
+    emptyOutDir: true,
+    rollupOptions: {
+      input: 'resources/admin/main.js',
     },
   },
 })

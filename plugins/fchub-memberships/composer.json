@@ -1,7 +1,9 @@
 {
     "name": "fchub/memberships",
-    "description": "FCHub Memberships - Complete membership system for FluentCart",
-    "type": "wordpress-plugin",
+    "description": "FCHub Memberships plugin development tooling",
+    "license": "GPL-2.0-or-later",
+    "type": "project",
+    "require": {},
     "require-dev": {
         "phpunit/phpunit": "^13.0"
     },
@@ -14,6 +16,9 @@
         "psr-4": {
             "FChubMemberships\\Tests\\": "tests/"
         }
+    },
+    "scripts": {
+        "test": "phpunit"
     },
     "config": {
         "sort-packages": true
