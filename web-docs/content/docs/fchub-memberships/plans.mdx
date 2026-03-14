@@ -32,6 +32,7 @@ Go to **Memberships > Plans** and click **Create Plan**. Each plan has these fie
 | **Duration Type** | `lifetime` (never expires), `fixed_days` (expires after X days), `subscription_mirror`, or `fixed_anchor` (monthly due date) |
 | **Duration Days** | Number of days for fixed duration. Only used when duration type is `fixed_days` |
 | **Billing Anchor Day** | Day of the month (1-31) when payment is due. Only used when duration type is `fixed_anchor` |
+| **Membership Term** | Absolute upper bound on membership duration. Works across all duration types. See [Membership Term](#membership-term) |
 | **Trial Days** | Free trial period in days. 0 = no trial |
 | **Grace Period Days** | Days to keep access after cancellation or failed renewal. 0 = immediate revocation |
 
@@ -82,6 +83,52 @@ The anchor day is baked into each grant's `meta.billing_anchor_day` at creation 
 
 <Callout type="info" title="Paused, not expired">
 Anchor grants that go overdue are **paused** — a recoverable state. Standard grants that expire are **expired** — terminal. This distinction means a late-paying anchor member can always recover access when they pay, whereas a fixed-duration member whose time ran out needs a new grant.
+</Callout>
+
+<Separator />
+
+## Membership Term <Badge>v1.3.0</Badge>
+
+Duration type tells you *how* a membership bills. Membership Term tells you *when it ends, period*. A dance school charging monthly dues via `fixed_anchor` can now say "this membership lasts 1 year" — and after 12 anchor cycles, access stops. A `lifetime` plan can be quietly finite. A `fixed_days` plan can have a friendlier input than "type 730 and pray about leap years."
+
+Term is an absolute upper bound on how long any grant can remain active. It works across all four duration types. The shorter of the two always wins — if a fixed_days plan gives 30 days but the term says 7 days, the member gets 7 days.
+
+### Configuring a term
+
+In the plan editor, after duration settings, you'll find the **Membership Term** section:
+
+| Mode | What happens |
+|---|---|
+| **No limit** | Default. No cap — the duration type controls everything |
+| **1 Year** / **2 Years** / **3 Years** | Preset caps. Simple, no maths required |
+| **Custom** | Pick a value and unit (days, weeks, months, years). Finally, "6 months" doesn't require a calculator |
+| **Specific Date** | Hard deadline. Every grant expires on that exact date regardless of when they joined |
+
+### How it interacts with each duration type
+
+| Duration Type | Without term | With term |
+|---|---|---|
+| `lifetime` | Never expires | Expires on term date |
+| `fixed_days` | Expires after X days | Shorter of X days or term wins |
+| `subscription_mirror` | Follows subscription indefinitely | Hard cap at term date |
+| `fixed_anchor` | Monthly billing indefinitely | Monthly billing capped at term date |
+
+### Grant-level behaviour
+
+When a grant is created, the term end date is calculated from the plan config and baked into the grant's `meta.membership_term_ends_at`. This value is immutable — if you change the plan's term later, existing grants keep their original end date. New grants get the new one.
+
+During subscription renewals, every expiry extension is capped at the term end date via `MembershipTermCalculator::capExpiry()`. The final renewal cycle may be shorter than usual — if the term ends March 5 but the next anchor date is March 20, the grant expires on March 5.
+
+When the term date passes, the 5-minute cron marks the grant as `expired` with `meta.expired_reason = 'membership_term_reached'` and fires both `fchub_memberships/grant_expired` and `fchub_memberships/grant_term_expired` hooks.
+
+### Feed-level override
+
+Integration feeds can override the plan's term. This is useful when the same plan is sold through different products with different term lengths. The feed-level term takes precedence — if both the feed and the plan have a term configured, the feed wins.
+
+Feed term options: No limit (use plan default), 1 Year, 2 Years, 3 Years, or Custom (value + unit).
+
+<Callout type="info" title="Term vs. Grace Period">
+Term is the total membership duration. Grace period is the buffer after cancellation. They're independent — a plan can have a 1-year term AND a 14-day grace period. When the subscription cancels at month 8, the member keeps access for 14 more days. When the term ends at month 12, it ends — no grace period applies.
 </Callout>
 
 <Separator />

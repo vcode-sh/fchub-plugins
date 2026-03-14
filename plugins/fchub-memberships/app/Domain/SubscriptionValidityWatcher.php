@@ -38,49 +38,74 @@ class SubscriptionValidityWatcher
 
     public function registerHooks(): void
     {
-        add_action('fluent_cart/subscription_status_changed', [$this, 'onSubscriptionStatusChanged'], 10, 2);
+        // Status changed catches statuses without dedicated event hooks (expired).
+        // Uses /payments/ prefix — that's the hook FluentCart actually fires.
+        add_action('fluent_cart/payments/subscription_status_changed', [$this, 'onSubscriptionStatusChanged'], 10, 1);
+
+        // Event-based hooks (fired via EventDispatcher, no /payments/ prefix).
         add_action('fluent_cart/subscription_renewed', [$this, 'onSubscriptionRenewed'], 10, 1);
-        add_action('fluent_cart/subscription_cancelled', [$this, 'onSubscriptionCancelled'], 10, 1);
-        add_action('fluent_cart/subscription_paused', [$this, 'onSubscriptionPaused'], 10, 1);
-        add_action('fluent_cart/subscription_resumed', [$this, 'onSubscriptionResumed'], 10, 1);
+        add_action('fluent_cart/subscription_canceled', [$this, 'onSubscriptionCancelled'], 10, 1);
+
+        // Dynamic status hooks (fired via /payments/ prefix, no event class exists).
+        add_action('fluent_cart/payments/subscription_paused', [$this, 'onSubscriptionPaused'], 10, 1);
+        add_action('fluent_cart/payments/subscription_active', [$this, 'onSubscriptionResumed'], 10, 1);
 
         // Payment failure hooks
         add_action('fluent_cart/order_payment_failed', [$this, 'onOrderPaymentFailed'], 10, 1);
         add_action('fluent_cart/payments/subscription_failing', [$this, 'onSubscriptionFailing'], 10, 1);
     }
 
-    public function onSubscriptionStatusChanged($subscription, string $newStatus): void
+    public function onSubscriptionStatusChanged($data): void
     {
+        $subscription = $data['subscription'] ?? null;
+        $newStatus = $data['new_status'] ?? '';
+
+        if (!$subscription) {
+            return;
+        }
+
+        // Only handle statuses that don't have dedicated hooks to avoid double-firing.
+        // canceled, paused, active (resumed) each have their own hooks registered above.
         $methodMap = [
-            'paused'    => 'handleSubscriptionPaused',
-            'active'    => 'handleSubscriptionResumed',
-            'cancelled' => 'handleSubscriptionCancelled',
-            'expired'   => 'handleSubscriptionExpired',
+            'expired' => 'handleSubscriptionExpired',
         ];
+
         $method = $methodMap[$newStatus] ?? null;
         if ($method && method_exists($this, $method)) {
             $this->$method($subscription);
         }
     }
 
-    public function onSubscriptionRenewed($subscription): void
+    public function onSubscriptionRenewed($data): void
     {
-        $this->handleSubscriptionRenewed($subscription);
+        $subscription = is_array($data) ? ($data['subscription'] ?? null) : $data;
+        if ($subscription) {
+            $this->handleSubscriptionRenewed($subscription);
+        }
     }
 
-    public function onSubscriptionCancelled($subscription): void
+    public function onSubscriptionCancelled($data): void
     {
-        $this->handleSubscriptionCancelled($subscription);
+        $subscription = is_array($data) ? ($data['subscription'] ?? null) : $data;
+        if ($subscription) {
+            $this->handleSubscriptionCancelled($subscription);
+        }
     }
 
-    public function onSubscriptionPaused($subscription): void
+    public function onSubscriptionPaused($data): void
     {
-        $this->handleSubscriptionPaused($subscription);
+        $subscription = is_array($data) ? ($data['subscription'] ?? null) : $data;
+        if ($subscription) {
+            $this->handleSubscriptionPaused($subscription);
+        }
     }
 
-    public function onSubscriptionResumed($subscription): void
+    public function onSubscriptionResumed($data): void
     {
-        $this->handleSubscriptionResumed($subscription);
+        $subscription = is_array($data) ? ($data['subscription'] ?? null) : $data;
+        if ($subscription) {
+            $this->handleSubscriptionResumed($subscription);
+        }
     }
 
     /**

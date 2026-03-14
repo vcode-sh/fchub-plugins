@@ -34,7 +34,7 @@ final class GrantRevocationService
         $plan = (new PlanRepository())->find($planId);
         $gracePeriodDays = (int) ($context['grace_period_days'] ?? ($plan['grace_period_days'] ?? 0));
 
-        $grants = $this->grants->getByUserId($userId, ['plan_id' => $planId, 'status' => 'active']);
+        $grants = $this->grants->getByUserId($userId, ['plan_id' => $planId]);
         $revoked = 0;
         $retained = 0;
 
@@ -95,8 +95,6 @@ final class GrantRevocationService
             $revoked++;
         }
 
-        do_action('fchub_memberships/grant_revoked', $grants, $planId, $userId, $reason);
-
         Logger::log(
             'Plan revoked',
             sprintf('User #%d plan #%d: %d revoked, %d retained', $userId, $planId, $revoked, $retained),
@@ -112,6 +110,7 @@ final class GrantRevocationService
         }
 
         if ($revoked > 0) {
+            do_action('fchub_memberships/grant_revoked', $grants, $planId, $userId, $reason);
             $this->notifications->sendRevoked($userId, $planId, $reason);
         }
 
@@ -121,10 +120,16 @@ final class GrantRevocationService
     public function revokeBySource(int $sourceId, string $sourceType = 'order', array $context = []): array
     {
         $grants = $this->grants->getBySourceId($sourceId, $sourceType);
+        $reason = $context['reason'] ?? '';
         $revoked = 0;
         $retained = 0;
+        $revokedByPlan = [];
 
         foreach ($grants as $grant) {
+            if (in_array($grant['status'], ['expired', 'revoked'], true)) {
+                continue;
+            }
+
             $sourceIds = array_values(array_filter(
                 $grant['source_ids'],
                 static fn($id): bool => (int) $id !== $sourceId
@@ -150,7 +155,22 @@ final class GrantRevocationService
                 $adapter->revoke($grant['user_id'], $grant['resource_type'], $grant['resource_id'], ['plan_id' => $grant['plan_id'] ?? null]);
             }
 
+            AuditLogger::logGrantChange($grant['id'], 'revoked', $grant, ['status' => 'revoked']);
+
+            $planId = (int) ($grant['plan_id'] ?? 0);
+            $userId = (int) $grant['user_id'];
+            if ($planId) {
+                $revokedByPlan[$userId . ':' . $planId] = ['user_id' => $userId, 'plan_id' => $planId];
+            }
+
             $revoked++;
+        }
+
+        // Fire hooks and notifications per user+plan combination (matching revokePlan behaviour).
+        foreach ($revokedByPlan as $entry) {
+            $planGrants = array_filter($grants, static fn($g) => (int) ($g['plan_id'] ?? 0) === $entry['plan_id'] && (int) $g['user_id'] === $entry['user_id']);
+            do_action('fchub_memberships/grant_revoked', array_values($planGrants), $entry['plan_id'], $entry['user_id'], $reason);
+            $this->notifications->sendRevoked($entry['user_id'], $entry['plan_id'], $reason);
         }
 
         return ['revoked' => $revoked, 'retained' => $retained];

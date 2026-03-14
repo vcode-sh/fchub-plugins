@@ -73,7 +73,7 @@ The `initNipToggle()` function:
 
 ## NIP Validation
 
-The plugin includes a server-side Polish NIP checksum validation algorithm. Polish NIP numbers are 10 digits with a built-in checksum.
+The plugin validates NIP at checkout via the `fluent_cart/checkout/validate_data` filter. Invalid NIPs are rejected with a clear error message before the order is placed. The validation uses the official Polish mod-11 checksum algorithm.
 
 ### The Algorithm
 
@@ -104,7 +104,14 @@ The plugin includes a server-side Polish NIP checksum validation algorithm. Poli
           $sum += (int) $nip[$i] * $weights[$i];
       }
 
-      return ($sum % 11) === (int) $nip[9];
+      $checkDigit = $sum % 11;
+
+      // Mod-11 = 10 means no valid check digit exists
+      if ($checkDigit === 10) {
+          return false;
+      }
+
+      return $checkDigit === (int) $nip[9];
   }
   ```
 
@@ -140,23 +147,17 @@ The data is stored in the `fct_order_addresses` table, specifically in the `meta
 
 ### How the Invoice Handler Reads It
 
-When creating an invoice, the `InvoiceHandler` reads these values from the billing address:
+When creating an invoice, the `InvoiceHandler` reads the NIP from the billing address:
 
 ```php
-$wantsCompanyInvoice = Arr::get(
-    $billingAddress->meta ?? [],
-    'other_data.wants_company_invoice',
-    false
-);
-
-$nip = Arr::get(
-    $billingAddress->meta ?? [],
-    'other_data.nip',
-    ''
-);
+$nip = $billingAddress
+    ? Arr::get($billingAddress->meta ?? [], 'other_data.nip', '')
+    : '';
 ```
 
-If both `wants_company_invoice` is truthy and `nip` is non-empty, a B2B invoice is created. Otherwise, it's a B2C invoice.
+If `nip` is non-empty, a B2B invoice is created. Otherwise, it's a B2C invoice.
+
+The checkbox state (`wants_company_invoice`) is **not** used for B2B detection — it's injected via raw DOM outside Vue's reactive system and its state is never persisted to POST data. The NIP value alone determines the invoice type. The checkbox exists purely as a UX toggle to show/hide the NIP field.
 
 <Separator className="my-8" />
 

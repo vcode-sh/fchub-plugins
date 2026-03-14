@@ -4,6 +4,8 @@ namespace FChubMemberships\Domain;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Domain\Grant\AnchorDateCalculator;
+use FChubMemberships\Domain\Grant\MembershipTermCalculator;
 use FChubMemberships\Email\TrialConvertedEmail;
 use FChubMemberships\Email\TrialExpiringEmail;
 use FChubMemberships\Domain\Trial\TrialGrantQueryService;
@@ -114,18 +116,44 @@ class TrialLifecycleService
 
         // Calculate proper expires_at from plan duration
         $expiresAt = null;
+        $grantMeta = $grant['meta'] ?? [];
         if ($plan) {
             $durationType = $plan['duration_type'] ?? 'lifetime';
             if ($durationType === 'fixed_days' && ($plan['duration_days'] ?? 0) > 0) {
                 $expiresAt = date('Y-m-d H:i:s', strtotime('+' . $plan['duration_days'] . ' days'));
+            } elseif ($durationType === 'fixed_anchor') {
+                $planMeta = $plan['meta'] ?? [];
+                $anchorDay = (int) ($planMeta['billing_anchor_day'] ?? 1);
+                $expiresAt = AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
+                $grantMeta['billing_anchor_day'] = $anchorDay;
+            }
+
+            // Apply membership term cap
+            $termConfig = $plan['meta']['membership_term'] ?? null;
+            if ($termConfig && ($termConfig['mode'] ?? 'none') !== 'none') {
+                $termEndsAt = MembershipTermCalculator::calculateEndDate($termConfig, current_time('mysql'));
+                if ($termEndsAt) {
+                    $grantMeta['membership_term_ends_at'] = $termEndsAt;
+                    if ($expiresAt === null) {
+                        $expiresAt = $termEndsAt;
+                    } else {
+                        $expiresAt = MembershipTermCalculator::capExpiry($expiresAt, $termEndsAt);
+                    }
+                }
             }
         }
 
-        $this->grantRepo->update($grant['id'], [
+        $updateData = [
             'source_type'   => 'subscription',
             'trial_ends_at' => null,
             'expires_at'    => $expiresAt,
-        ]);
+        ];
+
+        if ($grantMeta !== ($grant['meta'] ?? [])) {
+            $updateData['meta'] = $grantMeta;
+        }
+
+        $this->grantRepo->update($grant['id'], $updateData);
 
         $planTitle = $plan['title'] ?? __('Membership', 'fchub-memberships');
 

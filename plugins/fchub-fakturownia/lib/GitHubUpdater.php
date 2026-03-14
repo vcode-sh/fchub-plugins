@@ -264,7 +264,11 @@ class FCHub_GitHub_Updater
 
             foreach ($release['assets'] ?? [] as $asset) {
                 if (($asset['name'] ?? '') === $expectedName) {
-                    $zipUrl = $asset['browser_download_url'] ?? null;
+                    $url = $asset['browser_download_url'] ?? null;
+                    // Only accept ZIPs from our own GitHub repo to prevent supply chain attacks
+                    if ($url && str_starts_with($url, 'https://github.com/' . self::GITHUB_REPO . '/')) {
+                        $zipUrl = $url;
+                    }
                     break;
                 }
             }
@@ -319,7 +323,7 @@ class FCHub_GitHub_Updater
         $html = esc_html($md);
 
         // Code blocks (```...```) — must come before line-level processing
-        $html = preg_replace('/```[\s\S]*?```/', '<pre><code>$0</code></pre>', $html);
+        $html = preg_replace('/```([\s\S]*?)```/', '<pre><code>$1</code></pre>', $html);
 
         // Headers
         $html = preg_replace('/^#### (.+)$/m', '<h4>$1</h4>', $html);

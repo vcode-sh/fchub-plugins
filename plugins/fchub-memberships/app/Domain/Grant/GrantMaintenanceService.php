@@ -79,6 +79,42 @@ final class GrantMaintenanceService
         return $count;
     }
 
+    /**
+     * Expire grants whose membership term has ended.
+     * Catches lifetime grants (expires_at = null) that have a term cap,
+     * plus any other grants whose term date has passed.
+     */
+    public function expireTermExpiredGrants(): int
+    {
+        $termExpired = $this->grants->getTermExpiredGrants();
+        if (empty($termExpired)) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($termExpired as $grant) {
+            $meta = array_merge($grant['meta'], [
+                'expired_reason' => 'membership_term_reached',
+            ]);
+
+            $this->grants->update($grant['id'], [
+                'status' => 'expired',
+                'meta'   => $meta,
+            ]);
+
+            AuditLogger::logGrantChange($grant['id'], 'expired', $grant, [
+                'status' => 'expired',
+                'meta'   => $meta,
+            ], 'Membership term reached');
+
+            do_action('fchub_memberships/grant_expired', $grant);
+            do_action('fchub_memberships/grant_term_expired', $grant);
+            $count++;
+        }
+
+        return $count;
+    }
+
     public function expireOverdueGrantsWithHooks(): int
     {
         $overdueGrants = $this->grants->getOverdueGrants();

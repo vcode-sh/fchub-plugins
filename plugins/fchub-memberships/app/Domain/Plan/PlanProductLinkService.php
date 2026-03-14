@@ -161,6 +161,18 @@ final class PlanProductLinkService
             $feedSettings['billing_anchor_day'] = (int) ($planMeta['billing_anchor_day'] ?? 1);
         }
 
+        $planMeta = $plan['meta'] ?? [];
+        $termConfig = $planMeta['membership_term'] ?? null;
+        if ($termConfig && ($termConfig['mode'] ?? 'none') !== 'none') {
+            $feedSettings['membership_term_mode'] = $termConfig['mode'];
+            if ($termConfig['mode'] === 'custom') {
+                $feedSettings['membership_term_value'] = $termConfig['value'] ?? 1;
+                $feedSettings['membership_term_unit'] = $termConfig['unit'] ?? 'months';
+            } elseif ($termConfig['mode'] === 'date') {
+                $feedSettings['membership_term_date'] = $termConfig['date'] ?? null;
+            }
+        }
+
         $this->wpdb->insert($this->metaTable, [
             'object_id'   => $productId,
             'object_type' => 'product_integration',

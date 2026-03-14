@@ -26,6 +26,7 @@ abstract class PluginTestCase extends TestCase
         $GLOBALS['_fchub_test_remote_post_result'] = ['response' => ['code' => 200]];
         $GLOBALS['_fchub_test_is_admin'] = false;
         $GLOBALS['_fchub_test_current_user_can'] = true;
+        $GLOBALS['_fchub_test_cache'] = [];
         $GLOBALS['wpdb'] = new \wpdb();
     }
 }

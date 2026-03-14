@@ -44,20 +44,8 @@ class AccessEvaluator
             return $result;
         }
 
-        // Check for paused membership
-        $pausedGrant = $this->getPausedGrant($userId, $provider, $resourceType, $resourceId);
-        if ($pausedGrant) {
-            $result = [
-                'allowed' => false,
-                'reason' => Constants::REASON_MEMBERSHIP_PAUSED,
-                'drip_locked' => false,
-                'drip_available_at' => null,
-                'grant' => $pausedGrant,
-                'trial_active' => false,
-            ];
-            self::$cache[$cacheKey] = $result;
-            return $result;
-        }
+        // Bug F fix: Check active grants FIRST, then paused. A paused grant from
+        // plan B must not mask an active grant from plan A for the same resource.
 
         // Check direct grant
         $grant = $this->grantRepo->getActiveGrant($userId, $provider, $resourceType, $resourceId);
@@ -136,24 +124,25 @@ class AccessEvaluator
         // Check wildcard grants (resource_id = '*')
         $wildcardGrant = $this->grantRepo->getActiveGrant($userId, $provider, $resourceType, '*');
         if ($wildcardGrant) {
-            // Bug #8: Check if the wildcard grant is paused
-            $pausedWildcard = $this->getPausedGrant($userId, $provider, $resourceType, '*');
-            if ($pausedWildcard) {
-                $result = [
-                    'allowed' => false,
-                    'reason' => Constants::REASON_MEMBERSHIP_PAUSED,
-                    'drip_locked' => false,
-                    'drip_available_at' => null,
-                    'grant' => $pausedWildcard,
-                    'trial_active' => false,
-                ];
-                self::$cache[$cacheKey] = $result;
-                return $result;
-            }
-
             $now = current_time('timestamp', true);
             $wildcardTrialActive = !empty($wildcardGrant['trial_ends_at']) && strtotime($wildcardGrant['trial_ends_at']) > $now;
             $result = ['allowed' => true, 'reason' => Constants::REASON_WILDCARD_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $wildcardGrant, 'trial_active' => $wildcardTrialActive];
+            self::$cache[$cacheKey] = $result;
+            return $result;
+        }
+
+        // Bug F fix: Check paused grants only AFTER all active grant checks have been exhausted.
+        // This prevents a paused grant from plan B masking an active grant from plan A.
+        $pausedGrant = $this->getPausedGrant($userId, $provider, $resourceType, $resourceId);
+        if ($pausedGrant) {
+            $result = [
+                'allowed' => false,
+                'reason' => Constants::REASON_MEMBERSHIP_PAUSED,
+                'drip_locked' => false,
+                'drip_available_at' => null,
+                'grant' => $pausedGrant,
+                'trial_active' => false,
+            ];
             self::$cache[$cacheKey] = $result;
             return $result;
         }

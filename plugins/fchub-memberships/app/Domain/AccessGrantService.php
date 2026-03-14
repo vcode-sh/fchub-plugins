@@ -153,6 +153,11 @@ class AccessGrantService
         return $this->maintenance->expireOverdueGrantsWithHooks();
     }
 
+    public function expireTermExpiredGrants(): int
+    {
+        return $this->maintenance->expireTermExpiredGrants();
+    }
+
     public function revokeExpiredGracePeriodGrants(): int
     {
         return $this->revocation->revokeExpiredGracePeriodGrants();

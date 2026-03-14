@@ -663,6 +663,38 @@ class GrantRepository
         return array_map('intval', array_column($rows ?: [], 'source_id'));
     }
 
+    /**
+     * Get active/paused grants whose membership term has expired.
+     * SQL pre-filters by meta LIKE, PHP post-filters for precise date comparison.
+     */
+    public function getTermExpiredGrants(?string $now = null): array
+    {
+        global $wpdb;
+        $now = $now ?? current_time('mysql');
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE status IN ('active', 'paused')
+               AND meta LIKE %s",
+            '%"membership_term_ends_at"%'
+        ), ARRAY_A);
+
+        if (empty($rows)) {
+            return [];
+        }
+
+        $expired = [];
+        foreach ($rows as $row) {
+            $hydrated = $this->hydrate($row);
+            $termEndsAt = $hydrated['meta']['membership_term_ends_at'] ?? null;
+            if ($termEndsAt && strtotime($termEndsAt) <= strtotime($now)) {
+                $expired[] = $hydrated;
+            }
+        }
+
+        return $expired;
+    }
+
     public function getDueGracePeriodGrants(int $limit = 100): array
     {
         global $wpdb;

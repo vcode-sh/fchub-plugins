@@ -9,13 +9,19 @@ use FChubMemberships\Storage\PlanRuleRepository;
 
 class PlanRuleResolver
 {
+    /**
+     * Maximum plan hierarchy depth to prevent infinite recursion.
+     * Plans nested deeper than this level are silently excluded.
+     */
+    public const MAX_HIERARCHY_DEPTH = 5;
+
     private PlanRepository $planRepo;
     private PlanRuleRepository $ruleRepo;
 
-    public function __construct()
+    public function __construct(?PlanRepository $planRepo = null, ?PlanRuleRepository $ruleRepo = null)
     {
-        $this->planRepo = new PlanRepository();
-        $this->ruleRepo = new PlanRuleRepository();
+        $this->planRepo = $planRepo ?? new PlanRepository();
+        $this->ruleRepo = $ruleRepo ?? new PlanRuleRepository();
     }
 
     /**
@@ -140,7 +146,7 @@ class PlanRuleResolver
 
     private function collectPlanIds(int $planId, array &$collected, int $depth): void
     {
-        if ($depth > 5 || in_array($planId, $collected, true)) {
+        if ($depth > self::MAX_HIERARCHY_DEPTH || in_array($planId, $collected, true)) {
             return;
         }
 
@@ -179,7 +185,11 @@ class PlanRuleResolver
             return strtotime($ruleA['drip_date']) < strtotime($ruleB['drip_date']);
         }
 
-        // Delayed is generally more permissive than fixed_date for short delays
+        // Mixed comparison: delayed vs fixed_date cannot be accurately resolved without
+        // the grant's created_at date (needed to convert delay_days to an absolute date).
+        // Intentional simplification: delayed is treated as more permissive. In practice,
+        // delay values are short (days/weeks) while fixed_date tends to be further out.
+        // If this assumption breaks, resolveUniqueRules() should accept a reference date.
         return $ruleA['drip_type'] === 'delayed';
     }
 }

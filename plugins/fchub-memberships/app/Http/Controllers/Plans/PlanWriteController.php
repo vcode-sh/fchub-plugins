@@ -2,6 +2,7 @@
 
 namespace FChubMemberships\Http\Controllers\Plans;
 
+use FChubMemberships\Domain\Grant\MembershipTermCalculator;
 use FChubMemberships\Domain\Plan\PlanRuleValidationService;
 use FChubMemberships\Domain\Plan\PlanService;
 use FChubMemberships\Support\PlanStatus;
@@ -29,6 +30,14 @@ final class PlanWriteController
             $anchorDay = (int) ($data['meta']['billing_anchor_day'] ?? 0);
             if ($anchorDay < 1 || $anchorDay > 31) {
                 return new \WP_REST_Response(['message' => __('Billing anchor day must be between 1 and 31.', 'fchub-memberships')], 422);
+            }
+        }
+
+        $termConfig = $data['meta']['membership_term'] ?? null;
+        if ($termConfig && ($termConfig['mode'] ?? 'none') !== 'none') {
+            $termError = MembershipTermCalculator::validate($termConfig);
+            if ($termError) {
+                return new \WP_REST_Response(['message' => $termError], 422);
             }
         }
 
@@ -100,6 +109,14 @@ final class PlanWriteController
         }
         if (isset($data['meta'])) {
             $updateData['meta'] = $data['meta'];
+
+            $termConfig = $data['meta']['membership_term'] ?? null;
+            if ($termConfig && ($termConfig['mode'] ?? 'none') !== 'none') {
+                $termError = MembershipTermCalculator::validate($termConfig);
+                if ($termError) {
+                    return new \WP_REST_Response(['message' => $termError], 422);
+                }
+            }
         }
         if (isset($data['rules'])) {
             $validation = new PlanRuleValidationService();

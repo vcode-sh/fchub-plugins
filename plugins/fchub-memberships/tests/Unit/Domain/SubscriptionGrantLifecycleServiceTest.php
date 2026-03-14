@@ -426,4 +426,165 @@ final class SubscriptionGrantLifecycleServiceTest extends PluginTestCase
         // Non-anchor with null billing date: nothing to extend
         self::assertEmpty($grantService->extended);
     }
+
+    // --- Membership Term tests ---
+
+    public function test_renew_caps_non_anchor_expiry_at_term_ends_at(): void
+    {
+        $grantService = new class() extends AccessGrantService {
+            public array $extended = [];
+
+            public function __construct()
+            {
+            }
+
+            public function extendExpiry(int $userId, int $planId, string $newExpiresAt, ?int $renewalSourceId = null): int
+            {
+                $this->extended[] = ['expires_at' => $newExpiresAt];
+                return 1;
+            }
+        };
+
+        $grantRepo = new class() extends GrantRepository {
+            public function __construct()
+            {
+            }
+
+            public function getBySourceId(int $sourceId, string $sourceType = 'order'): array
+            {
+                return [
+                    [
+                        'user_id' => 10, 'plan_id' => 3, 'status' => 'active',
+                        'meta' => ['membership_term_ends_at' => '2026-04-01 23:59:59'],
+                    ],
+                ];
+            }
+        };
+
+        $service = new SubscriptionGrantLifecycleService($grantService, $grantRepo);
+        // next_billing is after term end
+        $service->renew((object) ['id' => 55, 'next_billing_date' => '2026-05-01 00:00:00']);
+
+        // Should cap at term end
+        self::assertSame('2026-04-01 23:59:59', $grantService->extended[0]['expires_at']);
+    }
+
+    public function test_renew_caps_anchor_ontime_at_term_ends_at(): void
+    {
+        $grantService = new class() extends AccessGrantService {
+            public array $extended = [];
+
+            public function __construct()
+            {
+            }
+
+            public function extendExpiry(int $userId, int $planId, string $newExpiresAt, ?int $renewalSourceId = null): int
+            {
+                $this->extended[] = ['expires_at' => $newExpiresAt];
+                return 1;
+            }
+        };
+
+        $grantRepo = new class() extends GrantRepository {
+            public function __construct()
+            {
+            }
+
+            public function getBySourceId(int $sourceId, string $sourceType = 'order'): array
+            {
+                return [
+                    [
+                        'id' => 1, 'user_id' => 10, 'plan_id' => 3,
+                        'status' => 'active',
+                        'expires_at' => '2027-02-20 23:59:59',
+                        'meta' => [
+                            'billing_anchor_day' => 20,
+                            'membership_term_ends_at' => '2027-03-05 23:59:59',
+                        ],
+                    ],
+                ];
+            }
+        };
+
+        $service = new SubscriptionGrantLifecycleService($grantService, $grantRepo);
+        $service->renew((object) ['id' => 55, 'next_billing_date' => '2027-03-18 00:00:00']);
+
+        // nextAnchorAfter(20, Feb 20) = March 20, but term ends March 5 → capped
+        self::assertSame('2027-03-05 23:59:59', $grantService->extended[0]['expires_at']);
+    }
+
+    public function test_renew_skips_grant_when_term_already_expired(): void
+    {
+        $grantService = new class() extends AccessGrantService {
+            public array $extended = [];
+
+            public function __construct()
+            {
+            }
+
+            public function extendExpiry(int $userId, int $planId, string $newExpiresAt, ?int $renewalSourceId = null): int
+            {
+                $this->extended[] = ['expires_at' => $newExpiresAt];
+                return 1;
+            }
+        };
+
+        $grantRepo = new class() extends GrantRepository {
+            public function __construct()
+            {
+            }
+
+            public function getBySourceId(int $sourceId, string $sourceType = 'order'): array
+            {
+                return [
+                    [
+                        'user_id' => 10, 'plan_id' => 3, 'status' => 'active',
+                        'meta' => ['membership_term_ends_at' => '2020-01-01 23:59:59'],
+                    ],
+                ];
+            }
+        };
+
+        $service = new SubscriptionGrantLifecycleService($grantService, $grantRepo);
+        $service->renew((object) ['id' => 55, 'next_billing_date' => '2026-05-01 00:00:00']);
+
+        // Term already expired — should skip entirely
+        self::assertEmpty($grantService->extended);
+    }
+
+    public function test_renew_no_term_meta_behaves_unchanged(): void
+    {
+        $grantService = new class() extends AccessGrantService {
+            public array $extended = [];
+
+            public function __construct()
+            {
+            }
+
+            public function extendExpiry(int $userId, int $planId, string $newExpiresAt, ?int $renewalSourceId = null): int
+            {
+                $this->extended[] = ['expires_at' => $newExpiresAt];
+                return 1;
+            }
+        };
+
+        $grantRepo = new class() extends GrantRepository {
+            public function __construct()
+            {
+            }
+
+            public function getBySourceId(int $sourceId, string $sourceType = 'order'): array
+            {
+                return [
+                    ['user_id' => 10, 'plan_id' => 3, 'status' => 'active', 'meta' => []],
+                ];
+            }
+        };
+
+        $service = new SubscriptionGrantLifecycleService($grantService, $grantRepo);
+        $service->renew((object) ['id' => 55, 'next_billing_date' => '2026-05-01 00:00:00']);
+
+        // No term meta — uses next_billing_date as-is
+        self::assertSame('2026-05-01 00:00:00', $grantService->extended[0]['expires_at']);
+    }
 }

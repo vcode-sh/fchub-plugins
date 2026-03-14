@@ -143,16 +143,57 @@ class FakturowniaSettings
 
     /**
      * Return field definitions for the global settings form.
-     * FluentCart assembles the response from both settings + fields filters.
+     *
+     * FluentCart's getGlobalSettingsData() calls wp_send_json() which bypasses
+     * the framework's response wrapping. The Vue component expects t.data.X
+     * (framework-wrapped) but gets raw JSON (unwrapped). We intercept here
+     * by sending the properly-wrapped response ourselves and dying before
+     * FluentCart's wp_send_json can fire.
      */
     public static function getGlobalFields($fields, $args): array
     {
+        // Send the full response ourselves with proper {data: ...} wrapping.
+        // FluentCart's getGlobalSettingsData() uses wp_send_json() which bypasses
+        // the framework's response wrapping — the Vue expects t.data.X but gets
+        // raw JSON. By sending here and dying, we preempt the broken handler.
+        $settings = self::getSettings();
+        $fieldSettings = self::buildGlobalFields();
+
+        // Connection status — shown in description and as instruction banner
+        if ($settings['status']) {
+            $fieldSettings['menu_description'] = '<span style="color:#065f46;font-weight:500;">&#10003; '
+                . sprintf(__('Connected to %s.fakturownia.pl', 'fchub-fakturownia'), esc_html($settings['domain']))
+                . '</span>';
+        } elseif (!empty($settings['domain']) && !empty($settings['api_token'])) {
+            $fieldSettings['config_instruction'] = '<div style="padding:10px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#991b1b;margin-bottom:8px;">'
+                . '<strong>&#10007; ' . __('Not Connected', 'fchub-fakturownia') . '</strong> — '
+                . __('API connection failed. Please check your domain and API token, then save again.', 'fchub-fakturownia')
+                . '</div>';
+        }
+
+        wp_send_json([
+            'data' => [
+                'integration' => $settings,
+                'settings'    => $fieldSettings,
+            ],
+        ], 200);
+        // wp_send_json dies — code below never runs, but PHP requires a return type match
+        return [];
+    }
+
+    /**
+     * Build the global settings field definitions
+     */
+    private static function buildGlobalFields(): array
+    {
         $fieldSettings = [
-            'logo'             => FCHUB_FAKTUROWNIA_URL . 'assets/fakturownia.webp',
-            'save_button_text' => __('Save Settings', 'fchub-fakturownia'),
-            'valid_message'    => __('Your Fakturownia API connection is valid', 'fchub-fakturownia'),
-            'invalid_message'  => __('Your Fakturownia API connection is not valid', 'fchub-fakturownia'),
-            'fields'           => [
+            'logo'              => FCHUB_FAKTUROWNIA_URL . 'assets/fakturownia.webp',
+            'menu_title'        => __('Fakturownia Integration', 'fchub-fakturownia'),
+            'menu_description'  => __('Configure your Fakturownia account to automatically create invoices with KSeF 2.0 support.', 'fchub-fakturownia'),
+            'save_button_text'  => __('Save Settings', 'fchub-fakturownia'),
+            'valid_message'     => __('Your Fakturownia API connection is valid', 'fchub-fakturownia'),
+            'invalid_message'   => __('Your Fakturownia API connection is not valid', 'fchub-fakturownia'),
+            'fields'            => [
                 'domain' => [
                     'type'        => 'text',
                     'placeholder' => __('e.g. mojafirma', 'fchub-fakturownia'),
@@ -241,6 +282,7 @@ class FakturowniaSettings
                 'message' => __('Please provide both domain and API token.', 'fchub-fakturownia'),
                 'status'  => false,
             ], 422);
+            return; // wp_send_json dies, but return for safety
         }
 
         $api = new \FChubFakturownia\API\FakturowniaAPI($domain, $apiToken);
@@ -251,6 +293,7 @@ class FakturowniaSettings
                 'message' => __('Connection failed: ', 'fchub-fakturownia') . $result['error'],
                 'status'  => false,
             ], 422);
+            return;
         }
 
         // Save validated settings
@@ -280,10 +323,18 @@ class FakturowniaSettings
         $settings = self::getSettings();
         $settings['domain'] = sanitize_text_field(Arr::get($integration, 'domain', $settings['domain']));
         $settings['api_token'] = sanitize_text_field(Arr::get($integration, 'api_token', $settings['api_token']));
-        $settings['department_id'] = sanitize_text_field(Arr::get($integration, 'department_id', ''));
-        $settings['invoice_kind'] = sanitize_text_field(Arr::get($integration, 'invoice_kind', 'vat'));
-        $settings['payment_type'] = sanitize_text_field(Arr::get($integration, 'payment_type', 'transfer'));
-        $settings['invoice_lang'] = sanitize_text_field(Arr::get($integration, 'invoice_lang', 'pl'));
+        $rawDeptId = sanitize_text_field(Arr::get($integration, 'department_id', ''));
+        $settings['department_id'] = ($rawDeptId !== '' && ctype_digit($rawDeptId)) ? $rawDeptId : '';
+
+        $invoiceKind = sanitize_text_field(Arr::get($integration, 'invoice_kind', 'vat'));
+        $settings['invoice_kind'] = in_array($invoiceKind, ['vat', 'proforma', 'bill'], true) ? $invoiceKind : 'vat';
+
+        $paymentType = sanitize_text_field(Arr::get($integration, 'payment_type', 'transfer'));
+        $settings['payment_type'] = in_array($paymentType, ['transfer', 'card', 'cash', 'paypal'], true) ? $paymentType : 'transfer';
+
+        $invoiceLang = sanitize_text_field(Arr::get($integration, 'invoice_lang', 'pl'));
+        $settings['invoice_lang'] = in_array($invoiceLang, ['pl', 'en', 'de', 'fr', 'pl/en'], true) ? $invoiceLang : 'pl';
+
         $settings['ksef_auto_send'] = Arr::get($integration, 'ksef_auto_send', 'no') === 'yes' ? 'yes' : 'no';
         $settings['show_nip_toggle'] = Arr::get($integration, 'show_nip_toggle', 'yes') === 'yes' ? 'yes' : 'no';
 
@@ -304,6 +355,7 @@ class FakturowniaSettings
                 'message' => __('Settings saved, but API connection failed. Please check your domain and API token.', 'fchub-fakturownia'),
                 'status'  => false,
             ], 422);
+            return;
         }
 
         wp_send_json([

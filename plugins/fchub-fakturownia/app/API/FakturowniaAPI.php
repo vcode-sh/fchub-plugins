@@ -61,17 +61,6 @@ class FakturowniaAPI
     }
 
     /**
-     * Send existing invoice to KSeF
-     */
-    public function sendToKSeF(int $id): array
-    {
-        return $this->request('GET', '/invoices/' . $id . '.json', [
-            'api_token'     => $this->apiToken,
-            'send_to_ksef'  => 'yes',
-        ]);
-    }
-
-    /**
      * Download invoice PDF content (server-side, token never exposed to browser)
      */
     public function downloadInvoicePdf(int $id): array
@@ -127,6 +116,8 @@ class FakturowniaAPI
 
     /**
      * Find client by NIP (tax number)
+     *
+     * @internal Reserved for future B2B client matching.
      */
     public function findClientByTaxNo(string $nip): ?array
     {
@@ -149,6 +140,8 @@ class FakturowniaAPI
 
     /**
      * Create a client
+     *
+     * @internal Reserved for future B2B client matching.
      */
     public function createClient(array $clientData): array
     {
@@ -159,16 +152,23 @@ class FakturowniaAPI
     }
 
     /**
-     * Get base URL for the Fakturownia account
+     * Get base URL for the Fakturownia account.
+     * Only allows Fakturownia domains to prevent SSRF.
      */
     public function getBaseUrl(): string
     {
-        // Support full domain or just subdomain
-        if (strpos($this->domain, '.') !== false) {
+        // Subdomain-only format (e.g. "mojafirma")
+        if (preg_match('/^[a-z0-9-]+$/i', $this->domain)) {
+            return 'https://' . $this->domain . '.fakturownia.pl';
+        }
+
+        // Full domain — must end with .fakturownia.pl
+        if (preg_match('/^[a-z0-9-]+\.fakturownia\.pl$/i', $this->domain)) {
             return 'https://' . $this->domain;
         }
 
-        return 'https://' . $this->domain . '.fakturownia.pl';
+        // Reject anything else — prevents SSRF to arbitrary hosts
+        return 'https://invalid.fakturownia.pl';
     }
 
     /**

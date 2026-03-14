@@ -19,6 +19,20 @@ class RefundHandler
     }
 
     /**
+     * Log a warning for partial refunds — full correction invoices are not appropriate
+     * and partial correction support is not yet implemented.
+     */
+    public function handlePartialRefund(Order $order): void
+    {
+        $order->addLog(
+            __('Fakturownia: Partial refund detected', 'fchub-fakturownia'),
+            __('Automatic correction invoices are only supported for full refunds. Please create a partial correction invoice manually in Fakturownia.', 'fchub-fakturownia'),
+            'warning',
+            'Fakturownia'
+        );
+    }
+
+    /**
      * Create correction invoice for a refunded order
      */
     public function createCorrectionInvoice(Order $order): array
@@ -41,10 +55,10 @@ class RefundHandler
             return ['error' => __('Correction invoice already exists.', 'fchub-fakturownia')];
         }
 
-        $reason = sprintf(
+        $reason = mb_substr(sprintf(
             __('Refund - Order #%s', 'fchub-fakturownia'),
             $order->invoice_no ?: $order->id
-        );
+        ), 0, 256);
 
         $sendToKsef = FakturowniaSettings::isKsefAutoSend();
 
@@ -73,11 +87,22 @@ class RefundHandler
         $order->updateMeta('_fakturownia_correction_id', Arr::get($result, 'id'));
         $order->updateMeta('_fakturownia_correction_number', Arr::get($result, 'number', ''));
 
-        // Track KSeF status if submitted
+        // Track KSeF status if submitted — normalize demo_ prefix from sandbox
         if ($sendToKsef) {
             $govStatus = Arr::get($result, 'gov_status');
             if ($govStatus) {
+                if (str_starts_with($govStatus, 'demo_')) {
+                    $govStatus = substr($govStatus, 5);
+                }
                 $order->updateMeta('_fakturownia_correction_ksef_status', $govStatus);
+            }
+            $govId = Arr::get($result, 'gov_id');
+            if ($govId) {
+                $order->updateMeta('_fakturownia_correction_ksef_id', $govId);
+            }
+            $govLink = Arr::get($result, 'gov_verification_link');
+            if ($govLink) {
+                $order->updateMeta('_fakturownia_correction_ksef_link', $govLink);
             }
         }
 
@@ -105,11 +130,13 @@ class RefundHandler
         foreach ($originalInvoice['positions'] as $position) {
             $positions[] = [
                 'name'              => $position['name'] ?? __('Item', 'fchub-fakturownia'),
+                'kind'              => 'correction',
                 'quantity'          => 0,
                 'quantity_unit'     => $position['quantity_unit'] ?? 'szt',
                 'total_price_gross' => 0,
                 'tax'               => $position['tax'] ?? 23,
                 'correction_before_attributes' => [
+                    'kind'              => 'correction_before',
                     'quantity'          => $position['quantity'] ?? 1,
                     'total_price_gross' => $position['total_price_gross'] ?? 0,
                     'tax'               => $position['tax'] ?? 23,

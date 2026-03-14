@@ -661,24 +661,22 @@ onMounted(async () => {
   margin-bottom: 20px;
 }
 
-.search-bar {
+/* Filter Row — inline, single row with breathing room */
+.filter-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
-.search-input {
+.filter-search {
   flex: 1;
+  min-width: 200px;
 }
 
-.filter-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.filter-controls .el-select {
-  width: 160px;
+.filter-select {
+  width: 180px;
+  flex-shrink: 0;
 }
 
 /* Bulk Bar */
@@ -738,6 +736,14 @@ onMounted(async () => {
   text-decoration: none;
 }
 
+/* Actions Cell */
+.actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
 /* Pagination */
 .pagination-bar {
   display: flex;
@@ -748,16 +754,20 @@ onMounted(async () => {
   border-top: 1px solid var(--fchub-border-color);
 }
 
-.pagination-info {
+.pagination-meta {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.pagination-total {
   font-size: 13px;
   color: var(--fchub-text-secondary);
+  white-space: nowrap;
 }
 
 .per-page-select {
-  width: 120px;
+  width: 130px;
 }
 
 /* Empty State */

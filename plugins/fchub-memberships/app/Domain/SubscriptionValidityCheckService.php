@@ -19,23 +19,27 @@ final class SubscriptionValidityCheckService
 
     public function run(): void
     {
+        // Subscription validity checks (requires FluentCart)
         $subscriptionIds = $this->grants->getActiveSubscriptionSourceIds();
-        if (empty($subscriptionIds)) {
-            return;
+        if (!empty($subscriptionIds) && class_exists('\FluentCart\App\Models\Subscription')) {
+            foreach ($subscriptionIds as $subscriptionId) {
+                $this->checkSubscription((int) $subscriptionId);
+            }
         }
 
-        if (!class_exists('\FluentCart\App\Models\Subscription')) {
-            return;
-        }
-
-        foreach ($subscriptionIds as $subscriptionId) {
-            $this->checkSubscription((int) $subscriptionId);
-        }
+        // --- Grant maintenance (always runs, regardless of subscription state) ---
 
         // Anchor grants must be paused before the generic expiry runs
         $anchorPaused = $this->grantService->pauseOverdueAnchorGrants();
         if ($anchorPaused > 0) {
             Logger::log('Validity check', sprintf('%d overdue anchor grants paused', $anchorPaused));
+        }
+
+        // Term-expired grants (including lifetime with a term cap) must be
+        // caught before the generic expiry — they may have expires_at = null
+        $termExpired = $this->grantService->expireTermExpiredGrants();
+        if ($termExpired > 0) {
+            Logger::log('Validity check', sprintf('%d term-expired grants expired', $termExpired));
         }
 
         $this->grantService->revokeExpiredGracePeriodGrants();

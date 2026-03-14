@@ -72,7 +72,7 @@ The plugin tracks the following KSeF statuses, as reported by Fakturownia:
 | `ok` | Invoice accepted by KSeF | KSeF ID and verification link stored. Success log added. Polling stops. |
 | `processing` | Submitted, waiting for KSeF confirmation | Another status check is scheduled in 2 minutes. |
 | `send_error` | KSeF rejected the invoice | Error messages from KSeF are logged on the order. Polling stops. |
-| `server_error` | KSeF service error | Displayed as "Server Error" in admin. |
+| `server_error` | KSeF service error (transient) | Retried automatically like `processing`. Displayed as "Server Error" in admin. |
 | `not_applicable` | KSeF submission not applicable | Displayed as "N/A" in admin. |
 | `not_connected` | Fakturownia account not connected to KSeF | Displayed as "Not Connected" in admin. |
 
@@ -98,7 +98,8 @@ The cron event receives two arguments:
 
 - **First check**: 60 seconds after invoice creation
 - **Subsequent checks**: every 120 seconds (2 minutes) while the status is `processing`
-- **Stops when**: the status changes to any value other than `processing` (e.g., `ok`, `send_error`)
+- **Stops when**: the status changes to a terminal value (`ok`, `send_error`). Both `processing` and `server_error` trigger retries.
+- **Retry limit**: 30 attempts (~1 hour). After that, a warning is logged and polling stops.
 
 ### What It Does
 
@@ -110,6 +111,10 @@ Each cron execution:
 5. If status is `ok` -- logs a success message with the KSeF number
 6. If status is `send_error` -- logs the error messages from KSeF
 7. If status is `processing` -- schedules another check in 2 minutes
+
+<Callout type="info" title="Sandbox / Demo Environments">
+Fakturownia sandbox environments return KSeF statuses with a `demo_` prefix (e.g. `demo_ok`, `demo_processing`). The plugin strips this prefix automatically, so status tracking works identically in sandbox and production.
+</Callout>
 
 <Callout type="warn" title="WordPress Cron Dependency">
 KSeF status polling depends on WordPress cron (`wp-cron.php`). If your site has low traffic or cron is disabled, status updates may be delayed. For reliable cron execution, consider setting up a system-level cron job that hits `wp-cron.php` regularly:
@@ -125,13 +130,9 @@ KSeF status polling depends on WordPress cron (`wp-cron.php`). If your site has 
 
 When a refund triggers a correction invoice, the correction is also submitted to KSeF if auto-send is enabled.
 
-The correction flow differs slightly from regular invoices:
+Corrections use the same single-step `gov_save_and_send` flag as regular invoices. KSeF data from the create response (`gov_status`, `gov_id`, `gov_link`) is stored immediately under the `_fakturownia_correction_ksef_*` meta keys. A separate cron poll is also scheduled to catch async KSeF processing.
 
-1. The correction invoice is created first via the standard `/invoices.json` endpoint
-2. After successful creation, the plugin calls the `send_to_ksef` endpoint on the correction invoice
-3. The correction's KSeF status is stored separately as `_fakturownia_correction_ksef_status`
-
-This two-step process is necessary because correction invoices reference the original invoice and need to be created before they can be submitted to KSeF.
+Correction positions include the required `kind: 'correction'` and `correction_before_attributes` fields per the Fakturownia API spec.
 
 <Separator className="my-8" />
 
@@ -145,6 +146,8 @@ The following KSeF-related metadata is stored on FluentCart orders:
 | `_fakturownia_ksef_id` | KSeF invoice number | `1234567890-20250115-ABC123DEF456` |
 | `_fakturownia_ksef_link` | KSeF verification URL | `https://ksef.mf.gov.pl/...` |
 | `_fakturownia_correction_ksef_status` | Correction invoice KSeF status | `ok`, `processing` |
+| `_fakturownia_correction_ksef_id` | Correction KSeF number | `1234567890-20250115-XYZ789` |
+| `_fakturownia_correction_ksef_link` | Correction KSeF verification URL | `https://ksef.mf.gov.pl/...` |
 
 <Separator className="my-8" />
 

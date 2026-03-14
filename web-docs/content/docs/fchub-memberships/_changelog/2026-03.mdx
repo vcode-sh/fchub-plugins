@@ -1,3 +1,42 @@
+### v1.3.0
+
+*Released March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.3.0)
+
+New feature: Membership Term. Plus a genuinely alarming number of bugs that were quietly lurking behind the curtain, some since v1.0.0.
+
+#### Membership Term
+
+Plans now have an absolute upper bound on how long a membership can last. Set it to 1 Year, 2 Years, 3 Years, a custom duration, or a specific date — works across all four duration types.
+
+A `lifetime` plan can finally be "lifetime, but actually 3 years." A `fixed_anchor` school membership can bill monthly but auto-expire after 12 months. And `fixed_days` users can stop typing `730` and hoping they got the leap year right — just pick "2 Years" and move on.
+
+- **Presets and custom** — 1y/2y/3y presets for the click-averse, custom value+unit (days, weeks, months, years), or a hard calendar deadline
+- **Stored per-grant** — the term end date is calculated at grant creation and baked into `meta.membership_term_ends_at`. Changing the plan's term later doesn't retroactively yank existing members
+- **Renewal capping** — every subscription renewal is capped at the term end. The final billing cycle may be shorter than usual
+- **Cron enforcement** — the 5-minute validity check catches term-expired grants (including lifetime ones that would otherwise live forever) and marks them expired
+- **Feed-level override** — integration feeds can override the plan's term. Different products, different term lengths, same plan
+- **New hook** — `fchub_memberships/grant_term_expired` fires alongside `grant_expired` when a grant reaches its term limit
+- **Validation** — sensible upper bounds (max 100 years, 36500 days, etc.) because nobody needs a 999999-year membership and `strtotime` was starting to have opinions about it
+
+#### Bug fixes
+
+This release includes fixes for 12 bugs across the grant lifecycle, content protection, trial conversion, and subscription watcher:
+
+- **Revocation now includes paused grants** — previously, `revokePlan()` only queried active grants. Paused anchor grants (overdue payment) were silently skipped and lived forever, which is impressive commitment from an unpaying member
+- **Revocation hooks fire correctly** — the `grant_revoked` hook and notification emails no longer fire when nothing was actually revoked. Downstream automations (FluentCRM, webhooks) were getting false positives
+- **Revocation by source respects status transitions** — `revokeBySource()` no longer sets already-expired grants back to "revoked," which was a state machine violation that would make any finite automata textbook weep
+- **Source-based revocation now fires hooks and sends notifications** — was silently revoking grants with no audit trail, no emails, and no webhook/FluentCRM events. Grants revoked by source were invisible to every downstream system
+- **Trial conversion handles all duration types** — converting a trial to paid membership now correctly applies `fixed_anchor` (with anchor day in grant meta) and membership term caps. Previously, lifetime-with-term trials converted to infinite access
+- **Content protection cache invalidated on expiry** — the 5-minute transient cache wasn't cleared when grants expired or hit their term limit. Users kept access for up to 5 minutes after expiry. Now both `grant_expired` and `grant_term_expired` trigger cache invalidation
+- **Excerpt filtering checks taxonomy access** — `filterExcerpt()` now checks taxonomy-based access, matching `filterContent()`. Users with access via a category grant no longer see their excerpts hidden in archive listings
+- **`resume()` checks term expiry** — paused grants whose term expired during the pause were being resumed to active. Now checked and skipped
+- **Renewal meta preserved** — grant meta (including term end dates and anchor days) is now properly merged during renewals via `GrantCreationService`. Previously silently dropped
+- **Subscription watcher hooks match FluentCart** — the watcher was listening for `fluent_cart/subscription_cancelled` (double L) but FluentCart fires `fluent_cart/subscription_canceled` (single L). Also fixed missing `/payments/` prefix on `subscription_status_changed`. Several subscription event handlers were simply never firing
+- **`capExpiry()` handles malformed dates** — returns the proposed date instead of garbage when either input is unparseable
+- **Validator rejects whitespace dates** — a date field containing only spaces passed validation because `strtotime('   ')` returns "now" on PHP 8.4. The kind of behaviour that's technically correct and spiritually bankrupt
+
+<Separator className="my-8" />
+
 ### v1.2.0
 
 *Released March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.2.0)

@@ -372,3 +372,25 @@ if (!function_exists('esc_html__')) {
         return $text;
     }
 }
+
+if (!function_exists('wp_get_current_user')) {
+    function wp_get_current_user(): object
+    {
+        return (object) ['ID' => 0];
+    }
+}
+
+if (!function_exists('wp_cache_get')) {
+    function wp_cache_get(string $key, string $group = ''): mixed
+    {
+        return $GLOBALS['_fchub_test_cache'][$group . ':' . $key] ?? false;
+    }
+}
+
+if (!function_exists('wp_cache_set')) {
+    function wp_cache_set(string $key, mixed $value, string $group = '', int $expiration = 0): bool
+    {
+        $GLOBALS['_fchub_test_cache'][$group . ':' . $key] = $value;
+        return true;
+    }
+}

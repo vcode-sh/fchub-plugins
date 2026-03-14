@@ -4,6 +4,13 @@ defined('WP_UNINSTALL_PLUGIN') || exit;
 
 global $wpdb;
 
+// Clean up scheduled cron events
+wp_clear_scheduled_hook('fchub_fakturownia_check_ksef_status');
+
+// Clean up transients
+delete_transient('fchub_github_releases');
+delete_transient('fchub_github_rate_limited');
+
 // Delete integration settings from FluentCart's meta table (not wp_options)
 $meta_table = $wpdb->prefix . 'fct_meta';
 if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $meta_table)) === $meta_table) {
@@ -28,6 +35,9 @@ if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $order_meta_table)) ===
         '_fakturownia_correction_id',
         '_fakturownia_correction_number',
         '_fakturownia_correction_ksef_status',
+        '_fakturownia_correction_ksef_id',
+        '_fakturownia_correction_ksef_link',
+        '_fakturownia_correction_ksef_retry_count',
     ];
 
     foreach ($meta_keys as $key) {

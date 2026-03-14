@@ -3,6 +3,7 @@
 namespace FChubMemberships\Domain;
 
 use FChubMemberships\Domain\Grant\AnchorDateCalculator;
+use FChubMemberships\Domain\Grant\MembershipTermCalculator;
 use FChubMemberships\Storage\GrantRepository;
 
 defined('ABSPATH') || exit;
@@ -33,6 +34,10 @@ final class SubscriptionGrantLifecycleService
         $grants = $this->grantRepo->getBySourceId((int) $subscription->id, 'subscription');
         foreach ($grants as $grant) {
             if ($grant['status'] === 'paused') {
+                // Don't resume if the membership term expired during the pause
+                if (MembershipTermCalculator::isTermExpired($grant['meta'])) {
+                    continue;
+                }
                 $this->grants->resumeGrant($grant['id']);
             }
         }
@@ -72,6 +77,12 @@ final class SubscriptionGrantLifecycleService
         $nextBilling = $subscription->next_billing_date ?? null;
 
         foreach ($grants as $grant) {
+            // Skip grants whose membership term has already expired
+            if (MembershipTermCalculator::isTermExpired($grant['meta'])) {
+                continue;
+            }
+
+            $termEndsAt = $grant['meta']['membership_term_ends_at'] ?? null;
             $anchorDay = $grant['meta']['billing_anchor_day'] ?? null;
 
             if ($anchorDay) {
@@ -81,17 +92,20 @@ final class SubscriptionGrantLifecycleService
                     // Late payment: resume access, then extend to next anchor
                     $this->grants->resumeGrant($grant['id']);
                     $newExpiry = AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
+                    $newExpiry = MembershipTermCalculator::capExpiry($newExpiry, $termEndsAt);
                     $this->grants->extendExpiry((int) $grant['user_id'], (int) $grant['plan_id'], $newExpiry, (int) $subscription->id);
                 } elseif ($grant['status'] === 'active') {
                     // On-time renewal: extend to the following month's anchor
                     $currentExpiry = $grant['expires_at'] ?? current_time('mysql');
                     $newExpiry = AnchorDateCalculator::nextAnchorAfter($anchorDay, $currentExpiry);
+                    $newExpiry = MembershipTermCalculator::capExpiry($newExpiry, $termEndsAt);
                     $this->grants->extendExpiry((int) $grant['user_id'], (int) $grant['plan_id'], $newExpiry, (int) $subscription->id);
                 }
             } else {
                 // Non-anchor: existing mirror behaviour
                 if ($grant['status'] === 'active' && $nextBilling) {
-                    $this->grants->extendExpiry((int) $grant['user_id'], (int) $grant['plan_id'], (string) $nextBilling, (int) $subscription->id);
+                    $capped = MembershipTermCalculator::capExpiry((string) $nextBilling, $termEndsAt);
+                    $this->grants->extendExpiry((int) $grant['user_id'], (int) $grant['plan_id'], $capped, (int) $subscription->id);
                 }
             }
         }

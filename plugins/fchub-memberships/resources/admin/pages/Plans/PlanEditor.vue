@@ -135,6 +135,55 @@
             </div>
           </el-form-item>
 
+          <el-divider content-position="left">Membership Term</el-divider>
+
+          <el-form-item label="Membership Term">
+            <el-select v-model="form.meta.membership_term.mode" style="width: 340px" @change="onTermModeChange">
+              <el-option label="No limit" value="none" />
+              <el-option label="1 Year" value="1y" />
+              <el-option label="2 Years" value="2y" />
+              <el-option label="3 Years" value="3y" />
+              <el-option label="Custom" value="custom" />
+              <el-option label="Specific Date" value="date" />
+            </el-select>
+            <div class="field-hint">{{ termHintText }}</div>
+          </el-form-item>
+
+          <el-form-item
+            v-if="form.meta.membership_term.mode === 'custom'"
+            label="Term Length"
+          >
+            <div style="display: flex; gap: 8px; align-items: center">
+              <el-input-number
+                v-model="form.meta.membership_term.value"
+                :min="1"
+                :max="999"
+                controls-position="right"
+                style="width: 120px"
+              />
+              <el-select v-model="form.meta.membership_term.unit" style="width: 140px">
+                <el-option label="Days" value="days" />
+                <el-option label="Weeks" value="weeks" />
+                <el-option label="Months" value="months" />
+                <el-option label="Years" value="years" />
+              </el-select>
+            </div>
+          </el-form-item>
+
+          <el-form-item
+            v-if="form.meta.membership_term.mode === 'date'"
+            label="Term End Date"
+          >
+            <el-date-picker
+              v-model="form.meta.membership_term.date"
+              type="date"
+              placeholder="Select end date"
+              :format="wpDatePickerFormat"
+              value-format="YYYY-MM-DD"
+              style="width: 200px"
+            />
+          </el-form-item>
+
           <el-form-item label="Trial Period (days)" prop="trial_days">
             <el-input-number
               v-model="form.trial_days"
@@ -494,6 +543,12 @@ const form = reactive({
   level: 0,
   meta: {
     billing_anchor_day: null,
+    membership_term: {
+      mode: 'none',
+      value: null,
+      unit: 'months',
+      date: null,
+    },
   },
 })
 
@@ -541,6 +596,36 @@ function onDripTypeChange(rule) {
     rule.drip_delay_days = null
   }
 }
+
+function onTermModeChange(mode) {
+  if (mode === 'none' || mode === '1y' || mode === '2y' || mode === '3y') {
+    form.meta.membership_term.value = null
+    form.meta.membership_term.unit = 'months'
+    form.meta.membership_term.date = null
+  } else if (mode === 'custom') {
+    form.meta.membership_term.date = null
+    if (!form.meta.membership_term.value) form.meta.membership_term.value = 1
+    if (!form.meta.membership_term.unit) form.meta.membership_term.unit = 'months'
+  } else if (mode === 'date') {
+    form.meta.membership_term.value = null
+    form.meta.membership_term.unit = 'months'
+  }
+}
+
+const termHintText = computed(() => {
+  switch (form.duration_type) {
+    case 'lifetime':
+      return 'Sets a maximum membership duration. Without a term, lifetime memberships never expire.'
+    case 'fixed_days':
+      return 'Overrides the fixed days duration with a more flexible term. The shorter of the two wins.'
+    case 'subscription_mirror':
+      return 'Caps total membership duration regardless of how many times the subscription renews.'
+    case 'fixed_anchor':
+      return 'Caps total membership duration regardless of how many monthly anchor cycles pass.'
+    default:
+      return 'Sets an absolute upper bound on how long the membership can remain active.'
+  }
+})
 
 const specialPageOptions = [
   { id: 'blog', label: 'Blog / Posts Page' },
@@ -738,6 +823,15 @@ async function loadPlan(id) {
     const planMeta = plan.meta || {}
     form.meta.billing_anchor_day = planMeta.billing_anchor_day ?? null
 
+    // Load membership term
+    const savedTerm = planMeta.membership_term || {}
+    form.meta.membership_term = {
+      mode: savedTerm.mode || 'none',
+      value: savedTerm.value ?? null,
+      unit: savedTerm.unit || 'months',
+      date: savedTerm.date ?? null,
+    }
+
     // T17: load schedule
     schedule.scheduled_status = plan.scheduled_status || null
     schedule.scheduled_at = plan.scheduled_at || null
@@ -802,6 +896,18 @@ async function savePlan() {
     const meta = form.duration_type === 'fixed_anchor'
       ? { billing_anchor_day: form.meta.billing_anchor_day }
       : {}
+
+    // Always include membership term — mode 'none' must overwrite any
+    // previously stored term config (PlanService merges meta via array_merge)
+    const termMode = form.meta.membership_term.mode
+    const term = { mode: termMode }
+    if (termMode === 'custom') {
+      term.value = form.meta.membership_term.value
+      term.unit = form.meta.membership_term.unit
+    } else if (termMode === 'date') {
+      term.date = form.meta.membership_term.date
+    }
+    meta.membership_term = term
 
     const payload = {
       title: form.title,

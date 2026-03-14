@@ -45,9 +45,11 @@ class FakturowniaIntegration extends BaseIntegrationManager
     public function getApiSettings(): array
     {
         $settings = FakturowniaSettings::getSettings();
+        $token = $settings['api_token'] ?? '';
+
         return [
-            'status'    => !empty($settings['domain']) && !empty($settings['api_token']) && !empty($settings['status']),
-            'api_key'   => $settings['api_token'] ?? '',
+            'status'    => !empty($settings['domain']) && !empty($token) && !empty($settings['status']),
+            'api_key'   => $token ? '****' . substr($token, -4) : '',
         ];
     }
 
@@ -111,6 +113,13 @@ class FakturowniaIntegration extends BaseIntegrationManager
             return;
         }
 
+        // Partial refunds can't produce automatic correction invoices — warn the admin
+        if ($trigger === 'order_partially_refunded') {
+            $handler = new RefundHandler($api);
+            $handler->handlePartialRefund($order);
+            return;
+        }
+
         $this->handleInvoiceCreation($order, $api, $eventData);
     }
 
@@ -120,15 +129,16 @@ class FakturowniaIntegration extends BaseIntegrationManager
     private function handleInvoiceCreation($order, FakturowniaAPI $api, array $eventData): void
     {
         $handler = new InvoiceHandler($api);
-        $result = $handler->createInvoice($order);
+        $note = Arr::get($eventData, 'feed.note', '');
+        $result = $handler->createInvoice($order, $note);
 
         if (isset($result['error'])) {
             return; // Error already logged by handler
         }
 
-        // If KSeF is enabled, check status after a delay (Fakturownia processes async)
-        if (FakturowniaSettings::isKsefAutoSend() && isset($result['id'])) {
-            // Schedule a status check (Fakturownia processes KSeF async)
+        // Schedule KSeF status polling — skip proformas (not KSeF-eligible)
+        $isProforma = FakturowniaSettings::getInvoiceKind() === 'proforma';
+        if (!$isProforma && FakturowniaSettings::isKsefAutoSend() && isset($result['id'])) {
             wp_schedule_single_event(
                 time() + 60,
                 'fchub_fakturownia_check_ksef_status',
@@ -143,7 +153,16 @@ class FakturowniaIntegration extends BaseIntegrationManager
     private function handleRefund($order, FakturowniaAPI $api): void
     {
         $handler = new RefundHandler($api);
-        $handler->createCorrectionInvoice($order);
+        $result = $handler->createCorrectionInvoice($order);
+
+        // Schedule KSeF status polling for the correction invoice
+        if (!isset($result['error']) && FakturowniaSettings::isKsefAutoSend() && isset($result['id'])) {
+            wp_schedule_single_event(
+                time() + 60,
+                'fchub_fakturownia_check_ksef_status',
+                [$order->id, $result['id']]
+            );
+        }
     }
 
     /**

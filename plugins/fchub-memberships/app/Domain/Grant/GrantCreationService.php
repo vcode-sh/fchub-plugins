@@ -48,6 +48,14 @@ final class GrantCreationService
                 $updateData['plan_id'] = $context['plan_id'];
             }
 
+            // Merge context meta into existing grant meta (preserves existing keys,
+            // overwrites overlapping ones like membership_term_ends_at on renewal)
+            $contextMeta = $context['meta'] ?? [];
+            $existingMeta = $existing['meta'] ?? [];
+            if ($contextMeta || $existingMeta) {
+                $updateData['meta'] = array_merge($existingMeta, $contextMeta);
+            }
+
             $this->grants->update($existing['id'], $updateData);
 
             if ($sourceId) {

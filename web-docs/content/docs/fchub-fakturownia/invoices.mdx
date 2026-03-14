@@ -91,10 +91,15 @@ Here's exactly how FluentCart order data maps to Fakturownia invoice fields.
 | `kind` | Settings: Invoice Type | `vat`, `proforma`, or `bill` |
 | `payment_type` | Order payment method or Settings fallback | See payment type mapping below |
 | `lang` | Settings: Invoice Language | `pl`, `en`, `de`, `fr`, `pl/en` |
-| `status` | Hardcoded | Always `paid` |
-| `paid_date` | Current date | `Y-m-d` format |
+| `status` | Depends on invoice type | `paid` for VAT/bill, `issued` for proforma |
+| `sell_date` | Order payment date | Falls back to creation date, then today |
+| `issue_date` | Current date (WordPress timezone) | `Y-m-d` format via `wp_date()` |
+| `paid_date` | Order payment date | Only set for non-proforma invoices |
+| `payment_to_kind` | Depends on invoice type | 7-day term for proforma, `other_date` for paid |
+| `currency` | Order currency | Falls back to `PLN` if not set |
 | `oid` | Order invoice number | Falls back to `FC-{order_id}` |
 | `oid_unique` | Hardcoded | Always `yes` (prevents duplicates in Fakturownia) |
+| `description` | Feed note setting | Optional, truncated to 3,500 chars for KSeF |
 | `department_id` | Settings: Department ID | If set, seller data is pulled from this department |
 | `seller_name` | WordPress site name | Only used if no department ID is configured |
 
@@ -104,7 +109,8 @@ Here's exactly how FluentCart order data maps to Fakturownia invoice fields.
 |---|---|
 | `buyer_company` | `true` if NIP provided, `false` otherwise |
 | `buyer_tax_no` | NIP from billing address meta |
-| `buyer_name` | Company name (B2B) |
+| `buyer_tax_no_kind` | Auto-detected: `''` for PL, `'nip_ue'` for EU, `'other'` for rest |
+| `buyer_name` | Company name (B2B), truncated to 255 chars |
 | `buyer_first_name` | First name (B2C) |
 | `buyer_last_name` | Last name (B2C) |
 | `buyer_street` | Address line 1 + line 2 |
@@ -137,9 +143,11 @@ The plugin calculates the VAT rate for each line item from the order's tax data 
 ### Calculation
 
 For each order item:
-1. The tax amount and subtotal are extracted
-2. The effective rate is calculated: `(tax_amount / subtotal) * 100`
+1. The tax amount and post-discount line total are extracted
+2. The effective rate is calculated: `(tax_amount / line_total) * 100`
 3. The result is rounded and mapped to the nearest standard rate
+
+Using `line_total` (not `subtotal`) is critical — tax is calculated on the discounted amount. Using the pre-discount subtotal produced wrong rates for discounted items.
 
 ### Standard Rates
 
@@ -149,9 +157,9 @@ For each order item:
 | **8%** | Reduced rate. Applied to certain food products, construction services, etc. |
 | **5%** | Reduced rate. Applied to basic food products, books, periodicals. |
 | **0%** | Zero rate. Applied to intra-EU supplies and certain exports. |
-| **zw** | Exempt (zwolniony). Applied when the item has zero tax and zero tax amount. |
+| **zw** | Exempt (zwolniony). Applied when the calculated rate is negative (shouldn't happen in practice). |
 
-If the tax amount is zero, the item is marked as exempt (`zw`). If a rate cannot be determined, the default is 23%.
+If the tax amount is zero, the item gets a `0` rate (not `zw` — zero-rate and exempt are legally different in Polish tax law). If a rate cannot be determined, the default is 23%. When KSeF is enabled and any position uses `zw`, the plugin auto-sets `exempt_tax_kind` to prevent KSeF rejection.
 
 <Callout type="info" title="Rate Normalization">
 The plugin maps calculated rates to the nearest standard Polish rate. For example, if the effective rate calculates to 22.8% or 23.2%, it will be normalized to 23%. This handles rounding differences between FluentCart's tax calculation and Polish standard rates.

@@ -13,12 +13,14 @@ All settings for FCHub Fakturownia are managed through FluentCart's integration 
 
 ## Settings Location
 
-Navigate to: **FluentCart > Settings > Integrations > Fakturownia**
+Navigate to: **FluentCart > Integrations > Fakturownia** (click the **Settings** button on the Fakturownia card)
 
 Or go directly to:
 ```
 /wp-admin/admin.php?page=fluent-cart#/integrations/fakturownia
 ```
+
+When connected, the page header shows a green **"Connected to your-domain.fakturownia.pl"** status. If credentials are invalid, a red error banner appears above the form.
 
 <Separator className="my-8" />
 
@@ -30,12 +32,13 @@ These are the required fields to connect your Fakturownia account.
 
 Your Fakturownia subdomain. If your Fakturownia URL is `https://mojafirma.fakturownia.pl`, enter `mojafirma`.
 
-You can also enter the full domain (e.g., `mojafirma.fakturownia.pl`). The plugin handles both formats -- if a dot is detected, it uses the value as-is. If there's no dot, it appends `.fakturownia.pl` automatically.
+You can also enter the full domain (e.g., `mojafirma.fakturownia.pl`). The plugin validates the domain format and only accepts `*.fakturownia.pl` domains — custom domains or arbitrary hostnames are rejected for security.
 
-| Field | Example |
-|---|---|
-| Subdomain only | `mojafirma` |
-| Full domain | `mojafirma.fakturownia.pl` |
+| Field | Example | Accepted |
+|---|---|---|
+| Subdomain only | `mojafirma` | Yes — becomes `mojafirma.fakturownia.pl` |
+| Full domain | `mojafirma.fakturownia.pl` | Yes |
+| Custom domain | `invoices.mycompany.com` | No — rejected |
 
 ### API Token
 
@@ -217,5 +220,7 @@ The plugin validates your credentials every time you save settings. If Fakturown
     | `_fakturownia_correction_id` | Correction invoice ID |
     | `_fakturownia_correction_number` | Correction invoice number |
     | `_fakturownia_correction_ksef_status` | Correction KSeF status |
+    | `_fakturownia_correction_ksef_id` | Correction KSeF number |
+    | `_fakturownia_correction_ksef_link` | Correction KSeF verification link |
   </Accordion>
 </Accordions>

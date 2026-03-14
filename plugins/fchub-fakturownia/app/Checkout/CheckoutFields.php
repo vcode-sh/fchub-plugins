@@ -19,6 +19,7 @@ class CheckoutFields
 
         add_filter('fluent_cart/checkout_page_name_fields_schema', [self::class, 'addNipFields'], 20, 2);
         add_action('wp_enqueue_scripts', [self::class, 'enqueueCheckoutScript']);
+        add_filter('fluent_cart/checkout/validate_data', [self::class, 'validateCheckoutNip'], 20, 2);
     }
 
     /**
@@ -128,7 +129,11 @@ class CheckoutFields
     var observer = new MutationObserver(function(mutations) {
         for (var i = 0; i < mutations.length; i++) {
             if (mutations[i].addedNodes.length) {
-                initNipToggle();
+                var nipField = document.getElementById('billing_nip');
+                if (nipField) {
+                    initNipToggle();
+                    observer.disconnect();
+                }
                 break;
             }
         }
@@ -136,6 +141,30 @@ class CheckoutFields
     observer.observe(document.body, { childList: true, subtree: true });
 })();
 JS;
+    }
+
+    /**
+     * Validate NIP at checkout — if provided, it must pass the checksum.
+     * FluentCart passes ['data' => $formData, 'cart' => $cart] as second arg.
+     */
+    public static function validateCheckoutNip($errors, $data): mixed
+    {
+        // FluentCart wraps checkout data: $data = ['data' => [...], 'cart' => [...]]
+        $formData = $data['data'] ?? $data;
+        $nip = $formData['billing_nip'] ?? '';
+        if (empty($nip)) {
+            return $errors;
+        }
+
+        if (!self::validateNip($nip)) {
+            if (is_wp_error($errors)) {
+                $errors->add('billing_nip', __('Invalid NIP (Tax ID). Please check the number.', 'fchub-fakturownia'));
+            } else {
+                $errors = new \WP_Error('billing_nip', __('Invalid NIP (Tax ID). Please check the number.', 'fchub-fakturownia'));
+            }
+        }
+
+        return $errors;
     }
 
     /**
@@ -156,6 +185,13 @@ JS;
             $sum += (int) $nip[$i] * $weights[$i];
         }
 
-        return ($sum % 11) === (int) $nip[9];
+        $checkDigit = $sum % 11;
+
+        // Mod-11 = 10 means the NIP is invalid (no valid check digit exists)
+        if ($checkDigit === 10) {
+            return false;
+        }
+
+        return $checkDigit === (int) $nip[9];
     }
 }

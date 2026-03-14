@@ -55,6 +55,9 @@ class ContentProtection
         add_action('fchub_memberships/grant_paused', [$this, 'invalidateGrantUserCache'], 10, 1);
         add_action('fchub_memberships/grant_resumed', [$this, 'invalidateGrantUserCache'], 10, 1);
         add_action('fchub_memberships/grant_renewed', [$this, 'invalidateGrantUserCache'], 10, 1);
+        // Bug G fix: Also invalidate cache when grants expire (cron-triggered events)
+        add_action('fchub_memberships/grant_expired', [$this, 'invalidateGrantUserCache'], 10, 1);
+        add_action('fchub_memberships/grant_term_expired', [$this, 'invalidateGrantUserCache'], 10, 1);
     }
 
     /**
@@ -125,6 +128,11 @@ class ContentProtection
 
         $userId = get_current_user_id();
         if ($userId && $this->evaluator->canAccess($userId, Constants::PROVIDER_WORDPRESS_CORE, $postType, $postId)) {
+            return $excerpt;
+        }
+
+        // Bug H fix: Also check taxonomy-based access, same as filterContent() does
+        if ($userId && $this->hasAccessViaTaxonomy($userId, $post)) {
             return $excerpt;
         }
 

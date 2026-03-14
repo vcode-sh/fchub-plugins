@@ -3,6 +3,7 @@
 namespace FChubMemberships\Domain;
 
 use FChubMemberships\Domain\Grant\AnchorDateCalculator;
+use FChubMemberships\Domain\Grant\MembershipTermCalculator;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 
@@ -53,6 +54,32 @@ final class GrantPlanContextService
                 ]);
             } elseif ($durationType === 'lifetime') {
                 $context['expires_at'] = null;
+            }
+        }
+
+        // Apply membership term cap (universal, runs after all duration type logic).
+        // Skip if feed-level override already set a term end date.
+        if ($plan && empty($context['meta']['membership_term_ends_at'])) {
+            $termConfig = $plan['meta']['membership_term'] ?? null;
+            if ($termConfig && ($termConfig['mode'] ?? 'none') !== 'none') {
+                $termEndsAt = MembershipTermCalculator::calculateEndDate($termConfig, current_time('mysql'));
+                if ($termEndsAt) {
+                    $context['meta'] = array_merge($context['meta'] ?? [], [
+                        'membership_term_ends_at' => $termEndsAt,
+                    ]);
+
+                    $currentExpiry = $context['expires_at'] ?? null;
+                    if ($currentExpiry === null) {
+                        // Lifetime / subscription_mirror with no expiry gets one from the term
+                        $context['expires_at'] = $termEndsAt;
+                    } else {
+                        // Cap existing expiry at term end
+                        $context['expires_at'] = MembershipTermCalculator::capExpiry(
+                            $currentExpiry,
+                            $termEndsAt
+                        );
+                    }
+                }
             }
         }
 

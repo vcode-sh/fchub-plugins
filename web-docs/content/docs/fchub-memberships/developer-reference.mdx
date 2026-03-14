@@ -19,6 +19,7 @@ The plugin fires these WordPress action hooks during the membership lifecycle. A
 | `grant_created` | `int $userId, int $planId, array $context` | New membership access granted |
 | `grant_revoked` | `array $grants, int $planId, int $userId, string $reason` | Access revoked |
 | `grant_expired` | `array $grant` | Access expired naturally |
+| `grant_term_expired` | `array $grant` | Access expired because membership term reached <Badge>v1.3.0</Badge> |
 | `grant_paused` | `array $grant, string $reason` | Membership paused |
 | `grant_resumed` | `array $grant` | Paused membership resumed |
 | `grant_renewed` | `array $grant` | Subscription renewed |

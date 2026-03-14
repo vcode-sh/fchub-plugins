@@ -1,3 +1,95 @@
+### v1.1.1
+
+*Released 14 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.1)
+
+The audit that wouldn't end. We ran 206 unit tests, found 50+ bugs across five audit rounds (including a security audit, Fakturownia API spec review, and a full frontend wiring teardown), and discovered the settings page was completely blank the whole time. Nobody complained. We're choosing to find that encouraging.
+
+#### Fixed: settings page was entirely broken
+
+The Fakturownia settings page at **Integrations > Fakturownia** showed absolutely nothing. A white void. No fields, no buttons, no error. Just the quiet despair of a misconfigured REST response wrapper. FluentCart's Vue expected `response.data.integration` but got raw JSON with no `data` key. Every integration that uses FluentCart's `getGlobalSettingsData()` has this problem — we just happened to be the first to notice.
+
+The page now loads, renders all 8 fields, shows a green **"Connected to your-domain.fakturownia.pl"** status, and the Save button actually tells you whether it worked.
+
+#### Fixed: Settings button missing from integration card
+
+On the Integrations page, every other plugin had install/configure buttons. Fakturownia had nothing — just a card you could technically click if you happened to know the cursor changed. Now there's a visible **Settings** button. Revolutionary.
+
+#### Fixed: NIP validation never actually ran
+
+The NIP checksum validation at checkout was wired to the wrong data path. FluentCart passes `{data: formData, cart: cart}` but we read `formData.billing_nip` directly — one level too shallow. Every NIP was accepted. `0000000000`? Sure. `ABCDEFGHIJ`? Why not. Fixed with a proper nested lookup and a fallback for backwards compatibility.
+
+#### Fixed: invoices sent without currency
+
+Multi-currency stores were creating invoices in Fakturownia's default currency (PLN) regardless of what the customer actually paid in. A EUR order got a PLN invoice. Now sends the order's actual currency.
+
+#### Fixed: proforma invoices sent as "paid"
+
+Proformas are payment requests. Sending them with `status: paid` defeats the entire point. They now get `status: issued`, no `paid_date`, and a 7-day payment term. Also no longer sent to KSeF (proformas aren't KSeF-eligible — `gov_status: not_applicable`).
+
+#### Fixed: invoices crashed on null billing address
+
+Digital-only orders or orders where the billing address insert failed would crash with a TypeError before any null check could save them. Every property access now uses null-safe operators. Guest orders with deleted customer records are also handled.
+
+#### Fixed: discounted items got wrong VAT rate
+
+Tax rate was calculated using the pre-discount subtotal as the denominator. A 50%-off product at 23% VAT would calculate as 11.5% and snap to 8%. Now uses `line_total` (post-discount amount) — where the tax was actually calculated.
+
+#### Fixed: 0% VAT treated as exempt
+
+`normalizeVatRate(0)` returned `'zw'` (exempt). But 0% VAT and exempt are legally different things — 0% is a real rate (e.g. intra-community supply), `'zw'` means no VAT applies at all. KSeF cares about this distinction. Fixed.
+
+#### Security: SSRF prevention on domain field
+
+An admin could set the Fakturownia domain to `169.254.169.254` or `evil.attacker.com` and the plugin would happily send API requests (including the API token) to that host. Now validates that the domain matches `*.fakturownia.pl` and rejects anything else.
+
+#### Security: Content-Type hardcoded on PDF proxy
+
+The PDF download proxy was forwarding the upstream Content-Type header verbatim. If a MitM (or a very confused Fakturownia API) returned `text/html`, your browser would render the response body as a page — potential XSS. Now hardcoded to `application/pdf`.
+
+#### Security: ZIP URL validated in auto-updater
+
+The GitHub auto-updater accepted any `browser_download_url` from the releases API without checking the domain. A compromised API response (or poisoned transient) could redirect the download to a backdoored ZIP. Now validates URLs start with `github.com/vcode-sh/fchub-plugins/`.
+
+#### New: connection status on settings page
+
+The settings page now shows a clear **"Connected to X.fakturownia.pl"** indicator in green when the API connection is active. If credentials are wrong, a red error banner explains what to do. No more guessing whether your token works.
+
+#### New: EU VAT number support (`buyer_tax_no_kind`)
+
+Non-Polish buyers with EU VAT numbers (e.g. `DE123456789`) now get the correct `buyer_tax_no_kind: 'nip_ue'` on the invoice. Non-EU tax IDs get `'other'`. KSeF requires this field — without it, invoices to EU companies were rejected.
+
+#### New: correction invoices follow Fakturownia API spec
+
+Correction invoice positions now include `kind: 'correction'` and `correction_before_attributes.kind: 'correction_before'` as the API spec requires. Also stores initial KSeF data (`gov_id`, `gov_link`) from the correction create response instead of waiting for the first cron poll.
+
+#### New: feed note wired to invoice description
+
+The "Invoice Note" field in the integration feed settings existed in the UI but did exactly nothing. It now passes through to Fakturownia as the invoice `description` field, truncated to 3,500 characters (KSeF limit).
+
+#### New: KSeF sandbox support
+
+Fakturownia sandbox environments return `demo_ok`, `demo_processing`, `demo_send_error` etc. The plugin only checked for the non-prefixed versions, so sandbox KSeF statuses would retry 30 times and give up. Now strips the `demo_` prefix automatically.
+
+#### New: `server_error` KSeF status triggers retry
+
+KSeF `server_error` is transient (KSeF is down, not your invoice). Previously treated as terminal — the plugin would just stop checking. Now retries alongside `processing`, giving KSeF time to recover.
+
+#### Other improvements
+
+- `exempt_tax_kind` auto-set when KSeF is enabled and positions use `'zw'` tax — prevents KSeF 422 rejection
+- `payment_to` and `payment_to_kind` now sent to Fakturownia (payment deadline visible on documents)
+- API token masked in admin settings API response (`****` + last 4 chars)
+- `department_id` validated as numeric — no more SQL injection via settings field (admin-only, but still)
+- NIP mod-11=10 explicitly rejected (was only working by accident)
+- `return` after every `wp_send_json` error for defensive safety
+- All buyer/position fields truncated to Fakturownia's documented limits (255/256/3500/16 chars)
+- `mb_substr` used everywhere instead of `substr` — Polish characters no longer split mid-byte
+- Strict `=== 0.0` comparison instead of loose `== 0` for tax amount checks
+- GitHubUpdater markdown code blocks no longer render with backtick delimiters
+- 206 unit tests covering every bug fix, edge case, and adversarial input
+
+<Separator className="my-8" />
+
 ### v1.1.0
 
 *Released 14 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.0)

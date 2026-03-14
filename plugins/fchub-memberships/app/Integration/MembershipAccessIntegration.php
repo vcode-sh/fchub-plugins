@@ -5,6 +5,7 @@ namespace FChubMemberships\Integration;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Domain\Grant\AnchorDateCalculator;
+use FChubMemberships\Domain\Grant\MembershipTermCalculator;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Support\Logger;
@@ -146,6 +147,47 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                 'inline_tip' => __('What happens when a subscription is cancelled or a refund is issued.', 'fchub-memberships'),
             ],
             [
+                'key'       => 'membership_term_mode',
+                'label'     => __('Membership Term', 'fchub-memberships'),
+                'component' => 'radio_choice',
+                'options'   => [
+                    'none'   => __('No limit (use plan default)', 'fchub-memberships'),
+                    '1y'     => __('1 Year', 'fchub-memberships'),
+                    '2y'     => __('2 Years', 'fchub-memberships'),
+                    '3y'     => __('3 Years', 'fchub-memberships'),
+                    'custom' => __('Custom', 'fchub-memberships'),
+                ],
+                'inline_tip' => __('Override the plan\'s membership term for this feed. Sets an absolute upper bound on membership duration.', 'fchub-memberships'),
+            ],
+            [
+                'key'         => 'membership_term_value',
+                'label'       => __('Term Length', 'fchub-memberships'),
+                'component'   => 'number',
+                'placeholder' => '6',
+                'inline_tip'  => __('Number of units for the custom term length.', 'fchub-memberships'),
+                'dependency'  => [
+                    'depends_on' => 'membership_term_mode',
+                    'value'      => 'custom',
+                    'operator'   => '=',
+                ],
+            ],
+            [
+                'key'       => 'membership_term_unit',
+                'label'     => __('Term Unit', 'fchub-memberships'),
+                'component' => 'radio_choice',
+                'options'   => [
+                    'days'   => __('Days', 'fchub-memberships'),
+                    'weeks'  => __('Weeks', 'fchub-memberships'),
+                    'months' => __('Months', 'fchub-memberships'),
+                    'years'  => __('Years', 'fchub-memberships'),
+                ],
+                'dependency' => [
+                    'depends_on' => 'membership_term_mode',
+                    'value'      => 'custom',
+                    'operator'   => '=',
+                ],
+            ],
+            [
                 'key'        => 'auto_create_user',
                 'label'      => __('Auto-Create User', 'fchub-memberships'),
                 'component'  => 'yes-no-checkbox',
@@ -244,6 +286,29 @@ class MembershipAccessIntegration extends BaseIntegrationManager
             $context['meta'] = array_merge($context['meta'] ?? [], [
                 'billing_anchor_day' => (int) Arr::get($settings, 'billing_anchor_day', 1),
             ]);
+        }
+
+        // Feed-level membership term override
+        $feedTermMode = Arr::get($settings, 'membership_term_mode', 'none');
+        if ($feedTermMode !== 'none') {
+            $feedTermConfig = ['mode' => $feedTermMode];
+            if ($feedTermMode === 'custom') {
+                $feedTermConfig['value'] = (int) Arr::get($settings, 'membership_term_value', 1);
+                $feedTermConfig['unit'] = Arr::get($settings, 'membership_term_unit', 'months');
+            } elseif ($feedTermMode === 'date') {
+                $feedTermConfig['date'] = Arr::get($settings, 'membership_term_date');
+            }
+            $termEndsAt = MembershipTermCalculator::calculateEndDate($feedTermConfig, current_time('mysql'));
+            if ($termEndsAt) {
+                $context['meta'] = array_merge($context['meta'] ?? [], [
+                    'membership_term_ends_at' => $termEndsAt,
+                ]);
+                if (empty($context['expires_at'])) {
+                    $context['expires_at'] = $termEndsAt;
+                } else {
+                    $context['expires_at'] = MembershipTermCalculator::capExpiry($context['expires_at'], $termEndsAt);
+                }
+            }
         }
 
         $grantService = new \FChubMemberships\Domain\AccessGrantService();
