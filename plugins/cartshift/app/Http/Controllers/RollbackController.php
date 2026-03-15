@@ -42,9 +42,12 @@ final class RollbackController
             );
         }
 
-        /** @var MigrationRollback $rollback */
-        $rollback = $this->container->get(MigrationRollback::class);
+        /** @var IdMapRepository $idMap */
+        $idMap = $this->container->get(IdMapRepository::class);
+        /** @var MigrationLogRepository $log */
+        $log = $this->container->get(MigrationLogRepository::class);
 
+        $rollback = new MigrationRollback($idMap, $log);
         $stats = $rollback->rollback($migrationId);
 
         return new WP_REST_Response([

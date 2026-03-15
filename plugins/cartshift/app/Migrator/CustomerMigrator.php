@@ -71,6 +71,22 @@ final class CustomerMigrator extends AbstractMigrator
         return $batch;
     }
 
+    /**
+     * Validate a customer record without creating any FC records.
+     */
+    #[\Override]
+    public function validateRecord(mixed $record): bool
+    {
+        $type = $record['type'];
+        $data = $record['data'];
+
+        return match ($type) {
+            'registered' => $this->validateRegistered($data),
+            'guest'      => $this->validateGuest($data),
+            default      => false,
+        };
+    }
+
     #[\Override]
     public function processRecord(mixed $record): int|false
     {
@@ -92,6 +108,62 @@ final class CustomerMigrator extends AbstractMigrator
         }
 
         return $record['data']['email'];
+    }
+
+    /**
+     * Validate a registered customer without creating any FC records.
+     */
+    private function validateRegistered(array $userData): bool
+    {
+        $userId = (int) $userData['user_id'];
+
+        if ($this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $userId)) {
+            $this->writeLog($userId, 'dry-run', 'dry-run: already migrated, would skip.');
+            return false;
+        }
+
+        $user = get_userdata($userId);
+        if (!$user) {
+            $this->writeLog($userId, 'dry-run', 'dry-run: user not found, would fail.');
+            return false;
+        }
+
+        if (empty($user->user_email)) {
+            $this->writeLog($userId, 'dry-run', 'dry-run: user has no email, would fail.');
+            return false;
+        }
+
+        $this->writeLog($userId, 'dry-run', sprintf(
+            'dry-run: would create customer "%s".',
+            $user->user_email,
+        ));
+
+        return true;
+    }
+
+    /**
+     * Validate a guest customer without creating any FC records.
+     */
+    private function validateGuest(array $guestData): bool
+    {
+        $email = $guestData['email'];
+
+        if (empty($email)) {
+            $this->writeLog($email, 'dry-run', 'dry-run: guest email is empty, would fail.');
+            return false;
+        }
+
+        if ($this->idMap->getFcId(Constants::ENTITY_GUEST_CUSTOMER, $email)) {
+            $this->writeLog($email, 'dry-run', 'dry-run: guest already migrated, would skip.');
+            return false;
+        }
+
+        $this->writeLog($email, 'dry-run', sprintf(
+            'dry-run: would create customer "%s".',
+            $email,
+        ));
+
+        return true;
     }
 
     /**

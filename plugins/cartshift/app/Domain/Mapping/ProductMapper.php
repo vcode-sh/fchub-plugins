@@ -10,8 +10,12 @@ use CartShift\Support\MoneyHelper;
 
 final class ProductMapper
 {
+    /**
+     * @param array<int, int> $shippingClassMap WC shipping class term_id => FC shipping class ID.
+     */
     public function __construct(
         private readonly string $currency,
+        private readonly array $shippingClassMap = [],
     ) {}
 
     /**
@@ -34,7 +38,7 @@ final class ProductMapper
             'post_title'    => $product->get_name(),
             'post_content'  => $product->get_description(),
             'post_excerpt'  => $product->get_short_description(),
-            'post_status'   => $product->get_status() === 'publish' ? 'publish' : 'draft',
+            'post_status'   => self::resolvePostStatus($product),
             'post_type'     => 'fluent-products',
             'post_name'     => $product->get_slug(),
             'post_date'     => $product->get_date_created()
@@ -56,7 +60,7 @@ final class ProductMapper
             'other_info'          => self::buildDetailOtherInfo($product),
         ];
 
-        $variationMapper = new VariationMapper($this->currency);
+        $variationMapper = new VariationMapper($this->currency, $this->shippingClassMap);
         $variations = [];
 
         if ($isVariable) {
@@ -136,6 +140,44 @@ final class ProductMapper
         }
 
         return $info;
+    }
+
+    /**
+     * Resolve the FC post_status from WC status + catalog visibility.
+     *
+     * WC separates post_status (publish/draft/private/pending) from catalog visibility
+     * (visible/catalog/search/hidden). FC only has publish/draft/private.
+     *
+     * Products that are published but hidden from both catalog and search are mapped to draft.
+     * Products with partial visibility (catalog-only or search-only) stay published but
+     * generate a warning via the 'cartshift/mapper/product/warnings' filter.
+     */
+    private static function resolvePostStatus(\WC_Product $product): string
+    {
+        $wcStatus = $product->get_status();
+        $visibility = method_exists($product, 'get_catalog_visibility')
+            ? $product->get_catalog_visibility()
+            : 'visible';
+
+        $fcStatus = match (true) {
+            $wcStatus === 'private' => 'private',
+            $wcStatus !== 'publish' => 'draft',
+            $visibility === 'hidden' => 'draft',
+            default => 'publish',
+        };
+
+        if ($wcStatus === 'publish' && in_array($visibility, ['catalog', 'search'], true)) {
+            /** @see 'cartshift/mapper/product/warnings' */
+            apply_filters('cartshift/mapper/product/warnings', [
+                sprintf(
+                    'Product #%d has partial visibility "%s" — mapped as published. FC does not support partial catalog visibility.',
+                    $product->get_id(),
+                    $visibility,
+                ),
+            ], $product);
+        }
+
+        return $fcStatus;
     }
 
     /**

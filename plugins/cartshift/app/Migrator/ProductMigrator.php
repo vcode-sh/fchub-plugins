@@ -19,6 +19,7 @@ use FluentCart\App\Models\ProductDetail;
 use FluentCart\App\Models\ProductDownload;
 use FluentCart\App\Models\ProductMeta;
 use FluentCart\App\Models\ProductVariation;
+use FluentCart\App\Models\ShippingClass;
 
 final class ProductMigrator extends AbstractMigrator
 {
@@ -34,8 +35,11 @@ final class ProductMigrator extends AbstractMigrator
     /** @var array<string, int> WC attribute term slug => FC attribute term ID */
     private array $attributeTermMap = [];
 
-    private readonly ProductMapper $productMapper;
-    private readonly VariationMapper $variationMapper;
+    /** @var array<int, int> WC shipping class term_id => FC shipping class ID */
+    private array $shippingClassMap = [];
+
+    private ProductMapper $productMapper;
+    private VariationMapper $variationMapper;
 
     public function __construct(
         IdMapRepository $idMap,
@@ -60,6 +64,12 @@ final class ProductMigrator extends AbstractMigrator
         $this->migrateCategories();
         $this->migrateBrands();
         $this->migrateAttributes();
+        $this->migrateShippingClasses();
+
+        // Rebuild mappers now that shipping class map is populated.
+        $currency = get_woocommerce_currency();
+        $this->productMapper = new ProductMapper($currency, $this->shippingClassMap);
+        $this->variationMapper = new VariationMapper($currency, $this->shippingClassMap);
     }
 
     /**
@@ -184,6 +194,53 @@ final class ProductMigrator extends AbstractMigrator
             'orderby' => 'ID',
             'order'   => 'ASC',
         ]);
+    }
+
+    /**
+     * Validate a product without creating any FC records.
+     *
+     * @param \WC_Product $product
+     */
+    #[\Override]
+    public function validateRecord(mixed $product): bool
+    {
+        $wcId = $product->get_id();
+        $name = $product->get_name();
+
+        if ($this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcId)) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.');
+            return false;
+        }
+
+        $mapped = $this->productMapper->map($product);
+
+        if ($mapped === null) {
+            $this->writeLog($wcId, 'dry-run', sprintf(
+                'dry-run: unsupported product type "%s", would skip.',
+                $product->get_type(),
+            ));
+            return false;
+        }
+
+        if (empty($name)) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: product name is empty, would fail.');
+            return false;
+        }
+
+        $variationCount = count($mapped['variations']);
+
+        if ($variationCount === 0) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: no variations would be created, would fail.');
+            return false;
+        }
+
+        $this->writeLog($wcId, 'dry-run', sprintf(
+            'dry-run: would create product "%s" with %d variation(s).',
+            $name,
+            $variationCount,
+        ));
+
+        return true;
     }
 
     /**
@@ -894,6 +951,63 @@ final class ProductMigrator extends AbstractMigrator
                     );
                 }
             }
+        }
+    }
+
+    /**
+     * Migrate WC product_shipping_class terms to FC fct_shipping_classes table.
+     */
+    public function migrateShippingClasses(): void
+    {
+        $wcShippingClasses = get_terms([
+            'taxonomy'   => 'product_shipping_class',
+            'hide_empty' => false,
+        ]);
+
+        if (is_wp_error($wcShippingClasses) || empty($wcShippingClasses)) {
+            return;
+        }
+
+        foreach ($wcShippingClasses as $wcTerm) {
+            $existing = ShippingClass::query()->where('name', $wcTerm->name)->first();
+
+            if ($existing) {
+                $this->shippingClassMap[$wcTerm->term_id] = (int) $existing->id;
+                $this->idMap->store(
+                    Constants::ENTITY_SHIPPING_CLASS,
+                    (string) $wcTerm->term_id,
+                    (int) $existing->id,
+                    $this->migrationId,
+                    false,
+                );
+                $this->writeLog(
+                    $wcTerm->term_id,
+                    'skipped',
+                    sprintf('Shipping class "%s" already exists in FluentCart (FC ID %d).', $wcTerm->name, $existing->id),
+                );
+                continue;
+            }
+
+            $fcShippingClass = ShippingClass::query()->create([
+                'name'     => $wcTerm->name,
+                'cost'     => '0.00',
+                'per_item' => 0,
+                'type'     => 'fixed',
+            ]);
+
+            $this->shippingClassMap[$wcTerm->term_id] = (int) $fcShippingClass->id;
+            $this->idMap->store(
+                Constants::ENTITY_SHIPPING_CLASS,
+                (string) $wcTerm->term_id,
+                (int) $fcShippingClass->id,
+                $this->migrationId,
+                true,
+            );
+            $this->writeLog(
+                $wcTerm->term_id,
+                'success',
+                sprintf('Migrated shipping class "%s" (FC ID: %d).', $wcTerm->name, $fcShippingClass->id),
+            );
         }
     }
 

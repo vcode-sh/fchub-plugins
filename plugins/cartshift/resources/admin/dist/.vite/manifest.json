@@ -1,0 +1,18 @@
+{
+  "resources/admin/fonts/inter-latin.woff2": {
+    "file": "assets/inter-latin-BOOGhInR.woff2",
+    "src": "resources/admin/fonts/inter-latin.woff2"
+  },
+  "src/main.js": {
+    "file": "assets/main-BAemgRd1.js",
+    "name": "main",
+    "src": "src/main.js",
+    "isEntry": true,
+    "css": [
+      "assets/main-CdGp-MBc.css"
+    ],
+    "assets": [
+      "assets/inter-latin-BOOGhInR.woff2"
+    ]
+  }
+}

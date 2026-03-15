@@ -625,6 +625,22 @@ class ProductMeta extends Model
 
 /**
  * @property int $id
+ * @property string $name
+ * @property string $cost
+ * @property int $per_item
+ * @property string $type
+ * @property string|null $created_at
+ * @property string|null $updated_at
+ */
+class ShippingClass extends Model
+{
+    protected $table = 'fct_shipping_classes';
+
+    protected $fillable = ['name', 'cost', 'per_item', 'type'];
+}
+
+/**
+ * @property int $id
  * @property string $title
  * @property string|null $slug
  * @property string|null $description

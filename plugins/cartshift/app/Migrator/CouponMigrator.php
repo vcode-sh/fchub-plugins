@@ -69,6 +69,47 @@ final class CouponMigrator extends AbstractMigrator
     }
 
     /**
+     * Validate a coupon without creating any FC records.
+     *
+     * @param \WC_Coupon $coupon
+     */
+    #[\Override]
+    public function validateRecord(mixed $coupon): bool
+    {
+        $wcId = $coupon->get_id();
+
+        if ($this->idMap->getFcId(Constants::ENTITY_COUPON, (string) $wcId)) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.');
+            return false;
+        }
+
+        $code = strtoupper($coupon->get_code());
+
+        if (empty($code)) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: coupon code is empty, would fail.');
+            return false;
+        }
+
+        $wcType = $coupon->get_discount_type();
+        $validTypes = ['percent', 'fixed_cart', 'fixed_product', 'recurring_fee', 'recurring_percent', 'sign_up_fee', 'sign_up_fee_percent'];
+
+        if (!in_array($wcType, $validTypes, true)) {
+            $this->writeLog($wcId, 'dry-run', sprintf(
+                'dry-run: unknown discount type "%s" for coupon "%s", would default to percent.',
+                $wcType,
+                $code,
+            ));
+        }
+
+        $this->writeLog($wcId, 'dry-run', sprintf(
+            'dry-run: would create coupon "%s".',
+            $code,
+        ));
+
+        return true;
+    }
+
+    /**
      * @param \WC_Coupon $coupon
      */
     #[\Override]

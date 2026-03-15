@@ -268,6 +268,12 @@ final class MigrationOrchestratorTest extends PluginTestCase
             }
 
             #[\Override]
+            public function validateRecord(mixed $record): bool
+            {
+                return true;
+            }
+
+            #[\Override]
             public function getRecordId(mixed $record): string
             {
                 return (string) $record->id;

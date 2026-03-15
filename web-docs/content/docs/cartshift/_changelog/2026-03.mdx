@@ -1,3 +1,72 @@
+### v1.1.0
+
+*Released 15 March 2026*
+
+A complete rewrite. The old codebase was a flat script with no separation of concerns — a god-class controller, static mappers, and enough corrupted JSON to make a database cry. We burned it down and rebuilt it properly. PER-CS 3.0, PHP 8.3, modular architecture, and 182 tests that actually prove things work.
+
+If you ran a migration with v1.0.x, bless your heart. This version fixes every data integrity issue we found — and we found a lot.
+
+#### Architecture
+
+Rebuilt from scratch following the `fchub-memberships` module pattern. DI container, feature flags, interface contracts, the works. The old 382-line `AdminController` is now four focused controllers that delegate to domain services. Mappers are instance classes with constructor injection instead of bags of static methods. Every class is `final` unless it's designed for inheritance.
+
+The admin UI moved from 770 lines of vanilla JS string concatenation to Vue 3 with Vite. Reactive state, composables, scoped styles, and a build step that outputs 99KB. The kind of frontend you can actually debug without questioning your life choices.
+
+#### Data integrity fixes (the scary ones)
+
+- **Double JSON encoding** — nine fields across six mappers called `json_encode()` before passing arrays to FluentCart models that already encode internally. Every piece of metadata in every migrated record was corrupted. Fixed everywhere.
+- **Order status mapping** — `pending` mapped to a status FluentCart doesn't recognise. `cancelled` mapped to `failed`. Both wrong. Now maps correctly using backed PHP 8.3 enums.
+- **Order type** — was `onetime` (not a thing in FC). Now `checkout`, matching FC's own migrator.
+- **Guest customer IDs** — used `crc32()` which collides at ~77k emails and produces negative integers on 64-bit PHP. Now uses the email string directly as the key.
+- **Null foreign keys** — if a customer wasn't migrated, the order was created with `customer_id = 0`. Now validates all FKs before creating records and skips with a logged warning.
+- **Rollback deleted pre-existing data** — if a customer already existed in FC, rollback would delete them. Now tracks `created_by_migration` and only rolls back what the migration actually created.
+- **Zero-decimal currencies** — JPY, KRW, and 14 others were multiplied by 100, turning ¥1000 into ¥100,000. Now handled correctly.
+- **Tax behaviour inverted** — inclusive tax was stored as exclusive and vice versa. The trifecta of wrong.
+- **Unit price from discounted total** — items with coupons had incorrect per-unit pricing. Now derives from the pre-discount subtotal.
+
+#### New data migrated
+
+Products get gallery images, variation thumbnails, download files, weight/dimensions, default variation selection, shipping classes, product visibility (private preserved, hidden mapped), brands, tags (as searchable meta), and FC attribute system integration.
+
+Orders get applied coupons, fee line items as proper FC records, per-item refund tracking, shipping line details, order notes, key meta fields (transaction ID, customer note, phone numbers), invoice numbers (`WC-{id}`), exchange rates, and partial refund status sync.
+
+Subscriptions get Stripe/PayPal vendor IDs, multi-item warnings, and quarterly/half-yearly billing intervals.
+
+Customers get purchase stats recalculated post-migration: LTV, AOV, purchase count, first/last purchase dates — all matching FC's actual schema including the JSON-by-currency `purchase_value` format.
+
+Coupons get FC's real condition schema with product/category restrictions and email restrictions.
+
+#### Migration engine
+
+- **Batch processing** — each batch processes 50 records then returns immediately. The UI drives batches via REST for real-time progress. No more single-request timeout bombs.
+- **Action Scheduler** — available for WP-CLI background processing. The web UI uses direct REST batches for instant feedback.
+- **Dry run** — actually works now (it was a complete no-op before — the flag travelled through the stack and did nothing). Validates every record without writing to the database. Log entries show exactly what would happen.
+- **Transaction wrapping** — each record wrapped in `START TRANSACTION / COMMIT / ROLLBACK`. Partial data on failure is impossible.
+- **Cache management** — `wp_cache_flush()` every 5 batches to prevent memory exhaustion on large stores.
+- **HPOS compatible** — all order queries use the `wc_orders` table, not `wp_posts`.
+
+#### Preflight
+
+Eight checks now, up from five: WooCommerce, FluentCart, WC Subscriptions (optional), PHP memory, max execution time, product type breakdown (warns about unsupported types), existing FC data, and migration table existence.
+
+#### WP-CLI
+
+Five commands: `wp cartshift migrate`, `rollback`, `status`, `log`, `finalize`. The `migrate` command runs synchronously with progress bars per entity. `log` supports `--format=table|json|csv` and `--status` filtering.
+
+#### Admin UI
+
+Vue 3 + Vite. Preflight checks with status badges, entity selection with auto-dependency resolution, real-time progress bars, expandable migration log with search/filter/load-more, CSV export, dark mode sync with FluentCart's theme.
+
+#### Rollback improvements
+
+Uses `wp_delete_post()` for products (not raw SQL — the old way left orphaned meta, terms, and thumbnails). Includes guest customers. Respects the `created_by_migration` flag. Follows `Constants::ROLLBACK_ORDER` for dependency-safe deletion.
+
+#### Post-migration finalization
+
+New `POST /cartshift/v1/finalize` endpoint recalculates customer purchase stats (LTV, AOV, purchase count, dates) and clears caches. Available via the admin UI button and `wp cartshift finalize`.
+
+<Separator className="my-8" />
+
 ### v1.0.3
 
 *Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/cartshift/v1.0.3)

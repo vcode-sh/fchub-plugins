@@ -1,25 +1,26 @@
 <?php
+
 /**
  * Plugin Name: CartShift
  * Plugin URI: https://fchub.co
  * Description: Migrate WooCommerce data (products, customers, orders, subscriptions, coupons) to FluentCart.
- * Version: 1.0.3
+ * Version: 1.1.0
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: cartshift
  * Domain Path: /languages
- * Requires at least: 6.4
- * Requires PHP: 8.1
- * Tested up to:    6.7
+ * Requires at least: 6.7
+ * Requires PHP: 8.3
+ * Tested up to:    7.0
  * Requires Plugins: woocommerce, fluent-cart
  * Update URI: https://fchub.co/cartshift
  */
 
 defined('ABSPATH') or die;
 
-define('CARTSHIFT_VERSION', '1.0.3');
+define('CARTSHIFT_VERSION', '1.1.0');
 define('CARTSHIFT_DB_VERSION', '1');
 define('CARTSHIFT_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CARTSHIFT_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -81,7 +82,7 @@ register_deactivation_hook(__FILE__, function () {
  * WordPress enforces `Requires Plugins: woocommerce, fluent-cart` at activation.
  * Dependency checks happen in the preflight endpoint, not here.
  */
-add_action('plugins_loaded', fn () => \CartShift\Core\PluginBootstrap::boot(), 20);
+add_action('plugins_loaded', fn() => \CartShift\Core\PluginBootstrap::boot(), 20);
 
 if (defined('WP_CLI') && WP_CLI) {
     \CartShift\CLI\MigrateCommand::register();

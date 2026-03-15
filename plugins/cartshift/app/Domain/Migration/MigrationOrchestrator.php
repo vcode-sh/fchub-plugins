@@ -106,10 +106,15 @@ final class MigrationOrchestrator
             $currentType,
         );
 
+        $isDryRun = $this->state->isDryRun();
+
         try {
             /** @see 'cartshift/migration/entity_started' */
             if ($offset === 0) {
-                $migrator->initialize();
+                // In dry-run mode, skip initialize() — it creates categories, brands, attributes.
+                if (!$isDryRun) {
+                    $migrator->initialize();
+                }
                 do_action('cartshift/migration/entity_started', $currentType, $migrationId);
             }
 
@@ -126,8 +131,16 @@ final class MigrationOrchestrator
 
                 // Check if there are more entities.
                 $nextIndex = $this->state->getCurrentEntityIndex();
+                $hasMore = $nextIndex < count($entityTypes);
 
-                return $this->buildResult($nextIndex < count($entityTypes));
+                if (!$hasMore) {
+                    $this->state->complete();
+
+                    /** @see 'cartshift/migration/completed' */
+                    do_action('cartshift/migration/completed', $migrationId);
+                }
+
+                return $this->buildResult($hasMore);
             }
 
             $entityState = $this->state->getCurrent()['entities'][$currentType] ?? [];
@@ -145,39 +158,62 @@ final class MigrationOrchestrator
                     return $this->buildCancelledResult();
                 }
 
-                // A2: Transaction wrapping prevents partial data on per-record failures.
-                $wpdb->query('START TRANSACTION');
+                if ($isDryRun) {
+                    // Dry-run: validate without creating records or transactions.
+                    try {
+                        $result = $migrator->validateRecord($record);
 
-                try {
-                    $result = $migrator->processRecord($record);
-
-                    if ($result === false) {
-                        $wpdb->query('COMMIT');
-                        $skipped++;
-                    } else {
-                        $wpdb->query('COMMIT');
-                        $processed++;
-
-                        /** @see 'cartshift/migration/record_migrated' */
-                        do_action(
-                            'cartshift/migration/record_migrated',
-                            $currentType,
-                            $migrator->getRecordId($record),
-                            $result,
+                        if ($result) {
+                            $processed++;
+                        } else {
+                            $skipped++;
+                        }
+                    } catch (\Throwable $e) {
+                        $errors++;
+                        $wcId = $migrator->getRecordId($record);
+                        $this->log->write(
                             $migrationId,
+                            $currentType,
+                            $wcId,
+                            'error',
+                            sprintf('dry-run validation failed: %s', $e->getMessage()),
                         );
                     }
-                } catch (\Throwable $e) {
-                    $wpdb->query('ROLLBACK');
-                    $errors++;
-                    $wcId = $migrator->getRecordId($record);
-                    $this->log->write(
-                        $migrationId,
-                        $currentType,
-                        $wcId,
-                        'error',
-                        $e->getMessage(),
-                    );
+                } else {
+                    // A2: Transaction wrapping prevents partial data on per-record failures.
+                    $wpdb->query('START TRANSACTION');
+
+                    try {
+                        $result = $migrator->processRecord($record);
+
+                        if ($result === false) {
+                            $wpdb->query('COMMIT');
+                            $skipped++;
+                        } else {
+                            $wpdb->query('COMMIT');
+                            $processed++;
+
+                            /** @see 'cartshift/migration/record_migrated' */
+                            do_action(
+                                'cartshift/migration/record_migrated',
+                                $currentType,
+                                $migrator->getRecordId($record),
+                                $result,
+                                $migrationId,
+                            );
+                        }
+                    } catch (\Throwable $e) {
+                        $wpdb->query('ROLLBACK');
+                        $errors++;
+                        $wcId = $migrator->getRecordId($record);
+                        $this->log->write(
+                            $migrationId,
+                            $currentType,
+                            $wcId,
+                            'error',
+                            $e->getMessage(),
+                        );
+                    }
                 }
             }
 
@@ -203,8 +239,16 @@ final class MigrationOrchestrator
                 $this->state->advanceEntity();
 
                 $nextIndex = $this->state->getCurrentEntityIndex();
+                $hasMore = $nextIndex < count($entityTypes);
 
-                return $this->buildResult($nextIndex < count($entityTypes));
+                if (!$hasMore) {
+                    $this->state->complete();
+
+                    /** @see 'cartshift/migration/completed' */
+                    do_action('cartshift/migration/completed', $migrationId);
+                }
+
+                return $this->buildResult($hasMore);
             }
 
             return $this->buildResult(true);

@@ -42,6 +42,13 @@ interface MigratorInterface
     public function processRecord(mixed $record): int|false;
 
     /**
+     * Validate a single record without creating any FC records (dry-run mode).
+     *
+     * @return bool True if the record is valid, false to skip.
+     */
+    public function validateRecord(mixed $record): bool;
+
+    /**
      * Get the WC ID from a record (for logging).
      */
     public function getRecordId(mixed $record): string;

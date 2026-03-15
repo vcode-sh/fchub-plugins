@@ -26,6 +26,7 @@ final class ConstantsTest extends PluginTestCase
         Constants::ENTITY_BRAND,
         Constants::ENTITY_ATTRIBUTE_GROUP,
         Constants::ENTITY_ATTRIBUTE_TERM,
+        Constants::ENTITY_SHIPPING_CLASS,
     ];
 
     public function testRollbackOrderContainsAllEntityTypes(): void
@@ -80,6 +81,25 @@ final class ConstantsTest extends PluginTestCase
             Constants::ENTITY_ATTRIBUTE_TERM,
             Constants::ROLLBACK_ORDER,
             'ROLLBACK_ORDER must include attribute_term entity type',
+        );
+    }
+
+    public function testRollbackOrderIncludesShippingClass(): void
+    {
+        $this->assertContains(
+            Constants::ENTITY_SHIPPING_CLASS,
+            Constants::ROLLBACK_ORDER,
+            'ROLLBACK_ORDER must include shipping_class entity type',
+        );
+
+        // Shipping classes must be rolled back before products (products reference them).
+        $scIndex = array_search(Constants::ENTITY_SHIPPING_CLASS, Constants::ROLLBACK_ORDER, true);
+        $productIndex = array_search(Constants::ENTITY_PRODUCT, Constants::ROLLBACK_ORDER, true);
+
+        $this->assertLessThan(
+            $productIndex,
+            $scIndex,
+            'ENTITY_SHIPPING_CLASS must appear before ENTITY_PRODUCT in ROLLBACK_ORDER',
         );
     }
 

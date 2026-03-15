@@ -104,6 +104,7 @@ final class MigrationRollback
             Constants::ENTITY_ORDER_TRANSACTION => $wpdb->prefix . 'fct_order_transactions',
             Constants::ENTITY_COUPON => $wpdb->prefix . 'fct_coupons',
             Constants::ENTITY_SUBSCRIPTION => $wpdb->prefix . 'fct_subscriptions',
+            Constants::ENTITY_SHIPPING_CLASS => $wpdb->prefix . 'fct_shipping_classes',
             default => null,
         };
     }

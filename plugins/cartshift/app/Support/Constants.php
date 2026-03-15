@@ -24,6 +24,7 @@ final class Constants
     public const string ENTITY_BRAND = 'brand';
     public const string ENTITY_ATTRIBUTE_GROUP = 'attribute_group';
     public const string ENTITY_ATTRIBUTE_TERM = 'attribute_term';
+    public const string ENTITY_SHIPPING_CLASS = 'shipping_class';
 
     public const int DEFAULT_BATCH_SIZE = 50;
 
@@ -40,6 +41,7 @@ final class Constants
         self::ENTITY_GUEST_CUSTOMER,
         self::ENTITY_ATTRIBUTE_TERM,
         self::ENTITY_ATTRIBUTE_GROUP,
+        self::ENTITY_SHIPPING_CLASS,
         self::ENTITY_VARIATION,
         self::ENTITY_PRODUCT_DETAIL,
         self::ENTITY_PRODUCT,

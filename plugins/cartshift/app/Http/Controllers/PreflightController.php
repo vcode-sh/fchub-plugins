@@ -7,6 +7,14 @@ namespace CartShift\Http\Controllers;
 defined('ABSPATH') || exit;
 
 use CartShift\Core\Container;
+use CartShift\Migrator\CouponMigrator;
+use CartShift\Migrator\CustomerMigrator;
+use CartShift\Migrator\OrderMigrator;
+use CartShift\Migrator\ProductMigrator;
+use CartShift\Migrator\SubscriptionMigrator;
+use CartShift\State\MigrationState;
+use CartShift\Storage\IdMapRepository;
+use CartShift\Storage\MigrationLogRepository;
 use CartShift\Validator\PreflightCheck;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -47,8 +55,20 @@ final class PreflightController
     {
         $counts = [];
 
-        /** @var \CartShift\Domain\Migration\Contracts\MigratorInterface[] $migrators */
-        $migrators = $this->container->get('migrators');
+        /** @var IdMapRepository $idMap */
+        $idMap = $this->container->get(IdMapRepository::class);
+        /** @var MigrationLogRepository $log */
+        $log = $this->container->get(MigrationLogRepository::class);
+        /** @var MigrationState $state */
+        $state = $this->container->get(MigrationState::class);
+
+        $migrators = [
+            new ProductMigrator($idMap, $log, $state, ''),
+            new CustomerMigrator($idMap, $log, $state, ''),
+            new CouponMigrator($idMap, $log, $state, ''),
+            new OrderMigrator($idMap, $log, $state, ''),
+            new SubscriptionMigrator($idMap, $log, $state, ''),
+        ];
 
         foreach ($migrators as $migrator) {
             $counts[$migrator->entityType()] = $migrator->count();

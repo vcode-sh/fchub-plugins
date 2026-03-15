@@ -163,6 +163,70 @@ final class ProductMapperTest extends PluginTestCase
         $this->assertSame('in', $otherInfo['dimension_unit']);
     }
 
+    public function testPrivateStatusPreserved(): void
+    {
+        $product = $this->createProduct([
+            'status' => 'private',
+            'catalog_visibility' => 'visible',
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertSame('private', $result['product']['post_status']);
+    }
+
+    public function testHiddenVisibilityMapsToDraft(): void
+    {
+        $product = $this->createProduct([
+            'status' => 'publish',
+            'catalog_visibility' => 'hidden',
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertSame('draft', $result['product']['post_status']);
+    }
+
+    public function testCatalogOnlyVisibilityStaysPublish(): void
+    {
+        $product = $this->createProduct([
+            'status' => 'publish',
+            'catalog_visibility' => 'catalog',
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertSame('publish', $result['product']['post_status']);
+    }
+
+    public function testSearchOnlyVisibilityStaysPublish(): void
+    {
+        $product = $this->createProduct([
+            'status' => 'publish',
+            'catalog_visibility' => 'search',
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertSame('publish', $result['product']['post_status']);
+    }
+
+    public function testPendingStatusMapsToDraft(): void
+    {
+        $product = $this->createProduct([
+            'status' => 'pending',
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertSame('draft', $result['product']['post_status']);
+    }
+
     public function testMapAppliesCartshiftMapperProductFilter(): void
     {
         $filterCalled = false;

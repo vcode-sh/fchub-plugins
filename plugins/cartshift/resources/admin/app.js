@@ -270,11 +270,11 @@
         html += '<p>Choose which WooCommerce data to migrate to FluentCart. Dependencies are respected automatically.</p>';
 
         var entities = [
-            { key: 'products', label: 'Products', count: state.counts ? state.counts.products : '?', dep: '' },
-            { key: 'customers', label: 'Customers', count: state.counts ? state.counts.customers : '?', dep: '' },
-            { key: 'coupons', label: 'Coupons', count: state.counts ? state.counts.coupons : '?', dep: '' },
-            { key: 'orders', label: 'Orders', count: state.counts ? state.counts.orders : '?', dep: 'Requires: Products, Customers' },
-            { key: 'subscriptions', label: 'Subscriptions', count: state.counts ? state.counts.subscriptions : '?', dep: 'Requires: Products, Customers, Orders' }
+            { key: 'product', label: 'Products', count: state.counts ? (state.counts.product || state.counts.products || 0) : '?', dep: '' },
+            { key: 'customer', label: 'Customers', count: state.counts ? (state.counts.customer || state.counts.customers || 0) : '?', dep: '' },
+            { key: 'coupon', label: 'Coupons', count: state.counts ? (state.counts.coupon || state.counts.coupons || 0) : '?', dep: '' },
+            { key: 'order', label: 'Orders', count: state.counts ? (state.counts.order || state.counts.orders || 0) : '?', dep: 'Requires: Products, Customers' },
+            { key: 'subscription', label: 'Subscriptions', count: state.counts ? (state.counts.subscription || state.counts.subscriptions || 0) : '?', dep: 'Requires: Products, Customers, Orders' }
         ];
 
         var wcsActive = state.preflight && state.preflight.checks.wc_subscriptions && state.preflight.checks.wc_subscriptions.active;
@@ -283,7 +283,7 @@
 
         for (var i = 0; i < entities.length; i++) {
             var e = entities[i];
-            var disabled = (e.key === 'subscriptions' && !wcsActive) ? ' disabled' : '';
+            var disabled = (e.key === 'subscription' && !wcsActive) ? ' disabled' : '';
             var checked = state.selectedEntities.indexOf(e.key) !== -1 ? ' checked' : '';
             html += '<tr>';
             html += '<td><input type="checkbox" class="cartshift-entity-cb" data-entity="' + e.key + '"' + checked + disabled + '></td>';
@@ -538,8 +538,10 @@
 
         Promise.all([api('GET', 'preflight'), api('GET', 'counts')])
             .then(function (results) {
-                state.preflight = results[0];
-                state.counts = results[1];
+                var preflightData = results[0].data || results[0];
+                var countsData = results[1].data || results[1];
+                state.preflight = preflightData;
+                state.counts = countsData.counts || countsData;
                 state.loading = false;
                 render();
             })
@@ -565,14 +567,14 @@
 
         // Auto-include dependencies.
         var selected = state.selectedEntities.slice();
-        if (selected.indexOf('orders') !== -1) {
-            if (selected.indexOf('products') === -1) selected.unshift('products');
-            if (selected.indexOf('customers') === -1) selected.splice(1, 0, 'customers');
+        if (selected.indexOf('order') !== -1) {
+            if (selected.indexOf('product') === -1) selected.unshift('product');
+            if (selected.indexOf('customer') === -1) selected.splice(1, 0, 'customer');
         }
-        if (selected.indexOf('subscriptions') !== -1) {
-            if (selected.indexOf('products') === -1) selected.unshift('products');
-            if (selected.indexOf('customers') === -1) selected.splice(1, 0, 'customers');
-            if (selected.indexOf('orders') === -1) selected.splice(selected.indexOf('subscriptions'), 0, 'orders');
+        if (selected.indexOf('subscription') !== -1) {
+            if (selected.indexOf('product') === -1) selected.unshift('product');
+            if (selected.indexOf('customer') === -1) selected.splice(1, 0, 'customer');
+            if (selected.indexOf('order') === -1) selected.splice(selected.indexOf('subscription'), 0, 'order');
         }
         state.selectedEntities = selected;
 
@@ -585,12 +587,18 @@
         api('POST', 'migrate', { entity_types: selected, dry_run: dryRun })
             .then(function (result) {
                 var data = result.data || result;
-                updateProgressFromBatch(data);
+                state.progress = data;
+                render();
 
-                if (data.continue) {
-                    runNextBatch();
-                } else {
+                if (!data.continue) {
+                    // Migration completed in the first batch.
                     migrationFinished();
+                } else if (data.scheduled) {
+                    // Action Scheduler handles batches in the background — just poll.
+                    startPolling();
+                } else {
+                    // AS unavailable — fall back to self-calling REST batch loop.
+                    runNextBatch();
                 }
             })
             .catch(function (err) {
@@ -602,16 +610,17 @@
     }
 
     /**
-     * Self-calling batch loop: POST /migrate/batch until continue === false.
+     * Fallback batch loop for when Action Scheduler is unavailable, or
+     * retry scenario. Processes one batch via REST, then self-calls.
      */
     function runNextBatch() {
         api('POST', 'migrate/batch')
             .then(function (result) {
                 var data = result.data || result;
-                updateProgressFromBatch(data);
+                state.progress = data;
+                render();
 
                 if (data.continue) {
-                    // Use setTimeout to avoid deep call stacks and let the browser breathe.
                     setTimeout(runNextBatch, 50);
                 } else {
                     migrationFinished();
@@ -620,7 +629,6 @@
             .catch(function (err) {
                 state.error = err.message;
                 state.batchError = true;
-                // Fetch latest progress to display current state.
                 api('GET', 'progress').then(function (result) {
                     var data = result.data || result;
                     state.progress = data;
@@ -631,28 +639,9 @@
             });
     }
 
-    /**
-     * Update local progress state from a batch response.
-     */
-    function updateProgressFromBatch(data) {
-        // Fetch full progress from the server to get the complete picture.
-        api('GET', 'progress').then(function (result) {
-            var progressData = result.data || result;
-            state.progress = progressData;
-            render();
-        }).catch(function () {
-            // Fallback: use the batch entities data if progress endpoint fails.
-            if (data.entities && state.progress) {
-                state.progress.entities = data.entities;
-                state.progress.status = data.status || state.progress.status;
-            }
-            render();
-        });
-    }
-
     function migrationFinished() {
+        stopPolling();
         state.migrating = false;
-        // Final progress fetch.
         api('GET', 'progress').then(function (result) {
             var data = result.data || result;
             state.progress = data;
@@ -692,10 +681,15 @@
             api('GET', 'progress').then(function (result) {
                 var data = result.data || result;
                 state.progress = data;
-                render();
-                if (data.status !== 'running') {
-                    stopPolling();
+
+                if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+                    migrationFinished();
+                    return;
                 }
+
+                render();
+            }).catch(function () {
+                // Network blip — keep polling, don't blow up.
             });
         }, 2000);
     }
@@ -723,8 +717,8 @@
     function loadLog() {
         api('GET', 'log?page=' + state.logPage).then(function (result) {
             var data = result.data || result;
-            state.log = data.entries;
-            state.logPages = data.pages;
+            state.log = data.data || data.entries || [];
+            state.logPages = Math.ceil((data.total || 0) / (data.per_page || 50));
             render();
         });
     }
@@ -735,10 +729,10 @@
         state.loading = true;
         render();
 
-        api('POST', 'rollback').then(function (result) {
+        api('POST', 'rollback', { migration_id: state.progress ? state.progress.migration_id : null }).then(function (result) {
             var data = result.data || result;
             state.loading = false;
-            alert('Rollback complete. Deleted records: ' + JSON.stringify(data.deleted));
+            alert('Rollback complete. Deleted records: ' + JSON.stringify(data.stats));
             state.screen = 'preflight';
             state.preflight = null;
             state.counts = null;

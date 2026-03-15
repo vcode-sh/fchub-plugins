@@ -55,7 +55,12 @@ abstract class AbstractMigrator implements MigratorInterface
     #[\Override]
     public function run(): void
     {
-        $this->initialize();
+        $isDryRun = $this->migrationState->isDryRun();
+
+        // In dry-run mode, skip initialize() — it creates categories, brands, attributes.
+        if (!$isDryRun) {
+            $this->initialize();
+        }
 
         $effectiveBatchSize = (int) apply_filters(
             'cartshift/migration/batch_size',
@@ -97,40 +102,10 @@ abstract class AbstractMigrator implements MigratorInterface
                     break 2;
                 }
 
-                // A2: Transaction wrapping prevents partial data on per-record failures.
-                global $wpdb;
-                $wpdb->query('START TRANSACTION');
-
-                try {
-                    $result = $this->processRecord($record);
-
-                    if ($result === false) {
-                        $wpdb->query('COMMIT');
-                        $this->skipped++;
-                    } else {
-                        $wpdb->query('COMMIT');
-                        $this->processed++;
-
-                        /** @see 'cartshift/migration/record_migrated' */
-                        do_action(
-                            'cartshift/migration/record_migrated',
-                            $this->getEntityType(),
-                            $this->getRecordId($record),
-                            $result,
-                            $this->migrationId,
-                        );
-                    }
-                } catch (\Throwable $e) {
-                    $wpdb->query('ROLLBACK');
-                    $this->errors++;
-                    $wcId = $this->getRecordId($record);
-                    $this->log->write(
-                        $this->migrationId,
-                        $this->getEntityType(),
-                        $wcId,
-                        'error',
-                        $e->getMessage(),
-                    );
+                if ($isDryRun) {
+                    $this->processDryRunRecord($record);
+                } else {
+                    $this->processRealRecord($record);
                 }
 
                 $this->migrationState->updateProgress(
@@ -164,6 +139,98 @@ abstract class AbstractMigrator implements MigratorInterface
         } else {
             $this->migrationState->completeEntity($this->getEntityType());
         }
+    }
+
+    /**
+     * Process a single record during a real (non-dry-run) migration.
+     * Wraps processRecord() in a transaction with error handling.
+     */
+    private function processRealRecord(mixed $record): void
+    {
+        // A2: Transaction wrapping prevents partial data on per-record failures.
+        global $wpdb;
+        $wpdb->query('START TRANSACTION');
+
+        try {
+            $result = $this->processRecord($record);
+
+            if ($result === false) {
+                $wpdb->query('COMMIT');
+                $this->skipped++;
+            } else {
+                $wpdb->query('COMMIT');
+                $this->processed++;
+
+                /** @see 'cartshift/migration/record_migrated' */
+                do_action(
+                    'cartshift/migration/record_migrated',
+                    $this->getEntityType(),
+                    $this->getRecordId($record),
+                    $result,
+                    $this->migrationId,
+                );
+            }
+        } catch (\Throwable $e) {
+            $wpdb->query('ROLLBACK');
+            $this->errors++;
+            $wcId = $this->getRecordId($record);
+            $this->log->write(
+                $this->migrationId,
+                $this->getEntityType(),
+                $wcId,
+                'error',
+                $e->getMessage(),
+            );
+        }
+    }
+
+    /**
+     * Process a single record during a dry-run migration.
+     * Validates data mapping without creating any FC records.
+     */
+    private function processDryRunRecord(mixed $record): void
+    {
+        try {
+            $result = $this->validateRecord($record);
+
+            if ($result) {
+                $this->processed++;
+            } else {
+                $this->skipped++;
+            }
+        } catch (\Throwable $e) {
+            $this->errors++;
+            $wcId = $this->getRecordId($record);
+            $this->log->write(
+                $this->migrationId,
+                $this->getEntityType(),
+                $wcId,
+                'error',
+                sprintf('dry-run validation failed: %s', $e->getMessage()),
+            );
+        }
+    }
+
+    /**
+     * Validate a single record without creating any FC records.
+     *
+     * Default implementation: logs what would be created and returns true.
+     * Override in subclasses for entity-specific validation.
+     *
+     * @return bool True if the record is valid and would be created, false to skip.
+     */
+    #[\Override]
+    public function validateRecord(mixed $record): bool
+    {
+        $wcId = $this->getRecordId($record);
+
+        $this->writeLog(
+            $wcId,
+            'dry-run',
+            sprintf('dry-run: would create %s from WC #%s', $this->getEntityType(), $wcId),
+        );
+
+        return true;
     }
 
     /**

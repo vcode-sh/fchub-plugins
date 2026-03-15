@@ -19,5 +19,8 @@ abstract class PluginTestCase extends TestCase
         $GLOBALS['_cartshift_test_deleted_posts'] = [];
         $GLOBALS['_cartshift_test_deleted_terms'] = [];
         $GLOBALS['_cartshift_test_post_meta'] = [];
+        $GLOBALS['_cartshift_test_as_scheduled'] = [];
+        $GLOBALS['_cartshift_test_as_unscheduled'] = [];
+        $GLOBALS['_cartshift_test_wc_products'] = [];
     }
 }

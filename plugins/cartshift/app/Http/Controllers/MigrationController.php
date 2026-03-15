@@ -7,6 +7,7 @@ namespace CartShift\Http\Controllers;
 defined('ABSPATH') || exit;
 
 use CartShift\Core\Container;
+use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
 use CartShift\Migrator\CouponMigrator;
 use CartShift\Migrator\CustomerMigrator;
@@ -56,7 +57,13 @@ final class MigrationController
     }
 
     /**
-     * POST /migrate — initialise migration and process first batch.
+     * POST /migrate — initialise migration and schedule background processing.
+     *
+     * When Action Scheduler is available, the first batch is scheduled as a
+     * background action and the response returns immediately. The UI then
+     * polls GET /progress. If AS is missing (shouldn't happen — WC and FC
+     * both bundle it), falls back to processing the first batch inline so
+     * the JS self-calling loop can take over.
      */
     public function migrate(WP_REST_Request $request): WP_REST_Response
     {
@@ -71,8 +78,10 @@ final class MigrationController
         }
 
         $orchestrator = $this->buildOrchestrator();
-
         $result = $orchestrator->startMigration($entityTypes, $dryRun);
+
+        // Web UI uses direct REST batch loop for real-time progress.
+        // Action Scheduler is used by WP-CLI for true background processing.
 
         return new WP_REST_Response(['data' => $result]);
     }
@@ -112,7 +121,15 @@ final class MigrationController
         /** @var MigrationState $state */
         $state = $this->container->get(MigrationState::class);
 
+        $migrationId = $state->getMigrationId();
         $state->cancel();
+
+        // Cancel any pending Action Scheduler actions for this migration.
+        if ($migrationId && BatchProcessor::isAvailable()) {
+            /** @var BatchProcessor $batchProcessor */
+            $batchProcessor = $this->container->get(BatchProcessor::class);
+            $batchProcessor->cancel($migrationId);
+        }
 
         return new WP_REST_Response([
             'data' => ['message' => 'Migration cancellation requested.'],

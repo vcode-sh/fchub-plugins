@@ -71,6 +71,36 @@ final class SubscriptionMigrator extends AbstractMigrator
     }
 
     /**
+     * Validate a subscription without creating any FC records.
+     * Skips FK validation in dry-run — we validate data mapping quality only.
+     *
+     * @param \WC_Subscription $subscription
+     */
+    #[\Override]
+    public function validateRecord(mixed $subscription): bool
+    {
+        $wcId = $subscription->get_id();
+
+        if ($this->idMap->getFcId(Constants::ENTITY_SUBSCRIPTION, (string) $wcId)) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.');
+            return false;
+        }
+
+        $wcCustomerId = $subscription->get_customer_id();
+        if ($wcCustomerId <= 0) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: subscription has no customer, would fail.');
+            return false;
+        }
+
+        $this->writeLog($wcId, 'dry-run', sprintf(
+            'dry-run: would create subscription WC-#%d.',
+            $wcId,
+        ));
+
+        return true;
+    }
+
+    /**
      * @param \WC_Subscription $subscription
      */
     #[\Override]

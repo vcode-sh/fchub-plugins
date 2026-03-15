@@ -91,6 +91,42 @@ final class VariationMapperTest extends PluginTestCase
         $this->assertArrayHasKey('dimension_unit', $result['other_info']);
     }
 
+    public function testShippingClassResolvedFromMap(): void
+    {
+        $mapper = new VariationMapper('USD', [10 => 99]);
+        $product = $this->createProduct([
+            'shipping_class_id' => 10,
+        ]);
+
+        $result = $mapper->mapSimple($product);
+
+        $this->assertSame(99, $result['shipping_class']);
+    }
+
+    public function testShippingClassNullWhenNotInMap(): void
+    {
+        $mapper = new VariationMapper('USD', [10 => 99]);
+        $product = $this->createProduct([
+            'shipping_class_id' => 77,
+        ]);
+
+        $result = $mapper->mapSimple($product);
+
+        $this->assertNull($result['shipping_class']);
+    }
+
+    public function testShippingClassNullWhenNoMap(): void
+    {
+        $mapper = new VariationMapper('USD', []);
+        $product = $this->createProduct([
+            'shipping_class_id' => 10,
+        ]);
+
+        $result = $mapper->mapSimple($product);
+
+        $this->assertNull($result['shipping_class']);
+    }
+
     public function testSubscriptionDataPreservedWithWeightMerge(): void
     {
         // When a product has both subscription data and weight/dimensions,

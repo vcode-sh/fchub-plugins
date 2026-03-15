@@ -283,6 +283,30 @@ if (!function_exists('wp_cache_flush')) {
     }
 }
 
+if (!function_exists('as_schedule_single_action')) {
+    function as_schedule_single_action(int $timestamp, string $hook, array $args = [], string $group = ''): int
+    {
+        $GLOBALS['_cartshift_test_as_scheduled'][] = [
+            'timestamp' => $timestamp,
+            'hook'      => $hook,
+            'args'      => $args,
+            'group'     => $group,
+        ];
+        return count($GLOBALS['_cartshift_test_as_scheduled']);
+    }
+}
+
+if (!function_exists('as_unschedule_all_actions')) {
+    function as_unschedule_all_actions(string $hook, ?array $args = null, string $group = ''): void
+    {
+        $GLOBALS['_cartshift_test_as_unscheduled'][] = [
+            'hook'  => $hook,
+            'args'  => $args,
+            'group' => $group,
+        ];
+    }
+}
+
 if (!function_exists('wp_convert_hr_to_bytes')) {
     function wp_convert_hr_to_bytes(string $value): int
     {
@@ -426,6 +450,8 @@ if (!class_exists('WC_Product')) {
         protected ?int $stock_quantity = null;
         protected string $backorders = 'no';
         protected ?object $date_created = null;
+        protected string $catalog_visibility = 'visible';
+        protected int $shipping_class_id = 0;
 
         public function get_id(): int { return $this->id; }
         public function get_name(): string { return $this->name; }
@@ -456,6 +482,8 @@ if (!class_exists('WC_Product')) {
         public function get_stock_quantity(): ?int { return $this->stock_quantity; }
         public function get_backorders(): string { return $this->backorders; }
         public function get_date_created(): ?object { return $this->date_created; }
+        public function get_catalog_visibility(): string { return $this->catalog_visibility; }
+        public function get_shipping_class_id(): int { return $this->shipping_class_id; }
     }
 }
 

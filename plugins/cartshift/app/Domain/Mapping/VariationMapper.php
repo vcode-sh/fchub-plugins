@@ -11,8 +11,12 @@ use CartShift\Support\MoneyHelper;
 
 final class VariationMapper
 {
+    /**
+     * @param array<int, int> $shippingClassMap WC shipping class term_id => FC shipping class ID.
+     */
     public function __construct(
         private readonly string $currency,
+        private readonly array $shippingClassMap = [],
     ) {}
 
     /**
@@ -99,7 +103,7 @@ final class VariationMapper
             'downloadable'         => $variation->is_downloadable() ? 'true' : 'false',
             'item_status'          => $variation->get_status() === 'publish' ? 'active' : 'inactive',
             'sold_individually'    => 0,
-            'shipping_class'       => null,
+            'shipping_class'       => $this->resolveShippingClass($variation),
             'media_id'             => self::getMediaId($variation),
             'other_info'           => !empty($otherInfo) ? $otherInfo : null,
         ];
@@ -172,7 +176,7 @@ final class VariationMapper
             'downloadable'         => $product->is_downloadable() ? 'true' : 'false',
             'item_status'          => 'active',
             'sold_individually'    => $product->is_sold_individually() ? 1 : 0,
-            'shipping_class'       => null,
+            'shipping_class'       => $this->resolveShippingClass($product),
             'media_id'             => self::getMediaId($product),
             'other_info'           => !empty($otherInfo) ? $otherInfo : null,
         ];
@@ -235,5 +239,19 @@ final class VariationMapper
         $imageId = $product->get_image_id();
 
         return $imageId ? (int) $imageId : null;
+    }
+
+    /**
+     * Resolve the FC shipping class ID from the WC product's shipping class term.
+     */
+    private function resolveShippingClass(\WC_Product $product): ?int
+    {
+        $wcShippingClassId = $product->get_shipping_class_id();
+
+        if ($wcShippingClassId <= 0) {
+            return null;
+        }
+
+        return $this->shippingClassMap[$wcShippingClassId] ?? null;
     }
 }

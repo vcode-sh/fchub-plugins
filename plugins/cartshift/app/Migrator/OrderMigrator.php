@@ -68,6 +68,39 @@ final class OrderMigrator extends AbstractMigrator
     }
 
     /**
+     * Validate an order without creating any FC records.
+     * Skips FK validation in dry-run — we validate data mapping quality only.
+     *
+     * @param \WC_Order $wcOrder
+     */
+    #[\Override]
+    public function validateRecord(mixed $wcOrder): bool
+    {
+        $wcId = $wcOrder->get_id();
+
+        if ($this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $wcId)) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.');
+            return false;
+        }
+
+        $mapped = $this->orderMapper->map($wcOrder);
+
+        $itemCount = count($mapped['items']);
+        if ($itemCount === 0) {
+            $this->writeLog($wcId, 'dry-run', 'dry-run: order has no items, would fail.');
+            return false;
+        }
+
+        $this->writeLog($wcId, 'dry-run', sprintf(
+            'dry-run: would create order WC-#%d with %d item(s).',
+            $wcId,
+            $itemCount,
+        ));
+
+        return true;
+    }
+
+    /**
      * @param \WC_Order $wcOrder
      */
     #[\Override]

@@ -52,6 +52,19 @@ final class LogController
                 ],
             ],
         ]);
+
+        register_rest_route(self::NAMESPACE, '/log/stats', [
+            'methods'             => 'GET',
+            'callback'            => [$this, 'stats'],
+            'permission_callback' => [$this, 'checkPermission'],
+            'args'                => [
+                'migration_id' => [
+                    'type'              => 'string',
+                    'required'          => true,
+                    'sanitize_callback' => 'sanitize_text_field',
+                ],
+            ],
+        ]);
     }
 
     public function index(WP_REST_Request $request): WP_REST_Response
@@ -67,6 +80,16 @@ final class LogController
         );
 
         return new WP_REST_Response(['data' => $result]);
+    }
+
+    public function stats(WP_REST_Request $request): WP_REST_Response
+    {
+        /** @var MigrationLogRepository $log */
+        $log = $this->container->get(MigrationLogRepository::class);
+
+        $stats = $log->getStats($request->get_param('migration_id'));
+
+        return new WP_REST_Response(['data' => $stats]);
     }
 
     public function checkPermission(): bool
