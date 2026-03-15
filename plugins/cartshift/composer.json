@@ -27,7 +27,11 @@
     "autoload-dev": {
         "psr-4": {
             "CartShift\\Tests\\": "tests/"
-        }
+        },
+        "files": [
+            "stubs/fluent-cart-stubs.php",
+            "stubs/wp-cli-stubs.php"
+        ]
     },
     "scripts": {
         "test": "phpunit"

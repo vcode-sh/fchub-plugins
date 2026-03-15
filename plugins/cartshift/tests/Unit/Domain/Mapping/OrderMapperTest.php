@@ -6,7 +6,6 @@ namespace CartShift\Tests\Unit\Domain\Mapping;
 
 use CartShift\Domain\Mapping\OrderMapper;
 use CartShift\Storage\IdMapRepository;
-use CartShift\Support\Enums\FcOrderType;
 use CartShift\Tests\Unit\PluginTestCase;
 
 final class OrderMapperTest extends PluginTestCase
@@ -32,28 +31,17 @@ final class OrderMapperTest extends PluginTestCase
         parent::tearDown();
     }
 
-    public function testMapReturnsPaymentTypeForNormalOrder(): void
+    public function testMapAlwaysReturnsCheckoutType(): void
     {
         $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
 
         $result = $this->mapper->map($order);
 
-        $this->assertSame(FcOrderType::Payment->value, $result['order']['type']);
+        $this->assertSame('checkout', $result['order']['type']);
     }
 
-    public function testMapReturnsSubscriptionTypeForSubscriptionOrder(): void
+    public function testMapReturnsCheckoutTypeForAllStatuses(): void
     {
-        // Without WCS functions defined, default to 'payment'.
-        $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
-
-        $result = $this->mapper->map($order);
-
-        $this->assertSame('payment', $result['order']['type']);
-    }
-
-    public function testMapNeverReturnsOnetimeOrRefundType(): void
-    {
-        // C3: type must never be 'onetime' or 'refund'.
         $wcStatuses = [
             'pending', 'processing', 'on-hold', 'completed',
             'cancelled', 'refunded', 'failed',
@@ -63,12 +51,18 @@ final class OrderMapperTest extends PluginTestCase
             $order = $this->createOrder(['status' => $status, 'total' => '100.00']);
             $result = $this->mapper->map($order);
 
-            $type = $result['order']['type'];
-            $this->assertNotSame('onetime', $type, "Status '{$status}' must not produce 'onetime' type");
-            $this->assertNotSame('refund', $type, "Status '{$status}' must not produce 'refund' type");
-            $this->assertContains($type, ['payment', 'subscription', 'renewal'],
-                "Status '{$status}' produced unexpected type '{$type}'");
+            $this->assertSame('checkout', $result['order']['type'],
+                "Status '{$status}' must produce 'checkout' type");
         }
+    }
+
+    public function testMapIncludesInvoiceNo(): void
+    {
+        $order = $this->createOrder(['id' => 42, 'status' => 'completed', 'total' => '50.00']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame('WC-42', $result['order']['invoice_no']);
     }
 
     public function testTaxBehaviorIsZeroWhenNoTax(): void
@@ -329,6 +323,187 @@ final class OrderMapperTest extends PluginTestCase
         $this->assertCount(1, $lineMeta, 'Only non-internal meta should remain');
         $this->assertSame('Colour', $lineMeta[0]['key']);
         $this->assertSame('Red', $lineMeta[0]['value']);
+    }
+
+    // ──────────────────────────────────────────────
+    // Adversarial FC schema alignment tests
+    // ──────────────────────────────────────────────
+
+    public function testOrderTypeIsCheckoutNotPayment(): void
+    {
+        // FC schema uses 'checkout' as the order type, NOT 'payment'.
+        // This was a bug where WC's "payment" concept leaked into FC data.
+        $order = $this->createOrder(['status' => 'completed', 'total' => '99.99']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame('checkout', $result['order']['type']);
+        $this->assertNotSame('payment', $result['order']['type']);
+        $this->assertNotSame('order', $result['order']['type']);
+    }
+
+    public function testInvoiceNoFormat(): void
+    {
+        // invoice_no must follow 'WC-{id}' pattern — not just the numeric ID.
+        $order = $this->createOrder(['id' => 1337, 'status' => 'completed', 'total' => '50.00']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame('WC-1337', $result['order']['invoice_no']);
+        $this->assertMatchesRegularExpression('/^WC-\d+$/', $result['order']['invoice_no']);
+    }
+
+    public function testModeIsLive(): void
+    {
+        // Migrated orders are real historical data — mode must always be 'live'.
+        $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame('live', $result['order']['mode']);
+        $this->assertNotSame('test', $result['order']['mode']);
+        $this->assertNotSame('sandbox', $result['order']['mode']);
+    }
+
+    public function testTransactionPaymentModeIsLive(): void
+    {
+        // Transaction payment_mode must also be 'live' for migrated orders.
+        $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertNotNull($result['transaction']);
+        $this->assertSame('live', $result['transaction']['payment_mode']);
+    }
+
+    public function testConfigContainsMigratedFlag(): void
+    {
+        // config.migrated must be true so FC knows this is imported data.
+        $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertArrayHasKey('migrated', $result['order']['config']);
+        $this->assertTrue($result['order']['config']['migrated']);
+    }
+
+    public function testConfigContainsWcOrderId(): void
+    {
+        // config.wc_order_id preserves traceability back to WooCommerce.
+        $order = $this->createOrder(['id' => 999, 'status' => 'completed', 'total' => '50.00']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertArrayHasKey('wc_order_id', $result['order']['config']);
+        $this->assertSame(999, $result['order']['config']['wc_order_id']);
+    }
+
+    public function testMoneyFieldsAreInCentsNotDecimals(): void
+    {
+        // All money fields must be integers (cents), not floats or string decimals.
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '123.45',
+            'subtotal' => '100.00',
+            'shipping_total' => '10.00',
+            'total_tax' => '13.45',
+            'discount_total' => '5.00',
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame(12345, $result['order']['total_amount']);
+        $this->assertSame(10000, $result['order']['subtotal']);
+        $this->assertSame(1000, $result['order']['shipping_total']);
+        $this->assertSame(1345, $result['order']['tax_total']);
+        $this->assertSame(500, $result['order']['coupon_discount_total']);
+
+        // Verify they are integers, not floats.
+        $this->assertIsInt($result['order']['total_amount']);
+        $this->assertIsInt($result['order']['subtotal']);
+        $this->assertIsInt($result['order']['shipping_total']);
+        $this->assertIsInt($result['order']['tax_total']);
+    }
+
+    public function testTotalPaidIsNetOfRefundsForCompletedOrders(): void
+    {
+        // total_paid = total - refunded for completed orders.
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '100.00',
+            'total_refunded' => '25.00',
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame(7500, $result['order']['total_paid']); // 10000 - 2500
+    }
+
+    public function testTotalPaidIsZeroForPendingOrders(): void
+    {
+        // Unpaid orders have total_paid = 0.
+        $order = $this->createOrder([
+            'status' => 'pending',
+            'total' => '100.00',
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame(0, $result['order']['total_paid']);
+    }
+
+    public function testFreePendingOrderHasNoTransaction(): void
+    {
+        // Free pending orders should NOT get a transaction (only completed/processing do).
+        $order = $this->createOrder([
+            'status' => 'pending',
+            'total' => '0',
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertNull($result['transaction']);
+    }
+
+    public function testFreeProcessingOrderGetsTransaction(): void
+    {
+        // Free processing orders DO get a transaction (like completed).
+        $order = $this->createOrder([
+            'status' => 'processing',
+            'total' => '0',
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertNotNull($result['transaction']);
+        $this->assertSame('succeeded', $result['transaction']['status']);
+        $this->assertSame(0, $result['transaction']['total']);
+    }
+
+    public function testOrderHasUuid(): void
+    {
+        // Every mapped order must have a non-empty uuid.
+        $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertArrayHasKey('uuid', $result['order']);
+        $this->assertNotEmpty($result['order']['uuid']);
+        // UUID v4 format
+        $this->assertMatchesRegularExpression(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+            $result['order']['uuid'],
+        );
+    }
+
+    public function testShippingStatusDefaultsToUnshipped(): void
+    {
+        // FC expects shipping_status to be 'unshipped' by default.
+        $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame('unshipped', $result['order']['shipping_status']);
     }
 
     public function testItemMetaIncludesVisibleMeta(): void

@@ -10,7 +10,6 @@ use CartShift\Storage\IdMapRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\Enums\FcBillingInterval;
 use CartShift\Support\Enums\FcOrderStatus;
-use CartShift\Support\Enums\FcOrderType;
 use CartShift\Support\Enums\FcPaymentStatus;
 use CartShift\Support\MoneyHelper;
 
@@ -34,7 +33,7 @@ final class OrderMapper
         $orderData = [
             'customer_id'           => $customerId,
             'parent_id'             => $this->resolveParentOrderId($order),
-            'type'                  => $this->getOrderType($order),
+            'type'                  => 'checkout',
             'status'                => FcOrderStatus::fromWooCommerce($wcStatus)->value,
             'payment_status'        => FcPaymentStatus::fromWooCommerce($wcStatus)->value,
             'payment_method'        => $order->get_payment_method() ?: 'wc_migrated',
@@ -57,6 +56,7 @@ final class OrderMapper
             'mode'                  => 'live',
             'fulfillment_type'      => self::guessFulfillmentType($order),
             'shipping_status'       => 'unshipped',
+            'invoice_no'            => 'WC-' . $order->get_id(),
             'uuid'                  => wp_generate_uuid4(),
             'config'                => array_filter([
                 'wc_order_id'    => $order->get_id(),
@@ -72,9 +72,15 @@ final class OrderMapper
                 : null,
         ];
 
+        $items = $this->mapItems($order);
+        $feeItems = $this->mapFeeItems($order);
+        if (!empty($feeItems)) {
+            $items = array_merge($items, $feeItems);
+        }
+
         $mapped = [
             'order'       => $orderData,
-            'items'       => $this->mapItems($order),
+            'items'       => $items,
             'addresses'   => self::mapAddresses($order),
             'transaction' => $this->mapTransaction($order),
         ];
@@ -163,6 +169,53 @@ final class OrderMapper
                 'payment_type'     => $paymentType,
                 'other_info'       => !empty($otherInfo) ? $otherInfo : [],
                 'line_meta'        => self::extractItemMeta($item),
+                'created_at'       => $order->get_date_created()
+                    ? $order->get_date_created()->date('Y-m-d H:i:s')
+                    : gmdate('Y-m-d H:i:s'),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Map WC fee line items as FC order items (post_id=0).
+     * Matches FC's migrateFeeItem() pattern.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function mapFeeItems(\WC_Order $order): array
+    {
+        $items = [];
+
+        /** @var \WC_Order_Item_Fee $fee */
+        foreach ($order->get_items('fee') as $fee) {
+            $feeAmount = MoneyHelper::toCents($fee->get_total(), $this->currency);
+            $feeTax    = MoneyHelper::toCents($fee->get_total_tax(), $this->currency);
+            $feeTotal  = $feeAmount + $feeTax;
+
+            if ($feeTotal <= 0) {
+                continue;
+            }
+
+            $items[] = [
+                'post_id'          => 0,
+                'object_id'        => 0,
+                'post_title'       => $fee->get_name(),
+                'title'            => $fee->get_name(),
+                'fulfillment_type' => 'digital',
+                'quantity'         => 1,
+                'unit_price'       => $feeTotal,
+                'cost'             => 0,
+                'subtotal'         => $feeAmount,
+                'tax_amount'       => $feeTax,
+                'discount_total'   => 0,
+                'refund_total'     => 0,
+                'line_total'       => $feeTotal,
+                'rate'             => self::getExchangeRate($order),
+                'payment_type'     => 'onetime',
+                'other_info'       => ['is_custom' => true],
+                'line_meta'        => [],
                 'created_at'       => $order->get_date_created()
                     ? $order->get_date_created()->date('Y-m-d H:i:s')
                     : gmdate('Y-m-d H:i:s'),
@@ -304,28 +357,6 @@ final class OrderMapper
         }
 
         return null;
-    }
-
-    /**
-     * Determine the order type using FcOrderType enum.
-     * FIX C3: Never returns 'refund'. Parent orders with renewals = renewal,
-     * subscription orders = subscription, everything else = payment.
-     */
-    private function getOrderType(\WC_Order $order): string
-    {
-        if ($order->get_parent_id() > 0) {
-            if (function_exists('wcs_order_contains_renewal') && wcs_order_contains_renewal($order)) {
-                return FcOrderType::Renewal->value;
-            }
-
-            return FcOrderType::Payment->value;
-        }
-
-        if (function_exists('wcs_order_contains_subscription') && wcs_order_contains_subscription($order)) {
-            return FcOrderType::Subscription->value;
-        }
-
-        return FcOrderType::Payment->value;
     }
 
     /**

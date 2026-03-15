@@ -186,7 +186,7 @@ final class MigrationOrchestrator
 
             // Flush object cache every 5 batches (250 records) to prevent memory exhaustion.
             $newOffset = $this->state->getCurrentOffset();
-            if ($newOffset > 0 && ($newOffset / $batchSize) % 5 === 0) {
+            if ($newOffset > 0 && intdiv($newOffset, $batchSize) % 5 === 0) {
                 wp_cache_flush();
                 if (function_exists('gc_collect_cycles')) {
                     gc_collect_cycles();

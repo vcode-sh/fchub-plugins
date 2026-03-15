@@ -119,6 +119,8 @@ final class MigrateCommand
 
         /** @var array<string, \cli\progress\Bar|null> $progressBars */
         $progressBars = [];
+        /** @var array<string, int> $barProcessed — tracks ticked count per entity */
+        $barProcessed = [];
         $currentEntity = null;
 
         while ($result['continue']) {
@@ -136,6 +138,7 @@ final class MigrateCommand
                     sprintf('Migrating %s', $entityType),
                     $total,
                 );
+                $barProcessed[$entityType] = 0;
                 $currentEntity = $entityType;
             }
 
@@ -147,11 +150,11 @@ final class MigrateCommand
                 $processed = ($entityData['processed'] ?? 0) + ($entityData['skipped'] ?? 0) + ($entityData['errors'] ?? 0);
                 $bar = $progressBars[$currentEntity];
 
-                // WP-CLI progress bar uses tick() — we tick the difference.
-                $barCurrent = $bar->current ?? 0;
-                $diff = $processed - $barCurrent;
+                // WP-CLI progress bar uses tick() — track processed count externally.
+                $diff = $processed - $barProcessed[$currentEntity];
                 if ($diff > 0) {
                     $bar->tick($diff);
+                    $barProcessed[$currentEntity] = $processed;
                 }
 
                 // Finish bar when entity is completed.
@@ -598,6 +601,13 @@ final class MigrateCommand
 
     /**
      * Recalculate a single FluentCart customer's purchase stats.
+     *
+     * Mirrors FluentCart's Customer::recountStat() logic:
+     * - purchase_count: number of paid orders
+     * - purchase_value: JSON object keyed by currency (e.g. {"USD": 12300})
+     * - ltv: lifetime value (total_paid - total_refund, only positive)
+     * - aov: average order value (ltv / purchase_count)
+     * - first_purchase_date / last_purchase_date: from order created_at
      */
     private static function recalculateCustomerStats(int $fcCustomerId): void
     {
@@ -605,28 +615,61 @@ final class MigrateCommand
 
         $prefix = $wpdb->prefix;
 
-        $stats = $wpdb->get_row($wpdb->prepare(
-            "SELECT
-                COUNT(*) as total_orders,
-                COALESCE(SUM(total_amount), 0) as total_spent
+        // Fetch all paid orders for this customer.
+        $orders = $wpdb->get_results($wpdb->prepare(
+            "SELECT currency, total_paid, total_refund, created_at
              FROM {$prefix}fct_orders
              WHERE customer_id = %d
-               AND payment_status = 'paid'",
+               AND payment_status IN ('paid', 'partially_refunded')",
             $fcCustomerId,
         ));
 
-        if ($stats) {
-            $wpdb->update(
-                $prefix . 'fct_customers',
-                [
-                    'total_orders'  => (int) $stats->total_orders,
-                    'total_spent'   => (float) $stats->total_spent,
-                    'last_order_at' => gmdate('Y-m-d H:i:s'),
-                ],
-                ['id' => $fcCustomerId],
-                ['%d', '%f', '%s'],
-                ['%d'],
-            );
+        if (empty($orders)) {
+            return;
         }
+
+        $purchaseCount = count($orders);
+        $purchaseValueByCurrency = [];
+        $ltv = 0;
+        $firstDate = null;
+        $lastDate = null;
+
+        foreach ($orders as $order) {
+            $currency = strtoupper($order->currency ?: 'USD');
+            $netPaid = (int) $order->total_paid - (int) $order->total_refund;
+
+            if (!isset($purchaseValueByCurrency[$currency])) {
+                $purchaseValueByCurrency[$currency] = 0;
+            }
+            $purchaseValueByCurrency[$currency] += (int) $order->total_paid;
+
+            if ($netPaid > 0) {
+                $ltv += $netPaid;
+            }
+
+            if ($firstDate === null || $order->created_at < $firstDate) {
+                $firstDate = $order->created_at;
+            }
+            if ($lastDate === null || $order->created_at > $lastDate) {
+                $lastDate = $order->created_at;
+            }
+        }
+
+        $aov = $purchaseCount > 0 ? (int) round($ltv / $purchaseCount) : 0;
+
+        $wpdb->update(
+            $prefix . 'fct_customers',
+            [
+                'purchase_count'      => $purchaseCount,
+                'purchase_value'      => wp_json_encode($purchaseValueByCurrency),
+                'ltv'                 => $ltv,
+                'aov'                 => $aov,
+                'first_purchase_date' => $firstDate,
+                'last_purchase_date'  => $lastDate,
+            ],
+            ['id' => $fcCustomerId],
+            ['%d', '%s', '%d', '%d', '%s', '%s'],
+            ['%d'],
+        );
     }
 }

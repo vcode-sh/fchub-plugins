@@ -283,6 +283,38 @@ if (!function_exists('wp_cache_flush')) {
     }
 }
 
+if (!function_exists('wp_convert_hr_to_bytes')) {
+    function wp_convert_hr_to_bytes(string $value): int
+    {
+        $value = strtolower(trim($value));
+        $bytes = (int) $value;
+
+        if (str_contains($value, 'g')) {
+            $bytes *= GB_IN_BYTES;
+        } elseif (str_contains($value, 'm')) {
+            $bytes *= MB_IN_BYTES;
+        } elseif (str_contains($value, 'k')) {
+            $bytes *= KB_IN_BYTES;
+        }
+
+        return $bytes;
+    }
+}
+
+if (!function_exists('current_user_can')) {
+    function current_user_can(string $capability): bool
+    {
+        return $GLOBALS['_cartshift_test_user_can'] ?? true;
+    }
+}
+
+if (!function_exists('register_rest_route')) {
+    function register_rest_route(string $namespace, string $route, array $args): void
+    {
+        $GLOBALS['_cartshift_test_rest_routes'][$namespace . $route] = $args;
+    }
+}
+
 if (!function_exists('wc_get_product')) {
     function wc_get_product(int $productId): mixed
     {
@@ -313,6 +345,18 @@ if (!function_exists('get_user_meta')) {
 
 if (!defined('DAY_IN_SECONDS')) {
     define('DAY_IN_SECONDS', 86400);
+}
+
+if (!defined('KB_IN_BYTES')) {
+    define('KB_IN_BYTES', 1024);
+}
+
+if (!defined('MB_IN_BYTES')) {
+    define('MB_IN_BYTES', 1024 * KB_IN_BYTES);
+}
+
+if (!defined('GB_IN_BYTES')) {
+    define('GB_IN_BYTES', 1024 * MB_IN_BYTES);
 }
 
 // ──────────────────────────────────────────────
@@ -629,6 +673,48 @@ if (!class_exists('WC_Order_Item_Fee')) {
 }
 
 // ──────────────────────────────────────────────
+// WordPress REST API stubs
+// ──────────────────────────────────────────────
+
+if (!class_exists('WP_REST_Request')) {
+    class WP_REST_Request
+    {
+        private array $params = [];
+
+        public function get_param(string $key): mixed
+        {
+            return $this->params[$key] ?? null;
+        }
+
+        public function set_param(string $key, mixed $value): void
+        {
+            $this->params[$key] = $value;
+        }
+    }
+}
+
+if (!class_exists('WP_REST_Response')) {
+    class WP_REST_Response
+    {
+        public function __construct(
+            private mixed $data = null,
+            private int $status = 200,
+        ) {
+        }
+
+        public function get_data(): mixed
+        {
+            return $this->data;
+        }
+
+        public function get_status(): int
+        {
+            return $this->status;
+        }
+    }
+}
+
+// ──────────────────────────────────────────────
 // Global $wpdb stub
 // ──────────────────────────────────────────────
 
@@ -636,6 +722,12 @@ if (!class_exists('wpdb')) {
     class wpdb
     {
         public string $prefix = 'wp_';
+        public string $posts = 'wp_posts';
+        public string $postmeta = 'wp_postmeta';
+        public string $terms = 'wp_terms';
+        public string $term_taxonomy = 'wp_term_taxonomy';
+        public string $term_relationships = 'wp_term_relationships';
+        public string $options = 'wp_options';
         public int $insert_id = 0;
 
         public function prepare(string $query, mixed ...$args): string
@@ -677,13 +769,24 @@ if (!class_exists('wpdb')) {
         public function get_results(string $query, string $output = OBJECT): array
         {
             $GLOBALS['_cartshift_test_queries'][] = ['get_results', $query, $output];
-            return [];
+
+            if (isset($GLOBALS['_cartshift_test_get_results_callback'])) {
+                return ($GLOBALS['_cartshift_test_get_results_callback'])($query, $output);
+            }
+
+            return $GLOBALS['_cartshift_test_get_results_return'] ?? [];
         }
 
         public function insert(string $table, array $data, ?array $format = null): int|false
         {
             $this->insert_id++;
             $GLOBALS['_cartshift_test_queries'][] = ['insert', $table, $data];
+            return 1;
+        }
+
+        public function update(string $table, array $data, array $where, ?array $format = null, ?array $where_format = null): int|false
+        {
+            $GLOBALS['_cartshift_test_queries'][] = ['update', $table, $data, $where];
             return 1;
         }
 

@@ -109,11 +109,25 @@ final class OrderMigrator extends AbstractMigrator
         $this->idMap->store(Constants::ENTITY_ORDER, (string) $wcId, $fcOrder->id, $this->migrationId, true);
 
         // 2. Create order items with compound keys (FIX C7).
+        $totalQuantity = 0;
         foreach ($mapped['items'] as $index => $itemData) {
             $itemData['order_id'] = $fcOrder->id;
             $fcItem = OrderItem::query()->create($itemData);
+            $totalQuantity += (int) ($itemData['quantity'] ?? 1);
             $itemKey = "{$wcId}_{$index}";
             $this->idMap->store(Constants::ENTITY_ORDER_ITEM, $itemKey, $fcItem->id, $this->migrationId, true);
+        }
+
+        // 2b. Update item_count on the FC order (sum of all item quantities).
+        if ($totalQuantity > 0) {
+            global $wpdb;
+            $wpdb->update(
+                $wpdb->prefix . 'fct_orders',
+                ['item_count' => $totalQuantity],
+                ['id' => $fcOrder->id],
+                ['%d'],
+                ['%d'],
+            );
         }
 
         // 3. Create order addresses with compound keys (FIX C7).
@@ -150,6 +164,9 @@ final class OrderMigrator extends AbstractMigrator
 
         // 8. Migrate applied coupons to FC applied_coupons table.
         $this->migrateAppliedCoupons($wcOrder, $fcOrder->id);
+
+        // 9. Migrate key WC order meta to fct_order_meta.
+        $this->migrateKeyOrderMeta($wcOrder, $fcOrder->id);
 
         $this->writeLog($wcId, 'success', sprintf(
             'Migrated order #%d (FC ID: %d) - Status: %s.',
@@ -337,6 +354,48 @@ final class OrderMigrator extends AbstractMigrator
                 ['%d'],
                 ['%d'],
             );
+        }
+    }
+
+    /**
+     * Migrate key WC order meta fields to FC order meta.
+     * Stores transaction_id, customer_note, billing_phone, shipping_phone, and order_key.
+     */
+    private function migrateKeyOrderMeta(\WC_Order $wcOrder, int $fcOrderId): void
+    {
+        $metaEntries = [];
+
+        $transactionId = $wcOrder->get_transaction_id();
+        if ($transactionId) {
+            $metaEntries['_transaction_id'] = $transactionId;
+        }
+
+        $customerNote = $wcOrder->get_customer_note();
+        if ($customerNote) {
+            $metaEntries['_customer_note'] = $customerNote;
+        }
+
+        $billingPhone = $wcOrder->get_billing_phone();
+        if ($billingPhone) {
+            $metaEntries['_billing_phone'] = $billingPhone;
+        }
+
+        $shippingPhone = $wcOrder->get_shipping_phone();
+        if ($shippingPhone) {
+            $metaEntries['_shipping_phone'] = $shippingPhone;
+        }
+
+        $orderKey = $wcOrder->get_order_key();
+        if ($orderKey) {
+            $metaEntries['_order_key'] = $orderKey;
+        }
+
+        foreach ($metaEntries as $key => $value) {
+            OrderMeta::query()->create([
+                'order_id'   => $fcOrderId,
+                'meta_key'   => $key,
+                'meta_value' => $value,
+            ]);
         }
     }
 

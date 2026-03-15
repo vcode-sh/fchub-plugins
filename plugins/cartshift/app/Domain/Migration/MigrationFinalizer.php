@@ -42,7 +42,10 @@ final class MigrationFinalizer
      * Recalculate purchase stats for every migrated customer.
      *
      * Processes in batches to avoid memory exhaustion on large datasets.
-     * Uses the same stat columns as FluentCart's Customer::recountStat().
+     * Matches FluentCart's CustomerMigrationService::calculateCustomerStats() format:
+     * - purchase_value is JSON keyed by currency, e.g. {"USD": 12345}
+     * - aov is average order value in cents
+     * - ltv is lifetime value (total_paid - total_refund)
      */
     public function recalculateCustomerStats(string $migrationId): int
     {
@@ -66,16 +69,18 @@ final class MigrationFinalizer
         foreach (array_chunk($fcIds, self::BATCH_SIZE) as $batch) {
             $placeholders = implode(',', array_fill(0, count($batch), '%d'));
 
+            // Fetch order-level stats grouped by customer.
             // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             $stats = $wpdb->get_results($wpdb->prepare(
                 "SELECT
                     customer_id,
                     COUNT(*) AS order_count,
-                    COALESCE(SUM(total_amount), 0) AS total_value,
+                    COALESCE(SUM(total_paid - total_refund), 0) AS ltv,
                     MAX(created_at) AS last_order,
                     MIN(created_at) AS first_order
                 FROM {$ordersTable}
                 WHERE customer_id IN ({$placeholders})
+                  AND payment_status IN ('paid', 'partially_refunded')
                 GROUP BY customer_id",
                 ...$batch,
             ));
@@ -85,27 +90,50 @@ final class MigrationFinalizer
                 $statsMap[(int) $row->customer_id] = $row;
             }
 
+            // Fetch per-currency totals for purchase_value JSON.
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $currencyStats = $wpdb->get_results($wpdb->prepare(
+                "SELECT
+                    customer_id,
+                    currency,
+                    COALESCE(SUM(total_amount), 0) AS currency_total
+                FROM {$ordersTable}
+                WHERE customer_id IN ({$placeholders})
+                  AND payment_status IN ('paid', 'partially_refunded')
+                GROUP BY customer_id, currency",
+                ...$batch,
+            ));
+
+            $currencyMap = [];
+            foreach ($currencyStats as $row) {
+                $cid = (int) $row->customer_id;
+                $currencyMap[$cid][$row->currency] = (int) $row->currency_total;
+            }
+
             foreach ($batch as $customerId) {
                 $row = $statsMap[$customerId] ?? null;
 
                 $count = $row ? (int) $row->order_count : 0;
-                $total = $row ? (float) $row->total_value : 0.0;
+                $ltv = $row ? (int) $row->ltv : 0;
                 $lastOrder = $row->last_order ?? null;
                 $firstOrder = $row->first_order ?? null;
-                $aov = $count > 0 ? round($total / $count, 2) : 0;
+                $aov = $count > 0 ? (int) round($ltv / $count) : 0;
+
+                $purchaseValue = $currencyMap[$customerId] ?? [];
 
                 // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $wpdb->update(
                     $customersTable,
                     [
                         'purchase_count'      => $count,
-                        'ltv'                 => (int) $total,
+                        'purchase_value'      => wp_json_encode($purchaseValue),
+                        'ltv'                 => $ltv,
+                        'aov'                 => $aov,
                         'first_purchase_date' => $firstOrder,
                         'last_purchase_date'  => $lastOrder,
-                        'aov'                 => $aov,
                     ],
                     ['id' => $customerId],
-                    ['%d', '%d', '%s', '%s', '%s'],
+                    ['%d', '%s', '%d', '%d', '%s', '%s'],
                     ['%d'],
                 );
 
