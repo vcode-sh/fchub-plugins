@@ -27,14 +27,14 @@ class ChurnReport
      * @param string $period E.g. '30d', '90d', '12m'.
      * @return float Churn rate as a percentage.
      */
-    public function getChurnRate(string $period = '30d'): float
+    public function getChurnRate(string $period = '30d', ?string $from = null, ?string $to = null): float
     {
-        $range = $this->parsePeriod($period);
+        $range = $this->resolveRange($period, $from, $to);
 
         $churnedCount = $this->grantRepo->countChurnedMembers($range['from'], $range['to']);
 
         // Active at period start = current active + churned during period - new during period
-        $currentActive = $this->grantRepo->countActiveMembers();
+        $currentActive = $this->grantRepo->countActiveMembers(null, $range['to']);
         $newDuringPeriod = $this->grantRepo->countNewMembers($range['from'], $range['to']);
         $activeAtStart = $currentActive + $churnedCount - $newDuringPeriod;
 
@@ -51,11 +51,11 @@ class ChurnReport
      * @param string $period E.g. '12m', '6m'.
      * @return array Array of ['month' => string, 'churn_rate' => float, 'churned' => int, 'active_start' => int].
      */
-    public function getChurnOverTime(string $period = '12m'): array
+    public function getChurnOverTime(string $period = '12m', ?string $from = null, ?string $to = null): array
     {
         global $wpdb;
 
-        $range = $this->parsePeriod($period);
+        $range = $this->resolveRange($period, $from, $to);
         $results = [];
 
         // Use daily stats table for historical data
@@ -180,5 +180,20 @@ class ChurnReport
         }
 
         return ['from' => $from, 'to' => $to];
+    }
+
+    /**
+     * @return array{from: string, to: string}
+     */
+    private function resolveRange(string $period, ?string $from, ?string $to): array
+    {
+        if ($from !== null && $to !== null && $from !== '' && $to !== '') {
+            return [
+                'from' => gmdate('Y-m-d 00:00:00', strtotime($from)),
+                'to' => gmdate('Y-m-d 23:59:59', strtotime($to)),
+            ];
+        }
+
+        return $this->parsePeriod($period);
     }
 }

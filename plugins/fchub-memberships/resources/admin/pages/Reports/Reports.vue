@@ -55,6 +55,12 @@
         :loading="contentLoading"
         :rows="contentRows"
       />
+      <ReportsRetentionTab
+        :loading="retentionLoading"
+        :cohorts="retentionCohorts"
+        :months="retentionMonths"
+        @update:months="onRetentionMonthsChange"
+      />
     </el-tabs>
   </div>
 </template>
@@ -84,6 +90,7 @@ import ReportsRevenueTab from '@/components/reports/ReportsRevenueTab.vue'
 import ReportsRenewalsTab from '@/components/reports/ReportsRenewalsTab.vue'
 import ReportsTrialsTab from '@/components/reports/ReportsTrialsTab.vue'
 import ReportsContentTab from '@/components/reports/ReportsContentTab.vue'
+import ReportsRetentionTab from '@/components/reports/ReportsRetentionTab.vue'
 
 ChartJS.register(
   CategoryScale,
@@ -203,6 +210,11 @@ const trialData = ref({})
 const contentLoading = ref(false)
 const contentRows = ref([])
 
+// Retention
+const retentionLoading = ref(false)
+const retentionCohorts = ref([])
+const retentionMonths = ref(6)
+
 // Chart options
 const lineChartOptions = {
   responsive: true,
@@ -267,6 +279,7 @@ const tabLoaded = reactive({
   renewals: false,
   trials: false,
   content: false,
+  retention: false,
 })
 
 async function loadOverview() {
@@ -492,6 +505,26 @@ async function loadContent() {
   tabLoaded.content = true
 }
 
+async function loadRetention() {
+  retentionLoading.value = true
+  try {
+    const response = await reports.retentionCohort({ months: retentionMonths.value })
+    const data = response.data ?? response
+    retentionCohorts.value = Array.isArray(data) ? data : []
+  } catch {
+    retentionCohorts.value = []
+  } finally {
+    retentionLoading.value = false
+  }
+  tabLoaded.retention = true
+}
+
+function onRetentionMonthsChange(months) {
+  retentionMonths.value = months
+  tabLoaded.retention = false
+  loadRetention()
+}
+
 function loadTabData(tab) {
   switch (tab) {
     case 'overview':
@@ -514,6 +547,9 @@ function loadTabData(tab) {
       break
     case 'content':
       loadContent()
+      break
+    case 'retention':
+      loadRetention()
       break
   }
 }

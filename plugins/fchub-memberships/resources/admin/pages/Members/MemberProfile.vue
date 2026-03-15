@@ -14,7 +14,7 @@
           <div class="member-meta">
             <span class="member-email">
               <el-icon><Message /></el-icon>
-              {{ member.email }}
+              {{ member.email || member.user_email }}
             </span>
             <span class="member-registered">
               <el-icon><Calendar /></el-icon>
@@ -55,7 +55,9 @@
       <el-table :data="activeGrants">
         <el-table-column prop="plan_title" label="Plan" min-width="180">
           <template #default="{ row }">
-            <el-tag size="small">{{ row.plan_title }}</el-tag>
+            <el-tag size="small" class="clickable-plan-tag" @click="openDripDrawer(row)">
+              {{ row.plan_title }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="Status" width="140">
@@ -338,6 +340,47 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Drip Timeline Drawer -->
+    <el-drawer
+      v-model="dripDrawerVisible"
+      :title="`Drip Timeline — ${dripDrawerPlan?.plan_title || ''}`"
+      direction="rtl"
+      size="520px"
+    >
+      <div v-loading="dripDrawerLoading">
+        <template v-if="dripDrawerData.length > 0">
+          <el-timeline>
+            <el-timeline-item
+              v-for="item in dripDrawerData"
+              :key="item.rule_id || item.id"
+              :type="dripDetailType(item)"
+              :hollow="item.status === 'locked'"
+              :timestamp="dripDetailTimestamp(item)"
+            >
+              <div class="drip-detail-item">
+                <div class="drip-detail-header">
+                  <span class="drip-detail-title">{{ item.resource_title || item.title }}</span>
+                  <el-tag :type="dripDetailType(item)" size="small">
+                    {{ item.status === 'unlocked' ? 'Unlocked' : item.status === 'scheduled' ? 'Upcoming' : 'Locked' }}
+                  </el-tag>
+                </div>
+                <div class="drip-detail-meta">
+                  <span v-if="item.resource_type">{{ item.resource_type }}</span>
+                  <span v-if="item.days_offset"> · {{ item.days_offset }} day{{ item.days_offset !== 1 ? 's' : '' }} delay</span>
+                </div>
+                <div v-if="item.notification_scheduled != null" class="drip-detail-notification">
+                  <el-tag size="small" :type="item.notification_scheduled ? 'success' : 'info'">
+                    Notification: {{ item.notification_scheduled ? 'Scheduled' : 'Pending' }}
+                  </el-tag>
+                </div>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+        </template>
+        <el-empty v-else-if="!dripDrawerLoading" description="No drip schedule for this plan" :image-size="60" />
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -386,6 +429,12 @@ const extending = ref(false)
 const extendDate = ref('')
 const extendingGrant = ref(null)
 
+// Drip drawer
+const dripDrawerVisible = ref(false)
+const dripDrawerLoading = ref(false)
+const dripDrawerPlan = ref(null)
+const dripDrawerData = ref([])
+
 // Computed
 const activeGrants = computed(() =>
   allGrants.value.filter((g) => g.status === 'active' || g.status === 'paused')
@@ -405,7 +454,10 @@ async function fetchMember() {
         grants.push({ ...g, plan_title: pg.plan_title || '' })
       })
     })
-    allGrants.value = grants.length > 0 ? grants : (data.history || [])
+    allGrants.value = (data.history || []).map((grant) => ({
+      ...grant,
+      plan_title: grant.plan_title || grants.find((item) => item.id === grant.id)?.plan_title || '',
+    }))
     timeline.value = planGroups.filter((pg) => pg.progress).map((pg) => ({
       plan_id: pg.plan_id,
       plan_title: pg.plan_title,
@@ -502,6 +554,34 @@ async function handleExtend() {
   } finally {
     extending.value = false
   }
+}
+
+async function openDripDrawer(grant) {
+  dripDrawerPlan.value = grant
+  dripDrawerVisible.value = true
+  dripDrawerLoading.value = true
+  dripDrawerData.value = []
+  try {
+    const response = await membersApi.dripTimeline(userId.value, { plan_id: grant.plan_id })
+    const data = response.data ?? response
+    dripDrawerData.value = Array.isArray(data) ? data : (data.items ?? data.timeline ?? [])
+  } catch {
+    dripDrawerData.value = []
+  } finally {
+    dripDrawerLoading.value = false
+  }
+}
+
+function dripDetailType(item) {
+  if (item.status === 'unlocked') return 'success'
+  if (item.status === 'scheduled') return 'warning'
+  return 'info'
+}
+
+function dripDetailTimestamp(item) {
+  if (item.status === 'unlocked' && (item.unlocked_at || item.unlock_date)) return `Unlocked ${formatDate(item.unlocked_at || item.unlock_date)}`
+  if (item.unlock_date) return `Unlocks ${formatDate(item.unlock_date)}`
+  return 'Locked'
 }
 
 function resetGrantForm() {
@@ -781,5 +861,44 @@ onMounted(() => {
 
 .effective-date {
   color: var(--fchub-text-secondary);
+}
+
+.clickable-plan-tag {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.clickable-plan-tag:hover {
+  opacity: 0.8;
+}
+
+.drip-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drip-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drip-detail-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fchub-text-primary);
+}
+
+.drip-detail-meta {
+  font-size: 12px;
+  color: var(--fchub-text-secondary);
+}
+
+.drip-detail-notification {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
 }
 </style>

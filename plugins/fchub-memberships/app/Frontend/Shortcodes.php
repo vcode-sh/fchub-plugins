@@ -5,6 +5,7 @@ namespace FChubMemberships\Frontend;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Domain\ContentProtection;
+use FChubMemberships\Frontend\FrontendAssets;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Storage\PlanRuleRepository;
 use FChubMemberships\Storage\GrantRepository;
@@ -207,112 +208,18 @@ class Shortcodes
      */
     public static function renderMyMemberships(array $atts): string
     {
-        wp_enqueue_style('fchub-memberships-frontend');
-
         if (!is_user_logged_in()) {
+            wp_enqueue_style('fchub-memberships-frontend');
+
             return self::renderRestrictionMessage(
                 self::getDefaultMessage('logged_out'),
                 true
             );
         }
 
-        $userId = get_current_user_id();
-        $data = AccountPage::getAccessData($userId);
+        FrontendAssets::enqueue();
 
-        $html = '<div class="fchub-membership-account">';
-
-        if (empty($data['plans'])) {
-            $html .= '<p>' . esc_html__('You do not have any active memberships.', 'fchub-memberships') . '</p>';
-            $html .= '</div>';
-            return $html;
-        }
-
-        // Active Plans section
-        $html .= '<h3>' . esc_html__('Active Memberships', 'fchub-memberships') . '</h3>';
-
-        foreach ($data['plans'] as $plan) {
-            $html .= '<div class="fchub-plan-section">';
-            $html .= '<div class="fchub-plan-header">';
-            $html .= '<span class="fchub-plan-badge">' . esc_html($plan['title']) . '</span>';
-
-            $html .= '<div class="fchub-plan-meta">';
-            if (!empty($plan['expires_at'])) {
-                $html .= '<span class="fchub-plan-expiry">';
-                $html .= sprintf(
-                    esc_html__('Expires: %s', 'fchub-memberships'),
-                    wp_date(get_option('date_format'), strtotime($plan['expires_at']))
-                );
-                $html .= '</span>';
-            } else {
-                $html .= '<span class="fchub-plan-expiry">'
-                    . esc_html__('Lifetime access', 'fchub-memberships')
-                    . '</span>';
-            }
-            $html .= '</div>';
-            $html .= '</div>';
-
-            // Drip progress
-            if (isset($plan['drip_progress'])) {
-                $html .= self::buildProgressBar(
-                    $plan['drip_progress']['unlocked'],
-                    $plan['drip_progress']['total']
-                );
-            }
-
-            // Content library
-            if (!empty($plan['content_items'])) {
-                $html .= '<div class="fchub-content-library">';
-                $html .= '<h4>' . esc_html__('Content', 'fchub-memberships') . '</h4>';
-
-                foreach ($plan['content_items'] as $item) {
-                    if ($item['is_locked']) {
-                        $html .= '<div class="fchub-content-item fchub-content-locked">';
-                        $html .= '<span class="fchub-content-title">' . esc_html($item['title']) . '</span>';
-                        if (!empty($item['available_at'])) {
-                            $html .= '<span class="fchub-content-date">';
-                            $html .= sprintf(
-                                esc_html__('Available: %s', 'fchub-memberships'),
-                                wp_date(get_option('date_format'), strtotime($item['available_at']))
-                            );
-                            $html .= '</span>';
-                        }
-                        $html .= '</div>';
-                    } else {
-                        $url = $item['url'] ?? '#';
-                        $html .= '<div class="fchub-content-item">';
-                        $html .= '<a href="' . esc_url($url) . '">' . esc_html($item['title']) . '</a>';
-                        $html .= '</div>';
-                    }
-                }
-
-                $html .= '</div>';
-            }
-
-            $html .= '</div>';
-        }
-
-        // History section
-        if (!empty($data['history'])) {
-            $html .= '<h3>' . esc_html__('History', 'fchub-memberships') . '</h3>';
-            $html .= '<div class="fchub-membership-history">';
-
-            foreach ($data['history'] as $entry) {
-                $html .= '<div class="fchub-history-item">';
-                $html .= '<span class="fchub-history-plan">' . esc_html($entry['plan_title']) . '</span>';
-                $html .= '<span class="fchub-history-status fchub-history-status--' . esc_attr($entry['status']) . '">';
-                $html .= esc_html(ucfirst($entry['status']));
-                $html .= '</span>';
-                $html .= '<span class="fchub-history-date">';
-                $html .= wp_date(get_option('date_format'), strtotime($entry['date']));
-                $html .= '</span>';
-                $html .= '</div>';
-            }
-
-            $html .= '</div>';
-        }
-
-        $html .= '</div>';
-        return $html;
+        return '<div id="fchub-membership-portal"></div>';
     }
 
     /**

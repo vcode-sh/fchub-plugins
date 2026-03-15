@@ -5,4 +5,23 @@
             <directory>tests/Unit</directory>
         </testsuite>
     </testsuites>
+    <source>
+        <include>
+            <directory suffix=".php">app/Core</directory>
+            <directory suffix=".php">app/Domain</directory>
+            <directory suffix=".php">app/Http</directory>
+            <directory suffix=".php">app/Integration</directory>
+            <directory suffix=".php">app/Modules</directory>
+            <directory suffix=".php">app/Reports</directory>
+            <directory suffix=".php">app/Storage</directory>
+            <directory suffix=".php">app/Support</directory>
+        </include>
+        <exclude>
+            <directory suffix=".php">app/Core/Contracts</directory>
+            <directory suffix=".php">app/Domain/Import/Contracts</directory>
+            <directory suffix=".php">app/Support/Contracts</directory>
+            <file>app/Http/index.php</file>
+            <file>app/Http/Controllers/index.php</file>
+        </exclude>
+    </source>
 </phpunit>

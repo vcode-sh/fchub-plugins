@@ -53,39 +53,71 @@ final class ReportInsightsService
         return $items;
     }
 
-    public function renewalRate(): array
+    public function renewalRate(?string $from = null, ?string $to = null): array
     {
-        $total = (int) $this->wpdb->get_var("SELECT COUNT(DISTINCT user_id) FROM {$this->grantsTable} WHERE status IN ('active', 'expired', 'revoked')");
-        $renewed = (int) $this->wpdb->get_var("SELECT COUNT(DISTINCT user_id) FROM {$this->grantsTable} WHERE renewal_count > 0");
+        [$fromDate, $toDate] = $this->resolveRange($from, $to);
+
+        $total = (int) $this->wpdb->get_var($this->wpdb->prepare(
+            "SELECT COUNT(DISTINCT user_id) FROM {$this->grantsTable}
+             WHERE status IN ('active', 'expired', 'revoked')
+               AND created_at >= %s
+               AND created_at <= %s",
+            $fromDate,
+            $toDate
+        ));
+        $renewed = (int) $this->wpdb->get_var($this->wpdb->prepare(
+            "SELECT COUNT(DISTINCT user_id) FROM {$this->grantsTable}
+             WHERE renewal_count > 0
+               AND updated_at >= %s
+               AND updated_at <= %s",
+            $fromDate,
+            $toDate
+        ));
         $rate = $total > 0 ? round(($renewed / $total) * 100, 1) : 0;
 
         $avgRenewalsPerMember = 0.0;
         if ($renewed > 0) {
             $avgRenewalsPerMember = (float) $this->wpdb->get_var(
-                "SELECT AVG(renewal_count) FROM {$this->grantsTable} WHERE renewal_count > 0"
+                $this->wpdb->prepare(
+                    "SELECT AVG(renewal_count) FROM {$this->grantsTable}
+                     WHERE renewal_count > 0
+                       AND updated_at >= %s
+                       AND updated_at <= %s",
+                    $fromDate,
+                    $toDate
+                )
             );
             $avgRenewalsPerMember = round($avgRenewalsPerMember, 1);
         }
 
-        $byPlan = $this->wpdb->get_results(
+        $byPlan = $this->wpdb->get_results($this->wpdb->prepare(
             "SELECT g.plan_id, p.title AS plan_title, COUNT(DISTINCT g.user_id) AS total_members,
                     SUM(CASE WHEN g.renewal_count > 0 THEN 1 ELSE 0 END) AS renewed_members,
                     AVG(g.renewal_count) AS avg_renewals
              FROM {$this->grantsTable} g
              LEFT JOIN {$this->plansTable} p ON g.plan_id = p.id
              WHERE g.plan_id IS NOT NULL
+               AND g.created_at >= %s
+               AND g.created_at <= %s
              GROUP BY g.plan_id, p.title",
+            $fromDate,
+            $toDate
+        ),
             ARRAY_A
         );
 
-        $overTime = $this->wpdb->get_results(
-            "SELECT DATE_FORMAT(updated_at, '%Y-%m') AS month,
+        $overTime = $this->wpdb->get_results($this->wpdb->prepare(
+            "SELECT DATE_FORMAT(updated_at, '%%Y-%%m') AS month,
                     COUNT(*) AS total_renewals
              FROM {$this->grantsTable}
              WHERE renewal_count > 0
-               AND updated_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
-             GROUP BY DATE_FORMAT(updated_at, '%Y-%m')
+               AND updated_at >= %s
+               AND updated_at <= %s
+             GROUP BY DATE_FORMAT(updated_at, '%%Y-%%m')
              ORDER BY month ASC",
+            $fromDate,
+            $toDate
+        ),
             ARRAY_A
         );
 
@@ -99,9 +131,11 @@ final class ReportInsightsService
         ];
     }
 
-    public function trialConversion(): array
+    public function trialConversion(?string $from = null, ?string $to = null): array
     {
-        $trials = $this->wpdb->get_results(
+        [$fromDate, $toDate] = $this->resolveRange($from, $to);
+
+        $trials = $this->wpdb->get_results($this->wpdb->prepare(
             "SELECT g.plan_id, p.title AS plan_title,
                     COUNT(*) AS total_trials,
                     SUM(CASE WHEN g.status = 'active' AND (g.trial_ends_at IS NULL OR g.trial_ends_at < NOW()) THEN 1 ELSE 0 END) AS converted,
@@ -109,7 +143,12 @@ final class ReportInsightsService
              FROM {$this->grantsTable} g
              LEFT JOIN {$this->plansTable} p ON g.plan_id = p.id
              WHERE g.trial_ends_at IS NOT NULL
+               AND g.created_at >= %s
+               AND g.created_at <= %s
              GROUP BY g.plan_id, p.title",
+            $fromDate,
+            $toDate
+        ),
             ARRAY_A
         );
 
@@ -124,6 +163,24 @@ final class ReportInsightsService
             'total_converted' => $totalConverted,
             'total_dropped' => $totalDropped,
             'by_plan' => $trials,
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function resolveRange(?string $from, ?string $to): array
+    {
+        if ($from !== null && $to !== null && $from !== '' && $to !== '') {
+            return [
+                gmdate('Y-m-d 00:00:00', strtotime($from)),
+                gmdate('Y-m-d 23:59:59', strtotime($to)),
+            ];
+        }
+
+        return [
+            gmdate('Y-m-d H:i:s', strtotime('-12 months')),
+            current_time('mysql'),
         ];
     }
 }

@@ -382,10 +382,10 @@ class GrantRepository
     /**
      * Count unique active members (users with at least one active grant).
      */
-    public function countActiveMembers(?int $planId = null): int
+    public function countActiveMembers(?int $planId = null, ?string $asOf = null): int
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $asOf ?: current_time('mysql');
 
         $sql = "SELECT COUNT(DISTINCT user_id) FROM {$this->table}
                 WHERE status = 'active'
@@ -485,11 +485,25 @@ class GrantRepository
         $page = max(1, (int) ($filters['page'] ?? 1));
         $offset = ($page - 1) * $perPage;
 
-        $sql = "SELECT g.*, u.user_email, u.display_name
+        $sql = "SELECT
+                    MIN(g.id) AS id,
+                    g.user_id,
+                    g.plan_id,
+                    g.source_type,
+                    MAX(g.source_id) AS source_id,
+                    MIN(g.status) AS status,
+                    MIN(g.created_at) AS created_at,
+                    MAX(g.updated_at) AS updated_at,
+                    MAX(g.expires_at) AS expires_at,
+                    MIN(g.starts_at) AS starts_at,
+                    COUNT(*) AS grant_count,
+                    u.user_email,
+                    u.display_name
                 FROM {$this->table} g
                 LEFT JOIN {$wpdb->users} u ON g.user_id = u.ID
                 WHERE " . implode(' AND ', $where) . "
-                ORDER BY g.created_at DESC";
+                GROUP BY g.user_id, g.plan_id
+                ORDER BY MIN(g.created_at) DESC";
 
         $sql .= $wpdb->prepare(' LIMIT %d OFFSET %d', $perPage, $offset);
 
@@ -498,7 +512,11 @@ class GrantRepository
         }
 
         $rows = $wpdb->get_results($sql, ARRAY_A);
-        return array_map([$this, 'hydrate'], $rows ?: []);
+
+        return array_map(function ($row) {
+            $row['grant_count'] = (int) ($row['grant_count'] ?? 1);
+            return $this->hydrate($row);
+        }, $rows ?: []);
     }
 
     public function countMembers(array $filters = []): int
@@ -534,10 +552,13 @@ class GrantRepository
             $params[] = $like;
         }
 
-        $sql = "SELECT COUNT(*)
-                FROM {$this->table} g
-                LEFT JOIN {$wpdb->users} u ON g.user_id = u.ID
-                WHERE " . implode(' AND ', $where);
+        $sql = "SELECT COUNT(*) FROM (
+                    SELECT g.user_id, g.plan_id
+                    FROM {$this->table} g
+                    LEFT JOIN {$wpdb->users} u ON g.user_id = u.ID
+                    WHERE " . implode(' AND ', $where) . "
+                    GROUP BY g.user_id, g.plan_id
+                ) AS grouped";
 
         if ($params) {
             $sql = $wpdb->prepare($sql, ...$params);

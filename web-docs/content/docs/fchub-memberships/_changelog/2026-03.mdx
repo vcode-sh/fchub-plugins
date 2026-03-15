@@ -1,3 +1,29 @@
+### v1.3.1
+
+*Released March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.3.1)
+
+Your memberships finally have a proper home. Plus a few admin upgrades that were quietly missing and a display bug that made one member look like twins.
+
+#### My Memberships portal
+
+Members can now view their plans, content access, drip progress, and membership history from the frontend — without bothering an admin or squinting at a shortcode that renders like it was designed in 2009.
+
+- **FluentCart account integration** — a "Memberships" tab appears in the customer portal at `/account/memberships/`, sitting alongside Purchase History and Downloads like it always should have
+- **Standalone shortcode** — `[fchub_my_memberships]` now renders a proper Vue app instead of static HTML. Same data, dramatically less depressing
+- **Plan dashboard cards** — each plan shows expiry date, days remaining, content progress bar, and a collapsible content library with drip status
+- **Matches FluentCart's design** — same fonts, badges, spacing, and general vibe. No rogue gradients, no surprise dark mode, no "designed by a different person" energy
+
+#### Admin improvements
+
+- **Retention cohort heatmap** — new tab in Reports showing month-by-month retention as a colour-coded matrix. Green means they stayed, red means they didn't. Maths has never been this judgemental
+- **Drip timeline drawer** — click any plan tag in a member's profile to see the full drip schedule in a side panel. Unlock dates, notification status, the lot
+
+#### Bug fix
+
+- **Members list no longer clones people** — if a plan has multiple content rules (say, a category and a post), the member appeared once per rule in the admin list. Now grouped by user and plan, because one row per human per plan is the bare minimum of data hygiene
+
+<Separator className="my-8" />
+
 ### v1.3.0
 
 *Released March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.3.0)

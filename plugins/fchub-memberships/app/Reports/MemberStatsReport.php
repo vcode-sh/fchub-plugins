@@ -26,16 +26,16 @@ class MemberStatsReport
     /**
      * Get overview stats for the dashboard.
      */
-    public function getOverview(): array
+    public function getOverview(?string $from = null, ?string $to = null): array
     {
         global $wpdb;
 
-        $monthStart = gmdate('Y-m-01 00:00:00');
-        $now = current_time('mysql');
+        $range = $this->resolveRange('30d', $from, $to);
+        $activeAt = $range['to_datetime'];
 
-        $activeMembers = $this->grantRepo->countActiveMembers();
-        $newThisMonth = $this->grantRepo->countNewMembers($monthStart, $now);
-        $churnedThisMonth = $this->grantRepo->countChurnedMembers($monthStart, $now);
+        $activeMembers = $this->grantRepo->countActiveMembers(null, $activeAt);
+        $newThisMonth = $this->grantRepo->countNewMembers($range['from_datetime'], $range['to_datetime']);
+        $churnedThisMonth = $this->grantRepo->countChurnedMembers($range['from_datetime'], $range['to_datetime']);
 
         $churnRate = 0.0;
         if ($activeMembers + $churnedThisMonth > 0) {
@@ -52,8 +52,9 @@ class MemberStatsReport
             "SELECT COUNT(*) FROM {$protectionTable}"
         );
         $grantsThisMonth = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->grantsTable} WHERE created_at >= %s",
-            $monthStart
+            "SELECT COUNT(*) FROM {$this->grantsTable} WHERE created_at >= %s AND created_at <= %s",
+            $range['from_datetime'],
+            $range['to_datetime']
         ));
 
         return [
@@ -73,11 +74,11 @@ class MemberStatsReport
      * @param string $period E.g. '12m', '6m', '30d'.
      * @return array Array of ['date' => string, 'count' => int].
      */
-    public function getMembersOverTime(string $period = '12m'): array
+    public function getMembersOverTime(string $period = '12m', ?string $from = null, ?string $to = null): array
     {
         global $wpdb;
 
-        $range = $this->parsePeriod($period);
+        $range = $this->resolveRange($period, $from, $to);
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT stat_date AS date, SUM(active_count) AS count
@@ -85,8 +86,8 @@ class MemberStatsReport
              WHERE stat_date >= %s AND stat_date <= %s
              GROUP BY stat_date
              ORDER BY stat_date ASC",
-            $range['from'],
-            $range['to']
+            $range['from_date'],
+            $range['to_date']
         ), ARRAY_A);
 
         return array_map(function ($row) {
@@ -102,10 +103,11 @@ class MemberStatsReport
      *
      * @return array Array of ['plan_id' => int, 'plan_title' => string, 'count' => int].
      */
-    public function getPlanDistribution(): array
+    public function getPlanDistribution(?string $from = null, ?string $to = null): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $range = $this->resolveRange('30d', $from, $to);
+        $now = $range['to_datetime'];
         $plansTable = $wpdb->prefix . 'fchub_membership_plans';
 
         $rows = $wpdb->get_results($wpdb->prepare(
@@ -272,5 +274,29 @@ class MemberStatsReport
         }
 
         return ['from' => $from, 'to' => $to];
+    }
+
+    /**
+     * @return array{from_date: string, to_date: string, from_datetime: string, to_datetime: string}
+     */
+    private function resolveRange(string $period, ?string $from, ?string $to): array
+    {
+        if ($from !== null && $to !== null && $from !== '' && $to !== '') {
+            return [
+                'from_date' => gmdate('Y-m-d', strtotime($from)),
+                'to_date' => gmdate('Y-m-d', strtotime($to)),
+                'from_datetime' => gmdate('Y-m-d 00:00:00', strtotime($from)),
+                'to_datetime' => gmdate('Y-m-d 23:59:59', strtotime($to)),
+            ];
+        }
+
+        $range = $this->parsePeriod($period);
+
+        return [
+            'from_date' => $range['from'],
+            'to_date' => $range['to'],
+            'from_datetime' => $range['from'] . ' 00:00:00',
+            'to_datetime' => $range['to'] . ' 23:59:59',
+        ];
     }
 }

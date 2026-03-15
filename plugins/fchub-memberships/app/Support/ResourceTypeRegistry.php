@@ -304,9 +304,9 @@ class ResourceTypeRegistry
             }
             $source = $this->detectPostTypeSource($cpt);
             $this->register($cpt->name, [
-                'label'          => $cpt->labels->singular_name ?: $cpt->label,
+                'label'          => $this->resolveObjectLabel($cpt),
                 'group'          => 'content',
-                'icon'           => $cpt->menu_icon ?: 'admin-post',
+                'icon'           => !empty($cpt->menu_icon) ? (string) $cpt->menu_icon : 'admin-post',
                 'searchable'     => true,
                 'supports_bulk'  => true,
                 'provider'       => Constants::PROVIDER_WORDPRESS_CORE,
@@ -347,7 +347,7 @@ class ResourceTypeRegistry
             }
             $source = $this->detectTaxonomySource($tax);
             $this->register($tax->name, [
-                'label'          => $tax->labels->singular_name ?: $tax->label,
+                'label'          => $this->resolveObjectLabel($tax),
                 'group'          => 'taxonomy',
                 'icon'           => 'tag',
                 'searchable'     => true,
@@ -450,5 +450,23 @@ class ResourceTypeRegistry
                 'source'         => 'FluentCommunity',
             ]);
         }
+    }
+
+    private function resolveObjectLabel(object $object): string
+    {
+        $singular = '';
+        if (isset($object->labels) && is_object($object->labels) && isset($object->labels->singular_name)) {
+            $singular = (string) $object->labels->singular_name;
+        }
+
+        if ($singular !== '') {
+            return $singular;
+        }
+
+        if (isset($object->label) && $object->label !== '') {
+            return (string) $object->label;
+        }
+
+        return isset($object->name) ? (string) $object->name : '';
     }
 }

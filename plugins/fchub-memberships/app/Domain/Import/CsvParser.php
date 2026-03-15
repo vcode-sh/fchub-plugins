@@ -169,7 +169,7 @@ class CsvParser
         fwrite($stream, $content);
         rewind($stream);
 
-        $headers = fgetcsv($stream, 0, $delimiter);
+        $headers = fgetcsv($stream, 0, $delimiter, '"', '\\');
         if ($headers === false) {
             fclose($stream);
             return [];
@@ -178,7 +178,7 @@ class CsvParser
         $count = count($headers);
 
         $rows = [];
-        while (($values = fgetcsv($stream, 0, $delimiter)) !== false) {
+        while (($values = fgetcsv($stream, 0, $delimiter, '"', '\\')) !== false) {
             if (count($values) === 1 && ($values[0] === null || trim($values[0]) === '')) {
                 continue; // skip blank lines
             }

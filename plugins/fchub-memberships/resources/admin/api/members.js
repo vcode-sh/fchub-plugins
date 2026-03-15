@@ -6,7 +6,6 @@ export const members = {
   grant: (data) => apiClient.post('admin/members/grant', data),
   revoke: (data) => apiClient.post('admin/members/revoke', data),
   extend: (data) => apiClient.post('admin/members/extend', data),
-  dripTimeline: (userId) => apiClient.get(`admin/members/${userId}/drip-timeline`),
   export: (params) => apiClient.get('admin/members/export', params),
   pause: (data) => apiClient.post('admin/members/pause', data),
   resume: (data) => apiClient.post('admin/members/resume', data),
@@ -14,6 +13,6 @@ export const members = {
   bulkRevoke: (data) => apiClient.post('admin/members/bulk-revoke', data),
   bulkExtend: (data) => apiClient.post('admin/members/bulk-extend', data),
   bulkExport: (data) => apiClient.post('admin/members/bulk-export', data),
-  auditLog: (userId, params) => apiClient.get(`admin/members/${userId}/audit-log`, params),
   activity: (userId, params) => apiClient.get(`admin/members/${userId}/activity`, params),
+  dripTimeline: (userId, params) => apiClient.get(`admin/members/${userId}/drip-timeline`, params),
 }

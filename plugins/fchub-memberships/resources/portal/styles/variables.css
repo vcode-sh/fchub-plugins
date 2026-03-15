@@ -1,0 +1,26 @@
+#fchub-membership-portal {
+  --portal-text-primary: #253241;
+  --portal-text-body: #2f3448;
+  --portal-text-secondary: #565865;
+  --portal-text-muted: #98a2b2;
+  --portal-border: #eaecf0;
+  --portal-border-light: #f3f4f6;
+  --portal-card-bg: #ffffff;
+  --portal-hover-bg: #f9fafb;
+  --portal-radius: 8px;
+  --portal-radius-sm: 6px;
+  --portal-accent-green: #16a34a;
+  --portal-accent-blue: #2563eb;
+  --portal-badge-active-bg: #d1eae4;
+  --portal-badge-active-text: #116a53;
+  --portal-badge-paused-bg: #fde8cd;
+  --portal-badge-paused-text: #ac6305;
+  --portal-badge-expired-bg: #fcdede;
+  --portal-badge-expired-text: #b91c1c;
+  --portal-badge-revoked-bg: #f3f4f6;
+  --portal-badge-revoked-text: #6b7280;
+  --portal-badge-lifetime-bg: #e8e0fc;
+  --portal-badge-lifetime-text: #5b21b6;
+  --portal-skeleton-base: #e5e7eb;
+  --portal-skeleton-shine: #f3f4f6;
+}

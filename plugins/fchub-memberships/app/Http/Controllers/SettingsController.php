@@ -70,6 +70,7 @@ class SettingsController
         $messageFields = [
             'restriction_message_logged_out', 'restriction_message_no_access',
             'restriction_message_expired', 'restriction_message_drip_locked',
+            'restriction_message_paused',
         ];
         foreach ($messageFields as $field) {
             if (isset($data[$field])) {
@@ -179,6 +180,7 @@ class SettingsController
             'restriction_message_no_access'        => __('You don\'t have access to this content. View membership options to learn more.', 'fchub-memberships'),
             'restriction_message_expired'          => __('Your access to this content has expired. Renew your subscription to continue.', 'fchub-memberships'),
             'restriction_message_drip_locked'      => __('This content will be available to you on {unlock_date}.', 'fchub-memberships'),
+            'restriction_message_paused'           => __('Your membership is currently paused. Resume your membership to access this content.', 'fchub-memberships'),
             'show_teaser'                         => 'no',
             'hide_protected_in_archive'           => 'no',
             'debug_mode'                          => 'no',

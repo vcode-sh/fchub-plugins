@@ -20,6 +20,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(process.cwd(), 'resources/admin'),
+      '@portal': path.resolve(process.cwd(), 'resources/portal'),
     },
   },
   base: './',
@@ -28,7 +29,18 @@ export default defineConfig({
     outDir: 'assets/dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: 'resources/admin/main.js',
+      input: {
+        admin: 'resources/admin/main.js',
+        portal: 'resources/portal/main.js',
+      },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['tests/admin/setup.js'],
+    globals: true,
+    css: true,
+    include: ['tests/admin/**/*.test.js'],
+    exclude: ['tests/admin-smoke/**'],
   },
 })

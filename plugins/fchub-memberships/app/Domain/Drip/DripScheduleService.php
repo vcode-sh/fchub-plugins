@@ -265,7 +265,13 @@ class DripScheduleService
             foreach ($allRules as $r) {
                 if ($r['sort_order'] > $rule['sort_order'] && $r['drip_type'] !== 'immediate') {
                     $nextAdapter = $this->getAdapter($r['provider'] ?? 'wordpress_core');
-                    $nextItem = $nextAdapter ? $nextAdapter->getResourceLabel($r['resource_type'], $r['resource_id']) : $r['resource_id'];
+                    $nextAvailableAt = $this->calculateNotifyAt($r);
+                    $nextItem = [
+                        'title' => $nextAdapter ? $nextAdapter->getResourceLabel($r['resource_type'], $r['resource_id']) : $r['resource_id'],
+                        'available_date' => $nextAvailableAt
+                            ? wp_date(get_option('date_format'), strtotime($nextAvailableAt))
+                            : '',
+                    ];
                     break;
                 }
             }

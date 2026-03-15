@@ -102,7 +102,7 @@ class ContentProtection
             return $this->getDripLockedHtml($result['drip_available_at'], $postType, $postId, $content);
         }
 
-        return $this->buildProtectedOutput('no_access', $postType, $postId, $content);
+        return $this->buildProtectedOutput($this->contextForEvaluation($result), $postType, $postId, $content);
     }
 
     /**
@@ -265,7 +265,11 @@ class ContentProtection
             return $response;
         }
 
-        $context = $userId ? 'no_access' : 'logged_out';
+        $context = 'logged_out';
+        if ($userId) {
+            $result = $this->evaluator->evaluate($userId, Constants::PROVIDER_WORDPRESS_CORE, $postType, $postId);
+            $context = $this->contextForEvaluation($result);
+        }
         $data = $response->get_data();
         $data['content']['rendered'] = $this->buildProtectedOutput($context, $postType, $postId, $data['content']['rendered'] ?? '');
         $data['content']['protected'] = true;
@@ -693,6 +697,23 @@ class ContentProtection
         $html .= '</div>';
 
         return $html;
+    }
+
+    /**
+     * Map evaluator results to restriction-message contexts.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function contextForEvaluation(array $result): string
+    {
+        if (!empty($result['drip_locked'])) {
+            return 'drip_locked';
+        }
+
+        return match ($result['reason'] ?? '') {
+            Constants::REASON_MEMBERSHIP_PAUSED => 'membership_paused',
+            default => 'no_access',
+        };
     }
 
     /**

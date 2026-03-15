@@ -223,9 +223,12 @@ function selectDay(day) {
 async function fetchCalendar() {
   calendarLoading.value = true
   try {
+    const from = formatDateStr(currentYear.value, currentMonth.value, 1)
+    const lastDay = new Date(currentYear.value, currentMonth.value + 1, 0).getDate()
+    const to = `${formatDateStr(currentYear.value, currentMonth.value, lastDay)} 23:59:59`
     const res = await drip.calendar({
-      year: currentYear.value,
-      month: currentMonth.value + 1, // API expects 1-indexed
+      from: `${from} 00:00:00`,
+      to,
     })
     calendarData.value = res.data ?? res ?? {}
   } catch {

@@ -69,6 +69,12 @@ final class DripAdminQueryService
             $params[] = (int) $filters['user_id'];
         }
 
+        if (!empty($filters['date'])) {
+            $where[] = 'notify_at >= %s AND notify_at <= %s';
+            $params[] = $filters['date'] . ' 00:00:00';
+            $params[] = $filters['date'] . ' 23:59:59';
+        }
+
         $sql = "SELECT COUNT(*) FROM {$this->table} WHERE " . implode(' AND ', $where);
 
         return $params

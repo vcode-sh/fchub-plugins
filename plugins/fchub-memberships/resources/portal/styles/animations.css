@@ -1,0 +1,53 @@
+/* Skeleton pulse */
+@keyframes fchub-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Skeleton shimmer */
+@keyframes fchub-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Progress bar fill */
+.fchub-progress-fill {
+  transition: width 0.6s ease;
+}
+
+/* Chevron rotation */
+.fchub-chevron {
+  transition: transform 0.2s ease;
+}
+
+.fchub-chevron--open {
+  transform: rotate(180deg);
+}
+
+/* Collapse/expand */
+.fchub-collapse-enter-active,
+.fchub-collapse-leave-active {
+  transition: max-height 0.3s ease, opacity 0.2s ease;
+  overflow: hidden;
+}
+
+.fchub-collapse-enter-from,
+.fchub-collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.fchub-collapse-enter-to,
+.fchub-collapse-leave-from {
+  max-height: 1000px;
+  opacity: 1;
+}

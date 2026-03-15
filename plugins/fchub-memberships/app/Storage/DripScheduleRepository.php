@@ -212,6 +212,14 @@ class DripScheduleRepository
             $params[] = (int) $filters['user_id'];
         }
 
+        if (!empty($filters['date'])) {
+            $start = $filters['date'] . ' 00:00:00';
+            $end = $filters['date'] . ' 23:59:59';
+            $where[] = 'notify_at >= %s AND notify_at <= %s';
+            $params[] = $start;
+            $params[] = $end;
+        }
+
         $sql = "SELECT * FROM {$this->table} WHERE " . implode(' AND ', $where) . " ORDER BY notify_at DESC";
 
         if (!empty($filters['per_page'])) {

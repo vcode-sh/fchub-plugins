@@ -36,10 +36,11 @@ class ContentPopularityReport
      * @param int $limit Maximum number of results.
      * @return array Array of ['provider' => string, 'resource_type' => string, 'resource_id' => string, 'title' => string, 'member_count' => int].
      */
-    public function getMostAccessedContent(int $limit = 20): array
+    public function getMostAccessedContent(int $limit = 20, ?string $from = null, ?string $to = null): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $range = $this->resolveRange($from, $to);
+        $now = $range['to'];
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT
@@ -52,12 +53,16 @@ class ContentPopularityReport
                AND (g.starts_at IS NULL OR g.starts_at <= %s)
                AND (g.expires_at IS NULL OR g.expires_at > %s)
                AND (g.drip_available_at IS NULL OR g.drip_available_at <= %s)
+               AND g.created_at >= %s
+               AND g.created_at <= %s
              GROUP BY g.provider, g.resource_type, g.resource_id
              ORDER BY member_count DESC
              LIMIT %d",
             $now,
             $now,
             $now,
+            $range['from'],
+            $range['to'],
             $limit
         ), ARRAY_A);
 
@@ -253,5 +258,23 @@ class ContentPopularityReport
         }
 
         return sprintf('#%s (%s)', $resourceId, $resourceType);
+    }
+
+    /**
+     * @return array{from: string, to: string}
+     */
+    private function resolveRange(?string $from, ?string $to): array
+    {
+        if ($from !== null && $to !== null && $from !== '' && $to !== '') {
+            return [
+                'from' => gmdate('Y-m-d 00:00:00', strtotime($from)),
+                'to' => gmdate('Y-m-d 23:59:59', strtotime($to)),
+            ];
+        }
+
+        return [
+            'from' => gmdate('Y-m-d H:i:s', strtotime('-12 months')),
+            'to' => current_time('mysql'),
+        ];
     }
 }

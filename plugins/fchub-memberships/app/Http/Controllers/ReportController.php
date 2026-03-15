@@ -80,30 +80,34 @@ class ReportController
     public static function overview(\WP_REST_Request $request): \WP_REST_Response
     {
         $report = new MemberStatsReport();
-        return new \WP_REST_Response(['data' => $report->getOverview()]);
+        [$from, $to] = self::resolveRange($request);
+        return new \WP_REST_Response(['data' => $report->getOverview($from, $to)]);
     }
 
     public static function membersOverTime(\WP_REST_Request $request): \WP_REST_Response
     {
         $period = $request->get_param('period') ?: '12m';
+        [$from, $to] = self::resolveRange($request);
         $report = new MemberStatsReport();
-        return new \WP_REST_Response(['data' => $report->getMembersOverTime($period)]);
+        return new \WP_REST_Response(['data' => $report->getMembersOverTime($period, $from, $to)]);
     }
 
     public static function planDistribution(\WP_REST_Request $request): \WP_REST_Response
     {
         $report = new MemberStatsReport();
-        return new \WP_REST_Response(['data' => $report->getPlanDistribution()]);
+        [$from, $to] = self::resolveRange($request);
+        return new \WP_REST_Response(['data' => $report->getPlanDistribution($from, $to)]);
     }
 
     public static function churn(\WP_REST_Request $request): \WP_REST_Response
     {
         $period = $request->get_param('period') ?: '12m';
+        [$from, $to] = self::resolveRange($request);
         $report = new ChurnReport();
         return new \WP_REST_Response([
             'data' => [
-                'current_rate' => $report->getChurnRate('30d'),
-                'over_time'    => $report->getChurnOverTime($period),
+                'current_rate' => $report->getChurnRate('30d', $from, $to),
+                'over_time'    => $report->getChurnOverTime($period, $from, $to),
             ],
         ]);
     }
@@ -118,25 +122,26 @@ class ReportController
     public static function revenue(\WP_REST_Request $request): \WP_REST_Response
     {
         $period = $request->get_param('period') ?: '12m';
+        [$from, $to] = self::resolveRange($request);
         $report = new RevenueReport();
 
         // FluentCart stores amounts in cents — convert to whole currency units for display
         $perPlan = array_map(function ($row) {
             $row['revenue'] = round($row['revenue'] / 100, 2);
             return $row;
-        }, $report->getRevenuePerPlan($period));
+        }, $report->getRevenuePerPlan($period, $from, $to));
 
         $ltv = array_map(function ($row) {
             $row['ltv'] = round($row['ltv'] / 100, 2);
             $row['total_revenue'] = round($row['total_revenue'] / 100, 2);
             return $row;
-        }, $report->getLifetimeValuePerPlan());
+        }, $report->getLifetimeValuePerPlan($from, $to));
 
         return new \WP_REST_Response([
             'data' => [
                 'per_plan' => $perPlan,
                 'mrr'      => round($report->getMRR() / 100, 2),
-                'arpm'     => round($report->getAverageRevenuePerMember() / 100, 2),
+                'arpm'     => round($report->getAverageRevenuePerMember($from, $to) / 100, 2),
                 'ltv'      => $ltv,
             ],
         ]);
@@ -145,9 +150,10 @@ class ReportController
     public static function contentPopularity(\WP_REST_Request $request): \WP_REST_Response
     {
         $report = new ContentPopularityReport();
+        [$from, $to] = self::resolveRange($request);
         return new \WP_REST_Response([
             'data' => [
-                'most_accessed'     => $report->getMostAccessedContent(),
+                'most_accessed'     => $report->getMostAccessedContent(20, $from, $to),
                 'least_accessed'    => $report->getLeastAccessedContent(),
                 'drip_completion'   => $report->getDripCompletionRates(),
                 'plan_overlap'      => $report->getContentByPlanOverlap(),
@@ -164,16 +170,33 @@ class ReportController
 
     public static function renewalRate(\WP_REST_Request $request): \WP_REST_Response
     {
-        return new \WP_REST_Response(['data' => (new ReportInsightsService())->renewalRate()]);
+        [$from, $to] = self::resolveRange($request);
+        return new \WP_REST_Response(['data' => (new ReportInsightsService())->renewalRate($from, $to)]);
     }
 
     public static function trialConversion(\WP_REST_Request $request): \WP_REST_Response
     {
-        return new \WP_REST_Response(['data' => (new ReportInsightsService())->trialConversion()]);
+        [$from, $to] = self::resolveRange($request);
+        return new \WP_REST_Response(['data' => (new ReportInsightsService())->trialConversion($from, $to)]);
     }
 
     public static function adminPermission(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    /**
+     * @return array{0: ?string, 1: ?string}
+     */
+    private static function resolveRange(\WP_REST_Request $request): array
+    {
+        $from = sanitize_text_field((string) ($request->get_param('start_date') ?? ''));
+        $to = sanitize_text_field((string) ($request->get_param('end_date') ?? ''));
+
+        if ($from === '' || $to === '') {
+            return [null, null];
+        }
+
+        return [$from, $to];
     }
 }

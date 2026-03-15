@@ -34,11 +34,11 @@ class RevenueReport
      * @param string $period E.g. '12m', '6m'.
      * @return array Array of ['month' => string, 'plan_id' => int, 'plan_title' => string, 'revenue' => int].
      */
-    public function getRevenuePerPlan(string $period = '12m'): array
+    public function getRevenuePerPlan(string $period = '12m', ?string $from = null, ?string $to = null): array
     {
         global $wpdb;
 
-        $range = $this->parsePeriod($period);
+        $range = $this->resolveRange($period, $from, $to);
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT
@@ -101,22 +101,27 @@ class RevenueReport
      *
      * @return int Average revenue in the smallest currency unit.
      */
-    public function getAverageRevenuePerMember(): int
+    public function getAverageRevenuePerMember(?string $from = null, ?string $to = null): int
     {
         global $wpdb;
 
-        $activeMembers = $this->grantRepo->countActiveMembers();
+        $range = $this->resolveRange('12m', $from, $to);
+        $activeMembers = $this->grantRepo->countActiveMembers(null, $range['to']);
 
         if ($activeMembers === 0) {
             return 0;
         }
 
-        $totalRevenue = (int) $wpdb->get_var(
+        $totalRevenue = (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COALESCE(SUM(o.total_amount), 0)
              FROM {$this->grantsTable} g
              JOIN {$this->ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
-             WHERE g.status = 'active'"
-        );
+             WHERE g.status = 'active'
+               AND g.created_at >= %s
+               AND g.created_at <= %s",
+            $range['from'],
+            $range['to']
+        ));
 
         return (int) round($totalRevenue / $activeMembers);
     }
@@ -127,11 +132,12 @@ class RevenueReport
      *
      * @return array Array of ['plan_id' => int, 'plan_title' => string, 'ltv' => int, 'member_count' => int, 'total_revenue' => int].
      */
-    public function getLifetimeValuePerPlan(): array
+    public function getLifetimeValuePerPlan(?string $from = null, ?string $to = null): array
     {
         global $wpdb;
+        $range = $this->resolveRange('12m', $from, $to);
 
-        $rows = $wpdb->get_results(
+        $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT
                 g.plan_id,
                 p.title AS plan_title,
@@ -141,10 +147,13 @@ class RevenueReport
              JOIN {$this->ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
              LEFT JOIN {$this->plansTable} p ON g.plan_id = p.id
              WHERE g.plan_id IS NOT NULL
+               AND g.created_at >= %s
+               AND g.created_at <= %s
              GROUP BY g.plan_id, p.title
              ORDER BY total_revenue DESC",
-            ARRAY_A
-        );
+            $range['from'],
+            $range['to']
+        ), ARRAY_A);
 
         return array_map(function ($row) {
             $memberCount = (int) $row['member_count'];
@@ -177,5 +186,20 @@ class RevenueReport
         }
 
         return ['from' => $from, 'to' => $to];
+    }
+
+    /**
+     * @return array{from: string, to: string}
+     */
+    private function resolveRange(string $period, ?string $from, ?string $to): array
+    {
+        if ($from !== null && $to !== null && $from !== '' && $to !== '') {
+            return [
+                'from' => gmdate('Y-m-d 00:00:00', strtotime($from)),
+                'to' => gmdate('Y-m-d 23:59:59', strtotime($to)),
+            ];
+        }
+
+        return $this->parsePeriod($period);
     }
 }

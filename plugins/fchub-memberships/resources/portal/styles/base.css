@@ -1,0 +1,50 @@
+#fchub-membership-portal {
+  font-family: Manrope, sans-serif;
+  color: var(--portal-text-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#fchub-membership-portal *,
+#fchub-membership-portal *::before,
+#fchub-membership-portal *::after {
+  box-sizing: border-box;
+}
+
+#fchub-membership-portal h1,
+#fchub-membership-portal h2,
+#fchub-membership-portal h3,
+#fchub-membership-portal h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--portal-text-primary);
+}
+
+#fchub-membership-portal p {
+  color: var(--portal-text-secondary);
+}
+
+#fchub-membership-portal a {
+  color: var(--portal-accent-blue);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+#fchub-membership-portal a:hover {
+  color: #1d4ed8;
+}
+
+#fchub-membership-portal button {
+  font-family: Manrope, sans-serif;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+#fchub-membership-portal button:focus-visible {
+  outline: 2px solid var(--portal-accent-blue);
+  outline-offset: 2px;
+  border-radius: var(--portal-radius-sm);
+}

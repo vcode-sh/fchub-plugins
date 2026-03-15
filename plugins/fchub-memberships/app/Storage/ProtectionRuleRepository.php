@@ -100,6 +100,16 @@ class ProtectionRuleRepository
             $params[] = $filters['protection_mode'];
         }
 
+        if (!empty($filters['plan_id'])) {
+            $where[] = "(plan_ids IS NULL OR plan_ids LIKE %s)";
+            $params[] = '%' . $wpdb->esc_like('"' . $filters['plan_id'] . '"') . '%';
+        }
+
+        if (!empty($filters['search'])) {
+            $where[] = 'resource_id LIKE %s';
+            $params[] = '%' . $wpdb->esc_like($filters['search']) . '%';
+        }
+
         $sql = "SELECT COUNT(*) FROM {$this->table} WHERE " . implode(' AND ', $where);
 
         if ($params) {
@@ -288,10 +298,11 @@ class ProtectionRuleRepository
      */
     private function hydrate(array $row): array
     {
-        $row['id'] = (int) $row['id'];
+        $row['id'] = (int) ($row['id'] ?? 0);
         $row['resource_type'] = (string) ($row['resource_type'] ?? '');
         $row['resource_id'] = (string) ($row['resource_id'] ?? '');
-        $row['plan_ids'] = $row['plan_ids'] !== null ? (json_decode($row['plan_ids'], true) ?: []) : [];
+        $planIds = $row['plan_ids'] ?? null;
+        $row['plan_ids'] = $planIds !== null ? (json_decode((string) $planIds, true) ?: []) : [];
         $row['protection_mode'] = (string) ($row['protection_mode'] ?? Constants::PROTECTION_MODE_EXPLICIT);
         $row['restriction_message'] = $row['restriction_message'] ?? null;
         $row['redirect_url'] = $row['redirect_url'] ?? null;

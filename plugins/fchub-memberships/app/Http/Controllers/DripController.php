@@ -54,11 +54,27 @@ class DripController
 
     public static function calendar(\WP_REST_Request $request): \WP_REST_Response
     {
-        $from = $request->get_param('from') ?: gmdate('Y-m-01');
-        $to = $request->get_param('to') ?: gmdate('Y-m-t');
+        $from = sanitize_text_field((string) ($request->get_param('from') ?: ''));
+        $to = sanitize_text_field((string) ($request->get_param('to') ?: ''));
+
+        if ($from === '' || $to === '') {
+            $year = (int) ($request->get_param('year') ?: gmdate('Y'));
+            $month = (int) ($request->get_param('month') ?: gmdate('n'));
+            $month = max(1, min(12, $month));
+            $from = gmdate('Y-m-01 00:00:00', strtotime(sprintf('%04d-%02d-01', $year, $month)));
+            $to = gmdate('Y-m-t 23:59:59', strtotime($from));
+        }
 
         $service = new DripScheduleService();
-        return new \WP_REST_Response(['data' => $service->getCalendar($from, $to)]);
+        $items = $service->getCalendar($from, $to);
+        $calendar = [];
+
+        foreach ($items as $item) {
+            $dateKey = gmdate('Y-m-d', strtotime($item['notify_at']));
+            $calendar[$dateKey] = ($calendar[$dateKey] ?? 0) + 1;
+        }
+
+        return new \WP_REST_Response(['data' => $calendar]);
     }
 
     public static function notifications(\WP_REST_Request $request): \WP_REST_Response
@@ -67,12 +83,14 @@ class DripController
         $filters = [
             'status'   => $request->get_param('status'),
             'user_id'  => $request->get_param('user_id'),
+            'date'     => $request->get_param('date'),
             'per_page' => $request->get_param('per_page') ?: 20,
             'page'     => $request->get_param('page') ?: 1,
         ];
 
         $items = $service->getNotificationQueue($filters);
         $ruleRepo = new \FChubMemberships\Storage\PlanRuleRepository();
+        $planRepo = new \FChubMemberships\Storage\PlanRepository();
 
         // Enrich with user email and content title
         foreach ($items as &$item) {
@@ -82,8 +100,11 @@ class DripController
             $rule = $ruleRepo->find($item['plan_rule_id']);
             if ($rule) {
                 $item['content_title'] = self::getResourceTitle($rule['resource_type'], $rule['resource_id']);
+                $plan = !empty($rule['plan_id']) ? $planRepo->find((int) $rule['plan_id']) : null;
+                $item['plan_title'] = $plan ? $plan['title'] : '';
             } else {
                 $item['content_title'] = "Rule #{$item['plan_rule_id']}";
+                $item['plan_title'] = '';
             }
 
             $item['scheduled_at'] = $item['notify_at'] ?? null;

@@ -109,6 +109,10 @@ class MemberController
 
     public static function index(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($request->get_param('users_only')) {
+            return self::searchUsers($request);
+        }
+
         $repo = new GrantRepository();
         $filters = AdminRequestFilters::memberList($request);
 
@@ -161,6 +165,19 @@ class MemberController
             ];
         }
 
+        $history = [];
+        foreach ($allGrants as $grant) {
+            $grant['plan_title'] = '';
+            if (!empty($grant['plan_id'])) {
+                $plan = $planRepo->find((int) $grant['plan_id']);
+                $grant['plan_title'] = $plan ? $plan['title'] : '';
+            } else {
+                $grant['plan_title'] = __('Direct Grant', 'fchub-memberships');
+            }
+
+            $history[] = $grant;
+        }
+
         // Collect audit log entries for all user grants
         $auditRepo = new \FChubMemberships\Storage\AuditLogRepository();
         $grantIds = array_column($allGrants, 'id');
@@ -175,11 +192,13 @@ class MemberController
                 'user' => [
                     'id'           => $user->ID,
                     'display_name' => $user->display_name,
+                    'email'        => $user->user_email,
                     'user_email'   => $user->user_email,
+                    'registered_at' => $user->user_registered ?? null,
                     'avatar_url'   => get_avatar_url($user->ID, ['size' => 64]),
                 ],
                 'plans'     => $plans,
-                'history'   => $allGrants,
+                'history'   => $history,
                 'audit_log' => array_slice($auditEntries, 0, 50),
             ],
         ]);
@@ -640,5 +659,31 @@ class MemberController
     public static function adminPermission(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    private static function searchUsers(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $search = sanitize_text_field((string) ($request->get_param('search') ?? ''));
+        $perPage = max(1, min(20, (int) ($request->get_param('per_page') ?: 10)));
+
+        $users = get_users([
+            'search'         => $search !== '' ? '*' . $search . '*' : '',
+            'search_columns' => ['user_email', 'display_name', 'user_login'],
+            'number'         => $perPage,
+        ]);
+
+        $data = array_map(static function (object $user): array {
+            return [
+                'id'           => (int) $user->ID,
+                'display_name' => (string) ($user->display_name ?? ''),
+                'email'        => (string) ($user->user_email ?? ''),
+                'registered_at' => $user->user_registered ?? null,
+            ];
+        }, $users);
+
+        return new \WP_REST_Response([
+            'data'  => $data,
+            'total' => count($data),
+        ]);
     }
 }

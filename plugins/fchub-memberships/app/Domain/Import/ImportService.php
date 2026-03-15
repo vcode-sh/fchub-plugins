@@ -170,10 +170,14 @@ class ImportService
         // Resolve plan mapping
         $mapping = $mappingIndex[$levelName] ?? null;
         if (!$mapping || ($mapping['action'] ?? '') === 'skip') {
+            $message = $mapping
+                ? "Level \"{$levelName}\" mapped to skip."
+                : 'No level mapping found.';
+
             return [
                 'email'   => $email,
                 'status'  => 'skipped',
-                'message' => $levelName ? "Level \"{$levelName}\" mapped to skip." : 'No level mapping found.',
+                'message' => $message,
             ];
         }
 

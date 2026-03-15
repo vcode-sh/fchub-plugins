@@ -33,11 +33,9 @@ final class TrialLifecycleBugHuntTest extends PluginTestCase
         $ref = new \ReflectionClass($service);
 
         $grantProp = $ref->getProperty('grantRepo');
-        $grantProp->setAccessible(true);
         $grantProp->setValue($service, $grantRepo);
 
         $planProp = $ref->getProperty('planRepo');
-        $planProp->setAccessible(true);
         $planProp->setValue($service, $planRepo);
 
         return $service;
@@ -49,7 +47,6 @@ final class TrialLifecycleBugHuntTest extends PluginTestCase
     private function callConvertTrial(TrialLifecycleService $service, array $grant): void
     {
         $ref = new \ReflectionMethod($service, 'convertTrial');
-        $ref->setAccessible(true);
         $ref->invoke($service, $grant);
     }
 

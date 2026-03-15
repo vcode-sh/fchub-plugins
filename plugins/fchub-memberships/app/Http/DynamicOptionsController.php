@@ -12,12 +12,6 @@ class DynamicOptionsController
     {
         $ns = 'fchub-memberships/v1';
 
-        register_rest_route($ns, '/admin/plans/options', [
-            'methods'             => 'GET',
-            'callback'            => [self::class, 'planOptions'],
-            'permission_callback' => [self::class, 'adminPermission'],
-        ]);
-
         register_rest_route($ns, '/admin/resource-types', [
             'methods'             => 'GET',
             'callback'            => [self::class, 'resourceTypes'],

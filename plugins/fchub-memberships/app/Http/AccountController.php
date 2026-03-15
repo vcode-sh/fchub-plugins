@@ -67,6 +67,12 @@ class AccountController
             return $g['status'] !== 'active';
         });
 
+        $history = array_map(function ($entry) use ($planRepo) {
+            $plan = $entry['plan_id'] ? $planRepo->find($entry['plan_id']) : null;
+            $entry['plan_title'] = $plan ? $plan['title'] : __('Direct Access', 'fchub-memberships');
+            return $entry;
+        }, $history);
+
         return new \WP_REST_Response([
             'plans'   => $plans,
             'history' => array_values($history),
