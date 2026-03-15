@@ -53,8 +53,12 @@ spl_autoload_register(function ($class) {
         $file = __DIR__ . '/app/' . str_replace('\\', '/', $relativeClass) . '.php';
     }
 
+    // H1: Prevent path traversal — resolved path must stay within plugin directory.
     if (file_exists($file)) {
-        require $file;
+        $realPath = realpath($file);
+        if ($realPath && str_starts_with($realPath, __DIR__)) {
+            require $realPath;
+        }
     }
 });
 

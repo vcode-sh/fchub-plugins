@@ -106,7 +106,7 @@ final class AdminMenu
             'nonce'    => wp_create_nonce('wp_rest'),
             'version'  => CARTSHIFT_VERSION,
             'features' => $this->flags->all(),
-        ]);
+        ], JSON_HEX_TAG | JSON_HEX_AMP);
         wp_add_inline_script('cartshift-admin', "window.cartshift = {$config};", 'before');
     }
 

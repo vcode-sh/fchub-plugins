@@ -257,7 +257,7 @@ final class PreflightCheck
                     "SELECT COUNT(*) FROM {$table} WHERE post_type = 'fluent-products' AND post_status != 'auto-draft'",
                 );
             } else {
-                $tableExists = $wpdb->get_var("SHOW TABLES LIKE '{$table}'");
+                $tableExists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
                 $counts[$key] = $tableExists ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}") : 0;
             }
         }

@@ -77,6 +77,33 @@ final class MigrationController
             );
         }
 
+        // M1: Prevent concurrent migrations.
+        /** @var MigrationState $state */
+        $state = $this->container->get(MigrationState::class);
+        if ($state->isRunning()) {
+            return new WP_REST_Response(
+                ['data' => ['message' => 'A migration is already in progress.']],
+                409,
+            );
+        }
+
+        // L1: Whitelist entity types against known constants.
+        $allowed = [
+            \CartShift\Support\Constants::ENTITY_PRODUCT,
+            \CartShift\Support\Constants::ENTITY_CUSTOMER,
+            \CartShift\Support\Constants::ENTITY_COUPON,
+            \CartShift\Support\Constants::ENTITY_ORDER,
+            \CartShift\Support\Constants::ENTITY_SUBSCRIPTION,
+        ];
+        $entityTypes = array_values(array_intersect($entityTypes, $allowed));
+
+        if (empty($entityTypes)) {
+            return new WP_REST_Response(
+                ['data' => ['message' => 'No valid entity types specified.']],
+                422,
+            );
+        }
+
         $orchestrator = $this->buildOrchestrator();
         $result = $orchestrator->startMigration($entityTypes, $dryRun);
 

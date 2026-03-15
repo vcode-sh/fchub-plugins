@@ -1,5 +1,7 @@
 <?php
 
+defined('ABSPATH') || exit;
+
 /**
  * GitHub-based auto-updater for FCHub plugins.
  *
