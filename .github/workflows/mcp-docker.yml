@@ -43,7 +43,7 @@ jobs:
   build-and-push:
     name: Build & Push
     needs: prepare
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write

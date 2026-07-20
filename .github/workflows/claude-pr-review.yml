@@ -12,7 +12,7 @@ jobs:
       github.event.pull_request.draft == false &&
       github.event.pull_request.user.type != 'Bot' &&
       !endsWith(github.event.pull_request.user.login, '[bot]')
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write

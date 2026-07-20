@@ -23,7 +23,7 @@ defaults:
 jobs:
   validate:
     name: Validate
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
