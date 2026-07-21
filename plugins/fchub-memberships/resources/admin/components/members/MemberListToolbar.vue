@@ -1,8 +1,11 @@
 <template>
   <div>
-    <div class="page-header">
-      <h2 class="fchub-page-title">Members</h2>
-      <div class="header-actions">
+    <WorkspacePageHeader
+      eyebrow="People and access"
+      title="Members"
+      description="Find members, review their access, and handle manual changes without losing context."
+    >
+      <template #actions>
         <el-button @click="$emit('export')" :loading="exporting">
           <el-icon><Download /></el-icon>
           Export CSV
@@ -15,8 +18,8 @@
           <el-icon><Plus /></el-icon>
           Grant Access
         </el-button>
-      </div>
-    </div>
+      </template>
+    </WorkspacePageHeader>
 
     <div class="search-bar">
       <el-input
@@ -63,6 +66,7 @@
 
 <script setup>
 import { Download, Plus, Search, Upload } from '@element-plus/icons-vue'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 defineProps({
   exporting: {
@@ -83,18 +87,6 @@ defineEmits(['export', 'import', 'grant', 'update:search', 'update:planId', 'upd
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
 .search-bar {
   display: flex;
   align-items: center;
@@ -119,5 +111,10 @@ defineEmits(['export', 'import', 'grant', 'update:search', 'update:planId', 'upd
   color: var(--fchub-text-secondary);
   margin-top: 6px;
   margin-bottom: 16px;
+}
+
+@media (max-width: 782px) {
+  .search-bar, .filter-controls { align-items: stretch; flex-direction: column; }
+  .filter-controls .el-select { width: 100%; }
 }
 </style>

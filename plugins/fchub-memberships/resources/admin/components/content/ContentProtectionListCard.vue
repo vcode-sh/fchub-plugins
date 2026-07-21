@@ -130,6 +130,26 @@
       </el-table-column>
     </el-table>
 
+    <div v-loading="loading" class="mobile-content-list" aria-label="Protected content">
+      <article v-for="row in items" :key="row.id" class="mobile-record-card">
+        <div class="mobile-record-card__topline">
+          <div>
+            <a v-if="row.edit_url" :href="row.edit_url" target="_blank" class="mobile-record-card__title">{{ row.resource_title }}</a>
+            <p v-else class="mobile-record-card__title">{{ row.resource_title }}</p>
+            <p class="mobile-record-card__subtitle">{{ row.resource_type_label || row.resource_type }}</p>
+          </div>
+          <el-tag size="small" :type="typeTagColor(row.resource_type_group)">{{ row.show_teaser === 'yes' ? 'Teaser on' : 'Protected' }}</el-tag>
+        </div>
+        <div class="mobile-card-tags">
+          <el-tag v-for="name in row.plan_names || []" :key="name" size="small" type="info">{{ name }}</el-tag>
+        </div>
+        <div class="mobile-record-card__footer">
+          <span>{{ formatDate(row.created_at) }}</span>
+          <div><el-button text type="primary" @click="$emit('edit', row)">Edit</el-button><el-button text type="danger" @click="$emit('unprotect', row)">Unprotect</el-button></div>
+        </div>
+      </article>
+    </div>
+
     <div v-if="!loading && items.length === 0 && !hasActiveFilters" class="empty-state">
       <el-empty :image-size="80">
         <template #description>
@@ -338,5 +358,16 @@ defineEmits([
   font-size: 13px;
   color: var(--fchub-text-secondary);
   margin: 0 0 16px 0;
+}
+
+.mobile-content-list { display: none; }
+.mobile-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 14px 0; }
+
+@media (max-width: 782px) {
+  .list-card :deep(.el-card__body) { padding: 14px; }
+  .filter-row { align-items: stretch; flex-direction: column; }
+  .filter-search, .filter-select { width: 100%; min-width: 0; }
+  .list-card :deep(.el-table) { display: none; }
+  .mobile-content-list { display: grid; gap: 12px; }
 }
 </style>

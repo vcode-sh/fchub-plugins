@@ -70,6 +70,30 @@
         <el-table-column prop="source_type" label="Source" width="120" />
       </el-table>
 
+      <div v-loading="loading" class="mobile-member-list" aria-label="Members">
+        <article v-for="row in rows" :key="`${row.user_id}-${row.plan_id}`" class="mobile-record-card">
+          <div class="mobile-record-card__topline">
+            <div class="member-cell">
+              <div class="member-avatar">{{ getInitials(row.display_name) }}</div>
+              <div class="member-info">
+                <div class="member-name">{{ row.display_name }}</div>
+                <div class="member-email">{{ row.user_email }}</div>
+              </div>
+            </div>
+            <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
+          </div>
+          <dl class="mobile-record-card__facts">
+            <div><dt>Plan</dt><dd>{{ row.plan_title }}</dd></div>
+            <div><dt>Granted</dt><dd>{{ formatDate(row.created_at) }}</dd></div>
+            <div><dt>Expires</dt><dd>{{ row.expires_at ? formatDate(row.expires_at) : 'Lifetime' }}</dd></div>
+          </dl>
+          <div class="mobile-record-card__footer">
+            <span>{{ row.source_type }}</span>
+            <router-link :to="`/members/${row.user_id}`">View profile</router-link>
+          </div>
+        </article>
+      </div>
+
       <el-empty v-if="!loading && rows.length === 0" description="No members found" />
 
       <!-- Pagination (FC pattern) -->
@@ -545,5 +569,12 @@ onMounted(() => {
 
 .per-page-select {
   width: 120px;
+}
+
+.mobile-member-list { display: none; }
+
+@media (max-width: 782px) {
+  .list-card :deep(.el-table) { display: none; }
+  .mobile-member-list { display: grid; gap: 12px; }
 }
 </style>

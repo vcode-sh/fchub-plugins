@@ -1,16 +1,15 @@
 <template>
   <div class="content-overview-page">
-    <!-- Dashboard Header -->
-    <div class="page-header">
-      <div class="page-header-text">
-        <h2 class="fchub-page-title">Content Protection</h2>
-        <p class="page-subtitle">Control what content your members can access</p>
-      </div>
-      <el-button type="primary" @click="openProtectWizard()">
+    <WorkspacePageHeader
+      eyebrow="Access rules"
+      title="Content Protection"
+      description="Choose what is protected, see who can access it, and change rules without hunting through WordPress."
+    >
+      <template #actions><el-button type="primary" @click="openProtectWizard()">
         <el-icon><Lock /></el-icon>
         Protect Content
-      </el-button>
-    </div>
+      </el-button></template>
+    </WorkspacePageHeader>
 
     <!-- Stats Bar -->
     <div class="stats-bar" v-if="stats.totalRules > 0">
@@ -123,6 +122,7 @@ import ContentProtectionEditDrawer from '@/components/content/ContentProtectionE
 import ContentProtectionListCard from '@/components/content/ContentProtectionListCard.vue'
 import { useContentProtectionEditor } from '@/composables/content/useContentProtectionEditor.js'
 import { useContentProtectionWizard } from '@/composables/content/useContentProtectionWizard.js'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 // ─── State ───
 

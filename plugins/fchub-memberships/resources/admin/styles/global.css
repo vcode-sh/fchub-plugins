@@ -5,6 +5,11 @@
   color: var(--fchub-text-primary);
 }
 
+#fchub-memberships-app,
+#fchub-memberships-app * {
+  box-sizing: border-box;
+}
+
 /* WordPress admin CSS reset — strip WP borders/shadows from form elements.
    Element Plus uses wrapper elements (.el-input__wrapper) for borders,
    so inner <input>/<textarea>/<select> must be visually bare. */
@@ -190,6 +195,7 @@ body.dark #fchub-memberships-app .el-input__wrapper:hover {
 
 .fchub-stat-widget {
   background: var(--fchub-card-bg);
+  border: 1px solid var(--fchub-border-color);
   border-radius: var(--fchub-radius-stat);
   padding: 20px;
   display: flex;
@@ -316,6 +322,99 @@ body.dark #fchub-memberships-app .el-input__wrapper:hover {
   justify-content: flex-end;
   padding: 20px 32px;
   border-top: 1px solid var(--fchub-border-color);
+}
+
+/* Compact operational records replace squeezed desktop tables on small screens. */
+.mobile-record-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 12px;
+  background: var(--fchub-card-bg);
+}
+
+.mobile-record-card__topline,
+.mobile-record-card__footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-record-card__title {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.mobile-record-card__subtitle {
+  margin: 3px 0 0;
+  color: var(--fchub-text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mobile-record-card__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.mobile-record-card__facts div { min-width: 0; }
+.mobile-record-card__facts dt {
+  margin-bottom: 3px;
+  color: var(--fchub-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.mobile-record-card__facts dd {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mobile-record-card__footer {
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--fchub-border-color);
+  color: var(--fchub-text-secondary);
+  font-size: 12px;
+}
+
+.mobile-record-card__footer a {
+  color: var(--el-color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .fchub-stat-grid,
+  .fchub-stat-grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .fchub-setting-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .fchub-setting-label { flex: none; }
+}
+
+@media (max-width: 782px) {
+  .fchub-settings-section { padding: 20px 16px 4px; }
+  .fchub-settings-footer { padding: 16px; }
+  .pagination-bar { align-items: stretch !important; flex-direction: column; gap: 14px; }
+  .pagination-info, .pagination-meta { flex-wrap: wrap; }
+  .mobile-record-card__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ───── Dark mode: Element Plus variable overrides ───── */

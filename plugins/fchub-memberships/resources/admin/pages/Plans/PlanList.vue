@@ -1,8 +1,11 @@
 <template>
   <div class="plan-list-page">
-    <div class="page-header">
-      <h2 class="fchub-page-title">Plans</h2>
-      <div class="header-actions">
+    <WorkspacePageHeader
+      eyebrow="Access products"
+      title="Plans"
+      description="Create, publish, and maintain the access packages your members receive."
+    >
+      <template #actions>
         <el-button @click="handleBulkExport" :loading="bulkExporting">
           <el-icon><Download /></el-icon>
           Export All
@@ -15,8 +18,8 @@
           <el-icon><Plus /></el-icon>
           Create Plan
         </el-button>
-      </div>
-    </div>
+      </template>
+    </WorkspacePageHeader>
 
     <el-card shadow="never" class="list-card">
       <!-- Search & Filters -->
@@ -162,6 +165,39 @@
         </el-table-column>
       </el-table>
 
+      <div v-loading="loading" class="mobile-plan-list" aria-label="Plans">
+        <article v-for="plan in plans_data" :key="plan.id" class="mobile-record-card">
+          <div class="mobile-record-card__topline">
+            <div>
+              <router-link :to="`/plans/${plan.id}/edit`" class="mobile-record-card__title">{{ plan.title }}</router-link>
+              <p class="mobile-record-card__subtitle">/{{ plan.slug }}</p>
+            </div>
+            <el-tag :type="statusTagType(plan.status)" size="small">{{ plan.status }}</el-tag>
+          </div>
+          <dl class="mobile-record-card__facts">
+            <div><dt>Members</dt><dd>{{ plan.members_count ?? 0 }}</dd></div>
+            <div><dt>Rules</dt><dd>{{ plan.rules_count ?? 0 }}</dd></div>
+            <div><dt>Created</dt><dd>{{ formatDate(plan.created_at) }}</dd></div>
+          </dl>
+          <div class="mobile-record-card__footer">
+            <router-link :to="`/plans/${plan.id}/edit`">Edit plan</router-link>
+            <el-dropdown trigger="click" @command="(cmd) => handleAction(cmd, plan)">
+              <el-button text aria-label="Plan actions"><el-icon><MoreFilled /></el-icon></el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="duplicate">Duplicate</el-dropdown-item>
+                  <el-dropdown-item command="export">Export</el-dropdown-item>
+                  <el-dropdown-item :command="plan.status === 'archived' ? 'activate' : 'archive'">
+                    {{ plan.status === 'archived' ? 'Activate' : 'Archive' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item command="delete" divided>Delete</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </article>
+      </div>
+
       <el-empty v-if="!loading && plans_data.length === 0" description="No plans found" />
 
       <!-- Pagination -->
@@ -250,6 +286,7 @@ import { ElMessage } from 'element-plus'
 import { Search, Upload, Download } from '@element-plus/icons-vue'
 import { plans } from '@/api/index.js'
 import { formatWpDate } from '@/utils/wpDate.js'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 const router = useRouter()
 
@@ -589,5 +626,14 @@ onMounted(() => {
 .import-file-name {
   font-size: 13px;
   color: var(--fchub-text-secondary);
+}
+
+.mobile-plan-list { display: none; }
+
+@media (max-width: 782px) {
+  .list-card :deep(.el-table) { display: none; }
+  .mobile-plan-list { display: grid; gap: 12px; }
+  .search-bar, .filter-controls { align-items: stretch; flex-direction: column; }
+  .filter-controls .el-select { width: 100%; }
 }
 </style>

@@ -1,14 +1,17 @@
 <template>
   <div class="drip-calendar-page">
-    <div class="page-header">
-      <div class="page-header-left">
+    <WorkspacePageHeader
+      eyebrow="Timed access"
+      title="Drip Calendar"
+      description="Scan upcoming unlocks by day and inspect the members affected."
+    >
+      <template #back>
         <a class="back-link" @click.prevent="$router.push('/drip')">
           <el-icon><ArrowLeft /></el-icon>
           Back to Drip
         </a>
-        <h2 class="fchub-page-title">Drip Calendar</h2>
-      </div>
-    </div>
+      </template>
+    </WorkspacePageHeader>
 
     <!-- Month Navigation -->
     <div class="month-nav">
@@ -85,6 +88,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { drip } from '@/api/index.js'
 import { formatWpWithPattern, formatWpTime, getWeekdayNames } from '@/utils/wpDate.js'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 const calendarLoading = ref(false)
 const detailLoading = ref(false)

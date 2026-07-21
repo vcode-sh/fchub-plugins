@@ -1,8 +1,11 @@
 <template>
   <div class="reports-page">
-    <div class="page-header">
-      <h2 class="fchub-page-title">Reports</h2>
-      <el-date-picker
+    <WorkspacePageHeader
+      eyebrow="Membership intelligence"
+      title="Reports"
+      description="Read growth, retention, revenue, and content performance without turning the page into a cockpit."
+    >
+      <template #actions><el-date-picker
         v-model="dateRange"
         type="daterange"
         range-separator="to"
@@ -12,8 +15,8 @@
         value-format="YYYY-MM-DD"
         :shortcuts="dateShortcuts"
         @change="onDateRangeChange"
-      />
-    </div>
+      /></template>
+    </WorkspacePageHeader>
 
     <el-tabs v-model="activeTab" @tab-change="onTabChange">
       <ReportsOverviewTab
@@ -91,6 +94,7 @@ import ReportsRenewalsTab from '@/components/reports/ReportsRenewalsTab.vue'
 import ReportsTrialsTab from '@/components/reports/ReportsTrialsTab.vue'
 import ReportsContentTab from '@/components/reports/ReportsContentTab.vue'
 import ReportsRetentionTab from '@/components/reports/ReportsRetentionTab.vue'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 ChartJS.register(
   CategoryScale,
@@ -601,5 +605,10 @@ onMounted(() => {
 
 .chart-card {
   margin-bottom: 20px;
+}
+
+@media (max-width: 782px) {
+  .reports-page :deep(.el-date-editor--daterange) { width: 100%; max-width: none; }
+  .reports-page :deep(.el-tabs__nav-scroll) { overflow-x: auto; }
 }
 </style>

@@ -18,6 +18,29 @@
               {{ item.label }}
             </router-link>
           </div>
+          <el-dropdown
+            class="fchub-mobile-nav"
+            trigger="click"
+            placement="bottom-start"
+            @command="navigateToSection"
+          >
+            <button class="fchub-mobile-nav-trigger" type="button" aria-label="Navigate sections">
+              <span>{{ currentSection.label }}</span>
+              <el-icon><ArrowDown /></el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-for="item in workspaceNavItems"
+                  :key="item.to"
+                  :command="item.to"
+                  :class="{ 'is-active': currentSection.to === item.to }"
+                >
+                  {{ item.label }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
         <div class="fchub-nav-right">
           <el-dropdown trigger="click" @command="changeTheme" placement="bottom-end">
@@ -56,20 +79,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
-import { Monitor, Moon, Setting, Sunny, UserFilled } from '@element-plus/icons-vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowDown, Monitor, Moon, Setting, Sunny, UserFilled } from '@element-plus/icons-vue'
+import { getWorkspaceSection, WORKSPACE_NAV_ITEMS } from '@/workspace/workspaceUi.js'
 
 const route = useRoute()
+const router = useRouter()
 
-const navItems = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/plans', label: 'Plans' },
-  { to: '/members', label: 'Members' },
-  { to: '/content', label: 'Content' },
-  { to: '/drip', label: 'Drip' },
-  { to: '/reports', label: 'Reports' },
-]
+const workspaceNavItems = WORKSPACE_NAV_ITEMS
+const navItems = WORKSPACE_NAV_ITEMS.filter((item) => item.to !== '/settings')
+const currentSection = computed(() => getWorkspaceSection(route.path))
+
+function navigateToSection(path) {
+  if (path !== route.path) router.push(path)
+}
 
 function isActive(path) {
   if (path === '/') return route.path === '/'
@@ -214,6 +238,10 @@ onBeforeUnmount(() => {
   gap: 4px;
 }
 
+.fchub-mobile-nav {
+  display: none;
+}
+
 .fchub-nav-link {
   display: inline-flex;
   align-items: center;
@@ -306,6 +334,32 @@ body.dark .fchub-theme-btn:hover {
   .fchub-nav-links,
   .fchub-nav-right .fchub-nav-link {
     display: none;
+  }
+
+  .fchub-brand span {
+    display: none;
+  }
+
+  .fchub-mobile-nav {
+    display: inline-flex;
+    margin-left: 10px;
+  }
+
+  .fchub-mobile-nav-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 180px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--fchub-border-color);
+    border-radius: 9px;
+    background: var(--fchub-page-bg);
+    color: var(--fchub-text-primary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
   }
 
   .fchub-content-area {

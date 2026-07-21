@@ -1,12 +1,15 @@
 <template>
   <div class="drip-overview-page">
-    <div class="page-header">
-      <h2 class="fchub-page-title">Drip Content</h2>
-      <el-button @click="$router.push('/drip/calendar')">
+    <WorkspacePageHeader
+      eyebrow="Timed access"
+      title="Drip Content"
+      description="Monitor scheduled unlocks and recover failed notifications before members notice."
+    >
+      <template #actions><el-button @click="$router.push('/drip/calendar')">
         <el-icon><Calendar /></el-icon>
         Calendar View
-      </el-button>
-    </div>
+      </el-button></template>
+    </WorkspacePageHeader>
 
     <!-- Stats Row -->
     <div class="fchub-stat-grid" v-loading="statsLoading">
@@ -88,6 +91,22 @@
         </el-table-column>
       </el-table>
 
+      <div v-loading="queueLoading" class="mobile-drip-queue" aria-label="Notifications queue">
+        <article v-for="row in queue" :key="row.id" class="mobile-record-card">
+          <div class="mobile-record-card__topline">
+            <div>
+              <p class="mobile-record-card__title">{{ row.content_title }}</p>
+              <p class="mobile-record-card__subtitle">{{ row.user_email }}</p>
+            </div>
+            <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
+          </div>
+          <div class="mobile-record-card__footer">
+            <span>{{ formatDateTime(row.scheduled_at) }}</span>
+            <el-button v-if="row.status === 'failed'" text type="primary" @click="handleRetry(row)">Retry</el-button>
+          </div>
+        </article>
+      </div>
+
       <div class="pagination-bar" v-if="queueTotal > 0">
         <div class="pagination-info">
           <span>Page {{ queueFilters.page }} of {{ queueTotalPages }}</span>
@@ -116,6 +135,7 @@ import { Calendar, Check, Clock, List, RefreshRight, WarningFilled } from '@elem
 import { ElMessage } from 'element-plus'
 import { drip } from '@/api/index.js'
 import { formatWpDateTime } from '@/utils/wpDate.js'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 const statsLoading = ref(false)
 const stats = ref({
@@ -251,5 +271,12 @@ onMounted(() => {
 
 .per-page-select {
   width: 120px;
+}
+
+.mobile-drip-queue { display: none; }
+
+@media (max-width: 782px) {
+  .queue-card :deep(.el-table) { display: none; }
+  .mobile-drip-queue { display: grid; gap: 12px; }
 }
 </style>

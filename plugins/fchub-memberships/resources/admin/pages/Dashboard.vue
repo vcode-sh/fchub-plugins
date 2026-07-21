@@ -1,6 +1,15 @@
 <template>
   <div class="dashboard-page">
-    <h2 class="fchub-page-title">Dashboard</h2>
+    <WorkspacePageHeader
+      eyebrow="Membership workspace"
+      title="Dashboard"
+      description="Track access health, spot changes, and move straight to the next useful action."
+    >
+      <template #actions>
+        <router-link to="/members"><el-button>View members</el-button></router-link>
+        <router-link to="/plans/new"><el-button type="primary"><el-icon><Plus /></el-icon>Create plan</el-button></router-link>
+      </template>
+    </WorkspacePageHeader>
 
     <!-- Stats Row -->
     <div class="fchub-stat-grid" v-loading="statsLoading">
@@ -32,16 +41,6 @@
         <div class="fchub-stat-title">Churn Rate</div>
         <div class="fchub-stat-value">{{ stats.churn_rate }}%</div>
       </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-      <router-link to="/plans/new">
-        <el-button type="primary"><el-icon><Plus /></el-icon> Create New Plan</el-button>
-      </router-link>
-      <router-link to="/members">
-        <el-button size="small" text type="primary">View All Members →</el-button>
-      </router-link>
     </div>
 
     <!-- Charts Row -->
@@ -132,6 +131,7 @@ import {
   Filler,
 } from 'chart.js'
 import { reports, members } from '@/api/index.js'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 ChartJS.register(
   CategoryScale,
@@ -334,5 +334,13 @@ onMounted(() => {
 
 .recent-activity {
   margin-bottom: 20px;
+}
+
+@media (max-width: 782px) {
+  .charts-row { margin-left: 0 !important; margin-right: 0 !important; }
+  .charts-row :deep(.el-col) { max-width: 100%; padding-left: 0 !important; padding-right: 0 !important; flex: 0 0 100%; }
+  .charts-row :deep(.el-col + .el-col) { margin-top: 14px; }
+  .chart-container { height: 230px; }
+  .dashboard-page :deep(.el-table) { width: 100%; }
 }
 </style>

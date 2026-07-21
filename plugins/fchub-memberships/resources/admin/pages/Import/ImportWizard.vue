@@ -1,22 +1,30 @@
 <template>
   <div class="import-wizard-page">
-    <!-- Header -->
-    <div class="page-header">
-      <a class="back-link" @click.prevent="$router.push('/members')">
-        <el-icon><ArrowLeft /></el-icon>
-        Back to Members
-      </a>
-      <h2 class="fchub-page-title">Import Members</h2>
-    </div>
+    <WorkspacePageHeader
+      eyebrow="Member migration"
+      title="Import Members"
+      description="Bring existing members across with a reviewable, reversible-feeling workflow. Nothing is imported before confirmation."
+    >
+      <template #back>
+        <a class="back-link" @click.prevent="$router.push('/members')"><el-icon><ArrowLeft /></el-icon>Back to Members</a>
+      </template>
+    </WorkspacePageHeader>
 
-    <!-- Steps indicator -->
-    <el-steps :active="currentStep" finish-status="success" class="wizard-steps">
-      <el-step title="Upload" />
-      <el-step title="Map Levels" />
-      <el-step title="Options" />
-      <el-step title="Preview" />
-      <el-step title="Import" />
-    </el-steps>
+    <nav class="import-progress-nav" aria-label="Import progress">
+      <button
+        v-for="(step, index) in importSteps"
+        :key="step"
+        type="button"
+        class="import-progress-step"
+        :class="{ active: currentStep === index, complete: currentStep > index }"
+        :aria-current="currentStep === index ? 'step' : undefined"
+        :disabled="index > currentStep"
+        @click="index < currentStep && (currentStep = index)"
+      >
+        <span>{{ index + 1 }}</span>
+        <strong>{{ step }}</strong>
+      </button>
+    </nav>
 
     <!-- Step 1: Upload & Parse -->
     <el-card v-if="currentStep === 0" shadow="never" class="wizard-card">
@@ -372,6 +380,9 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, UploadFilled, Download, Loading } from '@element-plus/icons-vue'
 import { importMembers, plans } from '@/api/index.js'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
+
+const importSteps = ['Upload', 'Map levels', 'Options', 'Preview', 'Import']
 
 // Wizard state
 const currentStep = ref(0)
@@ -705,14 +716,6 @@ onMounted(() => {
   /* full width like other pages */
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header .fchub-page-title {
-  margin-bottom: 0;
-}
-
 .back-link {
   display: inline-flex;
   align-items: center;
@@ -728,9 +731,41 @@ onMounted(() => {
   color: var(--el-color-primary);
 }
 
-.wizard-steps {
+.import-progress-nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
   margin-bottom: 24px;
 }
+
+.import-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 10px;
+  background: var(--fchub-card-bg);
+  color: var(--fchub-text-secondary);
+  cursor: pointer;
+}
+.import-progress-step span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  background: var(--el-fill-color-light);
+  font-size: 11px;
+  font-weight: 700;
+}
+.import-progress-step strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.import-progress-step.active { border-color: var(--el-color-primary); color: var(--fchub-text-primary); box-shadow: 0 0 0 2px var(--el-color-primary-light-8); }
+.import-progress-step.active span, .import-progress-step.complete span { background: var(--el-color-primary); color: #fff; }
+.import-progress-step:disabled { cursor: default; opacity: .72; }
 
 .wizard-card {
   margin-bottom: 20px;
@@ -1030,5 +1065,13 @@ onMounted(() => {
 /* Results */
 .results-detail {
   margin: 20px 0;
+}
+
+@media (max-width: 782px) {
+  .import-progress-nav { gap: 5px; }
+  .import-progress-step { justify-content: center; min-height: 42px; padding: 7px 4px; }
+  .import-progress-step strong { display: none; }
+  .stats-cards, .import-counters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wizard-actions { flex-wrap: wrap; }
 }
 </style>

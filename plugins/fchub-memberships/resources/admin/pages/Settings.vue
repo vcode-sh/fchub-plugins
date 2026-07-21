@@ -1,45 +1,63 @@
 <template>
   <div class="settings-page" v-loading="loading">
-    <div class="page-header">
-      <h2 class="fchub-page-title">Settings</h2>
-      <el-button type="primary" @click="saveSettings" :loading="saving">
+    <WorkspacePageHeader
+      eyebrow="Plugin configuration"
+      title="Settings"
+      description="Configure one area at a time. Changes remain local until you save them."
+    >
+      <template #actions><el-button type="primary" @click="saveSettings" :loading="saving">
         <el-icon><Check /></el-icon>
-        Save
-      </el-button>
-    </div>
+        Save settings
+      </el-button></template>
+    </WorkspacePageHeader>
 
-    <div class="fchub-settings-body">
-      <SettingsGeneralSection :form="form" />
-      <SettingsNotificationsSection :form="form" />
-      <SettingsIntegrationsSection
-        :form="form"
-        :plan-options="planOptions"
-        :loading-lists="loadingLists"
-        :fluentcrm-lists="fluentcrmLists"
-        :loading-spaces="loadingSpaces"
-        :fc-spaces="fcSpaces"
-        :loading-badges="loadingBadges"
-        :fc-badges="fcBadges"
-        :search-fluentcrm-lists="searchFluentcrmLists"
-        :search-fc-spaces="searchFcSpaces"
-        :search-fc-badges="searchFcBadges"
-      />
-      <SettingsWebhooksApiSection
-        :form="form"
-        :regenerating="regenerating"
-        :regenerating-secret="regeneratingSecret"
-        :testing-webhook="testingWebhook"
-        :test-results="testResults"
-        :copy-api-key="copyApiKey"
-        :regenerate-api-key="regenerateApiKey"
-        :copy-webhook-secret="copyWebhookSecret"
-        :regenerate-webhook-secret="regenerateWebhookSecret"
-        :send-test-webhook="sendTestWebhook"
-      />
-      <SettingsAdvancedSection :form="form" />
+    <div class="settings-workspace">
+      <el-tabs v-model="activeSettingsTab" class="settings-tabs">
+        <el-tab-pane label="General" name="general">
+          <SettingsGeneralSection :form="form" />
+        </el-tab-pane>
+        <el-tab-pane label="Notifications" name="notifications">
+          <SettingsNotificationsSection :form="form" />
+        </el-tab-pane>
+        <el-tab-pane label="Integrations" name="integrations">
+          <SettingsIntegrationsSection
+            :form="form"
+            :plan-options="planOptions"
+            :loading-lists="loadingLists"
+            :fluentcrm-lists="fluentcrmLists"
+            :loading-spaces="loadingSpaces"
+            :fc-spaces="fcSpaces"
+            :loading-badges="loadingBadges"
+            :fc-badges="fcBadges"
+            :search-fluentcrm-lists="searchFluentcrmLists"
+            :search-fc-spaces="searchFcSpaces"
+            :search-fc-badges="searchFcBadges"
+          />
+        </el-tab-pane>
+        <el-tab-pane label="Webhooks & API" name="webhooks">
+          <SettingsWebhooksApiSection
+            :form="form"
+            :regenerating="regenerating"
+            :regenerating-secret="regeneratingSecret"
+            :testing-webhook="testingWebhook"
+            :test-results="testResults"
+            :copy-api-key="copyApiKey"
+            :regenerate-api-key="regenerateApiKey"
+            :copy-webhook-secret="copyWebhookSecret"
+            :regenerate-webhook-secret="regenerateWebhookSecret"
+            :send-test-webhook="sendTestWebhook"
+          />
+        </el-tab-pane>
+        <el-tab-pane label="Advanced" name="advanced">
+          <SettingsAdvancedSection :form="form" />
+        </el-tab-pane>
+      </el-tabs>
 
-      <!-- Footer Save -->
-      <div class="fchub-settings-footer">
+      <div class="settings-save-bar" role="region" aria-label="Settings save status">
+        <div>
+          <strong>{{ saving ? 'Saving changes…' : isDirty ? 'Unsaved changes' : 'All changes saved' }}</strong>
+          <span>{{ isDirty ? ' Review the current group, then save when ready.' : ' Your configuration is up to date.' }}</span>
+        </div>
         <el-button type="primary" @click="saveSettings" :loading="saving">
           <el-icon><Check /></el-icon>
           Save Settings
@@ -50,7 +68,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check } from '@element-plus/icons-vue'
 import api, { settings } from '@/api/index.js'
@@ -59,6 +77,7 @@ import SettingsNotificationsSection from '@/components/settings/SettingsNotifica
 import SettingsIntegrationsSection from '@/components/settings/SettingsIntegrationsSection.vue'
 import SettingsWebhooksApiSection from '@/components/settings/SettingsWebhooksApiSection.vue'
 import SettingsAdvancedSection from '@/components/settings/SettingsAdvancedSection.vue'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -66,6 +85,8 @@ const regenerating = ref(false)
 const regeneratingSecret = ref(false)
 const testingWebhook = ref(false)
 const testResults = ref([])
+const activeSettingsTab = ref('general')
+const savedSnapshot = ref('')
 
 // FluentCRM remote search state
 const loadingLists = ref(false)
@@ -110,6 +131,8 @@ const form = ref({
   membership_mode: 'stack',
 })
 
+const isDirty = computed(() => savedSnapshot.value !== '' && JSON.stringify(buildPayload()) !== savedSnapshot.value)
+
 async function loadSettings() {
   loading.value = true
   try {
@@ -152,6 +175,7 @@ async function loadSettings() {
       // Membership Rules
       membership_mode: data.membership_mode ?? 'stack',
     }
+    savedSnapshot.value = JSON.stringify(buildPayload())
 
     // Pre-load FluentCRM lists if a default is set
     if (form.value.fluentcrm_default_list) {
@@ -199,6 +223,7 @@ async function saveSettings() {
   saving.value = true
   try {
     await settings.save(buildPayload())
+    savedSnapshot.value = JSON.stringify(buildPayload())
     ElMessage.success('Settings saved successfully.')
   } catch (err) {
     ElMessage.error('Failed to save settings: ' + (err.message || 'Unknown error'))
@@ -353,6 +378,42 @@ onMounted(() => {
   loadSettings()
 })
 </script>
+
+<style scoped>
+.settings-workspace {
+  overflow: hidden;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 14px;
+  background: var(--fchub-card-bg);
+}
+
+.settings-tabs :deep(.el-tabs__header) { margin: 0; padding: 0 24px; }
+.settings-tabs :deep(.el-tabs__content) { padding: 0; }
+.settings-save-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 12px;
+  background: var(--fchub-card-bg);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .12);
+}
+.settings-save-bar strong { display: block; font-size: 13px; }
+.settings-save-bar span { color: var(--fchub-text-secondary); font-size: 12px; }
+
+@media (max-width: 782px) {
+  .settings-tabs :deep(.el-tabs__header) { padding: 0 12px; }
+  .settings-tabs :deep(.el-tabs__nav-scroll) { overflow-x: auto; }
+  .settings-save-bar { align-items: stretch; flex-direction: column; bottom: 8px; margin: 10px; }
+  .settings-save-bar .el-button { width: 100%; margin: 0; }
+}
+</style>
 
 <style scoped>
 .page-header {
