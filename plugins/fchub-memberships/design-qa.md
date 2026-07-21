@@ -132,7 +132,7 @@ No actionable P0, P1, or P2 findings remain.
 #### Pass 2 — blocked
 
 - [P2] At the 900px auto-fold breakpoint, the fixed 880px width consumed the complete available canvas and lost the required gutters.
-- Fix: bound the dialog to `min(880px, calc(100% - 32px))` while retaining the existing full-width mobile override.
+- Fix: bound the dialog to `min(880px, 100%)` inside a 16px-padded centring canvas while retaining the existing full-width mobile override.
 
 #### Pass 3 — passed
 
@@ -149,6 +149,77 @@ No actionable P0, P1, or P2 findings remain.
 - [x] Mobile remains full width below the WordPress toolbar.
 - [x] Full wizard journey and frontend regression suites pass.
 - [x] Mounted desktop/mobile screenshots and browser-console checks pass.
+
+final result: passed
+
+---
+
+## Content Protection Viewport Fit and Internal Scrolling
+
+### Comparison target
+
+- Source state showing the overflow: `/Users/tomrobak/.codex/visualizations/2026/07/21/content-protection-wizard/desktop-content-canvas-anchored.png`
+- Final desktop top state: `/Users/tomrobak/.codex/visualizations/2026/07/21/content-protection-wizard/desktop-viewport-fit-top.png`
+- Final desktop internally scrolled state: `/Users/tomrobak/.codex/visualizations/2026/07/21/content-protection-wizard/desktop-viewport-fit-scrolled.png`
+- Final mobile state: `/Users/tomrobak/.codex/visualizations/2026/07/21/content-protection-wizard/mobile-viewport-fit.png`
+- Mounted implementation: `https://fchub.vcode.sh/wp-admin/admin.php?page=fchub-memberships#/content`
+
+### Viewports and states
+
+- Desktop: 1159×809, expanded WordPress navigation, Category step at scroll top and scroll bottom.
+- Mobile: 390×844, WordPress mobile toolbar, Category step at scroll top.
+- Interaction verified: scroll the central task stage from 0px to its 114px maximum while observing header, progress rail, and footer geometry.
+
+### Full-view comparison evidence
+
+- Same-viewport overflow and final implementation in one frame: `/Users/tomrobak/.codex/visualizations/2026/07/21/content-protection-wizard/viewport-fit-before-after.png`
+
+### Focused region comparison evidence
+
+- Scroll-top and scroll-bottom states in one frame: `/Users/tomrobak/.codex/visualizations/2026/07/21/content-protection-wizard/viewport-fit-scroll-evidence.png`
+
+The focused comparison is required because the change concerns ownership of vertical overflow. It shows that category content moves while the dialog header, progress rail, and action footer retain identical positions.
+
+### Findings
+
+No actionable P0, P1, or P2 findings remain.
+
+- Desktop dialog rectangle is x=219.5–1099.5 and y=48–793, fully inside the 1159×809 viewport.
+- Header remains at y=64, progress rail at y=129, and footer at y=716 before and after the central stage scrolls.
+- Central stage is y=220–716 with a 496px client height and 610px scroll height; it reaches its exact 114px maximum scroll position.
+- Mobile remains x=0–390 and y=46–844 with the footer ending at y=828, zero progress overflow, and document width exactly 390px.
+
+### Required fidelity surfaces
+
+- Fonts and typography: unchanged; headings, labels, descriptions, and compact step copy remain legible at both viewports.
+- Spacing and layout rhythm: desktop now has a 16px lower viewport gutter and begins 16px below the WordPress toolbar. Header, progress, scroll stage, and footer form four unambiguous vertical regions.
+- Colours and visual tokens: unchanged; backdrop, primary blue, borders, radii, and low elevation retain the approved FCHub treatment.
+- Image quality and asset fidelity: no imagery was added or replaced. Existing Element Plus icons remain unchanged and correctly aligned.
+- Copy and content: unchanged; all seven category rows remain reachable through the internal scrollbar.
+- Accessibility and interaction: keyboard and pointer controls are unchanged; the visible scroll container retains standard browser scrolling, while persistent actions never leave the viewport.
+
+### Comparison history
+
+#### Pass 1 — blocked
+
+- [P1] The desktop dialog used Element Plus's 15vh margin with a separate `max-height`, placing its lower edge outside short viewports and allowing the content shell to grow behind the footer.
+- Fix: bounded the desktop overlay itself between y=48 and y=793, removed the unreliable dialog margin, and made the dialog body/shell a shrinkable flex chain.
+
+#### Pass 2 — passed
+
+- Rebuilt and reloaded the mounted WordPress route using the final hashed stylesheet.
+- Captured and opened the same 1159×809 state before and after the fix in one comparison image.
+- Scrolled the mounted central stage to its exact maximum and confirmed the header, progress rail, and footer did not move.
+- Rechecked 390×844 mobile geometry and the mounted browser console; zero warnings or errors remain.
+
+### Implementation checklist
+
+- [x] Complete desktop dialog remains inside the visible viewport.
+- [x] Header, progress rail, and action footer remain fixed.
+- [x] Only the central task stage scrolls vertically.
+- [x] Every category row and primary action remains reachable.
+- [x] Mobile full-height behaviour is preserved.
+- [x] Full frontend tests, production build, mounted geometry, screenshots, and console checks pass.
 
 final result: passed
 

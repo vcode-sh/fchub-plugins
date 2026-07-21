@@ -442,8 +442,20 @@ watch(
 </script>
 
 <style>
+.content-protection-wizard-overlay .el-overlay-dialog {
+  top: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
 @media (min-width: 783px) {
   body.wp-admin .content-protection-wizard-overlay .el-overlay-dialog {
+    top: 48px;
     left: 160px;
   }
 
@@ -459,10 +471,13 @@ watch(
 }
 
 .content-protection-wizard {
-  width: min(880px, calc(100% - 32px)) !important;
-  max-height: calc(100dvh - 40px);
+  width: min(880px, 100%) !important;
+  height: auto;
+  max-height: none;
+  margin: 0 !important;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   overflow: hidden;
   border-radius: 12px;
 }
@@ -490,6 +505,7 @@ watch(
 .content-protection-wizard .el-dialog__body {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
   padding: 0;
   overflow: hidden;
 }
@@ -501,8 +517,9 @@ watch(
 }
 
 .cpw-shell {
+  flex: 1 1 auto;
   min-height: 0;
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
 }
@@ -1045,6 +1062,7 @@ watch(
 
 @media (max-width: 782px) {
   .content-protection-wizard-overlay .el-overlay-dialog {
+    display: block;
     position: absolute;
     inset: 46px 0 0;
     height: calc(100dvh - 46px);

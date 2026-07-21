@@ -144,6 +144,61 @@ test('centres the desktop wizard inside the WordPress content canvas', async ({ 
   expect(Math.abs(geometry.dialogCenter - geometry.contentCenter)).toBeLessThanOrEqual(1)
 })
 
+test('fits below the WordPress toolbar and scrolls only the central stage', async ({ page }) => {
+  await page.setViewportSize({ width: 1159, height: 809 })
+  await page.goto('/smoke/index.html#/content')
+  await page.evaluate(() => document.body.classList.add('wp-admin'))
+  await page.getByRole('button', { name: 'Protect Content' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Content Protection' })
+  await expect(dialog).toBeVisible()
+  await page.waitForTimeout(300)
+  const stage = dialog.locator('.cpw-stage')
+  const geometry = await dialog.evaluate((element) => {
+    const dialogRect = element.getBoundingClientRect()
+    const headerRect = element.querySelector('.el-dialog__header').getBoundingClientRect()
+    const progressRect = element.querySelector('.cpw-progress').getBoundingClientRect()
+    const stageElement = element.querySelector('.cpw-stage')
+    const stageRect = stageElement.getBoundingClientRect()
+    const footerRect = element.querySelector('.el-dialog__footer').getBoundingClientRect()
+
+    return {
+      dialogTop: dialogRect.top,
+      dialogBottom: dialogRect.bottom,
+      headerTop: headerRect.top,
+      progressTop: progressRect.top,
+      stageTop: stageRect.top,
+      stageBottom: stageRect.bottom,
+      stageClientHeight: stageElement.clientHeight,
+      stageScrollHeight: stageElement.scrollHeight,
+      footerTop: footerRect.top,
+      footerBottom: footerRect.bottom,
+      viewportHeight: window.innerHeight,
+    }
+  })
+
+  expect(geometry.dialogTop).toBeGreaterThanOrEqual(47.5)
+  expect(geometry.dialogBottom).toBeLessThanOrEqual(geometry.viewportHeight - 16)
+  expect(geometry.headerTop).toBeGreaterThanOrEqual(geometry.dialogTop)
+  expect(geometry.stageTop).toBeGreaterThanOrEqual(geometry.progressTop)
+  expect(geometry.stageBottom).toBeLessThanOrEqual(geometry.footerTop)
+  expect(geometry.footerBottom).toBeLessThanOrEqual(geometry.dialogBottom)
+  expect(geometry.stageScrollHeight).toBeGreaterThan(geometry.stageClientHeight)
+
+  const fixedRegionsBefore = await dialog.evaluate((element) => ({
+    headerTop: element.querySelector('.el-dialog__header').getBoundingClientRect().top,
+    footerTop: element.querySelector('.el-dialog__footer').getBoundingClientRect().top,
+  }))
+  await stage.evaluate((element) => element.scrollTo({ top: element.scrollHeight }))
+  await expect.poll(async () => stage.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+  const fixedRegionsAfter = await dialog.evaluate((element) => ({
+    headerTop: element.querySelector('.el-dialog__header').getBoundingClientRect().top,
+    footerTop: element.querySelector('.el-dialog__footer').getBoundingClientRect().top,
+  }))
+  expect(Math.abs(fixedRegionsAfter.headerTop - fixedRegionsBefore.headerTop)).toBeLessThan(0.5)
+  expect(Math.abs(fixedRegionsAfter.footerTop - fixedRegionsBefore.footerTop)).toBeLessThan(0.5)
+})
+
 test('follows folded and auto-folded WordPress navigation widths', async ({ page }) => {
   await page.setViewportSize({ width: 1159, height: 809 })
   await page.goto('/smoke/index.html#/content')
