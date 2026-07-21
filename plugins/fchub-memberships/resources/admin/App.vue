@@ -277,4 +277,40 @@ body.dark .fchub-theme-btn:hover {
   padding: 24px;
   padding-top: calc(var(--fchub-nav-height) + 24px);
 }
+
+@media (max-width: 782px) {
+  #fchub-memberships-app {
+    margin-left: -10px;
+  }
+
+  .fchub-top-nav,
+  .folded .fchub-top-nav {
+    top: 46px;
+    left: 0;
+    height: 54px;
+  }
+
+  .fchub-nav-inner {
+    padding: 0 16px;
+  }
+
+  .fchub-nav-left {
+    min-width: 0;
+    gap: 0;
+  }
+
+  .fchub-brand {
+    font-size: 14px;
+  }
+
+  .fchub-nav-links,
+  .fchub-nav-right .fchub-nav-link {
+    display: none;
+  }
+
+  .fchub-content-area {
+    padding: 16px;
+    padding-top: 116px;
+  }
+}
 </style>

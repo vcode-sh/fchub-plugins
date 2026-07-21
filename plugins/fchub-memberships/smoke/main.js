@@ -34,8 +34,32 @@ window.ResizeObserver = window.ResizeObserver || class {
   disconnect() {}
 }
 
-window.fetch = async (input) => {
+window.__fchubSmokeRequests = []
+window.__fchubSmokeHoldMutations = false
+window.__fchubSmokeReleaseMutation = null
+window.__fchubSmokeFailResourceSearch = false
+
+window.fetch = async (input, init = {}) => {
   const url = String(input)
+  const method = String(init.method || 'GET').toUpperCase()
+
+  if (method !== 'GET') {
+    let body = init.body ?? null
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body)
+      } catch {
+        // Keep malformed bodies visible to the test instead of concealing them.
+      }
+    }
+    window.__fchubSmokeRequests.push({ url, method, body })
+
+    if (window.__fchubSmokeHoldMutations) {
+      await new Promise((resolve) => {
+        window.__fchubSmokeReleaseMutation = resolve
+      })
+    }
+  }
 
   if (url.includes('/admin/reports/overview')) {
     return { ok: true, status: 200, json: async () => ({ data: { active_members: 1, new_this_month: 1, churned_this_month: 0, churn_rate: 0 } }) }
@@ -73,6 +97,9 @@ window.fetch = async (input) => {
   if (url.includes('/admin/plans/5/linked-products')) {
     return { ok: true, status: 200, json: async () => ({ data: [] }) }
   }
+  if (url.endsWith('/admin/plans/5') && method === 'PUT') {
+    return { ok: true, status: 200, json: async () => ({ data: { id: 5, ...JSON.parse(init.body || '{}') } }) }
+  }
   if (url.includes('/admin/plans/5')) {
     return {
       ok: true,
@@ -95,6 +122,9 @@ window.fetch = async (input) => {
         },
       }),
     }
+  }
+  if (url.endsWith('/admin/plans') && method === 'POST') {
+    return { ok: true, status: 201, json: async () => ({ data: { id: 6, ...JSON.parse(init.body || '{}') } }) }
   }
   if (url.includes('/admin/plans')) {
     return { ok: true, status: 200, json: async () => ({ data: [{ id: 5, title: 'Gold Plan', slug: 'gold-plan', status: 'active', duration_type: 'lifetime', members_count: 1, rules_count: 0, created_at: '2026-03-01 10:00:00' }], total: 1 }) }
@@ -126,10 +156,61 @@ window.fetch = async (input) => {
     return { ok: true, status: 200, json: async () => ({ data: [{ user_id: 21, display_name: 'Alice Example', user_email: 'alice@example.com', plan_id: 5, plan_title: 'Gold Plan', status: 'active', created_at: '2026-03-01 10:00:00', expires_at: null, source_type: 'manual' }], total: 1 }) }
   }
   if (url.includes('/admin/content/resource-types')) {
-    return { ok: true, status: 200, json: async () => ({ data: [{ key: 'post', label: 'Posts', group: 'content', searchable: true }], groups: { content: 'Content' }, select_options: [{ value: 'post', label: 'Posts' }] }) }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          { key: 'post', label: 'Posts', group: 'content', searchable: true },
+          { key: 'page', label: 'Pages', group: 'content', searchable: true },
+          { key: 'category', label: 'Categories', group: 'taxonomy', searchable: true },
+          { key: 'post_tag', label: 'Tags', group: 'taxonomy', searchable: true },
+          { key: 'lesson', label: 'Lessons', group: 'content', searchable: true },
+          { key: 'menu_item', label: 'Menu Items', group: 'navigation', searchable: true },
+          { key: 'url_pattern', label: 'URL Restrictions', group: 'advanced', searchable: false },
+          { key: 'special_page', label: 'Special Pages', group: 'advanced', searchable: true },
+          { key: 'comment', label: 'Comments', group: 'advanced', searchable: true },
+        ],
+        groups: {
+          content: 'Content',
+          taxonomy: 'Taxonomies',
+          navigation: 'Navigation',
+          advanced: 'Advanced',
+        },
+        select_options: [
+          { value: 'post', label: 'Posts' },
+          { value: 'page', label: 'Pages' },
+          { value: 'category', label: 'Categories' },
+          { value: 'post_tag', label: 'Tags' },
+          { value: 'lesson', label: 'Lessons' },
+          { value: 'menu_item', label: 'Menu Items' },
+          { value: 'url_pattern', label: 'URL Restrictions' },
+          { value: 'special_page', label: 'Special Pages' },
+          { value: 'comment', label: 'Comments' },
+        ],
+      }),
+    }
   }
   if (url.includes('/admin/content/search-resources')) {
-    return { ok: true, status: 200, json: async () => ({ data: [{ id: '55', label: 'Members Post', type: 'post', type_label: 'Posts' }] }) }
+    if (window.__fchubSmokeFailResourceSearch) {
+      return { ok: false, status: 503, json: async () => ({ message: 'Content search is temporarily unavailable' }) }
+    }
+
+    const parsedUrl = new URL(url)
+    const type = parsedUrl.searchParams.get('type') || 'post'
+    const resources = {
+      post: [{ id: '55', label: 'Members Post', type: 'post', type_label: 'Posts' }],
+      page: [{ id: '56', label: 'Member Welcome', type: 'page', type_label: 'Pages' }],
+      category: [{ id: '7', label: 'Premium Articles', type: 'category', type_label: 'Categories' }],
+      post_tag: [{ id: '8', label: 'Member News', type: 'post_tag', type_label: 'Tags' }],
+      lesson: [{ id: '91', label: 'Advanced Lesson', type: 'lesson', type_label: 'Lessons' }],
+      menu_item: [{ id: '12', label: 'Member Area', type: 'menu_item', type_label: 'Menu Items' }],
+      special_page: [{ id: 'shop', label: 'Shop page', type: 'special_page', type_label: 'Special Pages' }],
+    }
+    return { ok: true, status: 200, json: async () => ({ data: resources[type] || [] }) }
+  }
+  if (url.includes('/admin/content/protect') && method === 'POST') {
+    return { ok: true, status: 201, json: async () => ({ data: { id: 301 } }) }
   }
   if (url.includes('/admin/content')) {
     return { ok: true, status: 200, json: async () => ({ data: [], total: 0 }) }

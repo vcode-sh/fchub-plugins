@@ -1,451 +1,479 @@
 <template>
   <div class="plan-editor-page">
-    <div class="page-header">
-      <a class="back-link" @click.prevent="$router.push('/plans')">
+    <header class="page-header">
+      <router-link class="back-link" to="/plans">
         <el-icon><ArrowLeft /></el-icon>
         Back to Plans
-      </a>
-      <h2 class="fchub-page-title">{{ isNew ? 'Create Plan' : 'Edit Plan' }}</h2>
-    </div>
+      </router-link>
+      <div class="page-title-row">
+        <div>
+          <p class="page-eyebrow">Memberships</p>
+          <h1 class="fchub-page-title">{{ isNew ? 'Create membership plan' : 'Edit membership plan' }}</h1>
+          <p>Build the offer, choose what it unlocks, then review the member experience.</p>
+        </div>
+        <span class="page-status" :class="`is-${form.status}`">{{ planSummary.status }}</span>
+      </div>
+    </header>
 
     <el-form
       ref="formRef"
       v-loading="pageLoading"
       :model="form"
       :rules="rules"
-      label-width="140px"
       label-position="top"
       class="plan-form"
-      @submit.prevent
+      @submit.prevent="handlePrimaryAction"
     >
-      <el-tabs v-model="activeTab" type="border-card">
-        <el-tab-pane label="General" name="general">
-          <el-form-item label="Title" prop="title">
-            <el-input
-              v-model="form.title"
-              placeholder="e.g. Gold Membership"
-              @input="onTitleInput"
-            />
-          </el-form-item>
+      <div class="plan-builder-shell">
+        <PlanBuilderProgress
+          class="plan-builder-progress"
+          :steps="PLAN_BUILDER_STEPS"
+          :active-step="activeStep"
+          :completed-steps="completedSteps"
+          @select="selectBuilderStep"
+        />
 
-          <el-form-item label="Slug" prop="slug">
-            <el-input v-model="form.slug" placeholder="e.g. gold-membership">
-              <template #prepend>/</template>
-            </el-input>
-            <div class="field-hint">
-              URL-friendly identifier. Auto-generated from title if left empty.
+        <PlanBuilderSummary
+          class="plan-builder-summary-mobile"
+          id-prefix="mobile-plan-summary"
+          :summary="planSummary"
+          :mobile-open="mobileSummaryOpen"
+          @toggle-mobile="mobileSummaryOpen = !mobileSummaryOpen"
+        />
+
+        <main class="plan-builder-content">
+          <section v-show="activeStep === 'offer'" class="builder-panel" aria-labelledby="offer-step-heading">
+            <div class="builder-panel-heading">
+              <span class="builder-panel-step">Step 1 of 3</span>
+              <h2 id="offer-step-heading">Shape the offer</h2>
+              <p>Give members a clear name and decide how long their access lasts.</p>
             </div>
-          </el-form-item>
 
-          <el-form-item label="Description" prop="description">
-            <el-input
-              v-model="form.description"
-              type="textarea"
-              :rows="3"
-              placeholder="Describe what this plan offers..."
-            />
-          </el-form-item>
+            <div class="builder-form-section">
+              <el-form-item label="Plan name" prop="title">
+                <el-input
+                  v-model="form.title"
+                  placeholder="e.g. Gold Membership"
+                  size="large"
+                  @input="onTitleInput"
+                />
+              </el-form-item>
 
-          <el-form-item label="Status" prop="status">
-            <el-select v-model="form.status" style="width: 200px">
-              <el-option label="Active" value="active" />
-              <el-option label="Inactive" value="inactive" />
-              <el-option label="Archived" value="archived" />
-            </el-select>
-          </el-form-item>
+              <el-form-item label="Short description" prop="description">
+                <el-input
+                  v-model="form.description"
+                  type="textarea"
+                  :rows="3"
+                  maxlength="240"
+                  show-word-limit
+                  placeholder="What will members get from this plan?"
+                />
+              </el-form-item>
 
-          <el-form-item label="Level" prop="level">
-            <el-input-number
-              v-model="form.level"
-              :min="0"
-              :max="100"
-              controls-position="right"
-              style="width: 200px"
-            />
-            <div class="field-hint">
-              Plan hierarchy level (0-100). Higher number = higher tier. Used for upgrade/downgrade logic when Membership Mode is set to "Upgrade Only".
+              <div class="offer-field-grid">
+                <el-form-item label="Availability" prop="status">
+                  <el-select v-model="form.status">
+                    <el-option label="Active" value="active" />
+                    <el-option label="Inactive" value="inactive" />
+                    <el-option label="Archived" value="archived" />
+                  </el-select>
+                  <div class="field-hint">Inactive keeps the plan hidden while you finish setting it up.</div>
+                </el-form-item>
+              </div>
             </div>
-          </el-form-item>
 
-          <el-form-item label="Includes Plans" prop="includes_plan_ids">
-            <el-select
-              v-model="form.includes_plan_ids"
-              multiple
-              filterable
-              placeholder="Select plans to include..."
-              style="width: 100%"
-            >
-              <el-option
-                v-for="opt in planOptions"
-                :key="opt.id"
-                :label="opt.title"
-                :value="opt.id"
-              />
-            </el-select>
-            <div class="field-hint">
-              Members of this plan will also receive access from the selected plans.
-            </div>
-          </el-form-item>
+            <div class="builder-form-section" aria-labelledby="plan-duration-heading">
+              <div class="section-heading-inline">
+                <div>
+                  <h3 id="plan-duration-heading">How long does access last?</h3>
+                  <p>Choose the rule that best matches the offer.</p>
+                </div>
+              </div>
 
-          <el-divider content-position="left">Duration & Trial</el-divider>
-
-          <el-form-item label="Duration Type" prop="duration_type">
-            <el-select v-model="form.duration_type" style="width: 340px">
-              <el-option label="Lifetime (never expires)" value="lifetime" />
-              <el-option label="Fixed Duration (X days)" value="fixed_days" />
-              <el-option label="Mirror Subscription" value="subscription_mirror" />
-              <el-option label="Fixed Billing Anchor (monthly due date)" value="fixed_anchor" />
-            </el-select>
-            <div class="field-hint">
-              Determines how long membership access lasts. Fixed Billing Anchor ties access to a calendar day each month. Applies to all linked products unless overridden.
-            </div>
-          </el-form-item>
-
-          <el-form-item
-            v-if="form.duration_type === 'fixed_days'"
-            label="Duration (days)"
-            prop="duration_days"
-            :rules="[{ required: true, message: 'Required for fixed duration', trigger: 'blur' }]"
-          >
-            <el-input-number
-              v-model="form.duration_days"
-              :min="1"
-              :max="36500"
-              controls-position="right"
-              style="width: 200px"
-            />
-            <div class="field-hint">Number of days the membership remains active after purchase.</div>
-          </el-form-item>
-
-          <el-form-item
-            v-if="form.duration_type === 'fixed_anchor'"
-            label="Billing Anchor Day"
-            prop="meta.billing_anchor_day"
-            :rules="[{ required: true, message: 'Required for anchor billing', trigger: 'blur' }]"
-          >
-            <el-input-number
-              v-model="form.meta.billing_anchor_day"
-              :min="1"
-              :max="31"
-              controls-position="right"
-              style="width: 200px"
-            />
-            <div class="field-hint">
-              Day of the month when payment is due (1-31). Access suspends if unpaid by this date. For months with fewer days (e.g. Feb), the anchor clamps to the last day.
-            </div>
-          </el-form-item>
-
-          <el-divider content-position="left">Membership Term</el-divider>
-
-          <el-form-item label="Membership Term">
-            <el-select v-model="form.meta.membership_term.mode" style="width: 340px" @change="onTermModeChange">
-              <el-option label="No limit" value="none" />
-              <el-option label="1 Year" value="1y" />
-              <el-option label="2 Years" value="2y" />
-              <el-option label="3 Years" value="3y" />
-              <el-option label="Custom" value="custom" />
-              <el-option label="Specific Date" value="date" />
-            </el-select>
-            <div class="field-hint">{{ termHintText }}</div>
-          </el-form-item>
-
-          <el-form-item
-            v-if="form.meta.membership_term.mode === 'custom'"
-            label="Term Length"
-          >
-            <div style="display: flex; gap: 8px; align-items: center">
-              <el-input-number
-                v-model="form.meta.membership_term.value"
-                :min="1"
-                :max="999"
-                controls-position="right"
-                style="width: 120px"
-              />
-              <el-select v-model="form.meta.membership_term.unit" style="width: 140px">
-                <el-option label="Days" value="days" />
-                <el-option label="Weeks" value="weeks" />
-                <el-option label="Months" value="months" />
-                <el-option label="Years" value="years" />
-              </el-select>
-            </div>
-          </el-form-item>
-
-          <el-form-item
-            v-if="form.meta.membership_term.mode === 'date'"
-            label="Term End Date"
-          >
-            <el-date-picker
-              v-model="form.meta.membership_term.date"
-              type="date"
-              placeholder="Select end date"
-              :format="wpDatePickerFormat"
-              value-format="YYYY-MM-DD"
-              style="width: 200px"
-            />
-          </el-form-item>
-
-          <el-form-item label="Trial Period (days)" prop="trial_days">
-            <el-input-number
-              v-model="form.trial_days"
-              :min="0"
-              :max="365"
-              controls-position="right"
-              style="width: 200px"
-            />
-            <div class="field-hint">
-              Set to 0 for no trial. When set, new members get a trial period before their paid membership begins.
-            </div>
-          </el-form-item>
-
-          <el-form-item label="Grace Period (days)" prop="grace_period_days">
-            <el-input-number
-              v-model="form.grace_period_days"
-              :min="0"
-              :max="365"
-              controls-position="right"
-              style="width: 200px"
-            />
-            <div class="field-hint">
-              Days to keep access after cancellation or failed renewal. 0 = immediate revocation.
-            </div>
-          </el-form-item>
-
-          <!-- T17: Schedule Status Change -->
-          <PlanSchedulePanel
-            :is-new="isNew"
-            :scheduled-status="schedule.scheduled_status"
-            :scheduled-at="schedule.scheduled_at"
-            :new-status="schedule.new_status"
-            :new-at="schedule.new_at"
-            :loading="scheduleSaving"
-            :format-date-time="formatWpDateTime"
-            :date-time-picker-format="wpDateTimePickerFormat"
-            @update:new-status="schedule.new_status = $event"
-            @update:new-at="schedule.new_at = $event"
-            @save="saveSchedule"
-            @clear="clearSchedule"
-          />
-        </el-tab-pane>
-
-        <el-tab-pane label="Access Rules" name="rules">
-          <div class="section-header-row" style="margin-bottom: 12px">
-            <span></span>
-            <el-button size="small" @click="addRule">
-              <el-icon><Plus /></el-icon>
-              Add Rule
-            </el-button>
-          </div>
-
-          <el-empty
-            v-if="form.rules.length === 0"
-            description="No access rules defined. Add a rule to control what content this plan unlocks."
-            :image-size="60"
-          />
-
-          <div
-            v-for="(rule, index) in form.rules"
-            :key="index"
-            class="rule-row"
-          >
-            <div class="rule-fields">
-              <el-form-item
-                :prop="`rules.${index}.resource_type`"
-                :rules="[{ required: true, message: 'Required', trigger: 'change' }]"
-                label="Resource Type"
-              >
-                <el-select
-                  v-model="rule.resource_type"
-                  placeholder="Type"
-                  style="width: 260px"
-                  @change="onResourceTypeChange(index, rule)"
-                >
-                  <el-option-group
-                    v-for="group in resourceTypeGroups"
-                    :key="group.key"
-                    :label="group.label"
+              <el-form-item prop="duration_type" class="duration-form-item">
+                <div class="duration-options" role="group" aria-labelledby="plan-duration-heading">
+                  <button
+                    v-for="option in durationOptions"
+                    :key="option.value"
+                    type="button"
+                    class="duration-option"
+                    :class="{ 'is-selected': form.duration_type === option.value }"
+                    :aria-pressed="String(form.duration_type === option.value)"
+                    @click="selectDuration(option.value)"
                   >
-                    <el-option
-                      v-for="type in group.types"
-                      :key="type.value"
-                      :label="type.displayLabel"
-                      :value="type.value"
-                    >
-                      <span>{{ type.label }}</span>
-                      <span v-if="type.source" class="resource-type-source">{{ type.source }}</span>
-                    </el-option>
-                  </el-option-group>
-                </el-select>
+                    <span class="duration-radio" aria-hidden="true"></span>
+                    <span>
+                      <strong>{{ option.label }}</strong>
+                      <small>{{ option.description }}</small>
+                    </span>
+                  </button>
+                </div>
               </el-form-item>
 
               <el-form-item
-                :prop="`rules.${index}.resource_id`"
-                label="Resource"
+                v-if="form.duration_type === 'fixed_days'"
+                label="Duration (days)"
+                prop="duration_days"
+                :rules="[{ required: true, message: 'Enter the access duration', trigger: 'blur' }]"
+                class="conditional-duration-field"
               >
-                <!-- URL Pattern: free text input -->
-                <template v-if="rule.resource_type === 'url_pattern'">
-                  <el-input
-                    v-model="rule.resource_id"
-                    placeholder="/members/* or /premium/content/*"
-                    style="width: 280px"
+                <el-input-number v-model="form.duration_days" :min="1" :max="36500" controls-position="right" />
+                <div class="field-hint">Access ends this many days after it begins.</div>
+              </el-form-item>
+
+              <el-form-item
+                v-if="form.duration_type === 'fixed_anchor'"
+                label="Billing anchor day"
+                prop="meta.billing_anchor_day"
+                :rules="[{ required: true, message: 'Choose a day from 1 to 31', trigger: 'blur' }]"
+                class="conditional-duration-field"
+              >
+                <el-input-number v-model="form.meta.billing_anchor_day" :min="1" :max="31" controls-position="right" />
+                <div class="field-hint">Shorter months use their final calendar day.</div>
+              </el-form-item>
+            </div>
+
+            <section class="plan-advanced-section" aria-labelledby="advanced-settings-heading">
+              <button
+                type="button"
+                class="advanced-settings-toggle"
+                :aria-expanded="String(advancedOpen)"
+                aria-controls="plan-advanced-settings"
+                @click="advancedOpen = !advancedOpen"
+              >
+                <span>
+                  <strong id="advanced-settings-heading">Advanced settings</strong>
+                  <small>Slug, hierarchy, plan inclusion, membership term, trial and grace period</small>
+                </span>
+                <el-icon :class="{ 'is-open': advancedOpen }"><ArrowDown /></el-icon>
+              </button>
+
+              <div v-show="advancedOpen" id="plan-advanced-settings" class="advanced-settings-content">
+                <el-form-item label="Slug" prop="slug">
+                  <el-input v-model="form.slug" placeholder="e.g. gold-membership" @input="onSlugInput">
+                    <template #prepend>/</template>
+                  </el-input>
+                  <div class="field-hint">Generated from the plan name. Change it only when the identifier must differ.</div>
+                </el-form-item>
+
+                <div class="advanced-field-grid">
+                  <el-form-item label="Level" prop="level">
+                    <el-input-number v-model="form.level" :min="0" :max="100" controls-position="right" />
+                    <div class="field-hint">Used only by Upgrade Only membership mode.</div>
+                  </el-form-item>
+
+                  <el-form-item label="Trial period (days)" prop="trial_days">
+                    <el-input-number v-model="form.trial_days" :min="0" :max="365" controls-position="right" />
+                    <div class="field-hint">Leave at 0 for no trial.</div>
+                  </el-form-item>
+
+                  <el-form-item label="Grace period (days)" prop="grace_period_days">
+                    <el-input-number v-model="form.grace_period_days" :min="0" :max="365" controls-position="right" />
+                    <div class="field-hint">Leave at 0 to revoke access immediately.</div>
+                  </el-form-item>
+                </div>
+
+                <el-form-item label="Includes plans" prop="includes_plan_ids">
+                  <el-select v-model="form.includes_plan_ids" multiple filterable placeholder="Select plans to include...">
+                    <el-option v-for="opt in planOptions" :key="opt.id" :label="opt.title" :value="opt.id" />
+                  </el-select>
+                  <div class="field-hint">Members also receive access granted by the selected plans.</div>
+                </el-form-item>
+
+                <el-divider content-position="left">Membership term</el-divider>
+
+                <el-form-item label="Membership term">
+                  <el-select v-model="form.meta.membership_term.mode" @change="onTermModeChange">
+                    <el-option label="No limit" value="none" />
+                    <el-option label="1 year" value="1y" />
+                    <el-option label="2 years" value="2y" />
+                    <el-option label="3 years" value="3y" />
+                    <el-option label="Custom" value="custom" />
+                    <el-option label="Specific date" value="date" />
+                  </el-select>
+                  <div class="field-hint">{{ termHintText }}</div>
+                </el-form-item>
+
+                <div v-if="form.meta.membership_term.mode === 'custom'" class="term-custom-row">
+                  <el-form-item label="Term length">
+                    <el-input-number v-model="form.meta.membership_term.value" :min="1" :max="999" controls-position="right" />
+                  </el-form-item>
+                  <el-form-item label="Term unit">
+                    <el-select v-model="form.meta.membership_term.unit">
+                      <el-option label="Days" value="days" />
+                      <el-option label="Weeks" value="weeks" />
+                      <el-option label="Months" value="months" />
+                      <el-option label="Years" value="years" />
+                    </el-select>
+                  </el-form-item>
+                </div>
+
+                <el-form-item v-if="form.meta.membership_term.mode === 'date'" label="Term end date">
+                  <el-date-picker
+                    v-model="form.meta.membership_term.date"
+                    type="date"
+                    placeholder="Select end date"
+                    :format="wpDatePickerFormat"
+                    value-format="YYYY-MM-DD"
                   />
-                  <span class="resource-hint">Use * as wildcard. Example: /members/*</span>
-                </template>
+                </el-form-item>
 
-                <!-- Special Page: fixed options -->
-                <template v-else-if="rule.resource_type === 'special_page'">
-                  <el-select
-                    v-model="rule.resource_id"
-                    placeholder="Select page..."
-                    style="width: 240px"
-                  >
-                    <el-option
-                      v-for="sp in specialPageOptions"
-                      :key="sp.id"
-                      :label="sp.label"
-                      :value="sp.id"
-                    />
-                  </el-select>
-                </template>
-
-                <!-- Searchable types: remote search dropdown -->
-                <template v-else>
-                  <el-select
-                    v-model="rule.resource_id"
-                    filterable
-                    remote
-                    clearable
-                    :remote-method="(q) => searchRuleResources(index, rule.resource_type, q)"
-                    :loading="ruleResourceLoading[index]"
-                    placeholder="Search by title..."
-                    style="width: 240px"
-                    @clear="rule.resource_id = '0'"
-                  >
-                    <el-option label="All of this type" value="0" />
-                    <el-option
-                      v-for="item in ruleResourceOptions[index]"
-                      :key="item.id"
-                      :label="item.label"
-                      :value="String(item.id)"
-                    />
-                  </el-select>
-                  <el-icon
-                    v-if="rule.resource_id && rule.resource_id !== '0' && rule.resource_label === '(Deleted)'"
-                    class="rule-warning-icon"
-                    title="This resource has been deleted"
-                  ><WarningFilled /></el-icon>
-                </template>
-              </el-form-item>
-
-              <el-form-item
-                :prop="`rules.${index}.drip_type`"
-                :rules="[{ required: true, message: 'Required', trigger: 'change' }]"
-                label="Drip"
-              >
-                <el-select
-                  v-model="rule.drip_type"
-                  placeholder="Drip"
-                  style="width: 140px"
-                  @change="onDripTypeChange(rule)"
-                >
-                  <el-option label="Immediate" value="immediate" />
-                  <el-option label="Delayed" value="delayed" />
-                  <el-option label="Fixed Date" value="fixed_date" />
-                </el-select>
-              </el-form-item>
-
-              <el-form-item
-                v-if="rule.drip_type === 'delayed'"
-                :prop="`rules.${index}.drip_delay_days`"
-                :rules="[{ required: true, message: 'Required', trigger: 'blur' }]"
-                label="Delay (days)"
-              >
-                <el-input-number
-                  v-model="rule.drip_delay_days"
-                  :min="1"
-                  :max="730"
-                  controls-position="right"
-                  style="width: 120px"
+                <PlanSchedulePanel
+                  :is-new="isNew"
+                  :scheduled-status="schedule.scheduled_status"
+                  :scheduled-at="schedule.scheduled_at"
+                  :new-status="schedule.new_status"
+                  :new-at="schedule.new_at"
+                  :loading="scheduleSaving"
+                  :format-date-time="formatWpDateTime"
+                  :date-time-picker-format="wpDateTimePickerFormat"
+                  @update:new-status="schedule.new_status = $event"
+                  @update:new-at="schedule.new_at = $event"
+                  @save="saveSchedule"
+                  @clear="clearSchedule"
                 />
-              </el-form-item>
+              </div>
+            </section>
+          </section>
 
-              <el-form-item
-                v-if="rule.drip_type === 'fixed_date'"
-                :prop="`rules.${index}.drip_date`"
-                :rules="[{ required: true, message: 'Required', trigger: 'change' }]"
-                label="Unlock Date"
-              >
-                <el-date-picker
-                  v-model="rule.drip_date"
-                  type="date"
-                  placeholder="Select date"
-                  :format="wpDatePickerFormat"
-                  value-format="YYYY-MM-DD"
-                  :disabled-date="isPastDate"
-                  style="width: 160px"
-                />
-              </el-form-item>
+          <section v-show="activeStep === 'access'" class="builder-panel" aria-labelledby="access-step-heading">
+            <div class="builder-panel-heading access-rules-heading">
+              <div>
+                <span class="builder-panel-step">Step 2 of 3</span>
+                <h2 id="access-step-heading">Choose content access</h2>
+                <p>Define what members unlock now or later. You can safely skip this step.</p>
+              </div>
+              <el-button v-if="form.rules.length" @click="addRule">
+                <el-icon><Plus /></el-icon>
+                Add content access
+              </el-button>
             </div>
 
-            <el-button
-              type="danger"
-              text
-              size="small"
-              class="remove-rule-btn"
-              @click="removeRule(index)"
-            >
-              <el-icon><Delete /></el-icon>
-            </el-button>
-          </div>
-        </el-tab-pane>
+            <div v-if="form.rules.length === 0" class="access-empty-state">
+              <div class="access-empty-icon" aria-hidden="true"><el-icon><Lock /></el-icon></div>
+              <h3>No content access yet</h3>
+              <p>Members can still receive the plan. Add a rule when it should unlock protected content.</p>
+              <el-button type="primary" class="empty-state-action" @click="addRule">
+                <el-icon><Plus /></el-icon>
+                Add content access
+              </el-button>
+            </div>
 
-        <el-tab-pane label="Drip Preview" name="drip" v-if="dripPreviewRules.length > 0">
-          <el-timeline>
-            <el-timeline-item
-              v-for="(item, index) in dripPreviewRules"
+            <article
+              v-for="(rule, index) in form.rules"
               :key="index"
-              :timestamp="item.label"
-              placement="top"
-              :type="item.type"
+              class="rule-row"
+              :aria-labelledby="`rule-title-${index}`"
             >
-              <strong>{{ item.resourceLabel }}</strong>
-            </el-timeline-item>
-          </el-timeline>
-        </el-tab-pane>
+              <header class="rule-row-header">
+                <div>
+                  <span>CONTENT RULE {{ index + 1 }}</span>
+                  <h3 :id="`rule-title-${index}`">{{ ruleSummary(rule) }}</h3>
+                </div>
+                <el-button
+                  type="danger"
+                  text
+                  class="remove-rule-btn"
+                  :aria-label="`Remove rule ${index + 1}`"
+                  @click="removeRule(index)"
+                >
+                  <el-icon><Delete /></el-icon>
+                  <span>Remove</span>
+                </el-button>
+              </header>
 
-        <el-tab-pane v-if="!isNew" label="Linked Products" name="products" :lazy="true">
-          <PlanLinkedProductsTab
-            :loading="productsLoading"
-            :products="linkedProducts"
-            @link="showLinkProductDialog"
-            @unlink="confirmUnlinkProduct"
-          />
-        </el-tab-pane>
+              <div class="rule-fields">
+                <el-form-item
+                  :prop="`rules.${index}.resource_type`"
+                  :rules="[{ required: true, message: 'Choose a resource type', trigger: 'change' }]"
+                  label="Resource type"
+                >
+                  <el-select v-model="rule.resource_type" placeholder="Type" @change="onResourceTypeChange(index, rule)">
+                    <el-option-group v-for="group in resourceTypeGroups" :key="group.key" :label="group.label">
+                      <el-option v-for="type in group.types" :key="type.value" :label="type.displayLabel" :value="type.value">
+                        <span>{{ type.label }}</span>
+                        <span v-if="type.source" class="resource-type-source">{{ type.source }}</span>
+                      </el-option>
+                    </el-option-group>
+                  </el-select>
+                </el-form-item>
 
-        <el-tab-pane v-if="!isNew" label="Members" name="members" :lazy="true">
-          <PlanMembersTab
-            :loading="planMembersLoading"
-            :members="planMembers"
-            :total="planMembersTotal"
-            :page="planMembersPage"
-            :per-page="planMembersPerPage"
-            :format-date="formatWpDate"
-            :members-link="`/members?plan_id=${route.params.id}`"
-            @page-change="onMembersPageChange"
-          />
-        </el-tab-pane>
-      </el-tabs>
+                <el-form-item :prop="`rules.${index}.resource_id`" label="Resource">
+                  <template v-if="rule.resource_type === 'url_pattern'">
+                    <el-input v-model="rule.resource_id" placeholder="/members/* or /premium/content/*" />
+                    <span class="resource-hint">Use * as a wildcard. Example: /members/*</span>
+                  </template>
+                  <template v-else-if="rule.resource_type === 'special_page'">
+                    <el-select v-model="rule.resource_id" placeholder="Select page...">
+                      <el-option v-for="sp in specialPageOptions" :key="sp.id" :label="sp.label" :value="sp.id" />
+                    </el-select>
+                  </template>
+                  <template v-else>
+                    <el-select
+                      v-model="rule.resource_id"
+                      filterable
+                      remote
+                      clearable
+                      :remote-method="(q) => searchRuleResources(index, rule.resource_type, q)"
+                      :loading="ruleResourceLoading[index]"
+                      placeholder="Search by title..."
+                      @clear="rule.resource_id = '0'"
+                    >
+                      <el-option label="All of this type" value="0" />
+                      <el-option
+                        v-for="item in ruleResourceOptions[index]"
+                        :key="item.id"
+                        :label="item.label"
+                        :value="String(item.id)"
+                      />
+                    </el-select>
+                    <el-icon
+                      v-if="rule.resource_id && rule.resource_id !== '0' && rule.resource_label === '(Deleted)'"
+                      class="rule-warning-icon"
+                      title="This resource has been deleted"
+                    ><WarningFilled /></el-icon>
+                  </template>
+                </el-form-item>
 
-      <!-- Actions -->
-      <div class="form-actions">
-        <el-button @click="$router.push('/plans')">Cancel</el-button>
-        <el-button
-          type="primary"
-          :loading="saving"
-          @click="savePlan"
-        >
-          {{ isNew ? 'Create Plan' : 'Save Changes' }}
-        </el-button>
+                <el-form-item
+                  :prop="`rules.${index}.drip_type`"
+                  :rules="[{ required: true, message: 'Choose when access begins', trigger: 'change' }]"
+                  label="Access begins"
+                >
+                  <el-select v-model="rule.drip_type" placeholder="Timing" @change="onDripTypeChange(rule)">
+                    <el-option label="Immediately" value="immediate" />
+                    <el-option label="After a delay" value="delayed" />
+                    <el-option label="On a fixed date" value="fixed_date" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item
+                  v-if="rule.drip_type === 'delayed'"
+                  :prop="`rules.${index}.drip_delay_days`"
+                  :rules="[{ required: true, message: 'Enter the delay', trigger: 'blur' }]"
+                  label="Delay (days)"
+                >
+                  <el-input-number v-model="rule.drip_delay_days" :min="1" :max="730" controls-position="right" />
+                </el-form-item>
+
+                <el-form-item
+                  v-if="rule.drip_type === 'fixed_date'"
+                  :prop="`rules.${index}.drip_date`"
+                  :rules="[{ required: true, message: 'Choose an unlock date', trigger: 'change' }]"
+                  label="Unlock date"
+                >
+                  <el-date-picker
+                    v-model="rule.drip_date"
+                    type="date"
+                    placeholder="Select date"
+                    :format="wpDatePickerFormat"
+                    value-format="YYYY-MM-DD"
+                    :disabled-date="isPastDate"
+                  />
+                </el-form-item>
+              </div>
+            </article>
+          </section>
+
+          <section v-show="activeStep === 'review'" class="builder-panel review-panel" aria-labelledby="review-step-heading">
+            <div class="builder-panel-heading">
+              <span class="builder-panel-step">Step 3 of 3</span>
+              <h2 id="review-step-heading">Review the member experience</h2>
+              <p>One last check before this plan is created.</p>
+            </div>
+
+            <div class="review-hero">
+              <span>Your membership plan</span>
+              <h3>{{ planSummary.title }}</h3>
+              <p>{{ form.description.trim() || 'No member-facing description has been added.' }}</p>
+            </div>
+
+            <dl class="review-list">
+              <div><dt>Availability</dt><dd>{{ planSummary.status }}</dd></div>
+              <div><dt>Access duration</dt><dd>{{ planSummary.duration }}</dd></div>
+              <div><dt>Content access</dt><dd>{{ planSummary.contentAccess }}</dd></div>
+              <div><dt>Trial</dt><dd>{{ planSummary.trial }}</dd></div>
+            </dl>
+
+            <el-alert
+              v-if="form.rules.length === 0"
+              title="This plan does not unlock protected content yet."
+              description="That is valid. You can add content access now or edit the plan later."
+              type="warning"
+              :closable="false"
+              show-icon
+            />
+            <el-alert
+              v-if="form.status !== 'active'"
+              :title="form.status === 'archived' ? 'This plan will be archived.' : 'This plan will stay inactive.'"
+              description="Members will not see it as an available active plan until its status changes."
+              type="info"
+              :closable="false"
+              show-icon
+            />
+          </section>
+        </main>
+
+        <PlanBuilderSummary
+          class="plan-builder-summary-desktop"
+          id-prefix="desktop-plan-summary"
+          :summary="planSummary"
+          :mobile-open="mobileSummaryOpen"
+          @toggle-mobile="mobileSummaryOpen = !mobileSummaryOpen"
+        />
       </div>
+
+      <section v-if="!isNew || dripPreviewRules.length > 0" class="plan-management" aria-labelledby="plan-management-heading">
+        <div class="plan-management-heading">
+          <h2 id="plan-management-heading">Manage existing plan</h2>
+          <p>Related tools stay available without cluttering the creation flow.</p>
+        </div>
+        <el-tabs v-model="activeTab">
+          <el-tab-pane v-if="dripPreviewRules.length > 0" label="Drip Preview" name="drip">
+            <el-timeline>
+              <el-timeline-item
+                v-for="(item, index) in dripPreviewRules"
+                :key="index"
+                :timestamp="item.label"
+                placement="top"
+                :type="item.type"
+              >
+                <strong>{{ item.resourceLabel }}</strong>
+              </el-timeline-item>
+            </el-timeline>
+          </el-tab-pane>
+          <el-tab-pane v-if="!isNew" label="Linked Products" name="products" :lazy="true">
+            <PlanLinkedProductsTab
+              :loading="productsLoading"
+              :products="linkedProducts"
+              @link="showLinkProductDialog"
+              @unlink="confirmUnlinkProduct"
+            />
+          </el-tab-pane>
+          <el-tab-pane v-if="!isNew" label="Members" name="members" :lazy="true">
+            <PlanMembersTab
+              :loading="planMembersLoading"
+              :members="planMembers"
+              :total="planMembersTotal"
+              :page="planMembersPage"
+              :per-page="planMembersPerPage"
+              :format-date="formatWpDate"
+              :members-link="`/members?plan_id=${route.params.id}`"
+              @page-change="onMembersPageChange"
+            />
+          </el-tab-pane>
+        </el-tabs>
+      </section>
+
+      <footer class="form-actions">
+        <el-button @click="router.push('/plans')">Cancel</el-button>
+        <div class="form-actions-primary">
+          <el-button v-if="activeStep !== 'offer'" @click="goToPreviousStep">Back</el-button>
+          <el-button type="primary" native-type="submit" :loading="saving">
+            {{ primaryActionLabel }}
+          </el-button>
+        </div>
+      </footer>
     </el-form>
 
     <PlanLinkProductDialog
@@ -465,8 +493,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { ArrowLeft, Delete, Plus, WarningFilled } from '@element-plus/icons-vue'
+import { ref, reactive, computed, nextTick, onMounted, watch } from 'vue'
+import { ArrowDown, ArrowLeft, Delete, Lock, Plus, WarningFilled } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { plans, members, content } from '@/api/index.js'
@@ -475,6 +503,17 @@ import PlanSchedulePanel from '@/components/plans/PlanSchedulePanel.vue'
 import PlanLinkedProductsTab from '@/components/plans/PlanLinkedProductsTab.vue'
 import PlanMembersTab from '@/components/plans/PlanMembersTab.vue'
 import PlanLinkProductDialog from '@/components/plans/PlanLinkProductDialog.vue'
+import PlanBuilderProgress from '@/components/plans/PlanBuilderProgress.vue'
+import PlanBuilderSummary from '@/components/plans/PlanBuilderSummary.vue'
+import {
+  PLAN_BUILDER_STEPS,
+  buildPlanSummary,
+  hasAdvancedPlanSettings,
+  isOfferStepComplete,
+  isAdvancedValidationField,
+  previousBuilderStep,
+  stepForValidationFields,
+} from './planEditorUi.js'
 
 const props = defineProps({
   isNew: {
@@ -490,7 +529,10 @@ const pageLoading = ref(false)
 const saving = ref(false)
 const slugManuallyEdited = ref(false)
 const planOptions = ref([])
-const activeTab = ref('general')
+const activeTab = ref('products')
+const activeStep = ref('offer')
+const advancedOpen = ref(false)
+const mobileSummaryOpen = ref(false)
 
 // Linked Products tab state
 const linkedProducts = ref([])
@@ -552,17 +594,67 @@ const form = reactive({
   },
 })
 
+const durationOptions = Object.freeze([
+  {
+    value: 'lifetime',
+    label: 'Lifetime access',
+    description: 'Access never expires unless it is manually revoked.',
+  },
+  {
+    value: 'fixed_days',
+    label: 'Fixed duration',
+    description: 'Access ends after a set number of days.',
+  },
+  {
+    value: 'subscription_mirror',
+    label: 'Mirror subscription',
+    description: 'Access follows the linked subscription lifecycle.',
+  },
+  {
+    value: 'fixed_anchor',
+    label: 'Monthly billing anchor',
+    description: 'Access renews against a calendar day each month.',
+  },
+])
+
+const completedSteps = computed(() => [
+  ...(isOfferStepComplete(form) ? ['offer'] : []),
+  ...(form.rules.length > 0 ? ['access'] : []),
+])
+
+const planSummary = computed(() => buildPlanSummary(form, form.rules.length))
+
+const primaryActionLabel = computed(() => {
+  if (activeStep.value === 'offer') return 'Continue'
+  if (activeStep.value === 'access') return 'Review plan'
+  return props.isNew ? 'Create plan' : 'Save changes'
+})
+
+function validateSlug(_rule, value, callback) {
+  if (!form.title) {
+    callback()
+    return
+  }
+
+  if (!value) {
+    callback(new Error('Enter a slug for this title'))
+    return
+  }
+
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)) {
+    callback(new Error('Use lowercase letters, numbers, and hyphens only'))
+    return
+  }
+
+  callback()
+}
+
 const rules = {
   title: [
     { required: true, message: 'Title is required', trigger: 'blur' },
   ],
   slug: [
-    { required: true, message: 'Slug is required', trigger: 'blur' },
-    {
-      pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      message: 'Slug must be lowercase letters, numbers, and hyphens only',
-      trigger: 'blur',
-    },
+    { validator: validateSlug, trigger: ['blur', 'change'] },
   ],
 }
 
@@ -642,6 +734,22 @@ function getTypeConfig(resourceType) {
     if (found) return found
   }
   return null
+}
+
+function ruleSummary(rule) {
+  const type = getTypeConfig(rule.resource_type)?.displayLabel
+    || capitalize(rule.resource_type)
+    || 'Resource'
+  const scope = !rule.resource_id || String(rule.resource_id) === '0'
+    ? 'all of this type'
+    : 'selected resource'
+  const drip = rule.drip_type === 'delayed'
+    ? `after ${rule.drip_delay_days || 1} day${Number(rule.drip_delay_days || 1) === 1 ? '' : 's'}`
+    : rule.drip_type === 'fixed_date'
+      ? 'on a fixed date'
+      : 'immediately'
+
+  return `${type} · ${scope} · ${drip}`
 }
 
 function isSearchableType(resourceType) {
@@ -754,10 +862,68 @@ function slugify(text) {
     .replace(/^-+|-+$/g, '')
 }
 
-function onTitleInput() {
+function onTitleInput(value) {
   if (!slugManuallyEdited.value) {
-    form.slug = slugify(form.title)
+    form.slug = slugify(value)
   }
+}
+
+function onSlugInput(value) {
+  slugManuallyEdited.value = value !== slugify(form.title)
+}
+
+function selectDuration(value) {
+  if (!durationOptions.some((option) => option.value === value)) return
+
+  form.duration_type = value
+  if (value !== 'fixed_days') form.duration_days = null
+  if (value !== 'fixed_anchor') form.meta.billing_anchor_day = null
+}
+
+function selectBuilderStep(step) {
+  if (!PLAN_BUILDER_STEPS.some(({ id }) => id === step)) return
+  activeStep.value = step
+}
+
+function goToPreviousStep() {
+  activeStep.value = previousBuilderStep(activeStep.value)
+}
+
+async function validateOfferStep() {
+  const fields = ['title', 'slug']
+  if (form.duration_type === 'fixed_days') fields.push('duration_days')
+  if (form.duration_type === 'fixed_anchor') fields.push('meta.billing_anchor_day')
+
+  try {
+    await formRef.value?.validateField(fields)
+    return true
+  } catch (validationFields) {
+    await revealValidationError(validationFields || { title: [] })
+    ElMessage.warning('Please complete the highlighted offer details')
+    return false
+  }
+}
+
+async function handlePrimaryAction() {
+  if (saving.value) return
+
+  if (activeStep.value === 'offer') {
+    if (await validateOfferStep()) activeStep.value = 'access'
+    return
+  }
+
+  if (activeStep.value === 'access') {
+    try {
+      await formRef.value?.validate()
+      activeStep.value = 'review'
+    } catch (validationFields) {
+      await revealValidationError(validationFields)
+      ElMessage.warning('Please fix the highlighted content access details')
+    }
+    return
+  }
+
+  await savePlan()
 }
 
 // Drip Schedule Preview
@@ -831,6 +997,7 @@ async function loadPlan(id) {
       unit: savedTerm.unit || 'months',
       date: savedTerm.date ?? null,
     }
+    advancedOpen.value = hasAdvancedPlanSettings(form)
 
     // T17: load schedule
     schedule.scheduled_status = plan.scheduled_status || null
@@ -880,17 +1047,42 @@ async function loadPlanOptions() {
   }
 }
 
+async function revealValidationError(fields = {}) {
+  const firstField = Object.keys(fields)[0]
+
+  activeStep.value = stepForValidationFields(fields)
+  if (isAdvancedValidationField(firstField)) {
+    advancedOpen.value = true
+  }
+
+  await nextTick()
+
+  if (firstField) {
+    formRef.value?.scrollToField(firstField)
+  }
+
+  const firstInvalidControl = document.querySelector(
+    '#fchub-memberships-app .el-form-item.is-error input, '
+      + '#fchub-memberships-app .el-form-item.is-error textarea, '
+      + '#fchub-memberships-app .el-form-item.is-error button',
+  )
+  firstInvalidControl?.focus()
+}
+
 async function savePlan() {
-  if (!formRef.value) return
+  if (!formRef.value || saving.value) return
+
+  saving.value = true
 
   try {
     await formRef.value.validate()
-  } catch {
-    ElMessage.warning('Please fix the form errors before saving')
+  } catch (fields) {
+    await revealValidationError(fields)
+    ElMessage.warning('Please fix the highlighted fields before saving')
+    saving.value = false
     return
   }
 
-  saving.value = true
   try {
     // Build meta: only include billing_anchor_day for fixed_anchor
     const meta = form.duration_type === 'fixed_anchor'
@@ -945,10 +1137,9 @@ async function savePlan() {
       ElMessage.success('Plan updated successfully')
     }
 
-    router.push('/plans')
+    await router.push('/plans')
   } catch (err) {
     ElMessage.error(err.message || 'Failed to save plan')
-  } finally {
     saving.value = false
   }
 }
@@ -1134,11 +1325,101 @@ onMounted(() => {
   color: var(--el-color-primary);
 }
 
-.section-header-row {
+.plan-details-layout {
+  max-width: 840px;
+  padding: 8px 4px 4px;
+}
+
+.plan-section + .plan-section,
+.plan-advanced-section {
+  margin-top: 28px;
+}
+
+.plan-section-heading {
+  margin-bottom: 18px;
+}
+
+.plan-section-heading h3 {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.plan-section-heading p {
+  margin: 4px 0 0;
+  color: var(--fchub-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.plan-advanced-section {
+  border-top: 1px solid var(--fchub-border-color);
+  padding-top: 12px;
+}
+
+.advanced-settings-toggle {
+  padding-left: 0;
+  font-weight: 600;
+}
+
+.advanced-settings-toggle .el-icon {
+  margin-left: 6px;
+  transition: transform 0.15s ease;
+}
+
+.advanced-settings-toggle .el-icon.is-open {
+  transform: rotate(180deg);
+}
+
+.advanced-settings-content {
+  padding-top: 16px;
+}
+
+.access-rules-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
+}
+
+.access-rules-heading {
+  gap: 20px;
+  margin: 8px 0 20px;
+}
+
+.access-rules-heading h3,
+.rule-row-header h4 {
+  margin: 0;
+  color: var(--fchub-text-primary);
+}
+
+.access-rules-heading h3 {
+  font-size: 16px;
+}
+
+.access-rules-heading p,
+.rule-row-header p,
+.empty-state-help {
+  color: var(--fchub-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.access-rules-heading p,
+.rule-row-header p {
+  margin: 4px 0 0;
+}
+
+.empty-state-help {
+  max-width: 460px;
+  margin: -4px auto 16px;
+  text-align: center;
+}
+
+.access-rules-heading .el-icon,
+.empty-state-action .el-icon {
+  margin-right: 6px;
 }
 
 .field-hint {
@@ -1157,14 +1438,25 @@ onMounted(() => {
 }
 
 .rule-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   padding: 16px;
   margin-bottom: 12px;
   background: var(--el-fill-color-lighter, #fafafa);
   border: 1px solid var(--fchub-border-color);
-  border-radius: 6px;
+  border-radius: 8px;
+}
+
+.rule-row-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--fchub-border-color);
+}
+
+.rule-row-header h4 {
+  font-size: 14px;
 }
 
 .rule-fields {
@@ -1180,7 +1472,7 @@ onMounted(() => {
 
 .remove-rule-btn {
   flex-shrink: 0;
-  margin-top: 22px;
+  margin: 0;
 }
 
 .rule-warning-icon {
@@ -1205,13 +1497,701 @@ onMounted(() => {
 }
 
 .form-actions {
+  position: sticky;
+  z-index: 10;
+  bottom: 0;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 14px 24px;
   border-top: 1px solid var(--fchub-border-color);
   background: var(--fchub-card-bg);
+  box-shadow: 0 -8px 20px rgb(0 0 0 / 4%);
   border-radius: 0 0 var(--fchub-radius-card) var(--fchub-radius-card);
+}
+
+@media (max-width: 782px) {
+  .plan-details-layout {
+    max-width: none;
+  }
+}
+
+/* Guided builder */
+.plan-editor-page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 4px 40px;
+}
+
+.page-header {
+  margin-bottom: 22px;
+}
+
+.page-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.page-eyebrow {
+  margin: 0 0 4px;
+  color: var(--el-color-primary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-title-row .fchub-page-title {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: clamp(24px, 2vw, 30px);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.page-title-row p:last-child {
+  max-width: 620px;
+  margin: 7px 0 0;
+  color: var(--fchub-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.page-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 999px;
+  color: var(--fchub-text-secondary);
+  background: var(--fchub-card-bg);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.page-status.is-active {
+  color: var(--el-color-success-dark-2, #3b8b54);
+  border-color: color-mix(in srgb, var(--el-color-success) 30%, var(--fchub-border-color));
+  background: color-mix(in srgb, var(--el-color-success) 8%, var(--fchub-card-bg));
+}
+
+.plan-form {
+  min-width: 0;
+}
+
+.plan-builder-shell {
+  display: grid;
+  grid-template-columns: 190px minmax(420px, 1fr) 260px;
+  gap: 20px;
+  align-items: start;
+}
+
+.plan-builder-progress,
+.plan-builder-summary-desktop {
+  position: sticky;
+  top: 48px;
+}
+
+.plan-builder-summary-mobile {
+  display: none;
+}
+
+.plan-builder-content {
+  min-width: 0;
+}
+
+.builder-panel {
+  overflow: hidden;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 12px;
+  background: var(--fchub-card-bg);
+  box-shadow: 0 10px 30px rgb(38 55 95 / 5%);
+}
+
+.builder-panel-heading {
+  padding: 26px 28px 22px;
+  border-bottom: 1px solid var(--fchub-border-color);
+}
+
+.builder-panel-step {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--el-color-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.builder-panel-heading h2 {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 21px;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+.builder-panel-heading p {
+  margin: 6px 0 0;
+  color: var(--fchub-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.builder-form-section {
+  padding: 24px 28px 6px;
+}
+
+.builder-form-section + .builder-form-section {
+  border-top: 1px solid var(--fchub-border-color);
+}
+
+.offer-field-grid,
+.advanced-field-grid,
+.term-custom-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.advanced-field-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.section-heading-inline {
+  margin-bottom: 16px;
+}
+
+.section-heading-inline h3 {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.section-heading-inline p {
+  margin: 4px 0 0;
+  color: var(--fchub-text-secondary);
+  font-size: 12px;
+}
+
+.duration-form-item :deep(.el-form-item__content) {
+  display: block;
+}
+
+.duration-options {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.duration-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 9px;
+  color: var(--fchub-text-primary);
+  background: var(--fchub-card-bg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.duration-option:hover {
+  border-color: color-mix(in srgb, var(--el-color-primary) 45%, var(--fchub-border-color));
+}
+
+.duration-option:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--el-color-primary) 25%, transparent);
+  outline-offset: 2px;
+}
+
+.duration-option.is-selected {
+  border-color: var(--el-color-primary);
+  background: color-mix(in srgb, var(--el-color-primary) 4%, var(--fchub-card-bg));
+  box-shadow: inset 0 0 0 1px var(--el-color-primary);
+}
+
+.duration-radio {
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  margin-top: 2px;
+  border: 1.5px solid var(--fchub-border-color);
+  border-radius: 50%;
+  background: var(--fchub-card-bg);
+}
+
+.duration-option.is-selected .duration-radio {
+  border: 5px solid var(--el-color-primary);
+}
+
+.duration-option span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.duration-option strong {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.duration-option small {
+  color: var(--fchub-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.conditional-duration-field {
+  max-width: 280px;
+  margin-top: 4px;
+}
+
+.plan-advanced-section {
+  margin: 18px 28px 26px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 9px;
+}
+
+.advanced-settings-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 16px;
+  border: 0;
+  color: var(--fchub-text-primary);
+  background: var(--el-fill-color-extra-light, #fafbfc);
+  text-align: left;
+  cursor: pointer;
+}
+
+.advanced-settings-toggle > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.advanced-settings-toggle strong {
+  font-size: 13px;
+}
+
+.advanced-settings-toggle small {
+  color: var(--fchub-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.advanced-settings-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--el-color-primary) 25%, transparent);
+  outline-offset: -3px;
+}
+
+.advanced-settings-toggle .el-icon {
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.advanced-settings-toggle .el-icon.is-open {
+  transform: rotate(180deg);
+}
+
+.advanced-settings-content {
+  padding: 22px 18px 4px;
+  border-top: 1px solid var(--fchub-border-color);
+}
+
+.access-rules-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0;
+}
+
+.access-empty-state {
+  max-width: 480px;
+  margin: 60px auto 72px;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.access-empty-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
+  border-radius: 12px;
+  color: var(--el-color-primary);
+  background: color-mix(in srgb, var(--el-color-primary) 9%, var(--fchub-card-bg));
+  font-size: 20px;
+}
+
+.access-empty-state h3 {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 17px;
+}
+
+.access-empty-state p {
+  margin: 7px 0 18px;
+  color: var(--fchub-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.rule-row {
+  margin: 18px 24px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 10px;
+  background: var(--fchub-card-bg);
+}
+
+.rule-row + .rule-row {
+  margin-top: 12px;
+}
+
+.rule-row-header {
+  align-items: center;
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--el-fill-color-extra-light, #fafbfc);
+}
+
+.rule-row-header span:first-child {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--el-color-primary);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.rule-row-header h3 {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.rule-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 16px;
+  padding: 18px 16px 2px;
+}
+
+.rule-fields .el-form-item,
+.rule-fields :deep(.el-select),
+.rule-fields :deep(.el-input),
+.rule-fields :deep(.el-date-editor) {
+  width: 100%;
+}
+
+.review-panel {
+  padding-bottom: 24px;
+}
+
+.review-hero {
+  margin: 24px 28px 16px;
+  padding: 22px;
+  border-radius: 10px;
+  color: var(--fchub-text-primary);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--el-color-primary) 8%, var(--fchub-card-bg)), var(--fchub-card-bg));
+}
+
+.review-hero span {
+  color: var(--el-color-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-hero h3 {
+  overflow-wrap: anywhere;
+  margin: 7px 0 4px;
+  font-size: 21px;
+  line-height: 1.35;
+}
+
+.review-hero p {
+  margin: 0;
+  color: var(--fchub-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.review-list {
+  margin: 0 28px 18px;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 10px;
+}
+
+.review-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--fchub-border-color);
+}
+
+.review-list div:last-child {
+  border-bottom: 0;
+}
+
+.review-list dt {
+  color: var(--fchub-text-secondary);
+  font-size: 12px;
+}
+
+.review-list dd {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.review-panel :deep(.el-alert) {
+  width: auto;
+  margin: 12px 28px 0;
+}
+
+.plan-management {
+  margin: 24px 0 0 210px;
+  padding: 22px;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 12px;
+  background: var(--fchub-card-bg);
+}
+
+.plan-management-heading h2 {
+  margin: 0;
+  color: var(--fchub-text-primary);
+  font-size: 16px;
+}
+
+.plan-management-heading p {
+  margin: 4px 0 14px;
+  color: var(--fchub-text-secondary);
+  font-size: 12px;
+}
+
+.form-actions {
+  margin: 20px 0 0 210px;
+  padding: 13px 16px;
+  justify-content: space-between;
+  border: 1px solid var(--fchub-border-color);
+  border-radius: 10px;
+}
+
+.form-actions-primary {
+  display: flex;
+  gap: 10px;
+}
+
+@media (max-width: 1180px) {
+  .plan-builder-shell {
+    grid-template-columns: 180px minmax(380px, 1fr) 230px;
+    gap: 16px;
+  }
+
+  .advanced-field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plan-management,
+  .form-actions {
+    margin-left: 196px;
+  }
+}
+
+@media (max-width: 960px) {
+  .plan-builder-shell {
+    grid-template-columns: 170px minmax(0, 1fr);
+  }
+
+  .plan-builder-summary-desktop {
+    display: none;
+  }
+
+  .plan-builder-summary-mobile {
+    grid-column: 2;
+    display: block;
+  }
+
+  .plan-builder-content {
+    grid-column: 2;
+  }
+
+  .plan-builder-progress {
+    grid-row: 1 / span 2;
+  }
+
+  .plan-management,
+  .form-actions {
+    margin-left: 186px;
+  }
+}
+
+@media (max-width: 782px) {
+  .plan-editor-page {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 0 0 28px;
+    overflow-x: clip;
+  }
+
+  .page-title-row {
+    gap: 12px;
+  }
+
+  .page-title-row .fchub-page-title {
+    font-size: 23px;
+  }
+
+  .page-title-row p:last-child {
+    display: none;
+  }
+
+  .page-status {
+    margin-top: 2px;
+  }
+
+  .plan-builder-shell {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .plan-builder-progress,
+  .plan-builder-summary-mobile,
+  .plan-builder-content {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    grid-column: auto;
+    box-sizing: border-box;
+  }
+
+  .plan-builder-progress {
+    order: 1;
+  }
+
+  .plan-builder-summary-mobile {
+    order: 2;
+  }
+
+  .plan-builder-content {
+    order: 3;
+  }
+
+  .builder-panel-heading,
+  .builder-form-section {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .builder-panel-heading h2 {
+    font-size: 19px;
+  }
+
+  .duration-options,
+  .offer-field-grid,
+  .advanced-field-grid,
+  .term-custom-row,
+  .rule-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .duration-option {
+    min-height: 78px;
+  }
+
+  .plan-advanced-section {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+
+  .advanced-settings-toggle small {
+    display: none;
+  }
+
+  .access-rules-heading {
+    display: block;
+  }
+
+  .access-rules-heading .el-button {
+    width: 100%;
+    margin-top: 14px;
+  }
+
+  .rule-row {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+
+  .rule-row-header {
+    align-items: flex-start;
+  }
+
+  .remove-rule-btn span:last-child {
+    display: none;
+  }
+
+  .review-hero,
+  .review-list,
+  .review-panel :deep(.el-alert) {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .review-list div {
+    align-items: flex-start;
+  }
+
+  .plan-management,
+  .form-actions {
+    margin-left: 0;
+  }
+
+  .plan-management {
+    padding: 16px;
+  }
+
+  .form-actions {
+    gap: 8px;
+    padding: 11px 12px;
+  }
+
+  .form-actions-primary {
+    min-width: 0;
+    justify-content: flex-end;
+  }
+
+  .form-actions .el-button {
+    margin-left: 0;
+  }
 }
 
 </style>

@@ -1,5 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { canAdvanceProtectionStep } from '@/components/content/contentProtectionWizardUi.js'
 
 export function useContentProtectionWizard({
   contentApi,
@@ -12,7 +13,9 @@ export function useContentProtectionWizard({
   const wizardStep = ref(0)
   const protectLoading = ref(false)
   const resourceSearchLoading = ref(false)
+  const resourceSearchError = ref('')
   const resourceOptions = ref([])
+  let resourceRequestId = 0
 
   const wizardForm = reactive({
     categoryKey: '',
@@ -65,7 +68,10 @@ export function useContentProtectionWizard({
     wizardForm.restriction_message = ''
     wizardForm.redirect_url = ''
     wizardForm.commentMode = 'all'
+    resourceRequestId += 1
     resourceOptions.value = []
+    resourceSearchError.value = ''
+    resourceSearchLoading.value = false
   }
 
   function openProtectWizard(categoryKey, categoryCards) {
@@ -81,8 +87,12 @@ export function useContentProtectionWizard({
     wizardForm.categoryKey = card.key
     wizardForm.categoryLabel = card.label
     wizardForm.resource_type = ''
+    wizardForm.resource_type_label = ''
     wizardForm.resource_id = ''
+    resourceRequestId += 1
     resourceOptions.value = []
+    resourceSearchError.value = ''
+    resourceSearchLoading.value = false
 
     const types = wizardCategoryTypes.value
     if (types.length === 1) {
@@ -94,7 +104,10 @@ export function useContentProtectionWizard({
 
   function onWizardTypeChange() {
     wizardForm.resource_id = ''
+    resourceRequestId += 1
     resourceOptions.value = []
+    resourceSearchError.value = ''
+    resourceSearchLoading.value = false
     const typeObj = wizardCategoryTypes.value.find(t => t.value === wizardForm.resource_type)
     wizardForm.resource_type_label = typeObj ? typeObj.label : wizardForm.resource_type
     loadInitialResources()
@@ -109,14 +122,23 @@ export function useContentProtectionWizard({
     if (!type) return
 
     if (type === 'special_page' || type === 'menu_item') {
+      const requestId = ++resourceRequestId
       resourceSearchLoading.value = true
+      resourceSearchError.value = ''
       try {
         const res = await contentApi.searchResources({ type, query: '' })
-        resourceOptions.value = res.data ?? res ?? []
-      } catch {
-        resourceOptions.value = []
+        if (requestId === resourceRequestId) {
+          resourceOptions.value = res.data ?? res ?? []
+        }
+      } catch (error) {
+        if (requestId === resourceRequestId) {
+          resourceOptions.value = []
+          resourceSearchError.value = error.message || 'Content search failed. Try again.'
+        }
       } finally {
-        resourceSearchLoading.value = false
+        if (requestId === resourceRequestId) {
+          resourceSearchLoading.value = false
+        }
       }
     }
 
@@ -128,15 +150,32 @@ export function useContentProtectionWizard({
 
   async function searchResources(query) {
     const type = wizardForm.resource_type === 'comment' ? 'post' : wizardForm.resource_type
-    if (!query || !type) return
-    resourceSearchLoading.value = true
-    try {
-      const res = await contentApi.searchResources({ type, query })
-      resourceOptions.value = res.data ?? res ?? []
-    } catch {
+    const normalizedQuery = String(query || '').trim()
+    if (!normalizedQuery || !type) {
+      resourceRequestId += 1
       resourceOptions.value = []
-    } finally {
+      resourceSearchError.value = ''
       resourceSearchLoading.value = false
+      return
+    }
+
+    const requestId = ++resourceRequestId
+    resourceSearchLoading.value = true
+    resourceSearchError.value = ''
+    try {
+      const res = await contentApi.searchResources({ type, query: normalizedQuery })
+      if (requestId === resourceRequestId) {
+        resourceOptions.value = res.data ?? res ?? []
+      }
+    } catch (error) {
+      if (requestId === resourceRequestId) {
+        resourceOptions.value = []
+        resourceSearchError.value = error.message || 'Content search failed. Try again.'
+      }
+    } finally {
+      if (requestId === resourceRequestId) {
+        resourceSearchLoading.value = false
+      }
     }
   }
 
@@ -151,20 +190,11 @@ export function useContentProtectionWizard({
     return opt ? (opt.label || opt.title) : wizardForm.resource_id || '(not set)'
   })
 
-  const canAdvanceWizard = computed(() => {
-    switch (wizardStep.value) {
-      case 0:
-        return !!wizardForm.categoryKey
-      case 1:
-        return !!wizardForm.resource_type && !!wizardForm.resource_id
-      case 2:
-        return wizardForm.plan_ids.length > 0
-      default:
-        return true
-    }
-  })
+  const canAdvanceWizard = computed(() => canAdvanceProtectionStep(wizardStep.value, wizardForm))
 
   async function submitProtect() {
+    if (protectLoading.value) return
+
     protectLoading.value = true
     try {
       await contentApi.protect({
@@ -191,6 +221,7 @@ export function useContentProtectionWizard({
     wizardStep,
     protectLoading,
     resourceSearchLoading,
+    resourceSearchError,
     resourceOptions,
     wizardForm,
     wizardCategoryTypes,

@@ -107,7 +107,8 @@ final class ReportServicesTest extends PluginTestCase
         self::assertSame('Gold Plan', $planDistribution[0]['plan_title']);
         self::assertSame(16.67, $churnRate);
         self::assertSame(20.0, $churnOverTime[0]['churn_rate']);
-        self::assertSame('2026-02', $cohort[0]['cohort']);
+        $expectedFirstCohort = gmdate('Y-m', strtotime('-1 month'));
+        self::assertSame($expectedFirstCohort, $cohort[0]['cohort']);
         self::assertSame(2, $cohort[0]['size']);
         self::assertSame(100.0, $cohort[0]['retention'][0]);
 

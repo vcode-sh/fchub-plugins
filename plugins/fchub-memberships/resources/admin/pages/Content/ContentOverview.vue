@@ -77,6 +77,7 @@
       :category-cards="wizardCategoryCards"
       :category-types="wizardCategoryTypes"
       :resource-loading="resourceSearchLoading"
+      :resource-error="resourceSearchError"
       :resource-options="resourceOptions"
       :plan-options-loading="planOptionsLoading"
       :plan-options="planOptions"
@@ -88,6 +89,7 @@
       @close="wizardVisible = false; resetWizard()"
       @back="wizardStep--"
       @next="wizardStep++"
+      @select-step="wizardStep = $event"
       @submit="submitProtect"
       @select-category="selectWizardCategory"
       @type-change="onWizardTypeChange"
@@ -500,6 +502,7 @@ const {
   wizardStep,
   protectLoading,
   resourceSearchLoading,
+  resourceSearchError,
   resourceOptions,
   wizardForm,
   wizardCategoryTypes,
@@ -786,118 +789,6 @@ onMounted(async () => {
   font-size: 13px;
   color: var(--fchub-text-secondary);
   margin: 0 0 16px 0;
-}
-
-/* Wizard Dialog */
-.wizard-steps {
-  margin-bottom: 24px;
-}
-
-.wizard-body {
-  min-height: 200px;
-}
-
-.wizard-instruction {
-  font-size: 14px;
-  color: var(--fchub-text-secondary);
-  margin: 0 0 16px 0;
-}
-
-.wizard-category-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 10px;
-}
-
-.wizard-category-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 8px;
-  border: 2px solid var(--fchub-border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
-  color: var(--fchub-text-secondary);
-}
-
-.wizard-category-card:hover {
-  border-color: var(--el-color-primary-light-5);
-  color: var(--el-color-primary);
-}
-
-.wizard-category-card.selected {
-  border-color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-}
-
-.wizard-category-label {
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-}
-
-.wizard-form-item {
-  margin-bottom: 16px;
-}
-
-.wizard-step-content .field-hint {
-  font-size: 12px;
-  color: var(--fchub-text-secondary);
-  margin-top: 4px;
-}
-
-.wizard-footer {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.wizard-footer-right {
-  display: flex;
-  gap: 8px;
-}
-
-/* Review Summary */
-.review-summary {
-  border: 1px solid var(--fchub-border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.review-row {
-  display: flex;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--fchub-border-color);
-}
-
-.review-row:last-child {
-  border-bottom: none;
-}
-
-.review-label {
-  width: 100px;
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--fchub-text-secondary);
-}
-
-.review-value {
-  flex: 1;
-  font-size: 13px;
-  color: var(--fchub-text-primary);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-}
-
-.review-message {
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 /* Edit Drawer */

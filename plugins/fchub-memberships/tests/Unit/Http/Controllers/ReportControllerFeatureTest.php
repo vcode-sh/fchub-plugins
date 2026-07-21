@@ -132,7 +132,8 @@ final class ReportControllerFeatureTest extends PluginTestCase
         self::assertSame(5, $members[0]['count']);
         self::assertSame('Gold Plan', $plans[0]['plan_title']);
         self::assertSame(16.67, $churn['current_rate']);
-        self::assertSame('2026-02', $retention[0]['cohort']);
+        $expectedFirstCohort = gmdate('Y-m', strtotime('-1 month'));
+        self::assertSame($expectedFirstCohort, $retention[0]['cohort']);
         self::assertSame(45.0, $revenue['per_plan'][0]['revenue']);
         self::assertSame(12.0, $revenue['mrr']);
         self::assertSame(5.0, $revenue['arpm']);

@@ -1221,3 +1221,11 @@ if (!function_exists('get_user_locale')) {
         return 'en_US';
     }
 }
+
+if (!function_exists('dbDelta')) {
+    function dbDelta(string $queries = ''): array
+    {
+        $GLOBALS['_fchub_test_dbdelta'][] = $queries;
+        return [];
+    }
+}

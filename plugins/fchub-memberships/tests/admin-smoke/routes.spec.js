@@ -3,8 +3,8 @@ import { test, expect } from '@playwright/test'
 const routes = [
   ['/', 'Dashboard'],
   ['/plans', 'Plans'],
-  ['/plans/new', 'Create Plan'],
-  ['/plans/5/edit', 'Edit Plan'],
+  ['/plans/new', 'Create membership plan'],
+  ['/plans/5/edit', 'Edit membership plan'],
   ['/members', 'Alice Example'],
   ['/members/21', 'Alice Example'],
   ['/import', 'Import Members'],
