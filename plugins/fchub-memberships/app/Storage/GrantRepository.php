@@ -365,6 +365,29 @@ class GrantRepository
     }
 
     /**
+     * Count active grants that expire after now and no later than the requested window.
+     */
+    public function countExpiringSoon(int $days = 7): int
+    {
+        global $wpdb;
+
+        $now = current_time('mysql');
+        $future = gmdate('Y-m-d H:i:s', strtotime($now . " +{$days} days"));
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->table}
+             WHERE status = 'active'
+               AND (starts_at IS NULL OR starts_at <= %s)
+               AND expires_at IS NOT NULL
+               AND expires_at > %s
+               AND expires_at <= %s",
+            $now,
+            $now,
+            $future
+        ));
+    }
+
+    /**
      * Get recently created or modified grants.
      */
     public function getRecentActivity(int $limit = 20): array
@@ -447,39 +470,8 @@ class GrantRepository
     {
         global $wpdb;
         $now = current_time('mysql');
-
-        $where = ['1=1'];
-        $params = [];
-
-        if (!empty($filters['status'])) {
-            if ($filters['status'] === 'active') {
-                $where[] = "g.status = 'active' AND (g.starts_at IS NULL OR g.starts_at <= %s) AND (g.expires_at IS NULL OR g.expires_at > %s)";
-                $params[] = $now;
-                $params[] = $now;
-            } elseif ($filters['status'] === 'paused') {
-                $where[] = "g.status = 'paused'";
-            } else {
-                $where[] = 'g.status = %s';
-                $params[] = $filters['status'];
-            }
-        }
-
-        if (!empty($filters['plan_id'])) {
-            $where[] = 'g.plan_id = %d';
-            $params[] = (int) $filters['plan_id'];
-        }
-
-        if (!empty($filters['search'])) {
-            $where[] = '(u.user_email LIKE %s OR u.display_name LIKE %s)';
-            $like = '%' . $wpdb->esc_like($filters['search']) . '%';
-            $params[] = $like;
-            $params[] = $like;
-        }
-
-        if (!empty($filters['source_type'])) {
-            $where[] = 'g.source_type = %s';
-            $params[] = $filters['source_type'];
-        }
+        [$where, $params] = $this->buildAdminMemberWhere($filters, $now);
+        $plansTable = $wpdb->prefix . 'fchub_membership_plans';
 
         $perPage = (int) ($filters['per_page'] ?? 20);
         $page = max(1, (int) ($filters['page'] ?? 1));
@@ -491,6 +483,7 @@ class GrantRepository
                     g.plan_id,
                     g.source_type,
                     MAX(g.source_id) AS source_id,
+                    MAX(g.feed_id) AS feed_id,
                     MIN(g.status) AS status,
                     MIN(g.created_at) AS created_at,
                     MAX(g.updated_at) AS updated_at,
@@ -498,9 +491,11 @@ class GrantRepository
                     MIN(g.starts_at) AS starts_at,
                     COUNT(*) AS grant_count,
                     u.user_email,
-                    u.display_name
+                    u.display_name,
+                    COALESCE(MAX(p.title), '') AS plan_title
                 FROM {$this->table} g
                 LEFT JOIN {$wpdb->users} u ON g.user_id = u.ID
+                LEFT JOIN {$plansTable} p ON g.plan_id = p.id
                 WHERE " . implode(' AND ', $where) . "
                 GROUP BY g.user_id, g.plan_id
                 ORDER BY MIN(g.created_at) DESC";
@@ -515,6 +510,7 @@ class GrantRepository
 
         return array_map(function ($row) {
             $row['grant_count'] = (int) ($row['grant_count'] ?? 1);
+            $row['plan_title'] = (string) ($row['plan_title'] ?? '');
             return $this->hydrate($row);
         }, $rows ?: []);
     }
@@ -523,6 +519,70 @@ class GrantRepository
     {
         global $wpdb;
         $now = current_time('mysql');
+        [$where, $params] = $this->buildAdminMemberWhere($filters, $now);
+
+        $sql = "SELECT COUNT(*) FROM (
+                    SELECT g.user_id, g.plan_id
+                    FROM {$this->table} g
+                    LEFT JOIN {$wpdb->users} u ON g.user_id = u.ID
+                    WHERE " . implode(' AND ', $where) . "
+                    GROUP BY g.user_id, g.plan_id
+                ) AS grouped";
+
+        if ($params) {
+            $sql = $wpdb->prepare($sql, ...$params);
+        }
+
+        return (int) $wpdb->get_var($sql);
+    }
+
+    /**
+     * Return unfiltered access-assignment health totals for the admin list.
+     *
+     * @return array{active:int, expiring_soon:int, paused:int, ended:int}
+     */
+    public function getAdminSummary(int $expiringDays = 7): array
+    {
+        global $wpdb;
+        $now = current_time('mysql');
+        $future = gmdate('Y-m-d H:i:s', strtotime($now . " +{$expiringDays} days"));
+
+        $sql = "SELECT
+                    SUM(CASE WHEN access_status = 'active' THEN 1 ELSE 0 END) AS active,
+                    SUM(CASE WHEN access_status = 'active' AND expires_at IS NOT NULL AND expires_at > %s AND expires_at <= %s THEN 1 ELSE 0 END) AS expiring_soon,
+                    SUM(CASE WHEN access_status = 'paused' THEN 1 ELSE 0 END) AS paused,
+                    SUM(CASE WHEN access_status IN ('expired', 'revoked') THEN 1 ELSE 0 END) AS ended
+                FROM (
+                    SELECT
+                        g.user_id,
+                        g.plan_id,
+                        CASE
+                            WHEN SUM(CASE WHEN g.status = 'active' AND (g.starts_at IS NULL OR g.starts_at <= %s) AND (g.expires_at IS NULL OR g.expires_at > %s) THEN 1 ELSE 0 END) > 0 THEN 'active'
+                            WHEN SUM(CASE WHEN g.status = 'paused' THEN 1 ELSE 0 END) > 0 THEN 'paused'
+                            WHEN SUM(CASE WHEN g.status = 'revoked' THEN 1 ELSE 0 END) > 0 THEN 'revoked'
+                            ELSE 'expired'
+                        END AS access_status,
+                        MAX(g.expires_at) AS expires_at
+                    FROM {$this->table} g
+                    GROUP BY g.user_id, g.plan_id
+                ) access_rows";
+
+        $row = $wpdb->get_row($wpdb->prepare($sql, $now, $future, $now, $now), ARRAY_A) ?: [];
+
+        return [
+            'active' => (int) ($row['active'] ?? 0),
+            'expiring_soon' => (int) ($row['expiring_soon'] ?? 0),
+            'paused' => (int) ($row['paused'] ?? 0),
+            'ended' => (int) ($row['ended'] ?? 0),
+        ];
+    }
+
+    /**
+     * @return array{0:array<int,string>,1:array<int,mixed>}
+     */
+    private function buildAdminMemberWhere(array $filters, string $now): array
+    {
+        global $wpdb;
 
         $where = ['1=1'];
         $params = [];
@@ -546,25 +606,35 @@ class GrantRepository
         }
 
         if (!empty($filters['search'])) {
-            $where[] = '(u.user_email LIKE %s OR u.display_name LIKE %s)';
-            $like = '%' . $wpdb->esc_like($filters['search']) . '%';
-            $params[] = $like;
-            $params[] = $like;
+            $search = (string) $filters['search'];
+            $like = '%' . $wpdb->esc_like($search) . '%';
+            if (ctype_digit($search)) {
+                $where[] = '(u.user_email LIKE %s OR u.display_name LIKE %s OR u.ID = %d)';
+                $params[] = $like;
+                $params[] = $like;
+                $params[] = (int) $search;
+            } else {
+                $where[] = '(u.user_email LIKE %s OR u.display_name LIKE %s)';
+                $params[] = $like;
+                $params[] = $like;
+            }
         }
 
-        $sql = "SELECT COUNT(*) FROM (
-                    SELECT g.user_id, g.plan_id
-                    FROM {$this->table} g
-                    LEFT JOIN {$wpdb->users} u ON g.user_id = u.ID
-                    WHERE " . implode(' AND ', $where) . "
-                    GROUP BY g.user_id, g.plan_id
-                ) AS grouped";
-
-        if ($params) {
-            $sql = $wpdb->prepare($sql, ...$params);
+        if (!empty($filters['source_type'])) {
+            $where[] = 'g.source_type = %s';
+            $params[] = $filters['source_type'];
         }
 
-        return (int) $wpdb->get_var($sql);
+        if (!empty($filters['expires_within'])) {
+            $days = (int) $filters['expires_within'];
+            $future = gmdate('Y-m-d H:i:s', strtotime($now . " +{$days} days"));
+            $where[] = "g.status = 'active' AND (g.starts_at IS NULL OR g.starts_at <= %s) AND g.expires_at IS NOT NULL AND g.expires_at > %s AND g.expires_at <= %s";
+            $params[] = $now;
+            $params[] = $now;
+            $params[] = $future;
+        }
+
+        return [$where, $params];
     }
 
     /**

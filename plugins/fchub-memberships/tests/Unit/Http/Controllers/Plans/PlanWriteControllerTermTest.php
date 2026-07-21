@@ -95,6 +95,22 @@ class PlanWriteControllerTermTest extends PluginTestCase
         return new \WP_REST_Request('POST', '/fchub-memberships/v1/plans', $params);
     }
 
+    public function test_destroy_returns_conflict_when_plan_has_access_history(): void
+    {
+        $GLOBALS['wpdb'] = new class extends \wpdb {
+            public function get_var(string $query): string|int|float|null
+            {
+                return str_contains($query, 'fchub_membership_grants') ? 2 : 0;
+            }
+        };
+
+        $request = new \WP_REST_Request('DELETE', '/fchub-memberships/v1/admin/plans/5', ['id' => 5]);
+        $response = PlanWriteController::destroy($request);
+
+        self::assertSame(409, $response->get_status());
+        self::assertStringContainsString('Archive', $response->get_data()['message']);
+    }
+
     // ===============================================================
     // store() — membership_term validation
     // ===============================================================

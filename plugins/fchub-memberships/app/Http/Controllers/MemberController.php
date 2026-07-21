@@ -119,20 +119,16 @@ class MemberController
         $members = $repo->getMembers($filters);
         $total = $repo->countMembers($filters);
 
-        // Enrich with plan info
-        $planRepo = new \FChubMemberships\Storage\PlanRepository();
         foreach ($members as &$member) {
-            if ($member['plan_id']) {
-                $plan = $planRepo->find($member['plan_id']);
-                $member['plan_title'] = $plan ? $plan['title'] : '';
-            } else {
+            if (!$member['plan_id']) {
                 $member['plan_title'] = __('Direct Grant', 'fchub-memberships');
             }
         }
 
         return new \WP_REST_Response([
-            'data'  => $members,
-            'total' => $total,
+            'data'    => $members,
+            'total'   => $total,
+            'summary' => $repo->getAdminSummary(),
         ]);
     }
 

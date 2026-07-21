@@ -52,4 +52,17 @@ final class AdminRequestFiltersTest extends PluginTestCase
         self::assertSame('7', $filters['plan_id']);
         self::assertNull($filters['search']);
     }
+
+    public function test_member_list_only_accepts_supported_expiry_windows(): void
+    {
+        $supported = AdminRequestFilters::memberList(new \WP_REST_Request('GET', '/', [
+            'expires_within' => '7',
+        ]));
+        $unsupported = AdminRequestFilters::memberList(new \WP_REST_Request('GET', '/', [
+            'expires_within' => '365',
+        ]));
+
+        self::assertSame(7, $supported['expires_within']);
+        self::assertNull($unsupported['expires_within']);
+    }
 }

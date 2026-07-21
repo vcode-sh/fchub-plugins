@@ -102,6 +102,7 @@ final class FluentCartRuntimeModule implements ModuleInterface
         \FChubMemberships\Http\Controllers\MemberController::registerRoutes();
         \FChubMemberships\Http\Controllers\ContentController::registerRoutes();
         \FChubMemberships\Http\Controllers\DripController::registerRoutes();
+        \FChubMemberships\Http\Controllers\DashboardController::registerRoutes();
         \FChubMemberships\Http\Controllers\ReportController::registerRoutes();
         \FChubMemberships\Http\Controllers\SettingsController::registerRoutes();
         \FChubMemberships\Http\DynamicOptionsController::registerRoutes();

@@ -127,7 +127,11 @@ window.fetch = async (input, init = {}) => {
     return { ok: true, status: 201, json: async () => ({ data: { id: 6, ...JSON.parse(init.body || '{}') } }) }
   }
   if (url.includes('/admin/plans')) {
-    return { ok: true, status: 200, json: async () => ({ data: [{ id: 5, title: 'Gold Plan', slug: 'gold-plan', status: 'active', duration_type: 'lifetime', members_count: 1, rules_count: 0, created_at: '2026-03-01 10:00:00' }], total: 1 }) }
+    return { ok: true, status: 200, json: async () => ({
+      data: [{ id: 5, title: 'Gold Plan', slug: 'gold-plan', status: 'active', duration_type: 'lifetime', members_count: 1, rules_count: 0, drip_count: 0, history_count: 1, created_at: '2026-03-01 10:00:00' }],
+      total: 1,
+      summary: { total: 1, active: 1, needs_content: 1, scheduled: 0 },
+    }) }
   }
   if (url.includes('/admin/members/21/activity')) {
     return { ok: true, status: 200, json: async () => ({ data: [{ type: 'grant_created', date: '2026-03-01 10:00:00', description: 'Access granted', metadata: { plan_title: 'Gold Plan' } }], total: 1 }) }
@@ -172,7 +176,11 @@ window.fetch = async (input, init = {}) => {
     return { ok: true, status: 200, json: async () => ({ data: matches, total: matches.length }) }
   }
   if (url.includes('/admin/members')) {
-    return { ok: true, status: 200, json: async () => ({ data: [{ user_id: 21, display_name: 'Alice Example', user_email: 'alice@example.com', plan_id: 5, plan_title: 'Gold Plan', status: 'active', created_at: '2026-03-01 10:00:00', expires_at: null, source_type: 'manual' }], total: 1 }) }
+    return { ok: true, status: 200, json: async () => ({
+      data: [{ user_id: 21, display_name: 'Alice Example', user_email: 'alice@example.com', plan_id: 5, plan_title: 'Gold Plan', status: 'active', created_at: '2026-03-01 10:00:00', expires_at: null, source_type: 'manual' }],
+      total: 1,
+      summary: { active: 1, expiring_soon: 0, paused: 0, ended: 0 },
+    }) }
   }
   if (url.includes('/admin/content/resource-types')) {
     return {

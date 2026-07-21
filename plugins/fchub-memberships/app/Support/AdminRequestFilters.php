@@ -31,13 +31,19 @@ final class AdminRequestFilters
             $planId = self::stringOrNull($request->get_param('plan'));
         }
 
+        $expiresWithin = (int) $request->get_param('expires_within');
+        if (!in_array($expiresWithin, [1, 7, 30], true)) {
+            $expiresWithin = null;
+        }
+
         return [
-            'status'      => self::stringOrNull($request->get_param('status')),
-            'plan_id'     => $planId,
-            'search'      => self::stringOrNull($request->get_param('search')),
-            'source_type' => self::stringOrNull($request->get_param('source_type')),
-            'per_page'    => $request->get_param('per_page') ?: 20,
-            'page'        => $request->get_param('page') ?: 1,
+            'status'         => self::stringOrNull($request->get_param('status')),
+            'plan_id'        => $planId,
+            'search'         => self::stringOrNull($request->get_param('search')),
+            'source_type'    => self::stringOrNull($request->get_param('source_type')),
+            'expires_within' => $expiresWithin,
+            'per_page'       => $request->get_param('per_page') ?: 20,
+            'page'           => $request->get_param('page') ?: 1,
         ];
     }
 

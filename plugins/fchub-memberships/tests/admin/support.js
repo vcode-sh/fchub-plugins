@@ -93,9 +93,12 @@ function apiPayload(url) {
         duration_type: 'lifetime',
         members_count: 1,
         rules_count: 0,
+        drip_count: 0,
+        history_count: 1,
         created_at: '2026-03-01 10:00:00',
       }],
       total: 1,
+      summary: { total: 1, active: 1, needs_content: 1, scheduled: 0 },
     }
   }
   if (url.includes('/admin/members/21/activity')) {
@@ -136,6 +139,7 @@ function apiPayload(url) {
         source_type: 'manual',
       }],
       total: 1,
+      summary: { active: 1, expiring_soon: 0, paused: 0, ended: 0 },
     }
   }
   if (url.includes('/admin/content/resource-types')) {

@@ -3,17 +3,27 @@
     <WorkspacePageHeader
       eyebrow="People and access"
       title="Members"
-      description="Find members, review their access, and handle manual changes without losing context."
+      description="Find an access assignment, open the member profile, and make changes without losing context."
     >
       <template #actions>
-        <el-button @click="$emit('export')" :loading="exporting">
-          <el-icon><Download /></el-icon>
-          Export CSV
-        </el-button>
-        <el-button @click="$emit('import')">
-          <el-icon><Upload /></el-icon>
-          Import Members
-        </el-button>
+        <el-dropdown @command="$emit('utility', $event)">
+          <el-button aria-label="Member utilities">
+            More
+            <el-icon><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="import">
+                <el-icon><Upload /></el-icon>
+                Import members
+              </el-dropdown-item>
+              <el-dropdown-item command="export" :disabled="exporting">
+                <el-icon><Download /></el-icon>
+                Export current view
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button type="primary" @click="$emit('grant')">
           <el-icon><Plus /></el-icon>
           Grant Access
@@ -21,100 +31,114 @@
       </template>
     </WorkspacePageHeader>
 
-    <div class="search-bar">
+    <div class="member-filters" role="search" aria-label="Filter member access">
       <el-input
         :model-value="filters.search"
-        placeholder="Search"
+        aria-label="Search members"
+        placeholder="Search name, email or user ID"
         clearable
         :prefix-icon="Search"
-        class="search-input"
+        class="member-filters__search"
         @update:model-value="$emit('update:search', $event)"
         @input="$emit('search-input')"
       />
-      <div class="filter-controls">
-        <el-select
-          :model-value="filters.plan_id"
-          placeholder="All Plans"
-          clearable
-          @update:model-value="$emit('update:planId', $event)"
-          @change="$emit('filter-change')"
-        >
-          <el-option
-            v-for="plan in planOptions"
-            :key="plan.id"
-            :label="plan.title"
-            :value="plan.id"
-          />
-        </el-select>
-        <el-select
-          :model-value="filters.status"
-          placeholder="All Statuses"
-          clearable
-          @update:model-value="$emit('update:status', $event)"
-          @change="$emit('filter-change')"
-        >
-          <el-option label="Active" value="active" />
-          <el-option label="Paused" value="paused" />
-          <el-option label="Expired" value="expired" />
-          <el-option label="Revoked" value="revoked" />
-        </el-select>
-      </div>
+      <el-select
+        :model-value="filters.plan_id"
+        aria-label="Membership plan"
+        placeholder="All plans"
+        clearable
+        @update:model-value="$emit('update:planId', $event)"
+        @change="$emit('filter-change')"
+      >
+        <el-option v-for="plan in planOptions" :key="plan.id" :label="plan.title" :value="plan.id" />
+      </el-select>
+      <el-select
+        :model-value="filters.status"
+        aria-label="Access status"
+        placeholder="All statuses"
+        clearable
+        @update:model-value="$emit('update:status', $event)"
+        @change="$emit('filter-change')"
+      >
+        <el-option label="Active" value="active" />
+        <el-option label="Paused" value="paused" />
+        <el-option label="Expired" value="expired" />
+        <el-option label="Revoked" value="revoked" />
+      </el-select>
+      <el-select
+        :model-value="filters.expires_within"
+        aria-label="Expiry window"
+        placeholder="Any expiry"
+        clearable
+        @update:model-value="$emit('update:expiresWithin', $event)"
+        @change="$emit('filter-change')"
+      >
+        <el-option label="Expires today" :value="1" />
+        <el-option label="Next 7 days" :value="7" />
+        <el-option label="Next 30 days" :value="30" />
+      </el-select>
+      <el-button v-if="hasFilters" text class="member-filters__clear" @click="$emit('clear-filters')">
+        Clear filters
+      </el-button>
     </div>
-    <div class="search-hint">Search by name, email or user ID</div>
+    <p class="member-filters__hint">Each row is one member-plan access assignment.</p>
   </div>
 </template>
 
 <script setup>
-import { Download, Plus, Search, Upload } from '@element-plus/icons-vue'
+import { ArrowDown, Download, Plus, Search, Upload } from '@element-plus/icons-vue'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
 defineProps({
-  exporting: {
-    type: Boolean,
-    default: false,
-  },
-  filters: {
-    type: Object,
-    required: true,
-  },
-  planOptions: {
-    type: Array,
-    default: () => [],
-  },
+  exporting: { type: Boolean, default: false },
+  filters: { type: Object, required: true },
+  planOptions: { type: Array, default: () => [] },
+  hasFilters: { type: Boolean, default: false },
 })
 
-defineEmits(['export', 'import', 'grant', 'update:search', 'update:planId', 'update:status', 'search-input', 'filter-change'])
+defineEmits([
+  'utility',
+  'grant',
+  'update:search',
+  'update:planId',
+  'update:status',
+  'update:expiresWithin',
+  'search-input',
+  'filter-change',
+  'clear-filters',
+])
 </script>
 
 <style scoped>
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.search-input {
-  flex: 1;
-}
-
-.filter-controls {
-  display: flex;
+.member-filters {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) repeat(3, minmax(135px, 170px)) auto;
   gap: 8px;
+  align-items: center;
 }
 
-.filter-controls .el-select {
-  width: 150px;
-}
+.member-filters__search { min-width: 0; }
+.member-filters__clear { justify-self: end; }
 
-.search-hint {
-  font-size: 12px;
+.member-filters__hint {
+  margin: 7px 0 14px;
   color: var(--fchub-text-secondary);
-  margin-top: 6px;
-  margin-bottom: 16px;
+  font-size: 11px;
+}
+
+@media (max-width: 1050px) {
+  .member-filters { grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(135px, 1fr)); }
+  .member-filters__search { grid-column: 1 / -1; }
+  .member-filters__clear { justify-self: start; }
 }
 
 @media (max-width: 782px) {
-  .search-bar, .filter-controls { align-items: stretch; flex-direction: column; }
-  .filter-controls .el-select { width: 100%; }
+  .member-filters { grid-template-columns: 1fr 1fr; }
+  .member-filters__search { grid-column: 1 / -1; }
+}
+
+@media (max-width: 480px) {
+  .member-filters { grid-template-columns: 1fr; }
+  .member-filters__search { grid-column: auto; }
 }
 </style>

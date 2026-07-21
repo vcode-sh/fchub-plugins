@@ -1,5 +1,5 @@
 <template>
-  <div v-if="selectedCount > 0" class="bulk-actions">
+  <div v-if="selectedCount > 0" class="bulk-actions" role="region" aria-label="Selected access actions">
     <span class="bulk-count">{{ selectedCount }} selected</span>
     <el-dropdown @command="$emit('command', $event)">
       <el-button size="small">
@@ -38,11 +38,20 @@ defineEmits(['command', 'clear'])
   gap: 12px;
   padding: 8px 0;
   margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--el-color-primary) 24%, var(--fchub-border-color));
+  border-radius: var(--fchub-radius-card);
+  background: color-mix(in srgb, var(--el-color-primary) 6%, var(--fchub-card-bg));
 }
 
 .bulk-count {
   font-size: 13px;
   color: var(--el-color-primary);
   font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .bulk-actions { flex-wrap: wrap; }
+  .bulk-count { flex: 1 0 100%; }
 }
 </style>

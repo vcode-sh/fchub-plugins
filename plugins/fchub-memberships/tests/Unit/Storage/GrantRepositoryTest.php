@@ -150,6 +150,25 @@ final class GrantRepositoryTest extends PluginTestCase
         self::assertStringContainsString("g.status = 'paused'", $queryDump);
     }
 
+    public function test_count_expiring_soon_counts_only_currently_active_grants_within_the_inclusive_window(): void
+    {
+        $query = '';
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_var'] = static function (string $sql) use (&$query): int {
+            $query = $sql;
+            return 4;
+        };
+
+        $count = (new GrantRepository())->countExpiringSoon(7);
+
+        self::assertSame(4, $count);
+        self::assertStringContainsString('SELECT COUNT(*)', $query);
+        self::assertStringNotContainsString('SELECT *', $query);
+        self::assertStringContainsString("status = 'active'", $query);
+        self::assertStringContainsString("(starts_at IS NULL OR starts_at <= '2026-03-13 22:00:00')", $query);
+        self::assertStringContainsString("expires_at > '2026-03-13 22:00:00'", $query);
+        self::assertStringContainsString("expires_at <= '2026-03-20 22:00:00'", $query);
+    }
+
     public function test_source_term_and_summary_helpers_cover_remaining_repository_branches(): void
     {
         $GLOBALS['_fchub_test_wpdb_overrides']['get_var'] = static function (string $query): int|string {

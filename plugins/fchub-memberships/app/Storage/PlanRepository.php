@@ -79,6 +79,65 @@ class PlanRepository
         return array_map([$this, 'hydrate'], $rows ?: []);
     }
 
+    /**
+     * Return the paginated admin list with operational counts in one query.
+     */
+    public function allForAdmin(array $filters = []): array
+    {
+        global $wpdb;
+
+        $grantsTable = $wpdb->prefix . 'fchub_membership_grants';
+        $rulesTable = $wpdb->prefix . 'fchub_membership_plan_rules';
+        $now = current_time('mysql');
+        $where = ['1=1'];
+        $params = [$now, $now];
+
+        if (!empty($filters['status'])) {
+            $where[] = 'p.status = %s';
+            $params[] = $filters['status'];
+        }
+
+        if (!empty($filters['search'])) {
+            $where[] = '(p.title LIKE %s OR p.slug LIKE %s)';
+            $like = '%' . $wpdb->esc_like($filters['search']) . '%';
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        $orderBy = $filters['order_by'] ?? 'level';
+        $order = ($filters['order'] ?? 'ASC') === 'DESC' ? 'DESC' : 'ASC';
+        $allowedOrderBy = ['id', 'title', 'level', 'status', 'created_at'];
+        if (!in_array($orderBy, $allowedOrderBy, true)) {
+            $orderBy = 'level';
+        }
+
+        $sql = "SELECT p.*,
+                    (SELECT COUNT(DISTINCT g.user_id)
+                     FROM {$grantsTable} g
+                     WHERE g.plan_id = p.id
+                       AND g.status = 'active'
+                       AND (g.starts_at IS NULL OR g.starts_at <= %s)
+                       AND (g.expires_at IS NULL OR g.expires_at > %s)) AS members_count,
+                    (SELECT COUNT(*) FROM {$rulesTable} r WHERE r.plan_id = p.id) AS rules_count,
+                    (SELECT COUNT(*) FROM {$rulesTable} r WHERE r.plan_id = p.id AND r.drip_type != 'immediate') AS drip_count,
+                    (SELECT COUNT(*) FROM {$grantsTable} gh WHERE gh.plan_id = p.id) AS history_count
+                FROM {$this->table} p
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY p.{$orderBy} {$order}";
+
+        if (!empty($filters['per_page'])) {
+            $page = max(1, (int) ($filters['page'] ?? 1));
+            $perPage = (int) $filters['per_page'];
+            $offset = ($page - 1) * $perPage;
+            $sql .= ' LIMIT %d OFFSET %d';
+            $params[] = $perPage;
+            $params[] = $offset;
+        }
+
+        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
+        return array_map([$this, 'hydrate'], $rows ?: []);
+    }
+
     public function count(array $filters = []): int
     {
         global $wpdb;
@@ -92,8 +151,10 @@ class PlanRepository
         }
 
         if (!empty($filters['search'])) {
-            $where[] = 'title LIKE %s';
-            $params[] = '%' . $wpdb->esc_like($filters['search']) . '%';
+            $where[] = '(title LIKE %s OR slug LIKE %s)';
+            $like = '%' . $wpdb->esc_like($filters['search']) . '%';
+            $params[] = $like;
+            $params[] = $like;
         }
 
         $sql = "SELECT COUNT(*) FROM {$this->table} WHERE " . implode(' AND ', $where);
@@ -198,6 +259,46 @@ class PlanRepository
         ));
     }
 
+    public function countGrantHistory(int $planId): int
+    {
+        global $wpdb;
+        $grantsTable = $wpdb->prefix . 'fchub_membership_grants';
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$grantsTable} WHERE plan_id = %d",
+            $planId
+        ));
+    }
+
+    /**
+     * Return unfiltered plan health totals for the admin operations strip.
+     *
+     * @return array{total:int, active:int, needs_content:int, scheduled:int}
+     */
+    public function getAdminSummary(): array
+    {
+        global $wpdb;
+        $rulesTable = $wpdb->prefix . 'fchub_membership_plan_rules';
+        $row = $wpdb->get_row(
+            "SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN p.status = 'active' THEN 1 ELSE 0 END) AS active,
+                SUM(CASE WHEN p.status = 'active' AND NOT EXISTS (
+                    SELECT 1 FROM {$rulesTable} r WHERE r.plan_id = p.id
+                ) THEN 1 ELSE 0 END) AS needs_content,
+                SUM(CASE WHEN p.scheduled_status IS NOT NULL AND p.scheduled_at IS NOT NULL THEN 1 ELSE 0 END) AS scheduled
+             FROM {$this->table} p",
+            ARRAY_A
+        ) ?: [];
+
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'active' => (int) ($row['active'] ?? 0),
+            'needs_content' => (int) ($row['needs_content'] ?? 0),
+            'scheduled' => (int) ($row['scheduled'] ?? 0),
+        ];
+    }
+
     public function slugExists(string $slug, ?int $excludeId = null): bool
     {
         global $wpdb;
@@ -272,6 +373,11 @@ class PlanRepository
         $row['meta'] = json_decode($row['meta'] ?? '{}', true) ?: [];
         $row['scheduled_status'] = $row['scheduled_status'] ?? null;
         $row['scheduled_at'] = $row['scheduled_at'] ?? null;
+        foreach (['members_count', 'rules_count', 'drip_count', 'history_count'] as $countField) {
+            if (array_key_exists($countField, $row)) {
+                $row[$countField] = (int) $row[$countField];
+            }
+        }
         return $row;
     }
 }

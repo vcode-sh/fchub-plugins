@@ -6,27 +6,34 @@
       description="Create, publish, and maintain the access packages your members receive."
     >
       <template #actions>
-        <el-button @click="handleBulkExport" :loading="bulkExporting">
-          <el-icon><Download /></el-icon>
-          Export All
-        </el-button>
-        <el-button @click="handleImportDialog">
-          <el-icon><Upload /></el-icon>
-          Import
-        </el-button>
-        <el-button type="primary" @click="$router.push('/plans/new')">
+        <el-dropdown @command="handleUtility">
+          <el-button aria-label="Plan utilities">
+            More
+            <el-icon><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="import"><el-icon><Upload /></el-icon>Import plans</el-dropdown-item>
+              <el-dropdown-item command="export" :disabled="bulkExporting"><el-icon><Download /></el-icon>Export all plans</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <router-link to="/plans/new" class="primary-action-link">
           <el-icon><Plus /></el-icon>
           Create Plan
-        </el-button>
+        </router-link>
       </template>
     </WorkspacePageHeader>
+
+    <OperationsSummary label="Plan health" :items="summaryItems" />
 
     <el-card shadow="never" class="list-card">
       <!-- Search & Filters -->
       <div class="search-bar">
         <el-input
           v-model="filters.search"
-          placeholder="Search plans..."
+          aria-label="Search plans"
+          placeholder="Search title or slug"
           clearable
           :prefix-icon="Search"
           class="search-input"
@@ -35,7 +42,8 @@
         <div class="filter-controls">
           <el-select
             v-model="filters.status"
-            placeholder="All Statuses"
+            aria-label="Plan status"
+            placeholder="All statuses"
             clearable
             @change="resetAndFetch"
           >
@@ -44,11 +52,21 @@
             <el-option label="Archived" value="archived" />
           </el-select>
         </div>
+        <el-button v-if="hasActiveFilters" text @click="clearFilters">Clear filters</el-button>
       </div>
-      <div class="search-hint">Search by plan title or slug</div>
+      <div class="search-hint">Use readiness to spot active plans that do not protect any content yet.</div>
 
-      <!-- Table -->
+      <ListStatePanel
+        v-if="errorMessage"
+        kind="error"
+        title="Plans could not be loaded"
+        :description="errorMessage"
+        action-label="Try again"
+        @action="fetchPlans"
+      />
+
       <el-table
+        v-else
         v-loading="loading"
         :data="plans_data"
         row-class-name="clickable-row"
@@ -91,14 +109,7 @@
 
         <el-table-column label="Duration" width="160">
           <template #default="{ row }">
-            <el-tag v-if="row.duration_type === 'lifetime'" size="small">Lifetime</el-tag>
-            <el-tag v-else-if="row.duration_type === 'fixed_days'" type="warning" size="small">
-              {{ row.duration_days }} days
-            </el-tag>
-            <el-tag v-else-if="row.duration_type === 'subscription_mirror'" type="info" size="small">
-              Subscription
-            </el-tag>
-            <el-tag v-else size="small">Lifetime</el-tag>
+            <span class="duration-label">{{ durationLabel(row) }}</span>
           </template>
         </el-table-column>
 
@@ -114,17 +125,20 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="Created" width="160">
+        <el-table-column label="Readiness" min-width="150">
           <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
+            <span class="readiness-state" :data-state="readinessState(row)">
+              {{ readinessLabel(row) }}
+            </span>
           </template>
         </el-table-column>
 
-        <el-table-column label="Actions" width="80" align="center" fixed="right">
+        <el-table-column label="Actions" width="105" align="right" fixed="right">
           <template #default="{ row }">
             <el-dropdown trigger="click" @command="(cmd) => handleAction(cmd, row)" @click.stop>
-              <el-button text size="small" @click.stop>
-                <el-icon><MoreFilled /></el-icon>
+              <el-button text size="small" :aria-label="`Plan actions for ${row.title}`" @click.stop>
+                Manage
+                <el-icon><ArrowDown /></el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -154,7 +168,7 @@
                     <el-icon><CircleCheck /></el-icon>
                     Activate
                   </el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>
+                  <el-dropdown-item v-if="Number(row.history_count || 0) === 0" command="delete" divided>
                     <el-icon><Delete /></el-icon>
                     <span style="color: var(--el-color-danger)">Delete</span>
                   </el-dropdown-item>
@@ -165,7 +179,7 @@
         </el-table-column>
       </el-table>
 
-      <div v-loading="loading" class="mobile-plan-list" aria-label="Plans">
+      <div v-if="!errorMessage" v-loading="loading" class="mobile-plan-list" aria-label="Plans">
         <article v-for="plan in plans_data" :key="plan.id" class="mobile-record-card">
           <div class="mobile-record-card__topline">
             <div>
@@ -177,12 +191,16 @@
           <dl class="mobile-record-card__facts">
             <div><dt>Members</dt><dd>{{ plan.members_count ?? 0 }}</dd></div>
             <div><dt>Rules</dt><dd>{{ plan.rules_count ?? 0 }}</dd></div>
-            <div><dt>Created</dt><dd>{{ formatDate(plan.created_at) }}</dd></div>
+            <div><dt>Duration</dt><dd>{{ durationLabel(plan) }}</dd></div>
+            <div><dt>Readiness</dt><dd>{{ readinessLabel(plan) }}</dd></div>
           </dl>
           <div class="mobile-record-card__footer">
             <router-link :to="`/plans/${plan.id}/edit`">Edit plan</router-link>
             <el-dropdown trigger="click" @command="(cmd) => handleAction(cmd, plan)">
-              <el-button text aria-label="Plan actions"><el-icon><MoreFilled /></el-icon></el-button>
+              <el-button text :aria-label="`Plan actions for ${plan.title}`">
+                Manage
+                <el-icon><ArrowDown /></el-icon>
+              </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="duplicate">Duplicate</el-dropdown-item>
@@ -190,7 +208,7 @@
                   <el-dropdown-item :command="plan.status === 'archived' ? 'activate' : 'archive'">
                     {{ plan.status === 'archived' ? 'Activate' : 'Archive' }}
                   </el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>Delete</el-dropdown-item>
+                  <el-dropdown-item v-if="Number(plan.history_count || 0) === 0" command="delete" divided>Delete</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -198,10 +216,25 @@
         </article>
       </div>
 
-      <el-empty v-if="!loading && plans_data.length === 0" description="No plans found" />
+      <ListStatePanel
+        v-if="!errorMessage && !loading && plans_data.length === 0 && hasActiveFilters"
+        kind="filtered"
+        title="No plans match these filters"
+        description="Clear the filters or search for a different title or slug."
+        action-label="Clear filters"
+        @action="clearFilters"
+      />
+      <ListStatePanel
+        v-else-if="!errorMessage && !loading && plans_data.length === 0"
+        kind="empty"
+        title="Create the first access plan"
+        description="Plans package content rules, duration, and member access into one manageable product."
+        action-label="Create plan"
+        @action="$router.push('/plans/new')"
+      />
 
       <!-- Pagination -->
-      <div class="pagination-bar" v-if="total > 0">
+      <div class="pagination-bar" v-if="!errorMessage && total > 0">
         <div class="pagination-info">
           <span>Page {{ filters.page }} of {{ totalPages }}</span>
           <el-select v-model="filters.per_page" size="small" class="per-page-select" @change="resetAndFetch">
@@ -283,16 +316,21 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Search, Upload, Download } from '@element-plus/icons-vue'
+import { ArrowDown, Search, Upload, Download, Plus } from '@element-plus/icons-vue'
 import { plans } from '@/api/index.js'
 import { formatWpDate } from '@/utils/wpDate.js'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
+import OperationsSummary from '@/components/workspace/OperationsSummary.vue'
+import ListStatePanel from '@/components/workspace/ListStatePanel.vue'
 
 const router = useRouter()
 
 const loading = ref(false)
 const plans_data = ref([])
 const total = ref(0)
+const errorMessage = ref('')
+const summary = reactive({ total: 0, active: 0, needs_content: 0, scheduled: 0 })
+let requestSequence = 0
 
 const filters = reactive({
   page: 1,
@@ -302,6 +340,13 @@ const filters = reactive({
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / filters.per_page)))
+const hasActiveFilters = computed(() => Boolean(filters.search || filters.status))
+const summaryItems = computed(() => [
+  { label: 'Total plans', value: summary.total, support: 'All plan records in this workspace' },
+  { label: 'Active plans', value: summary.active, support: 'Available for member access', tone: 'success' },
+  { label: 'Needs content', value: summary.needs_content, support: 'Active plans without protection rules', tone: 'warning' },
+  { label: 'Scheduled changes', value: summary.scheduled, support: 'Lifecycle updates waiting to run' },
+])
 
 const deleteDialogVisible = ref(false)
 const deleteLoading = ref(false)
@@ -343,8 +388,47 @@ function formatDate(dateStr) {
   return formatWpDate(dateStr)
 }
 
+function durationLabel(plan) {
+  if (plan.duration_type === 'fixed_days') return `${plan.duration_days || 0} days access`
+  if (plan.duration_type === 'subscription_mirror') return 'Subscription access'
+  if (plan.duration_type === 'fixed_anchor') return 'Calendar anchored'
+  return 'Lifetime access'
+}
+
+function readinessState(plan) {
+  if (plan.status === 'archived') return 'archived'
+  if (plan.scheduled_status && plan.scheduled_at) return 'scheduled'
+  if (plan.status === 'active' && Number(plan.rules_count || 0) === 0) return 'attention'
+  if (plan.status === 'active') return 'ready'
+  return 'inactive'
+}
+
+function readinessLabel(plan) {
+  const labels = {
+    archived: 'Archived',
+    scheduled: 'Change scheduled',
+    attention: 'Needs content',
+    ready: 'Ready to grant',
+    inactive: 'Not published',
+  }
+  return labels[readinessState(plan)]
+}
+
+function clearFilters() {
+  filters.search = ''
+  filters.status = ''
+  resetAndFetch()
+}
+
+function handleUtility(command) {
+  if (command === 'import') handleImportDialog()
+  if (command === 'export') handleBulkExport()
+}
+
 async function fetchPlans() {
+  const requestId = ++requestSequence
   loading.value = true
+  errorMessage.value = ''
   try {
     const params = {
       page: filters.page,
@@ -354,12 +438,22 @@ async function fetchPlans() {
     if (filters.status) params.status = filters.status
 
     const res = await plans.list(params)
+    if (requestId !== requestSequence) return
     plans_data.value = res.data ?? []
     total.value = res.total ?? 0
+    Object.assign(summary, {
+      total: Number(res.summary?.total) || 0,
+      active: Number(res.summary?.active) || 0,
+      needs_content: Number(res.summary?.needs_content) || 0,
+      scheduled: Number(res.summary?.scheduled) || 0,
+    })
   } catch (err) {
-    ElMessage.error(err.message || 'Failed to load plans')
+    if (requestId !== requestSequence) return
+    plans_data.value = []
+    total.value = 0
+    errorMessage.value = err.message || 'Plan data could not be loaded. Please try again.'
   } finally {
-    loading.value = false
+    if (requestId === requestSequence) loading.value = false
   }
 }
 
@@ -385,6 +479,10 @@ async function handleAction(command, row) {
       await updatePlanStatus(row, 'active')
       break
     case 'delete':
+      if (Number(row.history_count || 0) > 0) {
+        ElMessage.warning('Archive plans with access history instead of deleting them')
+        break
+      }
       planToDelete.value = row
       deleteDialogVisible.value = true
       break
@@ -550,6 +648,29 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.primary-action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 8px 15px;
+  border: 1px solid var(--el-color-primary);
+  border-radius: var(--el-border-radius-base);
+  color: #fff;
+  background: var(--el-color-primary);
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.primary-action-link:hover {
+  border-color: var(--el-color-primary-light-3);
+  color: #fff;
+  background: var(--el-color-primary-light-3);
+}
+
 .search-bar {
   display: flex;
   align-items: center;
@@ -595,6 +716,33 @@ onMounted(() => {
   vertical-align: middle;
 }
 
+.duration-label {
+  color: var(--fchub-text-primary);
+  font-size: 12px;
+}
+
+.readiness-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--fchub-text-secondary);
+  background: var(--fchub-page-bg);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.readiness-state[data-state='ready'] {
+  color: color-mix(in srgb, var(--el-color-success) 78%, var(--fchub-text-primary));
+  background: color-mix(in srgb, var(--el-color-success) 10%, var(--fchub-card-bg));
+}
+
+.readiness-state[data-state='attention'] {
+  color: color-mix(in srgb, var(--el-color-warning) 78%, var(--fchub-text-primary));
+  background: color-mix(in srgb, var(--el-color-warning) 12%, var(--fchub-card-bg));
+}
+
 .pagination-bar {
   display: flex;
   justify-content: space-between;
@@ -635,5 +783,7 @@ onMounted(() => {
   .mobile-plan-list { display: grid; gap: 12px; }
   .search-bar, .filter-controls { align-items: stretch; flex-direction: column; }
   .filter-controls .el-select { width: 100%; }
+  .pagination-bar { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .primary-action-link { flex: 1; }
 }
 </style>

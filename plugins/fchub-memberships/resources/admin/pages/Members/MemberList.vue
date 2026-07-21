@@ -4,17 +4,20 @@
       :exporting="exporting"
       :filters="filters"
       :plan-options="planOptions"
-      @export="handleExport"
-      @import="$router.push('/import')"
+      :has-filters="hasActiveFilters"
+      @utility="handleUtility"
       @grant="grantDialogVisible = true"
       @update:search="filters.search = $event"
       @update:plan-id="filters.plan_id = $event"
       @update:status="filters.status = $event"
+      @update:expires-within="filters.expires_within = $event"
       @search-input="debouncedFetch"
       @filter-change="resetAndFetch"
+      @clear-filters="clearFilters"
     />
 
-    <!-- Single card wrapping search + table (FC pattern) -->
+    <OperationsSummary label="Access health" :items="summaryItems" />
+
     <el-card shadow="never" class="list-card">
       <MemberBulkActionsBar
         :selected-count="selectedRows.length"
@@ -22,8 +25,17 @@
         @clear="clearSelection"
       />
 
-      <!-- Table -->
+      <ListStatePanel
+        v-if="errorMessage"
+        kind="error"
+        title="Member access could not be loaded"
+        :description="errorMessage"
+        action-label="Try again"
+        @action="fetchMembers"
+      />
+
       <el-table
+        v-else
         ref="tableRef"
         :data="rows"
         v-loading="loading"
@@ -39,7 +51,14 @@
                 {{ getInitials(row.display_name) }}
               </div>
               <div class="member-info">
-                <div class="member-name">{{ row.display_name }}</div>
+                <router-link
+                  :to="`/members/${row.user_id}`"
+                  class="member-name member-name--link"
+                  :aria-label="`Open ${row.display_name} profile`"
+                  @click.stop
+                >
+                  {{ row.display_name }}
+                </router-link>
                 <div class="member-email">{{ row.user_email }}</div>
               </div>
             </div>
@@ -68,12 +87,33 @@
           </template>
         </el-table-column>
         <el-table-column prop="source_type" label="Source" width="120" />
+        <el-table-column label="Manage" width="110" align="right" fixed="right">
+          <template #default="{ row }">
+            <router-link
+              :to="`/members/${row.user_id}`"
+              class="manage-link"
+              :aria-label="`Manage ${row.display_name} access`"
+              @click.stop
+            >
+              Manage
+              <el-icon><ArrowRight /></el-icon>
+            </router-link>
+          </template>
+        </el-table-column>
       </el-table>
 
-      <div v-loading="loading" class="mobile-member-list" aria-label="Members">
+      <div v-if="!errorMessage" v-loading="loading" class="mobile-member-list" aria-label="Members">
         <article v-for="row in rows" :key="`${row.user_id}-${row.plan_id}`" class="mobile-record-card">
           <div class="mobile-record-card__topline">
-            <div class="member-cell">
+            <label class="mobile-selection">
+              <input
+                type="checkbox"
+                :checked="isRowSelected(row)"
+                :aria-label="`Select ${row.display_name} on ${row.plan_title}`"
+                @change="toggleMobileSelection(row, $event.target.checked)"
+              />
+            </label>
+            <div class="member-cell mobile-member-cell">
               <div class="member-avatar">{{ getInitials(row.display_name) }}</div>
               <div class="member-info">
                 <div class="member-name">{{ row.display_name }}</div>
@@ -89,15 +129,33 @@
           </dl>
           <div class="mobile-record-card__footer">
             <span>{{ row.source_type }}</span>
-            <router-link :to="`/members/${row.user_id}`">View profile</router-link>
+            <router-link :to="`/members/${row.user_id}`">
+              Manage profile
+              <el-icon><ArrowRight /></el-icon>
+            </router-link>
           </div>
         </article>
       </div>
 
-      <el-empty v-if="!loading && rows.length === 0" description="No members found" />
+      <ListStatePanel
+        v-if="!errorMessage && !loading && rows.length === 0 && hasActiveFilters"
+        kind="filtered"
+        title="No access matches these filters"
+        description="Clear the filters or try a different name, email, or user ID."
+        action-label="Clear filters"
+        @action="clearFilters"
+      />
+      <ListStatePanel
+        v-else-if="!errorMessage && !loading && rows.length === 0"
+        kind="empty"
+        title="No member access yet"
+        description="Grant a plan to a WordPress user to create the first access assignment."
+        action-label="Grant access"
+        @action="grantDialogVisible = true"
+      />
 
       <!-- Pagination (FC pattern) -->
-      <div class="pagination-bar" v-if="total > 0">
+      <div class="pagination-bar" v-if="!errorMessage && total > 0">
         <div class="pagination-info">
           <span>Page {{ page }} of {{ totalPages }}</span>
           <el-select v-model="perPage" size="small" class="per-page-select" @change="resetAndFetch">
@@ -180,6 +238,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { ArrowRight } from '@element-plus/icons-vue'
 import { members as membersApi, plans } from '@/api/index.js'
 import { formatWpDate, wpDatePickerFormat } from '@/utils/wpDate.js'
 import { useGrantAccessUserPicker } from '@/composables/members/useGrantAccessUserPicker.js'
@@ -189,6 +248,8 @@ import GrantAccessDialog from '@/components/members/GrantAccessDialog.vue'
 import BulkGrantDialog from '@/components/members/BulkGrantDialog.vue'
 import BulkRevokeDialog from '@/components/members/BulkRevokeDialog.vue'
 import BulkExtendDialog from '@/components/members/BulkExtendDialog.vue'
+import OperationsSummary from '@/components/workspace/OperationsSummary.vue'
+import ListStatePanel from '@/components/workspace/ListStatePanel.vue'
 
 const router = useRouter()
 
@@ -198,14 +259,27 @@ const rows = ref([])
 const total = ref(0)
 const page = ref(1)
 const perPage = ref(20)
+const errorMessage = ref('')
+const summary = reactive({ active: 0, expiring_soon: 0, paused: 0, ended: 0 })
+let requestSequence = 0
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage.value)))
+const hasActiveFilters = computed(() => Boolean(
+  filters.search || filters.plan_id || filters.status || filters.expires_within,
+))
+const summaryItems = computed(() => [
+  { label: 'Active access', value: summary.active, support: 'Member-plan assignments usable now', tone: 'success' },
+  { label: 'Expiring in 7 days', value: summary.expiring_soon, support: 'Assignments needing a renewal decision', tone: 'warning' },
+  { label: 'Paused access', value: summary.paused, support: 'Recoverable assignments currently held' },
+  { label: 'Ended access', value: summary.ended, support: 'Expired or revoked assignments' },
+])
 
 // Filters
 const filters = reactive({
   search: '',
   plan_id: '',
   status: '',
+  expires_within: '',
 })
 
 // Plan options
@@ -270,7 +344,9 @@ function getInitials(name) {
 }
 
 async function fetchMembers() {
+  const requestId = ++requestSequence
   loading.value = true
+  errorMessage.value = ''
   try {
     const params = {
       page: page.value,
@@ -279,14 +355,43 @@ async function fetchMembers() {
     if (filters.search) params.search = filters.search
     if (filters.plan_id) params.plan_id = filters.plan_id
     if (filters.status) params.status = filters.status
+    if (filters.expires_within) params.expires_within = filters.expires_within
+    if (filters.expires_within) params.expires_within = filters.expires_within
 
     const response = await membersApi.list(params)
+    if (requestId !== requestSequence) return
     rows.value = response.data || []
     total.value = response.total || 0
+    Object.assign(summary, {
+      active: Number(response.summary?.active) || 0,
+      expiring_soon: Number(response.summary?.expiring_soon) || 0,
+      paused: Number(response.summary?.paused) || 0,
+      ended: Number(response.summary?.ended) || 0,
+    })
+    clearSelection()
   } catch (err) {
-    ElMessage.error(err.message || 'Failed to load members')
+    if (requestId !== requestSequence) return
+    rows.value = []
+    total.value = 0
+    errorMessage.value = err.message || 'Member access could not be loaded. Please try again.'
   } finally {
-    loading.value = false
+    if (requestId === requestSequence) loading.value = false
+  }
+}
+
+function clearFilters() {
+  filters.search = ''
+  filters.plan_id = ''
+  filters.status = ''
+  filters.expires_within = ''
+  resetAndFetch()
+}
+
+function handleUtility(command) {
+  if (command === 'import') {
+    router.push('/import')
+  } else if (command === 'export') {
+    handleExport()
   }
 }
 
@@ -356,6 +461,24 @@ async function handleExport() {
 
 function onSelectionChange(rows) {
   selectedRows.value = rows
+}
+
+function rowKey(row) {
+  return `${row.user_id}:${row.plan_id ?? 'direct'}`
+}
+
+function isRowSelected(row) {
+  const key = rowKey(row)
+  return selectedRows.value.some((selected) => rowKey(selected) === key)
+}
+
+function toggleMobileSelection(row, checked) {
+  const key = rowKey(row)
+  if (checked && !isRowSelected(row)) {
+    selectedRows.value = [...selectedRows.value, row]
+  } else if (!checked) {
+    selectedRows.value = selectedRows.value.filter((selected) => rowKey(selected) !== key)
+  }
 }
 
 function handleBulkAction(command) {
@@ -544,6 +667,23 @@ onMounted(() => {
   color: var(--fchub-text-primary);
 }
 
+.member-name--link,
+.manage-link {
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+.member-name--link:hover,
+.manage-link:hover { text-decoration: underline; }
+
+.manage-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .member-email {
   font-size: 12px;
   color: var(--fchub-text-secondary);
@@ -573,8 +713,32 @@ onMounted(() => {
 
 .mobile-member-list { display: none; }
 
+.mobile-selection {
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  min-height: 36px;
+}
+
+.mobile-selection input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  border: 1px solid var(--fchub-border-color) !important;
+  border-radius: 4px;
+  background: var(--fchub-card-bg);
+  appearance: auto !important;
+  -webkit-appearance: checkbox !important;
+  accent-color: var(--el-color-primary);
+}
+
 @media (max-width: 782px) {
   .list-card :deep(.el-table) { display: none; }
   .mobile-member-list { display: grid; gap: 12px; }
+  .mobile-record-card__topline { align-items: flex-start; }
+  .mobile-member-cell { flex: 1; min-width: 0; }
+  .member-info { min-width: 0; }
+  .member-name, .member-email { overflow-wrap: anywhere; }
+  .pagination-bar { align-items: flex-start; flex-direction: column; gap: 12px; }
 }
 </style>

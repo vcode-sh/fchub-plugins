@@ -32,15 +32,12 @@ class PlanService
 
     public function list(array $filters = []): array
     {
-        $plans = $this->planRepo->all($filters);
+        return $this->planRepo->allForAdmin($filters);
+    }
 
-        foreach ($plans as &$plan) {
-            $plan['members_count'] = $this->planRepo->getMemberCount($plan['id']);
-            $plan['rules_count'] = $this->planRepo->getRuleCount($plan['id']);
-            $plan['drip_count'] = count($this->ruleRepo->getDripRules($plan['id']));
-        }
-
-        return $plans;
+    public function getAdminSummary(): array
+    {
+        return $this->planRepo->getAdminSummary();
     }
 
     public function count(array $filters = []): int
@@ -113,6 +110,10 @@ class PlanService
     public function delete(int $id): bool
     {
         global $wpdb;
+
+        if ($this->planRepo->countGrantHistory($id) > 0) {
+            return false;
+        }
 
         // Cascade: delete drip notifications for this plan's rules
         $ruleIds = array_column($this->ruleRepo->getByPlanId($id), 'id');

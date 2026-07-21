@@ -157,7 +157,12 @@ final class PlanWriteController
     public static function destroy(\WP_REST_Request $request): \WP_REST_Response
     {
         $service = new PlanService();
-        $service->delete((int) $request->get_param('id'));
+        if (!$service->delete((int) $request->get_param('id'))) {
+            return new \WP_REST_Response([
+                'message' => __('This plan has access history. Archive it instead to preserve member records.', 'fchub-memberships'),
+            ], 409);
+        }
+
         return new \WP_REST_Response(['message' => __('Plan deleted.', 'fchub-memberships')]);
     }
 

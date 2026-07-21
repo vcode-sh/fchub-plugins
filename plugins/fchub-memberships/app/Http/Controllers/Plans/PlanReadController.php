@@ -18,8 +18,9 @@ final class PlanReadController
         $filters = AdminRequestFilters::planList($request);
 
         return new \WP_REST_Response([
-            'data'  => $service->list($filters),
-            'total' => $service->count($filters),
+            'data'    => $service->list($filters),
+            'total'   => $service->count($filters),
+            'summary' => $service->getAdminSummary(),
         ]);
     }
 

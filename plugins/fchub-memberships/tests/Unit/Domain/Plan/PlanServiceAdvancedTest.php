@@ -127,6 +127,11 @@ final class PlanServiceAdvancedTest extends PluginTestCase
             {
                 return true;
             }
+
+            public function countGrantHistory(int $planId): int
+            {
+                return 0;
+            }
         };
 
         $ruleRepo = new class($deletedRules) extends PlanRuleRepository {
@@ -214,6 +219,11 @@ final class PlanServiceAdvancedTest extends PluginTestCase
                 return $slug === 'existing-slug';
             }
 
+            public function countGrantHistory(int $planId): int
+            {
+                return 0;
+            }
+
             public function delete(int $id): bool
             {
                 return true;
@@ -269,5 +279,44 @@ final class PlanServiceAdvancedTest extends PluginTestCase
         self::assertTrue($deleted);
         self::assertContains(5, $deletedRules);
         self::assertStringContainsString('DELETE FROM wp_fchub_membership_drip_notifications', implode("\n", $queries));
+    }
+
+    public function test_delete_refuses_to_detach_existing_access_history(): void
+    {
+        $deleted = false;
+        $rulesTouched = false;
+        $planRepo = new class($deleted) extends PlanRepository {
+            public function __construct(private bool &$deleted)
+            {
+            }
+
+            public function countGrantHistory(int $planId): int
+            {
+                return 3;
+            }
+
+            public function delete(int $id): bool
+            {
+                $this->deleted = true;
+                return true;
+            }
+        };
+        $ruleRepo = new class($rulesTouched) extends PlanRuleRepository {
+            public function __construct(private bool &$rulesTouched)
+            {
+            }
+
+            public function getByPlanId(int $planId): array
+            {
+                $this->rulesTouched = true;
+                return [];
+            }
+        };
+
+        $service = $this->serviceWith($planRepo, $ruleRepo);
+
+        self::assertFalse($service->delete(5));
+        self::assertFalse($deleted);
+        self::assertFalse($rulesTouched);
     }
 }
