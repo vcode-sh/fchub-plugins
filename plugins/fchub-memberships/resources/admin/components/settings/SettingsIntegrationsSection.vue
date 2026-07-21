@@ -7,7 +7,7 @@
         <h4>Enable FluentCRM Sync</h4>
         <p>Automatically sync membership events (grant, revoke, pause, resume, expire) to FluentCRM tags, lists, and custom fields.</p>
       </div>
-      <div class="fchub-setting-control"><el-switch v-model="form.fluentcrm_enabled" /></div>
+      <div class="fchub-setting-control"><el-switch v-model="form.fluentcrm_enabled" aria-label="Enable FluentCRM sync" /></div>
     </div>
 
     <template v-if="form.fluentcrm_enabled">
@@ -16,7 +16,7 @@
           <h4>Tag Prefix</h4>
           <p>Prefix for auto-created tags. Tags will be named like "member:plan-slug".</p>
         </div>
-        <div class="fchub-setting-control"><el-input v-model="form.fluentcrm_tag_prefix" placeholder="member:" /></div>
+        <div class="fchub-setting-control"><el-input v-model="form.fluentcrm_tag_prefix" aria-label="FluentCRM tag prefix" placeholder="member:" /></div>
       </div>
 
       <div class="fchub-setting-row">
@@ -27,6 +27,7 @@
         <div class="fchub-setting-control">
           <el-select
             v-model="form.fluentcrm_default_list"
+            aria-label="FluentCRM default list"
             style="width: 100%"
             placeholder="Select a list..."
             clearable
@@ -45,7 +46,7 @@
           <h4>Auto-Create Tags</h4>
           <p>Automatically create FluentCRM tags from plan names when they don't exist.</p>
         </div>
-        <div class="fchub-setting-control"><el-switch v-model="form.fluentcrm_auto_create_tags" /></div>
+        <div class="fchub-setting-control"><el-switch v-model="form.fluentcrm_auto_create_tags" aria-label="Auto-create FluentCRM tags" /></div>
       </div>
     </template>
   </div>
@@ -58,7 +59,7 @@
         <h4>Enable FluentCommunity Sync</h4>
         <p>Sync membership status to FluentCommunity spaces and badges when grants are created, revoked, or expire.</p>
       </div>
-      <div class="fchub-setting-control"><el-switch v-model="form.fc_enabled" /></div>
+      <div class="fchub-setting-control"><el-switch v-model="form.fc_enabled" aria-label="Enable FluentCommunity sync" /></div>
     </div>
 
     <template v-if="form.fc_enabled">
@@ -73,6 +74,7 @@
             <span class="mapping-plan-name">{{ plan.title }}</span>
             <el-select
               v-model="form.fc_space_mappings[plan.id]"
+              :aria-label="`Space for ${plan.title}`"
               style="width: 220px"
               placeholder="Select space..."
               clearable
@@ -98,6 +100,7 @@
             <span class="mapping-plan-name">{{ plan.title }}</span>
             <el-select
               v-model="form.fc_badge_mappings[plan.id]"
+              :aria-label="`Badge for ${plan.title}`"
               style="width: 220px"
               placeholder="Select badge..."
               clearable
@@ -117,7 +120,7 @@
           <h4>Remove Badge on Revoke</h4>
           <p>Remove the assigned badge when a member's access is revoked or expires.</p>
         </div>
-        <div class="fchub-setting-control"><el-switch v-model="form.fc_remove_badge_on_revoke" /></div>
+        <div class="fchub-setting-control"><el-switch v-model="form.fc_remove_badge_on_revoke" aria-label="Remove badge on revoke" /></div>
       </div>
     </template>
   </div>

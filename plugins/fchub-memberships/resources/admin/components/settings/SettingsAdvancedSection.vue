@@ -8,7 +8,7 @@
         <p>Enable verbose logging for troubleshooting. Not recommended for production.</p>
       </div>
       <div class="fchub-setting-control">
-        <el-switch v-model="form.debug_mode" />
+        <el-switch v-model="form.debug_mode" aria-label="Debug mode" />
       </div>
     </div>
   </div>

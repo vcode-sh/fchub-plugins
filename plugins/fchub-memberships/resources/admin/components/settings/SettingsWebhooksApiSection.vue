@@ -7,7 +7,7 @@
         <h4>Enable Webhooks</h4>
         <p>Send HTTP POST requests to external URLs when membership events occur (grant, revoke, pause, resume, expire).</p>
       </div>
-      <div class="fchub-setting-control"><el-switch v-model="form.webhook_enabled" /></div>
+      <div class="fchub-setting-control"><el-switch v-model="form.webhook_enabled" aria-label="Enable webhooks" /></div>
     </div>
 
     <template v-if="form.webhook_enabled">
@@ -19,6 +19,7 @@
         <div class="fchub-setting-control">
           <el-input
             v-model="form.webhook_urls"
+            aria-label="Webhook URLs"
             type="textarea"
             :rows="3"
             placeholder="https://example.com/webhook&#10;https://hooks.zapier.com/..."
@@ -32,7 +33,7 @@
           <p>Used to generate HMAC-SHA256 signatures in the X-FCHub-Signature header for verifying webhook authenticity.</p>
         </div>
         <div class="fchub-setting-control">
-          <el-input v-model="form.webhook_secret" readonly placeholder="No secret generated">
+          <el-input v-model="form.webhook_secret" aria-label="Webhook secret" readonly placeholder="No secret generated">
             <template #append>
               <el-button @click="copyWebhookSecret" :icon="CopyDocument">Copy</el-button>
             </template>
@@ -77,7 +78,7 @@
         <p>Use this key to authenticate external API requests to the memberships system.</p>
       </div>
       <div class="fchub-setting-control">
-        <el-input v-model="form.api_key" readonly placeholder="No API key generated">
+        <el-input v-model="form.api_key" aria-label="API key" readonly placeholder="No API key generated">
           <template #append>
             <el-button @click="copyApiKey" :icon="CopyDocument">Copy</el-button>
           </template>

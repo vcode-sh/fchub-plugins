@@ -8,7 +8,7 @@
         <p>How to handle access for non-members trying to view protected content.</p>
       </div>
       <div class="fchub-setting-control">
-        <el-select v-model="form.restriction_mode" style="width: 100%">
+        <el-select v-model="form.restriction_mode" aria-label="Restriction mode" style="width: 100%">
           <el-option label="Replace Content with Message" value="content_replace" />
           <el-option label="Redirect to URL" value="redirect" />
           <el-option label="Show 403 Forbidden" value="403" />
@@ -22,7 +22,7 @@
         <p>Message shown when content is restricted. Supports basic HTML.</p>
       </div>
       <div class="fchub-setting-control">
-        <el-input v-model="form.default_restriction_message" type="textarea" :rows="3" placeholder="This content is restricted to members only." />
+        <el-input v-model="form.default_restriction_message" aria-label="Default restriction message" type="textarea" :rows="3" placeholder="This content is restricted to members only." />
       </div>
     </div>
 
@@ -34,6 +34,7 @@
       <div class="fchub-setting-control">
         <el-input
           v-model="form.restriction_message_paused"
+          aria-label="Paused membership message"
           type="textarea"
           :rows="2"
           placeholder="Your membership is currently paused. Resume your membership to access this content."
@@ -47,7 +48,7 @@
         <p>Non-members will be redirected to this URL when they try to access protected content.</p>
       </div>
       <div class="fchub-setting-control">
-        <el-input v-model="form.redirect_url" placeholder="https://example.com/membership" />
+        <el-input v-model="form.redirect_url" aria-label="Redirect URL" placeholder="https://example.com/membership" />
       </div>
     </div>
   </div>
@@ -61,7 +62,7 @@
         <p>Controls whether users can hold multiple membership plans simultaneously.</p>
       </div>
       <div class="fchub-setting-control">
-        <el-select v-model="form.membership_mode" style="width: 100%">
+        <el-select v-model="form.membership_mode" aria-label="Membership mode" style="width: 100%">
           <el-option label="Allow Stacking (Multiple Plans)" value="stack" />
           <el-option label="Exclusive (One Plan Only)" value="exclusive" />
           <el-option label="Upgrade Only (Level-Based)" value="upgrade_only" />

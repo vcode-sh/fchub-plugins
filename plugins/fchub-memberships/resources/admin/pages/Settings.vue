@@ -3,24 +3,95 @@
     <WorkspacePageHeader
       eyebrow="Plugin configuration"
       title="Settings"
-      description="Configure one area at a time. Changes remain local until you save them."
-    >
-      <template #actions><el-button type="primary" @click="saveSettings" :loading="saving">
-        <el-icon><Check /></el-icon>
-        Save settings
-      </el-button></template>
-    </WorkspacePageHeader>
+      description="Control access, communication, and connections from one reliable workspace."
+    />
 
-    <div class="settings-workspace">
-      <el-tabs v-model="activeSettingsTab" class="settings-tabs">
-        <el-tab-pane label="General" name="general">
-          <SettingsGeneralSection :form="form" />
-        </el-tab-pane>
-        <el-tab-pane label="Notifications" name="notifications">
-          <SettingsNotificationsSection :form="form" />
-        </el-tab-pane>
-        <el-tab-pane label="Integrations" name="integrations">
+    <ListStatePanel
+      v-if="loadError"
+      kind="error"
+      title="Settings are unavailable"
+      :description="loadError"
+      action-label="Try again"
+      @action="loadSettings"
+    />
+
+    <template v-else-if="settingsReady">
+      <section class="settings-overview" aria-label="Settings overview">
+        <article class="settings-overview-card settings-overview-card--blue">
+          <el-icon><Lock /></el-icon>
+          <div><span>Content protection</span><strong>{{ restrictionModeLabel }}</strong></div>
+        </article>
+        <article class="settings-overview-card settings-overview-card--green">
+          <el-icon><Message /></el-icon>
+          <div><span>Email notifications</span><strong>{{ enabledEmailCount }} of 4 active</strong></div>
+        </article>
+        <article class="settings-overview-card settings-overview-card--purple">
+          <el-icon><Connection /></el-icon>
+          <div><span>Connected services</span><strong>{{ enabledConnectionCount }} of 3 active</strong></div>
+        </article>
+      </section>
+
+      <div class="settings-mobile-category">
+        <label for="settings-category-select">Settings category</label>
+        <el-select
+          id="settings-category-select"
+          v-model="activeSettingsTab"
+          aria-label="Settings category"
+          style="width: 100%"
+        >
+          <el-option v-for="category in settingsCategories" :key="category.id" :label="category.label" :value="category.id" />
+        </el-select>
+      </div>
+
+      <div class="settings-console">
+        <aside class="settings-sidebar">
+          <div class="settings-sidebar-heading">
+            <span>Configuration</span>
+            <strong>Choose one area</strong>
+          </div>
+          <nav class="settings-category-nav" aria-label="Settings categories">
+            <button
+              v-for="category in settingsCategories"
+              :key="category.id"
+              type="button"
+              class="settings-category-button"
+              :class="{ 'is-active': activeSettingsTab === category.id }"
+              :aria-current="activeSettingsTab === category.id ? 'page' : undefined"
+              @click="selectCategory(category.id)"
+            >
+              <el-icon><component :is="category.icon" /></el-icon>
+              <span class="settings-category-copy">
+                <strong>{{ category.label }}</strong>
+                <small>{{ category.summary }}</small>
+              </span>
+              <el-icon class="settings-category-arrow"><ArrowRight /></el-icon>
+            </button>
+          </nav>
+          <div class="settings-sidebar-note">
+            <el-icon><InfoFilled /></el-icon>
+            <span>Changes affect every membership plan unless a plan overrides them.</span>
+          </div>
+        </aside>
+
+        <section class="settings-panel" aria-labelledby="settings-panel-title">
+          <header class="settings-panel-header">
+            <div>
+              <p>Settings area</p>
+              <h2 id="settings-panel-title">{{ activeCategory.label }}</h2>
+              <span>{{ activeCategory.description }}</span>
+            </div>
+            <el-tag effect="plain" round>{{ activeCategory.summary }}</el-tag>
+          </header>
+
+          <div v-if="validationMessage" class="settings-validation" role="alert">
+            <el-icon><WarningFilled /></el-icon>
+            <span>{{ validationMessage }}</span>
+          </div>
+
+          <SettingsGeneralSection v-if="activeSettingsTab === 'general'" :form="form" />
+          <SettingsNotificationsSection v-else-if="activeSettingsTab === 'notifications'" :form="form" />
           <SettingsIntegrationsSection
+            v-else-if="activeSettingsTab === 'integrations'"
             :form="form"
             :plan-options="planOptions"
             :loading-lists="loadingLists"
@@ -33,9 +104,8 @@
             :search-fc-spaces="searchFcSpaces"
             :search-fc-badges="searchFcBadges"
           />
-        </el-tab-pane>
-        <el-tab-pane label="Webhooks & API" name="webhooks">
           <SettingsWebhooksApiSection
+            v-else-if="activeSettingsTab === 'webhooks'"
             :form="form"
             :regenerating="regenerating"
             :regenerating-secret="regeneratingSecret"
@@ -47,30 +117,45 @@
             :regenerate-webhook-secret="regenerateWebhookSecret"
             :send-test-webhook="sendTestWebhook"
           />
-        </el-tab-pane>
-        <el-tab-pane label="Advanced" name="advanced">
-          <SettingsAdvancedSection :form="form" />
-        </el-tab-pane>
-      </el-tabs>
-
-      <div class="settings-save-bar" role="region" aria-label="Settings save status">
-        <div>
-          <strong>{{ saving ? 'Saving changes…' : isDirty ? 'Unsaved changes' : 'All changes saved' }}</strong>
-          <span>{{ isDirty ? ' Review the current group, then save when ready.' : ' Your configuration is up to date.' }}</span>
-        </div>
-        <el-button type="primary" @click="saveSettings" :loading="saving">
-          <el-icon><Check /></el-icon>
-          Save Settings
-        </el-button>
+          <SettingsAdvancedSection v-else :form="form" />
+        </section>
       </div>
-    </div>
+
+      <Transition name="save-bar">
+        <div v-if="isDirty" class="settings-save-bar" role="region" aria-label="Unsaved settings">
+          <div class="settings-save-copy">
+            <span class="settings-save-dot" />
+            <div><strong>{{ saving ? 'Saving changes…' : 'Unsaved changes' }}</strong><span>Review and save, or restore the last saved configuration.</span></div>
+          </div>
+          <div class="settings-save-actions">
+            <el-button :disabled="saving" @click="discardChanges">Discard</el-button>
+            <el-button type="primary" :loading="saving" @click="saveSettings">
+              <el-icon><Check /></el-icon>
+              Save
+            </el-button>
+          </div>
+        </div>
+      </Transition>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, markRaw, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check } from '@element-plus/icons-vue'
+import {
+  ArrowRight,
+  Bell,
+  Check,
+  Connection,
+  InfoFilled,
+  Link,
+  Lock,
+  Message,
+  Setting,
+  Tools,
+  WarningFilled,
+} from '@element-plus/icons-vue'
 import api, { settings } from '@/api/index.js'
 import SettingsGeneralSection from '@/components/settings/SettingsGeneralSection.vue'
 import SettingsNotificationsSection from '@/components/settings/SettingsNotificationsSection.vue'
@@ -78,6 +163,7 @@ import SettingsIntegrationsSection from '@/components/settings/SettingsIntegrati
 import SettingsWebhooksApiSection from '@/components/settings/SettingsWebhooksApiSection.vue'
 import SettingsAdvancedSection from '@/components/settings/SettingsAdvancedSection.vue'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
+import ListStatePanel from '@/components/workspace/ListStatePanel.vue'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -87,6 +173,10 @@ const testingWebhook = ref(false)
 const testResults = ref([])
 const activeSettingsTab = ref('general')
 const savedSnapshot = ref('')
+const savedFormSnapshot = ref(null)
+const loadError = ref('')
+const validationMessage = ref('')
+const settingsReady = ref(false)
 
 // FluentCRM remote search state
 const loadingLists = ref(false)
@@ -133,18 +223,80 @@ const form = ref({
 
 const isDirty = computed(() => savedSnapshot.value !== '' && JSON.stringify(buildPayload()) !== savedSnapshot.value)
 
+const enabledEmailCount = computed(() => [
+  form.value.email_access_granted,
+  form.value.email_access_expiring,
+  form.value.email_access_revoked,
+  form.value.email_drip_unlocked,
+].filter(Boolean).length)
+
+const enabledConnectionCount = computed(() => [
+  form.value.fluentcrm_enabled,
+  form.value.fc_enabled,
+  form.value.webhook_enabled,
+].filter(Boolean).length)
+
+const restrictionModeLabel = computed(() => ({
+  content_replace: 'Protected message',
+  redirect: 'Redirect visitors',
+  403: '403 response',
+}[form.value.restriction_mode] ?? 'Not configured'))
+
+const settingsCategories = computed(() => [
+  {
+    id: 'general',
+    label: 'General',
+    description: 'Set the default protection experience and how plans work together.',
+    summary: restrictionModeLabel.value,
+    icon: markRaw(Setting),
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    description: 'Choose which membership events should send an email to members.',
+    summary: `${enabledEmailCount.value} of 4 active`,
+    icon: markRaw(Bell),
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    description: 'Connect the tools that should follow membership changes.',
+    summary: `${Number(form.value.fluentcrm_enabled) + Number(form.value.fc_enabled)} of 2 connected`,
+    icon: markRaw(Connection),
+  },
+  {
+    id: 'webhooks',
+    label: 'Webhooks & API',
+    description: 'Deliver membership events and manage credentials for external systems.',
+    summary: form.value.webhook_enabled ? 'Webhooks active' : (form.value.api_key ? 'API ready' : 'Not connected'),
+    icon: markRaw(Link),
+  },
+  {
+    id: 'advanced',
+    label: 'Advanced',
+    description: 'Use troubleshooting controls without cluttering everyday settings.',
+    summary: form.value.debug_mode ? 'Debug logging on' : 'Production safe',
+    icon: markRaw(Tools),
+  },
+])
+
+const activeCategory = computed(() => settingsCategories.value.find(({ id }) => id === activeSettingsTab.value) ?? settingsCategories.value[0])
+
 async function loadSettings() {
   loading.value = true
+  loadError.value = ''
+  validationMessage.value = ''
+  settingsReady.value = false
   try {
-    const [settingsRes, plansRes] = await Promise.all([
-      settings.get(),
-      api.get('admin/plans/options'),
-    ])
-
+    const settingsRes = await settings.get()
     const data = settingsRes.data ?? settingsRes
-    const plans = plansRes.data ?? plansRes
-
-    planOptions.value = Array.isArray(plans) ? plans : []
+    try {
+      const plansRes = await api.get('admin/plans/options')
+      const plans = plansRes.data ?? plansRes
+      planOptions.value = Array.isArray(plans) ? plans : []
+    } catch {
+      planOptions.value = []
+    }
 
     form.value = {
       restriction_mode: data.default_protection_mode ?? 'content_replace',
@@ -176,16 +328,27 @@ async function loadSettings() {
       membership_mode: data.membership_mode ?? 'stack',
     }
     savedSnapshot.value = JSON.stringify(buildPayload())
+    savedFormSnapshot.value = cloneForm(form.value)
+    settingsReady.value = true
 
     // Pre-load FluentCRM lists if a default is set
     if (form.value.fluentcrm_default_list) {
       searchFluentcrmLists('')
     }
   } catch (err) {
-    ElMessage.error('Failed to load settings: ' + (err.message || 'Unknown error'))
+    loadError.value = err.message || 'The settings service did not return a usable response.'
   } finally {
     loading.value = false
   }
+}
+
+function cloneForm(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function selectCategory(category) {
+  activeSettingsTab.value = category
+  validationMessage.value = ''
 }
 
 function buildPayload() {
@@ -220,15 +383,62 @@ function buildPayload() {
 }
 
 async function saveSettings() {
+  const validation = validateSettings()
+  if (validation) {
+    activeSettingsTab.value = validation.category
+    validationMessage.value = validation.message
+    return
+  }
+
   saving.value = true
+  validationMessage.value = ''
   try {
     await settings.save(buildPayload())
     savedSnapshot.value = JSON.stringify(buildPayload())
+    savedFormSnapshot.value = cloneForm(form.value)
     ElMessage.success('Settings saved successfully.')
   } catch (err) {
     ElMessage.error('Failed to save settings: ' + (err.message || 'Unknown error'))
   } finally {
     saving.value = false
+  }
+}
+
+function discardChanges() {
+  if (!savedFormSnapshot.value) return
+  form.value = cloneForm(savedFormSnapshot.value)
+  validationMessage.value = ''
+  testResults.value = []
+  ElMessage.info('Unsaved changes discarded.')
+}
+
+function validateSettings() {
+  if (form.value.restriction_mode === 'redirect' && !isHttpUrl(form.value.redirect_url)) {
+    return {
+      category: 'general',
+      message: 'Enter a valid HTTP or HTTPS redirect URL.',
+    }
+  }
+
+  if (form.value.webhook_enabled) {
+    const urls = String(form.value.webhook_urls || '').split('\n').map((url) => url.trim()).filter(Boolean)
+    if (urls.length === 0 || urls.some((url) => !isHttpUrl(url))) {
+      return {
+        category: 'webhooks',
+        message: 'Enter a valid HTTP or HTTPS URL on each line.',
+      }
+    }
+  }
+
+  return null
+}
+
+function isHttpUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim())
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
   }
 }
 
@@ -265,6 +475,7 @@ async function regenerateApiKey() {
     const response = await settings.generateApiKey()
     const data = response.data ?? response
     form.value.api_key = data.api_key ?? form.value.api_key
+    if (savedFormSnapshot.value) savedFormSnapshot.value.api_key = form.value.api_key
     ElMessage.success('API key regenerated successfully.')
   } catch (err) {
     ElMessage.error('Failed to regenerate API key: ' + (err.message || 'Unknown error'))
@@ -306,6 +517,7 @@ async function regenerateWebhookSecret() {
     const response = await settings.regenerateWebhookSecret()
     const data = response.data ?? response
     form.value.webhook_secret = data.webhook_secret ?? form.value.webhook_secret
+    if (savedFormSnapshot.value) savedFormSnapshot.value.webhook_secret = form.value.webhook_secret
     ElMessage.success('Webhook secret regenerated.')
   } catch (err) {
     ElMessage.error('Failed to regenerate webhook secret: ' + (err.message || 'Unknown error'))
@@ -380,67 +592,64 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.settings-workspace {
-  overflow: hidden;
-  border: 1px solid var(--fchub-border-color);
-  border-radius: 14px;
-  background: var(--fchub-card-bg);
-}
+.settings-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.settings-overview-card { display: flex; align-items: center; gap: 13px; min-width: 0; padding: 15px 16px; border: 1px solid var(--fchub-border-color); border-radius: 12px; background: var(--fchub-card-bg); }
+.settings-overview-card > .el-icon { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 10px; font-size: 18px; }
+.settings-overview-card--blue > .el-icon { color: var(--el-color-primary); background: color-mix(in srgb, var(--el-color-primary) 12%, var(--fchub-card-bg)); }
+.settings-overview-card--green > .el-icon { color: var(--el-color-success); background: color-mix(in srgb, var(--el-color-success) 12%, var(--fchub-card-bg)); }
+.settings-overview-card--purple > .el-icon { color: #8b5cf6; background: color-mix(in srgb, #8b5cf6 12%, var(--fchub-card-bg)); }
+.settings-overview-card div { min-width: 0; }
+.settings-overview-card span, .settings-overview-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-overview-card span { color: var(--fchub-text-secondary); font-size: 11px; font-weight: 650; letter-spacing: .025em; }
+.settings-overview-card strong { margin-top: 3px; color: var(--fchub-text-primary); font-size: 13px; }
 
-.settings-tabs :deep(.el-tabs__header) { margin: 0; padding: 0 24px; }
-.settings-tabs :deep(.el-tabs__content) { padding: 0; }
-.settings-save-bar {
-  position: sticky;
-  bottom: 16px;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin: 16px;
-  padding: 14px 16px;
-  border: 1px solid var(--fchub-border-color);
-  border-radius: 12px;
-  background: var(--fchub-card-bg);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, .12);
-}
-.settings-save-bar strong { display: block; font-size: 13px; }
-.settings-save-bar span { color: var(--fchub-text-secondary); font-size: 12px; }
+.settings-console { display: grid; grid-template-columns: 264px minmax(0, 1fr); align-items: start; overflow: hidden; border: 1px solid var(--fchub-border-color); border-radius: 14px; background: var(--fchub-card-bg); }
+.settings-sidebar { align-self: stretch; padding: 18px 12px; border-right: 1px solid var(--fchub-border-color); background: color-mix(in srgb, var(--fchub-page-bg) 58%, var(--fchub-card-bg)); }
+.settings-sidebar-heading { padding: 0 10px 14px; }
+.settings-sidebar-heading span { display: block; color: var(--el-color-primary); font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.settings-sidebar-heading strong { display: block; margin-top: 4px; color: var(--fchub-text-primary); font-size: 13px; }
+.settings-category-nav { display: grid; gap: 5px; }
+.settings-category-button { display: grid; grid-template-columns: 30px minmax(0, 1fr) 16px; align-items: center; gap: 9px; width: 100%; min-height: 58px; padding: 9px 10px; border: 1px solid transparent; border-radius: 10px; color: var(--fchub-text-secondary); background: transparent; font: inherit; text-align: left; cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
+.settings-category-button:hover { border-color: var(--fchub-border-color); background: var(--fchub-card-bg); color: var(--fchub-text-primary); }
+.settings-category-button:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 1px; }
+.settings-category-button.is-active { border-color: color-mix(in srgb, var(--el-color-primary) 32%, var(--fchub-border-color)); color: var(--fchub-text-primary); background: color-mix(in srgb, var(--el-color-primary) 8%, var(--fchub-card-bg)); box-shadow: inset 3px 0 0 var(--el-color-primary); }
+.settings-category-button > .el-icon:first-child { width: 30px; height: 30px; border-radius: 8px; background: var(--fchub-card-bg); font-size: 15px; }
+.settings-category-button.is-active > .el-icon:first-child { color: var(--el-color-primary); background: color-mix(in srgb, var(--el-color-primary) 12%, var(--fchub-card-bg)); }
+.settings-category-copy { min-width: 0; }
+.settings-category-copy strong, .settings-category-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-category-copy strong { font-size: 13px; font-weight: 650; }
+.settings-category-copy small { margin-top: 3px; color: var(--fchub-text-secondary); font-size: 10px; }
+.settings-category-arrow { font-size: 12px; opacity: .55; }
+.settings-sidebar-note { display: flex; align-items: flex-start; gap: 8px; margin: 16px 8px 0; padding: 12px; border-top: 1px solid var(--fchub-border-color); color: var(--fchub-text-secondary); font-size: 11px; line-height: 1.45; }
+.settings-sidebar-note .el-icon { flex: 0 0 auto; margin-top: 1px; color: var(--el-color-primary); }
 
-@media (max-width: 782px) {
-  .settings-tabs :deep(.el-tabs__header) { padding: 0 12px; }
-  .settings-tabs :deep(.el-tabs__nav-scroll) { overflow-x: auto; }
-  .settings-save-bar { align-items: stretch; flex-direction: column; bottom: 8px; margin: 10px; }
-  .settings-save-bar .el-button { width: 100%; margin: 0; }
-}
-</style>
+.settings-panel { min-width: 0; }
+.settings-panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 28px 20px; border-bottom: 1px solid var(--fchub-border-color); }
+.settings-panel-header > div { min-width: 0; }
+.settings-panel-header p { margin: 0 0 5px; color: var(--el-color-primary); font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.settings-panel-header h2 { margin: 0; color: var(--fchub-text-primary); font-size: 20px; line-height: 1.2; }
+.settings-panel-header span { display: block; max-width: 620px; margin-top: 7px; color: var(--fchub-text-secondary); font-size: 13px; line-height: 1.5; }
+.settings-panel-header .el-tag { flex: 0 0 auto; }
+.settings-validation { display: flex; align-items: center; gap: 9px; margin: 16px 28px 0; padding: 11px 13px; border: 1px solid color-mix(in srgb, var(--el-color-danger) 38%, var(--fchub-border-color)); border-radius: 9px; color: var(--el-color-danger); background: color-mix(in srgb, var(--el-color-danger) 7%, var(--fchub-card-bg)); font-size: 12px; }
+.settings-panel :deep(.fchub-settings-section) { padding: 22px 28px 10px; }
+.settings-panel :deep(.fchub-settings-section + .fchub-settings-section) { border-top: 8px solid var(--fchub-page-bg); }
+.settings-panel :deep(.fchub-setting-row) { display: grid; grid-template-columns: minmax(190px, 240px) minmax(0, 1fr); gap: 28px; padding: 18px 0; }
+.settings-panel :deep(.fchub-setting-label) { padding-top: 1px; }
+.settings-panel :deep(.fchub-setting-label h4) { font-weight: 650; }
+.settings-panel :deep(.fchub-setting-control) { max-width: 680px; }
 
-<style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-/* Inline controls */
-.control-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.inline-number {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.inline-label {
-  font-size: 13px;
-  color: var(--fchub-text-secondary);
-  white-space: nowrap;
-}
+.settings-save-bar { position: sticky; bottom: 14px; z-index: 8; display: flex; align-items: center; justify-content: space-between; gap: 20px; width: min(760px, calc(100% - 32px)); margin: 16px 16px 0 auto; padding: 13px 14px; border: 1px solid color-mix(in srgb, var(--el-color-primary) 30%, var(--fchub-border-color)); border-radius: 12px; background: var(--fchub-card-bg); box-shadow: 0 14px 38px rgba(15, 23, 42, .17); }
+.settings-save-copy { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.settings-save-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 999px; background: var(--el-color-warning); box-shadow: 0 0 0 4px color-mix(in srgb, var(--el-color-warning) 16%, transparent); }
+.settings-save-copy strong, .settings-save-copy span { display: block; }
+.settings-save-copy strong { color: var(--fchub-text-primary); font-size: 13px; }
+.settings-save-copy div > span { margin-top: 2px; color: var(--fchub-text-secondary); font-size: 11px; }
+.settings-save-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.settings-save-actions .el-button { margin: 0; }
+.save-bar-enter-active, .save-bar-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.save-bar-enter-from, .save-bar-leave-to { opacity: 0; transform: translateY(8px); }
+.settings-mobile-category { display: none; margin-bottom: 12px; }
+.settings-mobile-category label { display: block; margin-bottom: 6px; color: var(--fchub-text-primary); font-size: 12px; font-weight: 650; }
 
 /* Mapping rows */
 .mapping-row {
@@ -492,5 +701,30 @@ onMounted(() => {
   white-space: nowrap;
   min-width: 0;
   flex: 1;
+}
+
+@media (max-width: 980px) {
+  .settings-console { grid-template-columns: 226px minmax(0, 1fr); }
+  .settings-panel :deep(.fchub-setting-row) { grid-template-columns: 1fr; gap: 11px; }
+  .settings-save-bar { width: calc(100% - 258px); }
+}
+
+@media (max-width: 782px) {
+  .settings-overview { grid-template-columns: 1fr; gap: 8px; }
+  .settings-overview-card { padding: 12px 13px; }
+  .settings-mobile-category { display: block; }
+  .settings-console { display: block; overflow: visible; }
+  .settings-sidebar { display: none; }
+  .settings-panel-header { align-items: flex-start; padding: 20px 18px 16px; }
+  .settings-panel-header .el-tag { display: none; }
+  .settings-panel :deep(.fchub-settings-section) { padding: 18px 18px 8px; }
+  .settings-panel :deep(.fchub-setting-row) { padding: 16px 0; }
+  .settings-panel :deep(.fchub-setting-control) { max-width: 100%; }
+  .settings-validation { margin: 14px 18px 0; }
+  .settings-save-bar { align-items: stretch; flex-direction: column; gap: 12px; width: auto; bottom: 8px; margin: 12px 0 0; }
+  .settings-save-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .settings-save-actions .el-button { width: 100%; }
+  .mapping-row { align-items: stretch; flex-direction: column; }
+  .mapping-row :deep(.el-select) { width: 100% !important; }
 }
 </style>

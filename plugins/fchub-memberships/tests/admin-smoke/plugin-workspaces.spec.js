@@ -65,15 +65,16 @@ test('turns settings into focused groups with a reachable save state', async ({ 
   await page.setViewportSize({ width: 390, height: 844 })
   await openRoute(page, '/settings', 'Settings')
 
-  await expect(page.getByRole('tab', { name: 'General' })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Notifications' })).toBeVisible()
-  await page.getByRole('tab', { name: 'Advanced' }).click()
+  const category = page.getByRole('combobox', { name: 'Settings category' })
+  await expect(category).toBeVisible()
+  await expect(page.locator('.settings-page > .el-loading-mask')).toHaveCount(0)
+  await page.locator('.settings-mobile-category .el-select__wrapper').click()
+  await page.getByRole('option', { name: 'Advanced' }).click()
   await expect(page.getByText('Enable verbose logging for troubleshooting.')).toBeVisible()
-  const saveState = page.getByRole('region', { name: 'Settings save status' })
-  await expect(saveState).toBeVisible()
-  await expect(saveState).toContainText('All changes saved')
+  await expect(page.getByRole('region', { name: 'Unsaved settings' })).toHaveCount(0)
 
-  await page.locator('.settings-tabs .el-switch').last().click()
+  await page.getByRole('switch', { name: 'Debug mode' }).locator('..').click()
+  const saveState = page.getByRole('region', { name: 'Unsaved settings' })
   await expect(saveState).toContainText('Unsaved changes')
 })
 

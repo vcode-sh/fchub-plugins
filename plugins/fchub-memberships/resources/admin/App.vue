@@ -1,6 +1,9 @@
 <template>
   <div class="fchub-app-wrapper">
-    <nav class="fchub-top-nav">
+    <nav
+      class="fchub-top-nav"
+      :style="{ '--fchub-admin-bar-offset': `${adminBarOffset}px` }"
+    >
       <div class="fchub-nav-inner">
         <div class="fchub-nav-left">
           <router-link to="/" class="fchub-brand">
@@ -107,6 +110,26 @@ const FC_THEME_EVENT = 'onFluentCartThemeChange'
 const DARK_TARGETS = ['body', '#wpbody-content', '.wp-toolbar', '#wpfooter']
 
 const themeMode = ref('system') // 'light' | 'dark' | 'system'
+const adminBarOffset = ref(getVisibleAdminBarOffset())
+
+function getVisibleAdminBarOffset() {
+  const adminBar = document.querySelector('#wpadminbar')
+  if (!adminBar) return 0
+
+  return Math.max(0, adminBar.getBoundingClientRect().bottom)
+}
+
+let layoutFrame
+
+function updateAdminBarOffset() {
+  if (layoutFrame) return
+
+  layoutFrame = window.requestAnimationFrame(() => {
+    layoutFrame = undefined
+    const nextOffset = getVisibleAdminBarOffset()
+    if (nextOffset !== adminBarOffset.value) adminBarOffset.value = nextOffset
+  })
+}
 
 function getSystemTheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -165,12 +188,18 @@ onMounted(() => {
   applyTheme(themeMode.value)
 
   window.addEventListener(FC_THEME_EVENT, onFcThemeChange)
+  window.addEventListener('scroll', updateAdminBarOffset, { passive: true })
+  window.addEventListener('resize', updateAdminBarOffset)
   mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
   mediaQuery.addEventListener('change', onSystemPrefChange)
+  updateAdminBarOffset()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener(FC_THEME_EVENT, onFcThemeChange)
+  window.removeEventListener('scroll', updateAdminBarOffset)
+  window.removeEventListener('resize', updateAdminBarOffset)
+  if (layoutFrame) window.cancelAnimationFrame(layoutFrame)
   if (mediaQuery) mediaQuery.removeEventListener('change', onSystemPrefChange)
 })
 </script>
@@ -188,7 +217,7 @@ onBeforeUnmount(() => {
 
 .fchub-top-nav {
   position: fixed;
-  top: 32px;
+  top: var(--fchub-admin-bar-offset, 32px);
   left: 160px;
   right: 0;
   z-index: 2000;
@@ -313,7 +342,6 @@ body.dark .fchub-theme-btn:hover {
 
   .fchub-top-nav,
   .folded .fchub-top-nav {
-    top: 46px;
     left: 0;
     height: 54px;
   }
