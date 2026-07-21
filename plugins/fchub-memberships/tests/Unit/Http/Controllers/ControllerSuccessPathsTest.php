@@ -170,4 +170,38 @@ CSV;
         self::assertCount(2, $response['data']['preview']);
         self::assertSame(2, $response['data']['stats']['total']);
     }
+
+    public function test_content_index_exposes_workspace_protection_summary(): void
+    {
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static fn(string $query): array => str_contains($query, 'GROUP BY resource_type')
+            ? [
+                [
+                    'resource_type' => 'post',
+                    'total_rules' => '3',
+                    'teaser_rules' => '1',
+                    'unassigned_rules' => '0',
+                ],
+                [
+                    'resource_type' => 'category',
+                    'total_rules' => '2',
+                    'teaser_rules' => '0',
+                    'unassigned_rules' => '1',
+                ],
+            ]
+            : [];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_var'] = static fn(string $query): int => 5;
+
+        $response = ContentController::index(new \WP_REST_Request('GET', '/content'))->get_data();
+
+        self::assertSame([
+            'total_rules' => 5,
+            'resource_types' => 2,
+            'teaser_rules' => 1,
+            'unassigned_rules' => 1,
+            'type_counts' => [
+                'post' => 3,
+                'category' => 2,
+            ],
+        ], $response['summary'] ?? null);
+    }
 }

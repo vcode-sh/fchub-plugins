@@ -17,6 +17,10 @@ final class AdminModule implements ModuleInterface
     public function register(Container $container): void
     {
         add_action('admin_menu', [$this, 'registerAdminMenu']);
+        add_filter(
+            'plugin_action_links_' . plugin_basename(FCHUB_MEMBERSHIPS_FILE),
+            [\FChubMemberships\Support\AdminMenu::class, 'addPluginActionLinks']
+        );
     }
 
     public function registerAdminMenu(): void

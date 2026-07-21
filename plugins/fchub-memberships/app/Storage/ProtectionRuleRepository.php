@@ -119,6 +119,57 @@ class ProtectionRuleRepository
         return (int) $wpdb->get_var($sql);
     }
 
+    /**
+     * Return workspace-wide operational counts without loading individual rules.
+     *
+     * @return array{
+     *     total_rules: int,
+     *     resource_types: int,
+     *     teaser_rules: int,
+     *     unassigned_rules: int,
+     *     type_counts: array<string, int>
+     * }
+     */
+    public function summary(): array
+    {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            "SELECT resource_type,
+                    COUNT(*) AS total_rules,
+                    SUM(CASE WHEN show_teaser = 'yes' THEN 1 ELSE 0 END) AS teaser_rules,
+                    SUM(CASE WHEN plan_ids IS NULL OR plan_ids = '' OR plan_ids = '[]' THEN 1 ELSE 0 END) AS unassigned_rules
+             FROM {$this->table}
+             GROUP BY resource_type",
+            ARRAY_A
+        );
+
+        $summary = [
+            'total_rules' => 0,
+            'resource_types' => 0,
+            'teaser_rules' => 0,
+            'unassigned_rules' => 0,
+            'type_counts' => [],
+        ];
+
+        foreach ($rows ?: [] as $row) {
+            $resourceType = (string) ($row['resource_type'] ?? '');
+            if ($resourceType === '') {
+                continue;
+            }
+
+            $typeTotal = (int) ($row['total_rules'] ?? 0);
+            $summary['type_counts'][$resourceType] = $typeTotal;
+            $summary['total_rules'] += $typeTotal;
+            $summary['teaser_rules'] += (int) ($row['teaser_rules'] ?? 0);
+            $summary['unassigned_rules'] += (int) ($row['unassigned_rules'] ?? 0);
+        }
+
+        $summary['resource_types'] = count($summary['type_counts']);
+
+        return $summary;
+    }
+
     public function create(array $data): int
     {
         global $wpdb;

@@ -11,13 +11,7 @@
       </el-button></template>
     </WorkspacePageHeader>
 
-    <!-- Stats Bar -->
-    <div class="stats-bar" v-if="stats.totalRules > 0">
-      <div class="stat-item" v-for="stat in statsDisplay" :key="stat.label">
-        <span class="stat-value">{{ stat.value }}</span>
-        <span class="stat-label">{{ stat.label }}</span>
-      </div>
-    </div>
+    <OperationsSummary label="Protection health" :items="summaryItems" />
 
     <!-- Quick Protect Cards -->
     <div class="quick-cards" v-if="categoryCards.length > 0">
@@ -108,12 +102,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Search, Lock, Unlock, View,
+  Lock,
   Document, Folder, Grid, Menu as MenuIcon,
-  Link, Star, ChatDotRound, Files,
+  Link, Star, ChatDotRound,
 } from '@element-plus/icons-vue'
 import { content, plans } from '@/api/index.js'
 import { formatWpDate } from '@/utils/wpDate.js'
@@ -123,13 +117,13 @@ import ContentProtectionListCard from '@/components/content/ContentProtectionLis
 import { useContentProtectionEditor } from '@/composables/content/useContentProtectionEditor.js'
 import { useContentProtectionWizard } from '@/composables/content/useContentProtectionWizard.js'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
+import OperationsSummary from '@/components/workspace/OperationsSummary.vue'
 
 // ─── State ───
 
 const loading = ref(false)
 const items = ref([])
 const total = ref(0)
-const tableRef = ref(null)
 const selectedRows = ref([])
 
 const filters = reactive({
@@ -167,8 +161,36 @@ const planOptionsMap = computed(() => {
 // Stats
 const stats = reactive({
   totalRules: 0,
+  resourceTypes: 0,
+  teaserRules: 0,
+  unassignedRules: 0,
   typeCounts: {},
 })
+
+const summaryItems = computed(() => [
+  {
+    label: 'Protected resources',
+    value: stats.totalRules,
+    support: 'WordPress resources with an active protection rule',
+    tone: stats.totalRules > 0 ? 'success' : 'neutral',
+  },
+  {
+    label: 'Resource types',
+    value: stats.resourceTypes,
+    support: 'Protection categories currently in use',
+  },
+  {
+    label: 'Teasers enabled',
+    value: stats.teaserRules,
+    support: 'Rules showing a preview before access',
+  },
+  {
+    label: 'Needs a plan',
+    value: stats.unassignedRules,
+    support: 'Rules not assigned to an access plan',
+    tone: stats.unassignedRules > 0 ? 'warning' : 'neutral',
+  },
+])
 
 // ─── Category Card Definitions ───
 
@@ -257,23 +279,6 @@ const wizardCategoryCards = computed(() => {
 const groupTabs = computed(() => {
   const labels = groupLabels.value
   return Object.entries(labels).map(([key, label]) => ({ key, label }))
-})
-
-// ─── Stats Display ───
-
-const statsDisplay = computed(() => {
-  const result = []
-  const tc = stats.typeCounts
-
-  if (tc.post) result.push({ label: 'Posts', value: tc.post })
-  if (tc.page) result.push({ label: 'Pages', value: tc.page })
-
-  const taxCount = (tc.category || 0) + (tc.post_tag || 0)
-  if (taxCount > 0) result.push({ label: 'Taxonomies', value: taxCount })
-
-  result.push({ label: 'Total Rules', value: stats.totalRules })
-
-  return result
 })
 
 // ─── Debounce ───
@@ -387,23 +392,16 @@ async function fetchContent() {
 
     items.value = data
     total.value = res.total ?? 0
-    updateStats(data)
+    const summary = res.summary ?? {}
+    stats.totalRules = Number(summary.total_rules) || 0
+    stats.resourceTypes = Number(summary.resource_types) || 0
+    stats.teaserRules = Number(summary.teaser_rules) || 0
+    stats.unassignedRules = Number(summary.unassigned_rules) || 0
+    stats.typeCounts = { ...(summary.type_counts ?? {}) }
   } catch (err) {
     ElMessage.error(err.message || 'Failed to load protected content')
   } finally {
     loading.value = false
-  }
-}
-
-function updateStats(data) {
-  // Only update stats on unfiltered fetch
-  if (!filters.search && !filters.resource_type && !filters.plan_id && activeTab.value === 'all' && !activeCategory.value) {
-    stats.totalRules = total.value
-    const counts = {}
-    data.forEach(item => {
-      counts[item.resource_type] = (counts[item.resource_type] || 0) + 1
-    })
-    stats.typeCounts = counts
   }
 }
 
@@ -572,38 +570,10 @@ onMounted(async () => {
   margin: 0;
 }
 
-/* Stats Bar */
-.stats-bar {
-  display: flex;
-  gap: 24px;
-  padding: 16px 20px;
-  background: var(--fchub-card-bg);
-  border: 1px solid var(--fchub-border-color);
-  border-radius: 8px;
-  margin-bottom: 20px;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--fchub-text-primary);
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--fchub-text-secondary);
-}
-
 /* Quick Cards */
 .quick-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -807,5 +777,22 @@ onMounted(async () => {
   font-size: 15px;
   font-weight: 600;
   color: var(--fchub-text-primary);
+}
+
+@media (max-width: 1100px) {
+  .quick-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .quick-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .quick-card {
+    padding: 14px 10px;
+  }
 }
 </style>

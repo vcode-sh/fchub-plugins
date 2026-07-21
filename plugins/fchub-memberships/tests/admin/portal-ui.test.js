@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import MembershipHistory from '@portal/components/MembershipHistory.vue'
 import PlanCard from '@portal/components/PlanCard.vue'
@@ -83,5 +84,16 @@ describe('member portal presentation', () => {
     expect(toggle.attributes('aria-expanded')).toBe('true')
     expect(toggle.attributes('aria-controls')).toBe('fchub-membership-history')
     expect(wrapper.get('a.fchub-history-entry__action').text()).toBe('Renew membership')
+  })
+
+  it('keeps the membership name readable beside mobile recovery actions', () => {
+    const source = readFileSync(
+      'resources/portal/components/HistoryEntry.vue',
+      'utf8',
+    )
+
+    expect(source).toContain('@media (max-width: 480px)')
+    expect(source).toMatch(/\.fchub-history-entry__title\s*\{[^}]*white-space:\s*normal/s)
+    expect(source).toMatch(/\.fchub-history-entry__meta\s*\{[^}]*flex-direction:\s*row/s)
   })
 })

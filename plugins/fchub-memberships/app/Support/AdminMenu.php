@@ -6,6 +6,19 @@ defined('ABSPATH') || exit;
 
 class AdminMenu
 {
+    public static function addPluginActionLinks(array $links): array
+    {
+        $settingsLink = sprintf(
+            '<a href="%s">%s</a>',
+            esc_url(admin_url('admin.php?page=fchub-memberships#/settings')),
+            esc_html__('Settings', 'fchub-memberships')
+        );
+
+        array_unshift($links, $settingsLink);
+
+        return $links;
+    }
+
     public static function register(): void
     {
         add_menu_page(

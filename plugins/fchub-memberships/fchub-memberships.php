@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: FCHub - Memberships
- * Plugin URI: https://fchub.co
+ * Plugin URI: https://fchub.co/docs/fchub-memberships
  * Description: Complete membership system for FluentCart with plan management, content access control, content drip scheduling, and analytics
  * Version: 1.3.1
  * Author: Vibe Code
@@ -13,7 +13,7 @@
  * Requires at least: 6.7
  * Tested up to:    7.0
  * Requires PHP: 8.3
- * Update URI: https://fchub.co/fchub-memberships
+ * Update URI: https://fchub.co/docs/fchub-memberships
  */
 
 defined('ABSPATH') || exit;

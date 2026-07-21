@@ -180,6 +180,7 @@
     var el = wp.element.createElement;
     var Fragment = wp.element.Fragment;
     var useEffect = wp.element.useEffect;
+    var useState = wp.element.useState;
     var __ = wp.i18n.__;
     var components = wp.components;
     var PluginDocumentSettingPanel = wp.editor.PluginDocumentSettingPanel;
@@ -207,6 +208,39 @@
         return __('Protected by inherited rules', 'fchub-memberships');
     }
 
+    function planSelectionMode(planIds) {
+        return Array.isArray(planIds) && planIds.length ? 'specific' : 'any';
+    }
+
+    function filterPlans(plans, query) {
+        var needle = String(query || '').trim().toLocaleLowerCase();
+        if (!needle) {
+            return plans;
+        }
+        return plans.filter(function (plan) {
+            return String(plan.label || '').toLocaleLowerCase().includes(needle);
+        });
+    }
+
+    function togglePlanId(planIds, planId, checked) {
+        var current = (planIds || []).map(Number);
+        if (checked) {
+            return current.indexOf(Number(planId)) === -1 ? current.concat([Number(planId)]) : current;
+        }
+        return current.filter(function (id) { return id !== Number(planId); });
+    }
+
+    function selectedPlanSummary(config) {
+        if (planSelectionMode(config.plan_ids) === 'any') {
+            return __('Any active membership plan', 'fchub-memberships');
+        }
+        var namesById = {};
+        (config.plans || []).forEach(function (plan) { namesById[Number(plan.id)] = plan.label; });
+        return config.plan_ids.map(function (id) {
+            return namesById[Number(id)] || __('Unknown plan', 'fchub-memberships') + ' #' + id;
+        }).join(', ');
+    }
+
     function currentEffective(config) {
         var effective = config.effective || { protected: false, mode: 'public', sources: [] };
         var inherited = (effective.sources || []).filter(function (source) { return source.type !== 'direct'; });
@@ -217,9 +251,7 @@
                 sources: [{
                     type: 'direct',
                     label: __('Direct protection', 'fchub-memberships'),
-                    detail: config.plan_ids && config.plan_ids.length
-                        ? __('Selected membership plans', 'fchub-memberships')
-                        : __('Any active membership plan', 'fchub-memberships')
+                    detail: selectedPlanSummary(config)
                 }].concat(inherited)
             };
         }
@@ -312,16 +344,91 @@
         );
     }
 
+    function PlanPicker(props) {
+        var config = props.config;
+        var update = props.update;
+        var plans = config.plans || [];
+        var mode = planSelectionMode(config.plan_ids);
+        var searchState = useState('');
+        var query = searchState[0];
+        var setQuery = searchState[1];
+        var visiblePlans = filterPlans(plans, query);
+
+        function setMode(nextMode) {
+            if (nextMode === 'any') {
+                update({ plan_ids: [] });
+                return;
+            }
+            if (!(config.plan_ids || []).length && plans.length) {
+                update({ plan_ids: [Number(plans[0].id)] });
+            }
+        }
+
+        return el(
+            'div',
+            { className: 'fchub-plan-picker' },
+            el(components.RadioControl, {
+                label: __('Plan access', 'fchub-memberships'),
+                selected: mode,
+                options: [
+                    { label: __('Any active plan', 'fchub-memberships'), value: 'any' },
+                    { label: __('Specific plans', 'fchub-memberships'), value: 'specific', disabled: plans.length === 0 }
+                ],
+                onChange: setMode
+            }),
+            mode === 'any'
+                ? el(
+                    'div',
+                    { className: 'fchub-plan-picker__explanation' },
+                    el('strong', null, __('Open to every active member', 'fchub-memberships')),
+                    el('span', null, __('Access is granted by any active membership plan.', 'fchub-memberships'))
+                )
+                : el(
+                    Fragment,
+                    null,
+                    el(
+                        'div',
+                        { className: 'fchub-plan-picker__heading' },
+                        el('strong', null, __('Active plans', 'fchub-memberships')),
+                        el('span', null, String((config.plan_ids || []).length) + ' ' + __('selected', 'fchub-memberships'))
+                    ),
+                    plans.length > 6 && el(components.SearchControl, {
+                        label: __('Search plans', 'fchub-memberships'),
+                        placeholder: __('Search plans', 'fchub-memberships'),
+                        value: query,
+                        onChange: setQuery
+                    }),
+                    visiblePlans.length
+                        ? el(
+                            'div',
+                            { className: 'fchub-plan-picker__list', role: 'group', 'aria-label': __('Specific plans', 'fchub-memberships') },
+                            visiblePlans.map(function (plan) {
+                                var checked = (config.plan_ids || []).map(Number).indexOf(Number(plan.id)) !== -1;
+                                return el(
+                                    'div',
+                                    { className: 'fchub-plan-picker__option', key: plan.id },
+                                    el(components.CheckboxControl, {
+                                        label: plan.label,
+                                        checked: checked,
+                                        onChange: function (isChecked) {
+                                            update({ plan_ids: togglePlanId(config.plan_ids, plan.id, isChecked) });
+                                        }
+                                    })
+                                );
+                            })
+                        )
+                        : el(
+                            'p',
+                            { className: 'fchub-plan-picker__empty' },
+                            __('No plans match this search.', 'fchub-memberships')
+                        )
+                )
+        );
+    }
+
     function ProtectionControls(props) {
         var config = props.config;
         var update = props.update;
-        var planLabelsById = {};
-        var planIdsByLabel = {};
-        (config.plans || []).forEach(function (plan) {
-            planLabelsById[plan.id] = plan.label;
-            planIdsByLabel[plan.label] = plan.id;
-        });
-        var selectedPlanLabels = (config.plan_ids || []).map(function (id) { return planLabelsById[id]; }).filter(Boolean);
         var ctaError = validateCta(config.cta_text, config.cta_url);
         var tokens = ['{plan_names}', '{login_url}', '{pricing_url}', '{user_name}'];
 
@@ -334,18 +441,7 @@
                 el(SourceList, { config: config }),
                 el('div', { className: 'fchub-protection-divider' }),
                 config.plans && config.plans.length
-                    ? el(components.FormTokenField, {
-                        label: __('Required plans', 'fchub-memberships'),
-                        help: selectedPlanLabels.length
-                            ? __('Access is granted by any selected active plan.', 'fchub-memberships')
-                            : __('No selection means any active membership plan grants access.', 'fchub-memberships'),
-                        value: selectedPlanLabels,
-                        suggestions: (config.plans || []).map(function (plan) { return plan.label; }),
-                        __experimentalValidateInput: function (value) { return Object.prototype.hasOwnProperty.call(planIdsByLabel, value); },
-                        onChange: function (labels) {
-                            update({ plan_ids: labels.map(function (label) { return planIdsByLabel[label]; }).filter(Boolean) });
-                        }
-                    })
+                    ? el(PlanPicker, { config: config, update: update })
                     : el(components.Notice, { status: 'warning', isDismissible: false }, __('Create an active plan before limiting access to specific plans.', 'fchub-memberships'))
             ),
             el(
@@ -522,7 +618,11 @@
     window.fchubMembershipProtectionUI = {
         validateCta: validateCta,
         statusLabel: statusLabel,
-        currentEffective: currentEffective
+        currentEffective: currentEffective,
+        planSelectionMode: planSelectionMode,
+        filterPlans: filterPlans,
+        togglePlanId: togglePlanId,
+        selectedPlanSummary: selectedPlanSummary
     };
 
     wp.plugins.registerPlugin('fchub-membership-protection', {

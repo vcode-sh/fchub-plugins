@@ -190,4 +190,46 @@ final class ProtectionRuleRepositoryTest extends PluginTestCase
             'meta' => $rule['meta'],
         ], $rules));
     }
+
+    public function test_summary_aggregates_operational_counts_in_one_grouped_query(): void
+    {
+        $queries = [];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static function (string $query) use (&$queries): array {
+            $queries[] = $query;
+
+            return [
+                [
+                    'resource_type' => 'post',
+                    'total_rules' => '3',
+                    'teaser_rules' => '1',
+                    'unassigned_rules' => '1',
+                ],
+                [
+                    'resource_type' => 'category',
+                    'total_rules' => '2',
+                    'teaser_rules' => '0',
+                    'unassigned_rules' => '2',
+                ],
+            ];
+        };
+
+        $repo = new ProtectionRuleRepository();
+        self::assertTrue(method_exists($repo, 'summary'), 'The repository must expose an aggregate summary query.');
+        $summary = $repo->summary();
+
+        self::assertSame([
+            'total_rules' => 5,
+            'resource_types' => 2,
+            'teaser_rules' => 1,
+            'unassigned_rules' => 3,
+            'type_counts' => [
+                'post' => 3,
+                'category' => 2,
+            ],
+        ], $summary);
+        self::assertCount(1, $queries);
+        self::assertStringContainsString('GROUP BY resource_type', $queries[0]);
+        self::assertStringContainsString("show_teaser = 'yes'", $queries[0]);
+        self::assertStringContainsString("plan_ids = '[]'", $queries[0]);
+    }
 }

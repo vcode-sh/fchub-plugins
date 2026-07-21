@@ -153,7 +153,17 @@ function apiPayload(url) {
     return { data: [{ id: '55', label: 'Members Post', type: 'post', type_label: 'Posts' }] }
   }
   if (url.includes('/admin/content')) {
-    return { data: [], total: 0 }
+    return {
+      data: [],
+      total: 0,
+      summary: {
+        total_rules: 0,
+        resource_types: 0,
+        teaser_rules: 0,
+        unassigned_rules: 0,
+        type_counts: {},
+      },
+    }
   }
   if (url.includes('/admin/drip/calendar')) {
     return { data: { '2026-03-20': 1 } }

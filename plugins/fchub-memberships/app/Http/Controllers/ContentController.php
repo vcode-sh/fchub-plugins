@@ -137,8 +137,9 @@ class ContentController
         }
 
         return new \WP_REST_Response([
-            'data'  => $rules,
-            'total' => $total,
+            'data'    => $rules,
+            'total'   => $total,
+            'summary' => $repo->summary(),
         ]);
     }
 

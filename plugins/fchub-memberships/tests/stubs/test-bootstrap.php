@@ -532,6 +532,13 @@ if (!function_exists('admin_url')) {
     }
 }
 
+if (!function_exists('plugin_basename')) {
+    function plugin_basename(string $file): string
+    {
+        return basename(dirname($file)) . '/' . basename($file);
+    }
+}
+
 if (!function_exists('add_query_arg')) {
     function add_query_arg(array $args, string $url = ''): string
     {

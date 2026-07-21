@@ -26,6 +26,10 @@ if (!defined('FCHUB_MEMBERSHIPS_VERSION')) {
     define('FCHUB_MEMBERSHIPS_VERSION', '1.3.1');
 }
 
+if (!defined('FCHUB_MEMBERSHIPS_FILE')) {
+    define('FCHUB_MEMBERSHIPS_FILE', dirname(__DIR__) . '/fchub-memberships.php');
+}
+
 if (!defined('FCHUB_MEMBERSHIPS_PATH')) {
     define('FCHUB_MEMBERSHIPS_PATH', dirname(__DIR__) . '/');
 }

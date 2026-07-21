@@ -84,4 +84,22 @@ function formatDate(dateStr) {
 .fchub-history-entry__action:hover {
   text-decoration: underline;
 }
+
+@media (max-width: 480px) {
+  .fchub-history-entry {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .fchub-history-entry__title {
+    white-space: normal;
+  }
+
+  .fchub-history-entry__meta {
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
 </style>

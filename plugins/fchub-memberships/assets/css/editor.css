@@ -150,6 +150,88 @@
     margin: 16px 0;
 }
 
+.fchub-plan-picker .components-radio-control__option {
+    margin-bottom: 8px;
+}
+
+.fchub-plan-picker__explanation {
+    background: #f0f6fc;
+    border: 1px solid #c5d9ed;
+    border-radius: 6px;
+    display: grid;
+    gap: 3px;
+    margin-top: 12px;
+    padding: 11px 12px;
+}
+
+.fchub-plan-picker__explanation strong,
+.fchub-plan-picker__heading strong {
+    color: #1d2327;
+    font-size: 12px;
+}
+
+.fchub-plan-picker__explanation span,
+.fchub-plan-picker__heading span,
+.fchub-plan-picker__empty {
+    color: #646970;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.fchub-plan-picker__heading {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin: 14px 0 8px;
+}
+
+.fchub-plan-picker__heading span {
+    background: #f0f0f1;
+    border-radius: 999px;
+    padding: 2px 7px;
+}
+
+.fchub-plan-picker .components-search-control {
+    margin-bottom: 10px;
+}
+
+.fchub-plan-picker__list {
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    max-height: 232px;
+    overflow-y: auto;
+}
+
+.fchub-plan-picker__option {
+    border-bottom: 1px solid #e2e4e7;
+    padding: 10px 12px;
+}
+
+.fchub-plan-picker__option:last-child {
+    border-bottom: 0;
+}
+
+.fchub-plan-picker__option:has(input:checked) {
+    background: #f0f6fc;
+}
+
+.fchub-plan-picker__option .components-base-control,
+.fchub-plan-picker__option .components-base-control__field,
+.fchub-plan-picker__option .components-checkbox-control__input-container {
+    margin-bottom: 0;
+}
+
+.fchub-plan-picker__option .components-base-control__help {
+    margin: 6px 0 0 28px;
+}
+
+.fchub-plan-picker__empty {
+    background: #f6f7f7;
+    border-radius: 6px;
+    margin: 0;
+    padding: 12px;
+}
+
 .fchub-protection-field-group {
     background: #f6f7f7;
     border: 1px solid #dcdcde;
@@ -247,7 +329,10 @@
         width: min(360px, 34vw) !important;
     }
 
-    .interface-interface-skeleton__sidebar:has(.fchub-protection-sidebar) .interface-complementary-area {
+    .interface-interface-skeleton__sidebar:has(.fchub-protection-sidebar) .interface-complementary-area__fill,
+    .interface-interface-skeleton__sidebar:has(.fchub-protection-sidebar) .interface-complementary-area,
+    .interface-interface-skeleton__sidebar:has(.fchub-protection-sidebar) .fchub-protection-sidebar {
+        max-width: none !important;
         width: 100% !important;
     }
 }
