@@ -104,6 +104,42 @@ test('preserves completed work when moving back but clears a stale resource afte
   await expect(dialog.locator('.cpw-current-selection strong')).toHaveText('Categories & Tags')
 })
 
+test('opens the resource combobox with browse results before typing', async ({ page }) => {
+  const dialog = await openWizard(page)
+  await choosePost(dialog)
+  await dialog.getByRole('button', { name: 'Continue' }).click()
+
+  const resourcePicker = dialog.getByRole('combobox', { name: /Resource/ })
+  await expect(dialog.getByText('Choose or search posts', { exact: true })).toBeVisible()
+  await dialog.locator('.cpw-resource-step .el-select').click()
+
+  await expect(page.getByRole('option', { name: 'Members Post' })).toBeVisible()
+  await expect(dialog.getByText('Browse recent resources or type at least 2 characters to search.')).toBeVisible()
+})
+
+test('keeps long resource titles inside the mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const dialog = await openWizard(page)
+  await choosePost(dialog)
+  await dialog.getByRole('button', { name: 'Continue' }).click()
+  await dialog.locator('.cpw-resource-step .el-select').click()
+  await expect(page.getByRole('option', { name: 'Members Post' })).toBeVisible()
+
+  const geometry = await page.locator('.el-popper.cpw-resource-popper').evaluate((popper) => {
+    const rect = popper.getBoundingClientRect()
+    return {
+      left: rect.left,
+      right: rect.right,
+      viewportWidth: window.innerWidth,
+      rootScrollWidth: document.documentElement.scrollWidth,
+    }
+  })
+
+  expect(geometry.left).toBeGreaterThanOrEqual(0)
+  expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth)
+  expect(geometry.rootScrollWidth).toBe(geometry.viewportWidth)
+})
+
 test('keeps the modal deliberate and exposes resource-search failures', async ({ page }) => {
   const dialog = await openWizard(page)
   await choosePost(dialog)

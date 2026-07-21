@@ -106,6 +106,7 @@ describe('content protection wizard state', () => {
   })
 
   it('ignores a stale resource response after a newer search wins', async () => {
+    vi.useFakeTimers()
     const first = deferred()
     const second = deferred()
     const { wizard } = createWizard({
@@ -116,7 +117,9 @@ describe('content protection wizard state', () => {
     wizard.wizardForm.resource_type = 'post'
 
     const oldSearch = wizard.searchResources('old')
+    await vi.advanceTimersByTimeAsync(250)
     const newSearch = wizard.searchResources('new')
+    await vi.advanceTimersByTimeAsync(250)
     second.resolve({ data: [{ id: '2', label: 'New result' }] })
     await newSearch
     first.resolve({ data: [{ id: '1', label: 'Old result' }] })
@@ -124,18 +127,85 @@ describe('content protection wizard state', () => {
 
     expect(wizard.resourceOptions.value).toEqual([{ id: '2', label: 'New result' }])
     expect(wizard.resourceSearchLoading.value).toBe(false)
+    vi.useRealTimers()
   })
 
-  it('clears old results and errors for a blank query', async () => {
-    const { wizard } = createWizard()
+  it('loads browse results and clears old errors for a blank query', async () => {
+    const browseResults = [{ id: '1', label: 'Recent result' }]
+    const { api, wizard } = createWizard({
+      searchResources: vi.fn().mockResolvedValue({ data: browseResults }),
+    })
     wizard.wizardForm.resource_type = 'post'
     wizard.resourceOptions.value = [{ id: '1', label: 'Old result' }]
     wizard.resourceSearchError.value = 'Old failure'
 
     await wizard.searchResources('   ')
 
-    expect(wizard.resourceOptions.value).toEqual([])
+    expect(api.searchResources).toHaveBeenCalledWith({ type: 'post', query: '' })
+    expect(wizard.resourceOptions.value).toEqual(browseResults)
     expect(wizard.resourceSearchError.value).toBe('')
+  })
+
+  it('debounces remote searches and reuses cached query results', async () => {
+    vi.useFakeTimers()
+    const results = [{ id: '2', label: 'Designing Forms' }]
+    const { api, wizard } = createWizard({
+      searchResources: vi.fn().mockResolvedValue({ data: results }),
+    })
+    wizard.wizardForm.resource_type = 'post'
+
+    const firstSearch = wizard.searchResources('design')
+    expect(api.searchResources).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(249)
+    expect(api.searchResources).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    await firstSearch
+    expect(api.searchResources).toHaveBeenCalledTimes(1)
+    expect(api.searchResources).toHaveBeenCalledWith({ type: 'post', query: 'design' })
+
+    await wizard.searchResources('design')
+    expect(api.searchResources).toHaveBeenCalledTimes(1)
+    expect(wizard.resourceOptions.value).toEqual(results)
+    vi.useRealTimers()
+  })
+
+  it('keeps initial browse results for a one-character query', async () => {
+    const browseResults = [{ id: '3', label: 'Business' }]
+    const { api, wizard } = createWizard({
+      searchResources: vi.fn().mockResolvedValue({ data: browseResults }),
+    })
+    wizard.wizardForm.resource_type = 'category'
+
+    await wizard.searchResources('')
+    await wizard.searchResources('b')
+
+    expect(api.searchResources).toHaveBeenCalledTimes(1)
+    expect(api.searchResources).toHaveBeenCalledWith({ type: 'category', query: '' })
+    expect(wizard.resourceOptions.value).toEqual(browseResults)
+  })
+
+  it('preserves the selected resource while displaying new search results', async () => {
+    vi.useFakeTimers()
+    const { wizard } = createWizard({
+      searchResources: vi.fn().mockResolvedValue({
+        data: [{ id: '9', label: 'New result' }],
+      }),
+    })
+    wizard.wizardForm.resource_type = 'post'
+    wizard.wizardForm.resource_id = '5'
+    wizard.resourceOptions.value = [{ id: '5', label: 'Selected result' }]
+
+    const search = wizard.searchResources('new')
+    await vi.advanceTimersByTimeAsync(250)
+    await search
+
+    expect(wizard.resourceOptions.value).toEqual([
+      { id: '5', label: 'Selected result' },
+      { id: '9', label: 'New result' },
+    ])
+    vi.useRealTimers()
   })
 
   it('shows a useful search error without retaining stale results', async () => {

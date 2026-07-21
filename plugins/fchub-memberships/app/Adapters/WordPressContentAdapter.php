@@ -192,8 +192,8 @@ class WordPressContentAdapter implements AccessAdapterInterface
             'post_type'      => $postType,
             'post_status'    => 'publish',
             'posts_per_page' => $limit,
-            'orderby'        => 'title',
-            'order'          => 'ASC',
+            'orderby'        => $query === '' ? 'date' : 'relevance',
+            'order'          => 'DESC',
         ];
 
         if ($query !== '') {

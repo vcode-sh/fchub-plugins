@@ -2,6 +2,9 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { canAdvanceProtectionStep } from '@/components/content/contentProtectionWizardUi.js'
 
+const RESOURCE_SEARCH_DELAY = 250
+const MIN_RESOURCE_QUERY_LENGTH = 2
+
 export function useContentProtectionWizard({
   contentApi,
   fetchContent,
@@ -15,7 +18,10 @@ export function useContentProtectionWizard({
   const resourceSearchLoading = ref(false)
   const resourceSearchError = ref('')
   const resourceOptions = ref([])
+  const resourceResultCache = new Map()
+  const resourcePendingRequests = new Map()
   let resourceRequestId = 0
+  let resourceSessionId = 0
 
   const wizardForm = reactive({
     categoryKey: '',
@@ -69,6 +75,9 @@ export function useContentProtectionWizard({
     wizardForm.redirect_url = ''
     wizardForm.commentMode = 'all'
     resourceRequestId += 1
+    resourceSessionId += 1
+    resourceResultCache.clear()
+    resourcePendingRequests.clear()
     resourceOptions.value = []
     resourceSearchError.value = ''
     resourceSearchLoading.value = false
@@ -122,24 +131,7 @@ export function useContentProtectionWizard({
     if (!type) return
 
     if (type === 'special_page' || type === 'menu_item') {
-      const requestId = ++resourceRequestId
-      resourceSearchLoading.value = true
-      resourceSearchError.value = ''
-      try {
-        const res = await contentApi.searchResources({ type, query: '' })
-        if (requestId === resourceRequestId) {
-          resourceOptions.value = res.data ?? res ?? []
-        }
-      } catch (error) {
-        if (requestId === resourceRequestId) {
-          resourceOptions.value = []
-          resourceSearchError.value = error.message || 'Content search failed. Try again.'
-        }
-      } finally {
-        if (requestId === resourceRequestId) {
-          resourceSearchLoading.value = false
-        }
-      }
+      await searchResources('')
     }
 
     if (type === 'comment') {
@@ -148,10 +140,73 @@ export function useContentProtectionWizard({
     }
   }
 
+  function mergeSelectedResource(options) {
+    const selected = resourceOptions.value.find(
+      option => String(option.id) === String(wizardForm.resource_id),
+    )
+
+    if (!selected || options.some(option => String(option.id) === String(selected.id))) {
+      return options
+    }
+
+    return [selected, ...options]
+  }
+
+  function cacheKey(type, query) {
+    return `${type}:${query.toLowerCase()}`
+  }
+
+  async function fetchResourceOptions(type, query, requestId, sessionId) {
+    const key = cacheKey(type, query)
+
+    if (resourceResultCache.has(key)) {
+      if (requestId === resourceRequestId) {
+        resourceOptions.value = mergeSelectedResource(resourceResultCache.get(key))
+        resourceSearchLoading.value = false
+      }
+      return
+    }
+
+    let request = resourcePendingRequests.get(key)
+    if (!request) {
+      request = contentApi.searchResources({ type, query })
+        .then((res) => {
+          const options = res.data ?? res ?? []
+          if (sessionId === resourceSessionId) {
+            resourceResultCache.set(key, options)
+          }
+          return options
+        })
+      resourcePendingRequests.set(key, request)
+      const clearPendingRequest = () => {
+        if (resourcePendingRequests.get(key) === request) {
+          resourcePendingRequests.delete(key)
+        }
+      }
+      void request.then(clearPendingRequest, clearPendingRequest)
+    }
+
+    try {
+      const options = await request
+      if (requestId === resourceRequestId) {
+        resourceOptions.value = mergeSelectedResource(options)
+      }
+    } catch (error) {
+      if (requestId === resourceRequestId) {
+        resourceOptions.value = mergeSelectedResource([])
+        resourceSearchError.value = error.message || 'Content search failed. Try again.'
+      }
+    } finally {
+      if (requestId === resourceRequestId) {
+        resourceSearchLoading.value = false
+      }
+    }
+  }
+
   async function searchResources(query) {
     const type = wizardForm.resource_type === 'comment' ? 'post' : wizardForm.resource_type
     const normalizedQuery = String(query || '').trim()
-    if (!normalizedQuery || !type) {
+    if (!type) {
       resourceRequestId += 1
       resourceOptions.value = []
       resourceSearchError.value = ''
@@ -160,23 +215,18 @@ export function useContentProtectionWizard({
     }
 
     const requestId = ++resourceRequestId
+    const sessionId = resourceSessionId
+    const effectiveQuery = normalizedQuery.length < MIN_RESOURCE_QUERY_LENGTH ? '' : normalizedQuery
+    const key = cacheKey(type, effectiveQuery)
     resourceSearchLoading.value = true
     resourceSearchError.value = ''
-    try {
-      const res = await contentApi.searchResources({ type, query: normalizedQuery })
-      if (requestId === resourceRequestId) {
-        resourceOptions.value = res.data ?? res ?? []
-      }
-    } catch (error) {
-      if (requestId === resourceRequestId) {
-        resourceOptions.value = []
-        resourceSearchError.value = error.message || 'Content search failed. Try again.'
-      }
-    } finally {
-      if (requestId === resourceRequestId) {
-        resourceSearchLoading.value = false
-      }
+
+    if (normalizedQuery.length >= MIN_RESOURCE_QUERY_LENGTH && !resourceResultCache.has(key)) {
+      await new Promise(resolve => setTimeout(resolve, RESOURCE_SEARCH_DELAY))
+      if (requestId !== resourceRequestId) return
     }
+
+    await fetchResourceOptions(type, effectiveQuery, requestId, sessionId)
   }
 
   const wizardResourceDisplayName = computed(() => {

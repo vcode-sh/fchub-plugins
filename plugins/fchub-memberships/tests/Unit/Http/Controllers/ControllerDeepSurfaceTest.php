@@ -144,4 +144,26 @@ final class ControllerDeepSurfaceTest extends PluginTestCase
         self::assertNotEmpty($grouped['data']);
         self::assertSame('Content', $grouped['groups']['content']);
     }
+
+    public function test_content_resource_browse_is_recent_and_search_is_relevance_ordered(): void
+    {
+        ContentController::searchResources(new \WP_REST_Request('GET', '/search-resources', [
+            'type' => 'post',
+            'query' => '',
+        ]));
+        $browseArgs = $GLOBALS['_fchub_test_get_posts_args'][0];
+
+        ContentController::searchResources(new \WP_REST_Request('GET', '/search-resources', [
+            'type' => 'post',
+            'query' => 'Members',
+        ]));
+        $searchArgs = $GLOBALS['_fchub_test_get_posts_args'][1];
+
+        self::assertSame('date', $browseArgs['orderby']);
+        self::assertSame('DESC', $browseArgs['order']);
+        self::assertSame('relevance', $searchArgs['orderby']);
+        self::assertSame('DESC', $searchArgs['order']);
+        self::assertSame(20, $browseArgs['posts_per_page']);
+        self::assertSame(20, $searchArgs['posts_per_page']);
+    }
 }

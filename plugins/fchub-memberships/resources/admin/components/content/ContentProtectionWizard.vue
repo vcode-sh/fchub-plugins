@@ -181,9 +181,11 @@
                   remote
                   :remote-method="searchResources"
                   :loading="resourceLoading"
-                  placeholder="Search for a post"
+                  placeholder="Choose or search for a post"
                   class="cpw-control cpw-nested-control"
+                  popper-class="cpw-resource-popper"
                   no-data-text="No matching posts"
+                  @visible-change="onResourcePickerVisibility"
                 >
                   <el-option v-for="item in resourceOptions" :key="item.id" :label="item.label || item.title" :value="String(item.id)" />
                 </el-select>
@@ -198,11 +200,13 @@
                   :loading="resourceLoading"
                   :placeholder="resourcePlaceholder"
                   class="cpw-control"
+                  popper-class="cpw-resource-popper"
                   no-data-text="No matching content"
+                  @visible-change="onResourcePickerVisibility"
                 >
                   <el-option v-for="item in resourceOptions" :key="item.id" :label="item.label || item.title" :value="String(item.id)" />
                 </el-select>
-                <p class="cpw-field-help">Start typing to search. Only the selected resource will be protected.</p>
+                <p class="cpw-field-help">Browse recent resources or type at least 2 characters to search. Only the selected resource will be protected.</p>
               </el-form-item>
             </template>
           </el-form>
@@ -418,8 +422,14 @@ const categorySelectionLabel = computed(() => {
 })
 const resourcePlaceholder = computed(() => {
   const label = String(props.form.resource_type_label || 'content').toLowerCase()
-  return `Search ${label}`
+  return `Choose or search ${label}`
 })
+
+function onResourcePickerVisibility(visible) {
+  if (visible) {
+    props.searchResources('')
+  }
+}
 
 function selectStep(targetStep) {
   if (targetStep < props.step) {
@@ -868,6 +878,23 @@ watch(
   background: var(--el-fill-color-light);
   padding: 1px 4px;
   border-radius: 4px;
+}
+
+.cpw-resource-popper {
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
+}
+
+.cpw-resource-popper .el-select-dropdown,
+.cpw-resource-popper .el-select-dropdown__wrap,
+.cpw-resource-popper .el-select-dropdown__list {
+  max-width: 100%;
+}
+
+.cpw-resource-popper .el-select-dropdown__item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cpw-alert {

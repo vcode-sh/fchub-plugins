@@ -199,7 +199,10 @@ window.fetch = async (input, init = {}) => {
     const parsedUrl = new URL(url)
     const type = parsedUrl.searchParams.get('type') || 'post'
     const resources = {
-      post: [{ id: '55', label: 'Members Post', type: 'post', type_label: 'Posts' }],
+      post: [
+        { id: '55', label: 'Members Post', type: 'post', type_label: 'Posts' },
+        { id: '182', label: 'Mobile-First Design Is Not Just About Screen Size', type: 'post', type_label: 'Posts' },
+      ],
       page: [{ id: '56', label: 'Member Welcome', type: 'page', type_label: 'Pages' }],
       category: [{ id: '7', label: 'Premium Articles', type: 'category', type_label: 'Categories' }],
       post_tag: [{ id: '8', label: 'Member News', type: 'post_tag', type_label: 'Tags' }],

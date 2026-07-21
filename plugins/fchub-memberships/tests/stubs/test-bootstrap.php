@@ -817,6 +817,7 @@ if (!function_exists('get_post_type')) {
 if (!function_exists('get_posts')) {
     function get_posts(array $args = []): array
     {
+        $GLOBALS['_fchub_test_get_posts_args'][] = $args;
         $postType = (string) ($args['post_type'] ?? '');
         $posts = $GLOBALS['_fchub_test_posts_by_type'][$postType] ?? array_values($GLOBALS['_fchub_test_posts'] ?? []);
         $search = (string) ($args['s'] ?? '');
