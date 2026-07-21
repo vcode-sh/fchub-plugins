@@ -49,6 +49,34 @@ final class MemberControllerContractTest extends PluginTestCase
         $this->assertArrayNotHasKey('plan_id', $data['data'][0], 'User search should not return grant rows.');
     }
 
+    public function test_user_picker_queries_are_bounded_and_use_deterministic_ordering(): void
+    {
+        MemberController::index(new \WP_REST_Request('GET', '/fchub-memberships/v1/admin/members', [
+            'users_only' => true,
+            'search' => '',
+            'per_page' => 10,
+        ]));
+
+        MemberController::index(new \WP_REST_Request('GET', '/fchub-memberships/v1/admin/members', [
+            'users_only' => true,
+            'search' => 'alice',
+            'per_page' => 200,
+        ]));
+
+        [$browseArgs, $searchArgs] = $GLOBALS['_fchub_test_get_users_args'];
+        self::assertSame('', $browseArgs['search']);
+        self::assertSame('registered', $browseArgs['orderby']);
+        self::assertSame('DESC', $browseArgs['order']);
+        self::assertSame(10, $browseArgs['number']);
+        self::assertFalse($browseArgs['count_total']);
+
+        self::assertSame('*alice*', $searchArgs['search']);
+        self::assertSame('display_name', $searchArgs['orderby']);
+        self::assertSame('ASC', $searchArgs['order']);
+        self::assertSame(20, $searchArgs['number']);
+        self::assertFalse($searchArgs['count_total']);
+    }
+
     public function test_show_returns_profile_shape_and_enriched_history(): void
     {
         $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static function (string $query): array {

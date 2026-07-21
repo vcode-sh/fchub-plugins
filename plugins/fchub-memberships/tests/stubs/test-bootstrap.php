@@ -771,6 +771,7 @@ if (!function_exists('get_userdata')) {
 if (!function_exists('get_users')) {
     function get_users(array $args = []): array
     {
+        $GLOBALS['_fchub_test_get_users_args'][] = $args;
         $users = array_values($GLOBALS['_fchub_test_users'] ?? []);
         $search = trim((string) ($args['search'] ?? ''));
         $number = (int) ($args['number'] ?? count($users));

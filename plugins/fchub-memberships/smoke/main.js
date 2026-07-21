@@ -152,6 +152,25 @@ window.fetch = async (input, init = {}) => {
       }),
     }
   }
+  if (url.includes('/admin/members') && new URL(url).searchParams.get('users_only')) {
+    const query = (new URL(url).searchParams.get('search') || '').toLowerCase()
+    const users = [
+      { id: 21, display_name: 'Alice Example', email: 'alice@example.com', registered_at: '2026-03-10 10:00:00' },
+      { id: 22, display_name: 'Alexandria Montgomery With An Exceptionally Long Name', email: 'alexandria.montgomery.with.a.long.address@example.com', registered_at: '2026-03-09 10:00:00' },
+      { id: 23, display_name: 'Bob Example', email: 'bob@example.com', registered_at: '2026-03-08 10:00:00' },
+      { id: 24, display_name: 'Carla Example', email: 'carla@example.com', registered_at: '2026-03-07 10:00:00' },
+      { id: 25, display_name: 'Diego Example', email: 'diego@example.com', registered_at: '2026-03-06 10:00:00' },
+      { id: 26, display_name: 'Emilia Example', email: 'emilia@example.com', registered_at: '2026-03-05 10:00:00' },
+      { id: 27, display_name: 'Farah Example', email: 'farah@example.com', registered_at: '2026-03-04 10:00:00' },
+      { id: 28, display_name: 'George Example', email: 'george@example.com', registered_at: '2026-03-03 10:00:00' },
+      { id: 29, display_name: 'Hannah Example', email: 'hannah@example.com', registered_at: '2026-03-02 10:00:00' },
+      { id: 30, display_name: 'Ibrahim Example', email: 'ibrahim@example.com', registered_at: '2026-03-01 10:00:00' },
+    ]
+    const matches = query
+      ? users.filter((user) => `${user.display_name} ${user.email}`.toLowerCase().includes(query))
+      : users
+    return { ok: true, status: 200, json: async () => ({ data: matches, total: matches.length }) }
+  }
   if (url.includes('/admin/members')) {
     return { ok: true, status: 200, json: async () => ({ data: [{ user_id: 21, display_name: 'Alice Example', user_email: 'alice@example.com', plan_id: 5, plan_title: 'Gold Plan', status: 'active', created_at: '2026-03-01 10:00:00', expires_at: null, source_type: 'manual' }], total: 1 }) }
   }

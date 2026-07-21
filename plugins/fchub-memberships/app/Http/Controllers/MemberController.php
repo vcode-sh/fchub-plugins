@@ -670,6 +670,9 @@ class MemberController
             'search'         => $search !== '' ? '*' . $search . '*' : '',
             'search_columns' => ['user_email', 'display_name', 'user_login'],
             'number'         => $perPage,
+            'orderby'        => $search === '' ? 'registered' : 'display_name',
+            'order'          => $search === '' ? 'DESC' : 'ASC',
+            'count_total'    => false,
         ]);
 
         $data = array_map(static function (object $user): array {

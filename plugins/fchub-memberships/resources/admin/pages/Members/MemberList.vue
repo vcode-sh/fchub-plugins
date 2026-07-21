@@ -99,12 +99,14 @@
       :loading="granting"
       :searching-users="searchingUsers"
       :user-results="userResults"
+      :user-search-error="userSearchError"
+      :selected-user="selectedGrantUser"
       :plan-options="planOptions"
       :date-picker-format="wpDatePickerFormat"
       :search-users="searchUsers"
       @close="grantDialogVisible = false; resetGrantForm()"
       @confirm="handleGrant"
-      @update:user-id="grantForm.user_id = $event"
+      @update:user-id="updateGrantUser"
       @update:plan-id="grantForm.plan_id = $event"
       @update:expires-at="grantForm.expires_at = $event"
       @update:reason="grantForm.reason = $event"
@@ -156,6 +158,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { members as membersApi, plans } from '@/api/index.js'
 import { formatWpDate, wpDatePickerFormat } from '@/utils/wpDate.js'
+import { useGrantAccessUserPicker } from '@/composables/members/useGrantAccessUserPicker.js'
 import MemberListToolbar from '@/components/members/MemberListToolbar.vue'
 import MemberBulkActionsBar from '@/components/members/MemberBulkActionsBar.vue'
 import GrantAccessDialog from '@/components/members/GrantAccessDialog.vue'
@@ -197,9 +200,16 @@ const grantForm = reactive({
   reason: '',
 })
 
-// User search
-const searchingUsers = ref(false)
-const userResults = ref([])
+const selectedGrantUser = ref(null)
+const {
+  searchingUsers,
+  userResults,
+  userSearchError,
+  searchUsers,
+  resetUserSearch,
+} = useGrantAccessUserPicker({
+  fetchUsers: (params) => membersApi.list(params),
+})
 
 // Bulk actions
 const selectedRows = ref([])
@@ -266,20 +276,9 @@ async function fetchPlanOptions() {
   }
 }
 
-async function searchUsers(query) {
-  if (!query || query.length < 2) {
-    userResults.value = []
-    return
-  }
-  searchingUsers.value = true
-  try {
-    const response = await membersApi.list({ search: query, per_page: 10, users_only: true })
-    userResults.value = response.data || response || []
-  } catch {
-    userResults.value = []
-  } finally {
-    searchingUsers.value = false
-  }
+function updateGrantUser(userId) {
+  grantForm.user_id = userId
+  selectedGrantUser.value = userResults.value.find(({ id }) => String(id) === String(userId)) || null
 }
 
 async function handleGrant() {
@@ -458,7 +457,8 @@ function resetGrantForm() {
   grantForm.plan_id = ''
   grantForm.expires_at = ''
   grantForm.reason = ''
-  userResults.value = []
+  selectedGrantUser.value = null
+  resetUserSearch()
 }
 
 function statusTagType(status) {

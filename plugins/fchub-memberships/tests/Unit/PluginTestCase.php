@@ -31,6 +31,7 @@ abstract class PluginTestCase extends TestCase
         $GLOBALS['_fchub_test_cache'] = [];
         $GLOBALS['_fchub_test_users'] = [];
         $GLOBALS['_fchub_test_users_by_email'] = [];
+        $GLOBALS['_fchub_test_get_users_args'] = [];
         $GLOBALS['_fchub_test_current_user_id'] = 0;
         $GLOBALS['_fchub_test_current_user'] = (object) ['ID' => 0, 'user_email' => ''];
         $GLOBALS['_fchub_test_posts'] = [];
