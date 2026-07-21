@@ -14,8 +14,8 @@
     <div class="grant-access-shell">
       <header class="grant-task-header">
         <span class="grant-task-eyebrow">MANUAL ACCESS</span>
-        <h3>Create a manual membership grant</h3>
-        <p>Choose an existing WordPress user and the membership plan they should receive.</p>
+        <h3>{{ taskTitle }}</h3>
+        <p>{{ taskDescription }}</p>
       </header>
 
       <el-alert
@@ -33,11 +33,20 @@
             <span class="grant-section-icon" aria-hidden="true"><el-icon><UserFilled /></el-icon></span>
             <span>
               <h4 id="grant-member-heading">Member</h4>
-              <p>Find the WordPress account that should receive access.</p>
+              <p>{{ fixedUser ? 'This profile is the selected WordPress account.' : 'Find the WordPress account that should receive access.' }}</p>
             </span>
           </div>
 
-          <el-form-item label="User" required>
+          <div v-if="fixedUser" class="grant-fixed-member" aria-label="Selected member">
+            <span class="grant-fixed-avatar" aria-hidden="true">{{ fixedUserInitials }}</span>
+            <span class="grant-fixed-copy">
+              <strong>{{ fixedUser.display_name }}</strong>
+              <small>{{ fixedUser.email || fixedUser.user_email }}</small>
+            </span>
+            <el-tag type="success" effect="light" size="small">Selected</el-tag>
+          </div>
+
+          <el-form-item v-else label="User" required>
             <el-select
               :model-value="form.user_id"
               filterable
@@ -150,7 +159,7 @@
           <dl>
             <div>
               <dt>Member</dt>
-              <dd>{{ selectedUser?.display_name || 'Not selected' }}</dd>
+              <dd>{{ effectiveSelectedUser?.display_name || 'Not selected' }}</dd>
             </div>
             <div>
               <dt>Plan</dt>
@@ -219,6 +228,10 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  fixedUser: {
+    type: Object,
+    default: null,
+  },
   planOptions: {
     type: Array,
     default: () => [],
@@ -229,7 +242,7 @@ const props = defineProps({
   },
   searchUsers: {
     type: Function,
-    required: true,
+    default: () => {},
   },
 })
 
@@ -238,13 +251,31 @@ const emit = defineEmits(['close', 'confirm', 'update:userId', 'update:planId', 
 const selectedPlan = computed(() => (
   props.planOptions.find(({ id }) => String(id) === String(props.form.plan_id)) || null
 ))
-const isReady = computed(() => Boolean(props.form.user_id && props.form.plan_id))
+const effectiveSelectedUser = computed(() => props.fixedUser || props.selectedUser)
+const isReady = computed(() => Boolean((props.fixedUser || props.form.user_id) && props.form.plan_id))
+const fixedUserInitials = computed(() => {
+  const name = String(props.fixedUser?.display_name || '').trim()
+  const parts = name.split(/\s+/).filter(Boolean)
+  if (parts.length) return parts.slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase()
+  const email = String(props.fixedUser?.email || props.fixedUser?.user_email || '').trim()
+  return email ? email.charAt(0).toUpperCase() : '?'
+})
+const taskTitle = computed(() => (
+  props.fixedUser
+    ? `Create a manual grant for ${props.fixedUser.display_name}`
+    : 'Create a manual membership grant'
+))
+const taskDescription = computed(() => (
+  props.fixedUser
+    ? 'Choose the membership plan and confirm how long this access should remain active.'
+    : 'Choose an existing WordPress user and the membership plan they should receive.'
+))
 const summaryTitle = computed(() => {
   if (!isReady.value) {
     return 'Select a member and plan to preview this grant.'
   }
 
-  return `${props.selectedUser?.display_name || 'Selected member'} will receive ${selectedPlan.value?.title || 'the selected plan'}.`
+  return `${effectiveSelectedUser.value?.display_name || 'Selected member'} will receive ${selectedPlan.value?.title || 'the selected plan'}.`
 })
 
 function onUserPickerVisibility(visible) {
@@ -422,6 +453,53 @@ function onUserPickerVisibility(visible) {
 
 .grant-access-form .el-form-item {
   margin-bottom: 0;
+}
+
+.grant-fixed-member {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--el-color-primary) 20%, var(--fchub-border-color));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--fchub-card-bg) 95%, var(--el-color-primary) 5%);
+}
+
+.grant-fixed-avatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--el-color-primary);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.grant-fixed-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.grant-fixed-copy strong,
+.grant-fixed-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grant-fixed-copy strong {
+  color: var(--fchub-text-primary);
+  font-size: 13px;
+}
+
+.grant-fixed-copy small {
+  color: var(--fchub-text-secondary);
+  font-size: 11px;
 }
 
 .grant-control {
