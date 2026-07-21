@@ -6,21 +6,23 @@
         <h3 class="fchub-plan-card__title">{{ plan.plan_title }}</h3>
         <p v-if="plan.description" class="fchub-plan-card__desc">{{ plan.description }}</p>
       </div>
-      <StatusBadge :status="plan.status" :is-lifetime="plan.is_lifetime" />
+      <div class="fchub-plan-card__header-actions">
+        <StatusBadge :status="plan.status" :is-lifetime="plan.is_lifetime" />
+        <a
+          v-if="plan.action"
+          class="fchub-plan-card__action"
+          :href="plan.action.url"
+        >
+          {{ plan.action.label }}
+        </a>
+      </div>
     </div>
 
     <!-- Stats row -->
     <div class="fchub-plan-card__stats">
       <div class="fchub-plan-card__stat">
-        <span class="fchub-plan-card__stat-label">{{ plan.is_lifetime ? 'Access' : 'Expires' }}</span>
-        <span class="fchub-plan-card__stat-value">{{ plan.is_lifetime ? 'Lifetime' : formatDate(plan.expires_at) }}</span>
-      </div>
-      <span class="fchub-plan-card__stat-divider"></span>
-      <div class="fchub-plan-card__stat">
-        <span class="fchub-plan-card__stat-label">{{ plan.is_lifetime ? 'Duration' : 'Remaining' }}</span>
-        <span class="fchub-plan-card__stat-value" :class="{ 'fchub-plan-card__stat-value--warn': !plan.is_lifetime && isExpiringSoon }">
-          {{ plan.is_lifetime ? 'Forever' : daysLabel }}
-        </span>
+        <span class="fchub-plan-card__stat-label">{{ accessFact.label }}</span>
+        <span class="fchub-plan-card__stat-value">{{ accessFact.value }}</span>
       </div>
       <template v-if="showProgress">
         <span class="fchub-plan-card__stat-divider"></span>
@@ -50,18 +52,44 @@ import { computed } from 'vue'
 import StatusBadge from './StatusBadge.vue'
 import DripProgress from './DripProgress.vue'
 import ContentLibrary from './ContentLibrary.vue'
-import { useDaysRemaining } from '../composables/useDaysRemaining.js'
 
 const props = defineProps({
   plan: { type: Object, required: true },
 })
 
-const { daysLeft, label: daysLabel, isExpiringSoon } = useDaysRemaining(
-  computed(() => props.plan.is_lifetime ? null : props.plan.expires_at)
-)
-
 const showProgress = computed(() => {
   return props.plan.progress && props.plan.progress.total > 0
+})
+
+const accessFact = computed(() => {
+  if (props.plan.cancellation_effective_at) {
+    return { label: 'Access ends', value: formatDate(props.plan.cancellation_effective_at) }
+  }
+
+  if (props.plan.next_billing_date) {
+    return { label: 'Renews', value: props.plan.next_billing_date }
+  }
+
+  if (props.plan.access_date_kind === 'varies') {
+    return { label: 'Access', value: 'Dates vary' }
+  }
+
+  if (props.plan.is_lifetime) {
+    return { label: 'Access', value: 'Lifetime' }
+  }
+
+  if (props.plan.expires_at) {
+    return { label: 'Access ends', value: formatDate(props.plan.expires_at) }
+  }
+
+  if (props.plan.source_type === 'subscription') {
+    return {
+      label: 'Access',
+      value: props.plan.status === 'paused' ? 'Subscription paused' : 'Subscription active',
+    }
+  }
+
+  return { label: 'Access', value: 'Active' }
 })
 
 function formatDate(dateStr) {
@@ -95,6 +123,36 @@ function formatDate(dateStr) {
 .fchub-plan-card__header-left {
   min-width: 0;
   flex: 1;
+}
+
+.fchub-plan-card__header-actions {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.fchub-plan-card__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--portal-border);
+  border-radius: var(--portal-radius-sm);
+  background: var(--portal-card-bg);
+  color: var(--portal-accent-blue);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.fchub-plan-card__action:hover {
+  border-color: var(--portal-accent-blue);
+  background: var(--portal-hover-bg);
 }
 
 .fchub-plan-card__title {
@@ -156,10 +214,6 @@ function formatDate(dateStr) {
   color: var(--portal-text-primary);
 }
 
-.fchub-plan-card__stat-value--warn {
-  color: var(--portal-badge-expired-text);
-}
-
 /* Progress */
 .fchub-plan-card__progress {
   margin-top: 16px;
@@ -179,6 +233,15 @@ function formatDate(dateStr) {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
+  }
+
+  .fchub-plan-card__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .fchub-plan-card__header-actions {
+    align-items: flex-start;
   }
 
   .fchub-plan-card__stat-divider {

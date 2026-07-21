@@ -4,14 +4,9 @@
       eyebrow="Timed access"
       title="Drip Calendar"
       description="Scan upcoming unlocks by day and inspect the members affected."
-    >
-      <template #back>
-        <a class="back-link" @click.prevent="$router.push('/drip')">
-          <el-icon><ArrowLeft /></el-icon>
-          Back to Drip
-        </a>
-      </template>
-    </WorkspacePageHeader>
+      back-to="/drip"
+      back-label="Back to drip"
+    />
 
     <!-- Month Navigation -->
     <div class="month-nav">
@@ -264,33 +259,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.page-header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--fchub-text-secondary);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.back-link:hover {
-  color: var(--el-color-primary);
-}
-
 .month-nav {
   display: flex;
   align-items: center;

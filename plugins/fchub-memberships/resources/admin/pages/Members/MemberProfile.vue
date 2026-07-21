@@ -1,9 +1,10 @@
 <template>
   <div class="member-profile-page" v-loading="loading">
-    <a class="profile-back-link" @click.prevent="$router.push('/members')">
-      <el-icon><ArrowLeft /></el-icon>
-      Back to members
-    </a>
+    <WorkspaceBackButton
+      class="profile-back-button"
+      to="/members"
+      label="Back to members"
+    />
 
     <template v-if="member">
       <section class="profile-hero" aria-labelledby="member-profile-title">
@@ -323,12 +324,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { ArrowLeft, Calendar, CircleClose, Document, Key, List, Message, Plus } from '@element-plus/icons-vue'
+import { Calendar, CircleClose, Document, Key, List, Message, Plus } from '@element-plus/icons-vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { members as membersApi, plans } from '@/api/index.js'
 import { formatWpDate, wpDatePickerFormat } from '@/utils/wpDate.js'
 import GrantAccessDialog from '@/components/members/GrantAccessDialog.vue'
+import WorkspaceBackButton from '@/components/workspace/WorkspaceBackButton.vue'
 import {
   buildMemberProfileSummary,
   getMemberAccessState,
@@ -672,21 +674,8 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
-.profile-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.profile-back-button {
   margin-bottom: 14px;
-  color: var(--fchub-text-secondary);
-  font-size: 12px;
-  font-weight: 550;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.profile-back-link:hover,
-.profile-back-link:focus-visible {
-  color: var(--el-color-primary);
 }
 
 .profile-hero,

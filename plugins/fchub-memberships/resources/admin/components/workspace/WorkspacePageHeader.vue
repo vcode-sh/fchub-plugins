@@ -1,10 +1,24 @@
 <template>
   <header class="workspace-page-header">
     <div class="workspace-page-heading">
-      <slot name="back" />
-      <p v-if="eyebrow" class="workspace-page-eyebrow">{{ eyebrow }}</p>
-      <h1>{{ title }}</h1>
-      <p v-if="description" class="workspace-page-description">{{ description }}</p>
+      <p
+        v-if="eyebrow"
+        class="workspace-page-eyebrow"
+        :class="{ 'has-back': backTo }"
+      >
+        {{ eyebrow }}
+      </p>
+      <div class="workspace-page-title-row">
+        <WorkspaceBackButton
+          v-if="backTo"
+          :to="backTo"
+          :label="backLabel"
+        />
+        <div class="workspace-page-title-copy">
+          <h1>{{ title }}</h1>
+          <p v-if="description" class="workspace-page-description">{{ description }}</p>
+        </div>
+      </div>
     </div>
     <div v-if="$slots.actions" class="workspace-page-actions">
       <slot name="actions" />
@@ -13,10 +27,14 @@
 </template>
 
 <script setup>
+import WorkspaceBackButton from './WorkspaceBackButton.vue'
+
 defineProps({
   eyebrow: { type: String, default: '' },
   title: { type: String, required: true },
   description: { type: String, default: '' },
+  backTo: { type: [String, Object], default: '' },
+  backLabel: { type: String, default: 'Back' },
 })
 </script>
 
@@ -33,6 +51,16 @@ defineProps({
   min-width: 0;
 }
 
+.workspace-page-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.workspace-page-title-copy {
+  min-width: 0;
+}
+
 .workspace-page-eyebrow {
   margin: 0 0 6px;
   color: var(--el-color-primary);
@@ -40,6 +68,10 @@ defineProps({
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
+}
+
+.workspace-page-eyebrow.has-back {
+  margin-left: 52px;
 }
 
 h1 {

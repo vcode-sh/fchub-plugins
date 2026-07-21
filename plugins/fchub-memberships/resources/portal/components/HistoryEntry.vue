@@ -4,7 +4,16 @@
       <span class="fchub-history-entry__title">{{ entry.plan_title || 'Unknown Plan' }}</span>
       <span class="fchub-history-entry__date">{{ formatDate(entry.updated_at) }}</span>
     </div>
-    <StatusBadge :status="entry.status" />
+    <div class="fchub-history-entry__meta">
+      <StatusBadge :status="entry.status" />
+      <a
+        v-if="entry.action"
+        class="fchub-history-entry__action"
+        :href="entry.action.url"
+      >
+        {{ entry.action.label }}
+      </a>
+    </div>
   </div>
 </template>
 
@@ -55,5 +64,24 @@ function formatDate(dateStr) {
 .fchub-history-entry__date {
   font-size: 12px;
   color: var(--portal-text-muted);
+}
+
+.fchub-history-entry__meta {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.fchub-history-entry__action {
+  color: var(--portal-accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.fchub-history-entry__action:hover {
+  text-decoration: underline;
 }
 </style>

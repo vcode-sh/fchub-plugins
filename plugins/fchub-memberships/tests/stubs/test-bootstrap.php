@@ -1018,9 +1018,18 @@ if (!function_exists('wp_enqueue_style')) {
 }
 
 if (!function_exists('add_meta_box')) {
-    function add_meta_box(string $id, string $title, callable $callback, string $screen, string $context = 'advanced', string $priority = 'default'): void
+    function add_meta_box(string $id, string $title, callable $callback, string $screen, string $context = 'advanced', string $priority = 'default', ?array $callbackArgs = null): void
     {
-        $GLOBALS['_fchub_test_meta_boxes'][] = [$id, $title, $screen, $context, $priority];
+        $GLOBALS['_fchub_test_meta_boxes'][] = [$id, $title, $screen, $context, $priority, $callbackArgs];
+    }
+}
+
+if (!function_exists('register_rest_field')) {
+    function register_rest_field(string|array $objectType, string $attribute, array $args = []): void
+    {
+        foreach ((array) $objectType as $type) {
+            $GLOBALS['_fchub_test_rest_fields'][$type][$attribute] = $args;
+        }
     }
 }
 

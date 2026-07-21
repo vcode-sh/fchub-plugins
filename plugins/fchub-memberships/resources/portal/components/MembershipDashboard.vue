@@ -23,11 +23,15 @@
     <template v-else>
       <section v-if="hasPlans" class="fchub-plans-section">
         <div class="fchub-plans-section__list">
-          <PlanCard v-for="plan in plans" :key="plan.plan_id" :plan="plan" />
+          <PlanCard v-for="plan in plans" :key="plan.membership_key" :plan="plan" />
         </div>
       </section>
 
-      <MembershipHistory v-if="hasHistory" :entries="history" />
+      <MembershipHistory
+        v-if="hasHistory"
+        :entries="history"
+        :initially-expanded="!hasPlans"
+      />
     </template>
   </div>
 </template>

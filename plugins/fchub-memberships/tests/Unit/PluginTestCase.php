@@ -15,6 +15,7 @@ abstract class PluginTestCase extends TestCase
         $GLOBALS['_fchub_test_actions'] = [];
         $GLOBALS['_fchub_test_filters'] = [];
         $GLOBALS['_fchub_test_routes'] = [];
+        $GLOBALS['_fchub_test_rest_fields'] = [];
         $GLOBALS['_fchub_test_options'] = [];
         $GLOBALS['_fchub_test_queries'] = [];
         $GLOBALS['_fchub_test_scheduled_events'] = [];

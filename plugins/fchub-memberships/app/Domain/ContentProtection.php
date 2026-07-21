@@ -293,7 +293,8 @@ class ContentProtection
                 [$this, 'renderMetaBox'],
                 $postType,
                 'side',
-                'default'
+                'default',
+                ['__back_compat_meta_box' => true]
             );
         }
     }

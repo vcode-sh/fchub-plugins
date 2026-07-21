@@ -171,3 +171,362 @@
     window.wp.components,
     window.wp.i18n
 ));
+
+(function (wp) {
+    if (!wp.plugins || !wp.data || !wp.editor) {
+        return;
+    }
+
+    var el = wp.element.createElement;
+    var Fragment = wp.element.Fragment;
+    var useEffect = wp.element.useEffect;
+    var __ = wp.i18n.__;
+    var components = wp.components;
+    var PluginDocumentSettingPanel = wp.editor.PluginDocumentSettingPanel;
+    var PluginSidebar = wp.editor.PluginSidebar;
+    var PluginSidebarMoreMenuItem = wp.editor.PluginSidebarMoreMenuItem;
+
+    function validateCta(text, url) {
+        var hasText = String(text || '').trim() !== '';
+        var hasUrl = String(url || '').trim() !== '';
+        return hasText === hasUrl
+            ? ''
+            : __('Add both the button label and destination, or leave both empty.', 'fchub-memberships');
+    }
+
+    function statusLabel(effective) {
+        if (!effective || !effective.protected || effective.mode === 'public') {
+            return __('Public', 'fchub-memberships');
+        }
+        if (effective.mode === 'direct') {
+            return __('Protected directly', 'fchub-memberships');
+        }
+        if (effective.mode === 'mixed') {
+            return __('Protected by direct and inherited rules', 'fchub-memberships');
+        }
+        return __('Protected by inherited rules', 'fchub-memberships');
+    }
+
+    function currentEffective(config) {
+        var effective = config.effective || { protected: false, mode: 'public', sources: [] };
+        var inherited = (effective.sources || []).filter(function (source) { return source.type !== 'direct'; });
+        if (config.enabled) {
+            return {
+                protected: true,
+                mode: inherited.length ? 'mixed' : 'direct',
+                sources: [{
+                    type: 'direct',
+                    label: __('Direct protection', 'fchub-memberships'),
+                    detail: config.plan_ids && config.plan_ids.length
+                        ? __('Selected membership plans', 'fchub-memberships')
+                        : __('Any active membership plan', 'fchub-memberships')
+                }].concat(inherited)
+            };
+        }
+        return {
+            protected: inherited.length > 0,
+            mode: inherited.length ? 'inherited' : 'public',
+            sources: inherited
+        };
+    }
+
+    function Status(props) {
+        var effective = currentEffective(props.config);
+        return el(
+            'div',
+            { className: 'fchub-protection-status fchub-protection-status--' + effective.mode },
+            el('span', { className: 'fchub-protection-status__dot', 'aria-hidden': true }),
+            el(
+                'span',
+                null,
+                el('strong', null, statusLabel(effective)),
+                el(
+                    'small',
+                    null,
+                    effective.protected
+                        ? __('Visitors without access will see your configured fallback.', 'fchub-memberships')
+                        : __('Everyone can view this content.', 'fchub-memberships')
+                )
+            )
+        );
+    }
+
+    function SourceList(props) {
+        var sources = currentEffective(props.config).sources || [];
+        if (!sources.length) {
+            return el('p', { className: 'fchub-protection-empty' }, __('No protection rules apply to this content.', 'fchub-memberships'));
+        }
+
+        return el(
+            'div',
+            { className: 'fchub-protection-sources' },
+            sources.map(function (source, index) {
+                return el(
+                    'div',
+                    { className: 'fchub-protection-source', key: source.type + index },
+                    el(
+                        'div',
+                        null,
+                        el('strong', null, source.label),
+                        el('small', null, source.detail || '')
+                    ),
+                    source.manage_url && el(
+                        'a',
+                        { href: source.manage_url, className: 'fchub-protection-source__link' },
+                        __('Manage', 'fchub-memberships')
+                    )
+                );
+            })
+        );
+    }
+
+    function Preview(props) {
+        var config = props.config;
+        var selectedPlans = (config.plans || [])
+            .filter(function (plan) { return (config.plan_ids || []).indexOf(plan.id) !== -1; })
+            .map(function (plan) { return plan.label; });
+        var message = config.restriction_message || config.fallback_message || __('This content is available to members.', 'fchub-memberships');
+        message = message
+            .replaceAll('{plan_names}', selectedPlans.length ? selectedPlans.join(', ') : __('any active plan', 'fchub-memberships'))
+            .replaceAll('{user_name}', __('Preview member', 'fchub-memberships'))
+            .replaceAll('{login_url}', '#')
+            .replaceAll('{pricing_url}', '#');
+
+        return el(
+            'div',
+            { className: 'fchub-protection-preview' },
+            el('span', { className: 'fchub-protection-preview__eyebrow' }, __('Visitor preview', 'fchub-memberships')),
+            config.teaser_mode !== 'none' && el(
+                'p',
+                { className: 'fchub-protection-preview__teaser' },
+                config.teaser_mode === 'custom' && config.custom_teaser
+                    ? config.custom_teaser
+                    : __('A preview of the protected content will appear here.', 'fchub-memberships')
+            ),
+            el('p', { className: 'fchub-protection-preview__message' }, message),
+            config.cta_text && config.cta_url && el(
+                'span',
+                { className: 'fchub-protection-preview__button' },
+                config.cta_text
+            )
+        );
+    }
+
+    function ProtectionControls(props) {
+        var config = props.config;
+        var update = props.update;
+        var planLabelsById = {};
+        var planIdsByLabel = {};
+        (config.plans || []).forEach(function (plan) {
+            planLabelsById[plan.id] = plan.label;
+            planIdsByLabel[plan.label] = plan.id;
+        });
+        var selectedPlanLabels = (config.plan_ids || []).map(function (id) { return planLabelsById[id]; }).filter(Boolean);
+        var ctaError = validateCta(config.cta_text, config.cta_url);
+        var tokens = ['{plan_names}', '{login_url}', '{pricing_url}', '{user_name}'];
+
+        return el(
+            Fragment,
+            null,
+            el(
+                components.PanelBody,
+                { title: __('Who can access', 'fchub-memberships'), initialOpen: true },
+                el(SourceList, { config: config }),
+                el('div', { className: 'fchub-protection-divider' }),
+                config.plans && config.plans.length
+                    ? el(components.FormTokenField, {
+                        label: __('Required plans', 'fchub-memberships'),
+                        help: selectedPlanLabels.length
+                            ? __('Access is granted by any selected active plan.', 'fchub-memberships')
+                            : __('No selection means any active membership plan grants access.', 'fchub-memberships'),
+                        value: selectedPlanLabels,
+                        suggestions: (config.plans || []).map(function (plan) { return plan.label; }),
+                        __experimentalValidateInput: function (value) { return Object.prototype.hasOwnProperty.call(planIdsByLabel, value); },
+                        onChange: function (labels) {
+                            update({ plan_ids: labels.map(function (label) { return planIdsByLabel[label]; }).filter(Boolean) });
+                        }
+                    })
+                    : el(components.Notice, { status: 'warning', isDismissible: false }, __('Create an active plan before limiting access to specific plans.', 'fchub-memberships'))
+            ),
+            el(
+                components.PanelBody,
+                { title: __('Visitor experience', 'fchub-memberships'), initialOpen: true },
+                el(components.SelectControl, {
+                    label: __('Teaser', 'fchub-memberships'),
+                    value: config.teaser_mode || 'none',
+                    options: [
+                        { label: __('Restriction message only', 'fchub-memberships'), value: 'none' },
+                        { label: __('Post excerpt', 'fchub-memberships'), value: 'excerpt' },
+                        { label: __('Content before the More block', 'fchub-memberships'), value: 'more_tag' },
+                        { label: __('First number of words', 'fchub-memberships'), value: 'words' },
+                        { label: __('Custom teaser', 'fchub-memberships'), value: 'custom' }
+                    ],
+                    onChange: function (value) { update({ teaser_mode: value }); }
+                }),
+                config.teaser_mode === 'words' && el(components.TextControl, {
+                    label: __('Preview length', 'fchub-memberships'),
+                    help: __('Between 1 and 500 words.', 'fchub-memberships'),
+                    type: 'number',
+                    min: 1,
+                    max: 500,
+                    value: config.teaser_word_count || 50,
+                    onChange: function (value) { update({ teaser_word_count: Math.max(1, Math.min(500, parseInt(value || '50', 10))) }); }
+                }),
+                config.teaser_mode === 'custom' && el(components.TextareaControl, {
+                    label: __('Custom teaser', 'fchub-memberships'),
+                    value: config.custom_teaser || '',
+                    onChange: function (value) { update({ custom_teaser: value }); }
+                }),
+                el(components.TextareaControl, {
+                    label: __('Restriction message', 'fchub-memberships'),
+                    help: config.restriction_message
+                        ? __('This overrides the global message for this content.', 'fchub-memberships')
+                        : __('Leave empty to use the global restriction message.', 'fchub-memberships'),
+                    value: config.restriction_message || '',
+                    onChange: function (value) { update({ restriction_message: value }); }
+                }),
+                el(
+                    'div',
+                    { className: 'fchub-protection-tokens', 'aria-label': __('Available message tokens', 'fchub-memberships') },
+                    tokens.map(function (token) {
+                        return el(components.Button, {
+                            key: token,
+                            variant: 'tertiary',
+                            size: 'compact',
+                            onClick: function () { update({ restriction_message: (config.restriction_message || '') + token }); }
+                        }, token);
+                    })
+                ),
+                el('div', { className: 'fchub-protection-field-group' },
+                    el('strong', { className: 'fchub-protection-field-group__title' }, __('Optional call to action', 'fchub-memberships')),
+                    el('p', { className: 'fchub-protection-field-group__help' }, __('Shown below the restriction message. Add both fields to enable it.', 'fchub-memberships')),
+                    el(components.TextControl, {
+                        label: __('Button label', 'fchub-memberships'),
+                        value: config.cta_text || '',
+                        onChange: function (value) { update({ cta_text: value }); }
+                    }),
+                    el(components.TextControl, {
+                        label: __('Destination', 'fchub-memberships'),
+                        help: __('Use a site path such as /pricing or a full URL.', 'fchub-memberships'),
+                        value: config.cta_url || '',
+                        onChange: function (value) { update({ cta_url: value }); }
+                    }),
+                    ctaError && el(components.Notice, { status: 'error', isDismissible: false }, ctaError)
+                )
+            ),
+            el(
+                components.PanelBody,
+                { title: __('Preview', 'fchub-memberships'), initialOpen: true },
+                el(Preview, { config: config })
+            )
+        );
+    }
+
+    function ProtectionEditorPlugin() {
+        var config = wp.data.useSelect(function (select) {
+            return select('core/editor').getEditedPostAttribute('fchub_membership_protection');
+        }, []);
+        var editorActions = wp.data.useDispatch('core/editor');
+        var editPostActions = wp.data.useDispatch('core/edit-post');
+
+        if (!config || !PluginDocumentSettingPanel || !PluginSidebar) {
+            return null;
+        }
+
+        var ctaError = validateCta(config.cta_text, config.cta_url);
+        useEffect(function () {
+            if (!editorActions.lockPostSaving || !editorActions.unlockPostSaving) {
+                return undefined;
+            }
+            if (ctaError) {
+                editorActions.lockPostSaving('fchub-membership-protection');
+            } else {
+                editorActions.unlockPostSaving('fchub-membership-protection');
+            }
+            return function () { editorActions.unlockPostSaving('fchub-membership-protection'); };
+        }, [ctaError]);
+
+        function update(patch) {
+            editorActions.editPost({
+                fchub_membership_protection: Object.assign({}, config, patch)
+            });
+        }
+
+        function openSidebar() {
+            if (editPostActions.openGeneralSidebar) {
+                editPostActions.openGeneralSidebar('fchub-membership-protection/membership-protection-sidebar');
+            }
+        }
+
+        return el(
+            Fragment,
+            null,
+            el(
+                PluginDocumentSettingPanel,
+                {
+                    name: 'membership-protection-summary',
+                    title: __('Membership Protection', 'fchub-memberships'),
+                    className: 'fchub-protection-summary'
+                },
+                el(Status, { config: config }),
+                el(components.ToggleControl, {
+                    label: __('Add direct protection to this content', 'fchub-memberships'),
+                    help: currentEffective(config).mode === 'inherited' && !config.enabled
+                        ? __('Inherited rules still apply when direct protection is off.', 'fchub-memberships')
+                        : __('This setting is saved with the post.', 'fchub-memberships'),
+                    checked: Boolean(config.enabled),
+                    onChange: function (enabled) { update({ enabled: enabled }); }
+                }),
+                el(components.Button, {
+                    variant: 'secondary',
+                    className: 'fchub-protection-summary__button',
+                    onClick: openSidebar
+                }, __('Edit protection', 'fchub-memberships'))
+            ),
+            PluginSidebarMoreMenuItem && el(
+                PluginSidebarMoreMenuItem,
+                { target: 'membership-protection-sidebar', icon: 'lock' },
+                __('Membership Protection', 'fchub-memberships')
+            ),
+            el(
+                PluginSidebar,
+                {
+                    name: 'membership-protection-sidebar',
+                    title: __('Membership Protection', 'fchub-memberships'),
+                    icon: 'lock',
+                    className: 'fchub-protection-sidebar'
+                },
+                el('div', { className: 'fchub-protection-sidebar__intro' },
+                    el(Status, { config: config }),
+                    el(components.ToggleControl, {
+                        label: __('Direct protection', 'fchub-memberships'),
+                        help: __('Saved when you save or publish the post.', 'fchub-memberships'),
+                        checked: Boolean(config.enabled),
+                        onChange: function (enabled) { update({ enabled: enabled }); }
+                    })
+                ),
+                config.enabled
+                    ? el(ProtectionControls, { config: config, update: update })
+                    : el(
+                        'div',
+                        { className: 'fchub-protection-sidebar__disabled' },
+                        el(SourceList, { config: config }),
+                        el('p', null, currentEffective(config).protected
+                            ? __('This content remains protected by inherited rules. Enable direct protection to customise its visitor experience.', 'fchub-memberships')
+                            : __('Enable direct protection to choose plans and configure the visitor experience.', 'fchub-memberships'))
+                    )
+            )
+        );
+    }
+
+    window.fchubMembershipProtectionUI = {
+        validateCta: validateCta,
+        statusLabel: statusLabel,
+        currentEffective: currentEffective
+    };
+
+    wp.plugins.registerPlugin('fchub-membership-protection', {
+        icon: 'lock',
+        render: ProtectionEditorPlugin
+    });
+}(window.wp));

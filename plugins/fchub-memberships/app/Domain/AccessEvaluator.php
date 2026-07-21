@@ -76,6 +76,8 @@ class AccessEvaluator
         // Check plan-based grants (user has a plan that includes this resource)
         $planGrants = $this->grantRepo->getByUserId($userId, ['status' => Constants::STATUS_ACTIVE]);
         $checkedPlanIds = [];
+        $directProtectionRule = $this->protectionRepo->findByResource($resourceType, $resourceId);
+        $directPlanIds = array_map('intval', $directProtectionRule['plan_ids'] ?? []);
 
         foreach ($planGrants as $planGrant) {
             // Bug #5: Use strict null check instead of falsy check (plan_id=0 is valid)
@@ -83,6 +85,16 @@ class AccessEvaluator
                 continue;
             }
             $checkedPlanIds[] = $planGrant['plan_id'];
+
+            if (
+                $directProtectionRule
+                && ($directPlanIds === [] || in_array((int) $planGrant['plan_id'], $directPlanIds, true))
+            ) {
+                $planTrialActive = !empty($planGrant['trial_ends_at']) && strtotime($planGrant['trial_ends_at']) > current_time('timestamp', true);
+                $result = ['allowed' => true, 'reason' => Constants::REASON_PLAN_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $planGrant, 'trial_active' => $planTrialActive];
+                self::$cache[$cacheKey] = $result;
+                return $result;
+            }
 
             // Bug #7: Check both the exact provider and taxonomy resource types
             $hasResource = $this->ruleResolver->planHasResource($planGrant['plan_id'], $provider, $resourceType, $resourceId);

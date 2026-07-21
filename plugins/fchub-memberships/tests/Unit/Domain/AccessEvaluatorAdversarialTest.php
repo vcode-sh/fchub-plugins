@@ -8,6 +8,7 @@ use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Domain\Plan\PlanRuleResolver;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\ProtectionRuleRepository;
+use FChubMemberships\Support\Constants;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class AccessEvaluatorAdversarialTest extends PluginTestCase
@@ -22,6 +23,140 @@ final class AccessEvaluatorAdversarialTest extends PluginTestCase
             $reflection = new \ReflectionProperty(AccessEvaluator::class, $property);
             $reflection->setValue($evaluator, $value);
         }
+    }
+
+    public function test_direct_protection_plan_selection_grants_access_without_a_duplicate_plan_rule(): void
+    {
+        AccessEvaluator::clearCache();
+        $GLOBALS['_fchub_test_user_can'][9]['manage_options'] = false;
+
+        $evaluator = new AccessEvaluator();
+        $this->inject(
+            $evaluator,
+            new class extends GrantRepository {
+                public function getActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): ?array
+                {
+                    return null;
+                }
+
+                public function getByUserId(int $userId, array $filters = []): array
+                {
+                    return [['plan_id' => 5, 'status' => Constants::STATUS_ACTIVE, 'trial_ends_at' => null]];
+                }
+            },
+            new class extends PlanRuleResolver {
+                public function planHasResource(int $planId, string $provider, string $resourceType, string $resourceId): bool
+                {
+                    return false;
+                }
+            },
+            new class extends ProtectionRuleRepository {
+                public function findByResource(string $resourceType, string $resourceId): ?array
+                {
+                    return [
+                        'resource_type' => $resourceType,
+                        'resource_id' => $resourceId,
+                        'plan_ids' => [5],
+                        'meta' => [],
+                    ];
+                }
+            }
+        );
+
+        $result = $evaluator->evaluate(9, Constants::PROVIDER_WORDPRESS_CORE, 'post', '55');
+
+        self::assertTrue($result['allowed']);
+        self::assertSame(Constants::REASON_PLAN_GRANT, $result['reason']);
+    }
+
+    public function test_direct_protection_without_plan_selection_accepts_any_active_plan(): void
+    {
+        AccessEvaluator::clearCache();
+        $GLOBALS['_fchub_test_user_can'][9]['manage_options'] = false;
+
+        $evaluator = new AccessEvaluator();
+        $this->inject(
+            $evaluator,
+            new class extends GrantRepository {
+                public function getActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): ?array
+                {
+                    return null;
+                }
+
+                public function getByUserId(int $userId, array $filters = []): array
+                {
+                    if (($filters['status'] ?? null) === Constants::STATUS_PAUSED) {
+                        return [];
+                    }
+
+                    return [['plan_id' => 42, 'status' => Constants::STATUS_ACTIVE, 'trial_ends_at' => null]];
+                }
+            },
+            new class extends PlanRuleResolver {
+                public function planHasResource(int $planId, string $provider, string $resourceType, string $resourceId): bool
+                {
+                    return false;
+                }
+            },
+            new class extends ProtectionRuleRepository {
+                public function findByResource(string $resourceType, string $resourceId): ?array
+                {
+                    return [
+                        'resource_type' => $resourceType,
+                        'resource_id' => $resourceId,
+                        'plan_ids' => [],
+                        'meta' => [],
+                    ];
+                }
+            }
+        );
+
+        self::assertTrue($evaluator->evaluate(9, Constants::PROVIDER_WORDPRESS_CORE, 'post', '55')['allowed']);
+    }
+
+    public function test_direct_protection_rejects_an_active_grant_for_an_unselected_plan(): void
+    {
+        AccessEvaluator::clearCache();
+        $GLOBALS['_fchub_test_user_can'][9]['manage_options'] = false;
+
+        $evaluator = new AccessEvaluator();
+        $this->inject(
+            $evaluator,
+            new class extends GrantRepository {
+                public function getActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): ?array
+                {
+                    return null;
+                }
+
+                public function getByUserId(int $userId, array $filters = []): array
+                {
+                    if (($filters['status'] ?? null) === Constants::STATUS_PAUSED) {
+                        return [];
+                    }
+
+                    return [['plan_id' => 42, 'status' => Constants::STATUS_ACTIVE, 'trial_ends_at' => null]];
+                }
+            },
+            new class extends PlanRuleResolver {
+                public function planHasResource(int $planId, string $provider, string $resourceType, string $resourceId): bool
+                {
+                    return false;
+                }
+            },
+            new class extends ProtectionRuleRepository {
+                public function findByResource(string $resourceType, string $resourceId): ?array
+                {
+                    return [
+                        'resource_type' => $resourceType,
+                        'resource_id' => $resourceId,
+                        'plan_ids' => [5],
+                        'meta' => [],
+                    ];
+                }
+            }
+        );
+
+        self::assertFalse($evaluator->evaluate(9, Constants::PROVIDER_WORDPRESS_CORE, 'post', '55')['allowed']);
     }
 
     public function test_getters_prefer_specific_rules_then_plan_messages_then_settings_defaults(): void

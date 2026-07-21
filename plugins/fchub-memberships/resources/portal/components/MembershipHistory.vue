@@ -1,6 +1,11 @@
 <template>
   <div class="fchub-history">
-    <button class="fchub-history__toggle" @click="expanded = !expanded">
+    <button
+      class="fchub-history__toggle"
+      :aria-expanded="expanded"
+      aria-controls="fchub-membership-history"
+      @click="expanded = !expanded"
+    >
       <span class="fchub-history__heading">Past Memberships</span>
       <svg
         class="fchub-chevron"
@@ -9,6 +14,7 @@
         height="16"
         viewBox="0 0 16 16"
         fill="none"
+        aria-hidden="true"
       >
         <path
           d="M4 6L8 10L12 6"
@@ -21,7 +27,7 @@
     </button>
 
     <Transition name="fchub-collapse">
-      <div v-if="expanded" class="fchub-history__body">
+      <div v-if="expanded" id="fchub-membership-history" class="fchub-history__body">
         <HistoryEntry v-for="entry in entries" :key="entryKey(entry)" :entry="entry" />
       </div>
     </Transition>
@@ -32,14 +38,15 @@
 import { ref } from 'vue'
 import HistoryEntry from './HistoryEntry.vue'
 
-defineProps({
+const props = defineProps({
   entries: { type: Array, required: true },
+  initiallyExpanded: { type: Boolean, default: false },
 })
 
-const expanded = ref(false)
+const expanded = ref(props.initiallyExpanded)
 
 function entryKey(entry) {
-  return `${entry.id || ''}-${entry.plan_id || ''}-${entry.resource_id || ''}-${entry.updated_at || ''}`
+  return entry.membership_key || `${entry.plan_id || ''}-${entry.source_type || ''}-${entry.source_id || ''}-${entry.updated_at || ''}`
 }
 </script>
 

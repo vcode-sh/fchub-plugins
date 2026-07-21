@@ -1,19 +1,16 @@
 <template>
   <div class="plan-editor-page">
-    <header class="page-header">
-      <router-link class="back-link" to="/plans">
-        <el-icon><ArrowLeft /></el-icon>
-        Back to Plans
-      </router-link>
-      <div class="page-title-row">
-        <div>
-          <p class="page-eyebrow">Memberships</p>
-          <h1 class="fchub-page-title">{{ isNew ? 'Create membership plan' : 'Edit membership plan' }}</h1>
-          <p>Build the offer, choose what it unlocks, then review the member experience.</p>
-        </div>
+    <WorkspacePageHeader
+      eyebrow="Memberships"
+      :title="isNew ? 'Create membership plan' : 'Edit membership plan'"
+      description="Build the offer, choose what it unlocks, then review the member experience."
+      back-to="/plans"
+      back-label="Back to plans"
+    >
+      <template #actions>
         <span class="page-status" :class="`is-${form.status}`">{{ planSummary.status }}</span>
-      </div>
-    </header>
+      </template>
+    </WorkspacePageHeader>
 
     <el-form
       ref="formRef"
@@ -494,7 +491,7 @@
 
 <script setup>
 import { ref, reactive, computed, nextTick, onMounted, watch } from 'vue'
-import { ArrowDown, ArrowLeft, Delete, Lock, Plus, WarningFilled } from '@element-plus/icons-vue'
+import { ArrowDown, Delete, Lock, Plus, WarningFilled } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { plans, members, content } from '@/api/index.js'
@@ -505,6 +502,7 @@ import PlanMembersTab from '@/components/plans/PlanMembersTab.vue'
 import PlanLinkProductDialog from '@/components/plans/PlanLinkProductDialog.vue'
 import PlanBuilderProgress from '@/components/plans/PlanBuilderProgress.vue'
 import PlanBuilderSummary from '@/components/plans/PlanBuilderSummary.vue'
+import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 import {
   PLAN_BUILDER_STEPS,
   buildPlanSummary,
@@ -1301,30 +1299,6 @@ onMounted(() => {
 .plan-editor-page {
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header .fchub-page-title {
-  margin-bottom: 0;
-}
-
-/* Back link -- FC pattern */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--fchub-text-secondary);
-  text-decoration: none;
-  margin-bottom: 8px;
-  cursor: pointer;
-}
-
-.back-link:hover {
-  color: var(--el-color-primary);
-}
-
 .plan-details-layout {
   max-width: 840px;
   padding: 8px 4px 4px;
@@ -1521,42 +1495,6 @@ onMounted(() => {
   max-width: 1320px;
   margin: 0 auto;
   padding: 0 4px 40px;
-}
-
-.page-header {
-  margin-bottom: 22px;
-}
-
-.page-title-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.page-eyebrow {
-  margin: 0 0 4px;
-  color: var(--el-color-primary);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.page-title-row .fchub-page-title {
-  margin: 0;
-  color: var(--fchub-text-primary);
-  font-size: clamp(24px, 2vw, 30px);
-  line-height: 1.2;
-  letter-spacing: -0.025em;
-}
-
-.page-title-row p:last-child {
-  max-width: 620px;
-  margin: 7px 0 0;
-  color: var(--fchub-text-secondary);
-  font-size: 13px;
-  line-height: 1.5;
 }
 
 .page-status {
@@ -2059,18 +1997,6 @@ onMounted(() => {
     box-sizing: border-box;
     padding: 0 0 28px;
     overflow-x: clip;
-  }
-
-  .page-title-row {
-    gap: 12px;
-  }
-
-  .page-title-row .fchub-page-title {
-    font-size: 23px;
-  }
-
-  .page-title-row p:last-child {
-    display: none;
   }
 
   .page-status {

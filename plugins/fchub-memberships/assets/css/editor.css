@@ -1,0 +1,266 @@
+.fchub-protection-summary .components-panel__row {
+    display: block;
+}
+
+.fchub-protection-summary .components-toggle-control {
+    margin: 16px 0 12px;
+}
+
+.fchub-protection-summary__button {
+    justify-content: center;
+    width: 100%;
+}
+
+.fchub-protection-status {
+    align-items: flex-start;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+}
+
+.fchub-protection-status__dot {
+    background: #8c8f94;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px #8c8f94;
+    flex: 0 0 auto;
+    height: 8px;
+    margin-top: 4px;
+    width: 8px;
+}
+
+.fchub-protection-status--direct,
+.fchub-protection-status--mixed,
+.fchub-protection-status--inherited {
+    background: #f0f6fc;
+    border-color: #c5d9ed;
+}
+
+.fchub-protection-status--direct .fchub-protection-status__dot,
+.fchub-protection-status--mixed .fchub-protection-status__dot,
+.fchub-protection-status--inherited .fchub-protection-status__dot {
+    background: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.fchub-protection-status strong,
+.fchub-protection-status small {
+    display: block;
+}
+
+.fchub-protection-status strong {
+    color: #1d2327;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.fchub-protection-status small {
+    color: #50575e;
+    line-height: 1.45;
+    margin-top: 3px;
+}
+
+.fchub-protection-sidebar .components-panel__body {
+    border-top-color: #dcdcde;
+}
+
+.fchub-protection-sidebar {
+    overflow-x: hidden;
+}
+
+.fchub-protection-sidebar .components-panel__body.is-opened {
+    padding: 16px;
+}
+
+.fchub-protection-sidebar__intro {
+    background: #fff;
+    border-bottom: 1px solid #dcdcde;
+    padding: 16px;
+}
+
+.fchub-protection-sidebar__intro .components-toggle-control {
+    margin: 16px 0 0;
+}
+
+.fchub-protection-sidebar__disabled {
+    color: #50575e;
+    padding: 16px;
+}
+
+.fchub-protection-sidebar__disabled > p {
+    line-height: 1.5;
+    margin: 16px 0 0;
+}
+
+.fchub-protection-sources {
+    display: grid;
+    gap: 8px;
+}
+
+.fchub-protection-source {
+    align-items: center;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    min-width: 0;
+    padding: 10px 12px;
+}
+
+.fchub-protection-source > div {
+    min-width: 0;
+}
+
+.fchub-protection-source strong,
+.fchub-protection-source small {
+    display: block;
+}
+
+.fchub-protection-source strong {
+    color: #1d2327;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.fchub-protection-source small {
+    color: #646970;
+    line-height: 1.4;
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+}
+
+.fchub-protection-source__link {
+    flex: 0 0 auto;
+    font-size: 12px;
+}
+
+.fchub-protection-empty {
+    color: #646970;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.fchub-protection-divider {
+    border-top: 1px solid #dcdcde;
+    margin: 16px 0;
+}
+
+.fchub-protection-field-group {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    margin-top: 16px;
+    padding: 12px;
+}
+
+.fchub-protection-field-group__title {
+    display: block;
+    font-size: 13px;
+}
+
+.fchub-protection-field-group__help {
+    color: #646970;
+    font-size: 12px;
+    line-height: 1.45;
+    margin: 4px 0 12px;
+}
+
+.fchub-protection-field-group .components-base-control:last-child,
+.fchub-protection-field-group .components-base-control:last-child .components-base-control__field {
+    margin-bottom: 0;
+}
+
+.fchub-protection-tokens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: -4px 0 4px;
+}
+
+.fchub-protection-tokens .components-button {
+    font-family: SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+    height: 26px;
+    min-width: 0;
+    padding: 0 7px;
+}
+
+.fchub-protection-preview {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.fchub-protection-preview__eyebrow {
+    color: #646970;
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.fchub-protection-preview__teaser,
+.fchub-protection-preview__message {
+    line-height: 1.5;
+    margin: 0 0 10px;
+}
+
+.fchub-protection-preview__teaser {
+    border-bottom: 1px solid #dcdcde;
+    color: #646970;
+    font-style: italic;
+    padding-bottom: 10px;
+}
+
+.fchub-protection-preview__button {
+    background: #2271b1;
+    border-radius: 3px;
+    color: #fff;
+    display: inline-flex;
+    font-weight: 500;
+    justify-content: center;
+    min-height: 34px;
+    padding: 8px 12px;
+}
+
+.fchub-protection-sidebar .components-form-token-field__input-container,
+.fchub-protection-sidebar input[type="text"],
+.fchub-protection-sidebar input[type="number"],
+.fchub-protection-sidebar textarea,
+.fchub-protection-sidebar select {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+@media (min-width: 783px) {
+    .interface-interface-skeleton__sidebar:has(.fchub-protection-sidebar) {
+        width: min(360px, 34vw) !important;
+    }
+
+    .interface-interface-skeleton__sidebar:has(.fchub-protection-sidebar) .interface-complementary-area {
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 782px) {
+    .fchub-protection-sidebar__intro,
+    .fchub-protection-sidebar .components-panel__body.is-opened,
+    .fchub-protection-sidebar__disabled {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .fchub-protection-source {
+        align-items: flex-start;
+    }
+}

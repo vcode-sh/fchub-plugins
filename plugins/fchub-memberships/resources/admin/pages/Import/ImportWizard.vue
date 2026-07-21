@@ -4,11 +4,9 @@
       eyebrow="Member migration"
       title="Import Members"
       description="Bring existing members across with a reviewable, reversible-feeling workflow. Nothing is imported before confirmation."
-    >
-      <template #back>
-        <a class="back-link" @click.prevent="$router.push('/members')"><el-icon><ArrowLeft /></el-icon>Back to Members</a>
-      </template>
-    </WorkspacePageHeader>
+      back-to="/members"
+      back-label="Back to members"
+    />
 
     <nav class="import-progress-nav" aria-label="Import progress">
       <button
@@ -378,7 +376,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, UploadFilled, Download, Loading } from '@element-plus/icons-vue'
+import { UploadFilled, Download, Loading } from '@element-plus/icons-vue'
 import { importMembers, plans } from '@/api/index.js'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 
@@ -714,21 +712,6 @@ onMounted(() => {
 <style scoped>
 .import-wizard-page {
   /* full width like other pages */
-}
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--fchub-text-secondary);
-  text-decoration: none;
-  margin-bottom: 8px;
-  cursor: pointer;
-}
-
-.back-link:hover {
-  color: var(--el-color-primary);
 }
 
 .import-progress-nav {
