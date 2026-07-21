@@ -116,9 +116,19 @@ class AccessGrantService
         $results = ['granted' => 0, 'failed' => 0, 'errors' => []];
         foreach ($userIds as $userId) {
             try {
-                $this->grantPlan((int) $userId, $planId, $context);
+                $result = $this->grantPlan((int) $userId, $planId, $context);
+                if ((int) ($result['failed'] ?? 0) > 0 || !empty($result['blocked'])) {
+                    $results['failed']++;
+                    $results['errors'][] = sprintf(
+                        'User #%d: %s',
+                        $userId,
+                        $this->resultFailureMessage($result, __('Membership grant failed.', 'fchub-memberships'))
+                    );
+                    continue;
+                }
+
                 $results['granted']++;
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 $results['failed']++;
                 $results['errors'][] = sprintf('User #%d: %s', $userId, $e->getMessage());
             }
@@ -132,9 +142,19 @@ class AccessGrantService
         $results = ['revoked' => 0, 'failed' => 0, 'errors' => []];
         foreach ($userIds as $userId) {
             try {
-                $this->revokePlan((int) $userId, $planId, $context);
+                $result = $this->revokePlan((int) $userId, $planId, $context);
+                if (empty($result['success']) || (int) ($result['failed'] ?? 0) > 0) {
+                    $results['failed']++;
+                    $results['errors'][] = sprintf(
+                        'User #%d: %s',
+                        $userId,
+                        $this->resultFailureMessage($result, __('Membership revocation failed.', 'fchub-memberships'))
+                    );
+                    continue;
+                }
+
                 $results['revoked']++;
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 $results['failed']++;
                 $results['errors'][] = sprintf('User #%d: %s', $userId, $e->getMessage());
             }
@@ -161,5 +181,22 @@ class AccessGrantService
     public function revokeExpiredGracePeriodGrants(): int
     {
         return $this->revocation->revokeExpiredGracePeriodGrants();
+    }
+
+    private function resultFailureMessage(array $result, string $fallback): string
+    {
+        $messages = [];
+        foreach (($result['errors'] ?? []) as $error) {
+            if (is_string($error) && $error !== '') {
+                $messages[] = $error;
+                continue;
+            }
+
+            if (is_array($error) && !empty($error['message'])) {
+                $messages[] = (string) $error['message'];
+            }
+        }
+
+        return $messages ? implode('; ', $messages) : $fallback;
     }
 }

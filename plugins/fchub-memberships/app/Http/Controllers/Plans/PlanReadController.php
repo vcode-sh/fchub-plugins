@@ -35,13 +35,19 @@ final class PlanReadController
 
         $registry = ResourceTypeRegistry::getInstance();
         foreach ($plan['rules'] as &$rule) {
+            $storedResourceType = $rule['resource_type'];
             $rule['resource_label'] = self::resolveResourceName(
-                $rule['resource_type'],
+                $storedResourceType,
                 $rule['resource_id'],
                 $registry
             );
-            $typeConfig = $registry->get($rule['resource_type']);
-            $rule['resource_type_label'] = $typeConfig ? $typeConfig['label'] : $rule['resource_type'];
+            $typeConfig = $registry->getForRead($storedResourceType);
+            $rule['resource_type_label'] = $typeConfig ? $typeConfig['label'] : $storedResourceType;
+            $rule['resource_type'] = $registry->resolveReadType($storedResourceType);
+
+            if (!empty($typeConfig['read_only'])) {
+                $rule['read_only'] = true;
+            }
         }
 
         return new \WP_REST_Response(['data' => $plan]);
@@ -89,7 +95,8 @@ final class PlanReadController
 
     private static function resolveResourceName(string $type, string $id, ResourceTypeRegistry $registry): string
     {
-        $typeConfig = $registry->get($type);
+        $typeConfig = $registry->getForRead($type);
+        $resolvedType = $registry->resolveReadType($type);
         $typeLabel = $typeConfig ? $typeConfig['label'] : ucfirst($type);
 
         if ($id === '*' || $id === '0' || $id === '') {
@@ -128,6 +135,16 @@ final class PlanReadController
             return __('(Deleted)', 'fchub-memberships');
         }
 
+        $class = $typeConfig['adapter'] ?? null;
+        if (
+            $resolvedType !== $type
+            && is_string($class)
+            && class_exists($class)
+            && method_exists($class, 'getResourceLabel')
+        ) {
+            return (new $class())->getResourceLabel($resolvedType, $id);
+        }
+
         if (in_array($type, ['post', 'page'], true) || post_type_exists($type)) {
             $title = get_the_title((int) $id);
             return $title ?: __('(Deleted)', 'fchub-memberships');
@@ -142,15 +159,8 @@ final class PlanReadController
             return __('(Deleted)', 'fchub-memberships');
         }
 
-        if (in_array($type, ['fc_space', 'fc_course'], true)) {
-            $adapters = [
-                Constants::PROVIDER_FLUENT_COMMUNITY => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
-            ];
-            $provider = $typeConfig['provider'] ?? Constants::PROVIDER_WORDPRESS_CORE;
-            $class = $adapters[$provider] ?? null;
-            if ($class && class_exists($class) && method_exists($class, 'getResourceTitle')) {
-                return (new $class())->getResourceTitle($type, $id);
-            }
+        if (is_string($class) && class_exists($class) && method_exists($class, 'getResourceLabel')) {
+            return (new $class())->getResourceLabel($resolvedType, $id);
         }
 
         return $typeLabel . ' #' . $id;

@@ -6,13 +6,9 @@ defined('ABSPATH') || exit;
 
 use FChubMemberships\Support\Logger;
 use FChubMemberships\Storage\GrantRepository;
-use FChubMemberships\Storage\SubscriptionValidityLogRepository;
 
 /**
- * Cron job that checks subscription validity and fires expiration events.
- *
- * FluentCart's `subscription_expired_validity` hook is registered as an IntegrationEventListener
- * target but no do_action() call exists in FluentCart core. This watcher implements the dispatch.
+ * Cron job that maintains membership grants while FluentCart owns subscription validity events.
  */
 class SubscriptionValidityWatcher
 {
@@ -23,25 +19,19 @@ class SubscriptionValidityWatcher
     public function __construct(
         ?SubscriptionGrantLifecycleService $subscriptionGrants = null,
         ?GrantRepository $grantRepo = null,
-        ?SubscriptionValidityLogRepository $validityLogs = null,
         ?AccessGrantService $grantService = null
     )
     {
         $grantRepo = $grantRepo ?? new GrantRepository();
-        $validityLogs = $validityLogs ?? new SubscriptionValidityLogRepository();
         $grantService = $grantService ?? new AccessGrantService();
 
         $this->subscriptionGrants = $subscriptionGrants ?? new SubscriptionGrantLifecycleService();
-        $this->validityChecks = new SubscriptionValidityCheckService($grantRepo, $validityLogs, $grantService);
+        $this->validityChecks = new SubscriptionValidityCheckService($grantService);
         $this->paymentFailures = new SubscriptionPaymentFailureService($grantRepo);
     }
 
     public function registerHooks(): void
     {
-        // Status changed catches statuses without dedicated event hooks (expired).
-        // Uses /payments/ prefix — that's the hook FluentCart actually fires.
-        add_action('fluent_cart/payments/subscription_status_changed', [$this, 'onSubscriptionStatusChanged'], 10, 1);
-
         // Event-based hooks (fired via EventDispatcher, no /payments/ prefix).
         add_action('fluent_cart/subscription_renewed', [$this, 'onSubscriptionRenewed'], 10, 1);
         add_action('fluent_cart/subscription_canceled', [$this, 'onSubscriptionCancelled'], 10, 1);
@@ -53,27 +43,6 @@ class SubscriptionValidityWatcher
         // Payment failure hooks
         add_action('fluent_cart/order_payment_failed', [$this, 'onOrderPaymentFailed'], 10, 1);
         add_action('fluent_cart/payments/subscription_failing', [$this, 'onSubscriptionFailing'], 10, 1);
-    }
-
-    public function onSubscriptionStatusChanged($data): void
-    {
-        $subscription = $data['subscription'] ?? null;
-        $newStatus = $data['new_status'] ?? '';
-
-        if (!$subscription) {
-            return;
-        }
-
-        // Only handle statuses that don't have dedicated hooks to avoid double-firing.
-        // canceled, paused, active (resumed) each have their own hooks registered above.
-        $methodMap = [
-            'expired' => 'handleSubscriptionExpired',
-        ];
-
-        $method = $methodMap[$newStatus] ?? null;
-        if ($method && method_exists($this, $method)) {
-            $this->$method($subscription);
-        }
     }
 
     public function onSubscriptionRenewed($data): void
@@ -116,16 +85,6 @@ class SubscriptionValidityWatcher
         $this->validityChecks->run();
     }
 
-    private function checkSubscription(int $subscriptionId): void
-    {
-        $this->validityChecks->checkSubscription($subscriptionId);
-    }
-
-    private function dispatchExpiration($subscription): void
-    {
-        $this->validityChecks->dispatchExpiration($subscription);
-    }
-
     private function handleSubscriptionPaused($subscription): void
     {
         $this->subscriptionGrants->pause($subscription);
@@ -144,11 +103,6 @@ class SubscriptionValidityWatcher
     private function handleSubscriptionRenewed($subscription): void
     {
         $this->subscriptionGrants->renew($subscription);
-    }
-
-    private function handleSubscriptionExpired($subscription): void
-    {
-        $this->dispatchExpiration($subscription);
     }
 
     /**

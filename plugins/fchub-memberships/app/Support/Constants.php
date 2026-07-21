@@ -9,6 +9,7 @@ class Constants
     // Providers
     const PROVIDER_WORDPRESS_CORE = 'wordpress_core';
     const PROVIDER_LEARNDASH = 'learndash';
+    const PROVIDER_FLUENTCRM = 'fluentcrm';
     const PROVIDER_FLUENT_COMMUNITY = 'fluent_community';
 
     // Grant statuses

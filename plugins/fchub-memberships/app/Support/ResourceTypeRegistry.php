@@ -6,6 +6,17 @@ defined('ABSPATH') || exit;
 
 class ResourceTypeRegistry
 {
+    /** @var array<string, string> */
+    private const READ_ONLY_LEGACY_ALIASES = [
+        'sfwd-courses' => 'ld_course',
+    ];
+
+    /** @var string[] */
+    private const EXCLUDED_LEGACY_LEARNDASH_TYPES = [
+        'sfwd-courses',
+        'sfwd-lessons',
+    ];
+
     private static ?self $instance = null;
 
     /** @var array<string, array> */
@@ -54,6 +65,43 @@ class ResourceTypeRegistry
     }
 
     /**
+     * Resolve persisted legacy resource types for display without accepting them for new writes.
+     */
+    public function resolveReadType(string $key): string
+    {
+        return self::READ_ONLY_LEGACY_ALIASES[$key] ?? $key;
+    }
+
+    /**
+     * Get a resource type configuration for display of persisted rules.
+     */
+    public function getForRead(string $key): ?array
+    {
+        $type = $this->get($this->resolveReadType($key));
+        if ($type !== null) {
+            return $type;
+        }
+
+        if ($key === 'sfwd-lessons') {
+            return [
+                'key'           => 'sfwd-lessons',
+                'label'         => __('LearnDash Lesson', 'fchub-memberships'),
+                'group'         => 'content',
+                'icon'          => 'welcome-learn-more',
+                'searchable'    => false,
+                'supports_bulk' => false,
+                'allow_all'     => true,
+                'provider'      => Constants::PROVIDER_WORDPRESS_CORE,
+                'adapter'       => \FChubMemberships\Adapters\WordPressContentAdapter::class,
+                'source'        => 'LearnDash (legacy read-only)',
+                'read_only'     => true,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Check if a resource type key is valid/registered.
      */
     public function isValid(string $key): bool
@@ -74,7 +122,9 @@ class ResourceTypeRegistry
             'icon'           => 'file',
             'searchable'     => false,
             'supports_bulk'  => false,
+            'allow_all'      => true,
             'provider'       => Constants::PROVIDER_WORDPRESS_CORE,
+            'adapter'        => \FChubMemberships\Adapters\WordPressContentAdapter::class,
             'source'         => '',
         ], $config, ['key' => $key]);
     }
@@ -302,6 +352,9 @@ class ResourceTypeRegistry
             if (in_array($cpt->name, self::BLACKLISTED_POST_TYPES, true)) {
                 continue;
             }
+            if (defined('LEARNDASH_VERSION') && in_array($cpt->name, self::EXCLUDED_LEGACY_LEARNDASH_TYPES, true)) {
+                continue;
+            }
             $source = $this->detectPostTypeSource($cpt);
             $this->register($cpt->name, [
                 'label'          => $this->resolveObjectLabel($cpt),
@@ -408,24 +461,54 @@ class ResourceTypeRegistry
 
         // --- Third-party providers (conditional) ---
         if (defined('LEARNDASH_VERSION')) {
-            $this->register('sfwd-courses', [
-                'label'          => __('Courses', 'fchub-memberships'),
+            $this->register('ld_course', [
+                'label'          => __('LearnDash Course', 'fchub-memberships'),
                 'group'          => 'content',
                 'icon'           => 'welcome-learn-more',
                 'searchable'     => true,
-                'supports_bulk'  => true,
+                'supports_bulk'  => false,
+                'allow_all'      => false,
                 'provider'       => Constants::PROVIDER_LEARNDASH,
+                'adapter'        => \FChubMemberships\Adapters\LearnDashAdapter::class,
                 'source'         => 'LearnDash',
             ]);
 
-            $this->register('sfwd-lessons', [
-                'label'          => __('Lessons', 'fchub-memberships'),
+            $this->register('ld_group', [
+                'label'          => __('LearnDash Group', 'fchub-memberships'),
                 'group'          => 'content',
                 'icon'           => 'welcome-learn-more',
                 'searchable'     => true,
-                'supports_bulk'  => true,
+                'supports_bulk'  => false,
+                'allow_all'      => false,
                 'provider'       => Constants::PROVIDER_LEARNDASH,
+                'adapter'        => \FChubMemberships\Adapters\LearnDashAdapter::class,
                 'source'         => 'LearnDash',
+            ]);
+        }
+
+        if (defined('FLUENTCRM')) {
+            $this->register('fluentcrm_tag', [
+                'label'          => __('FluentCRM Tag', 'fchub-memberships'),
+                'group'          => 'content',
+                'icon'           => 'tag',
+                'searchable'     => true,
+                'supports_bulk'  => false,
+                'allow_all'      => false,
+                'provider'       => Constants::PROVIDER_FLUENTCRM,
+                'adapter'        => \FChubMemberships\Adapters\FluentCrmAdapter::class,
+                'source'         => 'FluentCRM',
+            ]);
+
+            $this->register('fluentcrm_list', [
+                'label'          => __('FluentCRM List', 'fchub-memberships'),
+                'group'          => 'content',
+                'icon'           => 'list-view',
+                'searchable'     => true,
+                'supports_bulk'  => false,
+                'allow_all'      => false,
+                'provider'       => Constants::PROVIDER_FLUENTCRM,
+                'adapter'        => \FChubMemberships\Adapters\FluentCrmAdapter::class,
+                'source'         => 'FluentCRM',
             ]);
         }
 
@@ -435,8 +518,10 @@ class ResourceTypeRegistry
                 'group'          => 'content',
                 'icon'           => 'groups',
                 'searchable'     => true,
-                'supports_bulk'  => true,
+                'supports_bulk'  => false,
+                'allow_all'      => false,
                 'provider'       => Constants::PROVIDER_FLUENT_COMMUNITY,
+                'adapter'        => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
                 'source'         => 'FluentCommunity',
             ]);
 
@@ -445,8 +530,10 @@ class ResourceTypeRegistry
                 'group'          => 'content',
                 'icon'           => 'welcome-learn-more',
                 'searchable'     => true,
-                'supports_bulk'  => true,
+                'supports_bulk'  => false,
+                'allow_all'      => false,
                 'provider'       => Constants::PROVIDER_FLUENT_COMMUNITY,
+                'adapter'        => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
                 'source'         => 'FluentCommunity',
             ]);
         }

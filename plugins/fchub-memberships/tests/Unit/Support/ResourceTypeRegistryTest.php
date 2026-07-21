@@ -7,6 +7,8 @@ namespace FChubMemberships\Tests\Unit\Support;
 use FChubMemberships\Support\Constants;
 use FChubMemberships\Support\ResourceTypeRegistry;
 use FChubMemberships\Tests\Unit\PluginTestCase;
+use FChubMemberships\Http\Controllers\Plans\PlanReadController;
+use FChubMemberships\Adapters\WordPressContentAdapter;
 
 if (!defined('WC_ABSPATH')) {
     define('WC_ABSPATH', '/tmp/woocommerce/');
@@ -18,6 +20,10 @@ if (!defined('LEARNDASH_VERSION')) {
 
 if (!defined('FLUENT_COMMUNITY_PLUGIN_VERSION')) {
     define('FLUENT_COMMUNITY_PLUGIN_VERSION', '1.0.0');
+}
+
+if (!defined('FLUENTCRM')) {
+    define('FLUENTCRM', 'fluentcrm');
 }
 
 final class ResourceTypeRegistryTest extends PluginTestCase
@@ -45,6 +51,18 @@ final class ResourceTypeRegistryTest extends PluginTestCase
                 'name' => 'sfwd-topic',
                 'label' => 'Topics',
                 'labels' => (object) ['singular_name' => 'Topic'],
+                'menu_icon' => 'welcome-learn-more',
+            ],
+            'sfwd-courses' => (object) [
+                'name' => 'sfwd-courses',
+                'label' => 'Legacy Courses',
+                'labels' => (object) ['singular_name' => 'Legacy Course'],
+                'menu_icon' => 'welcome-learn-more',
+            ],
+            'sfwd-lessons' => (object) [
+                'name' => 'sfwd-lessons',
+                'label' => 'Legacy Lessons',
+                'labels' => (object) ['singular_name' => 'Legacy Lesson'],
                 'menu_icon' => 'welcome-learn-more',
             ],
             'attachment' => (object) [
@@ -111,9 +129,80 @@ final class ResourceTypeRegistryTest extends PluginTestCase
         self::assertArrayNotHasKey('pa_color', $all, 'WooCommerce attributes should be skipped.');
         self::assertArrayNotHasKey('nav_menu', $all, 'Blacklisted taxonomies should be skipped.');
 
-        self::assertSame(Constants::PROVIDER_LEARNDASH, $all['sfwd-courses']['provider']);
+        self::assertSame(Constants::PROVIDER_LEARNDASH, $all['ld_course']['provider']);
+        self::assertSame(Constants::PROVIDER_LEARNDASH, $all['ld_group']['provider']);
         self::assertSame(Constants::PROVIDER_FLUENT_COMMUNITY, $all['fc_space']['provider']);
         self::assertSame('Hook Type', $all['custom_hook_type']['label']);
+    }
+
+    public function test_registry_uses_canonical_external_enrolment_types_with_safe_capabilities(): void
+    {
+        $all = ResourceTypeRegistry::getInstance()->getAll();
+
+        self::assertArrayHasKey('ld_course', $all);
+        self::assertArrayHasKey('ld_group', $all);
+        self::assertArrayHasKey('fc_space', $all);
+        self::assertArrayHasKey('fc_course', $all);
+        self::assertArrayHasKey('fluentcrm_tag', $all);
+        self::assertArrayHasKey('fluentcrm_list', $all);
+        self::assertArrayNotHasKey('sfwd-courses', $all);
+        self::assertArrayNotHasKey('sfwd-lessons', $all);
+
+        foreach (['ld_course', 'ld_group', 'fc_space', 'fc_course', 'fluentcrm_tag', 'fluentcrm_list'] as $type) {
+            self::assertFalse($all[$type]['allow_all']);
+            self::assertArrayHasKey('adapter', $all[$type]);
+        }
+
+        self::assertSame(\FChubMemberships\Adapters\FluentCrmAdapter::class, $all['fluentcrm_tag']['adapter']);
+        self::assertSame(\FChubMemberships\Adapters\FluentCommunityAdapter::class, $all['fc_space']['adapter']);
+    }
+
+    public function test_external_resource_labels_are_resolved_by_the_registered_adapter(): void
+    {
+        $adapter = new class {
+            public function getResourceLabel(string $resourceType, string $resourceId): string
+            {
+                return 'Resolved by adapter';
+            }
+        };
+        $registry = ResourceTypeRegistry::getInstance();
+        $registry->register('adapter_label_test', [
+            'adapter' => $adapter::class,
+        ]);
+        $method = new \ReflectionMethod(PlanReadController::class, 'resolveResourceName');
+
+        self::assertSame(
+            'Resolved by adapter',
+            $method->invoke(null, 'adapter_label_test', '11', $registry)
+        );
+    }
+
+    public function test_legacy_learndash_resource_types_are_read_only_and_never_registered_for_writes(): void
+    {
+        $registry = ResourceTypeRegistry::getInstance();
+
+        self::assertArrayNotHasKey('sfwd-courses', $registry->getAll());
+        self::assertArrayNotHasKey('sfwd-lessons', $registry->getAll());
+        self::assertTrue(method_exists($registry, 'resolveReadType'));
+        self::assertSame('ld_course', $registry->resolveReadType('sfwd-courses'));
+        self::assertSame('sfwd-lessons', $registry->resolveReadType('sfwd-lessons'));
+        self::assertSame('LearnDash Course', $registry->getForRead('sfwd-courses')['label']);
+        self::assertSame('LearnDash Lesson', $registry->getForRead('sfwd-lessons')['label']);
+        self::assertSame(Constants::PROVIDER_WORDPRESS_CORE, $registry->getForRead('sfwd-lessons')['provider']);
+        self::assertSame(WordPressContentAdapter::class, $registry->getForRead('sfwd-lessons')['adapter']);
+        self::assertFalse($registry->isValid('sfwd-courses'));
+        self::assertFalse($registry->isValid('sfwd-lessons'));
+    }
+
+    public function test_legacy_learndash_course_label_uses_the_canonical_adapter_key(): void
+    {
+        $registry = ResourceTypeRegistry::getInstance();
+        $method = new \ReflectionMethod(PlanReadController::class, 'resolveResourceName');
+
+        self::assertSame(
+            'Course #11',
+            $method->invoke(null, 'sfwd-courses', '11', $registry)
+        );
     }
 
     public function test_registry_exposes_grouped_searchable_and_select_option_views(): void

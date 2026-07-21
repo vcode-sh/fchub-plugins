@@ -15,15 +15,26 @@ class LearnDashAdapter implements AccessAdapterInterface
 
     public function grant(int $userId, string $resourceType, string $resourceId, array $context = []): array
     {
+        if (!$this->supports($resourceType)) {
+            return $this->unsupportedResourceResponse();
+        }
+
         if (!$this->isLearnDashActive()) {
             return [
-                'success' => true,
-                'message' => __('LearnDash not active. Grant recorded in membership grants.', 'fchub-memberships'),
+                'success' => false,
+                'message' => __('LearnDash is not active, so provider access could not be granted.', 'fchub-memberships'),
             ];
         }
 
         if ($resourceType === 'ld_course') {
             ld_update_course_access($userId, (int) $resourceId);
+
+            if (!$this->check($userId, $resourceType, $resourceId)) {
+                return [
+                    'success' => false,
+                    'message' => __('LearnDash did not confirm the course enrolment.', 'fchub-memberships'),
+                ];
+            }
 
             return [
                 'success' => true,
@@ -43,6 +54,13 @@ class LearnDashAdapter implements AccessAdapterInterface
                 learndash_set_users_group_ids($userId, $currentGroups);
             }
 
+            if (!$this->check($userId, $resourceType, $resourceId)) {
+                return [
+                    'success' => false,
+                    'message' => __('LearnDash did not confirm the group assignment.', 'fchub-memberships'),
+                ];
+            }
+
             return [
                 'success' => true,
                 'message' => sprintf(
@@ -52,23 +70,31 @@ class LearnDashAdapter implements AccessAdapterInterface
             ];
         }
 
-        return [
-            'success' => false,
-            'message' => __('Unsupported LearnDash resource type.', 'fchub-memberships'),
-        ];
+        return $this->unsupportedResourceResponse();
     }
 
     public function revoke(int $userId, string $resourceType, string $resourceId, array $context = []): array
     {
+        if (!$this->supports($resourceType)) {
+            return $this->unsupportedResourceResponse();
+        }
+
         if (!$this->isLearnDashActive()) {
             return [
-                'success' => true,
-                'message' => __('LearnDash not active. Revocation recorded in membership grants.', 'fchub-memberships'),
+                'success' => false,
+                'message' => __('LearnDash is not active, so provider access could not be revoked.', 'fchub-memberships'),
             ];
         }
 
         if ($resourceType === 'ld_course') {
             ld_update_course_access($userId, (int) $resourceId, true);
+
+            if ($this->check($userId, $resourceType, $resourceId)) {
+                return [
+                    'success' => false,
+                    'message' => __('LearnDash did not confirm the course removal.', 'fchub-memberships'),
+                ];
+            }
 
             return [
                 'success' => true,
@@ -85,6 +111,13 @@ class LearnDashAdapter implements AccessAdapterInterface
             $currentGroups = array_values(array_diff($currentGroups, [$groupId]));
             learndash_set_users_group_ids($userId, $currentGroups);
 
+            if ($this->check($userId, $resourceType, $resourceId)) {
+                return [
+                    'success' => false,
+                    'message' => __('LearnDash did not confirm the group removal.', 'fchub-memberships'),
+                ];
+            }
+
             return [
                 'success' => true,
                 'message' => sprintf(
@@ -94,10 +127,7 @@ class LearnDashAdapter implements AccessAdapterInterface
             ];
         }
 
-        return [
-            'success' => false,
-            'message' => __('Unsupported LearnDash resource type.', 'fchub-memberships'),
-        ];
+        return $this->unsupportedResourceResponse();
     }
 
     public function check(int $userId, string $resourceType, string $resourceId): bool
@@ -183,5 +213,13 @@ class LearnDashAdapter implements AccessAdapterInterface
     private function isLearnDashActive(): bool
     {
         return function_exists('sfwd_lms_has_access');
+    }
+
+    private function unsupportedResourceResponse(): array
+    {
+        return [
+            'success' => false,
+            'message' => __('Unsupported LearnDash resource type.', 'fchub-memberships'),
+        ];
     }
 }

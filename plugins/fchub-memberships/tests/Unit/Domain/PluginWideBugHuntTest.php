@@ -321,14 +321,11 @@ final class PluginWideBugHuntTest extends PluginTestCase
     }
 
     // =========================================================================
-    // Subscription watcher: duplicate hook concern
+    // Subscription watcher: FluentCart owns validity expiration events
     // =========================================================================
 
-    public function test_subscription_watcher_status_map_covers_all_statuses(): void
+    public function test_subscription_watcher_does_not_register_a_legacy_status_hook(): void
     {
-        // Test the status change handler mapping directly by calling onSubscriptionStatusChanged.
-        // It should call the correct internal method for each status.
-        $pauseCalled = false;
         $watcher = new \FChubMemberships\Domain\SubscriptionValidityWatcher(
             new SubscriptionGrantLifecycleService(
                 new class() extends AccessGrantService {
@@ -342,18 +339,12 @@ final class PluginWideBugHuntTest extends PluginTestCase
             )
         );
 
-        $sub = (object) ['id' => 1];
-        // Calling with 'paused' should not crash (method exists in map)
-        $watcher->onSubscriptionStatusChanged(['subscription' => $sub, 'new_status' => 'paused']);
-        // Calling with 'active' should not crash
-        $watcher->onSubscriptionStatusChanged(['subscription' => $sub, 'new_status' => 'active']);
-        // Calling with 'cancelled' should not crash
-        $watcher->onSubscriptionStatusChanged(['subscription' => $sub, 'new_status' => 'cancelled']);
-        // Calling with unknown status should be silently ignored
-        $watcher->onSubscriptionStatusChanged(['subscription' => $sub, 'new_status' => 'unknown_status']);
+        $watcher->registerHooks();
 
-        // If we got here, all status map lookups worked
-        self::assertTrue(true);
+        self::assertArrayNotHasKey(
+            'fluent_cart/payments/subscription_status_changed',
+            $GLOBALS['_fchub_test_actions']
+        );
     }
 
     // =========================================================================

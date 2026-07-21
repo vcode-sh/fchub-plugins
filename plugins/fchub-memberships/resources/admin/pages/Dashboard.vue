@@ -162,13 +162,15 @@
             <span v-if="hasTrend" class="trend-change">{{ trendChangeLabel }}</span>
           </div>
           <div v-if="hasTrend" class="trend-chart">
-            <Line
-              :data="membersChartData"
-              :options="lineChartOptions"
-              role="img"
-              aria-label="Member count over the last 30 days"
-              aria-describedby="member-trend-summary"
-            />
+            <div class="trend-plot">
+              <Line
+                :data="membersChartData"
+                :options="lineChartOptions"
+                role="img"
+                aria-label="Member count over the last 30 days"
+                aria-describedby="member-trend-summary"
+              />
+            </div>
             <p id="member-trend-summary" class="trend-summary">{{ trendSummary }}</p>
           </div>
           <div v-else class="compact-empty">
@@ -935,10 +937,16 @@ h2 {
 .trend-panel { display: flex; min-height: 220px; flex-direction: column; }
 .trend-chart {
   height: 168px;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   gap: 5px;
   margin-top: auto;
+}
+
+.trend-plot {
+  position: relative;
+  min-height: 0;
+  flex: 1;
 }
 
 .trend-summary {

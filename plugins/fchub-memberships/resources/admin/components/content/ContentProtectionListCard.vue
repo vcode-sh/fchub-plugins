@@ -232,6 +232,11 @@ defineEmits([
 </script>
 
 <style scoped>
+.list-card {
+  container-name: protected-content-list;
+  container-type: inline-size;
+}
+
 /* Filter Row — inline, single row with breathing room */
 .filter-row {
   display: flex;
@@ -360,14 +365,32 @@ defineEmits([
   margin: 0 0 16px 0;
 }
 
-.mobile-content-list { display: none; }
+.mobile-content-list {
+  display: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mobile-record-card__topline > div {
+  min-width: 0;
+}
+
+.mobile-record-card__title {
+  overflow-wrap: anywhere;
+}
+
 .mobile-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 14px 0; }
 
-@media (max-width: 782px) {
+@container protected-content-list (max-width: 1020px) {
+  .list-card :deep(.el-table) { display: none; }
+  .mobile-content-list { display: grid; }
+}
+
+@container protected-content-list (max-width: 640px) {
   .list-card :deep(.el-card__body) { padding: 14px; }
   .filter-row { align-items: stretch; flex-direction: column; }
   .filter-search, .filter-select { width: 100%; min-width: 0; }
-  .list-card :deep(.el-table) { display: none; }
-  .mobile-content-list { display: grid; gap: 12px; }
+  .mobile-content-list { grid-template-columns: minmax(0, 1fr); }
+  .pagination-bar { align-items: stretch; flex-direction: column; gap: 12px; }
 }
 </style>

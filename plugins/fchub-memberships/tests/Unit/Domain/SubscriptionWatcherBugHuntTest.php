@@ -187,16 +187,16 @@ final class SubscriptionWatcherBugHuntTest extends PluginTestCase
     }
 
     /**
-     * Verify status_changed uses /payments/ prefix matching FluentCart.
+     * FluentCart owns validity expiration, so the watcher does not register a status fallback.
      */
-    public function test_registers_status_changed_with_payments_prefix(): void
+    public function test_does_not_register_a_status_changed_fallback_hook(): void
     {
         $watcher = $this->createWatcher();
         $watcher->registerHooks();
 
         $hooks = array_keys($GLOBALS['_fchub_test_actions']);
 
-        self::assertContains('fluent_cart/payments/subscription_status_changed', $hooks);
+        self::assertNotContains('fluent_cart/payments/subscription_status_changed', $hooks);
         self::assertNotContains('fluent_cart/subscription_status_changed', $hooks);
     }
 

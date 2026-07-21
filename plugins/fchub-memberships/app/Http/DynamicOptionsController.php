@@ -5,6 +5,7 @@ namespace FChubMemberships\Http;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Domain\Plan\PlanService;
+use FChubMemberships\Support\ResourceTypeRegistry;
 
 class DynamicOptionsController
 {
@@ -57,26 +58,15 @@ class DynamicOptionsController
 
     public static function resourceTypes(\WP_REST_Request $request): \WP_REST_Response
     {
-        $provider = $request->get_param('provider') ?: 'wordpress_core';
-
-        $adapters = [
-            'wordpress_core'   => \FChubMemberships\Adapters\WordPressContentAdapter::class,
-            'learndash'        => \FChubMemberships\Adapters\LearnDashAdapter::class,
-            'fluentcrm'        => \FChubMemberships\Adapters\FluentCrmAdapter::class,
-            'fluent_community' => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
-        ];
-
-        $class = $adapters[$provider] ?? null;
-        if (!$class || !class_exists($class)) {
-            return new \WP_REST_Response(['data' => []]);
-        }
-
-        $adapter = new $class();
-        $types = $adapter->getResourceTypes();
-
+        $provider = (string) ($request->get_param('provider') ?: 'wordpress_core');
         $options = [];
-        foreach ($types as $key => $label) {
-            $options[] = ['value' => $key, 'label' => $label];
+
+        foreach (ResourceTypeRegistry::getInstance()->getAll() as $type) {
+            if (($type['provider'] ?? '') !== $provider) {
+                continue;
+            }
+
+            $options[] = ['value' => $type['key'], 'label' => $type['label']];
         }
 
         return new \WP_REST_Response(['data' => $options]);
@@ -84,23 +74,24 @@ class DynamicOptionsController
 
     public static function providers(\WP_REST_Request $request): \WP_REST_Response
     {
-        $providers = [
-            ['value' => 'wordpress_core', 'label' => __('WordPress Core', 'fchub-memberships')],
+        $labels = [
+            'wordpress_core' => __('WordPress Core', 'fchub-memberships'),
+            'learndash' => __('LearnDash', 'fchub-memberships'),
+            'fluentcrm' => __('FluentCRM', 'fchub-memberships'),
+            'fluent_community' => __('FluentCommunity', 'fchub-memberships'),
         ];
+        $providers = [];
 
-        if (defined('LEARNDASH_VERSION')) {
-            $providers[] = ['value' => 'learndash', 'label' => __('LearnDash', 'fchub-memberships')];
+        foreach (ResourceTypeRegistry::getInstance()->getAll() as $type) {
+            $provider = $type['provider'] ?? '';
+            if (!isset($labels[$provider]) || isset($providers[$provider])) {
+                continue;
+            }
+
+            $providers[$provider] = ['value' => $provider, 'label' => $labels[$provider]];
         }
 
-        if (defined('FLUENTCRM')) {
-            $providers[] = ['value' => 'fluentcrm', 'label' => __('FluentCRM', 'fchub-memberships')];
-        }
-
-        if (defined('FLUENT_COMMUNITY_PLUGIN_VERSION')) {
-            $providers[] = ['value' => 'fluent_community', 'label' => __('FluentCommunity', 'fchub-memberships')];
-        }
-
-        return new \WP_REST_Response(['data' => $providers]);
+        return new \WP_REST_Response(['data' => array_values($providers)]);
     }
 
     public static function fluentcrmTags(\WP_REST_Request $request): \WP_REST_Response

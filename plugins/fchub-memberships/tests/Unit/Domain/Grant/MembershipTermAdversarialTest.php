@@ -703,14 +703,6 @@ final class MembershipTermAdversarialTest extends PluginTestCase
     {
         // This was BUG 1: if no active subscription IDs, the old code returned
         // early and never called expireTermExpiredGrants().
-        $grantRepo = new class() extends GrantRepository {
-            public function __construct() {}
-            public function getActiveSubscriptionSourceIds(): array
-            {
-                return []; // No active subscriptions
-            }
-        };
-        $validityLogs = new \FChubMemberships\Storage\SubscriptionValidityLogRepository();
         $grantService = new class() extends AccessGrantService {
             public bool $termExpireCalled = false;
             public function __construct() {}
@@ -724,11 +716,7 @@ final class MembershipTermAdversarialTest extends PluginTestCase
             public function expireOverdueGrantsWithHooks(): int { return 0; }
         };
 
-        $service = new \FChubMemberships\Domain\SubscriptionValidityCheckService(
-            $grantRepo,
-            $validityLogs,
-            $grantService
-        );
+        $service = new \FChubMemberships\Domain\SubscriptionValidityCheckService($grantService);
         $service->run();
 
         self::assertTrue($grantService->termExpireCalled, 'expireTermExpiredGrants must be called even with no subscriptions');
@@ -737,14 +725,6 @@ final class MembershipTermAdversarialTest extends PluginTestCase
     public function test_cron_run_expires_terms_before_generic_expiry(): void
     {
         // Verify the call order: anchor pause → term expire → grace revoke → generic expire
-        $grantRepo = new class() extends GrantRepository {
-            public function __construct() {}
-            public function getActiveSubscriptionSourceIds(): array
-            {
-                return [];
-            }
-        };
-        $validityLogs = new \FChubMemberships\Storage\SubscriptionValidityLogRepository();
         $grantService = new class() extends AccessGrantService {
             public array $callOrder = [];
             public function __construct() {}
@@ -770,11 +750,7 @@ final class MembershipTermAdversarialTest extends PluginTestCase
             }
         };
 
-        $service = new \FChubMemberships\Domain\SubscriptionValidityCheckService(
-            $grantRepo,
-            $validityLogs,
-            $grantService
-        );
+        $service = new \FChubMemberships\Domain\SubscriptionValidityCheckService($grantService);
         $service->run();
 
         self::assertSame(

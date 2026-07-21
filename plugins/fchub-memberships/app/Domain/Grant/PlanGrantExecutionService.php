@@ -42,6 +42,8 @@ final class PlanGrantExecutionService
 
         $created = 0;
         $updated = 0;
+        $failed = 0;
+        $errors = [];
 
         foreach ($rules as $rule) {
             $result = $this->creation->grantResource(
@@ -66,16 +68,19 @@ final class PlanGrantExecutionService
                 $created++;
             } elseif ($result['action'] === 'updated') {
                 $updated++;
+            } elseif ($result['action'] === 'failed') {
+                $failed++;
+                $errors[] = $result;
             }
         }
 
         Logger::log(
             'Plan granted',
-            sprintf('User #%d granted plan #%d: %d created, %d updated', $userId, $planId, $created, $updated),
+            sprintf('User #%d processed plan #%d: %d created, %d updated, %d failed', $userId, $planId, $created, $updated, $failed),
             ['module_id' => $context['source_id'] ?? 0, 'module_name' => 'Order']
         );
 
-        if ($order) {
+        if ($order && $failed === 0) {
             Logger::orderLog(
                 $order,
                 __('Membership plan granted', 'fchub-memberships'),
@@ -83,17 +88,26 @@ final class PlanGrantExecutionService
             );
         }
 
-        $this->notifications->sendGranted($userId, $planId, $rules);
-        do_action('fchub_memberships/grant_created', $userId, $planId, $context);
+        if ($failed === 0) {
+            $this->notifications->sendGranted($userId, $planId, $rules);
+            do_action('fchub_memberships/grant_created', $userId, $planId, $context);
 
-        if (!empty($context['is_trial'])) {
-            do_action('fchub_memberships/trial_started', $context, $planId, $userId);
+            if (!empty($context['is_trial'])) {
+                do_action('fchub_memberships/trial_started', $context, $planId, $userId);
+            }
         }
 
-        return [
+        $result = [
             'created' => $created,
             'updated' => $updated,
             'total' => count($rules),
         ];
+
+        if ($failed > 0) {
+            $result['failed'] = $failed;
+            $result['errors'] = $errors;
+        }
+
+        return $result;
     }
 }

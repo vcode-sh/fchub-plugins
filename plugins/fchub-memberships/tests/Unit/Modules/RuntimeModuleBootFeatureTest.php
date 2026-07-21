@@ -53,7 +53,7 @@ namespace FChubMemberships\Tests\Unit\Modules {
                 'FChubMemberships\\Integration\\MembershipAccessIntegration',
                 $GLOBALS['_fchub_test_registered_integrations']
             );
-            self::assertArrayHasKey('fluent_cart/payments/subscription_status_changed', $GLOBALS['_fchub_test_actions']);
+            self::assertArrayNotHasKey('fluent_cart/payments/subscription_status_changed', $GLOBALS['_fchub_test_actions']);
             self::assertArrayHasKey('fluent_cart/order_payment_failed', $GLOBALS['_fchub_test_actions']);
             self::assertArrayHasKey('template_redirect', $GLOBALS['_fchub_test_actions']);
             self::assertArrayHasKey('comments_open', $GLOBALS['_fchub_test_filters']);

@@ -320,14 +320,7 @@ final class LifecycleCronBugHuntTest extends PluginTestCase
             }
         };
 
-        $grantRepo = new class() extends GrantRepository {
-            public function __construct() {}
-            public function getActiveSubscriptionSourceIds(): array { return []; }
-        };
-
-        $validityLogs = new SubscriptionValidityLogRepository();
-
-        $service = new SubscriptionValidityCheckService($grantRepo, $validityLogs, $grantService);
+        $service = new SubscriptionValidityCheckService($grantService);
         $service->run();
 
         // Term expiry must run before generic expiry to prevent double-processing.
@@ -458,13 +451,7 @@ final class LifecycleCronBugHuntTest extends PluginTestCase
             }
         };
 
-        $grantRepo = new class() extends GrantRepository {
-            public function __construct() {}
-            public function getActiveSubscriptionSourceIds(): array { return []; }
-        };
-
-        $validityLogs = new SubscriptionValidityLogRepository();
-        $service = new SubscriptionValidityCheckService($grantRepo, $validityLogs, $grantService);
+        $service = new SubscriptionValidityCheckService($grantService);
 
         $this->expectException(\RuntimeException::class);
         $service->run();

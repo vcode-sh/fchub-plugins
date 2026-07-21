@@ -39,13 +39,23 @@ final class MembershipModeService
         }
 
         if ($mode === 'exclusive') {
+            $revokedPlanIds = [];
             foreach ($otherPlanIds as $oldPlanId) {
-                $revokePlan($userId, $oldPlanId, [
+                $result = $revokePlan($userId, $oldPlanId, [
                     'reason' => sprintf('Replaced by plan #%d (exclusive mode)', $planId),
                 ]);
+                if ($this->revocationFailed($result)) {
+                    return $this->failedModeTransition(
+                        'replacement_revoke_failed',
+                        $result,
+                        $revokedPlanIds
+                    );
+                }
+
+                $revokedPlanIds[] = $oldPlanId;
             }
 
-            do_action('fchub_memberships/plan_replaced', $userId, $planId, $otherPlanIds);
+            do_action('fchub_memberships/plan_replaced', $userId, $planId, $revokedPlanIds);
 
             return null;
         }
@@ -93,9 +103,17 @@ final class MembershipModeService
         foreach ($otherPlanIds as $oldPlanId) {
             $oldPlan = $this->plans->find($oldPlanId);
             if ($oldPlan && (int) ($oldPlan['level'] ?? 0) < $planLevel) {
-                $revokePlan($userId, $oldPlanId, [
+                $result = $revokePlan($userId, $oldPlanId, [
                     'reason' => sprintf('Upgraded to plan #%d level %d (upgrade_only mode)', $planId, $planLevel),
                 ]);
+                if ($this->revocationFailed($result)) {
+                    return $this->failedModeTransition(
+                        'upgrade_revoke_failed',
+                        $result,
+                        $revokedPlanIds
+                    );
+                }
+
                 $revokedPlanIds[] = $oldPlanId;
             }
         }
@@ -105,5 +123,28 @@ final class MembershipModeService
         }
 
         return null;
+    }
+
+    private function revocationFailed(array $result): bool
+    {
+        return (int) ($result['failed'] ?? 0) > 0
+            || (array_key_exists('success', $result) && $result['success'] === false);
+    }
+
+    private function failedModeTransition(string $reason, array $result, array $revokedPlanIds): array
+    {
+        return [
+            'created' => 0,
+            'updated' => 0,
+            'total' => 0,
+            'failed' => max(1, (int) ($result['failed'] ?? 0)),
+            'errors' => $result['errors'] ?? [[
+                'message' => __('The existing membership could not be revoked.', 'fchub-memberships'),
+            ]],
+            'blocked' => true,
+            'reason' => $reason,
+            'partial' => !empty($revokedPlanIds) || !empty($result['partial']),
+            'revoked_plan_ids' => $revokedPlanIds,
+        ];
     }
 }

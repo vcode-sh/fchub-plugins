@@ -11,6 +11,8 @@ use FChubMemberships\FluentCRM\Helpers\CheckoutUrlHelper;
 
 class MembershipSmartCodes
 {
+    private const MEMBERSHIP_META_OBJECT_TYPE = 'fchub_memberships';
+
     /** @var array Per-request cache keyed by user_id */
     private static array $grantCache = [];
 
@@ -245,11 +247,11 @@ class MembershipSmartCodes
     {
         switch ($valueKey) {
             case 'coupon_code':
-                return (string) ($subscriber->getMeta('_fchub_last_coupon_code') ?: '');
+                return (string) ($subscriber->getMeta('_fchub_last_coupon_code', self::MEMBERSHIP_META_OBJECT_TYPE) ?: '');
 
             case 'coupon_amount':
-                $couponAmount = $subscriber->getMeta('_fchub_last_coupon_amount');
-                $couponType = $subscriber->getMeta('_fchub_last_coupon_type');
+                $couponAmount = $subscriber->getMeta('_fchub_last_coupon_amount', self::MEMBERSHIP_META_OBJECT_TYPE);
+                $couponType = $subscriber->getMeta('_fchub_last_coupon_type', self::MEMBERSHIP_META_OBJECT_TYPE);
                 if (!$couponAmount) {
                     return '';
                 }
@@ -258,7 +260,7 @@ class MembershipSmartCodes
                     : $couponAmount;
 
             case 'coupon_expires':
-                $expiryDate = $subscriber->getMeta('_fchub_last_coupon_expires');
+                $expiryDate = $subscriber->getMeta('_fchub_last_coupon_expires', self::MEMBERSHIP_META_OBJECT_TYPE);
                 if (!$expiryDate) {
                     return '';
                 }

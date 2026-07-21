@@ -219,10 +219,7 @@ class MemberController
         $service = new AccessGrantService();
         $result = $service->manualGrant($userId, $planId, $expiresAt);
 
-        return new \WP_REST_Response([
-            'data'    => $result,
-            'message' => __('Access granted successfully.', 'fchub-memberships'),
-        ]);
+        return self::grantResultResponse($result);
     }
 
     public static function revoke(\WP_REST_Request $request): \WP_REST_Response
@@ -239,8 +236,48 @@ class MemberController
         $service = new AccessGrantService();
         $result = $service->revokePlan($userId, $planId, ['reason' => $reason]);
 
+        return self::revokeResultResponse($result);
+    }
+
+    public static function grantResultResponse(array $result): \WP_REST_Response
+    {
+        $succeeded = (int) ($result['created'] ?? 0) + (int) ($result['updated'] ?? 0);
+        $failed = (int) ($result['failed'] ?? 0);
+
+        if ($failed > 0) {
+            $partial = $succeeded > 0;
+            return new \WP_REST_Response([
+                'data' => $result,
+                'message' => $partial
+                    ? sprintf(__('%d resources were granted and %d failed. Access was partially granted.', 'fchub-memberships'), $succeeded, $failed)
+                    : sprintf(__('Access could not be granted. %d resources failed.', 'fchub-memberships'), $failed),
+            ], $partial ? 207 : 502);
+        }
+
         return new \WP_REST_Response([
-            'data'    => $result,
+            'data' => $result,
+            'message' => __('Access granted successfully.', 'fchub-memberships'),
+        ]);
+    }
+
+    public static function revokeResultResponse(array $result): \WP_REST_Response
+    {
+        $revoked = (int) ($result['revoked'] ?? 0);
+        $retained = (int) ($result['retained'] ?? 0);
+        $failed = (int) ($result['failed'] ?? 0);
+
+        if ($failed > 0 || (array_key_exists('success', $result) && $result['success'] === false)) {
+            $partial = $revoked > 0 || $retained > 0 || !empty($result['partial']);
+            return new \WP_REST_Response([
+                'data' => $result,
+                'message' => $partial
+                    ? sprintf(__('%d resources were revoked, %d retained, and %d failed. Access was partially revoked.', 'fchub-memberships'), $revoked, $retained, $failed)
+                    : sprintf(__('Access could not be revoked. %d resources failed.', 'fchub-memberships'), $failed),
+            ], $partial ? 207 : 502);
+        }
+
+        return new \WP_REST_Response([
+            'data' => $result,
             'message' => __('Access revoked.', 'fchub-memberships'),
         ]);
     }
@@ -351,7 +388,11 @@ class MemberController
         }
         $service = new AccessGrantService();
         $result = $service->bulkGrant($userIds, $planId, ['expires_at' => $expiresAt, 'source_type' => 'manual']);
-        return new \WP_REST_Response(['data' => $result, 'message' => sprintf(__('%d grants created.', 'fchub-memberships'), $result['granted'])]);
+        $status = $result['failed'] > 0 ? ($result['granted'] > 0 ? 207 : 502) : 200;
+        $message = $result['failed'] > 0
+            ? sprintf(__('%d memberships granted and %d failed.', 'fchub-memberships'), $result['granted'], $result['failed'])
+            : sprintf(__('%d memberships granted.', 'fchub-memberships'), $result['granted']);
+        return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
     }
 
     public static function bulkRevoke(\WP_REST_Request $request): \WP_REST_Response
@@ -365,7 +406,11 @@ class MemberController
         }
         $service = new AccessGrantService();
         $result = $service->bulkRevoke($userIds, $planId, ['reason' => $reason]);
-        return new \WP_REST_Response(['data' => $result, 'message' => sprintf(__('%d grants revoked.', 'fchub-memberships'), $result['revoked'])]);
+        $status = $result['failed'] > 0 ? ($result['revoked'] > 0 ? 207 : 502) : 200;
+        $message = $result['failed'] > 0
+            ? sprintf(__('%d memberships revoked and %d failed.', 'fchub-memberships'), $result['revoked'], $result['failed'])
+            : sprintf(__('%d memberships revoked.', 'fchub-memberships'), $result['revoked']);
+        return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
     }
 
     public static function bulkExtend(\WP_REST_Request $request): \WP_REST_Response

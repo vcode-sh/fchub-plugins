@@ -15,10 +15,14 @@ class FluentCrmAdapter implements AccessAdapterInterface
 
     public function grant(int $userId, string $resourceType, string $resourceId, array $context = []): array
     {
+        if (!$this->supports($resourceType)) {
+            return $this->unsupportedResourceResponse();
+        }
+
         if (!$this->isFluentCrmActive()) {
             return [
-                'success' => true,
-                'message' => __('FluentCRM not active. Grant recorded in membership grants.', 'fchub-memberships'),
+                'success' => false,
+                'message' => __('FluentCRM is not active, so provider access could not be granted.', 'fchub-memberships'),
             ];
         }
 
@@ -35,6 +39,13 @@ class FluentCrmAdapter implements AccessAdapterInterface
         if ($resourceType === 'fluentcrm_tag') {
             $contact->attachTags([$id]);
 
+            if (!$this->contactHasResource($contact, $resourceType, $id)) {
+                return [
+                    'success' => false,
+                    'message' => __('FluentCRM did not confirm the tag assignment.', 'fchub-memberships'),
+                ];
+            }
+
             return [
                 'success' => true,
                 'message' => sprintf(
@@ -47,6 +58,13 @@ class FluentCrmAdapter implements AccessAdapterInterface
         if ($resourceType === 'fluentcrm_list') {
             $contact->attachLists([$id]);
 
+            if (!$this->contactHasResource($contact, $resourceType, $id)) {
+                return [
+                    'success' => false,
+                    'message' => __('FluentCRM did not confirm the list assignment.', 'fchub-memberships'),
+                ];
+            }
+
             return [
                 'success' => true,
                 'message' => sprintf(
@@ -56,18 +74,19 @@ class FluentCrmAdapter implements AccessAdapterInterface
             ];
         }
 
-        return [
-            'success' => false,
-            'message' => __('Unsupported FluentCRM resource type.', 'fchub-memberships'),
-        ];
+        return $this->unsupportedResourceResponse();
     }
 
     public function revoke(int $userId, string $resourceType, string $resourceId, array $context = []): array
     {
+        if (!$this->supports($resourceType)) {
+            return $this->unsupportedResourceResponse();
+        }
+
         if (!$this->isFluentCrmActive()) {
             return [
-                'success' => true,
-                'message' => __('FluentCRM not active. Revocation recorded in membership grants.', 'fchub-memberships'),
+                'success' => false,
+                'message' => __('FluentCRM is not active, so provider access could not be revoked.', 'fchub-memberships'),
             ];
         }
 
@@ -84,6 +103,13 @@ class FluentCrmAdapter implements AccessAdapterInterface
         if ($resourceType === 'fluentcrm_tag') {
             $contact->detachTags([$id]);
 
+            if ($this->contactHasResource($contact, $resourceType, $id)) {
+                return [
+                    'success' => false,
+                    'message' => __('FluentCRM did not confirm the tag removal.', 'fchub-memberships'),
+                ];
+            }
+
             return [
                 'success' => true,
                 'message' => sprintf(
@@ -96,6 +122,13 @@ class FluentCrmAdapter implements AccessAdapterInterface
         if ($resourceType === 'fluentcrm_list') {
             $contact->detachLists([$id]);
 
+            if ($this->contactHasResource($contact, $resourceType, $id)) {
+                return [
+                    'success' => false,
+                    'message' => __('FluentCRM did not confirm the list removal.', 'fchub-memberships'),
+                ];
+            }
+
             return [
                 'success' => true,
                 'message' => sprintf(
@@ -105,10 +138,7 @@ class FluentCrmAdapter implements AccessAdapterInterface
             ];
         }
 
-        return [
-            'success' => false,
-            'message' => __('Unsupported FluentCRM resource type.', 'fchub-memberships'),
-        ];
+        return $this->unsupportedResourceResponse();
     }
 
     public function check(int $userId, string $resourceType, string $resourceId): bool
@@ -124,17 +154,7 @@ class FluentCrmAdapter implements AccessAdapterInterface
 
         $id = (int) $resourceId;
 
-        if ($resourceType === 'fluentcrm_tag') {
-            $tagIds = $contact->tags->pluck('id')->toArray();
-            return in_array($id, $tagIds, true);
-        }
-
-        if ($resourceType === 'fluentcrm_list') {
-            $listIds = $contact->lists->pluck('id')->toArray();
-            return in_array($id, $listIds, true);
-        }
-
-        return false;
+        return $this->contactHasResource($contact, $resourceType, $id);
     }
 
     public function getResourceLabel(string $resourceType, string $resourceId): string
@@ -252,5 +272,28 @@ class FluentCrmAdapter implements AccessAdapterInterface
     private function isFluentCrmActive(): bool
     {
         return defined('FLUENTCRM') && function_exists('FluentCrmApi');
+    }
+
+    private function contactHasResource(object $contact, string $resourceType, int $resourceId): bool
+    {
+        if ($resourceType === 'fluentcrm_tag') {
+            $resourceIds = $contact->tags->pluck('id')->toArray();
+            return in_array($resourceId, array_map('intval', $resourceIds), true);
+        }
+
+        if ($resourceType === 'fluentcrm_list') {
+            $resourceIds = $contact->lists->pluck('id')->toArray();
+            return in_array($resourceId, array_map('intval', $resourceIds), true);
+        }
+
+        return false;
+    }
+
+    private function unsupportedResourceResponse(): array
+    {
+        return [
+            'success' => false,
+            'message' => __('Unsupported FluentCRM resource type.', 'fchub-memberships'),
+        ];
     }
 }

@@ -10,6 +10,8 @@ use FluentCrm\Framework\Support\Arr;
 
 class CreateFluentCartCouponAction extends BaseAction
 {
+    private const MEMBERSHIP_META_OBJECT_TYPE = 'fchub_memberships';
+
     public function __construct()
     {
         $this->actionName = 'fchub_create_fluentcart_coupon';
@@ -133,7 +135,7 @@ class CreateFluentCartCouponAction extends BaseAction
 
         // Restrict to this contact's email
         if ($subscriber->email) {
-            $conditions['email_restrictions'] = [$subscriber->email];
+            $conditions['email_restrictions'] = $subscriber->email;
         }
 
         // Build coupon data
@@ -162,6 +164,12 @@ class CreateFluentCartCouponAction extends BaseAction
         // Use CouponResource if available (handles amount-to-cents conversion)
         if (class_exists('\FluentCart\Api\Resource\CouponResource')) {
             $result = \FluentCart\Api\Resource\CouponResource::create($couponData);
+            if (is_wp_error($result) || !is_array($result) || empty($result['data'])) {
+                FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+                return;
+            }
+
+            $coupon = $result['data'];
         } else {
             // Fallback: manual creation with amount conversion
             $createData = $couponData;
@@ -173,19 +181,30 @@ class CreateFluentCartCouponAction extends BaseAction
                     );
                 }
             }
-            \FluentCart\App\Models\Coupon::query()->create($createData);
+            $coupon = \FluentCart\App\Models\Coupon::query()->create($createData);
+            if (!$coupon || is_wp_error($coupon)) {
+                FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+                return;
+            }
         }
 
         // Store the coupon code in subscriber meta for smart code access
-        $subscriber->updateMeta('_fchub_last_coupon_code', $code);
-        $subscriber->updateMeta('_fchub_last_coupon_amount', $amount);
-        $subscriber->updateMeta('_fchub_last_coupon_type', $couponType);
+        $subscriber->updateMeta('_fchub_last_coupon_code', $code, self::MEMBERSHIP_META_OBJECT_TYPE);
+        $subscriber->updateMeta('_fchub_last_coupon_amount', $amount, self::MEMBERSHIP_META_OBJECT_TYPE);
+        $subscriber->updateMeta('_fchub_last_coupon_type', $couponType, self::MEMBERSHIP_META_OBJECT_TYPE);
 
         if ($expiryDays !== '' && (int) $expiryDays > 0) {
-            $subscriber->updateMeta('_fchub_last_coupon_expires', gmdate('Y-m-d', strtotime('+' . (int) $expiryDays . ' days')));
+            $subscriber->updateMeta(
+                '_fchub_last_coupon_expires',
+                gmdate('Y-m-d', strtotime('+' . (int) $expiryDays . ' days')),
+                self::MEMBERSHIP_META_OBJECT_TYPE
+            );
         }
 
-        do_action('fluent_cart/coupon_created', ['data' => $couponData]);
+        do_action('fluent_cart/coupon_created', [
+            'data' => $couponData,
+            'coupon' => $coupon,
+        ]);
     }
 
     private function generateUniqueCode(string $prefix): string

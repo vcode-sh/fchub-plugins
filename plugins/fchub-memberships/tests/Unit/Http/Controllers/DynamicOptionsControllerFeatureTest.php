@@ -78,6 +78,10 @@ namespace {
     if (!function_exists('FluentCrmApi')) {
         function FluentCrmApi(string $resource): object
         {
+            if (isset($GLOBALS['_fchub_test_fluentcrm_api'][$resource])) {
+                return $GLOBALS['_fchub_test_fluentcrm_api'][$resource];
+            }
+
             return match ($resource) {
                 'tags' => new FchubTestFluentCrmApi([
                     (object) ['id' => 11, 'title' => 'Gold Members'],
@@ -96,6 +100,30 @@ namespace {
 namespace FluentCommunity\App\Models {
     final class Space
     {
+        /** @return list<object> */
+        public static function testSpaces(): array
+        {
+            if (isset($GLOBALS['_fchub_test_fluent_community_spaces'])) {
+                return $GLOBALS['_fchub_test_fluent_community_spaces'];
+            }
+
+            return [
+                (object) ['id' => 31, 'title' => 'VIP Space'],
+                (object) ['id' => 32, 'title' => 'General Space'],
+            ];
+        }
+
+        public static function find(int $id): ?object
+        {
+            foreach (self::testSpaces() as $space) {
+                if ((int) $space->id === $id) {
+                    return $space;
+                }
+            }
+
+            return null;
+        }
+
         public static function query(): object
         {
             return new class {
@@ -114,10 +142,7 @@ namespace FluentCommunity\App\Models {
 
                 public function get(): array
                 {
-                    $spaces = [
-                        (object) ['id' => 31, 'title' => 'VIP Space'],
-                        (object) ['id' => 32, 'title' => 'General Space'],
-                    ];
+                    $spaces = Space::testSpaces();
 
                     if ($this->search === '') {
                         return $spaces;
@@ -137,6 +162,14 @@ namespace FChubMemberships\Tests\Unit\Http\Controllers {
 
     final class DynamicOptionsControllerFeatureTest extends PluginTestCase
     {
+        public function test_fluentcrm_api_double_uses_the_per_test_resource_override(): void
+        {
+            $contacts = new \stdClass();
+            $GLOBALS['_fchub_test_fluentcrm_api'] = ['contacts' => $contacts];
+
+            self::assertSame($contacts, \FluentCrmApi('contacts'));
+        }
+
         public function test_dynamic_options_controller_exposes_integrated_provider_search_results_and_permission_checks(): void
         {
             $providers = DynamicOptionsController::providers(new \WP_REST_Request('GET', '/providers'))->get_data();

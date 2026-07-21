@@ -29,6 +29,28 @@ final class PlanRuleValidationService
                 );
             }
 
+            $typeConfig = $this->registry->get($resourceType);
+            if (
+                $typeConfig
+                && ($typeConfig['allow_all'] ?? true) === false
+                && !preg_match('/^[1-9]\d*$/', (string) ($rule['resource_id'] ?? ''))
+            ) {
+                $resourceId = (string) ($rule['resource_id'] ?? '');
+                if (in_array($resourceId, ['0', '*'], true)) {
+                    return sprintf(
+                        __('Rule #%d: resource type "%s" does not support all resources; choose a positive resource ID.', 'fchub-memberships'),
+                        $ruleNum,
+                        $resourceType
+                    );
+                }
+
+                return sprintf(
+                    __('Rule #%d: resource type "%s" requires a positive resource ID.', 'fchub-memberships'),
+                    $ruleNum,
+                    $resourceType
+                );
+            }
+
             $dripType = $rule['drip_type'] ?? 'immediate';
 
             if ($dripType === 'fixed_date' && empty($rule['drip_date'])) {

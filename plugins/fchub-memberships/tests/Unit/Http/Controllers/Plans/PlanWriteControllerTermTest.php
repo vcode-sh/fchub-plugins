@@ -6,6 +6,11 @@ namespace FChubMemberships\Tests\Unit\Http\Controllers\Plans;
 
 use FChubMemberships\Http\Controllers\Plans\PlanWriteController;
 use FChubMemberships\Tests\Unit\PluginTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+if (!defined('FLUENTCRM')) {
+    define('FLUENTCRM', 'fluentcrm');
+}
 
 /**
  * Tests for PlanWriteController membership_term handling.
@@ -122,6 +127,49 @@ class PlanWriteControllerTermTest extends PluginTestCase
         $response = PlanWriteController::store($this->makeRequest($data));
 
         $this->assertEquals(201, $response->get_status(), 'Should accept meta without membership_term');
+    }
+
+    public function test_store_rejects_an_all_resources_rule_for_an_external_type(): void
+    {
+        foreach (['0', '*'] as $allResourcesSentinel) {
+            $response = PlanWriteController::store($this->makeRequest($this->validPlanData([
+                'rules' => [[
+                    'resource_type' => 'fluentcrm_tag',
+                    'resource_id' => $allResourcesSentinel,
+                    'drip_type' => 'immediate',
+                ]],
+            ])));
+
+            self::assertSame(422, $response->get_status());
+            self::assertStringContainsString('does not support all resources', $response->get_data()['message']);
+        }
+    }
+
+    #[DataProvider('invalidExternalResourceIds')]
+    public function test_store_rejects_non_positive_external_resource_ids(mixed $resourceId): void
+    {
+        $response = PlanWriteController::store($this->makeRequest($this->validPlanData([
+            'rules' => [[
+                'resource_type' => 'fluentcrm_tag',
+                'resource_id' => $resourceId,
+                'drip_type' => 'immediate',
+            ]],
+        ])));
+
+        self::assertSame(422, $response->get_status());
+        self::assertStringContainsString('positive resource ID', $response->get_data()['message']);
+    }
+
+    public static function invalidExternalResourceIds(): array
+    {
+        return [
+            'empty' => [''],
+            'null' => [null],
+            'zero' => [0],
+            'wildcard' => ['*'],
+            'negative' => [-7],
+            'malformed' => ['12abc'],
+        ];
     }
 
     public function test_store_accepts_mode_none(): void

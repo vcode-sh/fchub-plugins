@@ -258,16 +258,8 @@ class ContentController
             return new \WP_REST_Response(['data' => []]);
         }
 
-        $provider = $typeConfig['provider'];
-
-        $adapters = [
-            Constants::PROVIDER_WORDPRESS_CORE    => \FChubMemberships\Adapters\WordPressContentAdapter::class,
-            Constants::PROVIDER_LEARNDASH         => \FChubMemberships\Adapters\LearnDashAdapter::class,
-            Constants::PROVIDER_FLUENT_COMMUNITY  => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
-        ];
-
-        $class = $adapters[$provider] ?? null;
-        if (!$class || !class_exists($class)) {
+        $class = $typeConfig['adapter'] ?? null;
+        if (!is_string($class) || !class_exists($class)) {
             return new \WP_REST_Response(['data' => []]);
         }
 

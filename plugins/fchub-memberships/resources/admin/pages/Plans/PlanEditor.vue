@@ -240,11 +240,20 @@
                 <h2 id="access-step-heading">Choose content access</h2>
                 <p>Define what members unlock now or later. You can safely skip this step.</p>
               </div>
-              <el-button v-if="form.rules.length" @click="addRule">
+              <el-button v-if="form.rules.length" :disabled="hasReadOnlyRules" @click="addRule">
                 <el-icon><Plus /></el-icon>
                 Add content access
               </el-button>
             </div>
+
+            <el-alert
+              v-if="hasReadOnlyRules"
+              title="Legacy lesson access is preserved as read-only until its migration is available."
+              description="All content rule controls are locked, and the complete rule set will be preserved unchanged when you save other plan details."
+              type="info"
+              :closable="false"
+              show-icon
+            />
 
             <div v-if="form.rules.length === 0" class="access-empty-state">
               <div class="access-empty-icon" aria-hidden="true"><el-icon><Lock /></el-icon></div>
@@ -271,6 +280,7 @@
                   type="danger"
                   text
                   class="remove-rule-btn"
+                  :disabled="hasReadOnlyRules"
                   :aria-label="`Remove rule ${index + 1}`"
                   @click="removeRule(index)"
                 >
@@ -285,7 +295,12 @@
                   :rules="[{ required: true, message: 'Choose a resource type', trigger: 'change' }]"
                   label="Resource type"
                 >
-                  <el-select v-model="rule.resource_type" placeholder="Type" @change="onResourceTypeChange(index, rule)">
+                  <el-select
+                    v-model="rule.resource_type"
+                    placeholder="Type"
+                    :disabled="isPlanRuleControlLocked(form.rules, rule)"
+                    @change="onResourceTypeChange(index, rule)"
+                  >
                     <el-option-group v-for="group in resourceTypeGroups" :key="group.key" :label="group.label">
                       <el-option v-for="type in group.types" :key="type.value" :label="type.displayLabel" :value="type.value">
                         <span>{{ type.label }}</span>
@@ -295,13 +310,17 @@
                   </el-select>
                 </el-form-item>
 
-                <el-form-item :prop="`rules.${index}.resource_id`" label="Resource">
+                <el-form-item
+                  :prop="`rules.${index}.resource_id`"
+                  :rules="resourceIdRules(rule)"
+                  label="Resource"
+                >
                   <template v-if="rule.resource_type === 'url_pattern'">
-                    <el-input v-model="rule.resource_id" placeholder="/members/* or /premium/content/*" />
+                    <el-input v-model="rule.resource_id" :disabled="isPlanRuleControlLocked(form.rules, rule)" placeholder="/members/* or /premium/content/*" />
                     <span class="resource-hint">Use * as a wildcard. Example: /members/*</span>
                   </template>
                   <template v-else-if="rule.resource_type === 'special_page'">
-                    <el-select v-model="rule.resource_id" placeholder="Select page...">
+                    <el-select v-model="rule.resource_id" :disabled="isPlanRuleControlLocked(form.rules, rule)" placeholder="Select page...">
                       <el-option v-for="sp in specialPageOptions" :key="sp.id" :label="sp.label" :value="sp.id" />
                     </el-select>
                   </template>
@@ -311,12 +330,13 @@
                       filterable
                       remote
                       clearable
+                      :disabled="isPlanRuleControlLocked(form.rules, rule)"
                       :remote-method="(q) => searchRuleResources(index, rule.resource_type, q)"
                       :loading="ruleResourceLoading[index]"
                       placeholder="Search by title..."
-                      @clear="rule.resource_id = '0'"
+                      @clear="resetRuleResource(rule)"
                     >
-                      <el-option label="All of this type" value="0" />
+                      <el-option v-if="getTypeConfig(rule.resource_type)?.allow_all" label="All of this type" value="0" />
                       <el-option
                         v-for="item in ruleResourceOptions[index]"
                         :key="item.id"
@@ -337,7 +357,7 @@
                   :rules="[{ required: true, message: 'Choose when access begins', trigger: 'change' }]"
                   label="Access begins"
                 >
-                  <el-select v-model="rule.drip_type" placeholder="Timing" @change="onDripTypeChange(rule)">
+                  <el-select v-model="rule.drip_type" :disabled="hasReadOnlyRules" placeholder="Timing" @change="onDripTypeChange(rule)">
                     <el-option label="Immediately" value="immediate" />
                     <el-option label="After a delay" value="delayed" />
                     <el-option label="On a fixed date" value="fixed_date" />
@@ -350,7 +370,7 @@
                   :rules="[{ required: true, message: 'Enter the delay', trigger: 'blur' }]"
                   label="Delay (days)"
                 >
-                  <el-input-number v-model="rule.drip_delay_days" :min="1" :max="730" controls-position="right" />
+                  <el-input-number v-model="rule.drip_delay_days" :disabled="hasReadOnlyRules" :min="1" :max="730" controls-position="right" />
                 </el-form-item>
 
                 <el-form-item
@@ -363,6 +383,7 @@
                     v-model="rule.drip_date"
                     type="date"
                     placeholder="Select date"
+                    :disabled="hasReadOnlyRules"
                     :format="wpDatePickerFormat"
                     value-format="YYYY-MM-DD"
                     :disabled-date="isPastDate"
@@ -496,6 +517,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { plans, members, content } from '@/api/index.js'
 import { formatWpDate, formatWpDateTime, wpDatePickerFormat, wpDateTimePickerFormat } from '@/utils/wpDate.js'
+import { buildPlanRulesPayload, hasReadOnlyPlanRules, isPlanRuleControlLocked } from '@/utils/planRulePayload.js'
 import PlanSchedulePanel from '@/components/plans/PlanSchedulePanel.vue'
 import PlanLinkedProductsTab from '@/components/plans/PlanLinkedProductsTab.vue'
 import PlanMembersTab from '@/components/plans/PlanMembersTab.vue'
@@ -621,6 +643,7 @@ const completedSteps = computed(() => [
 ])
 
 const planSummary = computed(() => buildPlanSummary(form, form.rules.length))
+const hasReadOnlyRules = computed(() => hasReadOnlyPlanRules(form.rules))
 
 const primaryActionLabel = computed(() => {
   if (activeStep.value === 'offer') return 'Continue'
@@ -668,14 +691,17 @@ function createEmptyRule() {
 }
 
 function addRule() {
+  if (hasReadOnlyRules.value) return
   form.rules.push(createEmptyRule())
 }
 
 function removeRule(index) {
+  if (hasReadOnlyRules.value) return
   form.rules.splice(index, 1)
 }
 
 function onDripTypeChange(rule) {
+  if (hasReadOnlyRules.value) return
   if (rule.drip_type === 'immediate') {
     rule.drip_delay_days = null
     rule.drip_date = null
@@ -734,6 +760,24 @@ function getTypeConfig(resourceType) {
   return null
 }
 
+function resourceIdRules(rule) {
+  if (hasReadOnlyRules.value || getTypeConfig(rule.resource_type)?.allow_all !== false) {
+    return []
+  }
+
+  return [{
+    trigger: ['blur', 'change'],
+    validator: (_rule, value, callback) => {
+      if (/^[1-9]\d*$/.test(String(value ?? ''))) {
+        callback()
+        return
+      }
+
+      callback(new Error('Choose a valid provider resource'))
+    },
+  }]
+}
+
 function ruleSummary(rule) {
   const type = getTypeConfig(rule.resource_type)?.displayLabel
     || capitalize(rule.resource_type)
@@ -757,13 +801,18 @@ function isSearchableType(resourceType) {
 }
 
 function onResourceTypeChange(index, rule) {
+  if (hasReadOnlyRules.value) return
   if (rule.resource_type === 'url_pattern') {
     rule.resource_id = ''
   } else {
-    rule.resource_id = '0'
+    rule.resource_id = getTypeConfig(rule.resource_type)?.allow_all ? '0' : ''
   }
   rule.resource_label = null
   delete ruleResourceOptions[index]
+}
+
+function resetRuleResource(rule) {
+  rule.resource_id = getTypeConfig(rule.resource_type)?.allow_all ? '0' : ''
 }
 
 async function searchRuleResources(index, resourceType, query) {
@@ -814,6 +863,7 @@ async function loadResourceTypes() {
         label: type.label,
         source,
         searchable: type.searchable !== false,
+        allow_all: type.allow_all === true,
         displayLabel: source ? `${type.label} (${source})` : type.label,
       })
     }
@@ -1004,6 +1054,7 @@ async function loadPlan(id) {
     form.rules = (plan.rules || []).map((r, index) => {
       const resourceId = String(r.resource_id ?? '0')
       const resourceLabel = r.resource_label || null
+      const resourceType = r.resource_type === 'sfwd-courses' ? 'ld_course' : r.resource_type
 
       // Pre-populate the search options for this rule so the select shows the label
       if (resourceId && resourceId !== '0' && resourceLabel) {
@@ -1011,9 +1062,10 @@ async function loadPlan(id) {
       }
 
       return {
-        resource_type: r.resource_type || 'post',
+        resource_type: resourceType || 'post',
         resource_id: resourceId,
         resource_label: resourceLabel,
+        read_only: r.read_only === true,
         drip_type: r.drip_type || 'immediate',
         drip_delay_days: r.drip_delay_days ?? null,
         drip_date: r.drip_date ?? null,
@@ -1111,20 +1163,11 @@ async function savePlan() {
       grace_period_days: form.grace_period_days,
       level: form.level,
       meta,
-      rules: form.rules.map((r) => {
-        const rule = {
-          resource_type: r.resource_type,
-          resource_id: r.resource_id,
-          drip_type: r.drip_type,
-        }
-        if (r.drip_type === 'delayed') {
-          rule.drip_delay_days = r.drip_delay_days
-        }
-        if (r.drip_type === 'fixed_date') {
-          rule.drip_date = r.drip_date
-        }
-        return rule
-      }),
+    }
+
+    const rulesPayload = buildPlanRulesPayload(form.rules)
+    if (rulesPayload !== undefined) {
+      payload.rules = rulesPayload
     }
 
     if (props.isNew) {

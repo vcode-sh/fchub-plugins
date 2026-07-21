@@ -314,19 +314,14 @@ class MembershipAccessIntegration extends BaseIntegrationManager
         $grantService = new \FChubMemberships\Domain\AccessGrantService();
         $result = $grantService->grantPlan($userId, $planId, $context);
 
-        Logger::orderLog(
+        self::logGrantResult(
             $order,
-            __('Membership access granted', 'fchub-memberships'),
-            sprintf(
-                __('Plan "%s" granted to user #%d (%d created, %d updated, validity: %s, source: %s #%d).', 'fchub-memberships'),
-                $plan['title'],
-                $userId,
-                $result['created'] ?? 0,
-                $result['updated'] ?? 0,
-                $expiresAt ?? __('lifetime', 'fchub-memberships'),
-                $sourceType,
-                $sourceId
-            )
+            $result,
+            (string) $plan['title'],
+            $userId,
+            $expiresAt,
+            $sourceType,
+            (int) $sourceId
         );
     }
 
@@ -385,6 +380,8 @@ class MembershipAccessIntegration extends BaseIntegrationManager
 
         $grantService = new \FChubMemberships\Domain\AccessGrantService();
         $totalRevoked = 0;
+        $totalFailed = 0;
+        $errors = [];
 
         foreach ($planUsers as $info) {
             $sourceId = $subscription ? $subscription->id : $order->id;
@@ -394,17 +391,108 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                 'order'     => $order,
             ]);
             $totalRevoked += $result['revoked'] ?? 0;
+            $totalFailed += $result['failed'] ?? 0;
+            $errors = array_merge($errors, $result['errors'] ?? []);
+        }
+
+        self::logRevokeResult($order, (int) $order->id, $totalRevoked, $totalFailed, $errors);
+    }
+
+    public static function logGrantResult(
+        $order,
+        array $result,
+        string $planTitle,
+        int $userId,
+        ?string $expiresAt,
+        string $sourceType,
+        int $sourceId
+    ): void {
+        $created = (int) ($result['created'] ?? 0);
+        $updated = (int) ($result['updated'] ?? 0);
+        $failed = (int) ($result['failed'] ?? 0);
+        $succeeded = $created + $updated;
+
+        if ($failed > 0) {
+            $partial = $succeeded > 0;
+            Logger::orderLog(
+                $order,
+                $partial
+                    ? __('Membership access partially granted', 'fchub-memberships')
+                    : __('Membership access grant failed', 'fchub-memberships'),
+                sprintf(
+                    __('Plan "%s" for user #%d: %d resources applied, %d failed. %s', 'fchub-memberships'),
+                    $planTitle,
+                    $userId,
+                    $succeeded,
+                    $failed,
+                    self::resultErrors($result['errors'] ?? [])
+                ),
+                $partial ? 'warning' : 'error'
+            );
+            return;
+        }
+
+        Logger::orderLog(
+            $order,
+            __('Membership access granted', 'fchub-memberships'),
+            sprintf(
+                __('Plan "%s" granted to user #%d (%d created, %d updated, validity: %s, source: %s #%d).', 'fchub-memberships'),
+                $planTitle,
+                $userId,
+                $created,
+                $updated,
+                $expiresAt ?? __('lifetime', 'fchub-memberships'),
+                $sourceType,
+                $sourceId
+            )
+        );
+    }
+
+    public static function logRevokeResult(
+        $order,
+        int $orderId,
+        int $revoked,
+        int $failed,
+        array $errors = []
+    ): void {
+        if ($failed > 0) {
+            $partial = $revoked > 0;
+            Logger::orderLog(
+                $order,
+                $partial
+                    ? __('Membership access partially revoked', 'fchub-memberships')
+                    : __('Membership access revoke failed', 'fchub-memberships'),
+                sprintf(
+                    __('Order #%d: %d grants revoked, %d failed. %s', 'fchub-memberships'),
+                    $orderId,
+                    $revoked,
+                    $failed,
+                    self::resultErrors($errors)
+                ),
+                $partial ? 'warning' : 'error'
+            );
+            return;
         }
 
         Logger::orderLog(
             $order,
             __('Membership access revoked', 'fchub-memberships'),
-            sprintf(
-                __('%d grant(s) revoked for order #%d.', 'fchub-memberships'),
-                $totalRevoked,
-                $order->id
-            )
+            sprintf(__('%d grant(s) revoked for order #%d.', 'fchub-memberships'), $revoked, $orderId)
         );
+    }
+
+    private static function resultErrors(array $errors): string
+    {
+        $messages = [];
+        foreach ($errors as $error) {
+            if (is_string($error) && $error !== '') {
+                $messages[] = $error;
+            } elseif (is_array($error) && !empty($error['message'])) {
+                $messages[] = (string) $error['message'];
+            }
+        }
+
+        return $messages ? implode('; ', $messages) : __('No provider error details were returned.', 'fchub-memberships');
     }
 
     /**

@@ -8,9 +8,24 @@ use PHPUnit\Framework\TestCase;
 
 abstract class PluginTestCase extends TestCase
 {
+    protected function tearDown(): void
+    {
+        unset(
+            $GLOBALS['_fchub_test_fluentcrm_api'],
+            $GLOBALS['_fchub_test_fluent_community_spaces']
+        );
+
+        parent::tearDown();
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        unset(
+            $GLOBALS['_fchub_test_fluentcrm_api'],
+            $GLOBALS['_fchub_test_fluent_community_spaces']
+        );
 
         $GLOBALS['_fchub_test_actions'] = [];
         $GLOBALS['_fchub_test_filters'] = [];
