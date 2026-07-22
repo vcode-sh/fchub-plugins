@@ -1,0 +1,145 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - link "Memberships" [ref=e7] [cursor=pointer]:
+          - /url: "#/"
+          - img [ref=e9] [cursor=pointer]
+          - generic [ref=e11] [cursor=pointer]: Memberships
+        - generic [ref=e12]:
+          - link "Dashboard" [ref=e13] [cursor=pointer]:
+            - /url: "#/"
+          - link "Plans" [ref=e14] [cursor=pointer]:
+            - /url: "#/plans"
+          - link "Members" [ref=e15] [cursor=pointer]:
+            - /url: "#/members"
+          - link "Content" [ref=e16] [cursor=pointer]:
+            - /url: "#/content"
+          - link "Drip" [ref=e17] [cursor=pointer]:
+            - /url: "#/drip"
+          - link "Reports" [ref=e18] [cursor=pointer]:
+            - /url: "#/reports"
+      - generic [ref=e19]:
+        - 'button "Theme: system" [ref=e21] [cursor=pointer]':
+          - img [ref=e23] [cursor=pointer]
+        - link "Settings" [ref=e25] [cursor=pointer]:
+          - /url: "#/settings"
+          - img [ref=e27] [cursor=pointer]
+          - text: Settings
+  - generic [ref=e30]:
+    - banner [ref=e31]:
+      - generic [ref=e32]:
+        - paragraph [ref=e33]: Access products
+        - generic [ref=e35]:
+          - heading "Plans" [level=1] [ref=e36]
+          - paragraph [ref=e37]: Create, publish, and maintain the access packages your members receive.
+      - generic [ref=e38]:
+        - button "Plan utilities" [ref=e40] [cursor=pointer]:
+          - generic [ref=e41] [cursor=pointer]:
+            - text: More
+            - img [ref=e43] [cursor=pointer]
+        - link "Create Plan" [ref=e45] [cursor=pointer]:
+          - /url: "#/plans/new"
+          - img [ref=e47] [cursor=pointer]
+          - text: Create Plan
+    - region "Plan health" [ref=e49]:
+      - article [ref=e50]:
+        - generic [ref=e51]: "1"
+        - generic [ref=e52]:
+          - strong [ref=e53]: Total plans
+          - generic [ref=e54]: All plan records in this workspace
+      - article [ref=e55]:
+        - generic [ref=e56]: "1"
+        - generic [ref=e57]:
+          - strong [ref=e58]: Active plans
+          - generic [ref=e59]: Available for member access
+      - article [ref=e60]:
+        - generic [ref=e61]: "1"
+        - generic [ref=e62]:
+          - strong [ref=e63]: Needs content
+          - generic [ref=e64]: Active plans without protection rules
+      - article [ref=e65]:
+        - generic [ref=e66]: "0"
+        - generic [ref=e67]:
+          - strong [ref=e68]: Scheduled changes
+          - generic [ref=e69]: Lifecycle updates waiting to run
+    - generic [ref=e71]:
+      - generic [ref=e72]:
+        - generic [ref=e74]:
+          - img [ref=e77]
+          - textbox "Search plans" [ref=e79]
+        - generic [ref=e82] [cursor=pointer]:
+          - generic:
+            - combobox "Plan status" [ref=e84]
+            - generic [ref=e86] [cursor=pointer]: All statuses
+          - img [ref=e89] [cursor=pointer]
+      - generic [ref=e91]: Use readiness to spot active plans that do not protect any content yet.
+      - generic [ref=e92]:
+        - generic [ref=e93]:
+          - table [ref=e95]:
+            - rowgroup [ref=e105]:
+              - row "Title Slug Status Duration Members Rules Readiness Actions" [ref=e106]:
+                - columnheader "Title" [ref=e107]:
+                  - generic [ref=e108]: Title
+                - columnheader "Slug" [ref=e109]:
+                  - generic [ref=e110]: Slug
+                - columnheader "Status" [ref=e111]:
+                  - generic [ref=e112]: Status
+                - columnheader "Duration" [ref=e113]:
+                  - generic [ref=e114]: Duration
+                - columnheader "Members" [ref=e115]:
+                  - generic [ref=e116]: Members
+                - columnheader "Rules" [ref=e117]:
+                  - generic [ref=e118]: Rules
+                - columnheader "Readiness" [ref=e119]:
+                  - generic [ref=e120]: Readiness
+                - columnheader "Actions" [ref=e121]:
+                  - generic [ref=e122]: Actions
+          - table [ref=e127]:
+            - rowgroup [ref=e137]:
+              - row "Gold Plan gold-plan active Lifetime access 1 0 Needs content Plan actions for Gold Plan" [ref=e138] [cursor=pointer]:
+                - cell "Gold Plan" [ref=e139] [cursor=pointer]:
+                  - link "Gold Plan" [ref=e141] [cursor=pointer]:
+                    - /url: "#/plans/5/edit"
+                - cell "gold-plan" [ref=e142] [cursor=pointer]:
+                  - generic [ref=e143] [cursor=pointer]: gold-plan
+                - cell "active" [ref=e144] [cursor=pointer]:
+                  - generic [ref=e145] [cursor=pointer]:
+                    - generic:
+                      - generic: active
+                - cell "Lifetime access" [ref=e146] [cursor=pointer]:
+                  - generic [ref=e148] [cursor=pointer]: Lifetime access
+                - cell "1" [ref=e149] [cursor=pointer]:
+                  - generic [ref=e150] [cursor=pointer]: "1"
+                - cell "0" [ref=e151] [cursor=pointer]:
+                  - generic [ref=e152] [cursor=pointer]: "0"
+                - cell "Needs content" [ref=e153] [cursor=pointer]:
+                  - generic [ref=e155] [cursor=pointer]: Needs content
+                - cell "Plan actions for Gold Plan" [ref=e156] [cursor=pointer]:
+                  - button "Plan actions for Gold Plan" [ref=e159] [cursor=pointer]:
+                    - generic [ref=e160] [cursor=pointer]:
+                      - text: Manage
+                      - img [ref=e162] [cursor=pointer]
+        - img [ref=e166]
+      - generic [ref=e168]:
+        - generic [ref=e169]:
+          - generic [ref=e170]: Page 1 of 1
+          - generic [ref=e172] [cursor=pointer]:
+            - generic:
+              - combobox [ref=e174]
+              - generic [ref=e176] [cursor=pointer]: 20 / page
+            - img [ref=e179] [cursor=pointer]
+          - generic [ref=e181]: Total 1
+        - generic [ref=e182]:
+          - button "Go to previous page" [disabled] [ref=e183]:
+            - generic:
+              - img
+          - list [ref=e184]:
+            - listitem "page 1" [ref=e185]: "1"
+          - button "Go to next page" [disabled] [ref=e186]:
+            - generic:
+              - img
+```
