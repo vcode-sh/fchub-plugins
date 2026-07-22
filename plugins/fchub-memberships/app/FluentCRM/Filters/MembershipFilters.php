@@ -8,6 +8,8 @@ use FChubMemberships\Storage\PlanRepository;
 
 class MembershipFilters
 {
+    private const GRANTS_TABLE = 'fchub_membership_grants as fchub_grants';
+
     public static function register(): void
     {
         add_filter('fluentcrm_advanced_filter_options', [static::class, 'addFilterOptions']);
@@ -100,8 +102,7 @@ class MembershipFilters
             return $query;
         }
 
-        global $wpdb;
-        $t = $wpdb->prefix . 'fchub_membership_grants';
+        $t = 'fchub_grants';
 
         return match ($key) {
             'fchub_has_membership' => static::filterHasMembership($query, $operator, $value, $t),
@@ -120,7 +121,7 @@ class MembershipFilters
         $method = $operator === 'not_exist' ? 'whereNotExists' : 'whereExists';
 
         return $query->{$method}(function ($q) use ($t, $planIds) {
-            $q->select(fluentCrmDb()->raw(1))->from($t)
+            $q->select(fluentCrmDb()->raw(1))->from(self::GRANTS_TABLE)
                 ->whereColumn($t . '.user_id', 'fc_subscribers.user_id')
                 ->where($t . '.status', 'active');
             if ($planIds) {
@@ -135,7 +136,7 @@ class MembershipFilters
         $method = $operator === 'not_exist' ? 'whereNotExists' : 'whereExists';
 
         return $query->{$method}(function ($q) use ($t, $status) {
-            $q->select(fluentCrmDb()->raw(1))->from($t)
+            $q->select(fluentCrmDb()->raw(1))->from(self::GRANTS_TABLE)
                 ->whereColumn($t . '.user_id', 'fc_subscribers.user_id')
                 ->where($t . '.status', $status);
         });
@@ -149,7 +150,7 @@ class MembershipFilters
         }
 
         return $query->whereExists(function ($q) use ($t, $operator, $value) {
-            $q->select(fluentCrmDb()->raw(1))->from($t)
+            $q->select(fluentCrmDb()->raw(1))->from(self::GRANTS_TABLE)
                 ->whereColumn($t . '.user_id', 'fc_subscribers.user_id')
                 ->where($t . '.status', 'active')
                 ->whereNotNull($t . '.expires_at')
@@ -165,7 +166,7 @@ class MembershipFilters
         }
 
         return $query->whereExists(function ($q) use ($t, $operator, $value) {
-            $q->select(fluentCrmDb()->raw(1))->from($t)
+            $q->select(fluentCrmDb()->raw(1))->from(self::GRANTS_TABLE)
                 ->whereColumn($t . '.user_id', 'fc_subscribers.user_id')
                 ->where($t . '.status', 'active')
                 ->where($t . '.renewal_count', $operator, (int) $value);
@@ -186,7 +187,7 @@ class MembershipFilters
         }
 
         return $query->whereExists(function ($q) use ($t, $operator, $value) {
-            $q->select(fluentCrmDb()->raw(1))->from($t)
+            $q->select(fluentCrmDb()->raw(1))->from(self::GRANTS_TABLE)
                 ->whereColumn($t . '.user_id', 'fc_subscribers.user_id')
                 ->whereRaw("DATEDIFF(NOW(), {$t}.created_at) {$operator} ?", [(int) $value]);
         });
@@ -197,7 +198,7 @@ class MembershipFilters
         $method = $operator === 'not_exist' ? 'whereNotExists' : 'whereExists';
 
         return $query->{$method}(function ($q) use ($t) {
-            $q->select(fluentCrmDb()->raw(1))->from($t)
+            $q->select(fluentCrmDb()->raw(1))->from(self::GRANTS_TABLE)
                 ->whereColumn($t . '.user_id', 'fc_subscribers.user_id')
                 ->where($t . '.status', 'active')
                 ->whereNotNull($t . '.trial_ends_at')

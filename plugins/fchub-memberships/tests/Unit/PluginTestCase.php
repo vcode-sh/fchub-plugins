@@ -28,6 +28,7 @@ abstract class PluginTestCase extends TestCase
         );
 
         $GLOBALS['_fchub_test_actions'] = [];
+        $GLOBALS['_fchub_test_action_registrations'] = [];
         $GLOBALS['_fchub_test_filters'] = [];
         $GLOBALS['_fchub_test_routes'] = [];
         $GLOBALS['_fchub_test_rest_fields'] = [];
@@ -43,11 +44,15 @@ abstract class PluginTestCase extends TestCase
         $GLOBALS['_fchub_test_is_admin'] = false;
         $GLOBALS['_fchub_test_is_singular'] = true;
         $GLOBALS['_fchub_test_current_user_can'] = true;
+        $GLOBALS['_fchub_test_current_user_can_checks'] = [];
+        $GLOBALS['_fchub_test_current_user_caps'] = [];
         $GLOBALS['_fchub_test_user_can'] = [];
         $GLOBALS['_fchub_test_cache'] = [];
         $GLOBALS['_fchub_test_users'] = [];
         $GLOBALS['_fchub_test_users_by_email'] = [];
         $GLOBALS['_fchub_test_get_users_args'] = [];
+        $GLOBALS['_fchub_test_role_lookups'] = [];
+        $GLOBALS['_fchub_test_roles'] = [];
         $GLOBALS['_fchub_test_current_user_id'] = 0;
         $GLOBALS['_fchub_test_current_user'] = (object) ['ID' => 0, 'user_email' => ''];
         $GLOBALS['_fchub_test_posts'] = [];

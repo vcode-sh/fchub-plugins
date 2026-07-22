@@ -31,7 +31,7 @@ final class FluentCrmAutomationModule implements ModuleInterface
 
     public function register(Container $container): void
     {
-        add_action('init', [$this, 'bootAutomation'], 30);
+        add_action('init', [$this, 'bootAutomation'], 1);
     }
 
     public function bootAutomation(): void

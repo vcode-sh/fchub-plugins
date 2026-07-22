@@ -311,7 +311,15 @@ final class ProviderOutcomeOwnershipTest extends PluginTestCase
             public function update(int $id, array $data): bool
             {
                 $this->updates[] = [$id, $data];
+                if ($this->existing !== null) {
+                    $this->existing = array_replace($this->existing, $data);
+                }
                 return true;
+            }
+
+            public function find(int $id): ?array
+            {
+                return $this->existing;
             }
         };
 

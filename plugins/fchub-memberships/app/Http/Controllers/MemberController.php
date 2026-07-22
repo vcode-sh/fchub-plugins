@@ -8,10 +8,20 @@ use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Domain\AccessGrantService;
 use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Domain\Drip\DripEvaluator;
+use FChubMemberships\Http\MembershipMutationPermission;
+use FChubMemberships\Http\MembershipRestArguments;
+use FChubMemberships\Http\IdempotentMutation;
 use FChubMemberships\Support\AdminRequestFilters;
 
 class MemberController
 {
+    private static ?\Closure $accessGrantServiceFactory = null;
+
+    public static function setAccessGrantServiceFactory(?callable $factory): void
+    {
+        self::$accessGrantServiceFactory = $factory === null ? null : \Closure::fromCallable($factory);
+    }
+
     public static function registerRoutes(): void
     {
         $ns = 'fchub-memberships/v1';
@@ -31,19 +41,22 @@ class MemberController
         register_rest_route($ns, '/admin/members/grant', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'grant'],
-            'permission_callback' => [self::class, 'adminPermission'],
+            'permission_callback' => [MembershipMutationPermission::class, 'check'],
+            'args'                => MembershipRestArguments::grant(),
         ]);
 
         register_rest_route($ns, '/admin/members/revoke', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'revoke'],
-            'permission_callback' => [self::class, 'adminPermission'],
+            'permission_callback' => [MembershipMutationPermission::class, 'check'],
+            'args'                => MembershipRestArguments::revoke(),
         ]);
 
         register_rest_route($ns, '/admin/members/extend', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'extend'],
-            'permission_callback' => [self::class, 'adminPermission'],
+            'permission_callback' => [MembershipMutationPermission::class, 'check'],
+            'args'                => MembershipRestArguments::extend(),
         ]);
 
         register_rest_route($ns, '/admin/members/(?P<user_id>\d+)/drip-timeline', [
@@ -61,31 +74,36 @@ class MemberController
         register_rest_route($ns, '/admin/members/pause', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'pause'],
-            'permission_callback' => [self::class, 'adminPermission'],
+            'permission_callback' => [MembershipMutationPermission::class, 'check'],
+            'args'                => MembershipRestArguments::pause(),
         ]);
 
         register_rest_route($ns, '/admin/members/resume', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'resume'],
-            'permission_callback' => [self::class, 'adminPermission'],
+            'permission_callback' => [MembershipMutationPermission::class, 'check'],
+            'args'                => MembershipRestArguments::resume(),
         ]);
 
         register_rest_route($ns, '/admin/members/bulk-grant', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'bulkGrant'],
-            'permission_callback' => [self::class, 'adminPermission'],
+            'permission_callback' => [MembershipMutationPermission::class, 'check'],
+            'args'                => MembershipRestArguments::bulkGrant(),
         ]);
 
         register_rest_route($ns, '/admin/members/bulk-revoke', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'bulkRevoke'],
-            'permission_callback' => [self::class, 'adminPermission'],
+            'permission_callback' => [MembershipMutationPermission::class, 'check'],
+            'args'                => MembershipRestArguments::bulkRevoke(),
         ]);
 
         register_rest_route($ns, '/admin/members/bulk-extend', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'bulkExtend'],
-            'permission_callback' => [self::class, 'adminPermission'],
+            'permission_callback' => [MembershipMutationPermission::class, 'check'],
+            'args'                => MembershipRestArguments::bulkExtend(),
         ]);
 
         register_rest_route($ns, '/admin/members/bulk-export', [
@@ -216,10 +234,10 @@ class MemberController
             return new \WP_REST_Response(['message' => __('User not found.', 'fchub-memberships')], 404);
         }
 
-        $service = new AccessGrantService();
-        $result = $service->manualGrant($userId, $planId, $expiresAt);
-
-        return self::grantResultResponse($result);
+        return (new IdempotentMutation())->execute($request, 'grant', static function () use ($userId, $planId, $expiresAt): \WP_REST_Response {
+            $result = self::accessGrantService()->manualGrant($userId, $planId, $expiresAt);
+            return self::grantResultResponse($result);
+        });
     }
 
     public static function revoke(\WP_REST_Request $request): \WP_REST_Response
@@ -233,10 +251,10 @@ class MemberController
             return new \WP_REST_Response(['message' => __('User ID and Plan ID are required.', 'fchub-memberships')], 422);
         }
 
-        $service = new AccessGrantService();
-        $result = $service->revokePlan($userId, $planId, ['reason' => $reason]);
-
-        return self::revokeResultResponse($result);
+        return (new IdempotentMutation())->execute($request, 'revoke', static function () use ($userId, $planId, $reason): \WP_REST_Response {
+            $result = self::accessGrantService()->revokePlan($userId, $planId, ['reason' => $reason]);
+            return self::revokeResultResponse($result);
+        });
     }
 
     public static function grantResultResponse(array $result): \WP_REST_Response
@@ -293,13 +311,17 @@ class MemberController
             return new \WP_REST_Response(['message' => __('User ID, Plan ID, and expiry date are required.', 'fchub-memberships')], 422);
         }
 
-        $service = new AccessGrantService();
-        $extended = $service->extendExpiry($userId, $planId, $expiresAt);
+        return (new IdempotentMutation())->execute($request, 'extend', static function () use ($userId, $planId, $expiresAt): \WP_REST_Response {
+            $extended = self::accessGrantService()->extendExpiry($userId, $planId, $expiresAt);
+            if ($extended === 0) {
+                return new \WP_REST_Response(['message' => __('No compatible active grant was found.', 'fchub-memberships')], 404);
+            }
 
-        return new \WP_REST_Response([
-            'data'    => ['extended' => $extended],
-            'message' => sprintf(__('%d grants extended.', 'fchub-memberships'), $extended),
-        ]);
+            return new \WP_REST_Response([
+                'data'    => ['extended' => $extended],
+                'message' => sprintf(__('%d grants extended.', 'fchub-memberships'), $extended),
+            ]);
+        });
     }
 
     public static function dripTimeline(\WP_REST_Request $request): \WP_REST_Response
@@ -352,13 +374,17 @@ class MemberController
         if (!$grantId) {
             return new \WP_REST_Response(['message' => __('Grant ID is required.', 'fchub-memberships')], 422);
         }
-        $service = new AccessGrantService();
-        try {
-            $result = $service->pauseGrant($grantId, $reason);
-            return new \WP_REST_Response(['data' => $result, 'message' => __('Membership paused.', 'fchub-memberships')]);
-        } catch (\InvalidArgumentException $e) {
-            return new \WP_REST_Response(['message' => $e->getMessage()], 422);
-        }
+        return (new IdempotentMutation())->execute($request, 'pause', static function () use ($grantId, $reason): \WP_REST_Response {
+            try {
+                $result = self::accessGrantService()->pauseGrant($grantId, $reason);
+                if (!empty($result['error'])) {
+                    return new \WP_REST_Response(['message' => $result['error']], 404);
+                }
+                return new \WP_REST_Response(['data' => $result, 'message' => __('Membership paused.', 'fchub-memberships')]);
+            } catch (\InvalidArgumentException $exception) {
+                return self::grantExceptionResponse($exception);
+            }
+        });
     }
 
     public static function resume(\WP_REST_Request $request): \WP_REST_Response
@@ -368,13 +394,17 @@ class MemberController
         if (!$grantId) {
             return new \WP_REST_Response(['message' => __('Grant ID is required.', 'fchub-memberships')], 422);
         }
-        $service = new AccessGrantService();
-        try {
-            $result = $service->resumeGrant($grantId);
-            return new \WP_REST_Response(['data' => $result, 'message' => __('Membership resumed.', 'fchub-memberships')]);
-        } catch (\InvalidArgumentException $e) {
-            return new \WP_REST_Response(['message' => $e->getMessage()], 422);
-        }
+        return (new IdempotentMutation())->execute($request, 'resume', static function () use ($grantId): \WP_REST_Response {
+            try {
+                $result = self::accessGrantService()->resumeGrant($grantId);
+                if (!empty($result['error'])) {
+                    return new \WP_REST_Response(['message' => $result['error']], 404);
+                }
+                return new \WP_REST_Response(['data' => $result, 'message' => __('Membership resumed.', 'fchub-memberships')]);
+            } catch (\InvalidArgumentException $exception) {
+                return self::grantExceptionResponse($exception);
+            }
+        });
     }
 
     public static function bulkGrant(\WP_REST_Request $request): \WP_REST_Response
@@ -386,13 +416,14 @@ class MemberController
         if (empty($userIds) || !$planId) {
             return new \WP_REST_Response(['message' => __('User IDs and Plan ID are required.', 'fchub-memberships')], 422);
         }
-        $service = new AccessGrantService();
-        $result = $service->bulkGrant($userIds, $planId, ['expires_at' => $expiresAt, 'source_type' => 'manual']);
-        $status = $result['failed'] > 0 ? ($result['granted'] > 0 ? 207 : 502) : 200;
-        $message = $result['failed'] > 0
-            ? sprintf(__('%d memberships granted and %d failed.', 'fchub-memberships'), $result['granted'], $result['failed'])
-            : sprintf(__('%d memberships granted.', 'fchub-memberships'), $result['granted']);
-        return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
+        return (new IdempotentMutation())->execute($request, 'bulk_grant', static function () use ($userIds, $planId, $expiresAt): \WP_REST_Response {
+            $result = self::accessGrantService()->bulkGrant($userIds, $planId, ['expires_at' => $expiresAt, 'source_type' => 'manual']);
+            $status = $result['failed'] > 0 ? ($result['granted'] > 0 ? 207 : 502) : 200;
+            $message = $result['failed'] > 0
+                ? sprintf(__('%d memberships granted and %d failed.', 'fchub-memberships'), $result['granted'], $result['failed'])
+                : sprintf(__('%d memberships granted.', 'fchub-memberships'), $result['granted']);
+            return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
+        });
     }
 
     public static function bulkRevoke(\WP_REST_Request $request): \WP_REST_Response
@@ -404,13 +435,14 @@ class MemberController
         if (empty($userIds) || !$planId) {
             return new \WP_REST_Response(['message' => __('User IDs and Plan ID are required.', 'fchub-memberships')], 422);
         }
-        $service = new AccessGrantService();
-        $result = $service->bulkRevoke($userIds, $planId, ['reason' => $reason]);
-        $status = $result['failed'] > 0 ? ($result['revoked'] > 0 ? 207 : 502) : 200;
-        $message = $result['failed'] > 0
-            ? sprintf(__('%d memberships revoked and %d failed.', 'fchub-memberships'), $result['revoked'], $result['failed'])
-            : sprintf(__('%d memberships revoked.', 'fchub-memberships'), $result['revoked']);
-        return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
+        return (new IdempotentMutation())->execute($request, 'bulk_revoke', static function () use ($userIds, $planId, $reason): \WP_REST_Response {
+            $result = self::accessGrantService()->bulkRevoke($userIds, $planId, ['reason' => $reason]);
+            $status = $result['failed'] > 0 ? ($result['revoked'] > 0 ? 207 : 502) : 200;
+            $message = $result['failed'] > 0
+                ? sprintf(__('%d memberships revoked and %d failed.', 'fchub-memberships'), $result['revoked'], $result['failed'])
+                : sprintf(__('%d memberships revoked.', 'fchub-memberships'), $result['revoked']);
+            return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
+        });
     }
 
     public static function bulkExtend(\WP_REST_Request $request): \WP_REST_Response
@@ -426,25 +458,41 @@ class MemberController
             ], 422);
         }
 
-        $service = new AccessGrantService();
-        $extended = 0;
-        $failed = 0;
-        $errors = [];
+        return (new IdempotentMutation())->execute($request, 'bulk_extend', static function () use ($userIds, $planId, $expiresAt): \WP_REST_Response {
+            $service = self::accessGrantService();
+            $extended = 0;
+            $failed = 0;
+            $notFound = 0;
+            $errors = [];
 
-        foreach ($userIds as $userId) {
-            try {
-                $count = $service->extendExpiry($userId, $planId, $expiresAt);
-                $extended += $count;
-            } catch (\Exception $e) {
-                $failed++;
-                $errors[] = sprintf('User #%d: %s', $userId, $e->getMessage());
+            foreach ($userIds as $userId) {
+                try {
+                    $count = $service->extendExpiry($userId, $planId, $expiresAt);
+                    if ($count === 0) {
+                        $notFound++;
+                        $errors[] = sprintf('User #%d: no compatible active grant was found.', $userId);
+                        continue;
+                    }
+                    $extended += $count;
+                } catch (\Exception $exception) {
+                    $failed++;
+                    $errors[] = sprintf('User #%d: %s', $userId, $exception->getMessage());
+                }
             }
-        }
 
-        return new \WP_REST_Response([
-            'data'    => ['extended' => $extended, 'failed' => $failed, 'errors' => $errors],
-            'message' => sprintf(__('%d grants extended.', 'fchub-memberships'), $extended),
-        ]);
+            $total = count($userIds);
+            $status = match (true) {
+                $extended > 0 && ($notFound > 0 || $failed > 0) => 207,
+                $failed === $total => 502,
+                $notFound === $total => 404,
+                $notFound > 0 || $failed > 0 => 207,
+                default => 200,
+            };
+            return new \WP_REST_Response([
+                'data'    => ['extended' => $extended, 'not_found' => $notFound, 'failed' => $failed, 'errors' => $errors],
+                'message' => sprintf(__('%d grants extended.', 'fchub-memberships'), $extended),
+            ], $status);
+        });
     }
 
     public static function bulkExport(\WP_REST_Request $request): \WP_REST_Response
@@ -700,6 +748,28 @@ class MemberController
     public static function adminPermission(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    private static function grantExceptionResponse(\InvalidArgumentException $exception): \WP_REST_Response
+    {
+        $message = $exception->getMessage();
+        $status = str_contains(strtolower($message), 'not found') ? 404 : 422;
+
+        return new \WP_REST_Response(['message' => $message], $status);
+    }
+
+    private static function accessGrantService(): AccessGrantService
+    {
+        if (self::$accessGrantServiceFactory === null) {
+            return new AccessGrantService();
+        }
+
+        $service = (self::$accessGrantServiceFactory)();
+        if (!$service instanceof AccessGrantService) {
+            throw new \LogicException('The access grant service factory must return AccessGrantService.');
+        }
+
+        return $service;
     }
 
     private static function searchUsers(\WP_REST_Request $request): \WP_REST_Response

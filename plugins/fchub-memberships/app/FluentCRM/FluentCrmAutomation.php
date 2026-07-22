@@ -6,28 +6,35 @@ defined('ABSPATH') || exit;
 
 class FluentCrmAutomation
 {
+    /** @var list<class-string> */
+    public const TRIGGER_CLASSES = [
+        Triggers\MembershipGrantedTrigger::class,
+        Triggers\MembershipRevokedTrigger::class,
+        Triggers\MembershipExpiredTrigger::class,
+        Triggers\MembershipPausedTrigger::class,
+        Triggers\MembershipResumedTrigger::class,
+        Triggers\MembershipRenewedTrigger::class,
+        Triggers\TrialStartedTrigger::class,
+        Triggers\TrialConvertedTrigger::class,
+        Triggers\TrialExpiredTrigger::class,
+        Triggers\DripContentUnlockedTrigger::class,
+        Triggers\MembershipExpiringSoonTrigger::class,
+        Triggers\MembershipAnniversaryTrigger::class,
+        Triggers\DripMilestoneTrigger::class,
+        Triggers\TrialExpiringSoonTrigger::class,
+        Triggers\PaymentFailedTrigger::class,
+        Triggers\MembershipPlanChangedTrigger::class,
+    ];
+
     public static function boot(): void
     {
         if (!defined('FLUENTCRM')) {
             return;
         }
 
-        // Triggers
-        new Triggers\MembershipGrantedTrigger();
-        new Triggers\MembershipRevokedTrigger();
-        new Triggers\MembershipExpiredTrigger();
-        new Triggers\MembershipPausedTrigger();
-        new Triggers\MembershipResumedTrigger();
-        new Triggers\MembershipRenewedTrigger();
-        new Triggers\TrialStartedTrigger();
-        new Triggers\TrialConvertedTrigger();
-        new Triggers\TrialExpiredTrigger();
-        new Triggers\DripContentUnlockedTrigger();
-        new Triggers\MembershipExpiringSoonTrigger();
-        new Triggers\MembershipAnniversaryTrigger();
-        new Triggers\DripMilestoneTrigger();
-        new Triggers\TrialExpiringSoonTrigger();
-        new Triggers\PaymentFailedTrigger();
+        foreach (self::TRIGGER_CLASSES as $triggerClass) {
+            new $triggerClass();
+        }
 
         // Actions
         new Actions\GrantMembershipAction();

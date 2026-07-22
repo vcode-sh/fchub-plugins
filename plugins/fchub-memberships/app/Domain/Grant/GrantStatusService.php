@@ -26,13 +26,20 @@ final class GrantStatusService
 
         StatusTransitionValidator::assertTransition($grant['status'], 'paused');
 
-        $this->grants->update($grantId, [
+        $updated = $this->grants->update($grantId, [
             'status' => 'paused',
             'meta' => array_merge($grant['meta'], [
                 'paused_at' => current_time('mysql'),
                 'pause_reason' => $reason,
             ]),
         ]);
+        if (!$updated) {
+            return [
+                'success' => false,
+                'error' => 'Grant update failed',
+                'grant_id' => $grantId,
+            ];
+        }
 
         AuditLogger::logGrantChange($grantId, 'paused', $grant, ['status' => 'paused'], $reason);
         do_action('fchub_memberships/grant_paused', $grant, $reason);
@@ -50,12 +57,19 @@ final class GrantStatusService
 
         StatusTransitionValidator::assertTransition($grant['status'], 'active');
 
-        $this->grants->update($grantId, [
+        $updated = $this->grants->update($grantId, [
             'status' => 'active',
             'meta' => array_merge($grant['meta'], [
                 'resumed_at' => current_time('mysql'),
             ]),
         ]);
+        if (!$updated) {
+            return [
+                'success' => false,
+                'error' => 'Grant update failed',
+                'grant_id' => $grantId,
+            ];
+        }
 
         AuditLogger::logGrantChange($grantId, 'resumed', $grant, ['status' => 'active']);
         do_action('fchub_memberships/grant_resumed', $grant);

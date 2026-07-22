@@ -96,12 +96,17 @@ class PaymentFailedTrigger extends BaseTrigger
         $grants = $originalArgs[0];
         $subscription = $originalArgs[1];
 
-        if (empty($grants)) {
+        if (!is_array($grants) || empty($grants)) {
             return false;
         }
 
-        $userId = $grants[0]['user_id'] ?? 0;
-        $planId = $grants[0]['plan_id'] ?? 0;
+        $grant = $this->resolveMatchingGrant($funnel, $grants);
+        if (!$grant) {
+            return false;
+        }
+
+        $userId = $grant['user_id'] ?? 0;
+        $planId = $grant['plan_id'] ?? 0;
 
         $user = get_user_by('ID', $userId);
         if (!$user) {
@@ -121,6 +126,23 @@ class PaymentFailedTrigger extends BaseTrigger
             'source_trigger_name' => $this->triggerName,
             'source_ref_id'       => $planId,
         ]);
+    }
+
+    private function resolveMatchingGrant($funnel, array $grants): ?array
+    {
+        $planIds = Arr::get($funnel->conditions, 'plan_ids', []);
+
+        foreach ($grants as $grant) {
+            if (!is_array($grant)) {
+                continue;
+            }
+
+            if (!$planIds || in_array($grant['plan_id'] ?? 0, $planIds)) {
+                return $grant;
+            }
+        }
+
+        return null;
     }
 
     private function isProcessable($funnel, $user, $planId)

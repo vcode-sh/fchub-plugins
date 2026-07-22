@@ -2,12 +2,16 @@
 
 namespace FChubMemberships\Support;
 
+use FChubMemberships\Http\MembershipMutationPermission;
+
 defined('ABSPATH') || exit;
 
 class Migrations
 {
     public static function run(): void
     {
+        self::ensureAdministratorCapability();
+
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
         $prefix = $wpdb->prefix . 'fchub_membership_';
@@ -99,6 +103,22 @@ class Migrations
             UNIQUE KEY event_hash (event_hash)
         ) {$charset};");
 
+        dbDelta("CREATE TABLE {$prefix}mutation_requests (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            request_key VARCHAR(191) NOT NULL,
+            fingerprint CHAR(64) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            state VARCHAR(20) NOT NULL DEFAULT 'reserved',
+            response_status SMALLINT UNSIGNED NULL,
+            response_body LONGTEXT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            completed_at DATETIME NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY request_key (request_key),
+            KEY state_updated (state, updated_at)
+        ) {$charset};");
+
         // 5. Protection Rules
         dbDelta("CREATE TABLE {$prefix}protection_rules (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -162,6 +182,17 @@ class Migrations
         MigrationV3::run();
     }
 
+    public static function ensureAdministratorCapability(): void
+    {
+        $administrator = get_role('administrator');
+
+        if (!$administrator || $administrator->has_cap(MembershipMutationPermission::CAPABILITY)) {
+            return;
+        }
+
+        $administrator->add_cap(MembershipMutationPermission::CAPABILITY);
+    }
+
     /**
      * Drop all plugin tables. Only called if user opts in via settings.
      */
@@ -178,6 +209,7 @@ class Migrations
             'validity_log',
             'protection_rules',
             'event_locks',
+            'mutation_requests',
             'grants',
             'plan_rules',
             'plans',

@@ -281,6 +281,7 @@ final class PluginWideBugHuntTest extends PluginTestCase
         // This was fixed by wiring-hunter — verify it holds
         $grantRepo = new class() extends GrantRepository {
             public array $lastUpdate = [];
+            private array $snapshot = [];
             public function __construct() {}
             public static function makeGrantKey(int $userId, string $provider, string $resourceType, string $resourceId): string
             {
@@ -297,8 +298,10 @@ final class PluginWideBugHuntTest extends PluginTestCase
             public function update(int $id, array $data): bool
             {
                 $this->lastUpdate = $data;
+                $this->snapshot = array_replace($this->findByGrantKey('test-key'), $data);
                 return true;
             }
+            public function find(int $id): ?array { return $this->snapshot; }
         };
         $sourceRepo = new class() extends GrantSourceRepository {
             public function __construct() {}

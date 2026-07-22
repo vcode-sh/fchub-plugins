@@ -10,6 +10,16 @@
   box-sizing: border-box;
 }
 
+/* Element Plus messages are teleported to <body>, outside the app wrapper.
+   A margin preserves Element Plus' inline stacking offsets while clearing the
+   visible WordPress toolbar on desktop and while it scrolls away on mobile. */
+.el-message {
+  margin-top: calc(
+    var(--fchub-admin-bar-offset, 0px)
+    + var(--fchub-toast-nav-height, 64px)
+  );
+}
+
 /* WordPress admin CSS reset — strip WP borders/shadows from form elements.
    Element Plus uses wrapper elements (.el-input__wrapper) for borders,
    so inner <input>/<textarea>/<select> must be visually bare. */
@@ -410,6 +420,7 @@ body.dark #fchub-memberships-app .el-input__wrapper:hover {
 }
 
 @media (max-width: 782px) {
+  :root { --fchub-toast-nav-height: 54px; }
   .fchub-settings-section { padding: 20px 16px 4px; }
   .fchub-settings-footer { padding: 16px; }
   .pagination-bar { align-items: stretch !important; flex-direction: column; gap: 14px; }

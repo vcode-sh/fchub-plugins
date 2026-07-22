@@ -22,7 +22,7 @@ defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.3
 defined('FCHUB_MEMBERSHIPS_FILE') || define('FCHUB_MEMBERSHIPS_FILE', __FILE__);
 defined('FCHUB_MEMBERSHIPS_PATH') || define('FCHUB_MEMBERSHIPS_PATH', plugin_dir_path(__FILE__));
 defined('FCHUB_MEMBERSHIPS_URL') || define('FCHUB_MEMBERSHIPS_URL', plugin_dir_url(__FILE__));
-defined('FCHUB_MEMBERSHIPS_DB_VERSION') || define('FCHUB_MEMBERSHIPS_DB_VERSION', '1.2.0');
+defined('FCHUB_MEMBERSHIPS_DB_VERSION') || define('FCHUB_MEMBERSHIPS_DB_VERSION', '1.3.0');
 
 if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
     require_once __DIR__ . '/lib/GitHubUpdater.php';

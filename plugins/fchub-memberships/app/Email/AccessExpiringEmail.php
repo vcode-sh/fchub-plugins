@@ -41,15 +41,12 @@ class AccessExpiringEmail
             $daysLeft = max(0, (int) $diff->days);
         }
 
-        $smartCodes = $this->buildSmartCodes($user, $data, $daysLeft);
-        $subject    = $this->replaceSmartCodes(
-            __('Your {plan_name} access expires in {days} days', 'fchub-memberships'),
-            $smartCodes
+        $message = (new NotificationEmailComposer())->compose(
+            self::TEMPLATE_KEY,
+            $this->buildSmartCodes($user, $data, $daysLeft)
         );
-        $body = $this->replaceSmartCodes($this->getTemplate(), $smartCodes);
-        $body = $this->wrapHtml($body, $subject);
 
-        $this->dispatch($user->user_email, $subject, $body);
+        $this->dispatch($user->user_email, $message['subject'], $message['html']);
 
         Logger::log(
             'Access expiring email sent',

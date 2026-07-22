@@ -5,6 +5,7 @@ namespace FChubMemberships\Domain\Grant;
 use FChubMemberships\Domain\GrantNotificationService;
 use FChubMemberships\Domain\GrantPlanContextService;
 use FChubMemberships\Domain\MembershipModeService;
+use FChubMemberships\Domain\MembershipPlanChangePublisher;
 use FChubMemberships\Domain\Plan\PlanRuleResolver;
 use FChubMemberships\Support\Logger;
 
@@ -18,7 +19,8 @@ final class PlanGrantExecutionService
         private GrantPlanContextService $planContext,
         private GrantCreationService $creation,
         private GrantRevocationService $revocation,
-        private GrantNotificationService $notifications
+        private GrantNotificationService $notifications,
+        private ?MembershipPlanChangePublisher $planChanges = null
     ) {
     }
 
@@ -36,8 +38,22 @@ final class PlanGrantExecutionService
             $context,
             fn(int $revokeUserId, int $revokePlanId, array $revokeContext): array => $this->revocation->revokePlan($revokeUserId, $revokePlanId, $revokeContext)
         );
-        if ($modeResult !== null) {
+        if (!empty($modeResult['blocked'])) {
             return $modeResult;
+        }
+        $modePlanChange = $modeResult['plan_change'] ?? null;
+        $requestedPlanChange = $context['plan_change'] ?? null;
+        $planChange = $modePlanChange ?? $requestedPlanChange;
+        if ($planChange !== null) {
+            $planChange['from_plan_ids'] = array_values(array_unique(array_merge(
+                $modePlanChange['from_plan_ids'] ?? [],
+                $requestedPlanChange['from_plan_ids'] ?? []
+            )));
+            $planChange['change_type'] = $requestedPlanChange['change_type']
+                ?? (($context['source_type'] ?? null) === 'automation'
+                    ? 'automation_change'
+                    : ($modePlanChange['transition_type'] ?? 'automation_change'));
+            $planChange['transition_type'] = $modePlanChange['transition_type'] ?? null;
         }
 
         $created = 0;
@@ -57,6 +73,7 @@ final class PlanGrantExecutionService
                     'source_id' => (int) ($context['source_id'] ?? 0),
                     'feed_id' => $context['feed_id'] ?? null,
                     'expires_at' => $context['expires_at'] ?? null,
+                    'preserve_expiry' => !empty($context['preserve_expiry']),
                     'drip_rule' => $rule,
                     'is_trial' => !empty($context['is_trial']),
                     'trial_ends_at' => $context['trial_ends_at'] ?? null,
@@ -94,6 +111,21 @@ final class PlanGrantExecutionService
 
             if (!empty($context['is_trial'])) {
                 do_action('fchub_memberships/trial_started', $context, $planId, $userId);
+            }
+
+            if ($planChange !== null) {
+                ($this->planChanges ?? new MembershipPlanChangePublisher())->publish(
+                    $userId,
+                    $planChange['from_plan_ids'],
+                    $planId,
+                    $planChange['change_type'],
+                    $context
+                );
+                if ($planChange['transition_type'] === 'exclusive_replacement') {
+                    do_action('fchub_memberships/plan_replaced', $userId, $planId, $planChange['from_plan_ids']);
+                } elseif ($planChange['transition_type'] === 'level_upgrade') {
+                    do_action('fchub_memberships/plan_upgraded', $userId, $planId, $planChange['from_plan_ids']);
+                }
             }
         }
 

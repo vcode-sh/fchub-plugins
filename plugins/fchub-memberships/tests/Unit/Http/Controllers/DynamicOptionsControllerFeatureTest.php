@@ -115,6 +115,7 @@ namespace FluentCommunity\App\Models {
 
         public static function find(int $id): ?object
         {
+            $GLOBALS['_fchub_test_fluent_community_space_finds'][] = $id;
             foreach (self::testSpaces() as $space) {
                 if ((int) $space->id === $id) {
                     return $space;
@@ -128,6 +129,7 @@ namespace FluentCommunity\App\Models {
         {
             return new class {
                 private string $search = '';
+                private array $ids = [];
 
                 public function where(string $column, string $operator, string $value): self
                 {
@@ -140,9 +142,22 @@ namespace FluentCommunity\App\Models {
                     return $this;
                 }
 
+                public function whereIn(string $column, array $ids): self
+                {
+                    $this->ids = array_map('intval', $ids);
+                    return $this;
+                }
+
                 public function get(): array
                 {
                     $spaces = Space::testSpaces();
+
+                    if ($this->ids !== []) {
+                        return array_values(array_filter(
+                            $spaces,
+                            fn(object $space): bool => in_array((int) $space->id, $this->ids, true)
+                        ));
+                    }
 
                     if ($this->search === '') {
                         return $spaces;
@@ -162,6 +177,23 @@ namespace FChubMemberships\Tests\Unit\Http\Controllers {
 
     final class DynamicOptionsControllerFeatureTest extends PluginTestCase
     {
+        public function test_fluentcommunity_search_includes_saved_resources_outside_the_query(): void
+        {
+            $GLOBALS['_fchub_test_fluent_community_space_finds'] = [];
+            $GLOBALS['_fchub_test_fluent_community_spaces'] = [
+                (object) ['id' => 31, 'title' => 'Start Here'],
+                (object) ['id' => 99, 'title' => 'Legacy Lounge'],
+            ];
+
+            $response = DynamicOptionsController::fcSpaces(new \WP_REST_Request('GET', '/fc-spaces', [
+                'search' => 'Start',
+                'include' => '99',
+            ]))->get_data();
+
+            self::assertSame(['31', '99'], array_column($response['data'], 'id'));
+            self::assertSame([], $GLOBALS['_fchub_test_fluent_community_space_finds']);
+        }
+
         public function test_fluentcrm_api_double_uses_the_per_test_resource_override(): void
         {
             $contacts = new \stdClass();

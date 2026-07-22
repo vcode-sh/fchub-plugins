@@ -53,7 +53,8 @@ class DynamicOptionsController
     public static function planOptions(\WP_REST_Request $request): \WP_REST_Response
     {
         $service = new PlanService();
-        return new \WP_REST_Response(['data' => $service->getOptions()]);
+        $includeIds = self::requestedIds($request);
+        return new \WP_REST_Response(['data' => $service->getOptions($includeIds)]);
     }
 
     public static function resourceTypes(\WP_REST_Request $request): \WP_REST_Response
@@ -129,6 +130,11 @@ class DynamicOptionsController
         $search = $request->get_param('search') ?: '';
         $adapter = new \FChubMemberships\Adapters\FluentCommunityAdapter();
         $spaces = $adapter->searchResources($search, 'fc_space', 50);
+        $spaces = self::appendRequestedModelOptions(
+            $spaces,
+            self::requestedIds($request),
+            'FluentCommunity\App\Models\Space'
+        );
 
         return new \WP_REST_Response(['data' => $spaces]);
     }
@@ -156,7 +162,52 @@ class DynamicOptionsController
             ];
         }
 
+        $results = self::appendRequestedModelOptions(
+            $results,
+            self::requestedIds($request),
+            'FluentCommunity\App\Models\Badge'
+        );
+
         return new \WP_REST_Response(['data' => $results]);
+    }
+
+    private static function requestedIds(\WP_REST_Request $request): array
+    {
+        $raw = (string) ($request->get_param('include') ?: '');
+        return array_values(array_unique(array_filter(
+            array_map('intval', explode(',', $raw)),
+            static fn(int $id): bool => $id > 0
+        )));
+    }
+
+    private static function appendRequestedModelOptions(array $options, array $requestedIds, string $modelClass): array
+    {
+        $existingIds = array_map('strval', array_column($options, 'id'));
+        $missingIds = array_values(array_filter(
+            $requestedIds,
+            static fn(int $id): bool => !in_array((string) $id, $existingIds, true)
+        ));
+
+        if ($missingIds === [] || !class_exists($modelClass)) {
+            return $options;
+        }
+
+        $models = $modelClass::query()->whereIn('id', $missingIds)->get();
+        $modelsById = [];
+        foreach ($models as $model) {
+            $modelsById[(int) $model->id] = $model;
+        }
+
+        foreach ($missingIds as $missingId) {
+            if (isset($modelsById[$missingId])) {
+                $options[] = [
+                    'id' => (string) $modelsById[$missingId]->id,
+                    'label' => $modelsById[$missingId]->title,
+                ];
+            }
+        }
+
+        return $options;
     }
 
     public static function adminPermission(): bool

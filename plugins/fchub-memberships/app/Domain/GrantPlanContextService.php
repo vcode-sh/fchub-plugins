@@ -26,6 +26,7 @@ final class GrantPlanContextService
     public function resolve(int $userId, int $planId, array $context): array
     {
         $plan = $this->plans->find($planId);
+        $preserveExpiry = !empty($context['preserve_expiry']);
 
         if ($plan && ($plan['trial_days'] ?? 0) > 0) {
             $existingGrants = $this->grants->getByUserId($userId, ['plan_id' => $planId]);
@@ -40,7 +41,7 @@ final class GrantPlanContextService
             }
         }
 
-        if ($plan && empty($context['expires_at'])) {
+        if ($plan && !$preserveExpiry && empty($context['expires_at'])) {
             $durationType = $plan['duration_type'] ?? 'lifetime';
 
             if ($durationType === 'fixed_days' && ($plan['duration_days'] ?? 0) > 0) {
@@ -59,7 +60,7 @@ final class GrantPlanContextService
 
         // Apply membership term cap (universal, runs after all duration type logic).
         // Skip if feed-level override already set a term end date.
-        if ($plan && empty($context['meta']['membership_term_ends_at'])) {
+        if ($plan && !$preserveExpiry && empty($context['meta']['membership_term_ends_at'])) {
             $termConfig = $plan['meta']['membership_term'] ?? null;
             if ($termConfig && ($termConfig['mode'] ?? 'none') !== 'none') {
                 $termEndsAt = MembershipTermCalculator::calculateEndDate($termConfig, current_time('mysql'));

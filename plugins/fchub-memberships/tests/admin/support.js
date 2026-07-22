@@ -22,6 +22,7 @@ export const routeExpectations = [
   { path: '/drip/calendar', text: 'Drip Calendar' },
   { path: '/reports', text: 'Reports' },
   { path: '/settings', text: 'Settings' },
+  { path: '/settings/email-studio', text: 'Email Studio' },
 ]
 
 function apiPayload(url) {

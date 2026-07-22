@@ -68,8 +68,10 @@ final class ContextWiringBugHuntTest extends PluginTestCase
             public function update(int $id, array $data): bool
             {
                 $this->lastUpdate = $data;
+                $this->existing = array_replace($this->existing, $data);
                 return true;
             }
+            public function find(int $id): ?array { return $this->existing; }
         };
 
         $sourceRepo = new class() extends GrantSourceRepository {
@@ -135,7 +137,8 @@ final class ContextWiringBugHuntTest extends PluginTestCase
                 return "{$userId}:{$provider}:{$resourceType}:{$resourceId}";
             }
             public function findByGrantKey(string $grantKey): ?array { return $this->existing; }
-            public function update(int $id, array $data): bool { $this->lastUpdate = $data; return true; }
+            public function update(int $id, array $data): bool { $this->lastUpdate = $data; $this->existing = array_replace($this->existing, $data); return true; }
+            public function find(int $id): ?array { return $this->existing; }
         };
 
         $sourceRepo = new class() extends GrantSourceRepository {
@@ -190,7 +193,8 @@ final class ContextWiringBugHuntTest extends PluginTestCase
                 return "{$userId}:{$provider}:{$resourceType}:{$resourceId}";
             }
             public function findByGrantKey(string $grantKey): ?array { return $this->existing; }
-            public function update(int $id, array $data): bool { $this->lastUpdate = $data; return true; }
+            public function update(int $id, array $data): bool { $this->lastUpdate = $data; $this->existing = array_replace($this->existing, $data); return true; }
+            public function find(int $id): ?array { return $this->existing; }
         };
 
         $sourceRepo = new class() extends GrantSourceRepository {
@@ -642,7 +646,8 @@ final class ContextWiringBugHuntTest extends PluginTestCase
                 return "{$userId}:{$provider}:{$resourceType}:{$resourceId}";
             }
             public function findByGrantKey(string $grantKey): ?array { return $this->existing; }
-            public function update(int $id, array $data): bool { $this->lastUpdate = $data; return true; }
+            public function update(int $id, array $data): bool { $this->lastUpdate = $data; $this->existing = array_replace($this->existing, $data); return true; }
+            public function find(int $id): ?array { return $this->existing; }
         };
 
         $sourceRepo = new class() extends GrantSourceRepository {
@@ -689,7 +694,8 @@ final class ContextWiringBugHuntTest extends PluginTestCase
                 return "{$userId}:{$provider}:{$resourceType}:{$resourceId}";
             }
             public function findByGrantKey(string $grantKey): ?array { return $this->existing; }
-            public function update(int $id, array $data): bool { $this->lastUpdate = $data; return true; }
+            public function update(int $id, array $data): bool { $this->lastUpdate = $data; $this->existing = array_replace($this->existing, $data); return true; }
+            public function find(int $id): ?array { return $this->existing; }
         };
 
         $sourceRepo = new class() extends GrantSourceRepository {

@@ -2,6 +2,9 @@
 
 namespace FChubMemberships\Http\Controllers;
 
+use FChubMemberships\Email\NotificationCatalog;
+use FChubMemberships\Email\NotificationTemplateRenderer;
+
 defined('ABSPATH') || exit;
 
 class SettingsController
@@ -38,6 +41,36 @@ class SettingsController
         register_rest_route($ns, '/admin/settings/test-webhook', [
             'methods'             => 'POST',
             'callback'            => [self::class, 'testWebhook'],
+            'permission_callback' => [self::class, 'adminPermission'],
+        ]);
+
+        register_rest_route($ns, '/admin/email-notifications', [
+            'methods'             => 'GET',
+            'callback'            => [self::class, 'emailNotifications'],
+            'permission_callback' => [self::class, 'adminPermission'],
+        ]);
+
+        register_rest_route($ns, '/admin/email-notifications/preview', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'previewEmailNotification'],
+            'permission_callback' => [self::class, 'adminPermission'],
+        ]);
+
+        register_rest_route($ns, '/admin/email-notifications/test', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'testEmailNotification'],
+            'permission_callback' => [self::class, 'adminPermission'],
+        ]);
+
+        register_rest_route($ns, '/admin/email-notifications/brand-template', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'saveEmailBrandTemplate'],
+            'permission_callback' => [self::class, 'adminPermission'],
+        ]);
+
+        register_rest_route($ns, '/admin/email-notifications/(?P<key>[a-z_]+)', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'saveEmailNotification'],
             'permission_callback' => [self::class, 'adminPermission'],
         ]);
     }
@@ -103,9 +136,35 @@ class SettingsController
             }
         }
 
-        // Email templates
-        if (isset($data['email_templates'])) {
-            $settings['email_templates'] = $data['email_templates'];
+        // Native email studio. Every value is normalised before persistence because
+        // the global settings endpoint can be called without using the visual editor.
+        $renderer = new NotificationTemplateRenderer();
+        if (isset($data['email_templates']) && is_array($data['email_templates'])) {
+            $templates = [];
+            foreach (NotificationCatalog::all() as $key => $definition) {
+                if (array_key_exists($key, $data['email_templates'])) {
+                    $templates[$key] = $renderer->normaliseTemplate($key, $data['email_templates'][$key]);
+                }
+            }
+            $settings['email_templates'] = $templates;
+        }
+        if (isset($data['email_theme']) && is_array($data['email_theme'])) {
+            $settings['email_theme'] = $renderer->normaliseTheme($data['email_theme']);
+        }
+        if (isset($data['email_delivery']) && is_array($data['email_delivery'])) {
+            $deliveries = [];
+            foreach (NotificationCatalog::all() as $key => $definition) {
+                $delivery = $data['email_delivery'][$key] ?? null;
+                if (!in_array($delivery, ['built_in', 'fluentcrm', 'off'], true)) {
+                    continue;
+                }
+                if ($delivery === 'fluentcrm' && !self::fluentCrmAvailable()) {
+                    $delivery = 'built_in';
+                }
+                $deliveries[$key] = $delivery;
+                $settings[$definition['setting_key']] = $delivery === 'built_in' ? 'yes' : 'no';
+            }
+            $settings['email_delivery'] = $deliveries;
         }
 
         // Webhook URLs (textarea, one per line)
@@ -166,6 +225,175 @@ class SettingsController
         ]);
     }
 
+    public static function emailNotifications(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $settings = self::getSettings();
+        $templates = is_array($settings['email_templates'] ?? null) ? $settings['email_templates'] : [];
+        $deliveries = is_array($settings['email_delivery'] ?? null) ? $settings['email_delivery'] : [];
+        $themeOverrides = is_array($settings['email_theme_overrides'] ?? null) ? $settings['email_theme_overrides'] : [];
+        $renderer = new NotificationTemplateRenderer();
+        $fluentCrmAvailable = self::fluentCrmAvailable();
+        $notifications = [];
+
+        foreach (NotificationCatalog::all() as $key => $definition) {
+            $delivery = $deliveries[$key] ?? (($settings[$definition['setting_key']] ?? 'yes') === 'yes' ? 'built_in' : 'off');
+            if ($delivery === 'fluentcrm' && !$fluentCrmAvailable) {
+                $delivery = 'built_in';
+            }
+
+            $notifications[] = [
+                'key' => $key,
+                'label' => $definition['label'],
+                'description' => $definition['description'],
+                'group' => $definition['group'],
+                'setting_key' => $definition['setting_key'],
+                'variables' => $definition['variables'],
+                'delivery' => $delivery,
+                'template' => $renderer->normaliseTemplate($key, $templates[$key] ?? null),
+                'default_template' => $renderer->normaliseTemplate($key, null),
+                'theme_override' => is_array($themeOverrides[$key] ?? null)
+                    ? $renderer->normaliseTheme($themeOverrides[$key])
+                    : null,
+            ];
+        }
+
+        $brandTemplate = $renderer->normaliseTheme(is_array($settings['email_theme'] ?? null) ? $settings['email_theme'] : []);
+
+        return new \WP_REST_Response(['data' => [
+            'notifications' => $notifications,
+            'theme' => $brandTemplate,
+            'brand_template' => $brandTemplate,
+            'fluentcrm_available' => $fluentCrmAvailable,
+        ]]);
+    }
+
+    public static function saveEmailNotification(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $data = $request->get_json_params();
+        $key = sanitize_text_field((string) ($request->get_param('key') ?? $data['key'] ?? ''));
+        $definition = NotificationCatalog::get($key);
+        if (!$definition) {
+            return new \WP_REST_Response(['message' => __('Unknown email notification type.', 'fchub-memberships')], 404);
+        }
+
+        $renderer = new NotificationTemplateRenderer();
+        $template = $renderer->normaliseTemplate($key, $data['template'] ?? null);
+        $settings = self::getSettings();
+        $theme = $renderer->normaliseTheme(is_array($settings['email_theme'] ?? null) ? $settings['email_theme'] : []);
+        if (isset($data['theme']) && is_array($data['theme'])) {
+            $theme = $renderer->normaliseTheme($data['theme']);
+        }
+        $themeOverride = isset($data['theme_override']) && is_array($data['theme_override'])
+            ? $renderer->normaliseTheme(array_replace($theme, $data['theme_override']))
+            : null;
+        $delivery = in_array(($data['delivery'] ?? ''), ['built_in', 'fluentcrm', 'off'], true)
+            ? $data['delivery']
+            : 'built_in';
+
+        if ($delivery === 'fluentcrm' && !self::fluentCrmAvailable()) {
+            return new \WP_REST_Response([
+                'message' => __('FluentCRM is not available. Keep this email built in or turn it off.', 'fchub-memberships'),
+            ], 422);
+        }
+
+        $settings['email_templates'] = is_array($settings['email_templates'] ?? null) ? $settings['email_templates'] : [];
+        $settings['email_templates'][$key] = $template;
+        if (isset($data['theme']) && is_array($data['theme'])) {
+            $settings['email_theme'] = $theme;
+        }
+        $settings['email_theme_overrides'] = is_array($settings['email_theme_overrides'] ?? null)
+            ? $settings['email_theme_overrides']
+            : [];
+        if ($themeOverride !== null) {
+            $settings['email_theme_overrides'][$key] = $themeOverride;
+        } else {
+            unset($settings['email_theme_overrides'][$key]);
+        }
+        $settings['email_delivery'] = is_array($settings['email_delivery'] ?? null) ? $settings['email_delivery'] : [];
+        $settings['email_delivery'][$key] = $delivery;
+        $settings[$definition['setting_key']] = $delivery === 'built_in' ? 'yes' : 'no';
+        update_option('fchub_memberships_settings', $settings);
+
+        return new \WP_REST_Response([
+            'data' => [
+                'key' => $key,
+                'template' => $template,
+                'theme' => $theme,
+                'theme_override' => $themeOverride,
+                'delivery' => $delivery,
+            ],
+            'message' => __('Email notification saved.', 'fchub-memberships'),
+        ]);
+    }
+
+    public static function saveEmailBrandTemplate(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $data = $request->get_json_params();
+        if (!isset($data['theme']) || !is_array($data['theme'])) {
+            return new \WP_REST_Response([
+                'message' => __('A valid brand template is required.', 'fchub-memberships'),
+            ], 422);
+        }
+
+        $theme = (new NotificationTemplateRenderer())->normaliseTheme($data['theme']);
+        $settings = self::getSettings();
+        $settings['email_theme'] = $theme;
+        update_option('fchub_memberships_settings', $settings);
+
+        return new \WP_REST_Response([
+            'data' => ['brand_template' => $theme],
+            'message' => __('Email brand template saved.', 'fchub-memberships'),
+        ]);
+    }
+
+    public static function previewEmailNotification(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $data = $request->get_json_params();
+        $key = sanitize_text_field((string) ($data['key'] ?? ''));
+        if (!NotificationCatalog::get($key)) {
+            return new \WP_REST_Response(['message' => __('Unknown email notification type.', 'fchub-memberships')], 404);
+        }
+
+        $renderer = new NotificationTemplateRenderer();
+        $result = $renderer->compose(
+            $key,
+            $data['template'] ?? null,
+            NotificationCatalog::sampleCodes($key),
+            is_array($data['theme'] ?? null) ? $data['theme'] : null,
+            is_array($data['theme_override'] ?? null) ? $data['theme_override'] : null
+        );
+
+        return new \WP_REST_Response(['data' => [
+            'subject' => $result['subject'],
+            'preheader' => $result['preheader'],
+            'html' => $result['html'],
+        ]]);
+    }
+
+    public static function testEmailNotification(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $data = $request->get_json_params();
+        $to = filter_var((string) ($data['to'] ?? ''), FILTER_VALIDATE_EMAIL);
+        if (!$to) {
+            return new \WP_REST_Response(['message' => __('Enter a valid test email address.', 'fchub-memberships')], 422);
+        }
+
+        $preview = self::previewEmailNotification($request);
+        if ($preview->get_status() !== 200) {
+            return $preview;
+        }
+
+        $message = $preview->get_data()['data'];
+        $sent = wp_mail($to, $message['subject'], $message['html'], ['Content-Type: text/html; charset=UTF-8']);
+
+        return new \WP_REST_Response([
+            'data' => ['sent' => (bool) $sent, 'to' => $to],
+            'message' => $sent
+                ? __('Test email sent.', 'fchub-memberships')
+                : __('WordPress could not send the test email.', 'fchub-memberships'),
+        ], $sent ? 200 : 502);
+    }
+
     public static function getSettings(): array
     {
         $defaults = [
@@ -200,6 +428,9 @@ class SettingsController
             'api_key'                             => '',
             'uninstall_remove_data'               => 'no',
             'email_templates'                     => [],
+            'email_theme'                         => [],
+            'email_theme_overrides'               => [],
+            'email_delivery'                      => [],
             // FluentCRM
             'fluentcrm_enabled'                   => 'no',
             'fluentcrm_tag_prefix'                => 'member:',
@@ -223,5 +454,10 @@ class SettingsController
     public static function adminPermission(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    private static function fluentCrmAvailable(): bool
+    {
+        return defined('FLUENTCRM_PLUGIN_VERSION') || defined('FLUENTCRM');
     }
 }

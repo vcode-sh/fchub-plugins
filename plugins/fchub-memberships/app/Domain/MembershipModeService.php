@@ -55,9 +55,10 @@ final class MembershipModeService
                 $revokedPlanIds[] = $oldPlanId;
             }
 
-            do_action('fchub_memberships/plan_replaced', $userId, $planId, $revokedPlanIds);
-
-            return null;
+            return ['plan_change' => [
+                'transition_type' => 'exclusive_replacement',
+                'from_plan_ids' => $revokedPlanIds,
+            ]];
         }
 
         if ($mode !== 'upgrade_only') {
@@ -119,7 +120,10 @@ final class MembershipModeService
         }
 
         if (!empty($revokedPlanIds)) {
-            do_action('fchub_memberships/plan_upgraded', $userId, $planId, $revokedPlanIds);
+            return ['plan_change' => [
+                'transition_type' => 'level_upgrade',
+                'from_plan_ids' => $revokedPlanIds,
+            ]];
         }
 
         return null;

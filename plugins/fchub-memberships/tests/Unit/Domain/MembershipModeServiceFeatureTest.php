@@ -55,7 +55,7 @@ final class MembershipModeServiceFeatureTest extends PluginTestCase
         $blocked = $service->enforce(21, 5, ['id' => 5, 'level' => 10], [], static function (): array {
             return [];
         });
-        $upgraded = $service->enforce(21, 50, ['id' => 50, 'level' => 30], [], static function (int $userId, int $planId, array $context) use (&$revokes): array {
+        $upgraded = $service->enforce(21, 50, ['id' => 50, 'level' => 30], ['source_type' => 'automation'], static function (int $userId, int $planId, array $context) use (&$revokes): array {
             $revokes[] = [$userId, $planId, $context];
             return ['revoked' => 1];
         });
@@ -63,6 +63,6 @@ final class MembershipModeServiceFeatureTest extends PluginTestCase
         self::assertNotEmpty($revokes);
         self::assertTrue($blocked['blocked']);
         self::assertSame('downgrade_blocked', $blocked['reason']);
-        self::assertNull($upgraded);
+        self::assertSame('level_upgrade', $upgraded['plan_change']['transition_type']);
     }
 }

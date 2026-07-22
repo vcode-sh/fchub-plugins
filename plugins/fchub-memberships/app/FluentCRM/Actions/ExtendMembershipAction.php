@@ -5,16 +5,18 @@ namespace FChubMemberships\FluentCRM\Actions;
 defined('ABSPATH') || exit;
 
 use FluentCrm\App\Services\Funnel\BaseAction;
-use FluentCrm\App\Services\Funnel\FunnelHelper;
 use FluentCrm\Framework\Support\Arr;
-use FChubMemberships\Domain\AccessGrantService;
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\FluentCRM\Actions\Contracts\MembershipActionRuntimeInterface;
 use FChubMemberships\Storage\PlanRepository;
+use Throwable;
 
 class ExtendMembershipAction extends BaseAction
 {
-    public function __construct()
+    private MembershipActionRuntimeInterface $runtime;
+
+    public function __construct(?MembershipActionRuntimeInterface $runtime = null)
     {
+        $this->runtime = $runtime ?? new MembershipActionRuntime();
         $this->actionName = 'fchub_extend_membership';
         $this->priority = 20;
         parent::__construct();
@@ -70,37 +72,55 @@ class ExtendMembershipAction extends BaseAction
     {
         $planId = (int) Arr::get($sequence->settings, 'plan_id');
         $extendDays = (int) Arr::get($sequence->settings, 'extend_days');
-        if (!$planId || !$extendDays) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+        if (!$planId || $extendDays <= 0) {
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
             return;
         }
 
         $userId = $this->resolveUserId($subscriber);
         if (!$userId) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
             return;
         }
 
-        $grantRepo = new GrantRepository();
-        $grants = $grantRepo->getByUserId($userId, ['plan_id' => $planId, 'status' => 'active']);
+        try {
+            if (!$this->runtime->planExists($planId)) {
+                $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
+                return;
+            }
+
+            $grants = $this->runtime->getActiveGrants($userId, $planId);
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, $exception);
+            return;
+        }
+
         if (empty($grants)) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, MembershipActionOutcome::fromAffectedRows(0));
             return;
         }
 
         $extendMode = Arr::get($sequence->settings, 'extend_mode', 'from_current_expiry');
 
-        foreach ($grants as $grant) {
-            if ($extendMode === 'from_current_expiry' && !empty($grant['expires_at'])) {
-                $baseTime = strtotime($grant['expires_at']);
-            } else {
-                $baseTime = time();
-            }
-            $newExpiresAt = gmdate('Y-m-d H:i:s', strtotime('+' . $extendDays . ' days', $baseTime));
+        $grant = $grants[0];
+        if ($extendMode === 'from_current_expiry' && !empty($grant['expires_at'])) {
+            $baseTime = strtotime($grant['expires_at']);
+        } else {
+            $baseTime = time();
+        }
+        $newExpiresAt = gmdate('Y-m-d H:i:s', strtotime('+' . $extendDays . ' days', $baseTime));
 
-            $service = new AccessGrantService();
-            $service->extendExpiry($userId, $planId, $newExpiresAt);
-            break; // extendExpiry updates all grants for the plan
+        try {
+            $outcome = MembershipActionOutcome::fromAffectedRows(
+                $this->runtime->extendExpiry($userId, $planId, $newExpiresAt)
+            );
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, $exception);
+            return;
+        }
+
+        if (!$outcome->isSuccessful()) {
+            $this->skip($funnelSubscriberId, $sequence->id, $outcome);
         }
     }
 
@@ -121,5 +141,19 @@ class ExtendMembershipAction extends BaseAction
             $options[] = ['id' => (string) $plan['id'], 'title' => $plan['title']];
         }
         return $options;
+    }
+
+    private function skip(mixed $funnelSubscriberId, mixed $sequenceId, MembershipActionOutcome $outcome): void
+    {
+        $outcome->skip((int) $funnelSubscriberId, (int) $sequenceId, $this->actionName);
+    }
+
+    private function skipRuntimeFailure(mixed $funnelSubscriberId, mixed $sequenceId, Throwable $exception): void
+    {
+        $this->skip(
+            $funnelSubscriberId,
+            $sequenceId,
+            MembershipActionOutcome::fromThrowable($exception)
+        );
     }
 }

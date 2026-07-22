@@ -56,7 +56,8 @@ final class PlanReadController
     public static function options(\WP_REST_Request $request): \WP_REST_Response
     {
         $service = new PlanService();
-        return new \WP_REST_Response(['data' => $service->getOptions()]);
+        $includeIds = array_filter(array_map('intval', explode(',', (string) $request->get_param('include'))));
+        return new \WP_REST_Response(['data' => $service->getOptions($includeIds)]);
     }
 
     public static function dripSchedule(\WP_REST_Request $request): \WP_REST_Response

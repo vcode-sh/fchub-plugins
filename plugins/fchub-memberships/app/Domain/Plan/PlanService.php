@@ -181,14 +181,32 @@ class PlanService
     /**
      * Get plan options for select/dropdown fields.
      */
-    public function getOptions(): array
+    public function getOptions(array $includeIds = []): array
     {
         $plans = $this->planRepo->getActivePlans();
+
+        $seen = array_fill_keys(array_map(static fn(array $plan): int => (int) $plan['id'], $plans), true);
+        foreach ($includeIds as $includeId) {
+            $includeId = (int) $includeId;
+            if ($includeId <= 0 || isset($seen[$includeId])) {
+                continue;
+            }
+
+            $plan = $this->planRepo->find($includeId);
+            if (!$plan) {
+                continue;
+            }
+
+            $plans[] = $plan;
+            $seen[$includeId] = true;
+        }
+
         return array_map(function ($plan) {
             return [
                 'id'    => $plan['id'],
                 'label' => $plan['title'],
                 'value' => (string) $plan['id'],
+                'status' => $plan['status'] ?? 'active',
             ];
         }, $plans);
     }

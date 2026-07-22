@@ -25,6 +25,8 @@ final class FluentCartRuntimeModule implements ModuleInterface
             return;
         }
 
+        \FChubMemberships\Support\Migrations::ensureAdministratorCapability();
+
         $currentDbVersion = get_option('fchub_memberships_db_version', '0');
         if (version_compare($currentDbVersion, FCHUB_MEMBERSHIPS_DB_VERSION, '<')) {
             \FChubMemberships\Support\Migrations::run();
@@ -109,5 +111,6 @@ final class FluentCartRuntimeModule implements ModuleInterface
         \FChubMemberships\Http\AccessCheckController::registerRoutes();
         \FChubMemberships\Http\AccountController::registerRoutes();
         \FChubMemberships\Http\Controllers\ImportController::registerRoutes();
+        \FChubMemberships\Http\Controllers\IntegrationHealthController::registerRoutes();
     }
 }

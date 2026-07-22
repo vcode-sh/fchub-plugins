@@ -32,15 +32,12 @@ class TrialConvertedEmail
             return;
         }
 
-        $smartCodes = $this->buildSmartCodes($user, $data);
-        $subject = $this->replaceSmartCodes(
-            __('Your {plan_name} membership is now active!', 'fchub-memberships'),
-            $smartCodes
+        $message = (new NotificationEmailComposer())->compose(
+            self::TEMPLATE_KEY,
+            $this->buildSmartCodes($user, $data)
         );
-        $body = $this->replaceSmartCodes($this->getTemplate(), $smartCodes);
-        $body = $this->wrapHtml($body, $subject);
 
-        $this->dispatch($user->user_email, $subject, $body);
+        $this->dispatch($user->user_email, $message['subject'], $message['html']);
 
         Logger::log(
             'Trial converted email sent',

@@ -5,15 +5,18 @@ namespace FChubMemberships\FluentCRM\Actions;
 defined('ABSPATH') || exit;
 
 use FluentCrm\App\Services\Funnel\BaseAction;
-use FluentCrm\App\Services\Funnel\FunnelHelper;
 use FluentCrm\Framework\Support\Arr;
-use FChubMemberships\Domain\AccessGrantService;
+use FChubMemberships\FluentCRM\Actions\Contracts\MembershipActionRuntimeInterface;
 use FChubMemberships\Storage\PlanRepository;
+use Throwable;
 
 class RevokeMembershipAction extends BaseAction
 {
-    public function __construct()
+    private MembershipActionRuntimeInterface $runtime;
+
+    public function __construct(?MembershipActionRuntimeInterface $runtime = null)
     {
+        $this->runtime = $runtime ?? new MembershipActionRuntime();
         $this->actionName = 'fchub_revoke_membership';
         $this->priority = 20;
         parent::__construct();
@@ -65,13 +68,23 @@ class RevokeMembershipAction extends BaseAction
     {
         $planId = (int) Arr::get($sequence->settings, 'plan_id');
         if (!$planId) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
             return;
         }
 
         $userId = $this->resolveUserId($subscriber);
         if (!$userId) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
+            return;
+        }
+
+        try {
+            if (!$this->runtime->planExists($planId)) {
+                $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
+                return;
+            }
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, $exception);
             return;
         }
 
@@ -79,8 +92,6 @@ class RevokeMembershipAction extends BaseAction
         $useGrace = Arr::get($sequence->settings, 'use_grace_period', 'no') === 'yes';
 
         $context = [
-            'source_type' => 'automation',
-            'source_id'   => $sequence->id,
             'reason'      => $reason,
         ];
 
@@ -88,8 +99,18 @@ class RevokeMembershipAction extends BaseAction
             $context['grace_period_days'] = 0;
         }
 
-        $service = new AccessGrantService();
-        $service->revokePlan($userId, $planId, $context);
+        try {
+            $outcome = MembershipActionOutcome::fromRevokeResult(
+                $this->runtime->revokePlan($userId, $planId, $context)
+            );
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, $exception);
+            return;
+        }
+
+        if (!$outcome->isSuccessful()) {
+            $this->skip($funnelSubscriberId, $sequence->id, $outcome);
+        }
     }
 
     private function resolveUserId($subscriber): ?int
@@ -109,5 +130,19 @@ class RevokeMembershipAction extends BaseAction
             $options[] = ['id' => (string) $plan['id'], 'title' => $plan['title']];
         }
         return $options;
+    }
+
+    private function skip(mixed $funnelSubscriberId, mixed $sequenceId, MembershipActionOutcome $outcome): void
+    {
+        $outcome->skip((int) $funnelSubscriberId, (int) $sequenceId, $this->actionName);
+    }
+
+    private function skipRuntimeFailure(mixed $funnelSubscriberId, mixed $sequenceId, Throwable $exception): void
+    {
+        $this->skip(
+            $funnelSubscriberId,
+            $sequenceId,
+            MembershipActionOutcome::fromThrowable($exception)
+        );
     }
 }

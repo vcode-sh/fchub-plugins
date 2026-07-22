@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMemberships\Tests\Unit\Modules;
 
+use FChubMemberships\Core\Container;
 use FChubMemberships\Modules\Automation\FluentCrmAutomationModule;
 use FChubMemberships\Integration\FluentCrmSync;
 use FChubMemberships\Tests\Unit\PluginTestCase;
@@ -19,6 +20,28 @@ if (!defined('FLUENTCRM_PLUGIN_VERSION')) {
 
 final class FluentCrmAutomationModuleContractTest extends PluginTestCase
 {
+    public function test_registers_automation_before_fluentcrm_init_scans(): void
+    {
+        $GLOBALS['_fchub_test_action_registrations'] = [];
+        $module = new FluentCrmAutomationModule();
+
+        $module->register(new Container());
+
+        $registration = null;
+        foreach ($GLOBALS['_fchub_test_action_registrations']['init'] ?? [] as $candidate) {
+            if ($candidate['callback'] === [$module, 'bootAutomation']) {
+                $registration = $candidate;
+                break;
+            }
+        }
+
+        self::assertNotNull($registration);
+        self::assertSame(1, $registration['priority']);
+        self::assertLessThan(2, $registration['priority']);
+        self::assertLessThan(20, $registration['priority']);
+        self::assertSame(1, $registration['accepted_args']);
+    }
+
     public function test_automation_boot_requires_fluentcrm_funnel_capabilities(): void
     {
         self::assertTrue(method_exists(FluentCrmAutomationModule::class, 'isCompatible'));

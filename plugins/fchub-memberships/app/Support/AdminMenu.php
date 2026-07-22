@@ -82,6 +82,10 @@ class AdminMenu
 
     private static function enqueueAssets(): void
     {
+        if (function_exists('wp_enqueue_media')) {
+            wp_enqueue_media();
+        }
+
         $distPath = FCHUB_MEMBERSHIPS_PATH . 'assets/dist/';
         $distUrl = FCHUB_MEMBERSHIPS_URL . 'assets/dist/';
 
@@ -95,9 +99,11 @@ class AdminMenu
             $buildVersion = (string) filemtime($manifest);
 
             if ($entry) {
-                // Load CSS from entry's css array or standalone style.css entry
-                if (!empty($entry['css'])) {
-                    foreach ($entry['css'] as $i => $css) {
+                // Vite may move shared CSS into imported chunks. WordPress must enqueue
+                // those files explicitly because it does not process modulepreload links.
+                $cssAssets = self::collectCssAssets($assets, $entryKey);
+                if ($cssAssets !== []) {
+                    foreach ($cssAssets as $i => $css) {
                         wp_enqueue_style(
                             'fchub-memberships-admin' . ($i ? "-{$i}" : ''),
                             $distUrl . $css,
@@ -170,6 +176,50 @@ class AdminMenu
             'currency'   => $currency,
         ]);
         wp_add_inline_script('fchub-memberships-admin', "window.fchubMembershipsAdmin = {$config};", 'before');
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $assets
+     * @return list<string>
+     */
+    private static function collectCssAssets(array $assets, string $entryKey): array
+    {
+        $cssAssets = [];
+        $seenCss = [];
+        $visitedEntries = [];
+        $pendingEntries = [$entryKey];
+
+        while ($pendingEntries !== []) {
+            $currentKey = array_shift($pendingEntries);
+
+            if (!is_string($currentKey) || isset($visitedEntries[$currentKey])) {
+                continue;
+            }
+
+            $visitedEntries[$currentKey] = true;
+            $currentEntry = $assets[$currentKey] ?? null;
+
+            if (!is_array($currentEntry)) {
+                continue;
+            }
+
+            foreach (($currentEntry['css'] ?? []) as $css) {
+                if (!is_string($css) || isset($seenCss[$css])) {
+                    continue;
+                }
+
+                $seenCss[$css] = true;
+                $cssAssets[] = $css;
+            }
+
+            foreach (($currentEntry['imports'] ?? []) as $importKey) {
+                if (is_string($importKey) && !isset($visitedEntries[$importKey])) {
+                    $pendingEntries[] = $importKey;
+                }
+            }
+        }
+
+        return $cssAssets;
     }
 
     private static function getCurrencyConfig(): array

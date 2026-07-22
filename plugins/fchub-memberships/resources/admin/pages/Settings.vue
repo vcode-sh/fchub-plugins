@@ -23,7 +23,7 @@
         </article>
         <article class="settings-overview-card settings-overview-card--green">
           <el-icon><Message /></el-icon>
-          <div><span>Email notifications</span><strong>{{ enabledEmailCount }} of 4 active</strong></div>
+          <div><span>Email notifications</span><strong>{{ enabledEmailCount }} of 8 active</strong></div>
         </article>
         <article class="settings-overview-card settings-overview-card--purple">
           <el-icon><Connection /></el-icon>
@@ -89,20 +89,24 @@
           </div>
 
           <SettingsGeneralSection v-if="activeSettingsTab === 'general'" :form="form" />
-          <SettingsNotificationsSection v-else-if="activeSettingsTab === 'notifications'" :form="form" />
+          <SettingsNotificationsSummary v-else-if="activeSettingsTab === 'notifications'" />
           <SettingsIntegrationsSection
             v-else-if="activeSettingsTab === 'integrations'"
             :form="form"
             :plan-options="planOptions"
+            :plan-options-error="planOptionsError"
             :loading-lists="loadingLists"
             :fluentcrm-lists="fluentcrmLists"
             :loading-spaces="loadingSpaces"
             :fc-spaces="fcSpaces"
             :loading-badges="loadingBadges"
             :fc-badges="fcBadges"
+            :space-search-error="spaceSearchError"
+            :badge-search-error="badgeSearchError"
             :search-fluentcrm-lists="searchFluentcrmLists"
             :search-fc-spaces="searchFcSpaces"
             :search-fc-badges="searchFcBadges"
+            :reload-plan-options="loadPlanOptions"
           />
           <SettingsWebhooksApiSection
             v-else-if="activeSettingsTab === 'webhooks'"
@@ -158,10 +162,12 @@ import {
 } from '@element-plus/icons-vue'
 import api, { settings } from '@/api/index.js'
 import SettingsGeneralSection from '@/components/settings/SettingsGeneralSection.vue'
-import SettingsNotificationsSection from '@/components/settings/SettingsNotificationsSection.vue'
+import SettingsNotificationsSummary from '@/components/settings/SettingsNotificationsSummary.vue'
 import SettingsIntegrationsSection from '@/components/settings/SettingsIntegrationsSection.vue'
 import SettingsWebhooksApiSection from '@/components/settings/SettingsWebhooksApiSection.vue'
 import SettingsAdvancedSection from '@/components/settings/SettingsAdvancedSection.vue'
+import { createRemoteOptionsLoader, mappedResourceIds } from '@/components/settings/settingsIntegrationUi.js'
+import { activeDeliveryCount } from '@/components/settings/notificationStudioUi.js'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 import ListStatePanel from '@/components/workspace/ListStatePanel.vue'
 
@@ -185,11 +191,35 @@ const fluentcrmLists = ref([])
 // FluentCommunity remote search state
 const loadingSpaces = ref(false)
 const fcSpaces = ref([])
+const spaceSearchError = ref('')
 const loadingBadges = ref(false)
 const fcBadges = ref([])
+const badgeSearchError = ref('')
 
 // Plan options for mappings
 const planOptions = ref([])
+const planOptionsError = ref('')
+
+const emailNotifications = [
+  ['access_granted', 'email_access_granted'],
+  ['access_expiring', 'email_access_expiring'],
+  ['access_revoked', 'email_access_revoked'],
+  ['membership_paused', 'email_membership_paused'],
+  ['membership_resumed', 'email_membership_resumed'],
+  ['trial_expiring', 'email_trial_expiring'],
+  ['trial_converted', 'email_trial_converted'],
+  ['drip_content_unlocked', 'email_drip_unlocked'],
+]
+
+const defaultEmailTheme = () => ({
+  logo_url: '',
+  primary_color: '#2563eb',
+  background_color: '#f3f4f6',
+  content_color: '#374151',
+  content_width: 600,
+  font_family: 'system',
+  footer_text: '',
+})
 
 const form = ref({
   restriction_mode: 'content_replace',
@@ -201,6 +231,13 @@ const form = ref({
   email_expiring_days_before: 7,
   email_access_revoked: true,
   email_drip_unlocked: true,
+  email_membership_paused: true,
+  email_membership_resumed: true,
+  email_trial_expiring: true,
+  email_trial_converted: true,
+  email_templates: {},
+  email_theme: defaultEmailTheme(),
+  email_delivery: {},
   api_key: '',
   debug_mode: false,
   // Webhooks
@@ -221,14 +258,22 @@ const form = ref({
   membership_mode: 'stack',
 })
 
+const spaceOptionsLoader = createRemoteOptionsLoader(async (query, include) => {
+  const response = await api.get('admin/fc-spaces', { search: query, include })
+  return response.data ?? response ?? []
+})
+
+const badgeOptionsLoader = createRemoteOptionsLoader(async (query, include) => {
+  const response = await api.get('admin/fc-badges', { search: query, include })
+  return response.data ?? response ?? []
+})
+
 const isDirty = computed(() => savedSnapshot.value !== '' && JSON.stringify(buildPayload()) !== savedSnapshot.value)
 
-const enabledEmailCount = computed(() => [
-  form.value.email_access_granted,
-  form.value.email_access_expiring,
-  form.value.email_access_revoked,
-  form.value.email_drip_unlocked,
-].filter(Boolean).length)
+const enabledEmailCount = computed(() => activeDeliveryCount(
+  form.value.email_delivery,
+  emailNotifications.map(([key]) => key),
+))
 
 const enabledConnectionCount = computed(() => [
   form.value.fluentcrm_enabled,
@@ -253,8 +298,8 @@ const settingsCategories = computed(() => [
   {
     id: 'notifications',
     label: 'Notifications',
-    description: 'Choose which membership events should send an email to members.',
-    summary: `${enabledEmailCount.value} of 4 active`,
+    description: 'Design, preview, test, and route every membership email.',
+    summary: `${enabledEmailCount.value} of 8 active`,
     icon: markRaw(Bell),
   },
   {
@@ -290,13 +335,14 @@ async function loadSettings() {
   try {
     const settingsRes = await settings.get()
     const data = settingsRes.data ?? settingsRes
-    try {
-      const plansRes = await api.get('admin/plans/options')
-      const plans = plansRes.data ?? plansRes
-      planOptions.value = Array.isArray(plans) ? plans : []
-    } catch {
-      planOptions.value = []
-    }
+    await loadPlanOptions(data)
+
+    const emailDelivery = { ...(data.email_delivery ?? {}) }
+    emailNotifications.forEach(([key, settingKey]) => {
+      if (!emailDelivery[key]) {
+        emailDelivery[key] = data[settingKey] === 'no' ? 'off' : 'built_in'
+      }
+    })
 
     form.value = {
       restriction_mode: data.default_protection_mode ?? 'content_replace',
@@ -308,6 +354,13 @@ async function loadSettings() {
       email_expiring_days_before: data.expiry_warning_days ?? 7,
       email_access_revoked: data.email_access_revoked === 'yes',
       email_drip_unlocked: data.email_drip_unlocked === 'yes',
+      email_membership_paused: data.email_membership_paused === 'yes',
+      email_membership_resumed: data.email_membership_resumed === 'yes',
+      email_trial_expiring: data.email_trial_expiring === 'yes',
+      email_trial_converted: data.email_trial_converted === 'yes',
+      email_templates: data.email_templates ?? {},
+      email_theme: { ...defaultEmailTheme(), ...(data.email_theme ?? {}) },
+      email_delivery: emailDelivery,
       api_key: data.api_key ?? '',
       debug_mode: data.debug_mode === 'yes',
       // Webhooks
@@ -335,6 +388,13 @@ async function loadSettings() {
     if (form.value.fluentcrm_default_list) {
       searchFluentcrmLists('')
     }
+
+    if (mappedResourceIds(form.value.fc_space_mappings)) {
+      await searchFcSpaces('')
+    }
+    if (mappedResourceIds(form.value.fc_badge_mappings)) {
+      await searchFcBadges('')
+    }
   } catch (err) {
     loadError.value = err.message || 'The settings service did not return a usable response.'
   } finally {
@@ -344,6 +404,43 @@ async function loadSettings() {
 
 function cloneForm(value) {
   return JSON.parse(JSON.stringify(value))
+}
+
+async function loadPlanOptions(source = form.value) {
+  planOptionsError.value = ''
+  const mappingKeys = [...new Set([
+    ...Object.keys(source.fc_space_mappings ?? {}),
+    ...Object.keys(source.fc_badge_mappings ?? {}),
+  ].filter((id) => Boolean(source.fc_space_mappings?.[id]) || Boolean(source.fc_badge_mappings?.[id])))]
+  const validPlanIds = mappingKeys.filter((id) => /^[1-9]\d*$/.test(id))
+  const invalidRows = mappingKeys
+    .filter((id) => !validPlanIds.includes(id))
+    .map((id) => ({
+      id,
+      label: `Invalid saved plan reference “${id}”`,
+      value: id,
+      status: 'invalid',
+    }))
+
+  try {
+    const plansRes = await api.get('admin/plans/options', { include: validPlanIds.join(',') })
+    const plans = plansRes.data ?? plansRes
+    const availablePlans = Array.isArray(plans) ? plans : []
+    const returnedPlanIds = new Set(availablePlans.map((plan) => String(plan.id)))
+    planOptions.value = [
+      ...availablePlans,
+      ...validPlanIds
+        .filter((id) => !returnedPlanIds.has(id))
+        .map((id) => ({ id: Number(id), label: `Unavailable plan #${id}`, value: id, status: 'missing' })),
+      ...invalidRows,
+    ]
+  } catch {
+    planOptionsError.value = 'Membership plans could not be loaded. Retry, or clear the saved mappings shown below.'
+    planOptions.value = [
+      ...validPlanIds.map((id) => ({ id: Number(id), label: `Saved plan #${id}`, value: id, status: 'unavailable' })),
+      ...invalidRows,
+    ]
+  }
 }
 
 function selectCategory(category) {
@@ -363,6 +460,13 @@ function buildPayload() {
     email_access_expiring: f.email_access_expiring ? 'yes' : 'no',
     email_access_revoked: f.email_access_revoked ? 'yes' : 'no',
     email_drip_unlocked: f.email_drip_unlocked ? 'yes' : 'no',
+    email_membership_paused: f.email_membership_paused ? 'yes' : 'no',
+    email_membership_resumed: f.email_membership_resumed ? 'yes' : 'no',
+    email_trial_expiring: f.email_trial_expiring ? 'yes' : 'no',
+    email_trial_converted: f.email_trial_converted ? 'yes' : 'no',
+    email_templates: f.email_templates,
+    email_theme: f.email_theme,
+    email_delivery: f.email_delivery,
     debug_mode: f.debug_mode ? 'yes' : 'no',
     // Webhooks
     webhook_enabled: f.webhook_enabled ? 'yes' : 'no',
@@ -430,7 +534,57 @@ function validateSettings() {
     }
   }
 
+  const hasCommunityMappings = [
+    ...Object.values(form.value.fc_space_mappings ?? {}),
+    ...Object.values(form.value.fc_badge_mappings ?? {}),
+  ].some(Boolean)
+
+  if (form.value.fc_enabled && planOptionsError.value && hasCommunityMappings) {
+    return {
+      category: 'integrations',
+      message: 'Retry loading membership plans, or clear the saved mapping rows before saving.',
+    }
+  }
+
+  if (form.value.fc_enabled && (
+    invalidCommunityMapping(form.value.fc_space_mappings)
+    || invalidCommunityMapping(form.value.fc_badge_mappings)
+  )) {
+    return {
+      category: 'integrations',
+      message: 'Review unavailable FluentCommunity mappings before saving.',
+    }
+  }
+
+  if (form.value.fc_enabled && (
+    unavailableCommunityMapping(form.value.fc_space_mappings, fcSpaces.value, spaceSearchError.value)
+    || unavailableCommunityMapping(form.value.fc_badge_mappings, fcBadges.value, badgeSearchError.value)
+  )) {
+    return {
+      category: 'integrations',
+      message: 'Clear or replace FluentCommunity resources that are no longer available.',
+    }
+  }
+
   return null
+}
+
+function invalidCommunityMapping(mappings = {}) {
+  return Object.entries(mappings).some(([planId, resourceId]) => Boolean(resourceId) && (
+    !/^[1-9]\d*$/.test(String(planId))
+    || !/^\d+$/.test(String(resourceId))
+    || Number(planId) <= 0
+    || Number(resourceId) <= 0
+  ))
+}
+
+function unavailableCommunityMapping(mappings = {}, options = [], loadError = '') {
+  const selectedIds = Object.values(mappings).map((value) => String(value ?? '')).filter(Boolean)
+  if (selectedIds.length === 0) return false
+  if (loadError) return true
+
+  const availableIds = new Set(options.map((option) => String(option.id)))
+  return selectedIds.some((id) => !availableIds.has(id))
 }
 
 function isHttpUrl(value) {
@@ -563,27 +717,35 @@ async function searchFluentcrmLists(query) {
 }
 
 async function searchFcSpaces(query) {
+  const include = mappedResourceIds(form.value.fc_space_mappings)
   loadingSpaces.value = true
-  try {
-    const res = await api.get('admin/fc-spaces', { search: query })
-    fcSpaces.value = res.data ?? res ?? []
-  } catch {
+  spaceSearchError.value = ''
+  const result = await spaceOptionsLoader.search(query, include)
+  if (result.stale) return
+
+  if (result.error) {
     fcSpaces.value = []
-  } finally {
-    loadingSpaces.value = false
+    spaceSearchError.value = 'Spaces could not be loaded. Try opening the selector again.'
+  } else {
+    fcSpaces.value = result.options
   }
+  loadingSpaces.value = false
 }
 
 async function searchFcBadges(query) {
+  const include = mappedResourceIds(form.value.fc_badge_mappings)
   loadingBadges.value = true
-  try {
-    const res = await api.get('admin/fc-badges', { search: query })
-    fcBadges.value = res.data ?? res ?? []
-  } catch {
+  badgeSearchError.value = ''
+  const result = await badgeOptionsLoader.search(query, include)
+  if (result.stale) return
+
+  if (result.error) {
     fcBadges.value = []
-  } finally {
-    loadingBadges.value = false
+    badgeSearchError.value = 'Badges could not be loaded. Try opening the selector again.'
+  } else {
+    fcBadges.value = result.options
   }
+  loadingBadges.value = false
 }
 
 onMounted(() => {
@@ -651,36 +813,6 @@ onMounted(() => {
 .settings-mobile-category { display: none; margin-bottom: 12px; }
 .settings-mobile-category label { display: block; margin-bottom: 6px; color: var(--fchub-text-primary); font-size: 12px; font-weight: 650; }
 
-/* Mapping rows */
-.mapping-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-
-.mapping-row:last-child {
-  border-bottom: none;
-}
-
-.mapping-plan-name {
-  font-size: 13px;
-  font-weight: 500;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fchub-empty-note {
-  font-size: 13px;
-  color: var(--fchub-text-secondary);
-  padding: 8px 0;
-}
-
 /* Webhook test results */
 .webhook-test-results {
   margin-top: 12px;
@@ -724,7 +856,5 @@ onMounted(() => {
   .settings-save-bar { align-items: stretch; flex-direction: column; gap: 12px; width: auto; bottom: 8px; margin: 12px 0 0; }
   .settings-save-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .settings-save-actions .el-button { width: 100%; }
-  .mapping-row { align-items: stretch; flex-direction: column; }
-  .mapping-row :deep(.el-select) { width: 100% !important; }
 }
 </style>

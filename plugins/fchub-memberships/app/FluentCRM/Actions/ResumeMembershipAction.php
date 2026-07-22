@@ -5,16 +5,18 @@ namespace FChubMemberships\FluentCRM\Actions;
 defined('ABSPATH') || exit;
 
 use FluentCrm\App\Services\Funnel\BaseAction;
-use FluentCrm\App\Services\Funnel\FunnelHelper;
 use FluentCrm\Framework\Support\Arr;
-use FChubMemberships\Domain\AccessGrantService;
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\FluentCRM\Actions\Contracts\MembershipActionRuntimeInterface;
 use FChubMemberships\Storage\PlanRepository;
+use Throwable;
 
 class ResumeMembershipAction extends BaseAction
 {
-    public function __construct()
+    private MembershipActionRuntimeInterface $runtime;
+
+    public function __construct(?MembershipActionRuntimeInterface $runtime = null)
     {
+        $this->runtime = $runtime ?? new MembershipActionRuntime();
         $this->actionName = 'fchub_resume_membership';
         $this->priority = 20;
         parent::__construct();
@@ -56,28 +58,48 @@ class ResumeMembershipAction extends BaseAction
     {
         $userId = $this->resolveUserId($subscriber);
         if (!$userId) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
             return;
         }
 
         $planId = (int) Arr::get($sequence->settings, 'plan_id');
 
-        $grantRepo = new GrantRepository();
+        try {
+            if ($planId && !$this->runtime->planExists($planId)) {
+                $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
+                return;
+            }
 
-        if ($planId) {
-            $grants = $grantRepo->getByUserId($userId, ['status' => 'paused', 'plan_id' => $planId]);
-        } else {
-            $grants = $grantRepo->getPausedGrants($userId);
-        }
-
-        if (empty($grants)) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $grants = $this->runtime->getPausedGrants($userId, $planId ?: null);
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, $exception);
             return;
         }
 
-        $service = new AccessGrantService();
+        if (empty($grants)) {
+            $this->skip($funnelSubscriberId, $sequence->id, MembershipActionOutcome::fromAffectedRows(0));
+            return;
+        }
+
+        $resumed = 0;
         foreach ($grants as $grant) {
-            $service->resumeGrant($grant['id']);
+            try {
+                $result = $this->runtime->resumeGrant((int) $grant['id']);
+            } catch (Throwable $exception) {
+                $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, $exception, $resumed);
+                return;
+            }
+
+            if (empty($result['success'])) {
+                $this->skip(
+                    $funnelSubscriberId,
+                    $sequence->id,
+                    new MembershipActionOutcome(false, $resumed > 0, $resumed > 0 ? 'partial' : 'failed', ['affected' => $resumed])
+                );
+                return;
+            }
+
+            $resumed++;
         }
     }
 
@@ -98,5 +120,24 @@ class ResumeMembershipAction extends BaseAction
             $options[] = ['id' => (string) $plan['id'], 'title' => $plan['title']];
         }
         return $options;
+    }
+
+    private function skip(mixed $funnelSubscriberId, mixed $sequenceId, MembershipActionOutcome $outcome): void
+    {
+        $outcome->skip((int) $funnelSubscriberId, (int) $sequenceId, $this->actionName);
+    }
+
+    private function skipRuntimeFailure(
+        mixed $funnelSubscriberId,
+        mixed $sequenceId,
+        Throwable $exception,
+        int $affected = 0
+    ): void
+    {
+        $this->skip(
+            $funnelSubscriberId,
+            $sequenceId,
+            MembershipActionOutcome::fromThrowable($exception, null, $affected)
+        );
     }
 }

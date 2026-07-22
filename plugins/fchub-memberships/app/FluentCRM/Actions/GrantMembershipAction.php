@@ -5,15 +5,18 @@ namespace FChubMemberships\FluentCRM\Actions;
 defined('ABSPATH') || exit;
 
 use FluentCrm\App\Services\Funnel\BaseAction;
-use FluentCrm\App\Services\Funnel\FunnelHelper;
 use FluentCrm\Framework\Support\Arr;
-use FChubMemberships\Domain\AccessGrantService;
+use FChubMemberships\FluentCRM\Actions\Contracts\MembershipActionRuntimeInterface;
 use FChubMemberships\Storage\PlanRepository;
+use Throwable;
 
 class GrantMembershipAction extends BaseAction
 {
-    public function __construct()
+    private MembershipActionRuntimeInterface $runtime;
+
+    public function __construct(?MembershipActionRuntimeInterface $runtime = null)
     {
+        $this->runtime = $runtime ?? new MembershipActionRuntime();
         $this->actionName = 'fchub_grant_membership';
         $this->priority = 20;
         parent::__construct();
@@ -84,13 +87,23 @@ class GrantMembershipAction extends BaseAction
     {
         $planId = (int) Arr::get($sequence->settings, 'plan_id');
         if (!$planId) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
             return;
         }
 
         $userId = $this->resolveUserId($subscriber);
         if (!$userId) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
+            return;
+        }
+
+        try {
+            if (!$this->runtime->planExists($planId)) {
+                $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
+                return;
+            }
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, $exception);
             return;
         }
 
@@ -108,15 +121,24 @@ class GrantMembershipAction extends BaseAction
 
         $context = [
             'source_type' => 'automation',
-            'source_id'   => $sequence->id,
         ];
 
         if ($expiresAt) {
             $context['expires_at'] = $expiresAt;
         }
 
-        $service = new AccessGrantService();
-        $service->grantPlan($userId, $planId, $context);
+        try {
+            $outcome = MembershipActionOutcome::fromGrantResult(
+                $this->runtime->grantPlan($userId, $planId, $context)
+            );
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, $exception);
+            return;
+        }
+
+        if (!$outcome->isSuccessful()) {
+            $this->skip($funnelSubscriberId, $sequence->id, $outcome);
+        }
     }
 
     private function resolveUserId($subscriber): ?int
@@ -136,5 +158,19 @@ class GrantMembershipAction extends BaseAction
             $options[] = ['id' => (string) $plan['id'], 'title' => $plan['title']];
         }
         return $options;
+    }
+
+    private function skip(mixed $funnelSubscriberId, mixed $sequenceId, MembershipActionOutcome $outcome): void
+    {
+        $outcome->skip((int) $funnelSubscriberId, (int) $sequenceId, $this->actionName);
+    }
+
+    private function skipRuntimeFailure(mixed $funnelSubscriberId, mixed $sequenceId, Throwable $exception): void
+    {
+        $this->skip(
+            $funnelSubscriberId,
+            $sequenceId,
+            MembershipActionOutcome::fromThrowable($exception)
+        );
     }
 }

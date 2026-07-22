@@ -3,38 +3,47 @@
 declare(strict_types=1);
 
 namespace FluentCrm\App\Services\Funnel {
-    class BaseAction
-    {
-        public string $actionName = '';
-        public int $priority = 10;
-
-        public function __construct()
+    if (!class_exists(BaseAction::class)) {
+        class BaseAction
         {
+            public string $actionName = '';
+            public int $priority = 10;
+
+            public function __construct()
+            {
+            }
         }
     }
 
-    class FunnelHelper
-    {
-        public static function changeFunnelSubSequenceStatus($funnelSubscriberId, $sequenceId, string $status): void
+    if (!class_exists(FunnelHelper::class)) {
+        class FunnelHelper
         {
-            $GLOBALS['_fchub_test_funnel_statuses'][] = [$funnelSubscriberId, $sequenceId, $status];
+            public static function changeFunnelSubSequenceStatus(
+                $funnelSubscriberId,
+                $sequenceId,
+                string $status
+            ): void {
+                $GLOBALS['_fchub_test_funnel_statuses'][] = [$funnelSubscriberId, $sequenceId, $status];
+            }
         }
     }
 }
 
 namespace FluentCrm\Framework\Support {
-    class Arr
-    {
-        public static function get(array $values, string $key, mixed $default = null): mixed
+    if (!class_exists(Arr::class)) {
+        class Arr
         {
-            $value = $values;
-            foreach (explode('.', $key) as $segment) {
-                if (!is_array($value) || !array_key_exists($segment, $value)) {
-                    return $default;
+            public static function get(array $values, string $key, mixed $default = null): mixed
+            {
+                $value = $values;
+                foreach (explode('.', $key) as $segment) {
+                    if (!is_array($value) || !array_key_exists($segment, $value)) {
+                        return $default;
+                    }
+                    $value = $value[$segment];
                 }
-                $value = $value[$segment];
+                return $value;
             }
-            return $value;
         }
     }
 }

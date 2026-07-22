@@ -149,11 +149,20 @@ class TrialLifecycleService
             'expires_at'    => $expiresAt,
         ];
 
-        if ($grantMeta !== ($grant['meta'] ?? [])) {
-            $updateData['meta'] = $grantMeta;
+        $grantMeta['trial_converted_at'] = current_time('mysql');
+        $updateData['meta'] = $grantMeta;
+        if (!$this->grantRepo->update($grant['id'], $updateData)) {
+            return;
         }
 
-        $this->grantRepo->update($grant['id'], $updateData);
+        try {
+            $convertedGrant = $this->grantRepo->find((int) $grant['id']);
+        } catch (\Throwable) {
+            return;
+        }
+        if (!$convertedGrant) {
+            return;
+        }
 
         $planTitle = $plan['title'] ?? __('Membership', 'fchub-memberships');
 
@@ -167,7 +176,7 @@ class TrialLifecycleService
             'expires_at' => $expiresAt,
         ]);
 
-        do_action('fchub_memberships/trial_converted', $grant, $grant['plan_id'], $grant['user_id']);
+        do_action('fchub_memberships/trial_converted', $convertedGrant, $grant['plan_id'], $grant['user_id']);
 
         Logger::log(
             'Trial converted to paid',

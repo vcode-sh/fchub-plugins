@@ -75,7 +75,7 @@
         </div>
       </div>
     </nav>
-    <div class="fchub-content-area">
+    <div class="fchub-content-area" :class="{ 'is-wide': route.meta.wide }">
       <router-view :key="route.fullPath" />
     </div>
   </div>
@@ -111,12 +111,17 @@ const DARK_TARGETS = ['body', '#wpbody-content', '.wp-toolbar', '#wpfooter']
 
 const themeMode = ref('system') // 'light' | 'dark' | 'system'
 const adminBarOffset = ref(getVisibleAdminBarOffset())
+syncGlobalAdminBarOffset(adminBarOffset.value)
 
 function getVisibleAdminBarOffset() {
   const adminBar = document.querySelector('#wpadminbar')
   if (!adminBar) return 0
 
   return Math.max(0, adminBar.getBoundingClientRect().bottom)
+}
+
+function syncGlobalAdminBarOffset(offset) {
+  document.documentElement.style.setProperty('--fchub-admin-bar-offset', `${offset}px`)
 }
 
 let layoutFrame
@@ -128,6 +133,7 @@ function updateAdminBarOffset() {
     layoutFrame = undefined
     const nextOffset = getVisibleAdminBarOffset()
     if (nextOffset !== adminBarOffset.value) adminBarOffset.value = nextOffset
+    syncGlobalAdminBarOffset(adminBarOffset.value)
   })
 }
 
@@ -333,6 +339,10 @@ body.dark .fchub-theme-btn:hover {
   margin: 0 auto;
   padding: 24px;
   padding-top: calc(var(--fchub-nav-height) + 24px);
+}
+
+.fchub-content-area.is-wide {
+  max-width: 1600px;
 }
 
 @media (max-width: 782px) {

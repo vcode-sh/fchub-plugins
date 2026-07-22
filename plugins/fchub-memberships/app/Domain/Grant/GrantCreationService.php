@@ -62,7 +62,9 @@ final class GrantCreationService
                 'renewal_count' => ($existing['renewal_count'] ?? 0) + 1,
             ];
 
-            if (!empty($context['expires_at'])) {
+            if (!empty($context['preserve_expiry']) && array_key_exists('expires_at', $context)) {
+                $updateData['expires_at'] = $context['expires_at'];
+            } elseif (!empty($context['expires_at'])) {
                 if (empty($existing['expires_at']) || strtotime($context['expires_at']) > strtotime($existing['expires_at'])) {
                     $updateData['expires_at'] = $context['expires_at'];
                 }
@@ -82,6 +84,16 @@ final class GrantCreationService
                     $providerApplication['had_access']
                 ),
             ]);
+            $incident = $updateData['meta']['payment_incident'] ?? null;
+            if (
+                is_array($incident)
+                && ($context['source_type'] ?? null) === 'subscription'
+                && (int) ($context['source_id'] ?? 0) === (int) ($incident['subscription_id'] ?? 0)
+                && empty($incident['recovered_at'])
+            ) {
+                $updateData['meta']['payment_incident']['recovered_at'] = current_time('mysql');
+                $updateData['meta']['payment_incident']['recovery_renewal_count'] = $updateData['renewal_count'];
+            }
 
             try {
                 $updated = $this->grants->update($existing['id'], $updateData);
@@ -134,8 +146,11 @@ final class GrantCreationService
                 }
             }
 
-            AuditLogger::logGrantChange($existing['id'], 'renewed', $existing, $updateData);
-            do_action('fchub_memberships/grant_renewed', $existing, $updateData['renewal_count']);
+            $snapshot = $this->grants->find((int) $existing['id']);
+            if ($snapshot) {
+                AuditLogger::logGrantChange($existing['id'], 'renewed', $existing, $updateData);
+                do_action('fchub_memberships/grant_renewed', $snapshot, $snapshot['renewal_count']);
+            }
 
             return ['action' => 'updated', 'grant_id' => $existing['id']];
         }
@@ -158,7 +173,9 @@ final class GrantCreationService
             'trial_ends_at' => $context['trial_ends_at'] ?? null,
             'drip_available_at' => $dripAvailableAt,
             'source_ids' => $sourceId ? [$sourceId] : [],
-            'meta' => array_merge($context['meta'] ?? [], [
+            'meta' => array_merge($context['meta'] ?? [], $isTrial ? [
+                'trial_started_at' => current_time('mysql'),
+            ] : [], [
                 'provider_access_owner' => $providerApplication['had_access'] ? 'preexisting' : 'fchub',
             ]),
         ];

@@ -369,6 +369,11 @@ if (!function_exists('add_filter')) {
 if (!function_exists('add_action')) {
     function add_action(string $hook, callable $callback, int $priority = 10, int $acceptedArgs = 1): bool
     {
+        $GLOBALS['_fchub_test_action_registrations'][$hook][] = [
+            'callback' => $callback,
+            'priority' => $priority,
+            'accepted_args' => $acceptedArgs,
+        ];
         $GLOBALS['_fchub_test_actions'][$hook][] = $callback;
         return true;
     }
@@ -420,6 +425,15 @@ if (!function_exists('update_option')) {
     }
 }
 
+if (!function_exists('get_role')) {
+    function get_role(string $role): ?object
+    {
+        $GLOBALS['_fchub_test_role_lookups'][] = $role;
+
+        return $GLOBALS['_fchub_test_roles'][$role] ?? null;
+    }
+}
+
 if (!function_exists('current_time')) {
     function current_time(string $type = 'mysql', bool $gmt = false): string|int
     {
@@ -436,6 +450,12 @@ if (!function_exists('current_time')) {
 if (!function_exists('current_user_can')) {
     function current_user_can(string $capability, mixed ...$args): bool
     {
+        $GLOBALS['_fchub_test_current_user_can_checks'][] = $capability;
+
+        if (array_key_exists($capability, $GLOBALS['_fchub_test_current_user_caps'] ?? [])) {
+            return (bool) $GLOBALS['_fchub_test_current_user_caps'][$capability];
+        }
+
         return $GLOBALS['_fchub_test_current_user_can'] ?? true;
     }
 }

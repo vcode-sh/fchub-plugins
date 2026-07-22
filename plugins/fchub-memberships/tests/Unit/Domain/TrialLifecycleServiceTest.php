@@ -89,6 +89,7 @@ final class TrialLifecycleServiceTest extends PluginTestCase
         $queries = new TrialGrantQueryService();
 
         $grants = new class($updates) extends GrantRepository {
+            private array $snapshots = [];
             public function __construct(private array &$updates)
             {
             }
@@ -96,7 +97,19 @@ final class TrialLifecycleServiceTest extends PluginTestCase
             public function update(int $id, array $data): bool
             {
                 $this->updates[] = [$id, $data];
+                $this->snapshots[$id] = array_replace([
+                    'id' => $id,
+                    'user_id' => 21,
+                    'plan_id' => 5,
+                    'source_ids' => [77],
+                    'meta' => ['trial_started_at' => '2026-03-01 00:00:00'],
+                ], $data);
                 return true;
+            }
+
+            public function find(int $id): ?array
+            {
+                return $this->snapshots[$id] ?? null;
             }
         };
 
@@ -148,5 +161,26 @@ final class TrialLifecycleServiceTest extends PluginTestCase
         self::assertArrayHasKey('membership_term_ends_at', $updates[0][1]['meta']);
         self::assertSame(11, $updates[1][0]);
         self::assertSame('expired', $updates[1][1]['status']);
+    }
+
+    public function test_trial_conversion_suppresses_success_when_updated_grant_cannot_be_refetched(): void
+    {
+        $service = new TrialLifecycleService();
+        $grants = new class extends GrantRepository {
+            public function update(int $id, array $data): bool { return true; }
+            public function find(int $id): ?array { return null; }
+        };
+        $plans = new class extends PlanRepository {
+            public function find(int $id): ?array { return ['id' => $id, 'title' => 'Paid', 'duration_type' => 'lifetime', 'meta' => []]; }
+        };
+        $this->inject($service, $grants, $plans, new TrialGrantQueryService());
+        $events = [];
+        $GLOBALS['_fchub_test_actions']['fchub_memberships/trial_converted'] = [static function (...$args) use (&$events): void { $events[] = $args; }];
+        $method = new \ReflectionMethod(TrialLifecycleService::class, 'convertTrial');
+
+        $method->invoke($service, ['id' => 10, 'user_id' => 21, 'plan_id' => 5, 'source_ids' => [77], 'meta' => ['trial_started_at' => '2026-03-01 00:00:00']]);
+
+        self::assertSame([], $events);
+        self::assertSame([], $GLOBALS['_fchub_test_mails']);
     }
 }

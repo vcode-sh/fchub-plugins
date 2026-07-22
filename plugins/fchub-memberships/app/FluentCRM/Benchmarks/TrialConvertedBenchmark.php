@@ -68,6 +68,9 @@ class TrialConvertedBenchmark extends BaseBenchMark
         $grant  = $originalArgs[0];
         $planId = $originalArgs[1];
         $userId = $originalArgs[2];
+        if (empty($grant['meta']['trial_converted_at'])) {
+            return;
+        }
 
         $user = get_user_by('ID', $userId);
         if (!$user) {
@@ -108,7 +111,7 @@ class TrialConvertedBenchmark extends BaseBenchMark
 
         // Check for active grants that are no longer in trial (converted)
         foreach ($activeGrants as $grant) {
-            $isNonTrial = empty($grant['trial_ends_at']);
+            $isNonTrial = !empty($grant['meta']['trial_converted_at']);
             $planMatch  = MembershipFunnelHelper::matchesPlanCondition($grant['plan_id'], $benchmarkPlanIds);
 
             if ($isNonTrial && $planMatch) {

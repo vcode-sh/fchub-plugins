@@ -45,23 +45,22 @@ namespace FChubMemberships\Tests\Unit\Integration {
             ];
         }
 
-        /**
-         * @param callable(FluentCrmSync): void $dispatch
-         * @param array<string, string> $expectedValues
-         */
+        /** @param callable(FluentCrmSync): void $dispatch */
         #[DataProvider('lifecycleEvents')]
-        public function test_lifecycle_events_sync_only_installed_custom_fields_once(
-            callable $dispatch,
-            array $expectedValues
-        ): void {
-            $dispatch(new FluentCrmSync());
+        public function test_lifecycle_events_delegate_the_affected_user_to_the_projector(callable $dispatch): void
+        {
+            $reconciled = [];
+            $sync = new FluentCrmSync(static function (int $userId) use (&$reconciled): array {
+                $reconciled[] = $userId;
+                return ['success' => true];
+            });
 
-            self::assertSame([[$expectedValues, false]], $this->contact->syncCalls);
+            $dispatch($sync);
+
+            self::assertSame([21], $reconciled);
         }
 
-        /**
-         * @return array<string, array{callable(FluentCrmSync): void, array<string, string>}>
-         */
+        /** @return array<string, array{callable(FluentCrmSync): void}> */
         public static function lifecycleEvents(): array
         {
             $grant = [
@@ -72,30 +71,21 @@ namespace FChubMemberships\Tests\Unit\Integration {
             return [
                 'grant' => [
                     static fn(FluentCrmSync $sync) => $sync->onGrantCreated(21, 5, ['expires_at' => '2026-04-01 00:00:00']),
-                    [
-                        'membership_plan' => 'Gold Plan',
-                        'membership_status' => 'active',
-                        'membership_expires' => '2026-04-01 00:00:00',
-                    ],
                 ],
                 'pause' => [
                     static fn(FluentCrmSync $sync) => $sync->onGrantPaused($grant),
-                    ['membership_status' => 'paused'],
                 ],
                 'resume' => [
                     static fn(FluentCrmSync $sync) => $sync->onGrantResumed($grant),
-                    ['membership_status' => 'active'],
                 ],
                 'revoke' => [
                     static fn(FluentCrmSync $sync) => $sync->onGrantRevoked([], 5, 21),
-                    [
-                        'membership_plan' => 'Gold Plan',
-                        'membership_status' => 'revoked',
-                    ],
                 ],
                 'expiry' => [
                     static fn(FluentCrmSync $sync) => $sync->onGrantExpired($grant),
-                    ['membership_status' => 'expired'],
+                ],
+                'renewal' => [
+                    static fn(FluentCrmSync $sync) => $sync->onGrantRenewed($grant, 4),
                 ],
             ];
         }
@@ -239,6 +229,11 @@ namespace FChubMemberships\Tests\Unit\Integration {
             self::assertArrayHasKey('fchub_memberships/grant_paused', $GLOBALS['_fchub_test_actions']);
             self::assertArrayHasKey('fchub_memberships/grant_resumed', $GLOBALS['_fchub_test_actions']);
             self::assertArrayHasKey('fchub_memberships/grant_expired', $GLOBALS['_fchub_test_actions']);
+            self::assertArrayHasKey('fchub_memberships/grant_renewed', $GLOBALS['_fchub_test_actions']);
+            self::assertSame(
+                2,
+                $GLOBALS['_fchub_test_action_registrations']['fchub_memberships/grant_renewed'][0]['accepted_args']
+            );
         }
     }
 

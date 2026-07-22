@@ -172,4 +172,96 @@ final class PlanGrantExecutionServiceTest extends PluginTestCase
         self::assertNotEmpty($GLOBALS['_fchub_test_mails']);
         self::assertCount(1, $order->logs);
     }
+
+    public function test_completed_replacement_and_upgrade_publish_after_destination_success_and_keep_legacy_hooks(): void
+    {
+        foreach ([
+            'exclusive' => ['legacy_hook' => 'fchub_memberships/plan_replaced', 'old_level' => 10, 'new_level' => 20],
+            'upgrade_only' => ['legacy_hook' => 'fchub_memberships/plan_upgraded', 'old_level' => 10, 'new_level' => 20],
+        ] as $mode => $case) {
+            $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = ['membership_mode' => $mode, 'email_access_granted' => 'no'];
+            PlanChangeExecutionAdapter::$succeeds = true;
+            PlanChangeExecutionAdapter::$events = [];
+            $published = [];
+            $legacy = [];
+            $GLOBALS['_fchub_test_actions']['fchub_memberships/plan_changed'] = [static function (array $change) use (&$published): void { PlanChangeExecutionAdapter::$events[] = 'canonical'; $published[] = $change; }];
+            $GLOBALS['_fchub_test_actions'][$case['legacy_hook']] = [static function (...$args) use (&$legacy): void { PlanChangeExecutionAdapter::$events[] = 'legacy'; $legacy[] = $args; }];
+
+            $service = $this->planChangeService($case['old_level'], $case['new_level']);
+            $service->grantPlan(44, 8, ['source_type' => 'automation', 'source_id' => 91]);
+
+            self::assertSame(['destination_granted', 'canonical', 'legacy'], PlanChangeExecutionAdapter::$events, $mode);
+            self::assertSame('automation_change', $published[0]['change_type'], $mode);
+            self::assertSame([3], $published[0]['from_plan_ids'], $mode);
+            self::assertSame([[44, 8, [3]]], $legacy, $mode);
+
+            PlanChangeExecutionAdapter::$succeeds = false;
+            PlanChangeExecutionAdapter::$events = [];
+            $published = [];
+            $legacy = [];
+            $service = $this->planChangeService($case['old_level'], $case['new_level']);
+            $service->grantPlan(44, 8, ['source_type' => 'automation', 'source_id' => 91]);
+            self::assertSame(['destination_failed'], PlanChangeExecutionAdapter::$events, $mode);
+            self::assertSame([], $published, $mode);
+            self::assertSame([], $legacy, $mode);
+        }
+    }
+
+    private function planChangeService(int $oldLevel, int $newLevel): PlanGrantExecutionService
+    {
+        $plans = new class($oldLevel, $newLevel) extends PlanRepository {
+            public function __construct(private int $oldLevel, private int $newLevel) {}
+            public function find(int $id): ?array
+            {
+                return ['id' => $id, 'title' => 'Plan ' . $id, 'level' => $id === 3 ? $this->oldLevel : $this->newLevel, 'trial_days' => 0, 'duration_type' => 'lifetime', 'meta' => []];
+            }
+        };
+        $memberGrants = new class($oldLevel) extends GrantRepository {
+            public function __construct(private int $oldLevel) {}
+            public function getUserActivePlanIds(int $userId): array { return [3]; }
+            public function getHighestActivePlanLevel(int $userId): int { return $this->oldLevel; }
+            public function getByUserId(int $userId, array $filters = []): array { return []; }
+        };
+        $rules = new class extends PlanRuleResolver {
+            public function resolveUniqueRules(int $planId): array { return [['id' => 1, 'provider' => 'plan_change', 'resource_type' => 'post', 'resource_id' => '88', 'drip_type' => 'immediate']]; }
+        };
+        $creation = new GrantCreationService(
+            new class extends GrantRepository {
+                public function findByGrantKey(string $grantKey): ?array { return null; }
+                public function create(array $data): int { return 501; }
+            },
+            new class extends GrantSourceRepository { public function addSource(int $grantId, string $sourceType, int $sourceId): bool { return true; } },
+            new class extends DripScheduleRepository {},
+            new GrantAdapterRegistry(['plan_change' => PlanChangeExecutionAdapter::class])
+        );
+        $notifications = new GrantNotificationService($plans);
+        $revocation = new GrantRevocationService(
+            new class extends GrantRepository { public function getByUserId(int $userId, array $filters = []): array { return []; } },
+            new class extends GrantSourceRepository {},
+            new class extends DripScheduleRepository {},
+            new GrantAdapterRegistry(),
+            $notifications
+        );
+
+        return new PlanGrantExecutionService(
+            $rules,
+            new MembershipModeService($memberGrants, $plans),
+            new GrantPlanContextService($plans, $memberGrants),
+            $creation,
+            $revocation,
+            $notifications
+        );
+    }
+}
+
+final class PlanChangeExecutionAdapter
+{
+    public static bool $succeeds = true;
+    public static array $events = [];
+    public function check(int $userId, string $resourceType, string $resourceId): bool { return false; }
+    public function grant(int $userId, string $resourceType, string $resourceId, array $context = []): array
+    {
+        self::$events[] = self::$succeeds ? 'destination_granted' : 'destination_failed';
+        return ['success' => self::$succeeds, 'message' => self::$succeeds ? 'ok' : 'failed'];
+    }
 }

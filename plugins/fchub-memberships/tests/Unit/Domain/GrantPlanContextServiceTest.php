@@ -77,6 +77,40 @@ final class GrantPlanContextServiceTest extends PluginTestCase
         self::assertNotNull($result['context']['expires_at']);
     }
 
+    public function test_resolve_preserves_explicit_lifetime_expiry_during_plan_change(): void
+    {
+        $plans = new class() extends PlanRepository {
+            public function __construct()
+            {
+            }
+
+            public function find(int $id): ?array
+            {
+                return [
+                    'id' => $id,
+                    'trial_days' => 0,
+                    'duration_type' => 'fixed_days',
+                    'duration_days' => 30,
+                ];
+            }
+        };
+
+        $grants = new class() extends GrantRepository {
+            public function __construct()
+            {
+            }
+        };
+
+        $service = new GrantPlanContextService($plans, $grants);
+        $result = $service->resolve(3, 11, [
+            'expires_at' => null,
+            'preserve_expiry' => true,
+        ]);
+
+        self::assertArrayHasKey('expires_at', $result['context']);
+        self::assertNull($result['context']['expires_at']);
+    }
+
     // --- Membership Term tests ---
 
     public function test_resolve_injects_term_ends_at_for_lifetime_plan(): void

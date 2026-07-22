@@ -5,16 +5,18 @@ namespace FChubMemberships\FluentCRM\Actions;
 defined('ABSPATH') || exit;
 
 use FluentCrm\App\Services\Funnel\BaseAction;
-use FluentCrm\App\Services\Funnel\FunnelHelper;
 use FluentCrm\Framework\Support\Arr;
-use FChubMemberships\Domain\AccessGrantService;
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\FluentCRM\Actions\Contracts\MembershipActionRuntimeInterface;
 use FChubMemberships\Storage\PlanRepository;
+use Throwable;
 
 class ChangeMembershipPlanAction extends BaseAction
 {
-    public function __construct()
+    private MembershipActionRuntimeInterface $runtime;
+
+    public function __construct(?MembershipActionRuntimeInterface $runtime = null)
     {
+        $this->runtime = $runtime ?? new MembershipActionRuntime();
         $this->actionName = 'fchub_change_membership_plan';
         $this->priority = 20;
         parent::__construct();
@@ -73,61 +75,92 @@ class ChangeMembershipPlanAction extends BaseAction
     {
         $toPlanId = (int) Arr::get($sequence->settings, 'to_plan_id');
         if (!$toPlanId) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
             return;
         }
 
         $userId = $this->resolveUserId($subscriber);
         if (!$userId) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
+            return;
+        }
+
+        try {
+            $destinationExists = $this->runtime->planExists($toPlanId);
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, 'destinationPlanLookup', $exception);
+            return;
+        }
+        if (!$destinationExists) {
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
             return;
         }
 
         $fromPlanId = (int) Arr::get($sequence->settings, 'from_plan_id');
         $keepExpiry = Arr::get($sequence->settings, 'keep_expiry', 'no') === 'yes';
 
-        $grantRepo = new GrantRepository();
-        $service = new AccessGrantService();
-
-        // Find active grants to revoke
-        $filters = ['status' => 'active'];
-        if ($fromPlanId) {
-            $filters['plan_id'] = $fromPlanId;
-        }
-        $existingGrants = $grantRepo->getByUserId($userId, $filters);
-
-        if (empty($existingGrants)) {
-            FunnelHelper::changeFunnelSubSequenceStatus($funnelSubscriberId, $sequence->id, 'skipped');
+        try {
+            $existingGrants = $this->runtime->getActiveGrants($userId, $fromPlanId ?: null);
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, 'activeGrantLookup', $exception);
             return;
         }
 
-        // Capture expiry from first grant before revoking
+        if (empty($existingGrants)) {
+            $this->skip($funnelSubscriberId, $sequence->id, MembershipActionOutcome::fromAffectedRows(0));
+            return;
+        }
+
         $existingExpiry = null;
         if ($keepExpiry) {
             $existingExpiry = $existingGrants[0]['expires_at'] ?? null;
         }
 
-        // Revoke the old plan
-        $revokePlanId = $fromPlanId ?: ($existingGrants[0]['plan_id'] ?? 0);
-        if ($revokePlanId) {
-            $service->revokePlan($userId, $revokePlanId, [
-                'source_type'      => 'automation',
-                'source_id'        => $sequence->id,
-                'reason'           => 'Changed to plan #' . $toPlanId,
+        $revokePlanId = $fromPlanId ?: (int) ($existingGrants[0]['plan_id'] ?? 0);
+        if (!$revokePlanId) {
+            $this->skip($funnelSubscriberId, $sequence->id, new MembershipActionOutcome(false, false, 'invalid_input'));
+            return;
+        }
+
+        try {
+            $revokeResult = $this->runtime->revokePlan($userId, $revokePlanId, [
+                'reason' => 'Changed to plan #' . $toPlanId,
                 'grace_period_days' => 0,
             ]);
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, 'revoke', $exception);
+            return;
+        }
+        $revokeOutcome = MembershipActionOutcome::fromRevokeResult($revokeResult);
+        if (!$revokeOutcome->isSuccessful()) {
+            $this->skip($funnelSubscriberId, $sequence->id, $revokeOutcome);
+            return;
         }
 
-        // Grant the new plan
         $context = [
             'source_type' => 'automation',
-            'source_id'   => $sequence->id,
+            'plan_change' => [
+                'change_type' => 'automation_change',
+                'from_plan_ids' => [$revokePlanId],
+            ],
         ];
-        if ($keepExpiry && $existingExpiry) {
+        if ($keepExpiry) {
             $context['expires_at'] = $existingExpiry;
+            if ($existingExpiry === null) {
+                $context['preserve_expiry'] = true;
+            }
         }
 
-        $service->grantPlan($userId, $toPlanId, $context);
+        try {
+            $grantResult = $this->runtime->grantPlan($userId, $toPlanId, $context);
+        } catch (Throwable $exception) {
+            $this->skipRuntimeFailure($funnelSubscriberId, $sequence->id, 'grant', $exception);
+            return;
+        }
+        $grantOutcome = MembershipActionOutcome::fromGrantResult($grantResult);
+        if (!$grantOutcome->isSuccessful()) {
+            $this->skip($funnelSubscriberId, $sequence->id, $grantOutcome);
+        }
     }
 
     private function resolveUserId($subscriber): ?int
@@ -147,5 +180,23 @@ class ChangeMembershipPlanAction extends BaseAction
             $options[] = ['id' => (string) $plan['id'], 'title' => $plan['title']];
         }
         return $options;
+    }
+
+    private function skipRuntimeFailure(
+        mixed $funnelSubscriberId,
+        mixed $sequenceId,
+        string $stage,
+        Throwable $exception
+    ): void {
+        $this->skip(
+            $funnelSubscriberId,
+            $sequenceId,
+            MembershipActionOutcome::fromThrowable($exception, $stage)
+        );
+    }
+
+    private function skip(mixed $funnelSubscriberId, mixed $sequenceId, MembershipActionOutcome $outcome): void
+    {
+        $outcome->skip((int) $funnelSubscriberId, (int) $sequenceId, $this->actionName);
     }
 }

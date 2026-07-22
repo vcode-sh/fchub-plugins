@@ -62,6 +62,12 @@ const routes = [
         name: 'Settings',
         component: () => import('../pages/Settings.vue'),
     },
+    {
+        path: '/settings/email-studio',
+        name: 'EmailStudio',
+        component: () => import('../pages/Notifications/EmailStudio.vue'),
+        meta: { wide: true },
+    },
 ];
 
 const router = createRouter({

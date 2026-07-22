@@ -75,6 +75,11 @@ class PaymentRecoveredBenchmark extends BaseBenchMark
 
         $userId = (int) $grant['user_id'];
         $planId = $grant['plan_id'] ?? 0;
+        $renewalCount = (int) ($originalArgs[1] ?? 0);
+        $incident = $grant['meta']['payment_incident'] ?? [];
+        if (($incident['recovery_renewal_count'] ?? null) !== $renewalCount) {
+            return;
+        }
 
         $user = get_user_by('ID', $userId);
         if (!$user) {
@@ -126,7 +131,7 @@ class PaymentRecoveredBenchmark extends BaseBenchMark
                 continue;
             }
 
-            if ($grant['source_type'] === 'subscription' && $grant['source_id']) {
+            if (!empty($grant['meta']['payment_incident']['recovered_at'])) {
                 if ($this->isSubscriptionActive($grant)) {
                     return true;
                 }
@@ -142,7 +147,7 @@ class PaymentRecoveredBenchmark extends BaseBenchMark
     private function isSubscriptionActive(array $grant): bool
     {
         if ($grant['source_type'] !== 'subscription' || empty($grant['source_id'])) {
-            return true; // Non-subscription grants are considered recovered
+            return false;
         }
 
         if (!class_exists('\FluentCart\App\Models\Subscription')) {

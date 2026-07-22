@@ -63,5 +63,37 @@ namespace FChubMemberships\Tests\Unit\Modules {
             self::assertArrayHasKey('fluent_cart/integration/addons', $GLOBALS['_fchub_test_filters']);
             self::assertArrayHasKey('rest_api_init', $GLOBALS['_fchub_test_actions']);
         }
+
+        public function test_boot_runtime_reconciles_administrator_capability_when_database_is_current(): void
+        {
+            $GLOBALS['_fchub_test_options']['fchub_memberships_db_version'] = FCHUB_MEMBERSHIPS_DB_VERSION;
+            $GLOBALS['_fchub_test_registered_integrations'] = [];
+            $administrator = new class {
+                /** @var array<string, bool> */
+                private array $capabilities = [];
+
+                /** @var list<string> */
+                public array $addedCapabilities = [];
+
+                public function has_cap(string $capability): bool
+                {
+                    return $this->capabilities[$capability] ?? false;
+                }
+
+                public function add_cap(string $capability): void
+                {
+                    $this->capabilities[$capability] = true;
+                    $this->addedCapabilities[] = $capability;
+                }
+            };
+            $GLOBALS['_fchub_test_roles']['administrator'] = $administrator;
+
+            (new FluentCartRuntimeModule())->bootRuntime();
+
+            self::assertSame([], $GLOBALS['_fchub_test_dbdelta'], 'An equal DB version must skip schema migration.');
+            self::assertTrue($administrator->has_cap('manage_fchub_memberships'));
+            self::assertSame(['manage_fchub_memberships'], $administrator->addedCapabilities);
+            self::assertSame(['administrator'], $GLOBALS['_fchub_test_role_lookups']);
+        }
     }
 }

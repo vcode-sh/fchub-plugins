@@ -5,9 +5,21 @@ namespace FChubMemberships\Integration;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Http\Controllers\SettingsController;
+use FChubMemberships\Storage\GrantRepository;
 
 class FluentCommunitySync
 {
+    private GrantRepository $grants;
+    private FluentCommunityMappingPolicy $mappingPolicy;
+
+    public function __construct(
+        ?GrantRepository $grants = null,
+        ?FluentCommunityMappingPolicy $mappingPolicy = null
+    ) {
+        $this->grants = $grants ?? new GrantRepository();
+        $this->mappingPolicy = $mappingPolicy ?? new FluentCommunityMappingPolicy();
+    }
+
     public function register(): void
     {
         if (!defined('FLUENT_COMMUNITY_PLUGIN_VERSION')) {
@@ -60,7 +72,8 @@ class FluentCommunitySync
         $spaceMappings = $settings['fc_space_mappings'] ?? [];
         $spaceId = $spaceMappings[$planId] ?? null;
 
-        if ($spaceId && class_exists('FluentCommunity\App\Models\Space')) {
+        if ($spaceId && !$this->isResourceStillGranted($userId, (string) $spaceId, $spaceMappings)
+            && class_exists('FluentCommunity\App\Models\Space')) {
             $space = \FluentCommunity\App\Models\Space::find((int) $spaceId);
             if ($space) {
                 $space->removeMember($userId);
@@ -71,7 +84,8 @@ class FluentCommunitySync
             $badgeMappings = $settings['fc_badge_mappings'] ?? [];
             $badgeId = $badgeMappings[$planId] ?? null;
 
-            if ($badgeId && class_exists('FluentCommunity\App\Models\Badge')) {
+            if ($badgeId && !$this->isResourceStillGranted($userId, (string) $badgeId, $badgeMappings)
+                && class_exists('FluentCommunity\App\Models\Badge')) {
                 $badge = \FluentCommunity\App\Models\Badge::find((int) $badgeId);
                 if ($badge) {
                     $badge->removeFromUser($userId);
@@ -99,7 +113,8 @@ class FluentCommunitySync
         $planId = $grant['plan_id'] ?? 0;
         $spaceId = $spaceMappings[$planId] ?? null;
 
-        if ($spaceId && class_exists('FluentCommunity\App\Models\Space')) {
+        if ($spaceId && !$this->isResourceStillGranted((int) $grant['user_id'], (string) $spaceId, $spaceMappings)
+            && class_exists('FluentCommunity\App\Models\Space')) {
             $space = \FluentCommunity\App\Models\Space::find((int) $spaceId);
             if ($space) {
                 $space->removeMember($grant['user_id']);
@@ -110,7 +125,8 @@ class FluentCommunitySync
             $badgeMappings = $settings['fc_badge_mappings'] ?? [];
             $badgeId = $badgeMappings[$planId] ?? null;
 
-            if ($badgeId && class_exists('FluentCommunity\App\Models\Badge')) {
+            if ($badgeId && !$this->isResourceStillGranted((int) $grant['user_id'], (string) $badgeId, $badgeMappings)
+                && class_exists('FluentCommunity\App\Models\Badge')) {
                 $badge = \FluentCommunity\App\Models\Badge::find((int) $badgeId);
                 if ($badge) {
                     $badge->removeFromUser($grant['user_id']);
@@ -124,5 +140,12 @@ class FluentCommunitySync
         update_user_meta($userId, '_fchub_membership_status', $status);
         update_user_meta($userId, '_fchub_membership_plan_id', $planId);
         update_user_meta($userId, '_fchub_membership_updated', current_time('mysql'));
+    }
+
+    private function isResourceStillGranted(int $userId, string $resourceId, array $mappings): bool
+    {
+        $activePlanIds = array_keys($this->grants->getActiveByUserGroupedByPlan($userId));
+
+        return $this->mappingPolicy->isStillGranted($mappings, $resourceId, $activePlanIds);
     }
 }
