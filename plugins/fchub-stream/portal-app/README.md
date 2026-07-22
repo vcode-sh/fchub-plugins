@@ -1,5 +1,8 @@
 # FCHub Stream - Portal Integration
 
+> [!WARNING]
+> FCHub Stream is discontinued and no longer maintained. This code is retained as-is, without support or updates. See the [plugin README](../README.md) for the full status.
+
 Vue 3 frontend application for video upload functionality in FluentCommunity Portal.
 
 ## Overview

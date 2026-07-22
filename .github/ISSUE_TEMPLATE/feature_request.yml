@@ -2,6 +2,11 @@ name: Feature Request
 description: Got an idea? I'm listening. Probably.
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!IMPORTANT]
+        > FCHub Stream is discontinued and receives no support, new features, or updates. Stream requests are not accepted here; the GPLv2 source remains available if you want to fork it.
   - type: dropdown
     id: plugin
     attributes:
@@ -11,7 +16,6 @@ body:
         - Przelewy24 (fchub-p24)
         - Fakturownia (fchub-fakturownia)
         - Memberships (fchub-memberships)
-        - Stream (fchub-stream)
         - Wishlist (fchub-wishlist)
         - Multi-Currency (fchub-multi-currency)
         - Portal Extender (fchub-portal-extender)

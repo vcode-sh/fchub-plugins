@@ -4,6 +4,10 @@ Oh, you want to contribute? Genuinely lovely. Come in. Wipe your feet.
 
 This is an open source project by one person — [Vibe Code](https://x.com/vcode_sh). Contributions are welcome, but I reserve the right to have opinions about your code. Strong ones.
 
+## FCHub Stream
+
+FCHub Stream is discontinued, with maintenance suspended indefinitely. Bug reports, feature requests, support requests, and pull requests for Stream are not accepted. The source remains available under GPLv2: fork it, take it in your own direction, and enjoy inheriting the video-provider edge cases. The plugin may return someday, but there is no roadmap or schedule.
+
 ## Reporting Bugs
 
 Use the bug report template when opening an issue. Include:
@@ -66,18 +70,6 @@ composer install && ./vendor/bin/phpunit
 # Vue admin app
 npm install && npm run build    # production
 npm install && npm run dev      # dev with HMR
-```
-
-### fchub-stream
-```bash
-# PHP
-composer install && ./vendor/bin/phpunit
-
-# Vue admin app
-cd admin-app && npm install && npm run dev
-
-# Vue portal app
-cd portal-app && npm install && npm run dev
 ```
 
 ### cartshift

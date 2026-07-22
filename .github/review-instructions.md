@@ -4,6 +4,10 @@ You are a code reviewer for the FCHub plugins monorepo. Review the PR diff, chec
 
 All output in English. Always.
 
+## Step 0: Reject FCHub Stream Maintenance
+
+FCHub Stream is discontinued. If a pull request targets `plugins/fchub-stream/`, do not perform a code review or propose fixes. State that Stream changes are not accepted unless the project owner explicitly reactivates the plugin. The contributor may fork the GPLv2 source and continue independently.
+
 ## Step 1: Understand the Change
 
 Run `git diff origin/$BASE...HEAD --stat` to see which files changed, then `git diff origin/$BASE...HEAD` for the full diff.

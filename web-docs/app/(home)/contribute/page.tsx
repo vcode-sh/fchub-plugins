@@ -208,6 +208,14 @@ export default function ContributePage() {
             Contribute Code
           </h2>
           <div className="border rounded-md p-6 space-y-4">
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-muted-foreground">
+              <strong className="text-foreground">
+                FCHub Stream is discontinued.
+              </strong>{" "}
+              Stream issues and pull requests are not accepted. The GPLv2 source
+              remains available if you want to fork it and continue
+              independently.
+            </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center justify-center size-8 border rounded-sm bg-muted">
                 <Code className="size-4" />

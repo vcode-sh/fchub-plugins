@@ -76,7 +76,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
             },
             { text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
             {
-              text: "FCHub Stream",
+              text: "FCHub Stream (Discontinued)",
               url: "/docs/fchub-stream",
               icon: <SquarePlay size={16} />,
             },
@@ -190,7 +190,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
                     render={<Link href="/docs/fchub-stream" />}
                   >
                     <SquarePlay size={16} />
-                    FCHub Stream
+                    FCHub Stream (Discontinued)
                   </NavigationMenuLink>
                   <div className="flex items-center gap-1.5 rounded-sm p-2 text-sm text-muted-foreground/50 pointer-events-none [&_svg:not([class*='size-'])]:size-4">
                     <MessageSquare size={16} />

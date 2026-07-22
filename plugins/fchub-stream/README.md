@@ -1,5 +1,8 @@
 # FCHub - Stream
 
+> [!WARNING]
+> **Discontinued - maintenance suspended indefinitely.** FCHub Stream is retained as-is and receives no support, bug fixes, compatibility updates, security updates, or new releases. Use it at your own risk. The GPLv2 source remains available for anyone who wants to fork it and continue independently. The project may return someday, but there is no roadmap or schedule.
+
 Video streaming for [FluentCommunity](https://fluentcommunity.com). I built this because the WordPress media library treats video like an afterthought, and embedding YouTube links in a community portal feels like hosting a party in someone else's house.
 
 ## What it actually does

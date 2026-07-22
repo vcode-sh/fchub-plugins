@@ -1,7 +1,7 @@
 {
-  "title": "FCHub Stream",
+  "title": "FCHub Stream (Discontinued)",
   "root": true,
-  "description": "Direct video uploads for FluentCommunity.",
+  "description": "Discontinued and retained as-is without support or updates.",
   "pages": [
     "---Introduction---",
     "index",

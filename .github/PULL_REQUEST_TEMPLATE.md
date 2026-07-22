@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> FCHub Stream is discontinued. Pull requests targeting `plugins/fchub-stream/` are not reviewed or accepted unless the project owner explicitly reactivates the plugin. Forking the GPLv2 source and continuing independently is welcome.
+
 ## What changed?
 
 <!-- What does this PR do? Keep it short. -->

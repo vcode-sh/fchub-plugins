@@ -21,12 +21,16 @@ This whole thing runs on caffeine and spite. If any of these plugins saved you f
 | [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling. 15k lines of PHP and Vue so people can pay to read your blog | FluentCart |
 | [fchub-multi-currency](plugins/fchub-multi-currency/) | Display-layer multi-currency with exchange rates. Not everyone lives in USD-land, shocking I know | FluentCart |
 | [fchub-portal-extender](plugins/fchub-portal-extender/) | Custom portal pages without writing PHP. For the "I'm not a developer" crowd, and fair enough | FluentCart |
-| [fchub-stream](plugins/fchub-stream/) | Video streaming via Cloudflare Stream & Bunny.net. The WP media library handling video is a war crime | FluentCommunity |
+| [fchub-stream](plugins/fchub-stream/) | **Discontinued.** Video streaming via Cloudflare Stream & Bunny.net. Retained as-is, without support or updates | FluentCommunity |
 | [fchub-thank-you](plugins/fchub-thank-you/) | Per-product post-payment redirects. "Thank you for your order" is not a personality | FluentCart |
 | [fchub-wishlist](plugins/fchub-wishlist/) | Wishlists with guest sessions, portal support, FluentCRM automations. The basics, done properly | FluentCart |
 | [CartShift](plugins/cartshift/) | WooCommerce → FluentCart migrator. Products, orders, subscriptions, customers, coupons. Your escape hatch | Both |
 
 WordPress 6.7+. PHP 8.3+. Patience optional.
+
+### FCHub Stream status
+
+FCHub Stream is discontinued, with maintenance suspended indefinitely. It receives no support, bug fixes, compatibility updates, security updates, or new releases. The source and existing releases remain available under GPLv2, so anyone may fork it and continue in their own direction. I may return to it someday. There is no roadmap or schedule, because apparently even abandoned video plugins deserve fewer fictional deadlines.
 
 Docs, install guides, changelogs, screenshots — all at **[fchub.co](https://fchub.co)**. This README is not a documentation site and it's not going to pretend to be one.
 
@@ -83,12 +87,10 @@ MCP server: `fluentcart-mcp/v1.1.0` → npm publish + GitHub Release + Docker to
 cd plugins/fchub-p24 && composer install && ./vendor/bin/phpunit
 ```
 
-**Vue apps:**
+**Vue apps for maintained plugins:**
 ```bash
 cd plugins/fchub-memberships && npm install && npm run dev
 cd plugins/fchub-portal-extender && npm install && npm run dev
-cd plugins/fchub-stream/admin-app && npm install && npm run dev
-cd plugins/fchub-stream/portal-app && npm install && npm run dev
 ```
 
 **Docker:** Volume-mount plugins from this repo into a WordPress container. Edit file, refresh browser, see change. Revolutionary.

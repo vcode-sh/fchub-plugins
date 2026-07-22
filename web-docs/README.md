@@ -28,7 +28,7 @@ web-docs/
 ├── components/ui/        # shadcn/ui components
 ├── content/docs/         # MDX documentation content
 │   ├── fchub/            # Core plugin docs
-│   ├── fchub-stream/     # Video streaming plugin
+│   ├── fchub-stream/     # Discontinued video streaming plugin
 │   ├── fchub-p24/        # Przelewy24 payment gateway
 │   ├── fchub-fakturownia/# Invoice automation
 │   ├── fchub-memberships/# Membership plans
@@ -60,4 +60,3 @@ The image uses a multi-stage build: deps, build, then a minimal Alpine runner. `
 ## License
 
 GPLv2 or later.
-

@@ -43,6 +43,7 @@ type Plugin = {
   docsHref: string;
   downloadUrl?: string;
   comingSoon?: boolean;
+  discontinued?: boolean;
   hot?: boolean;
 };
 
@@ -56,10 +57,11 @@ const communityPlugins: Plugin[] = [
   {
     title: "FCHub Stream",
     description:
-      "Video uploads via Cloudflare Stream & Bunny.net. Because WP media and video don't mix.",
+      "Discontinued and retained as-is. Historical video uploads via Cloudflare Stream & Bunny.net.",
     icon: SquarePlay,
     docsHref: "/docs/fchub-stream",
     downloadUrl: versions["fchub-stream"].releaseUrl,
+    discontinued: true,
   },
   {
     title: "FCHub Chat",
@@ -210,6 +212,11 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
         <div className="flex items-center gap-2">
           <Icon className="size-4" />
           <CardTitle>{plugin.title}</CardTitle>
+          {plugin.discontinued && (
+            <Badge variant="destructive" className="ml-auto text-[10px] h-4">
+              Discontinued
+            </Badge>
+          )}
           {plugin.hot && (
             <Badge className="ml-auto text-[10px] h-4 bg-orange-500/15 text-orange-500 border-transparent">
               <Flame size={10} />
