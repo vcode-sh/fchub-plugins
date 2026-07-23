@@ -21,6 +21,7 @@ export const routeExpectations = [
   { path: '/drip', text: 'Drip Content' },
   { path: '/drip/calendar', text: 'Drip Calendar' },
   { path: '/reports', text: 'Reports' },
+  { path: '/integrations', text: 'Integrations' },
   { path: '/settings', text: 'Settings' },
   { path: '/settings/email-studio', text: 'Email Studio' },
 ]

@@ -5,6 +5,7 @@ export const WORKSPACE_NAV_ITEMS = [
   { to: '/content', label: 'Content' },
   { to: '/drip', label: 'Drip' },
   { to: '/reports', label: 'Reports' },
+  { to: '/integrations', label: 'Integrations' },
   { to: '/settings', label: 'Settings' },
 ]
 

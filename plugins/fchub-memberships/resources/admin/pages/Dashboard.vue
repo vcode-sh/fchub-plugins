@@ -94,7 +94,7 @@
         </div>
       </section>
 
-      <ProviderHealthCards />
+      <ProviderHealthCards compact />
 
       <section class="summary-grid" aria-label="Membership summary">
         <router-link to="/members" class="summary-metric">

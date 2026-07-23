@@ -10,6 +10,7 @@ describe('workspace navigation policy', () => {
       '/content',
       '/drip',
       '/reports',
+      '/integrations',
       '/settings',
     ])
   })
@@ -23,6 +24,7 @@ describe('workspace navigation policy', () => {
     ['/content', 'Content'],
     ['/drip/calendar', 'Drip'],
     ['/reports', 'Reports'],
+    ['/integrations', 'Integrations'],
     ['/settings', 'Settings'],
     ['/unknown', 'Dashboard'],
   ])('maps %s to the %s workspace', (path, label) => {

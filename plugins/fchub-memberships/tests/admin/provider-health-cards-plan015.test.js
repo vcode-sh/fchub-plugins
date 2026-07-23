@@ -1,6 +1,13 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProviderHealthCards from '@/components/dashboard/ProviderHealthCards.vue'
+
+const dashboardSource = fs.readFileSync(
+  path.resolve(process.cwd(), 'resources/admin/pages/Dashboard.vue'),
+  'utf8',
+)
 
 function provider(overrides = {}) {
   return {
@@ -31,8 +38,9 @@ function response(items) {
   }
 }
 
-function mountCards() {
+function mountCards(props = {}) {
   return mount(ProviderHealthCards, {
+    props,
     global: {
       stubs: {
         RouterLink: {
@@ -120,6 +128,31 @@ describe('ProviderHealthCards', () => {
       expect.stringContaining('/admin/providers'),
       expect.objectContaining({ method: 'GET' }),
     )
+  })
+
+  it('renders a compact dashboard summary that links to the dedicated integrations page', async () => {
+    global.fetch.mockResolvedValue(response([
+      provider({ value: 'wordpress_core', label: 'WordPress Core' }),
+      provider({ value: 'fluent_community', label: 'FluentCommunity' }),
+      provider({ value: 'fluentcrm', label: 'FluentCRM', status: 'degraded' }),
+      provider({ value: 'learndash', label: 'LearnDash', status: 'unverified' }),
+    ]))
+
+    const wrapper = mountCards({ compact: true })
+    await flushPromises()
+
+    expect(wrapper.classes()).toContain('provider-health--compact')
+    expect(wrapper.findAll('.provider-card')).toHaveLength(0)
+    expect(wrapper.text()).toContain('2 healthy')
+    expect(wrapper.text()).toContain('1 needs attention')
+    expect(wrapper.text()).toContain('1 not verified')
+    expect(wrapper.text()).not.toContain('WordPress Core')
+    expect(wrapper.get('a').attributes('href')).toBe('#/integrations')
+    expect(wrapper.get('a').text()).toContain('View integrations')
+  })
+
+  it('uses compact provider health on the dashboard', () => {
+    expect(dashboardSource).toContain('<ProviderHealthCards compact />')
   })
 
   it('renders an honest empty provider state', async () => {
