@@ -252,7 +252,7 @@ final class RepositoryCoverageTest extends PluginTestCase
         $GLOBALS['_fchub_test_wpdb_overrides']['get_var'] = static function (string $query) use (&$queries): int {
             $queries[] = $query;
             return match (true) {
-                str_contains($query, "result = 'success'") => 1,
+                str_contains($query, "state = 'succeeded'") => 1,
                 str_contains($query, 'grant_id = 10 AND source_type = \'order\' AND source_id = 77') => 0,
                 str_contains($query, 'grant_id = 10') => 2,
                 default => 0,
@@ -294,6 +294,11 @@ final class RepositoryCoverageTest extends PluginTestCase
             'trigger' => 'created',
             'subscription_id' => 123,
         ]));
+        self::assertSame('acquired', $eventLocks->claim(
+            'claim-hash',
+            ['order_id' => 99, 'feed_id' => 7, 'trigger' => 'created'],
+            'coverage-owner'
+        )->outcome);
         $eventLocks->recordFailure('hash', 'Broken');
         self::assertSame([['event_hash' => 'hash', 'order_id' => 99]], $eventLocks->getByOrderId(99));
         self::assertSame(1, $eventLocks->purgeOlderThan(30));
@@ -310,5 +315,6 @@ final class RepositoryCoverageTest extends PluginTestCase
         self::assertSame('failed', $updates[0][1]['result']);
         self::assertSame([['wp_fchub_membership_grant_sources', ['grant_id' => 10, 'source_type' => 'order', 'source_id' => 77]], ['wp_fchub_membership_grant_sources', ['grant_id' => 10]]], $deletes);
         self::assertStringContainsString('INSERT IGNORE INTO wp_fchub_membership_event_locks', implode("\n", $queries));
+        self::assertStringContainsString('INSERT INTO wp_fchub_membership_event_locks', implode("\n", $queries));
     }
 }

@@ -4,20 +4,27 @@ namespace FChubMemberships\Integration;
 
 defined('ABSPATH') || exit;
 
-use FChubMemberships\Http\Controllers\SettingsController;
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\PlanRuleRepository;
 
-class FluentCommunitySync
+final class FluentCommunitySync
 {
-    private GrantRepository $grants;
-    private FluentCommunityMappingPolicy $mappingPolicy;
+    private PlanRuleRepository $rules;
+
+    /** @var \Closure(int): ?string */
+    private \Closure $resourceTypeResolver;
+
+    private MembershipSettingsOptionCoordinator $settings;
 
     public function __construct(
-        ?GrantRepository $grants = null,
-        ?FluentCommunityMappingPolicy $mappingPolicy = null
+        ?PlanRuleRepository $rules = null,
+        ?callable $resourceTypeResolver = null,
+        ?MembershipSettingsOptionCoordinator $settings = null
     ) {
-        $this->grants = $grants ?? new GrantRepository();
-        $this->mappingPolicy = $mappingPolicy ?? new FluentCommunityMappingPolicy();
+        $this->rules = $rules ?? new PlanRuleRepository();
+        $this->resourceTypeResolver = $resourceTypeResolver !== null
+            ? \Closure::fromCallable($resourceTypeResolver)
+            : $this->resolveInstalledResourceType(...);
+        $this->settings = $settings ?? new MembershipSettingsOptionCoordinator();
     }
 
     public function register(): void
@@ -26,126 +33,226 @@ class FluentCommunitySync
             return;
         }
 
-        $settings = SettingsController::getSettings();
-        if (($settings['fc_enabled'] ?? 'no') !== 'yes') {
-            return;
-        }
+        $this->settings->synchronized(function (MembershipSettingsOptionCoordinator $coordinator): bool {
+            $settings = $coordinator->read();
+            if (($settings['fc_enabled'] ?? 'no') !== 'yes') {
+                return true;
+            }
 
-        add_action('fchub_memberships/grant_created', [$this, 'onGrantCreated'], 10, 3);
-        add_action('fchub_memberships/grant_revoked', [$this, 'onGrantRevoked'], 10, 4);
-        add_action('fchub_memberships/grant_paused', [$this, 'onGrantPaused'], 10, 2);
-        add_action('fchub_memberships/grant_resumed', [$this, 'onGrantResumed'], 10, 1);
-        add_action('fchub_memberships/grant_expired', [$this, 'onGrantExpired'], 10, 1);
+            return $this->migrateLegacyMappingsLocked($coordinator, $settings);
+        });
     }
 
-    public function onGrantCreated(int $userId, int $planId, array $context = []): void
+    /**
+     * Convert the legacy plan-to-space map into canonical plan rules.
+     *
+     * The saved map is cleared only after every missing rule has been written.
+     * Failed attempts retain both the compatibility payload and any canonical
+     * rule already created, so retries can deduplicate without removing access.
+     */
+    public function migrateLegacyMappings(?int $onlyPlanId = null): bool
     {
-        $this->updateUserMeta($userId, $planId, 'active');
+        $result = $this->settings->synchronized(
+            fn(MembershipSettingsOptionCoordinator $coordinator): bool => $this->migrateLegacyMappingsLocked(
+                $coordinator,
+                $coordinator->read(),
+                $onlyPlanId
+            )
+        );
 
-        $settings = SettingsController::getSettings();
-        $spaceMappings = $settings['fc_space_mappings'] ?? [];
-        $spaceId = $spaceMappings[$planId] ?? null;
+        if (!$result['success']) {
+            return false;
+        }
 
-        if ($spaceId && class_exists('FluentCommunity\App\Models\Space')) {
-            $space = \FluentCommunity\App\Models\Space::find((int) $spaceId);
-            if ($space) {
-                $space->addMember($userId, 'member');
+        return $result['value'] === true;
+    }
+
+    /** @return array{ready:bool, reason:string, message?:string} */
+    public function ensurePlanReady(int $planId): array
+    {
+        $result = $this->settings->synchronized(function (MembershipSettingsOptionCoordinator $coordinator) use ($planId): array {
+            $settings = $coordinator->read();
+            if (($settings['fc_enabled'] ?? 'no') !== 'yes') {
+                return ['ready' => true, 'reason' => 'integration_disabled'];
+            }
+
+            $mappings = $settings['fc_space_mappings'] ?? [];
+            $resourceId = is_array($mappings) ? ($mappings[$planId] ?? null) : null;
+            if ($resourceId === null || (is_string($resourceId) && trim($resourceId) === '')) {
+                return ['ready' => true, 'reason' => 'no_legacy_mapping'];
+            }
+
+            $this->migrateLegacyMappingsLocked($coordinator, $settings, $planId);
+            if ($this->canonicalEntitlementExists($planId, $resourceId)) {
+                return ['ready' => true, 'reason' => 'canonical_rule_present'];
+            }
+
+            return [
+                'ready' => false,
+                'reason' => 'legacy_mapping_not_converted',
+                'message' => __('The legacy FluentCommunity mapping could not be converted to a canonical plan rule.', 'fchub-memberships'),
+            ];
+        });
+
+        if (!$result['success']) {
+            return [
+                'ready' => false,
+                'reason' => $result['reason'] ?? 'legacy_mapping_check_failed',
+                'message' => __('The legacy FluentCommunity mapping could not be checked safely.', 'fchub-memberships'),
+            ];
+        }
+
+        return $result['value'];
+    }
+
+    private function migrateLegacyMappingsLocked(
+        MembershipSettingsOptionCoordinator $coordinator,
+        array $settings,
+        ?int $onlyPlanId = null
+    ): bool {
+        $mappings = $settings['fc_space_mappings'] ?? [];
+        if (!is_array($mappings)) {
+            return false;
+        }
+
+        if ($onlyPlanId !== null) {
+            $mappings = array_key_exists($onlyPlanId, $mappings)
+                ? [$onlyPlanId => $mappings[$onlyPlanId]]
+                : [];
+        }
+
+        if ($mappings === []) {
+            return true;
+        }
+
+        $candidates = $this->migrationCandidates($mappings);
+        if ($candidates === null) {
+            return false;
+        }
+
+        foreach ($candidates as $candidate) {
+            if ($this->canonicalRuleExists($candidate)) {
+                continue;
+            }
+
+            $ruleId = $this->rules->create([
+                'plan_id' => $candidate['plan_id'],
+                'provider' => 'fluent_community',
+                'resource_type' => $candidate['resource_type'],
+                'resource_id' => $candidate['resource_id'],
+                'drip_type' => 'immediate',
+                'drip_delay_days' => 0,
+                'meta' => ['legacy_source' => 'fc_space_mappings'],
+            ]);
+
+            if ($ruleId <= 0) {
+                return false;
             }
         }
 
-        $badgeMappings = $settings['fc_badge_mappings'] ?? [];
-        $badgeId = $badgeMappings[$planId] ?? null;
-
-        if ($badgeId && class_exists('FluentCommunity\App\Models\Badge')) {
-            $badge = \FluentCommunity\App\Models\Badge::find((int) $badgeId);
-            if ($badge) {
-                $badge->assignToUser($userId);
-            }
-        }
-    }
-
-    public function onGrantRevoked(array $grants, int $planId, int $userId, string $reason = ''): void
-    {
-        $this->updateUserMeta($userId, $planId, 'revoked');
-
-        $settings = SettingsController::getSettings();
-        $spaceMappings = $settings['fc_space_mappings'] ?? [];
-        $spaceId = $spaceMappings[$planId] ?? null;
-
-        if ($spaceId && !$this->isResourceStillGranted($userId, (string) $spaceId, $spaceMappings)
-            && class_exists('FluentCommunity\App\Models\Space')) {
-            $space = \FluentCommunity\App\Models\Space::find((int) $spaceId);
-            if ($space) {
-                $space->removeMember($userId);
-            }
+        $next = $settings;
+        if ($onlyPlanId === null) {
+            $next['fc_space_mappings'] = [];
+        } else {
+            unset($next['fc_space_mappings'][$onlyPlanId]);
         }
 
-        if (($settings['fc_remove_badge_on_revoke'] ?? 'no') === 'yes') {
-            $badgeMappings = $settings['fc_badge_mappings'] ?? [];
-            $badgeId = $badgeMappings[$planId] ?? null;
+        return $coordinator->compareAndSwap($settings, $next)['success'];
+    }
 
-            if ($badgeId && !$this->isResourceStillGranted($userId, (string) $badgeId, $badgeMappings)
-                && class_exists('FluentCommunity\App\Models\Badge')) {
-                $badge = \FluentCommunity\App\Models\Badge::find((int) $badgeId);
-                if ($badge) {
-                    $badge->removeFromUser($userId);
-                }
+    /**
+     * @return list<array{plan_id:int, resource_type:string, resource_id:string}>|null
+     */
+    private function migrationCandidates(array $mappings): ?array
+    {
+        $candidates = [];
+
+        foreach ($mappings as $planId => $resourceId) {
+            if ($resourceId === null || (is_string($resourceId) && trim($resourceId) === '')) {
+                continue;
             }
+
+            if (!$this->isPositiveInteger($planId) || !$this->isPositiveInteger($resourceId)) {
+                return null;
+            }
+
+            $planId = (int) $planId;
+            $resourceId = (int) $resourceId;
+            $installedType = ($this->resourceTypeResolver)($resourceId);
+            $resourceType = match ($installedType) {
+                'community' => 'fc_space',
+                'course' => 'fc_course',
+                default => null,
+            };
+
+            if ($resourceType === null) {
+                return null;
+            }
+
+            $key = $planId . ':' . $resourceType . ':' . $resourceId;
+            $candidates[$key] = [
+                'plan_id' => $planId,
+                'resource_type' => $resourceType,
+                'resource_id' => (string) $resourceId,
+            ];
         }
+
+        return array_values($candidates);
     }
 
-    public function onGrantPaused(array $grant, string $reason = ''): void
+    /** @param array{plan_id:int, resource_type:string, resource_id:string} $candidate */
+    private function canonicalRuleExists(array $candidate): bool
     {
-        $this->updateUserMeta($grant['user_id'], $grant['plan_id'] ?? 0, 'paused');
-    }
-
-    public function onGrantResumed(array $grant): void
-    {
-        $this->updateUserMeta($grant['user_id'], $grant['plan_id'] ?? 0, 'active');
-    }
-
-    public function onGrantExpired(array $grant): void
-    {
-        $this->updateUserMeta($grant['user_id'], $grant['plan_id'] ?? 0, 'expired');
-
-        $settings = SettingsController::getSettings();
-        $spaceMappings = $settings['fc_space_mappings'] ?? [];
-        $planId = $grant['plan_id'] ?? 0;
-        $spaceId = $spaceMappings[$planId] ?? null;
-
-        if ($spaceId && !$this->isResourceStillGranted((int) $grant['user_id'], (string) $spaceId, $spaceMappings)
-            && class_exists('FluentCommunity\App\Models\Space')) {
-            $space = \FluentCommunity\App\Models\Space::find((int) $spaceId);
-            if ($space) {
-                $space->removeMember($grant['user_id']);
+        foreach ($this->rules->getByPlanId($candidate['plan_id']) as $rule) {
+            if (($rule['provider'] ?? '') === 'fluent_community'
+                && ($rule['resource_type'] ?? '') === $candidate['resource_type']
+                && (string) ($rule['resource_id'] ?? '') === $candidate['resource_id']
+            ) {
+                return true;
             }
         }
 
-        if (($settings['fc_remove_badge_on_revoke'] ?? 'no') === 'yes') {
-            $badgeMappings = $settings['fc_badge_mappings'] ?? [];
-            $badgeId = $badgeMappings[$planId] ?? null;
+        return false;
+    }
 
-            if ($badgeId && !$this->isResourceStillGranted((int) $grant['user_id'], (string) $badgeId, $badgeMappings)
-                && class_exists('FluentCommunity\App\Models\Badge')) {
-                $badge = \FluentCommunity\App\Models\Badge::find((int) $badgeId);
-                if ($badge) {
-                    $badge->removeFromUser($grant['user_id']);
-                }
+    private function canonicalEntitlementExists(int $planId, mixed $resourceId): bool
+    {
+        if (!$this->isPositiveInteger($resourceId)) {
+            return false;
+        }
+
+        $resourceId = (string) (int) $resourceId;
+        foreach ($this->rules->getByPlanId($planId) as $rule) {
+            if (($rule['provider'] ?? '') === 'fluent_community'
+                && in_array(($rule['resource_type'] ?? ''), ['fc_space', 'fc_course'], true)
+                && (string) ($rule['resource_id'] ?? '') === $resourceId
+            ) {
+                return true;
             }
         }
+
+        return false;
     }
 
-    private function updateUserMeta(int $userId, int $planId, string $status): void
+    private function resolveInstalledResourceType(int $resourceId): ?string
     {
-        update_user_meta($userId, '_fchub_membership_status', $status);
-        update_user_meta($userId, '_fchub_membership_plan_id', $planId);
-        update_user_meta($userId, '_fchub_membership_updated', current_time('mysql'));
+        if (!class_exists('FluentCommunity\\App\\Models\\BaseSpace')) {
+            return null;
+        }
+
+        try {
+            $space = \FluentCommunity\App\Models\BaseSpace::withoutGlobalScopes()->find($resourceId);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $type = (string) ($space->type ?? '');
+        return in_array($type, ['community', 'course'], true) ? $type : null;
     }
 
-    private function isResourceStillGranted(int $userId, string $resourceId, array $mappings): bool
+    private function isPositiveInteger(mixed $value): bool
     {
-        $activePlanIds = array_keys($this->grants->getActiveByUserGroupedByPlan($userId));
-
-        return $this->mappingPolicy->isStillGranted($mappings, $resourceId, $activePlanIds);
+        return (is_int($value) && $value > 0)
+            || (is_string($value) && ctype_digit($value) && (int) $value > 0);
     }
 }

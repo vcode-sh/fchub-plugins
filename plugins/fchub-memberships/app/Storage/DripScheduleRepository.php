@@ -2,16 +2,20 @@
 
 namespace FChubMemberships\Storage;
 
+use FChubMemberships\Support\Clock;
+
 defined('ABSPATH') || exit;
 
 class DripScheduleRepository
 {
     private string $table;
+    private Clock $clock;
 
-    public function __construct()
+    public function __construct(?Clock $clock = null)
     {
         global $wpdb;
         $this->table = $wpdb->prefix . 'fchub_membership_drip_notifications';
+        $this->clock = $clock ?? new Clock();
     }
 
     public function find(int $id): ?array
@@ -54,7 +58,7 @@ class DripScheduleRepository
     public function getPendingNotifications(int $limit = 50): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->clock->storage($this->clock->now());
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table}
@@ -78,9 +82,41 @@ class DripScheduleRepository
         global $wpdb;
         return $wpdb->update(
             $this->table,
-            ['status' => 'sent', 'sent_at' => current_time('mysql')],
+            ['status' => 'sent', 'sent_at' => $this->clock->storage($this->clock->now())],
             ['id' => $id]
         ) !== false;
+    }
+
+    public function markDeferred(int $id): bool
+    {
+        global $wpdb;
+        return $wpdb->update(
+            $this->table,
+            ['status' => 'deferred'],
+            ['id' => $id]
+        ) !== false;
+    }
+
+    public function markCancelled(int $id): bool
+    {
+        global $wpdb;
+        return $wpdb->update(
+            $this->table,
+            ['status' => 'cancelled'],
+            ['id' => $id]
+        ) !== false;
+    }
+
+    public function releaseDeferredForGrant(int $grantId): int
+    {
+        global $wpdb;
+        $released = $wpdb->update(
+            $this->table,
+            ['status' => 'pending'],
+            ['grant_id' => $grantId, 'status' => 'deferred']
+        );
+
+        return $released === false ? 0 : (int) $released;
     }
 
     /**
@@ -108,9 +144,8 @@ class DripScheduleRepository
         ];
 
         if ($retryCount <= $maxRetries && isset($backoffMinutes[$retryCount])) {
-            $update['next_retry_at'] = gmdate(
-                'Y-m-d H:i:s',
-                time() + ($backoffMinutes[$retryCount] * 60)
+            $update['next_retry_at'] = $this->clock->storage(
+                $this->clock->plusMinutes($backoffMinutes[$retryCount])
             );
         } else {
             $update['next_retry_at'] = null;

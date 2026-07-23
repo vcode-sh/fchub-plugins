@@ -5,10 +5,22 @@ namespace FChubMemberships\Storage;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Support\Constants;
+use FChubMemberships\Domain\AccessEvaluator;
 
 class ProtectionRuleRepository
 {
+    private const CACHE_GROUP = 'fchub_memberships';
+    private const ANY_RULE_CACHE_KEY = 'protection_rules:any';
+
     private string $table;
+
+    /** @var array<int, array<string, mixed>|null> */
+    private static array $byId = [];
+
+    /** @var array<string, array<string, mixed>|null> */
+    private static array $byResource = [];
+
+    private static ?object $cacheContext = null;
 
     public function __construct()
     {
@@ -18,25 +30,54 @@ class ProtectionRuleRepository
 
     public function find(int $id): ?array
     {
+        $this->ensureCacheContext();
+        if (array_key_exists($id, self::$byId)) {
+            return self::$byId[$id];
+        }
+
         global $wpdb;
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read protection rule.');
+        }
 
-        return $row ? $this->hydrate($row) : null;
+        $rule = $row ? $this->hydrate($row) : null;
+        self::$byId[$id] = $rule;
+        if ($rule !== null) {
+            self::$byResource[$this->resourceKey($rule['resource_type'], $rule['resource_id'])] = $rule;
+        }
+
+        return $rule;
     }
 
     public function findByResource(string $resourceType, string $resourceId): ?array
     {
+        $this->ensureCacheContext();
+        $cacheKey = $this->resourceKey($resourceType, $resourceId);
+        if (array_key_exists($cacheKey, self::$byResource)) {
+            return self::$byResource[$cacheKey];
+        }
+
         global $wpdb;
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$this->table} WHERE resource_type = %s AND resource_id = %s",
             $resourceType,
             $resourceId
         ), ARRAY_A);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read protection rule.');
+        }
 
-        return $row ? $this->hydrate($row) : null;
+        $rule = $row ? $this->hydrate($row) : null;
+        self::$byResource[$cacheKey] = $rule;
+        if ($rule !== null) {
+            self::$byId[(int) $rule['id']] = $rule;
+        }
+
+        return $rule;
     }
 
     public function all(array $filters = []): array
@@ -57,8 +98,16 @@ class ProtectionRuleRepository
         }
 
         if (!empty($filters['plan_id'])) {
-            $where[] = "(plan_ids IS NULL OR plan_ids LIKE %s)";
-            $params[] = '%' . $wpdb->esc_like('"' . $filters['plan_id'] . '"') . '%';
+            $where[] = "(
+                plan_ids IS NULL
+                OR plan_ids = ''
+                OR plan_ids = '[]'
+                OR (
+                    JSON_VALID(plan_ids)
+                    AND JSON_CONTAINS(plan_ids, %s) = 1
+                )
+            )";
+            $params[] = wp_json_encode((int) $filters['plan_id']);
         }
 
         if (!empty($filters['search'])) {
@@ -80,7 +129,11 @@ class ProtectionRuleRepository
         }
 
         $rows = $wpdb->get_results($sql, ARRAY_A);
-        return array_map([$this, 'hydrate'], $rows ?: []);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read protection rules.');
+        }
+
+        return $this->hydrateMany($rows ?: []);
     }
 
     public function count(array $filters = []): int
@@ -101,8 +154,16 @@ class ProtectionRuleRepository
         }
 
         if (!empty($filters['plan_id'])) {
-            $where[] = "(plan_ids IS NULL OR plan_ids LIKE %s)";
-            $params[] = '%' . $wpdb->esc_like('"' . $filters['plan_id'] . '"') . '%';
+            $where[] = "(
+                plan_ids IS NULL
+                OR plan_ids = ''
+                OR plan_ids = '[]'
+                OR (
+                    JSON_VALID(plan_ids)
+                    AND JSON_CONTAINS(plan_ids, %s) = 1
+                )
+            )";
+            $params[] = wp_json_encode((int) $filters['plan_id']);
         }
 
         if (!empty($filters['search'])) {
@@ -116,7 +177,12 @@ class ProtectionRuleRepository
             $sql = $wpdb->prepare($sql, ...$params);
         }
 
-        return (int) $wpdb->get_var($sql);
+        $count = $wpdb->get_var($sql);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to count protection rules.');
+        }
+
+        return (int) $count;
     }
 
     /**
@@ -143,6 +209,9 @@ class ProtectionRuleRepository
              GROUP BY resource_type",
             ARRAY_A
         );
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to summarise protection rules.');
+        }
 
         $summary = [
             'total_rules' => 0,
@@ -195,7 +264,11 @@ class ProtectionRuleRepository
             'updated_at'          => $now,
         ];
 
-        $wpdb->insert($this->table, $insert);
+        $created = $wpdb->insert($this->table, $insert);
+        if ($created !== false) {
+            self::invalidateAfterWrite();
+        }
+
         return (int) $wpdb->insert_id;
     }
 
@@ -229,13 +302,23 @@ class ProtectionRuleRepository
             $update['meta'] = wp_json_encode($data['meta'] ?? []);
         }
 
-        return $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        $updated = $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        if ($updated) {
+            self::invalidateAfterWrite();
+        }
+
+        return $updated;
     }
 
     public function delete(int $id): bool
     {
         global $wpdb;
-        return $wpdb->delete($this->table, ['id' => $id]) !== false;
+        $deleted = $wpdb->delete($this->table, ['id' => $id]) !== false;
+        if ($deleted) {
+            self::invalidateAfterWrite();
+        }
+
+        return $deleted;
     }
 
     public function createOrUpdate(string $resourceType, string $resourceId, array $data): int
@@ -258,6 +341,23 @@ class ProtectionRuleRepository
     public function isProtected(string $resourceType, string $resourceId): bool
     {
         return $this->findByResource($resourceType, $resourceId) !== null;
+    }
+
+    public function hasAnyRules(): bool
+    {
+        $cached = wp_cache_get(self::ANY_RULE_CACHE_KEY, self::CACHE_GROUP);
+        if ($cached !== false) {
+            return (bool) $cached;
+        }
+
+        global $wpdb;
+        $hasRules = (bool) $wpdb->get_var("SELECT EXISTS(SELECT 1 FROM {$this->table} LIMIT 1)");
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to determine whether protection rules exist.');
+        }
+
+        wp_cache_set(self::ANY_RULE_CACHE_KEY, $hasRules ? 1 : 0, self::CACHE_GROUP);
+        return $hasRules;
     }
 
     /**
@@ -341,6 +441,52 @@ class ProtectionRuleRepository
         }
 
         return array_unique($postIds);
+    }
+
+    public static function clearCache(): void
+    {
+        self::$byId = [];
+        self::$byResource = [];
+        self::$cacheContext = null;
+        wp_cache_delete(self::ANY_RULE_CACHE_KEY, self::CACHE_GROUP);
+    }
+
+    private static function invalidateAfterWrite(): void
+    {
+        self::clearCache();
+        AccessEvaluator::clearCache();
+    }
+
+    /** @param array<int, array<string, mixed>> $rows */
+    private function hydrateMany(array $rows): array
+    {
+        $this->ensureCacheContext();
+        $rules = [];
+        foreach ($rows as $row) {
+            $rule = $this->hydrate($row);
+            self::$byId[(int) $rule['id']] = $rule;
+            self::$byResource[$this->resourceKey($rule['resource_type'], $rule['resource_id'])] = $rule;
+            $rules[] = $rule;
+        }
+
+        return $rules;
+    }
+
+    private function resourceKey(string $resourceType, string $resourceId): string
+    {
+        return $resourceType . "\0" . $resourceId;
+    }
+
+    private function ensureCacheContext(): void
+    {
+        global $wpdb;
+        if (self::$cacheContext === $wpdb) {
+            return;
+        }
+
+        self::$byId = [];
+        self::$byResource = [];
+        self::$cacheContext = $wpdb;
     }
 
     /**

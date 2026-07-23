@@ -55,7 +55,7 @@ final class Task6LifecycleIntegrityTest extends PluginTestCase
         self::assertSame('remote_failure', $result['errors'][0]['provider_result']['code']);
         self::assertSame([], $hookCalls);
         self::assertSame([], $GLOBALS['_fchub_test_mails']);
-        self::assertSame('Membership plan partially revoked', $order->logs[0][0]);
+        self::assertSame('Membership plan revocation partially processed', $order->logs[0][0]);
         self::assertSame('warning', $order->logs[0][2]);
     }
 
@@ -128,6 +128,53 @@ final class Task6LifecycleIntegrityTest extends PluginTestCase
         self::assertSame(0, $hookCalls);
     }
 
+    public function test_mixed_grace_start_suppresses_the_batch_hook_when_one_grant_fails(): void
+    {
+        $hookCalls = 0;
+        $GLOBALS['_fchub_test_actions']['fchub_memberships/grace_period_started'] = [
+            static function () use (&$hookCalls): void {
+                $hookCalls++;
+            },
+        ];
+        $repository = new Task6GrantRepository([
+            $this->grant(71, '41'),
+            $this->grant(72, '42'),
+        ]);
+        $repository->failedUpdateIds = [72];
+
+        $result = $this->revocationService($repository->grants, $repository)->revokePlan(17, 5, [
+            'grace_period_days' => 7,
+        ]);
+
+        self::assertSame(1, $result['grace_started']);
+        self::assertSame(1, $result['failed']);
+        self::assertTrue($result['partial']);
+        self::assertSame(0, $hookCalls);
+    }
+
+    public function test_grace_expiry_preserves_preexisting_and_unknown_provider_access(): void
+    {
+        Task6FakeAdapter::$access = ['41' => true, '42' => true];
+        $repository = new Task6GrantRepository([
+            $this->grant(71, '41', [
+                'meta' => ['provider_access_owner' => 'preexisting'],
+                'cancellation_reason' => 'Grace ended',
+            ]),
+            $this->grant(72, '42', [
+                'meta' => [],
+                'cancellation_reason' => 'Grace ended',
+            ]),
+        ]);
+        $repository->dueGrants = $repository->grants;
+
+        $revoked = $this->revocationService($repository->grants, $repository)->revokeExpiredGracePeriodGrants();
+
+        self::assertSame(2, $revoked);
+        self::assertSame(0, Task6FakeAdapter::$checkCalls);
+        self::assertSame(0, Task6FakeAdapter::$revokeCalls);
+        self::assertSame([71, 72], array_column($repository->updates, 0));
+    }
+
     public function test_bulk_wrappers_do_not_count_structured_failures_as_success(): void
     {
         $service = new class extends AccessGrantService {
@@ -175,8 +222,12 @@ final class Task6LifecycleIntegrityTest extends PluginTestCase
         $service = new MembershipModeService($repository, new Task6PlanRepository());
         $calls = [];
 
-        $result = $service->enforce(17, 9, ['id' => 9, 'level' => 30], [], static function (int $userId, int $planId) use (&$calls): array {
-            $calls[] = $planId;
+        $result = $service->enforce(17, 9, ['id' => 9, 'level' => 30], [], static function (
+            int $userId,
+            int $planId,
+            array $context
+        ) use (&$calls): array {
+            $calls[] = [$planId, $context];
             return $planId === 2
                 ? ['success' => false, 'partial' => false, 'revoked' => 0, 'retained' => 0, 'failed' => 1, 'errors' => [['message' => 'Detach failed']]]
                 : ['success' => true, 'partial' => false, 'revoked' => 1, 'retained' => 0, 'failed' => 0, 'errors' => []];
@@ -185,7 +236,9 @@ final class Task6LifecycleIntegrityTest extends PluginTestCase
         self::assertSame('replacement_revoke_failed', $result['reason']);
         self::assertTrue($result['blocked']);
         self::assertTrue($result['partial']);
-        self::assertSame([1, 2], $calls);
+        self::assertSame([1, 2], array_column($calls, 0));
+        self::assertSame(0, $calls[0][1]['grace_period_days']);
+        self::assertSame(0, $calls[1][1]['grace_period_days']);
         self::assertSame(0, $hookCalls);
     }
 
@@ -203,20 +256,79 @@ final class Task6LifecycleIntegrityTest extends PluginTestCase
         $repository->highestLevel = 10;
         $plans = new Task6PlanRepository([1 => ['id' => 1, 'level' => 10]]);
         $service = new MembershipModeService($repository, $plans);
+        $contexts = [];
 
-        $result = $service->enforce(17, 9, ['id' => 9, 'level' => 30], [], static fn(): array => [
-            'success' => false,
-            'partial' => false,
-            'revoked' => 0,
-            'retained' => 0,
-            'failed' => 1,
-            'errors' => [['message' => 'Detach failed']],
-        ]);
+        $result = $service->enforce(
+            17,
+            9,
+            ['id' => 9, 'level' => 30],
+            [],
+            static function (int $userId, int $planId, array $context) use (&$contexts): array {
+                $contexts[] = $context;
+                return [
+                    'success' => false,
+                    'partial' => false,
+                    'revoked' => 0,
+                    'retained' => 0,
+                    'failed' => 1,
+                    'errors' => [['message' => 'Detach failed']],
+                ];
+            }
+        );
 
         self::assertSame('upgrade_revoke_failed', $result['reason']);
         self::assertTrue($result['blocked']);
         self::assertSame(1, $result['failed']);
+        self::assertSame(0, $contexts[0]['grace_period_days']);
         self::assertSame(0, $hookCalls);
+    }
+
+    public function test_exclusive_replacement_blocks_when_revoke_reports_no_terminal_closure(): void
+    {
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = ['membership_mode' => 'exclusive'];
+        $repository = new Task6GrantRepository();
+        $repository->activePlanIds = [1, 9];
+        $service = new MembershipModeService($repository, new Task6PlanRepository());
+
+        $result = $service->enforce(17, 9, ['id' => 9, 'level' => 30], [], static fn(): array => [
+            'success' => true,
+            'partial' => false,
+            'revoked' => 0,
+            'grace_started' => 0,
+            'retained' => 0,
+            'failed' => 0,
+            'errors' => [],
+        ]);
+
+        self::assertSame('replacement_revoke_incomplete', $result['reason']);
+        self::assertTrue($result['blocked']);
+        self::assertSame([], $result['revoked_plan_ids']);
+    }
+
+    public function test_upgrade_blocks_when_revoke_reports_no_terminal_closure(): void
+    {
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = ['membership_mode' => 'upgrade_only'];
+        $repository = new Task6GrantRepository();
+        $repository->activePlanIds = [1, 9];
+        $repository->highestLevel = 10;
+        $service = new MembershipModeService(
+            $repository,
+            new Task6PlanRepository([1 => ['id' => 1, 'level' => 10]])
+        );
+
+        $result = $service->enforce(17, 9, ['id' => 9, 'level' => 30], [], static fn(): array => [
+            'success' => true,
+            'partial' => false,
+            'revoked' => 0,
+            'grace_started' => 0,
+            'retained' => 0,
+            'failed' => 0,
+            'errors' => [],
+        ]);
+
+        self::assertSame('upgrade_revoke_incomplete', $result['reason']);
+        self::assertTrue($result['blocked']);
+        self::assertSame([], $result['revoked_plan_ids']);
     }
 
     public function test_idempotent_provider_revoke_is_not_compensated_when_local_close_fails(): void
@@ -412,6 +524,8 @@ final class Task6GrantRepository extends GrantRepository
     public array $activePlanIds = [];
     public int $highestLevel = 0;
     public bool $throwOnUpdate = false;
+    /** @var list<int> */
+    public array $failedUpdateIds = [];
 
     public function __construct(array $grants = [])
     {
@@ -432,6 +546,9 @@ final class Task6GrantRepository extends GrantRepository
     {
         if ($this->throwOnUpdate) {
             throw new \RuntimeException('Database unavailable');
+        }
+        if (in_array($id, $this->failedUpdateIds, true)) {
+            return false;
         }
         $this->updates[] = [$id, $data];
         return true;

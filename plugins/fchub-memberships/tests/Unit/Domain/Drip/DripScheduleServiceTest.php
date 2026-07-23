@@ -5,12 +5,148 @@ declare(strict_types=1);
 namespace FChubMemberships\Tests\Unit\Domain\Drip;
 
 use FChubMemberships\Domain\Drip\DripScheduleService;
+use FChubMemberships\Domain\ProviderOperationOutcome;
+use FChubMemberships\Domain\ProviderOperationWorker;
 use FChubMemberships\Storage\DripScheduleRepository;
 use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class DripScheduleServiceTest extends PluginTestCase
 {
+    public function test_due_external_drip_unlocks_exact_provider_operation_before_success_effects(): void
+    {
+        $sent = [];
+        $drips = new class($sent) extends DripScheduleRepository {
+            public function __construct(private array &$sent)
+            {
+            }
+
+            public function getPendingNotifications(int $limit = 50): array
+            {
+                return [[
+                    'id' => 9,
+                    'grant_id' => 71,
+                    'user_id' => 17,
+                    'retry_count' => 0,
+                    'plan_rule_id' => 12,
+                    'notify_at' => '2026-03-14 12:30:00',
+                ]];
+            }
+
+            public function markSent(int $id): bool
+            {
+                $this->sent[] = $id;
+                return true;
+            }
+
+            public function getByGrantId(int $grantId): array
+            {
+                return [];
+            }
+        };
+        $grants = new class extends GrantRepository {
+            public function __construct()
+            {
+            }
+
+            public function find(int $id): ?array
+            {
+                return [
+                    'id' => 71,
+                    'user_id' => 17,
+                    'status' => 'active',
+                    'provider' => 'fluentcrm',
+                    'resource_type' => 'fluentcrm_tag',
+                    'resource_id' => '41',
+                    'meta' => [],
+                ];
+            }
+        };
+        $worker = new Task7DripProviderWorker([9 => ProviderOperationOutcome::applied()]);
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = ['email_drip_unlocked' => 'no'];
+
+        $processed = (new DripScheduleService($drips, $grants, null, $worker))->processNotifications();
+
+        self::assertSame(1, $processed);
+        self::assertSame([9], $sent);
+        self::assertSame([71], $worker->grantIds);
+        self::assertSame(['2026-03-14 12:30:00'], $worker->notifyAt);
+    }
+
+    public function test_retryable_provider_unlock_suppresses_drip_success_effects(): void
+    {
+        $sent = [];
+        $failed = [];
+        $drips = new class($sent, $failed) extends DripScheduleRepository {
+            public function __construct(private array &$sent, private array &$failed)
+            {
+            }
+
+            public function getPendingNotifications(int $limit = 50): array
+            {
+                return [['id' => 9, 'grant_id' => 71, 'user_id' => 17, 'retry_count' => 0, 'plan_rule_id' => 12]];
+            }
+
+            public function markSent(int $id): bool
+            {
+                $this->sent[] = $id;
+                return true;
+            }
+
+            public function markFailed(int $id): bool
+            {
+                $this->failed[] = $id;
+                return true;
+            }
+
+            public function getByGrantId(int $grantId): array
+            {
+                return [];
+            }
+        };
+        $grants = new class extends GrantRepository {
+            public function __construct()
+            {
+            }
+
+            public function find(int $id): ?array
+            {
+                return [
+                    'id' => 71,
+                    'user_id' => 17,
+                    'status' => 'active',
+                    'provider' => 'fluent_community',
+                    'resource_type' => 'fc_space',
+                    'resource_id' => '41',
+                    'meta' => [],
+                ];
+            }
+        };
+        $worker = new Task7DripProviderWorker([
+            9 => ProviderOperationOutcome::retryableFailure('provider_operation_failed', 'Provider operation failed.'),
+        ]);
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = ['email_drip_unlocked' => 'no'];
+
+        $processed = (new DripScheduleService($drips, $grants, null, $worker))->processNotifications();
+
+        self::assertSame(0, $processed);
+        self::assertSame([], $sent);
+        self::assertSame([9], $failed);
+    }
+
+    public function test_delayed_notification_uses_site_local_calendar_day(): void
+    {
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-28 12:30:00', $timezone), $timezone);
+        $service = new DripScheduleService(null, null, $clock);
+        $method = new \ReflectionMethod($service, 'calculateNotifyAt');
+
+        $result = $method->invoke($service, ['drip_type' => 'delayed', 'drip_delay_days' => 1]);
+
+        self::assertSame('2026-03-29 12:30:00', $result);
+    }
+
     private function inject(DripScheduleService $service, DripScheduleRepository $dripRepo, GrantRepository $grantRepo): void
     {
         $dripReflection = new \ReflectionProperty(DripScheduleService::class, 'dripRepo');
@@ -20,14 +156,19 @@ final class DripScheduleServiceTest extends PluginTestCase
         $grantReflection->setValue($service, $grantRepo);
     }
 
-    public function test_process_notifications_marks_missing_grants_sent_and_active_grants_processed(): void
+    public function test_process_notifications_cancels_terminal_grants_and_processes_active_grants(): void
     {
         $sent = [];
+        $cancelled = [];
         $failed = [];
         $updates = [];
 
-        $dripRepo = new class($sent, $failed) extends DripScheduleRepository {
-            public function __construct(private array &$sent, private array &$failed)
+        $dripRepo = new class($sent, $cancelled, $failed) extends DripScheduleRepository {
+            public function __construct(
+                private array &$sent,
+                private array &$cancelled,
+                private array &$failed
+            )
             {
             }
 
@@ -36,12 +177,20 @@ final class DripScheduleServiceTest extends PluginTestCase
                 return [
                     ['id' => 1, 'grant_id' => 10, 'user_id' => 21, 'retry_count' => 0, 'plan_rule_id' => 91],
                     ['id' => 2, 'grant_id' => 20, 'user_id' => 22, 'retry_count' => 0, 'plan_rule_id' => 92],
+                    ['id' => 3, 'grant_id' => 30, 'user_id' => 23, 'retry_count' => 0, 'plan_rule_id' => 93],
+                    ['id' => 4, 'grant_id' => 40, 'user_id' => 24, 'retry_count' => 0, 'plan_rule_id' => 94],
                 ];
             }
 
             public function markSent(int $id): bool
             {
                 $this->sent[] = $id;
+                return true;
+            }
+
+            public function markCancelled(int $id): bool
+            {
+                $this->cancelled[] = $id;
                 return true;
             }
 
@@ -71,7 +220,9 @@ final class DripScheduleServiceTest extends PluginTestCase
             {
                 return match ($id) {
                     10 => null,
-                    20 => ['id' => 20, 'user_id' => 22, 'status' => 'active', 'meta' => [], 'plan_id' => 5],
+                    20 => ['id' => 20, 'user_id' => 22, 'status' => 'revoked', 'meta' => [], 'plan_id' => 5],
+                    30 => ['id' => 30, 'user_id' => 23, 'status' => 'expired', 'meta' => [], 'plan_id' => 5],
+                    40 => ['id' => 40, 'user_id' => 24, 'status' => 'active', 'meta' => [], 'plan_id' => 5],
                     default => null,
                 };
             }
@@ -92,9 +243,69 @@ final class DripScheduleServiceTest extends PluginTestCase
         $processed = $service->processNotifications();
 
         self::assertSame(1, $processed);
-        self::assertSame([1, 2], $sent);
+        self::assertSame([4], $sent);
+        self::assertSame([1, 2, 3], $cancelled);
         self::assertSame([], $failed);
-        self::assertSame([20, ['meta' => ['drip_milestones_fired' => [25, 50]]]], $updates[0]);
+        self::assertSame([40, ['meta' => ['drip_milestones_fired' => [25, 50]]]], $updates[0]);
+    }
+
+    public function test_paused_notification_is_deferred_without_starving_later_active_notification(): void
+    {
+        $sent = [];
+        $deferred = [];
+
+        $dripRepo = new class($sent, $deferred) extends DripScheduleRepository {
+            public function __construct(private array &$sent, private array &$deferred)
+            {
+            }
+
+            public function getPendingNotifications(int $limit = 50): array
+            {
+                return [
+                    ['id' => 1, 'grant_id' => 10, 'user_id' => 21, 'retry_count' => 0, 'plan_rule_id' => 91],
+                    ['id' => 2, 'grant_id' => 20, 'user_id' => 22, 'retry_count' => 0, 'plan_rule_id' => 92],
+                ];
+            }
+
+            public function markDeferred(int $id): bool
+            {
+                $this->deferred[] = $id;
+                return true;
+            }
+
+            public function markSent(int $id): bool
+            {
+                $this->sent[] = $id;
+                return true;
+            }
+
+            public function getByGrantId(int $grantId): array
+            {
+                return [];
+            }
+        };
+        $grantRepo = new class extends GrantRepository {
+            public function find(int $id): ?array
+            {
+                return [
+                    'id' => $id,
+                    'user_id' => $id === 10 ? 21 : 22,
+                    'status' => $id === 10 ? 'paused' : 'active',
+                    'meta' => [],
+                    'plan_id' => 5,
+                ];
+            }
+        };
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = [
+            'email_drip_unlocked' => 'no',
+        ];
+        $service = new DripScheduleService($dripRepo, $grantRepo);
+
+        $processed = $service->processNotifications(2);
+
+        self::assertSame(1, $processed);
+        self::assertSame([1], $deferred);
+        self::assertSame([2], $sent);
     }
 
     public function test_process_notifications_handles_hook_failures_and_retry_logic(): void
@@ -532,5 +743,22 @@ final class DripScheduleServiceTest extends PluginTestCase
         self::assertSame('https://example.com/?p=55', $getResourceUrl->invoke($service, 'post', '55'));
         self::assertSame('https://example.com/category/3', $getResourceUrl->invoke($service, 'category', '3'));
         self::assertSame('', $getResourceUrl->invoke($service, 'unknown_type', '99'));
+    }
+}
+
+final class Task7DripProviderWorker extends ProviderOperationWorker
+{
+    public array $grantIds = [];
+    public array $notifyAt = [];
+
+    public function __construct(private array $outcomes)
+    {
+    }
+
+    public function unlockDeferredGrant(array $grant, array $schedule = []): array
+    {
+        $this->grantIds[] = (int) $grant['id'];
+        $this->notifyAt[] = $schedule['notify_at'] ?? null;
+        return $this->outcomes;
     }
 }

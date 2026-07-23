@@ -14,4 +14,9 @@ final class MembershipMutationPermission
     {
         return current_user_can(self::CAPABILITY) || current_user_can('manage_options');
     }
+
+    public static function requiresIdempotencyKey(): bool
+    {
+        return ApplicationPasswordRequestContext::isAuthenticatedUser(get_current_user_id());
+    }
 }

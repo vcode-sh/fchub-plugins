@@ -8,13 +8,21 @@ on:
     paths:
       - 'web-docs/**'
       - 'fluentcart-mcp/src/tools/**'
+      - 'plugins/fchub-memberships/app/Http/**/*.php'
+      - 'plugins/fchub-memberships/app/Modules/Runtime/FluentCartRuntimeModule.php'
+      - 'scripts/check-memberships-route-docs.mjs'
       - 'scripts/count-mcp-tools.mjs'
+      - '.github/workflows/docs-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'web-docs/**'
       - 'fluentcart-mcp/src/tools/**'
+      - 'plugins/fchub-memberships/app/Http/**/*.php'
+      - 'plugins/fchub-memberships/app/Modules/Runtime/FluentCartRuntimeModule.php'
+      - 'scripts/check-memberships-route-docs.mjs'
       - 'scripts/count-mcp-tools.mjs'
+      - '.github/workflows/docs-ci.yml'
 
 concurrency:
   group: docs-ci-${{ github.ref }}
@@ -33,6 +41,9 @@ jobs:
 
       - name: Validate versions.json
         run: node -e "JSON.parse(require('fs').readFileSync('web-docs/lib/versions.json','utf8'))"
+
+      - name: Verify Memberships route documentation
+        run: node --test scripts/check-memberships-route-docs.mjs
 
       - name: Verify tool counts match source
         run: node scripts/count-mcp-tools.mjs --check

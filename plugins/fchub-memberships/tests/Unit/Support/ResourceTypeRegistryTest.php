@@ -6,6 +6,7 @@ namespace FChubMemberships\Tests\Unit\Support;
 
 use FChubMemberships\Support\Constants;
 use FChubMemberships\Support\ResourceTypeRegistry;
+use FChubMemberships\Integration\Community\CommunityCapabilityRegistry;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 use FChubMemberships\Http\Controllers\Plans\PlanReadController;
 use FChubMemberships\Adapters\WordPressContentAdapter;
@@ -113,7 +114,7 @@ final class ResourceTypeRegistryTest extends PluginTestCase
 
     public function test_registry_registers_defaults_dynamic_types_and_provider_specific_types(): void
     {
-        $registry = ResourceTypeRegistry::getInstance();
+        $registry = new ResourceTypeRegistry($this->coreCommunityCapabilities());
         $all = $registry->getAll();
 
         self::assertTrue($registry->isValid('post'));
@@ -137,7 +138,7 @@ final class ResourceTypeRegistryTest extends PluginTestCase
 
     public function test_registry_uses_canonical_external_enrolment_types_with_safe_capabilities(): void
     {
-        $all = ResourceTypeRegistry::getInstance()->getAll();
+        $all = (new ResourceTypeRegistry($this->coreCommunityCapabilities()))->getAll();
 
         self::assertArrayHasKey('ld_course', $all);
         self::assertArrayHasKey('ld_group', $all);
@@ -155,6 +156,82 @@ final class ResourceTypeRegistryTest extends PluginTestCase
 
         self::assertSame(\FChubMemberships\Adapters\FluentCrmAdapter::class, $all['fluentcrm_tag']['adapter']);
         self::assertSame(\FChubMemberships\Adapters\FluentCommunityAdapter::class, $all['fc_space']['adapter']);
+        self::assertSame('positive_int', $all['fc_space']['identifier']);
+        self::assertSame('positive_int', $all['fc_course']['identifier']);
+        self::assertArrayNotHasKey('fc_badge', $all);
+    }
+
+    public function test_registry_registers_each_community_resource_only_when_its_capability_is_available(): void
+    {
+        $registry = new ResourceTypeRegistry(new CommunityCapabilityRegistry(
+            static fn(): array => [
+                'core_active' => true,
+                'core_version' => '2.7.0',
+                'pro_active' => true,
+                'pro_version' => '2.7.0',
+                'pro_certified' => true,
+            ],
+            static fn(string $feature): bool => $feature === 'user_badge',
+            static fn(string $capability): bool => in_array($capability, ['spaces', 'badges'], true)
+        ));
+
+        self::assertArrayHasKey('fc_space', $registry->getAll());
+        self::assertArrayNotHasKey('fc_course', $registry->getAll());
+        self::assertArrayHasKey('fc_badge', $registry->getAll());
+    }
+
+    public function test_inactive_community_badges_keep_a_read_only_slug_contract(): void
+    {
+        $registry = new ResourceTypeRegistry(new CommunityCapabilityRegistry(
+            static fn(): array => [
+                'core_active' => false,
+                'core_version' => null,
+                'pro_active' => false,
+                'pro_version' => null,
+            ]
+        ));
+
+        self::assertFalse($registry->isValid('fc_badge'));
+        self::assertSame([
+            'key' => 'fc_badge',
+            'label' => 'Community Badge',
+            'group' => 'content',
+            'icon' => 'awards',
+            'searchable' => false,
+            'supports_bulk' => false,
+            'allow_all' => false,
+            'identifier' => 'slug',
+            'provider' => Constants::PROVIDER_FLUENT_COMMUNITY,
+            'adapter' => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
+            'source' => 'FluentCommunity Pro (inactive, read-only)',
+            'read_only' => true,
+        ], $registry->getForRead('fc_badge'));
+    }
+
+    public function test_registry_registers_exact_slug_badges_only_for_a_certified_pro_runtime(): void
+    {
+        $registry = new ResourceTypeRegistry(new CommunityCapabilityRegistry(
+            static fn(): array => [
+                'core_active' => true,
+                'core_version' => '2.7.0',
+                'pro_active' => true,
+                'pro_version' => '2.7.0',
+                'pro_certified' => true,
+            ],
+            static fn(string $feature): bool => in_array($feature, [
+                'course_module',
+                'user_badge',
+                'leader_board_module',
+            ], true),
+            static fn(string $capability): bool => true
+        ));
+
+        $badge = $registry->get('fc_badge');
+
+        self::assertSame('slug', $badge['identifier']);
+        self::assertSame(Constants::PROVIDER_FLUENT_COMMUNITY, $badge['provider']);
+        self::assertSame(\FChubMemberships\Adapters\FluentCommunityAdapter::class, $badge['adapter']);
+        self::assertFalse($badge['allow_all']);
     }
 
     public function test_external_resource_labels_are_resolved_by_the_registered_adapter(): void
@@ -255,5 +332,19 @@ final class ResourceTypeRegistryTest extends PluginTestCase
         self::assertSame('Courses', $all['course']['label']);
         self::assertSame('admin-post', $all['course']['icon']);
         self::assertSame('audience', $all['audience']['label']);
+    }
+
+    private function coreCommunityCapabilities(): CommunityCapabilityRegistry
+    {
+        return new CommunityCapabilityRegistry(
+            static fn(): array => [
+                'core_active' => true,
+                'core_version' => '2.7.0',
+                'pro_active' => false,
+                'pro_version' => null,
+            ],
+            static fn(string $feature): bool => $feature === 'course_module',
+            static fn(string $capability): bool => in_array($capability, ['spaces', 'courses'], true)
+        );
     }
 }

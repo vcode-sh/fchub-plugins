@@ -4,11 +4,15 @@ namespace FChubMemberships\Integration;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Domain\AccessGrantService;
+use FChubMemberships\Domain\Event\EventClaimResult;
+use FChubMemberships\Domain\Event\EventProcessingOutcome;
 use FChubMemberships\Domain\Grant\AnchorDateCalculator;
 use FChubMemberships\Domain\Grant\MembershipTermCalculator;
-use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Domain\Lifecycle\MembershipLifecycleCoordinator;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Support\Logger;
+use FChubMemberships\Support\Clock;
 use FluentCart\App\Modules\Integrations\BaseIntegrationManager;
 use FluentCart\Framework\Support\Arr;
 
@@ -17,13 +21,28 @@ class MembershipAccessIntegration extends BaseIntegrationManager
     protected $runOnBackgroundForProduct = false;
     protected $runOnBackgroundForGlobal = false;
 
-    public function __construct()
-    {
+    private Clock $clock;
+    private ?AccessGrantService $accessGrantService;
+    private \Closure $ownerTokenFactory;
+    private ?MembershipLifecycleCoordinator $lifecycleCoordinator;
+
+    public function __construct(
+        ?Clock $clock = null,
+        ?AccessGrantService $accessGrantService = null,
+        ?callable $ownerTokenFactory = null,
+        ?MembershipLifecycleCoordinator $lifecycleCoordinator = null
+    ) {
         parent::__construct(
             'Memberships',
             'memberships',
             12
         );
+        $this->clock = $clock ?? new Clock();
+        $this->accessGrantService = $accessGrantService;
+        $this->lifecycleCoordinator = $lifecycleCoordinator;
+        $this->ownerTokenFactory = $ownerTokenFactory !== null
+            ? \Closure::fromCallable($ownerTokenFactory)
+            : static fn(): string => bin2hex(random_bytes(32));
 
         $this->description = __('Grant membership plan access when orders are paid. Supports lifetime, fixed duration, and subscription-mirrored validity.', 'fchub-memberships');
         $this->logo = FCHUB_MEMBERSHIPS_URL . 'assets/icons/memberships.svg';
@@ -208,17 +227,141 @@ class MembershipAccessIntegration extends BaseIntegrationManager
     /**
      * Process integration action — grant or revoke membership access.
      */
-    public function processAction($order, $eventData): void
+    public function processAction($order, $eventData): EventProcessingOutcome
     {
-        $trigger = Arr::get($eventData, 'trigger', '');
-        $isRevokeHook = Arr::get($eventData, 'is_revoke_hook') === 'yes';
-
-        if ($isRevokeHook) {
-            $this->handleRevoke($order, $eventData);
-            return;
+        $trigger = Arr::get($eventData, 'trigger');
+        if (in_array($trigger, [
+            'subscription_activated',
+            'subscription_reactivated',
+            'subscription_renewed',
+            'subscription_canceled',
+            'subscription_eot',
+            'subscription_expired_validity',
+        ], true)) {
+            return EventProcessingOutcome::skipped();
         }
 
-        $this->handleGrant($order, $eventData);
+        $orderId = $this->positiveIdentifier(is_object($order) ? ($order->id ?? null) : null);
+        $integrationId = $this->positiveIdentifier(Arr::get($eventData, 'integration_id'));
+        $scope = Arr::get($eventData, 'scope');
+        if ($orderId === null
+            || $integrationId === null
+            || !in_array($scope, ['product', 'global'], true)
+            || !is_string($trigger)
+            || trim($trigger) === ''
+            || $this->characterLength($trigger) > 100
+        ) {
+            return EventProcessingOutcome::terminalFailure(
+                'Membership event identifiers are invalid.',
+                true
+            );
+        }
+
+        try {
+            $ownerToken = ($this->ownerTokenFactory)();
+        } catch (\Throwable $exception) {
+            $error = $exception->getMessage() !== ''
+                ? $exception->getMessage()
+                : 'Membership event owner token factory failed.';
+            $description = sprintf(
+                'Owner token factory failed (%s): %s',
+                $exception::class,
+                $error
+            );
+            Logger::orderLog(
+                $order,
+                __('Membership event owner token factory failed', 'fchub-memberships'),
+                $description,
+                'error'
+            );
+            Logger::error(
+                __('Membership event owner token factory failed', 'fchub-memberships'),
+                $description
+            );
+
+            return EventProcessingOutcome::retryableFailure($error, true);
+        }
+        if (!is_string($ownerToken)
+            || trim($ownerToken) === ''
+            || $this->characterLength($ownerToken) > 64
+        ) {
+            return EventProcessingOutcome::terminalFailure(
+                'Membership event owner token is invalid.',
+                true
+            );
+        }
+
+        $isRevokeHook = Arr::get($eventData, 'is_revoke_hook') === 'yes';
+        $mode = $isRevokeHook ? 'revoke' : 'grant';
+        $service = $this->accessGrantService();
+        $eventHash = $service->orderEventHash($orderId, $scope, $integrationId, $trigger, $mode);
+
+        try {
+            $claim = $service->claimOrderEvent(
+                $orderId,
+                $scope,
+                $integrationId,
+                $trigger,
+                $mode,
+                $ownerToken
+            );
+        } catch (\Throwable $exception) {
+            Logger::orderLog(
+                $order,
+                __('Membership event claim failed', 'fchub-memberships'),
+                $exception->getMessage(),
+                'error'
+            );
+            Logger::error(
+                __('Membership event claim failed', 'fchub-memberships'),
+                $exception->getMessage(),
+                ['event_hash' => $eventHash]
+            );
+
+            return EventProcessingOutcome::retryableFailure($exception->getMessage(), true);
+        }
+
+        if ($claim->outcome === EventClaimResult::DUPLICATE_SUCCEEDED) {
+            Logger::orderLog(
+                $order,
+                __('Membership event skipped', 'fchub-memberships'),
+                __('This membership event was already processed.', 'fchub-memberships')
+            );
+
+            return EventProcessingOutcome::skipped();
+        }
+        if ($claim->outcome === EventClaimResult::IN_PROGRESS) {
+            Logger::orderLog(
+                $order,
+                __('Membership event already processing', 'fchub-memberships'),
+                __('Another worker currently owns this membership event.', 'fchub-memberships'),
+                'warning'
+            );
+
+            return EventProcessingOutcome::retryableFailure('Membership event is already processing.', true);
+        }
+        if ($claim->outcome === EventClaimResult::RETRYABLE_FAILED) {
+            return EventProcessingOutcome::retryableFailure('Membership event retry is not due yet.', true);
+        }
+        if ($claim->outcome !== EventClaimResult::ACQUIRED) {
+            return EventProcessingOutcome::terminalFailure('Membership event previously failed terminally.', true);
+        }
+
+        try {
+            $outcome = $isRevokeHook
+                ? $this->handleRevoke($order, $eventData)
+                : $this->handleGrant($order, $eventData);
+        } catch (\Throwable $exception) {
+            Logger::orderLog(
+                $order,
+                __('Membership event processing failed', 'fchub-memberships'),
+                $exception->getMessage(),
+                'error'
+            );
+            $outcome = EventProcessingOutcome::retryableFailure($exception->getMessage());
+        }
+
+        return $this->finalizeClaim($order, $eventHash, $ownerToken, $outcome);
     }
 
     /**
@@ -228,14 +371,14 @@ class MembershipAccessIntegration extends BaseIntegrationManager
      * audit logging, adapter calls, emails, trial detection, and multi-membership
      * mode enforcement are applied consistently.
      */
-    private function handleGrant($order, array $eventData): void
+    private function handleGrant($order, array $eventData): EventProcessingOutcome
     {
         $settings = Arr::get($eventData, 'feed', []);
         $planId = (int) Arr::get($settings, 'plan_id', 0);
 
         if (!$planId) {
             Logger::orderLog($order, __('Membership grant skipped', 'fchub-memberships'), __('No plan ID configured in feed.', 'fchub-memberships'), 'warning');
-            return;
+            return EventProcessingOutcome::terminalFailure('No plan ID configured in feed.');
         }
 
         $planRepo = new PlanRepository();
@@ -243,19 +386,20 @@ class MembershipAccessIntegration extends BaseIntegrationManager
 
         if (!$plan) {
             Logger::orderLog($order, __('Membership grant failed', 'fchub-memberships'), sprintf(__('Plan #%d not found.', 'fchub-memberships'), $planId), 'error');
-            return;
+            return EventProcessingOutcome::terminalFailure("Plan #{$planId} not found.");
         }
 
         $userId = $this->resolveUserId($order, $settings);
 
         if (!$userId) {
             Logger::orderLog($order, __('Membership grant failed', 'fchub-memberships'), __('No user found and auto-create is disabled.', 'fchub-memberships'), 'error');
-            return;
+            return EventProcessingOutcome::terminalFailure('No user found and auto-create is disabled.');
         }
 
         $validityMode = Arr::get($settings, 'validity_mode', 'lifetime');
-        $expiresAt = $this->calculateExpiresAt($validityMode, $settings, $order, $plan);
-        $feedId = (int) Arr::get($eventData, 'feed_id', 0);
+        $validityPolicy = $this->resolveValidityPolicy($validityMode, $settings, $plan);
+        $expiresAt = $this->calculateExpiresAt($validityPolicy, $order);
+        $feedId = (int) Arr::get($eventData, 'integration_id', 0);
         $graceDays = (int) Arr::get($settings, 'grace_period_days', $plan['grace_period_days'] ?? 0);
 
         // Detect subscription from event data to set correct source_type
@@ -267,9 +411,24 @@ class MembershipAccessIntegration extends BaseIntegrationManager
             'source_type'      => $sourceType,
             'source_id'        => $sourceId,
             'feed_id'          => $feedId,
+            'feed_scope'       => (string) Arr::get($eventData, 'scope'),
+            'origin_event'     => $this->providerOriginEvent($order, $eventData, 'grant'),
             'order'            => $order,
             'grace_period_days' => $graceDays,
+            'policy' => array_merge([
+                'cancel_behavior' => Arr::get($settings, 'cancel_behavior') === 'immediate'
+                    ? 'immediate'
+                    : 'wait_validity',
+                'grace_period_days' => max(0, $graceDays),
+            ], $validityPolicy),
         ];
+
+        if ($subscription) {
+            $subscriptionId = $this->positiveIdentifier($subscription->id ?? null);
+            if ($subscriptionId !== null) {
+                $context['policy']['subscription_id'] = $subscriptionId;
+            }
+        }
 
         if ($expiresAt) {
             $context['expires_at'] = $expiresAt;
@@ -298,7 +457,11 @@ class MembershipAccessIntegration extends BaseIntegrationManager
             } elseif ($feedTermMode === 'date') {
                 $feedTermConfig['date'] = Arr::get($settings, 'membership_term_date');
             }
-            $termEndsAt = MembershipTermCalculator::calculateEndDate($feedTermConfig, current_time('mysql'));
+            $termEndsAt = MembershipTermCalculator::calculateEndDate(
+                $feedTermConfig,
+                $this->clock->storage($this->clock->now()),
+                $this->clock
+            );
             if ($termEndsAt) {
                 $context['meta'] = array_merge($context['meta'] ?? [], [
                     'membership_term_ends_at' => $termEndsAt,
@@ -311,8 +474,30 @@ class MembershipAccessIntegration extends BaseIntegrationManager
             }
         }
 
-        $grantService = new \FChubMemberships\Domain\AccessGrantService();
-        $result = $grantService->grantPlan($userId, $planId, $context);
+        if (isset($context['meta']['billing_anchor_day'])) {
+            $context['policy']['billing_anchor_day'] = (int) $context['meta']['billing_anchor_day'];
+        }
+        if (isset($context['meta']['membership_term_ends_at'])) {
+            $context['policy']['membership_term_ends_at'] = (string) $context['meta']['membership_term_ends_at'];
+        }
+
+        $result = $this->lifecycleCoordinator()->paid($userId, $planId, $context);
+
+        $failed = (int) ($result['failed'] ?? 0);
+        $pending = (int) ($result['pending'] ?? 0);
+        if (!empty($result['blocked'])
+            && ($result['reason'] ?? null) === 'downgrade_blocked'
+            && $failed === 0
+        ) {
+            return EventProcessingOutcome::skipped();
+        }
+        $unsuccessful = $failed > 0
+            || $pending > 0
+            || (array_key_exists('success', $result) && $result['success'] === false)
+            || !empty($result['blocked']);
+        if ($unsuccessful && $failed === 0 && $pending === 0) {
+            $result['failed'] = 1;
+        }
 
         self::logGrantResult(
             $order,
@@ -323,6 +508,17 @@ class MembershipAccessIntegration extends BaseIntegrationManager
             $sourceType,
             (int) $sourceId
         );
+
+        if ($unsuccessful) {
+            return EventProcessingOutcome::retryableFailure(
+                self::outcomeError(
+                    $result,
+                    $pending > 0 ? 'Membership grant is pending recovery.' : 'Membership grant failed.'
+                )
+            );
+        }
+
+        return EventProcessingOutcome::succeeded();
     }
 
     /**
@@ -331,71 +527,276 @@ class MembershipAccessIntegration extends BaseIntegrationManager
      * Delegates to AccessGrantService::revokePlan() to ensure all lifecycle hooks,
      * audit logging, adapter calls, and emails are applied consistently.
      */
-    private function handleRevoke($order, array $eventData): void
+    private function handleRevoke($order, array $eventData): EventProcessingOutcome
     {
         $settings = Arr::get($eventData, 'feed', []);
-        $cancelBehavior = Arr::get($settings, 'cancel_behavior', 'wait_validity');
 
-        if ($cancelBehavior !== 'immediate') {
+        $planId = (int) Arr::get($settings, 'plan_id', 0);
+        if ($planId <= 0) {
+            Logger::orderLog($order, __('Membership revoke failed', 'fchub-memberships'), __('No plan ID configured in feed.', 'fchub-memberships'), 'error');
+            return EventProcessingOutcome::terminalFailure('No plan ID configured in feed.');
+        }
+
+        $userId = $this->resolveUserId($order, $settings, false);
+        if ($userId === null) {
+            Logger::orderLog($order, __('Membership revoke skipped', 'fchub-memberships'), __('No existing user found for this order.', 'fchub-memberships'), 'warning');
+            return EventProcessingOutcome::skipped();
+        }
+
+        $subscription = Arr::get($eventData, 'event_data.subscription');
+        $sourceId = $subscription ? $subscription->id : $order->id;
+        $sourceType = $subscription ? 'subscription' : 'order';
+        $result = $this->lifecycleCoordinator()->refund($userId, $planId, [
+            'source_type' => $sourceType,
+            'source_id' => (int) $sourceId,
+            'feed_id' => (int) Arr::get($eventData, 'integration_id'),
+            'feed_scope' => (string) Arr::get($eventData, 'scope'),
+            'origin_event' => $this->providerOriginEvent($order, $eventData, 'revoke'),
+            'reason' => sprintf('Order #%d revoked/refunded', $order->id),
+            'order' => $order,
+        ]);
+        $totalRevoked = (int) ($result['revoked'] ?? 0);
+        $totalGraceStarted = (int) ($result['grace_started'] ?? 0);
+        $totalPending = (int) ($result['pending'] ?? 0);
+        $totalFailed = (int) ($result['failed'] ?? 0);
+        $errors = $result['errors'] ?? [];
+        $unsuccessful = array_key_exists('success', $result) && $result['success'] === false;
+
+        $logFailed = $totalFailed;
+        if ($unsuccessful && $logFailed === 0 && $totalPending === 0) {
+            $logFailed = 1;
+        }
+
+        self::logRevokeResult(
+            $order,
+            (int) $order->id,
+            $totalRevoked,
+            $logFailed,
+            $errors,
+            $totalGraceStarted,
+            $totalPending
+        );
+
+        if ($logFailed > 0 || $totalPending > 0) {
+            return EventProcessingOutcome::retryableFailure(
+                self::outcomeError(
+                    ['errors' => $errors],
+                    $totalPending > 0 ? 'Membership revoke is pending recovery.' : 'Membership revoke failed.'
+                )
+            );
+        }
+        if ($totalRevoked === 0 && $totalGraceStarted === 0) {
+            return EventProcessingOutcome::skipped();
+        }
+
+        return EventProcessingOutcome::succeeded();
+    }
+
+    private function finalizeClaim(
+        $order,
+        string $eventHash,
+        string $ownerToken,
+        EventProcessingOutcome $outcome
+    ): EventProcessingOutcome {
+        $service = $this->accessGrantService();
+        if ($outcome->success) {
+            $completionException = null;
+            try {
+                $completed = $service->succeedEventLock($eventHash, $ownerToken);
+            } catch (\Throwable $exception) {
+                $completed = false;
+                $completionException = $exception;
+            }
+            if ($completed) {
+                return $outcome;
+            }
+
+            $error = 'Membership event lock completion failed after completed effects.';
+            $fallbackFailed = false;
+            $fallbackException = null;
+            try {
+                $fallbackFailed = !$service->failEventLock($eventHash, $ownerToken, $error, false);
+            } catch (\Throwable $exception) {
+                $fallbackFailed = true;
+                $fallbackException = $exception;
+            }
+
+            $description = $completionException === null
+                ? $error
+                : $this->transitionFailureDescription('succeedEventLock', $error, $completionException);
+
             Logger::orderLog(
                 $order,
-                __('Membership revocation deferred', 'fchub-memberships'),
-                __('Cancel behavior is set to wait until validity expires. SubscriptionValidityWatcher will handle expiration.', 'fchub-memberships')
+                __('Membership event lock completion failed', 'fchub-memberships'),
+                $description,
+                'error'
             );
-            return;
+            Logger::error(
+                __('Membership event lock completion failed', 'fchub-memberships'),
+                $description,
+                ['event_hash' => $eventHash]
+            );
+            if ($fallbackFailed) {
+                $this->logTransitionFailure(
+                    $order,
+                    $eventHash,
+                    $error,
+                    'failEventLock',
+                    $fallbackException
+                );
+            }
+
+            return EventProcessingOutcome::terminalFailure($error, $outcome->skipped);
         }
 
-        $grantRepo = new GrantRepository();
-        $grants = $grantRepo->getBySourceId($order->id, 'order');
+        $error = $outcome->error ?? 'Membership event processing failed.';
+        $transitioned = false;
+        $transitionException = null;
+        try {
+            $transitioned = $service->failEventLock(
+                $eventHash,
+                $ownerToken,
+                $error,
+                $outcome->retryable
+            );
+        } catch (\Throwable $exception) {
+            $transitioned = false;
+            $transitionException = $exception;
+        }
+        if (!$transitioned) {
+            $this->logTransitionFailure(
+                $order,
+                $eventHash,
+                $error,
+                'failEventLock',
+                $transitionException
+            );
+        }
 
-        // Also check subscription-sourced grants
-        $subscription = Arr::get($eventData, 'event_data.subscription');
-        if ($subscription) {
-            $subGrants = $grantRepo->getBySourceId($subscription->id, 'subscription');
-            $grantIds = array_column($grants, 'id');
-            foreach ($subGrants as $subGrant) {
-                if (!in_array($subGrant['id'], $grantIds, false)) {
-                    $grants[] = $subGrant;
-                }
+        return $outcome;
+    }
+
+    private function logTransitionFailure(
+        $order,
+        string $eventHash,
+        string $originalError,
+        string $stage,
+        ?\Throwable $exception = null
+    ): void {
+        $description = $this->transitionFailureDescription($stage, $originalError, $exception);
+        Logger::orderLog(
+            $order,
+            __('Membership event lock transition failed', 'fchub-memberships'),
+            $description,
+            'error'
+        );
+        Logger::error(
+            __('Membership event lock transition failed', 'fchub-memberships'),
+            $description,
+            ['event_hash' => $eventHash]
+        );
+    }
+
+    private function transitionFailureDescription(
+        string $stage,
+        string $originalError,
+        ?\Throwable $exception
+    ): string {
+        $description = sprintf(
+            'The event lock transition failed at %s after: %s',
+            $stage,
+            $originalError
+        );
+        if ($exception === null) {
+            return $description;
+        }
+
+        return sprintf(
+            '%s Throwable: %s: %s',
+            $description,
+            $exception::class,
+            $exception->getMessage()
+        );
+    }
+
+    private function accessGrantService(): AccessGrantService
+    {
+        return $this->accessGrantService ??= new AccessGrantService();
+    }
+
+    private function lifecycleCoordinator(): MembershipLifecycleCoordinator
+    {
+        return $this->lifecycleCoordinator ??= new MembershipLifecycleCoordinator(
+            $this->accessGrantService(),
+            null,
+            null,
+            $this->clock
+        );
+    }
+
+    private function providerOriginEvent(object $order, array $eventData, string $mode): string
+    {
+        $identity = [
+            'order_id' => (int) ($order->id ?? 0),
+            'scope' => (string) Arr::get($eventData, 'scope'),
+            'integration_id' => (int) Arr::get($eventData, 'integration_id'),
+            'trigger' => (string) Arr::get($eventData, 'trigger'),
+            'mode' => $mode,
+        ];
+
+        return 'membership:' . $mode . ':' . hash('sha256', wp_json_encode($identity));
+    }
+
+    private function positiveIdentifier(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value > 0 ? $value : null;
+        }
+        if (!is_string($value) || $value === '' || !ctype_digit($value)) {
+            return null;
+        }
+
+        $normalised = ltrim($value, '0');
+        $maximum = (string) PHP_INT_MAX;
+        if ($normalised === ''
+            || strlen($normalised) > strlen($maximum)
+            || (strlen($normalised) === strlen($maximum) && strcmp($normalised, $maximum) > 0)
+        ) {
+            return null;
+        }
+
+        return (int) $normalised;
+    }
+
+    private function characterLength(string $value): int
+    {
+        if (function_exists('mb_strlen')) {
+            return mb_strlen($value, 'UTF-8');
+        }
+
+        $length = preg_match_all('/./us', $value);
+
+        return $length === false ? strlen($value) : $length;
+    }
+
+    private static function outcomeError(array $result, string $fallback): string
+    {
+        $messages = [];
+        foreach ($result['errors'] ?? [] as $error) {
+            if (is_string($error) && $error !== '') {
+                $messages[] = $error;
+            } elseif (is_array($error) && !empty($error['message'])) {
+                $messages[] = (string) $error['message'];
             }
         }
-
-        if (empty($grants)) {
-            Logger::orderLog($order, __('Membership revoke skipped', 'fchub-memberships'), __('No active grants found for this order.', 'fchub-memberships'), 'warning');
-            return;
+        if ($messages !== []) {
+            return implode('; ', $messages);
+        }
+        if (!empty($result['reason'])) {
+            return (string) $result['reason'];
         }
 
-        // Group active grants by plan_id and user_id for proper revocation
-        $planUsers = [];
-        foreach ($grants as $grant) {
-            if ($grant['status'] !== 'active') {
-                continue;
-            }
-            $key = $grant['plan_id'] . ':' . $grant['user_id'];
-            $planUsers[$key] = [
-                'plan_id' => (int) $grant['plan_id'],
-                'user_id' => (int) $grant['user_id'],
-            ];
-        }
-
-        $grantService = new \FChubMemberships\Domain\AccessGrantService();
-        $totalRevoked = 0;
-        $totalFailed = 0;
-        $errors = [];
-
-        foreach ($planUsers as $info) {
-            $sourceId = $subscription ? $subscription->id : $order->id;
-            $result = $grantService->revokePlan($info['user_id'], $info['plan_id'], [
-                'source_id' => $sourceId,
-                'reason'    => sprintf('Order #%d revoked/refunded', $order->id),
-                'order'     => $order,
-            ]);
-            $totalRevoked += $result['revoked'] ?? 0;
-            $totalFailed += $result['failed'] ?? 0;
-            $errors = array_merge($errors, $result['errors'] ?? []);
-        }
-
-        self::logRevokeResult($order, (int) $order->id, $totalRevoked, $totalFailed, $errors);
+        return $fallback;
     }
 
     public static function logGrantResult(
@@ -410,7 +811,23 @@ class MembershipAccessIntegration extends BaseIntegrationManager
         $created = (int) ($result['created'] ?? 0);
         $updated = (int) ($result['updated'] ?? 0);
         $failed = (int) ($result['failed'] ?? 0);
+        $pending = (int) ($result['pending'] ?? 0);
         $succeeded = $created + $updated;
+
+        if ($pending > 0) {
+            Logger::orderLog(
+                $order,
+                __('Membership access grant pending', 'fchub-memberships'),
+                sprintf(
+                    __('Plan "%s" for user #%d: %d resources are pending provider recovery.', 'fchub-memberships'),
+                    $planTitle,
+                    $userId,
+                    $pending
+                ),
+                'warning'
+            );
+            return;
+        }
 
         if ($failed > 0) {
             $partial = $succeeded > 0;
@@ -453,23 +870,63 @@ class MembershipAccessIntegration extends BaseIntegrationManager
         int $orderId,
         int $revoked,
         int $failed,
-        array $errors = []
+        array $errors = [],
+        int $graceStarted = 0,
+        int $pending = 0
     ): void {
+        if ($pending > 0) {
+            Logger::orderLog(
+                $order,
+                __('Membership access revocation pending', 'fchub-memberships'),
+                sprintf(
+                    __('Order #%d: %d provider revocations are pending recovery.', 'fchub-memberships'),
+                    $orderId,
+                    $pending
+                ),
+                'warning'
+            );
+            return;
+        }
         if ($failed > 0) {
-            $partial = $revoked > 0;
+            $partial = $revoked > 0 || $graceStarted > 0;
             Logger::orderLog(
                 $order,
                 $partial
-                    ? __('Membership access partially revoked', 'fchub-memberships')
+                    ? ($graceStarted > 0
+                        ? __('Membership access revocation partially processed', 'fchub-memberships')
+                        : __('Membership access partially revoked', 'fchub-memberships'))
                     : __('Membership access revoke failed', 'fchub-memberships'),
                 sprintf(
-                    __('Order #%d: %d grants revoked, %d failed. %s', 'fchub-memberships'),
+                    __('Order #%d: %d grants revoked, %d scheduled after grace, %d failed. %s', 'fchub-memberships'),
                     $orderId,
                     $revoked,
+                    $graceStarted,
                     $failed,
                     self::resultErrors($errors)
                 ),
                 $partial ? 'warning' : 'error'
+            );
+            return;
+        }
+
+        if ($graceStarted > 0) {
+            Logger::orderLog(
+                $order,
+                $revoked > 0
+                    ? __('Membership access revocation processed', 'fchub-memberships')
+                    : __('Membership access revocation scheduled', 'fchub-memberships'),
+                $revoked > 0
+                    ? sprintf(
+                        __('Order #%d: %d revoked, %d scheduled after grace.', 'fchub-memberships'),
+                        $orderId,
+                        $revoked,
+                        $graceStarted
+                    )
+                    : sprintf(
+                        __('%d grant(s) scheduled for revocation after grace for order #%d.', 'fchub-memberships'),
+                        $graceStarted,
+                        $orderId
+                    )
             );
             return;
         }
@@ -499,42 +956,62 @@ class MembershipAccessIntegration extends BaseIntegrationManager
      * Calculate the expiration date based on validity mode.
      * Plan data is the primary source of truth for duration configuration.
      */
-    private function calculateExpiresAt(string $validityMode, array $settings, $order, ?array $plan = null): ?string
+    private function calculateExpiresAt(array $validityPolicy, $order): ?string
     {
-        // Plan is source of truth for duration
-        if ($plan) {
-            $planDurationType = $plan['duration_type'] ?? 'lifetime';
-            if ($planDurationType === 'fixed_days' && !empty($plan['duration_days'])) {
-                return date('Y-m-d H:i:s', strtotime('+' . (int) $plan['duration_days'] . ' days'));
-            }
-            if ($planDurationType === 'fixed_anchor') {
-                $planMeta = $plan['meta'] ?? [];
-                $anchorDay = (int) ($planMeta['billing_anchor_day'] ?? 1);
-                return AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
-            }
-            if ($planDurationType === 'lifetime') {
-                return null;
-            }
-            // subscription_mirror falls through to feed logic
-        }
-
-        // Feed override (existing logic)
-        switch ($validityMode) {
+        switch ($validityPolicy['validity_mode']) {
             case 'fixed_duration':
-                $days = (int) Arr::get($settings, 'validity_days', 30);
-                return date('Y-m-d H:i:s', strtotime('+' . max(1, $days) . ' days'));
+                $days = (int) $validityPolicy['validity_days'];
+                return $this->clock->storage($this->clock->plusDays(max(1, $days)));
 
             case 'mirror_subscription':
                 return $this->getSubscriptionNextBillingDate($order);
 
             case 'anchor_billing':
-                $anchorDay = (int) Arr::get($settings, 'billing_anchor_day', 1);
-                return AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
+                $anchorDay = (int) $validityPolicy['billing_anchor_day'];
+                return AnchorDateCalculator::nextAnchorDate(
+                    $anchorDay,
+                    $this->clock->storage($this->clock->now()),
+                    $this->clock
+                );
 
             case 'lifetime':
             default:
                 return null;
         }
+    }
+
+    private function resolveValidityPolicy(string $validityMode, array $settings, array $plan): array
+    {
+        $durationType = (string) ($plan['duration_type'] ?? 'lifetime');
+        if ($durationType === 'fixed_days') {
+            return [
+                'validity_mode' => 'fixed_duration',
+                'validity_days' => max(1, (int) ($plan['duration_days'] ?? 1)),
+            ];
+        }
+        if ($durationType === 'fixed_anchor') {
+            $meta = is_array($plan['meta'] ?? null) ? $plan['meta'] : [];
+            return [
+                'validity_mode' => 'anchor_billing',
+                'billing_anchor_day' => min(31, max(1, (int) ($meta['billing_anchor_day'] ?? 1))),
+            ];
+        }
+        if ($durationType === 'lifetime') {
+            return ['validity_mode' => 'lifetime'];
+        }
+
+        return match ($validityMode) {
+            'fixed_duration' => [
+                'validity_mode' => 'fixed_duration',
+                'validity_days' => max(1, (int) Arr::get($settings, 'validity_days', 30)),
+            ],
+            'mirror_subscription' => ['validity_mode' => 'mirror_subscription'],
+            'anchor_billing' => [
+                'validity_mode' => 'anchor_billing',
+                'billing_anchor_day' => min(31, max(1, (int) Arr::get($settings, 'billing_anchor_day', 1))),
+            ],
+            default => ['validity_mode' => 'lifetime'],
+        };
     }
 
     /**
@@ -566,7 +1043,7 @@ class MembershipAccessIntegration extends BaseIntegrationManager
     /**
      * Resolve the WordPress user ID from the order, optionally creating one.
      */
-    private function resolveUserId($order, array $settings): ?int
+    private function resolveUserId($order, array $settings, bool $allowCreate = true): ?int
     {
         $userId = $order->user_id ?? null;
 
@@ -585,7 +1062,7 @@ class MembershipAccessIntegration extends BaseIntegrationManager
 
         // Auto-create user if enabled
         $autoCreate = Arr::get($settings, 'auto_create_user', 'yes');
-        if ($autoCreate !== 'yes' || empty($email)) {
+        if (!$allowCreate || $autoCreate !== 'yes' || empty($email)) {
             return null;
         }
 

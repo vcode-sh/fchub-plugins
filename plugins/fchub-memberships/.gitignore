@@ -2,9 +2,6 @@ node_modules/
 vendor/
 .phpunit.cache/
 coverage/
-# assets/dist/ is tracked — plugin works without a build step
-# only ignore new untracked files, not already-tracked ones
-assets/dist/*
-!assets/dist/.vite/
+# assets/dist/ is versioned; regenerate it with npm run build after SPA changes.
 .DS_Store
 *.log

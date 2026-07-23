@@ -166,7 +166,7 @@ test.describe('Guided Plan Builder', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     expect(await page.evaluate(() => {
       const nav = document.querySelector('.fchub-top-nav').getBoundingClientRect()
-      const header = document.querySelector('.page-header').getBoundingClientRect()
+      const header = document.querySelector('.workspace-page-header').getBoundingClientRect()
       return nav.left >= 0 && nav.right <= window.innerWidth && header.top >= nav.bottom
     })).toBe(true)
     expect(await page.evaluate(() => {

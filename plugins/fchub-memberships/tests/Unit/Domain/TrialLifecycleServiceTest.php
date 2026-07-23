@@ -20,10 +20,86 @@ use FChubMemberships\Domain\TrialLifecycleService;
 use FChubMemberships\Domain\Trial\TrialGrantQueryService;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class TrialLifecycleServiceTest extends PluginTestCase
 {
+    public function test_trial_conversion_uses_site_local_calendar_days_across_dst(): void
+    {
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-28 12:30:00', $timezone), $timezone);
+        $updates = [];
+        $service = new TrialLifecycleService($clock);
+        $grants = new class($updates) extends GrantRepository {
+            public function __construct(private array &$updates)
+            {
+            }
+            public function update(int $id, array $data): bool
+            {
+                $this->updates[] = $data;
+                return true;
+            }
+            public function find(int $id): ?array
+            {
+                return null;
+            }
+        };
+        $plans = new class extends PlanRepository {
+            public function find(int $id): ?array
+            {
+                return ['id' => $id, 'title' => 'Gold', 'duration_type' => 'fixed_days', 'duration_days' => 1, 'meta' => []];
+            }
+        };
+        $this->inject($service, $grants, $plans, new TrialGrantQueryService());
+        $method = new \ReflectionMethod($service, 'convertTrial');
+
+        $method->invoke($service, [
+            'id' => 10,
+            'user_id' => 21,
+            'plan_id' => 5,
+            'source_ids' => [77],
+            'meta' => [],
+        ]);
+
+        self::assertSame('2026-03-29 12:30:00', $updates[0]['expires_at']);
+    }
+
+    public function test_expiring_payload_days_left_uses_calendar_days_and_rounds_partial_days(): void
+    {
+        $capturedDays = [];
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = [
+            'email_trial_expiring' => 'no',
+            'trial_expiry_notice_days' => 2,
+        ];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static fn(): array => [
+            ['id' => 1, 'user_id' => 21, 'plan_id' => 5, 'trial_ends_at' => '2026-10-25 12:30:00', 'meta' => '{}'],
+            ['id' => 2, 'user_id' => 21, 'plan_id' => 5, 'trial_ends_at' => '2026-10-24 12:30:01', 'meta' => '{}'],
+        ];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static fn(): object => (object) [
+            'title' => 'Gold',
+            'slug' => 'gold',
+        ];
+        $GLOBALS['_fchub_test_actions']['fchub_memberships/trial_expiring_soon'] = [
+            static function (array $grant, int $daysLeft) use (&$capturedDays): void {
+                $capturedDays[$grant['id']] = $daysLeft;
+            },
+        ];
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-10-24 12:30:00', $timezone), $timezone);
+        $service = new TrialLifecycleService($clock);
+        $this->inject(
+            $service,
+            new class extends GrantRepository {},
+            new class extends PlanRepository {},
+            new TrialGrantQueryService()
+        );
+
+        $service->sendTrialExpiringNotifications();
+
+        self::assertSame([1 => 1, 2 => 1], $capturedDays);
+    }
+
     private function inject(TrialLifecycleService $service, GrantRepository $grants, PlanRepository $plans, TrialGrantQueryService $queries): void
     {
         foreach ([

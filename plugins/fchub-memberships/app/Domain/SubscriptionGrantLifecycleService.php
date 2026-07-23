@@ -5,6 +5,7 @@ namespace FChubMemberships\Domain;
 use FChubMemberships\Domain\Grant\AnchorDateCalculator;
 use FChubMemberships\Domain\Grant\MembershipTermCalculator;
 use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Support\Clock;
 
 defined('ABSPATH') || exit;
 
@@ -12,11 +13,17 @@ final class SubscriptionGrantLifecycleService
 {
     private AccessGrantService $grants;
     private GrantRepository $grantRepo;
+    private Clock $clock;
 
-    public function __construct(?AccessGrantService $grants = null, ?GrantRepository $grantRepo = null)
+    public function __construct(
+        ?AccessGrantService $grants = null,
+        ?GrantRepository $grantRepo = null,
+        ?Clock $clock = null
+    )
     {
         $this->grants = $grants ?? new AccessGrantService();
         $this->grantRepo = $grantRepo ?? new GrantRepository();
+        $this->clock = $clock ?? new Clock();
     }
 
     public function pause(object $subscription): void
@@ -35,7 +42,7 @@ final class SubscriptionGrantLifecycleService
         foreach ($grants as $grant) {
             if ($grant['status'] === 'paused') {
                 // Don't resume if the membership term expired during the pause
-                if (MembershipTermCalculator::isTermExpired($grant['meta'])) {
+                if (MembershipTermCalculator::isTermExpired($grant['meta'], null, $this->clock)) {
                     continue;
                 }
                 $this->grants->resumeGrant($grant['id']);
@@ -78,7 +85,7 @@ final class SubscriptionGrantLifecycleService
 
         foreach ($grants as $grant) {
             // Skip grants whose membership term has already expired
-            if (MembershipTermCalculator::isTermExpired($grant['meta'])) {
+            if (MembershipTermCalculator::isTermExpired($grant['meta'], null, $this->clock)) {
                 continue;
             }
 
@@ -91,20 +98,24 @@ final class SubscriptionGrantLifecycleService
                 if ($grant['status'] === 'paused') {
                     // Late payment: resume access, then extend to next anchor
                     $this->grants->resumeGrant($grant['id']);
-                    $newExpiry = AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
-                    $newExpiry = MembershipTermCalculator::capExpiry($newExpiry, $termEndsAt);
+                    $newExpiry = AnchorDateCalculator::nextAnchorDate(
+                        $anchorDay,
+                        $this->clock->storage($this->clock->now()),
+                        $this->clock
+                    );
+                    $newExpiry = MembershipTermCalculator::capExpiry($newExpiry, $termEndsAt, $this->clock);
                     $this->grants->extendExpiry((int) $grant['user_id'], (int) $grant['plan_id'], $newExpiry, (int) $subscription->id);
                 } elseif ($grant['status'] === 'active') {
                     // On-time renewal: extend to the following month's anchor
-                    $currentExpiry = $grant['expires_at'] ?? current_time('mysql');
-                    $newExpiry = AnchorDateCalculator::nextAnchorAfter($anchorDay, $currentExpiry);
-                    $newExpiry = MembershipTermCalculator::capExpiry($newExpiry, $termEndsAt);
+                    $currentExpiry = $grant['expires_at'] ?? $this->clock->storage($this->clock->now());
+                    $newExpiry = AnchorDateCalculator::nextAnchorAfter($anchorDay, $currentExpiry, $this->clock);
+                    $newExpiry = MembershipTermCalculator::capExpiry($newExpiry, $termEndsAt, $this->clock);
                     $this->grants->extendExpiry((int) $grant['user_id'], (int) $grant['plan_id'], $newExpiry, (int) $subscription->id);
                 }
             } else {
                 // Non-anchor: existing mirror behaviour
                 if ($grant['status'] === 'active' && $nextBilling) {
-                    $capped = MembershipTermCalculator::capExpiry((string) $nextBilling, $termEndsAt);
+                    $capped = MembershipTermCalculator::capExpiry((string) $nextBilling, $termEndsAt, $this->clock);
                     $this->grants->extendExpiry((int) $grant['user_id'], (int) $grant['plan_id'], $capped, (int) $subscription->id);
                 }
             }

@@ -329,18 +329,7 @@ final class PluginWideBugHuntTest extends PluginTestCase
 
     public function test_subscription_watcher_does_not_register_a_legacy_status_hook(): void
     {
-        $watcher = new \FChubMemberships\Domain\SubscriptionValidityWatcher(
-            new SubscriptionGrantLifecycleService(
-                new class() extends AccessGrantService {
-                    public function __construct() {}
-                    public function pauseGrant(int $grantId, string $reason = ''): array { return []; }
-                },
-                new class() extends GrantRepository {
-                    public function __construct() {}
-                    public function getBySourceId(int $sourceId, string $sourceType = 'order'): array { return []; }
-                }
-            )
-        );
+        $watcher = new \FChubMemberships\Domain\SubscriptionValidityWatcher();
 
         $watcher->registerHooks();
 

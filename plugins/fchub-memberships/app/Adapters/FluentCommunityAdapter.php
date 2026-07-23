@@ -5,13 +5,28 @@ namespace FChubMemberships\Adapters;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Adapters\Contracts\AccessAdapterInterface;
-use FChubMemberships\Http\Controllers\SettingsController;
+use FChubMemberships\Adapters\Contracts\BatchResourceLabelAdapterInterface;
+use FChubMemberships\Integration\Community\CommunityCapabilityRegistry;
 
-class FluentCommunityAdapter implements AccessAdapterInterface
+class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLabelAdapterInterface
 {
+    private const BADGE_LOCK_TIMEOUT_SECONDS = 10;
+
+    public function __construct(private ?CommunityCapabilityRegistry $communityCapabilities = null)
+    {
+        $this->communityCapabilities ??= new CommunityCapabilityRegistry();
+    }
+
     public function supports(string $resourceType): bool
     {
-        return in_array($resourceType, ['fc_space', 'fc_course'], true);
+        $capability = match ($resourceType) {
+            'fc_space' => 'spaces',
+            'fc_course' => 'courses',
+            'fc_badge' => 'badges',
+            default => null,
+        };
+
+        return $capability !== null && $this->communityCapabilities->supports($capability);
     }
 
     public function grant(int $userId, string $resourceType, string $resourceId, array $context = []): array
@@ -30,7 +45,6 @@ class FluentCommunityAdapter implements AccessAdapterInterface
         if ($resourceType === 'fc_space') {
             $result = $this->grantSpace($userId, (int) $resourceId);
             if ($result) {
-                $this->maybeAssignBadge($userId, $context);
                 return [
                     'success' => true,
                     'message' => sprintf(
@@ -49,7 +63,6 @@ class FluentCommunityAdapter implements AccessAdapterInterface
         if ($resourceType === 'fc_course') {
             $result = $this->grantCourse($userId, (int) $resourceId);
             if ($result) {
-                $this->maybeAssignBadge($userId, $context);
                 return [
                     'success' => true,
                     'message' => sprintf(
@@ -63,6 +76,10 @@ class FluentCommunityAdapter implements AccessAdapterInterface
                 'success' => false,
                 'message' => __('Failed to enroll user in FluentCommunity course.', 'fchub-memberships'),
             ];
+        }
+
+        if ($resourceType === 'fc_badge') {
+            return $this->grantBadge($userId, $resourceId);
         }
 
         return $this->unsupportedResourceResponse();
@@ -89,9 +106,11 @@ class FluentCommunityAdapter implements AccessAdapterInterface
             $result = $this->revokeCourse($userId, (int) $resourceId);
         }
 
-        if ($result) {
-            $this->maybeRevokeBadge($userId, $context);
+        if ($resourceType === 'fc_badge') {
+            return $this->revokeBadge($userId, $resourceId);
+        }
 
+        if ($result) {
             return [
                 'success' => true,
                 'message' => sprintf(
@@ -117,12 +136,23 @@ class FluentCommunityAdapter implements AccessAdapterInterface
             return false;
         }
 
-        return $this->supports($resourceType)
-            && $this->isCommunityMember($userId, (int) $resourceId);
+        if (!$this->supports($resourceType)) {
+            return false;
+        }
+
+        if ($resourceType === 'fc_badge') {
+            return $this->hasBadge($userId, $resourceId);
+        }
+
+        return $this->isCommunityMember($userId, (int) $resourceId);
     }
 
     public function getResourceLabel(string $resourceType, string $resourceId): string
     {
+        if ($resourceType === 'fc_badge') {
+            return $this->badgeLabel($resourceId);
+        }
+
         if (!$this->isActive()) {
             $prefix = $resourceType === 'fc_space'
                 ? __('Space', 'fchub-memberships')
@@ -144,9 +174,51 @@ class FluentCommunityAdapter implements AccessAdapterInterface
         return sprintf('#%s', $resourceId);
     }
 
+    public function getResourceLabels(string $resourceType, array $resourceIds): array
+    {
+        $resourceIds = array_values(array_unique(array_map('strval', $resourceIds)));
+        if ($resourceType === 'fc_badge') {
+            $labels = [];
+            foreach ($resourceIds as $resourceId) {
+                $labels[$resourceId] = $this->badgeLabel($resourceId);
+            }
+
+            return $labels;
+        }
+        $prefix = $resourceType === 'fc_space'
+            ? __('Space', 'fchub-memberships')
+            : __('Course', 'fchub-memberships');
+        $labels = [];
+        foreach ($resourceIds as $resourceId) {
+            $labels[$resourceId] = sprintf('%s #%s', $prefix, $resourceId);
+        }
+        if ($resourceIds === [] || !$this->isActive()) {
+            return $labels;
+        }
+
+        $modelClass = $resourceType === 'fc_space'
+            ? \FluentCommunity\App\Models\Space::class
+            : \FluentCommunity\Modules\Course\Model\Course::class;
+        if (!class_exists($modelClass)) {
+            return $labels;
+        }
+
+        $models = $modelClass::query()
+            ->whereIn('id', array_values(array_filter(array_map('intval', $resourceIds))))
+            ->get();
+        foreach ($models as $model) {
+            $id = (string) $model->id;
+            if (array_key_exists($id, $labels)) {
+                $labels[$id] = (string) $model->title;
+            }
+        }
+
+        return $labels;
+    }
+
     public function searchResources(string $query, string $resourceType, int $limit = 20): array
     {
-        if (!$this->isActive()) {
+        if (!$this->isActive() || !$this->supports($resourceType)) {
             return [];
         }
 
@@ -158,15 +230,27 @@ class FluentCommunityAdapter implements AccessAdapterInterface
             return $this->searchCourses($query, $limit);
         }
 
+        if ($resourceType === 'fc_badge') {
+            return $this->searchBadges($query, $limit);
+        }
+
         return [];
     }
 
     public function getResourceTypes(): array
     {
-        return [
-            'fc_space' => __('Community Space', 'fchub-memberships'),
-            'fc_course' => __('Community Course', 'fchub-memberships'),
-        ];
+        $types = [];
+        if ($this->supports('fc_space')) {
+            $types['fc_space'] = __('Community Space', 'fchub-memberships');
+        }
+        if ($this->supports('fc_course')) {
+            $types['fc_course'] = __('Community Course', 'fchub-memberships');
+        }
+        if ($this->supports('fc_badge')) {
+            $types['fc_badge'] = __('Community Badge', 'fchub-memberships');
+        }
+
+        return $types;
     }
 
     private function grantSpace(int $userId, int $spaceId): bool
@@ -321,66 +405,280 @@ class FluentCommunityAdapter implements AccessAdapterInterface
         return $results;
     }
 
+    private function supportsBadges(): bool
+    {
+        return $this->communityCapabilities->supports('badges');
+    }
+
+    /** @return array<string, mixed> */
+    private function badgeDefinitions(): array
+    {
+        if (!$this->supportsBadges()
+            || !is_callable(['FluentCommunity\\App\\Functions\\Utility', 'getOption'])
+        ) {
+            return [];
+        }
+
+        $badges = \FluentCommunity\App\Functions\Utility::getOption('user_badges', []);
+
+        return is_array($badges) ? $badges : [];
+    }
+
+    private function hasInstalledBadgeSlug(string $badgeSlug): bool
+    {
+        return $badgeSlug !== ''
+            && sanitize_title($badgeSlug) === $badgeSlug
+            && array_key_exists($badgeSlug, $this->badgeDefinitions());
+    }
+
+    private function grantBadge(int $userId, string $badgeSlug): array
+    {
+        return $this->withBadgeMutationLock(
+            $userId,
+            fn(): array => $this->grantBadgeLocked($userId, $badgeSlug)
+        );
+    }
+
+    private function grantBadgeLocked(int $userId, string $badgeSlug): array
+    {
+        if (!$this->hasInstalledBadgeSlug($badgeSlug)) {
+            return $this->unsupportedResourceResponse();
+        }
+
+        $profile = $this->findProfile($userId);
+        if ($profile === null) {
+            return [
+                'success' => false,
+                'message' => __('Failed to find the FluentCommunity profile for the badge assignment.', 'fchub-memberships'),
+            ];
+        }
+        $meta = $this->profileMeta($profile);
+        $badges = (array) ($meta['badge_slug'] ?? []);
+        if (in_array($badgeSlug, $badges, true)) {
+            return [
+                'success' => true,
+                'message' => sprintf(__('Badge already assigned: %s', 'fchub-memberships'), $this->badgeLabel($badgeSlug)),
+            ];
+        }
+
+        $meta['badge_slug'] = array_values(array_unique(array_merge($badges, [$badgeSlug])));
+        $profile->meta = $meta;
+
+        if (!$profile->save() || !$this->hasBadge($userId, $badgeSlug)) {
+            return [
+                'success' => false,
+                'message' => __('Failed to assign the FluentCommunity badge.', 'fchub-memberships'),
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => sprintf(__('Assigned badge: %s', 'fchub-memberships'), $this->badgeLabel($badgeSlug)),
+        ];
+    }
+
+    private function revokeBadge(int $userId, string $badgeSlug): array
+    {
+        return $this->withBadgeMutationLock(
+            $userId,
+            fn(): array => $this->revokeBadgeLocked($userId, $badgeSlug)
+        );
+    }
+
+    private function revokeBadgeLocked(int $userId, string $badgeSlug): array
+    {
+        if (!$this->hasInstalledBadgeSlug($badgeSlug)) {
+            return $this->unsupportedResourceResponse();
+        }
+
+        $profile = $this->findProfile($userId);
+        if ($profile === null) {
+            return [
+                'success' => false,
+                'message' => __('Failed to find the FluentCommunity profile for the badge removal.', 'fchub-memberships'),
+            ];
+        }
+        $meta = $this->profileMeta($profile);
+        $badges = (array) ($meta['badge_slug'] ?? []);
+        if (!in_array($badgeSlug, $badges, true)) {
+            return [
+                'success' => true,
+                'message' => sprintf(__('Badge already absent: %s', 'fchub-memberships'), $this->badgeLabel($badgeSlug)),
+            ];
+        }
+
+        $meta['badge_slug'] = array_values(array_diff($badges, [$badgeSlug]));
+        $profile->meta = $meta;
+
+        if (!$profile->save() || $this->hasBadge($userId, $badgeSlug)) {
+            return [
+                'success' => false,
+                'message' => __('Failed to remove the FluentCommunity badge.', 'fchub-memberships'),
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => sprintf(__('Removed badge: %s', 'fchub-memberships'), $this->badgeLabel($badgeSlug)),
+        ];
+    }
+
+    private function withBadgeMutationLock(int $userId, callable $mutation): array
+    {
+        $lockName = $this->badgeMutationLockName($userId);
+        try {
+            $acquired = $this->acquireBadgeMutationLock($lockName);
+        } catch (\Throwable) {
+            $acquired = false;
+        }
+        if (!$acquired) {
+            return $this->badgeLockFailureResponse();
+        }
+
+        $result = $this->badgeLockFailureResponse();
+        $released = false;
+        try {
+            $result = $mutation();
+        } catch (\Throwable) {
+            $result = $this->badgeLockFailureResponse();
+        } finally {
+            try {
+                $released = $this->releaseBadgeMutationLock($lockName);
+            } catch (\Throwable) {
+                $released = false;
+            }
+        }
+
+        return $released ? $result : $this->badgeLockFailureResponse();
+    }
+
+    private function acquireBadgeMutationLock(string $lockName): bool
+    {
+        global $wpdb;
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            'SELECT GET_LOCK(%s, %d)',
+            $lockName,
+            self::BADGE_LOCK_TIMEOUT_SECONDS
+        )) === 1;
+    }
+
+    private function releaseBadgeMutationLock(string $lockName): bool
+    {
+        global $wpdb;
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            'SELECT RELEASE_LOCK(%s)',
+            $lockName
+        )) === 1;
+    }
+
+    private function badgeMutationLockName(int $userId): string
+    {
+        global $wpdb;
+
+        $blogId = function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 0;
+        $scope = (string) ($wpdb->dbname ?? '')
+            . "\0"
+            . (string) ($wpdb->prefix ?? '')
+            . "\0"
+            . $blogId
+            . "\0"
+            . $userId;
+
+        return 'fchub_fc_badge_' . substr(hash('sha256', $scope), 0, 49);
+    }
+
+    private function badgeLockFailureResponse(): array
+    {
+        return [
+            'success' => false,
+            'message' => __('FluentCommunity badge state is busy. Please retry.', 'fchub-memberships'),
+        ];
+    }
+
+    private function hasBadge(int $userId, string $badgeSlug): bool
+    {
+        if (!$this->hasInstalledBadgeSlug($badgeSlug)) {
+            return false;
+        }
+
+        $profile = $this->findProfile($userId);
+        if ($profile === null) {
+            return false;
+        }
+
+        return in_array($badgeSlug, (array) ($this->profileMeta($profile)['badge_slug'] ?? []), true);
+    }
+
+    private function findProfile(int $userId): ?object
+    {
+        if (!class_exists('FluentCommunity\\App\\Models\\XProfile')) {
+            return null;
+        }
+
+        try {
+            return \FluentCommunity\App\Models\XProfile::where('user_id', $userId)->first();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function profileMeta(object $profile): array
+    {
+        $meta = $profile->meta ?? [];
+
+        return is_array($meta) ? $meta : [];
+    }
+
+    private function badgeLabel(string $badgeSlug): string
+    {
+        $definition = $this->badgeDefinitions()[$badgeSlug] ?? null;
+        if (is_array($definition)) {
+            foreach (['title', 'label', 'name'] as $key) {
+                if (is_string($definition[$key] ?? null) && trim($definition[$key]) !== '') {
+                    return trim($definition[$key]);
+                }
+            }
+        }
+        if (is_string($definition) && trim($definition) !== '') {
+            return trim($definition);
+        }
+
+        return sprintf(__('Badge %s', 'fchub-memberships'), $badgeSlug);
+    }
+
+    private function searchBadges(string $query, int $limit): array
+    {
+        $needle = strtolower(trim($query));
+        $results = [];
+        foreach ($this->badgeDefinitions() as $badgeSlug => $_definition) {
+            if (!is_string($badgeSlug) || !$this->hasInstalledBadgeSlug($badgeSlug)) {
+                continue;
+            }
+            $label = $this->badgeLabel($badgeSlug);
+            if ($needle !== ''
+                && !str_contains(strtolower($badgeSlug), $needle)
+                && !str_contains(strtolower($label), $needle)
+            ) {
+                continue;
+            }
+            $results[] = ['id' => $badgeSlug, 'label' => $label];
+            if (count($results) >= $limit) {
+                break;
+            }
+        }
+
+        return $results;
+    }
+
     private function unsupportedResourceResponse(): array
     {
         return [
             'success' => false,
             'message' => __('Unsupported FluentCommunity resource type.', 'fchub-memberships'),
         ];
-    }
-
-    private function maybeAssignBadge(int $userId, array $context): void
-    {
-        if (!class_exists('FluentCommunity\App\Models\Badge')) {
-            return;
-        }
-
-        $planId = $context['plan_id'] ?? null;
-        if (!$planId) {
-            return;
-        }
-
-        $settings = SettingsController::getSettings();
-        $badgeMappings = $settings['fc_badge_mappings'] ?? [];
-        $badgeId = $badgeMappings[$planId] ?? null;
-
-        if (!$badgeId) {
-            return;
-        }
-
-        $badge = \FluentCommunity\App\Models\Badge::find((int) $badgeId);
-        if ($badge) {
-            $badge->assignToUser($userId);
-        }
-    }
-
-    private function maybeRevokeBadge(int $userId, array $context): void
-    {
-        if (!class_exists('FluentCommunity\App\Models\Badge')) {
-            return;
-        }
-
-        $settings = SettingsController::getSettings();
-        if (($settings['fc_remove_badge_on_revoke'] ?? 'no') !== 'yes') {
-            return;
-        }
-
-        $planId = $context['plan_id'] ?? null;
-        if (!$planId) {
-            return;
-        }
-
-        $badgeMappings = $settings['fc_badge_mappings'] ?? [];
-        $badgeId = $badgeMappings[$planId] ?? null;
-
-        if (!$badgeId) {
-            return;
-        }
-
-        $badge = \FluentCommunity\App\Models\Badge::find((int) $badgeId);
-        if ($badge) {
-            $badge->removeFromUser($userId);
-        }
     }
 
     private function isActive(): bool

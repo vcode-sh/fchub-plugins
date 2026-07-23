@@ -6,6 +6,7 @@ namespace FChubMemberships\Tests\Unit\Http\Controllers;
 
 use FChubMemberships\Domain\AccessGrantService;
 use FChubMemberships\Http\Controllers\MemberController;
+use FChubMemberships\Http\ApplicationPasswordRequestContext;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class MemberMutationRestTest extends PluginTestCase
@@ -58,6 +59,45 @@ final class MemberMutationRestTest extends PluginTestCase
         }
     }
 
+    public function test_all_eight_application_password_mutations_reject_a_missing_key_before_service_execution(): void
+    {
+        $cases = [
+            ['grant', ['user_id' => 21, 'plan_id' => 5]],
+            ['revoke', ['user_id' => 21, 'plan_id' => 5]],
+            ['pause', ['grant_id' => 91]],
+            ['resume', ['grant_id' => 91]],
+            ['extend', ['user_id' => 21, 'plan_id' => 5, 'expires_at' => '2027-01-01 00:00:00']],
+            ['bulkGrant', ['user_ids' => [21], 'plan_id' => 5]],
+            ['bulkRevoke', ['user_ids' => [21], 'plan_id' => 5]],
+            ['bulkExtend', ['user_ids' => [21], 'plan_id' => 5, 'expires_at' => '2027-01-01 00:00:00']],
+        ];
+        $service = $this->createMock(AccessGrantService::class);
+        $service->expects(self::never())->method('manualGrant');
+        $service->expects(self::never())->method('revokePlan');
+        $service->expects(self::never())->method('pauseGrant');
+        $service->expects(self::never())->method('resumeGrant');
+        $service->expects(self::never())->method('bulkGrant');
+        $service->expects(self::never())->method('bulkRevoke');
+        $service->expects(self::never())->method('extendExpiry');
+        MemberController::setAccessGrantServiceFactory(static fn(): AccessGrantService => $service);
+        $user = new \WP_User();
+        $user->ID = 44;
+        ApplicationPasswordRequestContext::authenticated($user, []);
+
+        try {
+            foreach ($cases as [$controllerMethod, $body]) {
+                $response = MemberController::{$controllerMethod}(
+                    new \WP_REST_Request('POST', '/fchub-memberships/v1/admin/members', $body)
+                );
+
+                self::assertSame(428, $response->get_status(), $controllerMethod);
+                self::assertSame('fchub_idempotency_key_required', $response->get_data()['code'], $controllerMethod);
+            }
+        } finally {
+            ApplicationPasswordRequestContext::clear();
+        }
+    }
+
     public function test_replays_partial_and_complete_service_failures(): void
     {
         $cases = [
@@ -79,6 +119,29 @@ final class MemberMutationRestTest extends PluginTestCase
             self::assertSame($first->get_status(), $replay->get_status());
             self::assertSame($first->get_data(), $replay->get_data());
         }
+    }
+
+    public function test_bulk_revoke_reports_deferred_users_without_claiming_memberships_were_revoked(): void
+    {
+        $this->usePersistentRequests();
+        $service = $this->createMock(AccessGrantService::class);
+        $service->expects(self::once())->method('bulkRevoke')->willReturn([
+            'revoked' => 0,
+            'grace_started' => 2,
+            'failed' => 0,
+            'errors' => [],
+        ]);
+        MemberController::setAccessGrantServiceFactory(static fn(): AccessGrantService => $service);
+
+        $response = MemberController::bulkRevoke($this->request('bulk-deferred', [
+            'user_ids' => [21, 22],
+            'plan_id' => 5,
+            'reason' => 'Owner request',
+        ]));
+
+        self::assertSame(200, $response->get_status());
+        self::assertStringContainsString('scheduled', strtolower($response->get_data()['message']));
+        self::assertStringNotContainsString('memberships revoked', strtolower($response->get_data()['message']));
     }
 
     public function test_changed_body_conflicts_without_repeating_the_service_call(): void
@@ -171,8 +234,26 @@ final class MemberMutationRestTest extends PluginTestCase
             $rows[$data['request_key']] = $data;
             return 1;
         };
-        $GLOBALS['_fchub_test_wpdb_overrides']['update'] = static function (string $table, array $data, array $where) use (&$rows): int {
-            $rows[$where['request_key']] = array_merge($rows[$where['request_key']], $data);
+        $GLOBALS['_fchub_test_wpdb_overrides']['query'] = static function (string $query, \wpdb $wpdb) use (&$rows): int {
+            if (!str_contains($query, 'UPDATE wp_fchub_membership_mutation_requests')) {
+                return 0;
+            }
+
+            preg_match("/request_key = '([^']+)'/", $query, $keyMatch);
+            preg_match("/SET state = '([^']+)'/", $query, $stateMatch);
+            preg_match('/response_status = ([0-9]+)/', $query, $statusMatch);
+            preg_match("/response_body = '([^']*)'/", $query, $bodyMatch);
+            $key = $keyMatch[1] ?? '';
+            $rows[$key] = array_merge($rows[$key], [
+                'state' => $stateMatch[1] ?? 'reserved',
+                'response_status' => isset($statusMatch[1]) ? (int) $statusMatch[1] : null,
+                'response_body' => $bodyMatch[1] ?? null,
+                'lease_token' => null,
+                'lease_expires_at' => null,
+                'completed_at' => '2026-03-13 22:00:00',
+                'updated_at' => '2026-03-13 22:00:00',
+            ]);
+            $wpdb->rows_affected = 1;
             return 1;
         };
     }

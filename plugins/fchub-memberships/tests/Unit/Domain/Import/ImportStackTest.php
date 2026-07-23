@@ -216,6 +216,87 @@ final class ImportStackTest extends PluginTestCase
         ], 'overwrite', false);
         self::assertSame(1, $overwrite['summary']['imported']);
         self::assertCount(1, $revoked);
+        self::assertSame(0, $revoked[0][2]['grace_period_days']);
+    }
+
+    public function test_import_overwrite_stops_before_regrant_when_revocation_fails(): void
+    {
+        $granted = [];
+        $revoked = [];
+        $service = new ImportService();
+        $grantService = new class($granted, $revoked) extends AccessGrantService {
+            private array $revokeResults = [[
+                'success' => false,
+                'revoked' => 0,
+                'failed' => 1,
+                'errors' => [['message' => 'Provider refused detach']],
+            ], [
+                'success' => true,
+                'revoked' => 0,
+                'failed' => 0,
+                'errors' => [],
+            ]];
+
+            public function __construct(private array &$granted, private array &$revoked)
+            {
+            }
+
+            public function grantPlan(int $userId, int $planId, array $context = []): array
+            {
+                $this->granted[] = [$userId, $planId, $context];
+                return ['created' => 1];
+            }
+
+            public function revokePlan(int $userId, int $planId, array $context = []): array
+            {
+                $this->revoked[] = [$userId, $planId, $context];
+                return array_shift($this->revokeResults);
+            }
+        };
+        $grantRepo = new class extends GrantRepository {
+            public function getByUserId(int $userId, array $filters = []): array
+            {
+                return ($filters['status'] ?? '') === 'active' ? [['id' => 1]] : [];
+            }
+        };
+
+        $this->inject($service, 'grantService', $grantService);
+        $this->inject($service, 'grantRepo', $grantRepo);
+
+        $result = $service->processBatch([[
+            'email' => 'alice@example.com',
+            'username' => 'alice',
+            'level_name' => 'Gold',
+            'expires_at' => null,
+            'is_lifetime' => true,
+        ]], [[
+            'level_name' => 'Gold',
+            'action' => 'map_existing',
+            'plan_id' => 55,
+        ]], 'overwrite');
+
+        self::assertSame(1, $result['summary']['failed']);
+        self::assertSame('failed', $result['results'][0]['status']);
+        self::assertStringContainsString('Provider refused detach', $result['results'][0]['message']);
+        self::assertSame(0, $revoked[0][2]['grace_period_days']);
+        self::assertSame([], $granted);
+
+        $staleResult = $service->processBatch([[
+            'email' => 'alice@example.com',
+            'username' => 'alice',
+            'level_name' => 'Gold',
+            'expires_at' => null,
+            'is_lifetime' => true,
+        ]], [[
+            'level_name' => 'Gold',
+            'action' => 'map_existing',
+            'plan_id' => 55,
+        ]], 'overwrite');
+
+        self::assertSame(1, $staleResult['summary']['failed']);
+        self::assertStringContainsString('could not be confirmed', $staleResult['results'][0]['message']);
+        self::assertSame(0, $revoked[1][2]['grace_period_days']);
+        self::assertSame([], $granted);
     }
 
     public function test_import_service_handles_existing_customers_missing_tables_and_member_processing_failures(): void

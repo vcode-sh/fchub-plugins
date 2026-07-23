@@ -1,34 +1,39 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FChubMemberships\Integration;
 
 defined('ABSPATH') || exit;
 
-use FChubMemberships\Support\Logger;
+use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Storage\WebhookDeliveryRepository;
+use FChubMemberships\Storage\WebhookEventRepository;
 
-class WebhookDispatcher
+final class WebhookDispatcher
 {
-    private array $settings;
+    private WebhookEventRepository $eventRepository;
+    private WebhookDeliveryRepository $deliveryRepository;
+    private WebhookQueue $queue;
+    private WebhookEndpointPolicy $endpointPolicy;
+    private MembershipSettingsOptionCoordinator $settingsCoordinator;
 
-    public function __construct()
-    {
-        $this->settings = get_option('fchub_memberships_settings', []);
+    public function __construct(
+        ?WebhookEventRepository $eventRepository = null,
+        ?WebhookDeliveryRepository $deliveryRepository = null,
+        ?WebhookQueue $queue = null,
+        ?WebhookEndpointPolicy $endpointPolicy = null,
+        ?MembershipSettingsOptionCoordinator $settingsCoordinator = null
+    ) {
+        $this->eventRepository = $eventRepository ?? new WebhookEventRepository();
+        $this->deliveryRepository = $deliveryRepository ?? new WebhookDeliveryRepository();
+        $this->queue = $queue ?? new WebhookQueue();
+        $this->endpointPolicy = $endpointPolicy ?? new WebhookEndpointPolicy();
+        $this->settingsCoordinator = $settingsCoordinator ?? new MembershipSettingsOptionCoordinator();
     }
 
-    /**
-     * Register hooks for all membership events.
-     */
     public function register(): void
     {
-        if (($this->settings['webhook_enabled'] ?? 'no') !== 'yes') {
-            return;
-        }
-
-        $urls = $this->getWebhookUrls();
-        if (empty($urls)) {
-            return;
-        }
-
         add_action('fchub_memberships/grant_created', [$this, 'onGrantCreated'], 20, 3);
         add_action('fchub_memberships/grant_revoked', [$this, 'onGrantRevoked'], 20, 4);
         add_action('fchub_memberships/grant_expired', [$this, 'onGrantExpired'], 20, 1);
@@ -36,225 +41,233 @@ class WebhookDispatcher
         add_action('fchub_memberships/grant_resumed', [$this, 'onGrantResumed'], 20, 1);
     }
 
+    /** @param array<string, mixed> $context */
     public function onGrantCreated(int $userId, int $planId, array $context): void
     {
-        $user = get_userdata($userId);
-        $planRepo = new \FChubMemberships\Storage\PlanRepository();
-        $plan = $planRepo->find($planId);
-
         $this->dispatch('grant_created', [
-            'user'    => $this->formatUser($user),
-            'plan'    => $this->formatPlan($plan),
+            'user' => $this->formatUser(get_userdata($userId)),
+            'plan' => $this->formatPlan((new PlanRepository())->find($planId)),
             'context' => [
                 'source_type' => $context['source_type'] ?? 'manual',
-                'source_id'   => $context['source_id'] ?? 0,
+                'source_id' => $context['source_id'] ?? 0,
             ],
         ]);
     }
 
+    /** @param list<array<string, mixed>> $grants */
     public function onGrantRevoked(array $grants, int $planId, int $userId, string $reason): void
     {
-        $user = get_userdata($userId);
-        $planRepo = new \FChubMemberships\Storage\PlanRepository();
-        $plan = $planRepo->find($planId);
-
         $this->dispatch('grant_revoked', [
-            'user'   => $this->formatUser($user),
-            'plan'   => $this->formatPlan($plan),
+            'user' => $this->formatUser(get_userdata($userId)),
+            'plan' => $this->formatPlan((new PlanRepository())->find($planId)),
             'reason' => $reason,
             'grants_affected' => count($grants),
         ]);
     }
 
+    /** @param array<string, mixed> $grant */
     public function onGrantExpired(array $grant): void
     {
-        $user = get_userdata($grant['user_id']);
-        $planRepo = new \FChubMemberships\Storage\PlanRepository();
-        $plan = $grant['plan_id'] ? $planRepo->find($grant['plan_id']) : null;
-
         $this->dispatch('grant_expired', [
-            'user'  => $this->formatUser($user),
-            'plan'  => $this->formatPlan($plan),
+            'user' => $this->formatUser(get_userdata((int) ($grant['user_id'] ?? 0))),
+            'plan' => $this->findGrantPlan($grant),
             'grant' => $this->formatGrant($grant),
         ]);
     }
 
+    /** @param array<string, mixed> $grant */
     public function onGrantPaused(array $grant, string $reason): void
     {
-        $user = get_userdata($grant['user_id']);
-        $planRepo = new \FChubMemberships\Storage\PlanRepository();
-        $plan = $grant['plan_id'] ? $planRepo->find($grant['plan_id']) : null;
-
         $this->dispatch('grant_paused', [
-            'user'   => $this->formatUser($user),
-            'plan'   => $this->formatPlan($plan),
-            'grant'  => $this->formatGrant($grant),
+            'user' => $this->formatUser(get_userdata((int) ($grant['user_id'] ?? 0))),
+            'plan' => $this->findGrantPlan($grant),
+            'grant' => $this->formatGrant($grant),
             'reason' => $reason,
         ]);
     }
 
+    /** @param array<string, mixed> $grant */
     public function onGrantResumed(array $grant): void
     {
-        $user = get_userdata($grant['user_id']);
-        $planRepo = new \FChubMemberships\Storage\PlanRepository();
-        $plan = $grant['plan_id'] ? $planRepo->find($grant['plan_id']) : null;
-
         $this->dispatch('grant_resumed', [
-            'user'  => $this->formatUser($user),
-            'plan'  => $this->formatPlan($plan),
+            'user' => $this->formatUser(get_userdata((int) ($grant['user_id'] ?? 0))),
+            'plan' => $this->findGrantPlan($grant),
             'grant' => $this->formatGrant($grant),
         ]);
     }
 
-    /**
-     * Dispatch a webhook event to all configured URLs.
-     */
+    /** @param array<string, mixed> $payload */
     public function dispatch(string $eventType, array $payload): void
     {
-        $urls = $this->getWebhookUrls();
-        if (empty($urls)) {
+        $persisted = $this->settingsCoordinator->synchronized(function (
+            MembershipSettingsOptionCoordinator $coordinator
+        ) use ($eventType, $payload): ?array {
+            $urls = $this->readyDestinations($coordinator->read());
+            if ($urls === []) {
+                return null;
+            }
+
+            $envelope = WebhookEnvelope::create($eventType, $payload);
+            $body = WebhookEnvelope::encode($envelope);
+            $occurredAt = new \DateTimeImmutable((string) $envelope['occurred_at']);
+            $occurredAt = $occurredAt->setTimezone(new \DateTimeZone('UTC'));
+            $storedAt = $occurredAt->format('Y-m-d H:i:s');
+
+            $this->eventRepository->create([
+                'event_id' => $envelope['id'],
+                'event_type' => $envelope['event_type'],
+                'schema_version' => $envelope['schema_version'],
+                'body' => $body,
+                'occurred_at' => $storedAt,
+                'created_at' => $storedAt,
+            ]);
+
+            return [
+                'deliveries' => $this->deliveryRepository->createMany((string) $envelope['id'], $urls),
+                'timestamp' => $occurredAt->getTimestamp(),
+            ];
+        });
+
+        if (!$persisted['success'] || !is_array($persisted['value'] ?? null)) {
             return;
         }
 
-        $secret = $this->settings['webhook_secret'] ?? '';
-
-        $body = wp_json_encode([
-            'event_type' => $eventType,
-            'timestamp'  => current_time('c'),
-            'site_url'   => get_site_url(),
-            'data'       => $payload,
-        ]);
-
-        $signature = $secret ? hash_hmac('sha256', $body, $secret) : '';
-
-        foreach ($urls as $url) {
-            $this->sendToUrl($url, $body, $signature, $eventType);
+        foreach ($persisted['value']['deliveries'] as $delivery) {
+            try {
+                $this->queue->schedule(
+                    (int) ($delivery['id'] ?? 0),
+                    1,
+                    (int) $persisted['value']['timestamp']
+                );
+            } catch (\Throwable) {
+                // The pending row remains recoverable by reconciliation.
+            }
         }
     }
 
-    /**
-     * Send a test webhook to configured URLs.
-     */
+    /** @return array<string, mixed> */
     public function sendTest(): array
     {
-        $urls = $this->getWebhookUrls();
-        if (empty($urls)) {
+        $loaded = $this->settingsCoordinator->synchronized(
+            static fn(MembershipSettingsOptionCoordinator $coordinator): array => $coordinator->read()
+        );
+        $settings = $loaded['success'] && is_array($loaded['value'] ?? null)
+            ? $loaded['value']
+            : [];
+        $urls = $this->readyDestinations($settings, false);
+        if ($urls === []) {
             return ['success' => false, 'message' => 'No webhook URLs configured'];
         }
 
-        $secret = $this->settings['webhook_secret'] ?? '';
-
         $body = wp_json_encode([
             'event_type' => 'test',
-            'timestamp'  => current_time('c'),
-            'site_url'   => get_site_url(),
-            'data'       => [
-                'message' => 'This is a test webhook from FCHub Memberships',
-            ],
+            'timestamp' => current_time('c'),
+            'site_url' => get_site_url(),
+            'data' => ['message' => 'This is a test webhook from FCHub Memberships'],
         ]);
+        if (!is_string($body)) {
+            return ['success' => false, 'message' => 'Unable to encode test webhook'];
+        }
 
-        $signature = $secret ? hash_hmac('sha256', $body, $secret) : '';
+        $signature = hash_hmac('sha256', $body, (string) $settings['webhook_secret']);
         $results = [];
-
         foreach ($urls as $url) {
             $response = wp_remote_post($url, [
                 'timeout' => 15,
                 'headers' => [
-                    'Content-Type'     => 'application/json',
+                    'Content-Type' => 'application/json',
                     'X-FCHub-Signature' => $signature,
-                    'X-FCHub-Event'    => 'test',
+                    'X-FCHub-Event' => 'test',
                 ],
                 'body' => $body,
             ]);
-
             if (is_wp_error($response)) {
-                $results[] = ['url' => $url, 'success' => false, 'error' => $response->get_error_message()];
-            } else {
-                $code = wp_remote_retrieve_response_code($response);
-                $results[] = ['url' => $url, 'success' => $code >= 200 && $code < 300, 'status_code' => $code];
+                $results[] = [
+                    'url' => $url,
+                    'success' => false,
+                    'error' => $response->get_error_message(),
+                ];
+                continue;
             }
+
+            $code = wp_remote_retrieve_response_code($response);
+            $results[] = [
+                'url' => $url,
+                'success' => $code >= 200 && $code < 300,
+                'status_code' => $code,
+            ];
         }
 
         return ['success' => true, 'results' => $results];
     }
 
-    private function sendToUrl(string $url, string $body, string $signature, string $eventType): void
+    /** @param array<string, mixed> $settings @return list<string> */
+    private function readyDestinations(array $settings, bool $requireEnabled = true): array
     {
-        $headers = [
-            'Content-Type'     => 'application/json',
-            'X-FCHub-Signature' => $signature,
-            'X-FCHub-Event'    => $eventType,
-        ];
-
-        // Use Action Scheduler if available for async dispatch
-        if (function_exists('as_schedule_single_action')) {
-            as_schedule_single_action(time(), 'fchub_memberships_dispatch_webhook', [
-                'url'     => $url,
-                'body'    => $body,
-                'headers' => $headers,
-            ]);
-            return;
-        }
-
-        // Fallback to synchronous dispatch
-        $response = wp_remote_post($url, [
-            'timeout' => 10,
-            'headers' => $headers,
-            'body'    => $body,
-        ]);
-
-        if (is_wp_error($response)) {
-            Logger::error('Webhook dispatch failed', sprintf('%s: %s', $url, $response->get_error_message()));
-        }
-    }
-
-    private function getWebhookUrls(): array
-    {
-        $raw = $this->settings['webhook_urls'] ?? '';
-        if (empty($raw)) {
+        if (($requireEnabled && ($settings['webhook_enabled'] ?? 'no') !== 'yes')
+            || empty($settings['webhook_secret'])
+        ) {
             return [];
         }
 
-        $urls = array_filter(array_map('trim', explode("\n", $raw)));
-        return array_filter($urls, function ($url) {
-            return filter_var($url, FILTER_VALIDATE_URL) !== false;
-        });
+        $raw = (string) ($settings['webhook_urls'] ?? '');
+        if ($raw === '' || $this->endpointPolicy->validate($raw) !== true) {
+            return [];
+        }
+
+        return $this->endpointPolicy->normalise($raw);
     }
 
-    private function formatUser($user): array
+    /** @param array<string, mixed> $grant */
+    private function findGrantPlan(array $grant): ?array
+    {
+        $planId = (int) ($grant['plan_id'] ?? 0);
+        return $planId > 0
+            ? $this->formatPlan((new PlanRepository())->find($planId))
+            : null;
+    }
+
+    private function formatUser(mixed $user): array
     {
         if (!$user) {
             return ['id' => 0, 'email' => '', 'display_name' => ''];
         }
 
         return [
-            'id'           => $user->ID,
-            'email'        => $user->user_email,
-            'display_name' => $user->display_name,
+            'id' => (int) $user->ID,
+            'email' => (string) $user->user_email,
+            'display_name' => (string) $user->display_name,
         ];
     }
 
+    /** @param array<string, mixed>|null $plan */
     private function formatPlan(?array $plan): ?array
     {
-        if (!$plan) {
+        if ($plan === null) {
             return null;
         }
 
         return [
-            'id'    => $plan['id'],
-            'title' => $plan['title'],
-            'slug'  => $plan['slug'] ?? '',
+            'id' => (int) $plan['id'],
+            'title' => (string) $plan['title'],
+            'slug' => (string) ($plan['slug'] ?? ''),
         ];
     }
 
+    /** @param array<string, mixed> $grant */
     private function formatGrant(array $grant): array
     {
+        $status = (string) ($grant['status'] ?? '');
+        if ($status === '' && ($grant['lifecycle'] ?? '') === 'ended') {
+            $status = 'expired';
+        }
+
         return [
-            'id'          => $grant['id'],
-            'status'      => $grant['status'],
-            'source_type' => $grant['source_type'],
-            'created_at'  => $grant['created_at'],
-            'expires_at'  => $grant['expires_at'],
+            'id' => (int) ($grant['id'] ?? 0),
+            'status' => $status,
+            'source_type' => (string) ($grant['source_type'] ?? ''),
+            'created_at' => $grant['created_at'] ?? null,
+            'expires_at' => $grant['expires_at'] ?? null,
         ];
     }
 }

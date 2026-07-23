@@ -13,6 +13,15 @@ final class MembershipContactProjectorTest extends TestCase
     public function test_dry_run_reports_desired_and_current_owned_state_without_mutation(): void
     {
         $fixture = ProjectorFixture::make([self::grant(5)]);
+        $matchingTagId = $fixture->tags->seed('member:gold', 31);
+        $fixture->contact->tagIds = [$matchingTagId];
+        $fixture->contact->listIds = [9];
+        $fixture->contact->storedCustomFields = [
+            'membership_plan' => 'Old plan',
+            'membership_status' => 'paused',
+            'membership_expires' => '2026-01-01 00:00:00',
+            'manual_note' => 'Keep me',
+        ];
 
         $preview = $fixture->projector->preview(21);
 
@@ -24,6 +33,16 @@ final class MembershipContactProjectorTest extends TestCase
         self::assertSame(0, $fixture->tags->importCalls);
         self::assertSame([], $fixture->state);
         self::assertSame([], $fixture->contact->lastCustomFields);
+        self::assertSame([
+            'membership_plan' => 'Old plan',
+            'membership_status' => 'paused',
+            'membership_expires' => '2026-01-01 00:00:00',
+        ], $preview['current']['custom_fields']);
+        self::assertSame(3, $preview['drift']);
+        self::assertSame(1, $fixture->contacts->getContactByUserIdCalls);
+        self::assertSame(0, $fixture->contacts->getContactByUserRefCalls);
+        self::assertSame(0, $fixture->contacts->createOrUpdateCalls);
+        self::assertSame(1, $fixture->contact->customFieldReadCalls);
     }
 
     public function test_dry_run_treats_a_missing_contact_as_reconcilable_drift_without_mutation(): void
@@ -54,7 +73,7 @@ final class MembershipContactProjectorTest extends TestCase
 
         self::assertTrue($applied['success']);
         self::assertGreaterThan(0, $before['drift']);
-        self::assertSame(0, max(0, $before['drift'] - $after['drift']));
+        self::assertSame(3, max(0, $before['drift'] - $after['drift']));
         self::assertGreaterThan(0, $after['drift']);
         self::assertSame(0, $fixture->tags->importCalls);
     }
@@ -312,6 +331,115 @@ final class MembershipContactProjectorTest extends TestCase
         self::assertSame([], $fixture->contact->tagIds);
         self::assertSame([], $fixture->contact->listIds);
         self::assertArrayNotHasKey(21, $fixture->state);
+        self::assertFalse($result['degraded']);
+        self::assertSame([], $fixture->contact->lastCustomFields);
+    }
+
+    public function test_detach_only_state_save_failure_restores_visible_owned_relations(): void
+    {
+        $fixture = ProjectorFixture::make([self::grant(5)]);
+        $fixture->projector->reconcile(21);
+        $ownedState = $fixture->state[21];
+        $fixture->contact->lastCustomFields = [];
+        $fixture->grants = [];
+        $fixture->stateSaveFails = true;
+
+        $result = $fixture->projector->reconcile(21);
+
+        self::assertFalse($result['success']);
+        self::assertFalse($result['degraded']);
+        self::assertContains('state_save_failed', $result['errors']);
+        self::assertSame($ownedState['tag_ids'], $fixture->contact->tagIds);
+        self::assertSame($ownedState['list_ids'], $fixture->contact->listIds);
+        self::assertSame([], $result['detached_tags']);
+        self::assertSame([], $result['detached_lists']);
+        self::assertSame($ownedState, $fixture->state[21]);
+        self::assertSame([], $fixture->contact->lastCustomFields);
+    }
+
+    public function test_mixed_delta_state_save_failure_restores_exact_pre_attempt_owned_state(): void
+    {
+        $fixture = ProjectorFixture::make([self::grant(5)]);
+        $fixture->projector->reconcile(21);
+        $ownedState = $fixture->state[21];
+        $goldTagId = $fixture->tags->idForTitle('member:gold');
+        $fixture->contact->lastCustomFields = [];
+        $fixture->grants = [self::grant(7)];
+        $fixture->stateSaveFails = true;
+
+        $result = $fixture->projector->reconcile(21);
+
+        self::assertFalse($result['success']);
+        self::assertFalse($result['degraded']);
+        self::assertSame([$goldTagId], $fixture->contact->tagIds);
+        self::assertNotContains($fixture->tags->idForTitle('member:pro'), $fixture->contact->tagIds);
+        self::assertSame([], $result['attached_tags']);
+        self::assertSame([], $result['detached_tags']);
+        self::assertSame($ownedState, $fixture->state[21]);
+        self::assertSame([], $fixture->contact->lastCustomFields);
+    }
+
+    public function test_incomplete_reattach_compensation_is_explicitly_degraded(): void
+    {
+        $fixture = ProjectorFixture::make([self::grant(5)]);
+        $fixture->projector->reconcile(21);
+        $ownedTagId = $fixture->tags->idForTitle('member:gold');
+        $fixture->grants = [];
+        $fixture->stateSaveFails = true;
+        $fixture->contact->throwOnAttachTags = true;
+
+        $result = $fixture->projector->reconcile(21);
+
+        self::assertFalse($result['success']);
+        self::assertTrue($result['degraded']);
+        self::assertContains('tag_compensation_attach_failed', $result['errors']);
+        self::assertNotContains($ownedTagId, $fixture->contact->tagIds);
+        self::assertContains($ownedTagId, $fixture->state[21]['tag_ids']);
+        self::assertStringNotContainsString('secret-token', implode(' ', $result['errors']));
+    }
+
+    public function test_compensation_never_reattaches_an_owned_relation_absent_before_the_attempt(): void
+    {
+        $fixture = ProjectorFixture::make([self::grant(5)]);
+        $fixture->projector->reconcile(21);
+        $ownedTagId = $fixture->tags->idForTitle('member:gold');
+        $fixture->contact->tagIds = [];
+        $fixture->contact->attachedTagIds = [];
+        $fixture->grants = [];
+        $fixture->stateSaveFails = true;
+
+        $result = $fixture->projector->reconcile(21);
+
+        self::assertFalse($result['success']);
+        self::assertFalse($result['degraded']);
+        self::assertNotContains($ownedTagId, $fixture->contact->tagIds);
+        self::assertNotContains($ownedTagId, $fixture->contact->attachedTagIds);
+        self::assertSame([], $result['detached_tags']);
+        self::assertSame([9], $fixture->contact->listIds);
+    }
+
+    public function test_custom_fields_run_only_after_state_commit_and_retry_idempotently(): void
+    {
+        $fixture = ProjectorFixture::make([self::grant(5)]);
+        $fixture->contact->throwOnCustomFieldSync = true;
+
+        $failed = $fixture->projector->reconcile(21);
+
+        self::assertFalse($failed['success']);
+        self::assertTrue($failed['degraded']);
+        self::assertContains('custom_field_sync_failed', $failed['errors']);
+        self::assertArrayHasKey(21, $fixture->state);
+        self::assertSame(1, $fixture->stateSaveCalls);
+        self::assertSame([], $fixture->contact->storedCustomFields);
+
+        $fixture->contact->throwOnCustomFieldSync = false;
+        $retry = $fixture->projector->reconcile(21);
+
+        self::assertTrue($retry['success']);
+        self::assertFalse($retry['degraded']);
+        self::assertSame(2, $fixture->stateSaveCalls);
+        self::assertSame('active', $fixture->contact->storedCustomFields['membership_status']);
+        self::assertSame([9], $fixture->contact->listIds);
     }
 
     public function test_failed_state_save_reports_sanitised_rollback_failure_and_leaves_asset_unowned(): void
@@ -422,6 +550,7 @@ final class ProjectorFixture
     /** @var array<int, array{contact_id:int, tag_ids:list<int>, list_ids:list<int>}> */
     public array $state = [];
     public bool $stateSaveFails = false;
+    public int $stateSaveCalls = 0;
 
     private function __construct(
         public MembershipContactProjector $projector,
@@ -445,6 +574,7 @@ final class ProjectorFixture
                 return $fixture->state[$userId] ?? '';
             },
             static function (int $userId, string $key, array $state) use ($fixture): bool {
+                $fixture->stateSaveCalls++;
                 if ($fixture->stateSaveFails) {
                     return false;
                 }
@@ -500,6 +630,8 @@ final class ProjectorContact
     public bool $throwOnDetachTags = false;
     public bool $silentlyIgnoreTagDetach = false;
     public bool $returnRuntimeRelationCollections = false;
+    public bool $throwOnCustomFieldSync = false;
+    public int $customFieldReadCalls = 0;
     /** @var list<int> */
     public array $attachedTagIds = [];
 
@@ -562,6 +694,9 @@ final class ProjectorContact
     /** @param array<string, string> $values */
     public function syncCustomFieldValues(array $values, bool $deleteOtherValues = true): void
     {
+        if ($this->throwOnCustomFieldSync) {
+            throw new \RuntimeException('custom-field-secret must never escape');
+        }
         $this->lastCustomFields = $values;
         $this->lastDeleteOtherValues = $deleteOtherValues;
         foreach ($values as $key => $value) {
@@ -573,6 +708,13 @@ final class ProjectorContact
             }
             $this->storedCustomFields[$key] = $value;
         }
+    }
+
+    /** @return array<string, string> */
+    public function custom_fields(): array
+    {
+        $this->customFieldReadCalls++;
+        return $this->storedCustomFields;
     }
 }
 
@@ -603,6 +745,9 @@ final class ProjectorContactsApi
         ['slug' => 'membership_status'],
         ['slug' => 'membership_expires'],
     ];
+    public int $getContactByUserIdCalls = 0;
+    public int $getContactByUserRefCalls = 0;
+    public int $createOrUpdateCalls = 0;
 
     public function __construct(public ?ProjectorContact $contact)
     {
@@ -610,11 +755,19 @@ final class ProjectorContactsApi
 
     public function getContactByUserRef(int $userId): ?ProjectorContact
     {
+        $this->getContactByUserRefCalls++;
+        return $this->contact;
+    }
+
+    public function getContactByUserId(int $userId): ?ProjectorContact
+    {
+        $this->getContactByUserIdCalls++;
         return $this->contact;
     }
 
     public function createOrUpdate(array $data): ProjectorContact
     {
+        $this->createOrUpdateCalls++;
         if ($this->contact === null) {
             $this->contact = new ProjectorContact(102);
         }

@@ -46,34 +46,26 @@ final class FluentCommunityMappingPolicyTest extends PluginTestCase
         ));
     }
 
-    public function test_grant_path_always_reconciles_the_external_membership(): void
+    public function test_legacy_sync_contains_no_provider_or_badge_mutation_contracts(): void
     {
         $source = file_get_contents(dirname(__DIR__, 3) . '/app/Integration/FluentCommunitySync.php');
         self::assertIsString($source);
 
-        $grantStart = strpos($source, 'public function onGrantCreated');
-        $revokeStart = strpos($source, 'public function onGrantRevoked');
-        self::assertNotFalse($grantStart);
-        self::assertNotFalse($revokeStart);
-
-        $grantMethod = substr($source, $grantStart, $revokeStart - $grantStart);
-        self::assertStringNotContainsString('isResourceStillGranted', $grantMethod);
+        self::assertStringNotContainsString('addMember', $source);
+        self::assertStringNotContainsString('removeMember', $source);
+        self::assertStringNotContainsString('Models\\Badge', $source);
+        self::assertStringNotContainsString('assignToUser', $source);
+        self::assertStringNotContainsString('removeFromUser', $source);
     }
 
-    public function test_revoke_path_checks_shared_space_before_removing_member(): void
+    public function test_legacy_sync_contains_no_single_plan_user_meta_or_lifecycle_mutation_hooks(): void
     {
         $source = file_get_contents(dirname(__DIR__, 3) . '/app/Integration/FluentCommunitySync.php');
         self::assertIsString($source);
 
-        $revokeStart = strpos($source, 'public function onGrantRevoked');
-        $pauseStart = strpos($source, 'public function onGrantPaused');
-        self::assertNotFalse($revokeStart);
-        self::assertNotFalse($pauseStart);
-
-        $revokeMethod = substr($source, $revokeStart, $pauseStart - $revokeStart);
-        self::assertStringContainsString(
-            '!$this->isResourceStillGranted($userId, (string) $spaceId, $spaceMappings)',
-            $revokeMethod
-        );
+        self::assertStringNotContainsString('_fchub_membership_plan_id', $source);
+        self::assertStringNotContainsString('_fchub_membership_status', $source);
+        self::assertStringNotContainsString('update_user_meta', $source);
+        self::assertStringNotContainsString("add_action('fchub_memberships/grant_", $source);
     }
 }

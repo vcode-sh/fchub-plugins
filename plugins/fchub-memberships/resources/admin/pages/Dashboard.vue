@@ -94,6 +94,8 @@
         </div>
       </section>
 
+      <ProviderHealthCards />
+
       <section class="summary-grid" aria-label="Membership summary">
         <router-link to="/members" class="summary-metric">
           <span class="summary-icon summary-icon--blue" aria-hidden="true"><el-icon><UserFilled /></el-icon></span>
@@ -272,6 +274,7 @@ import {
   Tooltip,
 } from 'chart.js'
 import { dashboard } from '@/api/dashboard.js'
+import ProviderHealthCards from '@/components/dashboard/ProviderHealthCards.vue'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 import { formatWpDate, formatWpDateTime } from '@/utils/wpDate.js'
 
@@ -1068,6 +1071,7 @@ h2 {
   .dashboard-content { gap: 12px; }
   .panel { padding: 14px; }
   .attention-section { order: 1; }
+  .provider-health { order: 2; }
   .summary-grid { order: 2; gap: 8px; }
   .dashboard-row--readiness { order: 3; gap: 12px; }
   .dashboard-row--details { order: 4; gap: 12px; }

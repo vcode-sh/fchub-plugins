@@ -9,10 +9,40 @@ use FChubMemberships\Domain\Plan\PlanRuleResolver;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\ProtectionRuleRepository;
 use FChubMemberships\Support\Constants;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class AccessEvaluatorAdversarialTest extends PluginTestCase
 {
+    public function test_direct_drip_comparison_parses_site_local_storage(): void
+    {
+        AccessEvaluator::clearCache();
+        $GLOBALS['_fchub_test_user_can'][9]['manage_options'] = false;
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-14 01:00:00', $timezone), $timezone);
+        $evaluator = new AccessEvaluator(null, null, null, $clock);
+        $this->inject(
+            $evaluator,
+            new class extends GrantRepository {
+                public function getActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): ?array
+                {
+                    return [
+                        'id' => 1,
+                        'trial_ends_at' => null,
+                        'drip_available_at' => '2026-03-14 00:30:00',
+                    ];
+                }
+            },
+            new class extends PlanRuleResolver {},
+            new class extends ProtectionRuleRepository {}
+        );
+
+        $result = $evaluator->evaluate(9, 'wordpress_core', 'post', '55');
+
+        self::assertTrue($result['allowed']);
+        self::assertFalse($result['drip_locked']);
+    }
+
     private function inject(AccessEvaluator $evaluator, object $grantRepo, object $ruleResolver, object $protectionRepo): void
     {
         foreach ([
@@ -312,8 +342,27 @@ final class AccessEvaluatorAdversarialTest extends PluginTestCase
             {
                 if (($filters['status'] ?? null) === 'active' && ($filters['plan_id'] ?? null) === 5) {
                     return [
-                        ['drip_available_at' => '2026-03-20 00:00:00'],
-                        ['drip_available_at' => '2026-03-18 00:00:00'],
+                        [
+                            'plan_id' => 5,
+                            'provider' => 'wordpress_core',
+                            'resource_type' => 'post',
+                            'resource_id' => '55',
+                            'drip_available_at' => null,
+                        ],
+                        [
+                            'plan_id' => 5,
+                            'provider' => 'wordpress_core',
+                            'resource_type' => 'page',
+                            'resource_id' => '77',
+                            'drip_available_at' => '2026-03-20 00:00:00',
+                        ],
+                        [
+                            'plan_id' => 5,
+                            'provider' => 'wordpress_core',
+                            'resource_type' => 'page',
+                            'resource_id' => '77',
+                            'drip_available_at' => '2026-03-18 00:00:00',
+                        ],
                     ];
                 }
 
@@ -464,7 +513,11 @@ final class AccessEvaluatorAdversarialTest extends PluginTestCase
                     if (($filters['status'] ?? null) === 'active') {
                         return [[
                             'plan_id' => 5,
+                            'provider' => 'wordpress_core',
+                            'resource_type' => 'post',
+                            'resource_id' => '77',
                             'created_at' => null,
+                            'drip_available_at' => null,
                             'trial_ends_at' => '2026-03-20 00:00:00',
                             'status' => 'active',
                         ]];

@@ -90,6 +90,55 @@
       </div>
     </div>
   </div>
+
+  <div class="fchub-settings-section">
+    <div class="fchub-settings-section-title">Access Discovery and Notice Timing</div>
+
+    <div class="fchub-setting-row">
+      <div class="fchub-setting-label">
+        <h4>Access Expiry Notice</h4>
+        <p>Send the access-expiring notice this many days before access ends.</p>
+      </div>
+      <div class="fchub-setting-control">
+        <el-input-number
+          v-model="form.email_expiring_days_before"
+          aria-label="Access expiry notice days"
+          :min="0"
+          :max="365"
+          controls-position="right"
+        />
+      </div>
+    </div>
+
+    <div class="fchub-setting-row">
+      <div class="fchub-setting-label">
+        <h4>Trial Expiry Notice</h4>
+        <p>Send the trial-expiring notice this many days before a trial ends.</p>
+      </div>
+      <div class="fchub-setting-control">
+        <el-input-number
+          v-model="form.trial_expiry_notice_days"
+          aria-label="Trial expiry notice days"
+          :min="0"
+          :max="365"
+          controls-position="right"
+        />
+      </div>
+    </div>
+
+    <div class="fchub-setting-row">
+      <div class="fchub-setting-label">
+        <h4>Hide Protected Content from Archives</h4>
+        <p>Remove protected posts from archive, home, and search result lists.</p>
+      </div>
+      <div class="fchub-setting-control">
+        <el-switch
+          v-model="form.hide_protected_in_archive"
+          aria-label="Hide protected content from archives"
+        />
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>

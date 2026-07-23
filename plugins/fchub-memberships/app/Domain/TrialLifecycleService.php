@@ -12,18 +12,21 @@ use FChubMemberships\Domain\Trial\TrialGrantQueryService;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Support\Logger;
+use FChubMemberships\Support\Clock;
 
 class TrialLifecycleService
 {
     private GrantRepository $grantRepo;
     private PlanRepository $planRepo;
     private TrialGrantQueryService $queries;
+    private Clock $clock;
 
-    public function __construct()
+    public function __construct(?Clock $clock = null)
     {
         $this->grantRepo = new GrantRepository();
         $this->planRepo = new PlanRepository();
         $this->queries = new TrialGrantQueryService();
+        $this->clock = $clock ?? new Clock();
     }
 
     /**
@@ -31,7 +34,7 @@ class TrialLifecycleService
      */
     public function checkTrialExpirations(): void
     {
-        $now = current_time('mysql');
+        $now = $this->clock->storage($this->clock->now());
 
         $grants = $this->queries->getDueTrialExpirations($now);
 
@@ -58,8 +61,9 @@ class TrialLifecycleService
         $settings = get_option('fchub_memberships_settings', []);
         $noticeDays = (int) ($settings['trial_expiry_notice_days'] ?? 3);
 
-        $now = current_time('mysql');
-        $cutoff = date('Y-m-d H:i:s', strtotime("+{$noticeDays} days", current_time('timestamp')));
+        $nowValue = $this->clock->now();
+        $now = $this->clock->storage($nowValue);
+        $cutoff = $this->clock->storage($this->clock->plusDays($noticeDays, $nowValue));
 
         $grants = $this->queries->getTrialExpiringSoon($now, $cutoff);
 
@@ -81,7 +85,10 @@ class TrialLifecycleService
                 : home_url('/');
 
             // Calculate days left for the hook
-            $daysLeft = max(0, (int) ceil((strtotime($row['trial_ends_at']) - time()) / DAY_IN_SECONDS));
+            $daysLeft = $this->clock->calendarDaysUntil(
+                $this->clock->parseLocal($row['trial_ends_at']),
+                $nowValue
+            );
 
             // Build grant array for hook
             $grantArray = [
@@ -102,7 +109,7 @@ class TrialLifecycleService
             ]);
 
             // Mark as notified to avoid duplicates
-            $meta['trial_expiry_notified'] = current_time('mysql');
+            $meta['trial_expiry_notified'] = $now;
             $this->queries->markTrialExpiryNotified((int) $row['id'], $meta);
         }
     }
@@ -120,24 +127,32 @@ class TrialLifecycleService
         if ($plan) {
             $durationType = $plan['duration_type'] ?? 'lifetime';
             if ($durationType === 'fixed_days' && ($plan['duration_days'] ?? 0) > 0) {
-                $expiresAt = date('Y-m-d H:i:s', strtotime('+' . $plan['duration_days'] . ' days'));
+                $expiresAt = $this->clock->storage($this->clock->plusDays((int) $plan['duration_days']));
             } elseif ($durationType === 'fixed_anchor') {
                 $planMeta = $plan['meta'] ?? [];
                 $anchorDay = (int) ($planMeta['billing_anchor_day'] ?? 1);
-                $expiresAt = AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
+                $expiresAt = AnchorDateCalculator::nextAnchorDate(
+                    $anchorDay,
+                    $this->clock->storage($this->clock->now()),
+                    $this->clock
+                );
                 $grantMeta['billing_anchor_day'] = $anchorDay;
             }
 
             // Apply membership term cap
             $termConfig = $plan['meta']['membership_term'] ?? null;
             if ($termConfig && ($termConfig['mode'] ?? 'none') !== 'none') {
-                $termEndsAt = MembershipTermCalculator::calculateEndDate($termConfig, current_time('mysql'));
+                $termEndsAt = MembershipTermCalculator::calculateEndDate(
+                    $termConfig,
+                    $this->clock->storage($this->clock->now()),
+                    $this->clock
+                );
                 if ($termEndsAt) {
                     $grantMeta['membership_term_ends_at'] = $termEndsAt;
                     if ($expiresAt === null) {
                         $expiresAt = $termEndsAt;
                     } else {
-                        $expiresAt = MembershipTermCalculator::capExpiry($expiresAt, $termEndsAt);
+                        $expiresAt = MembershipTermCalculator::capExpiry($expiresAt, $termEndsAt, $this->clock);
                     }
                 }
             }
@@ -149,7 +164,7 @@ class TrialLifecycleService
             'expires_at'    => $expiresAt,
         ];
 
-        $grantMeta['trial_converted_at'] = current_time('mysql');
+        $grantMeta['trial_converted_at'] = $this->clock->storage($this->clock->now());
         $updateData['meta'] = $grantMeta;
         if (!$this->grantRepo->update($grant['id'], $updateData)) {
             return;

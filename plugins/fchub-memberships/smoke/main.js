@@ -19,14 +19,12 @@ window.matchMedia = window.matchMedia || (() => ({
   removeEventListener() {},
 }))
 
-if (!navigator.clipboard) {
-  Object.defineProperty(navigator, 'clipboard', {
-    configurable: true,
-    value: {
-      writeText: async () => undefined,
-    },
-  })
-}
+Object.defineProperty(navigator, 'clipboard', {
+  configurable: true,
+  value: {
+    writeText: async () => undefined,
+  },
+})
 
 window.ResizeObserver = window.ResizeObserver || class {
   observe() {}
@@ -38,21 +36,104 @@ window.__fchubSmokeRequests = []
 window.__fchubSmokeHoldMutations = false
 window.__fchubSmokeReleaseMutation = null
 window.__fchubSmokeFailResourceSearch = false
+window.__fchubSmokeWebhookHistoryReads = 0
+window.__fchubSmokeHoldCredentials = false
+window.__fchubSmokeReleaseCredential = null
+
+let smokeWebhookUrls = 'https://127.0.0.1/webhook'
+let smokeWebhookDestinationsConfigured = false
+let smokeWebhookRetried = false
+let smokeAccessApi = {
+  configured: true,
+  prefix: 'fchub_abc123',
+  rotated_at: '2026-07-22 12:00:00',
+}
+const smokeRuntimeSettingsStorageKey = 'fchub-smoke-runtime-settings'
+const smokeRuntimeSettingsDefaults = {
+  expiry_warning_days: 7,
+  trial_expiry_notice_days: 3,
+  hide_protected_in_archive: 'no',
+  uninstall_remove_data: 'no',
+}
+let smokeRuntimeSettings = { ...smokeRuntimeSettingsDefaults }
+try {
+  smokeRuntimeSettings = {
+    ...smokeRuntimeSettings,
+    ...JSON.parse(window.sessionStorage.getItem(smokeRuntimeSettingsStorageKey) || '{}'),
+  }
+} catch {
+  window.sessionStorage.removeItem(smokeRuntimeSettingsStorageKey)
+}
+
+const emailTheme = {
+  logo_url: '',
+  logo_width: 160,
+  header_style: 'brand',
+  header_text: '',
+  header_alignment: 'center',
+  header_background: '#2563eb',
+  primary_color: '#2563eb',
+  background_color: '#f3f4f6',
+  panel_color: '#ffffff',
+  content_color: '#374151',
+  link_color: '#2563eb',
+  content_width: 600,
+  content_padding: 32,
+  border_radius: 12,
+  font_family: 'system',
+  footer_text: '',
+  footer_html: '',
+  footer_background: '#f9fafb',
+  footer_color: '#6b7280',
+}
+
+const commonEmailVariables = {
+  '{user_name}': { label: 'Member name', type: 'text', sample: 'Jamie Member' },
+  '{user_email}': { label: 'Member email', type: 'text', sample: 'jamie@example.com' },
+  '{plan_name}': { label: 'Plan name', type: 'text', sample: 'Premium Membership' },
+  '{site_name}': { label: 'Site name', type: 'text', sample: 'FCHub Playground' },
+}
+
+const emailNotification = ({ key, label, description, group, settingKey, variables, subject, preheader, content }) => {
+  const defaultTemplate = {
+    version: 1,
+    subject,
+    preheader,
+    blocks: [{ id: 'message-content', type: 'rich_text', content }],
+  }
+
+  return {
+    key,
+    label,
+    description,
+    group,
+    setting_key: settingKey,
+    variables: { ...commonEmailVariables, ...variables },
+    delivery: 'built_in',
+    template: {
+      ...defaultTemplate,
+      blocks: defaultTemplate.blocks.map((block) => ({ ...block })),
+    },
+    default_template: defaultTemplate,
+    theme_override: null,
+  }
+}
 
 window.fetch = async (input, init = {}) => {
   const url = String(input)
   const method = String(init.method || 'GET').toUpperCase()
+  let requestBody = null
 
   if (method !== 'GET') {
-    let body = init.body ?? null
-    if (typeof body === 'string') {
+    requestBody = init.body ?? null
+    if (typeof requestBody === 'string') {
       try {
-        body = JSON.parse(body)
+        requestBody = JSON.parse(requestBody)
       } catch {
         // Keep malformed bodies visible to the test instead of concealing them.
       }
     }
-    window.__fchubSmokeRequests.push({ url, method, body })
+    window.__fchubSmokeRequests.push({ url, method, body: requestBody })
 
     if (window.__fchubSmokeHoldMutations) {
       await new Promise((resolve) => {
@@ -188,15 +269,16 @@ window.fetch = async (input, init = {}) => {
       status: 200,
       json: async () => ({
         data: [
-          { key: 'post', label: 'Posts', group: 'content', searchable: true },
-          { key: 'page', label: 'Pages', group: 'content', searchable: true },
-          { key: 'category', label: 'Categories', group: 'taxonomy', searchable: true },
-          { key: 'post_tag', label: 'Tags', group: 'taxonomy', searchable: true },
-          { key: 'lesson', label: 'Lessons', group: 'content', searchable: true },
-          { key: 'menu_item', label: 'Menu Items', group: 'navigation', searchable: true },
-          { key: 'url_pattern', label: 'URL Restrictions', group: 'advanced', searchable: false },
-          { key: 'special_page', label: 'Special Pages', group: 'advanced', searchable: true },
-          { key: 'comment', label: 'Comments', group: 'advanced', searchable: true },
+          { key: 'post', label: 'Posts', group: 'content', searchable: true, allow_all: true },
+          { key: 'page', label: 'Pages', group: 'content', searchable: true, allow_all: true },
+          { key: 'category', label: 'Categories', group: 'taxonomy', searchable: true, allow_all: true },
+          { key: 'post_tag', label: 'Tags', group: 'taxonomy', searchable: true, allow_all: true },
+          { key: 'lesson', label: 'Lessons', group: 'content', searchable: true, allow_all: true },
+          { key: 'menu_item', label: 'Menu Items', group: 'navigation', icon: 'menu', searchable: false, supports_bulk: false, allow_all: true, provider: 'wordpress_core', adapter: 'FChubMemberships\\Adapters\\WordPressContentAdapter', source: 'WordPress' },
+          { key: 'comment', label: 'Comments', group: 'advanced', icon: 'admin-comments', searchable: false, supports_bulk: false, allow_all: true, provider: 'wordpress_core', adapter: 'FChubMemberships\\Adapters\\WordPressContentAdapter', source: 'WordPress' },
+          { key: 'url_pattern', label: 'URL Patterns', group: 'advanced', icon: 'admin-links', searchable: false, supports_bulk: false, allow_all: true, provider: 'wordpress_core', adapter: 'FChubMemberships\\Adapters\\WordPressContentAdapter', source: '' },
+          { key: 'special_page', label: 'Special Pages', group: 'advanced', icon: 'admin-home', searchable: false, supports_bulk: false, allow_all: true, provider: 'wordpress_core', adapter: 'FChubMemberships\\Adapters\\WordPressContentAdapter', source: '' },
+          { key: 'more_tag', label: 'More Tag Content', group: 'advanced', icon: 'editor-insertmore', searchable: true, supports_bulk: true, allow_all: true, provider: 'wordpress_core', adapter: 'FChubMemberships\\Adapters\\WordPressContentAdapter', source: '' },
         ],
         groups: {
           content: 'Content',
@@ -210,10 +292,11 @@ window.fetch = async (input, init = {}) => {
           { value: 'category', label: 'Categories' },
           { value: 'post_tag', label: 'Tags' },
           { value: 'lesson', label: 'Lessons' },
-          { value: 'menu_item', label: 'Menu Items' },
-          { value: 'url_pattern', label: 'URL Restrictions' },
-          { value: 'special_page', label: 'Special Pages' },
-          { value: 'comment', label: 'Comments' },
+          { value: 'menu_item', label: 'Menu Items', group: 'navigation', source: 'WordPress' },
+          { value: 'comment', label: 'Comments', group: 'advanced', source: 'WordPress' },
+          { value: 'url_pattern', label: 'URL Patterns', group: 'advanced', source: '' },
+          { value: 'special_page', label: 'Special Pages', group: 'advanced', source: '' },
+          { value: 'more_tag', label: 'More Tag Content', group: 'advanced', source: '' },
         ],
       }),
     }
@@ -254,7 +337,306 @@ window.fetch = async (input, init = {}) => {
   if (url.includes('/admin/drip/overview')) {
     return { ok: true, status: 200, json: async () => ({ data: { total_rules: 1, pending: 1, sent_today: 0, failed: 0 } }) }
   }
+  if (url.endsWith('/admin/email-notifications')) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          notifications: [
+            emailNotification({
+              key: 'access_granted',
+              label: 'Access granted',
+              description: 'Sent as soon as membership access is granted.',
+              group: 'access',
+              settingKey: 'email_access_granted',
+              variables: {
+                '{account_url}': { label: 'Account URL', type: 'url', sample: 'https://fchub.vcode.sh/account/' },
+                '{resources_list}': { label: 'Protected resources', type: 'rich', sample: '<ul><li>Getting Started</li><li>Member Library</li></ul>' },
+                '{drip_schedule}': { label: 'Drip schedule', type: 'rich', sample: '<h3>Coming Soon</h3><ul><li>Advanced Workshop &mdash; Friday</li></ul>' },
+              },
+              subject: 'Welcome to {plan_name}!',
+              preheader: 'Your membership is active and ready to use.',
+              content: `<h2>Welcome to {plan_name}, {user_name}!</h2>
+<p>Thank you for joining. Your membership is now active and you have immediate access to the following resources:</p>
+{resources_list}
+{drip_schedule}
+<p>You can manage your membership and access all your content from your account:</p>
+<p><a href="{account_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">Go to My Account</a></p>
+<p>If you have any questions, feel free to reply to this email.</p>
+<p>Best regards,<br>{site_name}</p>`,
+            }),
+            emailNotification({
+              key: 'access_expiring',
+              label: 'Access expiring',
+              description: 'Warns a member before their access expires.',
+              group: 'access',
+              settingKey: 'email_access_expiring',
+              variables: {
+                '{days}': { label: 'Days remaining', type: 'number', sample: '7' },
+                '{expires_at}': { label: 'Expiry date', type: 'date', sample: '29 July 2026' },
+                '{renewal_url}': { label: 'Renewal URL', type: 'url', sample: 'https://fchub.vcode.sh/pricing/' },
+                '{resources_list}': { label: 'Protected resources', type: 'rich', sample: '<ul><li>Member Library</li><li>Private Resources</li></ul>' },
+              },
+              subject: 'Your {plan_name} access expires in {days} days',
+              preheader: 'A clear reminder before membership access ends.',
+              content: `<h2>Your access is expiring soon, {user_name}</h2>
+<p>Your <strong>{plan_name}</strong> membership expires on <strong>{expires_at}</strong> ({days} days from now).</p>
+<p>When your access expires, you will lose access to the following resources:</p>
+{resources_list}
+<p>Renew now to keep your access:</p>
+<p><a href="{renewal_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">Renew Membership</a></p>
+<p>If you have any questions, feel free to reply to this email.</p>
+<p>Best regards,<br>{site_name}</p>`,
+            }),
+            emailNotification({
+              key: 'access_revoked',
+              label: 'Access revoked',
+              description: 'Confirms when membership access has been removed.',
+              group: 'access',
+              settingKey: 'email_access_revoked',
+              variables: {
+                '{reason}': { label: 'Reason', type: 'text', sample: 'Your membership has ended.' },
+                '{support_url}': { label: 'Support URL', type: 'url', sample: 'https://fchub.vcode.sh/contact/' },
+                '{repurchase_url}': { label: 'Purchase URL', type: 'url', sample: 'https://fchub.vcode.sh/pricing/' },
+              },
+              subject: 'Your {plan_name} access has ended',
+              preheader: 'A helpful explanation and a clear next step.',
+              content: `<h2>Access Removed</h2>
+<p>Hi {user_name},</p>
+<p>Your access to <strong>{plan_name}</strong> has been removed.</p>
+<p><strong>Reason:</strong> {reason}</p>
+<p>If you believe this was done in error or need help, please contact our support team:</p>
+<p><a href="{support_url}" style="display:inline-block;padding:12px 24px;background-color:#6b7280;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">Contact Support</a></p>
+<p>You can also re-purchase access at any time:</p>
+<p><a href="{repurchase_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">Re-purchase Membership</a></p>
+<p>Best regards,<br>{site_name}</p>`,
+            }),
+            emailNotification({
+              key: 'membership_paused',
+              label: 'Membership paused',
+              description: 'Explains what changes while a membership is paused.',
+              group: 'lifecycle',
+              settingKey: 'email_membership_paused',
+              variables: {
+                '{resume_url}': { label: 'Resume URL', type: 'url', sample: 'https://fchub.vcode.sh/account/' },
+              },
+              subject: 'Your {plan_name} membership is paused',
+              preheader: 'Membership is paused and can be resumed from the account.',
+              content: `<h2>Your membership has been paused, {user_name}</h2>
+<p>Your <strong>{plan_name}</strong> membership has been paused. While paused, you will not have access to the membership content.</p>
+<p>You can resume your membership at any time from your account:</p>
+<p><a href="{resume_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">Resume Membership</a></p>
+<p>If you have any questions, feel free to reply to this email.</p>
+<p>Best regards,<br>{site_name}</p>`,
+            }),
+            emailNotification({
+              key: 'membership_resumed',
+              label: 'Membership resumed',
+              description: 'Welcomes a member back after access resumes.',
+              group: 'lifecycle',
+              settingKey: 'email_membership_resumed',
+              variables: {
+                '{account_url}': { label: 'Account URL', type: 'url', sample: 'https://fchub.vcode.sh/account/' },
+                '{expires_at}': { label: 'Expiry date', type: 'date', sample: '21 August 2026' },
+              },
+              subject: 'Your {plan_name} membership is active again',
+              preheader: 'Membership access has resumed.',
+              content: `<h2>Welcome back, {user_name}!</h2>
+<p>Your <strong>{plan_name}</strong> membership is active again! You now have full access to all your membership content.</p>
+<p>Your membership is valid until <strong>{expires_at}</strong>.</p>
+<p>Access your content from your account:</p>
+<p><a href="{account_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">Go to My Account</a></p>
+<p>If you have any questions, feel free to reply to this email.</p>
+<p>Best regards,<br>{site_name}</p>`,
+            }),
+            emailNotification({
+              key: 'trial_expiring',
+              label: 'Trial expiring',
+              description: 'Reminds a member before their trial ends.',
+              group: 'trial',
+              settingKey: 'email_trial_expiring',
+              variables: {
+                '{days}': { label: 'Days remaining', type: 'number', sample: '3' },
+                '{trial_ends_at}': { label: 'Trial end date', type: 'date', sample: '25 July 2026' },
+                '{upgrade_url}': { label: 'Upgrade URL', type: 'url', sample: 'https://fchub.vcode.sh/pricing/' },
+              },
+              subject: 'Your {plan_name} trial ends in {days} days',
+              preheader: 'A timely reminder before the trial ends.',
+              content: `<h2>Your trial is ending soon, {user_name}</h2>
+<p>Your free trial of <strong>{plan_name}</strong> ends on <strong>{trial_ends_at}</strong> ({days} days from now).</p>
+<p>To keep your access and continue enjoying all the benefits, upgrade to a paid membership today:</p>
+<p><a href="{upgrade_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">Upgrade Now</a></p>
+<p>If you have any questions, feel free to reply to this email.</p>
+<p>Best regards,<br>{site_name}</p>`,
+            }),
+            emailNotification({
+              key: 'trial_converted',
+              label: 'Trial converted',
+              description: 'Confirms that a trial became a paid membership.',
+              group: 'trial',
+              settingKey: 'email_trial_converted',
+              variables: {
+                '{account_url}': { label: 'Account URL', type: 'url', sample: 'https://fchub.vcode.sh/account/' },
+                '{expires_at}': { label: 'Expiry date', type: 'date', sample: '22 July 2027' },
+              },
+              subject: 'Welcome to your paid {plan_name} membership',
+              preheader: 'The paid membership is active.',
+              content: `<h2>Welcome aboard, {user_name}!</h2>
+<p>Your trial has been successfully converted to a full <strong>{plan_name}</strong> membership.</p>
+<p>Your membership is now active and will remain valid until <strong>{expires_at}</strong>.</p>
+<p>You can manage your membership from your account:</p>
+<p><a href="{account_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">Go to My Account</a></p>
+<p>Thank you for your support!</p>
+<p>Best regards,<br>{site_name}</p>`,
+            }),
+            emailNotification({
+              key: 'drip_content_unlocked',
+              label: 'Drip content unlocked',
+              description: 'Notifies a member when scheduled content becomes available.',
+              group: 'content',
+              settingKey: 'email_drip_unlocked',
+              variables: {
+                '{resource_title}': { label: 'Resource title', type: 'text', sample: 'Advanced Workshop' },
+                '{resource_url}': { label: 'Resource URL', type: 'url', sample: 'https://fchub.vcode.sh/members/advanced-workshop/' },
+                '{progress}': { label: 'Drip progress', type: 'rich', sample: '<p><strong>3 of 8</strong> resources unlocked</p>' },
+                '{next_drip_item}': { label: 'Next drip item', type: 'rich', sample: '<p>Next: Member Q&amp;A on Friday</p>' },
+              },
+              subject: 'New content is available: {resource_title}',
+              preheader: 'A new membership resource is ready.',
+              content: `<h2>New Content Unlocked!</h2>
+<p>Hi {user_name},</p>
+<p>A new piece of content from your <strong>{plan_name}</strong> membership is now available:</p>
+<h3>{resource_title}</h3>
+<p><a href="{resource_url}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">View Content</a></p>
+{progress}
+{next_drip_item}
+<p>Best regards,<br>{site_name}</p>`,
+            }),
+          ],
+          theme: { ...emailTheme },
+          brand_template: { ...emailTheme },
+          fluentcrm_available: true,
+        },
+      }),
+    }
+  }
+  if (url.includes('/admin/webhooks/health')) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          status: 'off',
+          pending_count: 0,
+          processing_count: 0,
+          retrying_count: 0,
+          succeeded_count: 4,
+          failed_count: 1,
+          last_success_at: '2026-07-22 12:00:00',
+        },
+      }),
+    }
+  }
+  if (url.includes('/admin/webhooks/deliveries/91/retry')) {
+    smokeWebhookRetried = true
+    return { ok: true, status: 202, json: async () => ({ data: { id: 91, status: 'pending' } }) }
+  }
+  if (url.includes('/admin/webhooks/deliveries')) {
+    window.__fchubSmokeWebhookHistoryReads += 1
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          deliveries: [{
+            id: 91,
+            event_id: 'evt_smoke_failed',
+            event_type: 'access.revoked',
+            destination_url: 'https://hooks.example.com/memberships',
+            status: smokeWebhookRetried ? 'pending' : 'failed',
+            attempt_count: smokeWebhookRetried ? 0 : 7,
+            response_code: smokeWebhookRetried ? null : 503,
+            error_message: smokeWebhookRetried ? '' : 'webhook_http_503',
+            next_attempt_at: smokeWebhookRetried ? '2026-07-22 12:06:00' : null,
+            last_attempt_at: '2026-07-22 12:05:00',
+            delivered_at: null,
+            created_at: '2026-07-22 12:00:00',
+            updated_at: '2026-07-22 12:05:00',
+          }],
+          page: 1,
+          per_page: 20,
+        },
+      }),
+    }
+  }
+  if (url.includes('/admin/webhooks/test')) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          event_id: 'evt_smoke_test',
+          success: false,
+          results: [{
+            id: 92,
+            destination_url: 'https://hooks.example.com/memberships',
+            status: 'retrying',
+          }],
+        },
+      }),
+    }
+  }
+  if (url.includes('/admin/settings/generate-api-key')) {
+    if (window.__fchubSmokeHoldCredentials) {
+      await new Promise((resolve) => {
+        window.__fchubSmokeReleaseCredential = () => {
+          window.__fchubSmokeReleaseCredential = null
+          resolve()
+        }
+      })
+    }
+    smokeAccessApi = {
+      configured: true,
+      prefix: 'fchub_one_ti',
+      rotated_at: '2026-07-22 12:10:00',
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          api_key: 'fchub_one_time_smoke_key',
+          access_api: { ...smokeAccessApi },
+        },
+      }),
+    }
+  }
+  if (url.includes('/admin/settings/revoke-api-key')) {
+    smokeAccessApi = { configured: false, prefix: null, rotated_at: null }
+    return { ok: true, status: 200, json: async () => ({ data: { access_api: { ...smokeAccessApi } } }) }
+  }
+  if (url.includes('/admin/settings/regenerate-webhook-secret')) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { webhook_secret: 'webhook_one_time_smoke_secret' } }),
+    }
+  }
   if (url.includes('/admin/settings')) {
+    if (method === 'POST') {
+      smokeWebhookUrls = String(requestBody?.webhook_urls ?? smokeWebhookUrls)
+      smokeWebhookDestinationsConfigured = smokeWebhookUrls === 'https://hooks.example.com/memberships'
+      for (const key of Object.keys(smokeRuntimeSettingsDefaults)) {
+        if (Object.prototype.hasOwnProperty.call(requestBody ?? {}, key)) {
+          smokeRuntimeSettings[key] = requestBody[key]
+        }
+      }
+      window.sessionStorage.setItem(
+        smokeRuntimeSettingsStorageKey,
+        JSON.stringify(smokeRuntimeSettings),
+      )
+    }
     return {
       ok: true,
       status: 200,
@@ -266,14 +648,19 @@ window.fetch = async (input, init = {}) => {
           default_redirect_url: '',
           email_access_granted: 'yes',
           email_access_expiring: 'yes',
-          expiry_warning_days: 7,
+          expiry_warning_days: smokeRuntimeSettings.expiry_warning_days,
+          trial_expiry_notice_days: smokeRuntimeSettings.trial_expiry_notice_days,
           email_access_revoked: 'yes',
           email_drip_unlocked: 'yes',
-          api_key: '',
+          hide_protected_in_archive: smokeRuntimeSettings.hide_protected_in_archive,
+          uninstall_remove_data: smokeRuntimeSettings.uninstall_remove_data,
+          access_api: { ...smokeAccessApi },
           debug_mode: 'no',
           webhook_enabled: 'no',
-          webhook_urls: '',
-          webhook_secret: '',
+          webhook_urls: smokeWebhookUrls,
+          webhook_secret_configured: true,
+          webhook_destinations_configured: smokeWebhookDestinationsConfigured,
+          webhook_status: smokeWebhookDestinationsConfigured ? 'off' : 'needs_setup',
           fluentcrm_enabled: 'no',
           fluentcrm_tag_prefix: 'member:',
           fluentcrm_default_list: '',

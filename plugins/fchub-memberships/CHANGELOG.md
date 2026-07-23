@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+- Changed the read-only access check to accept `X-API-Key` only; query-string keys are no longer accepted. Membership write routes remain on WordPress Application Passwords, the dedicated membership capability, and required idempotency keys.
+- Made access keys and webhook secrets one-time values shown only when generated or rotated. Settings now expose safe configuration metadata rather than reusable credentials.
+- Added the replayable V8 / schema 1.8.0 migration, which hashes existing plaintext access keys without changing the client-visible value and creates the durable webhook event and delivery tables without enabling webhooks.
+- Added signed, durable at-least-once webhook delivery with stable event IDs for receiver deduplication. This does not promise exactly-once delivery, because apparently distributed systems still refuse to read the marketing copy.
+- Added seven-attempt webhook delivery using retry delays of 60, 300, 1,800, 7,200, 21,600, and 86,400 seconds, with successful deliveries retained for 30 days and terminal failures for 90 days.
+- Added `manage_options` operations at `GET /admin/webhooks/health`, `GET /admin/webhooks/deliveries`, `POST /admin/webhooks/test`, and `POST /admin/webhooks/deliveries/{id}/retry` for health, history, production-path testing, and terminal-delivery manual retry.
+
+## 1.3.1
+
+- Added date-range filtering to drip and report insights, plus member search in the admin tools.
+- Improved CSV imports with escaped-field handling and made content-protection messages more specific.
+
+## 1.3.0
+
+- Added membership terms for fixed end dates and annual or custom durations, with plan-editor support and lifecycle handling.
+
+## 1.2.0
+
+- Added monthly billing anchors, including calendar-day validation and month-end handling.
+- Overdue anchored grants are paused instead of expired, so a late renewal can resume access.
+
 ## 1.1.0
 
 This release is what happens when a plugin stops pretending one 700-line file is a personality — and then discovers half its SQL was querying tables that don't exist.

@@ -14,6 +14,10 @@ if (!defined('MINUTE_IN_SECONDS')) {
     define('MINUTE_IN_SECONDS', 60);
 }
 
+if (!defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
+
 if (!defined('ARRAY_A')) {
     define('ARRAY_A', 'ARRAY_A');
 }
@@ -39,7 +43,7 @@ if (!defined('FCHUB_MEMBERSHIPS_URL')) {
 }
 
 if (!defined('FCHUB_MEMBERSHIPS_DB_VERSION')) {
-    define('FCHUB_MEMBERSHIPS_DB_VERSION', '1.2.0');
+    define('FCHUB_MEMBERSHIPS_DB_VERSION', '1.9.0');
 }
 
 require_once __DIR__ . '/stubs/test-bootstrap.php';

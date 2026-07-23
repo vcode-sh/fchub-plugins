@@ -30,6 +30,21 @@ final class IntegrationHealthRestArguments
                 'default' => true,
                 'sanitize_callback' => [self::class, 'boolean'],
             ],
+            'cursor' => [
+                'required' => false,
+                'type' => 'integer',
+                'minimum' => 0,
+                'default' => 0,
+                'sanitize_callback' => 'absint',
+                'validate_callback' => [self::class, 'nonNegativeInteger'],
+            ],
+            'watermark' => [
+                'required' => false,
+                'type' => 'integer',
+                'minimum' => 0,
+                'sanitize_callback' => 'absint',
+                'validate_callback' => [self::class, 'nonNegativeIntegerOrNull'],
+            ],
         ];
     }
 
@@ -41,5 +56,15 @@ final class IntegrationHealthRestArguments
     public static function boolean(mixed $value): bool
     {
         return !in_array($value, [false, 'false', '0', 0], true);
+    }
+
+    public static function nonNegativeInteger(mixed $value): bool
+    {
+        return filter_var($value, FILTER_VALIDATE_INT) !== false && (int) $value >= 0;
+    }
+
+    public static function nonNegativeIntegerOrNull(mixed $value): bool
+    {
+        return $value === null || self::nonNegativeInteger($value);
     }
 }

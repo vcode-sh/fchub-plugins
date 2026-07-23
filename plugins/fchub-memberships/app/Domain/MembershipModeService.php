@@ -43,10 +43,18 @@ final class MembershipModeService
             foreach ($otherPlanIds as $oldPlanId) {
                 $result = $revokePlan($userId, $oldPlanId, [
                     'reason' => sprintf('Replaced by plan #%d (exclusive mode)', $planId),
+                    'grace_period_days' => 0,
                 ]);
                 if ($this->revocationFailed($result)) {
                     return $this->failedModeTransition(
                         'replacement_revoke_failed',
+                        $result,
+                        $revokedPlanIds
+                    );
+                }
+                if (!$this->revocationCompleted($result)) {
+                    return $this->failedModeTransition(
+                        'replacement_revoke_incomplete',
                         $result,
                         $revokedPlanIds
                     );
@@ -106,10 +114,18 @@ final class MembershipModeService
             if ($oldPlan && (int) ($oldPlan['level'] ?? 0) < $planLevel) {
                 $result = $revokePlan($userId, $oldPlanId, [
                     'reason' => sprintf('Upgraded to plan #%d level %d (upgrade_only mode)', $planId, $planLevel),
+                    'grace_period_days' => 0,
                 ]);
                 if ($this->revocationFailed($result)) {
                     return $this->failedModeTransition(
                         'upgrade_revoke_failed',
+                        $result,
+                        $revokedPlanIds
+                    );
+                }
+                if (!$this->revocationCompleted($result)) {
+                    return $this->failedModeTransition(
+                        'upgrade_revoke_incomplete',
                         $result,
                         $revokedPlanIds
                     );
@@ -133,6 +149,11 @@ final class MembershipModeService
     {
         return (int) ($result['failed'] ?? 0) > 0
             || (array_key_exists('success', $result) && $result['success'] === false);
+    }
+
+    private function revocationCompleted(array $result): bool
+    {
+        return (int) ($result['revoked'] ?? 0) > 0;
     }
 
     private function failedModeTransition(string $reason, array $result, array $revokedPlanIds): array

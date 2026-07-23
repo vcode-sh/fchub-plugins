@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMemberships\Tests\Unit\Http\Controllers;
 
+use FChubMemberships\Http\AccessApiCredential;
 use FChubMemberships\Http\AccessCheckController;
 use FChubMemberships\Http\AccountController;
 use FChubMemberships\Http\DynamicOptionsController;
@@ -15,6 +16,11 @@ final class ControllerFeatureExpansionTest extends PluginTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \FChubMemberships\Domain\AccessEvaluator::clearCache();
+        \FChubMemberships\Storage\GrantRepository::clearRequestCache();
+        \FChubMemberships\Storage\PlanRepository::clearCache();
+        \FChubMemberships\Storage\ProtectionRuleRepository::clearCache();
+        \FChubMemberships\Support\ResourceTypeRegistry::reset();
 
         $user = new \WP_User();
         $user->ID = 21;
@@ -56,7 +62,9 @@ final class ControllerFeatureExpansionTest extends PluginTestCase
         $GLOBALS['_fchub_test_current_user_can'] = false;
         $GLOBALS['_fchub_test_current_user_id'] = 21;
         $GLOBALS['_fchub_test_current_user'] = (object) ['ID' => 21, 'user_email' => 'alice@example.com'];
-        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = ['api_key' => 'secret'];
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = AccessApiCredential::migratePlaintext([
+            'api_key' => 'secret',
+        ]);
 
         $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static fn(string $query): ?array => match (true) {
             str_contains($query, "WHERE slug = 'gold-plan'") => [
@@ -106,7 +114,24 @@ final class ControllerFeatureExpansionTest extends PluginTestCase
             default => null,
         };
         $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static fn(string $query): array => match (true) {
-            str_contains($query, 'FROM wp_fchub_membership_grants') && str_contains($query, "plan_id = 5") => [],
+            str_contains($query, 'FROM wp_fchub_membership_grants') && str_contains($query, "plan_id = 5") => [[
+                'id' => 99,
+                'user_id' => 21,
+                'plan_id' => 5,
+                'provider' => 'wordpress_core',
+                'resource_type' => 'post',
+                'resource_id' => '55',
+                'source_type' => 'manual',
+                'source_id' => 77,
+                'feed_id' => null,
+                'grant_key' => 'internal-key',
+                'status' => 'active',
+                'starts_at' => null,
+                'expires_at' => null,
+                'drip_available_at' => null,
+                'source_ids' => '[]',
+                'meta' => '{"private":true}',
+            ]],
             str_contains($query, 'FROM wp_fchub_membership_grants') && str_contains($query, "resource_type = 'post'") => [[
                 'id' => 100,
                 'user_id' => 21,
@@ -150,10 +175,21 @@ final class ControllerFeatureExpansionTest extends PluginTestCase
             'resource_id' => '55',
         ]))->get_data();
 
-        self::assertFalse($planCheck['has_access']);
+        self::assertTrue($planCheck['has_access']);
         self::assertSame('gold-plan', $planCheck['plan']);
+        self::assertSame([
+            'id', 'plan_id', 'status', 'starts_at', 'expires_at', 'drip_available_at',
+            'resource_type', 'resource_id',
+        ], array_keys($planCheck['grants'][0]));
         self::assertTrue($resourceCheck['has_access']);
-        self::assertTrue(AccessCheckController::checkPermission(new \WP_REST_Request('GET', '/check-access', ['api_key' => 'secret'])));
+        self::assertSame([
+            'id', 'plan_id', 'status', 'starts_at', 'expires_at', 'drip_available_at',
+            'resource_type', 'resource_id',
+        ], array_keys($resourceCheck['grant']));
+        self::assertFalse(AccessCheckController::checkPermission(new \WP_REST_Request('GET', '/check-access', [
+            'api_key' => 'secret',
+            'user_id' => 999,
+        ])));
     }
 
     public function test_account_controller_dynamic_options_and_content_index_cover_success_paths(): void
@@ -299,6 +335,10 @@ final class ControllerFeatureExpansionTest extends PluginTestCase
                     'meta' => '{}',
                     'created_at' => '2026-03-01 00:00:00',
                     'updated_at' => '2026-03-01 00:00:00',
+                ]],
+                str_contains($query, 'GROUP BY access_rows._resource_key') => [[
+                    '_resource_key' => '0',
+                    'member_count' => '2',
                 ]],
                 default => [],
             };

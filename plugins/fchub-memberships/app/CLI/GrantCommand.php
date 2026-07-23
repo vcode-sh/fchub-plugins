@@ -9,6 +9,12 @@ use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Storage\PlanRuleRepository;
 use FChubMemberships\Storage\DripScheduleRepository;
 use FChubMemberships\Reports\MemberStatsReport;
+use FChubMemberships\Support\Clock;
+use FChubMemberships\Support\CsvSanitizer;
+use FChubMemberships\Domain\Entitlement\EntitlementBackfillService;
+use FChubMemberships\Domain\Entitlement\EntitlementService;
+use FChubMemberships\Storage\EntitlementEdgeRepository;
+use FChubMemberships\Storage\GrantSourceRepository;
 use WP_CLI;
 use WP_CLI\Utils;
 use WP_User;
@@ -36,13 +42,34 @@ class GrantCommand
     private PlanRepository $planRepo;
     private PlanRuleRepository $ruleRepo;
     private DripScheduleRepository $dripRepo;
+    private Clock $clock;
+    private EntitlementBackfillService $entitlementBackfillService;
 
-    public function __construct()
+    public function __construct(
+        ?GrantRepository $grantRepo = null,
+        ?PlanRepository $planRepo = null,
+        ?PlanRuleRepository $ruleRepo = null,
+        ?DripScheduleRepository $dripRepo = null,
+        ?Clock $clock = null,
+        ?EntitlementBackfillService $entitlementBackfillService = null
+    )
     {
-        $this->grantRepo = new GrantRepository();
-        $this->planRepo = new PlanRepository();
-        $this->ruleRepo = new PlanRuleRepository();
-        $this->dripRepo = new DripScheduleRepository();
+        $this->grantRepo = $grantRepo ?? new GrantRepository();
+        $this->planRepo = $planRepo ?? new PlanRepository();
+        $this->ruleRepo = $ruleRepo ?? new PlanRuleRepository();
+        $this->dripRepo = $dripRepo ?? new DripScheduleRepository();
+        $this->clock = $clock ?? new Clock();
+        if ($entitlementBackfillService !== null) {
+            $this->entitlementBackfillService = $entitlementBackfillService;
+        } else {
+            $edges = new EntitlementEdgeRepository();
+            $this->entitlementBackfillService = new EntitlementBackfillService(
+                $this->grantRepo,
+                new GrantSourceRepository(),
+                $edges,
+                new EntitlementService($edges, $this->grantRepo, $this->clock)
+            );
+        }
     }
 
     /**
@@ -155,7 +182,9 @@ class GrantCommand
         $expiresAt = null;
         if (!empty($assoc_args['expires'])) {
             $expiresAt = $assoc_args['expires'] . ' 23:59:59';
-            if (strtotime($expiresAt) === false) {
+            try {
+                $this->clock->parseLocal($expiresAt);
+            } catch (\Throwable) {
                 WP_CLI::error('Invalid expiration date format. Use YYYY-MM-DD.');
             }
         }
@@ -189,7 +218,9 @@ class GrantCommand
 
             $dripAvailableAt = null;
             if ($rule['drip_type'] === 'delayed' && $rule['drip_delay_days'] > 0) {
-                $dripAvailableAt = date('Y-m-d H:i:s', strtotime("+{$rule['drip_delay_days']} days"));
+                $dripAvailableAt = $this->clock->storage(
+                    $this->clock->plusDays((int) $rule['drip_delay_days'])
+                );
             } elseif ($rule['drip_type'] === 'fixed_date' && $rule['drip_date']) {
                 $dripAvailableAt = $rule['drip_date'];
             }
@@ -610,6 +641,77 @@ class GrantCommand
     }
 
     /**
+     * Backfill immutable entitlement edges from legacy grants.
+     *
+     * Dry-run is the default. Writes require the explicit --apply flag.
+     *
+     * ## OPTIONS
+     *
+     * [--after=<id>]
+     * : Continue after this grant ID.
+     *
+     * [--limit=<n>]
+     * : Maximum grants in this keyset batch (1-500).
+     * ---
+     * default: 100
+     * ---
+     *
+     * [--through=<id>]
+     * : Fixed maximum grant ID returned by an earlier batch.
+     *
+     * [--apply]
+     * : Persist the proposed entitlement edges.
+     *
+     * ## EXAMPLES
+     *
+     *     wp fchub-membership entitlement-backfill
+     *     wp fchub-membership entitlement-backfill --after=100 --through=500
+     *     wp fchub-membership entitlement-backfill --through=500 --apply
+     *
+     * @subcommand entitlement-backfill
+     */
+    public function entitlement_backfill($args, $assoc_args): void
+    {
+        $after = (int) ($assoc_args['after'] ?? 0);
+        $limit = (int) ($assoc_args['limit'] ?? 100);
+        $through = array_key_exists('through', $assoc_args)
+            ? (int) $assoc_args['through']
+            : null;
+        $apply = Utils\get_flag_value($assoc_args, 'apply', false);
+
+        try {
+            $report = $apply
+                ? $this->entitlementBackfillService->applyBatch($after, $limit, $through)
+                : $this->entitlementBackfillService->previewBatch($after, $limit, $through);
+        } catch (\InvalidArgumentException $exception) {
+            WP_CLI::error($exception->getMessage());
+        } catch (\Throwable) {
+            WP_CLI::error('Entitlement backfill could not be completed.');
+        }
+
+        $output = [
+            'mode' => $apply ? 'apply' : 'dry-run',
+            'counts' => $report['counts'],
+            'next_cursor' => $report['next_cursor'],
+            'through_grant_id' => $report['through_grant_id'],
+            'complete' => $report['complete'],
+        ];
+        $output['items'] = $report['items'];
+        WP_CLI::line((string) wp_json_encode($output));
+
+        if (!$apply) {
+            WP_CLI::warning('Dry run complete. No changes were made.');
+            return;
+        }
+        if ($report['counts']['refused'] > 0) {
+            WP_CLI::warning('Entitlement backfill stopped at a refused grant. Retry from the reported cursor.');
+            return;
+        }
+
+        WP_CLI::success('Entitlement backfill applied.');
+    }
+
+    /**
      * Sync grants for a specific integration feed or plan.
      *
      * ## OPTIONS
@@ -819,7 +921,7 @@ class GrantCommand
 
         if ($dryRun) {
             global $wpdb;
-            $now = current_time('mysql');
+            $now = $this->clock->storage($this->clock->now());
             $table = $wpdb->prefix . 'fchub_membership_grants';
 
             $count = (int) $wpdb->get_var($wpdb->prepare(
@@ -927,7 +1029,7 @@ class GrantCommand
         $dryRun = Utils\get_flag_value($assoc_args, 'dry-run', false);
         $table = $wpdb->prefix . 'fchub_membership_grants';
 
-        $cutoff = gmdate('Y-m-d H:i:s', strtotime("-{$olderThan} days"));
+        $cutoff = $this->clock->storage($this->clock->plusDays(-$olderThan));
 
         $count = (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM {$table}
@@ -1231,10 +1333,19 @@ class GrantCommand
             }
 
             // Header
-            fputcsv($fp, array_keys($rows[0]));
+            fputcsv($fp, array_keys($rows[0]), ',', '"', '');
 
             foreach ($rows as $row) {
-                fputcsv($fp, $row);
+                fputcsv(
+                    $fp,
+                    array_map(
+                        static fn(mixed $value): string => CsvSanitizer::sanitizeCell((string) $value),
+                        $row
+                    ),
+                    ',',
+                    '"',
+                    ''
+                );
             }
 
             fclose($fp);

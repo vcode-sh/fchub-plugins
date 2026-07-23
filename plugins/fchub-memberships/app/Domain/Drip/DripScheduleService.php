@@ -9,16 +9,27 @@ use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRuleRepository;
 use FChubMemberships\Email\DripContentUnlockedEmail;
 use FChubMemberships\Support\Logger;
+use FChubMemberships\Support\Clock;
+use FChubMemberships\Domain\ProviderOperationWorker;
 
 class DripScheduleService
 {
     private DripScheduleRepository $dripRepo;
     private GrantRepository $grantRepo;
+    private Clock $clock;
+    private ProviderOperationWorker $providerOperations;
 
-    public function __construct()
+    public function __construct(
+        ?DripScheduleRepository $dripRepo = null,
+        ?GrantRepository $grantRepo = null,
+        ?Clock $clock = null,
+        ?ProviderOperationWorker $providerOperations = null
+    )
     {
-        $this->dripRepo = new DripScheduleRepository();
-        $this->grantRepo = new GrantRepository();
+        $this->dripRepo = $dripRepo ?? new DripScheduleRepository();
+        $this->grantRepo = $grantRepo ?? new GrantRepository();
+        $this->clock = $clock ?? new Clock();
+        $this->providerOperations = $providerOperations ?? new ProviderOperationWorker();
     }
 
     /**
@@ -31,12 +42,28 @@ class DripScheduleService
 
         foreach ($pending as $notification) {
             $grant = $this->grantRepo->find($notification['grant_id']);
-            if (!$grant || $grant['status'] !== 'active') {
-                $this->dripRepo->markSent($notification['id']);
+            if (!$grant || in_array($grant['status'], ['revoked', 'expired'], true)) {
+                $this->dripRepo->markCancelled($notification['id']);
+                continue;
+            }
+            if ($grant['status'] === 'paused') {
+                $this->dripRepo->markDeferred($notification['id']);
                 continue;
             }
 
             try {
+                if (in_array(
+                    (string) ($grant['provider'] ?? ''),
+                    ['fluentcrm', 'fluent_community', 'learndash'],
+                    true
+                )) {
+                    $outcomes = $this->providerOperations->unlockDeferredGrant($grant, $notification);
+                    foreach ($outcomes as $outcome) {
+                        if (!in_array($outcome->status, ['applied', 'already-applied'], true)) {
+                            throw new \RuntimeException('Provider access was not unlocked.');
+                        }
+                    }
+                }
                 $this->sendDripNotification($notification, $grant);
                 $this->dripRepo->markSent($notification['id']);
                 do_action('fchub_memberships/drip_unlocked', $notification, $grant, $notification['user_id']);
@@ -255,7 +282,7 @@ class DripScheduleService
         $plan = $grant['plan_id'] ? $planRepo->find($grant['plan_id']) : null;
 
         // Get drip progress
-        $evaluator = new \FChubMemberships\Domain\AccessEvaluator();
+        $evaluator = new \FChubMemberships\Domain\AccessEvaluator(null, null, null, $this->clock);
         $progress = $grant['plan_id'] ? $evaluator->getDripProgress($notification['user_id'], $grant['plan_id']) : null;
 
         // Get next drip item
@@ -289,7 +316,7 @@ class DripScheduleService
     private function calculateNotifyAt(array $rule): ?string
     {
         if ($rule['drip_type'] === 'delayed' && $rule['drip_delay_days'] > 0) {
-            return gmdate('Y-m-d H:i:s', strtotime('+' . $rule['drip_delay_days'] . ' days'));
+            return $this->clock->storage($this->clock->plusDays((int) $rule['drip_delay_days']));
         }
 
         if ($rule['drip_type'] === 'fixed_date' && !empty($rule['drip_date'])) {

@@ -3,10 +3,14 @@
 namespace FChubMemberships\Domain\Grant;
 
 use FChubMemberships\Domain\AuditLogger;
+use FChubMemberships\Domain\Entitlement\EntitlementService;
 use FChubMemberships\Domain\GrantAdapterRegistry;
+use FChubMemberships\Domain\ProviderOperationOutcome;
+use FChubMemberships\Domain\ProviderOperationWorker;
 use FChubMemberships\Storage\DripScheduleRepository;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\GrantSourceRepository;
+use FChubMemberships\Support\Clock;
 
 defined('ABSPATH') || exit;
 
@@ -16,12 +20,26 @@ final class GrantCreationService
         private GrantRepository $grants,
         private GrantSourceRepository $sources,
         private DripScheduleRepository $drips,
-        private GrantAdapterRegistry $adapters
+        private GrantAdapterRegistry $adapters,
+        private ?Clock $clock = null,
+        private ?EntitlementService $entitlements = null,
+        private ?ProviderOperationWorker $providerOperations = null
     ) {
+        $this->clock ??= new Clock();
     }
 
     public function grantResource(int $userId, string $provider, string $resourceType, string $resourceId, array $context = []): array
     {
+        if ($this->entitlements !== null && $this->providerOperations !== null) {
+            return $this->grantResourceFromEntitlement(
+                $userId,
+                $provider,
+                $resourceType,
+                $resourceId,
+                $context
+            );
+        }
+
         $grantKey = GrantRepository::makeGrantKey($userId, $provider, $resourceType, $resourceId);
         $existing = $this->grants->findByGrantKey($grantKey);
         $sourceId = (int) ($context['source_id'] ?? 0);
@@ -65,7 +83,11 @@ final class GrantCreationService
             if (!empty($context['preserve_expiry']) && array_key_exists('expires_at', $context)) {
                 $updateData['expires_at'] = $context['expires_at'];
             } elseif (!empty($context['expires_at'])) {
-                if (empty($existing['expires_at']) || strtotime($context['expires_at']) > strtotime($existing['expires_at'])) {
+                if (
+                    empty($existing['expires_at'])
+                    || $this->clock->parseLocal($context['expires_at'])->getTimestamp()
+                        > $this->clock->parseLocal($existing['expires_at'])->getTimestamp()
+                ) {
                     $updateData['expires_at'] = $context['expires_at'];
                 }
             }
@@ -91,7 +113,7 @@ final class GrantCreationService
                 && (int) ($context['source_id'] ?? 0) === (int) ($incident['subscription_id'] ?? 0)
                 && empty($incident['recovered_at'])
             ) {
-                $updateData['meta']['payment_incident']['recovered_at'] = current_time('mysql');
+                $updateData['meta']['payment_incident']['recovered_at'] = $this->clock->storage($this->clock->now());
                 $updateData['meta']['payment_incident']['recovery_renewal_count'] = $updateData['renewal_count'];
             }
 
@@ -174,7 +196,7 @@ final class GrantCreationService
             'drip_available_at' => $dripAvailableAt,
             'source_ids' => $sourceId ? [$sourceId] : [],
             'meta' => array_merge($context['meta'] ?? [], $isTrial ? [
-                'trial_started_at' => current_time('mysql'),
+                'trial_started_at' => $this->clock->storage($this->clock->now()),
             ] : [], [
                 'provider_access_owner' => $providerApplication['had_access'] ? 'preexisting' : 'fchub',
             ]),
@@ -251,6 +273,234 @@ final class GrantCreationService
         AuditLogger::logGrantChange($grantId, 'created', [], $grantData);
 
         return ['action' => 'created', 'grant_id' => $grantId];
+    }
+
+    private function grantResourceFromEntitlement(
+        int $userId,
+        string $provider,
+        string $resourceType,
+        string $resourceId,
+        array $context
+    ): array {
+        $sourceType = !empty($context['is_trial'])
+            ? 'trial'
+            : trim((string) ($context['source_type'] ?? 'manual'));
+        $sourceId = (int) ($context['source_id'] ?? 0);
+        $planId = (int) ($context['plan_id'] ?? 0);
+        $feedId = (int) ($context['feed_id'] ?? 0);
+        $feedScope = array_key_exists('feed_scope', $context)
+            ? trim((string) $context['feed_scope'])
+            : 'external_unknown';
+        if (!in_array($feedScope, ['product', 'global', 'external_unknown'], true)) {
+            throw new \InvalidArgumentException('Entitlement feed scope is invalid.');
+        }
+
+        $identity = [
+            'user_id' => $userId,
+            'provider' => $provider,
+            'resource_type' => $resourceType,
+            'resource_id' => $resourceId,
+            'plan_id' => $planId,
+            'feed_id' => $feedId,
+            'feed_scope' => $feedScope,
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+        ];
+        $origin = $this->originEvent('grant', $identity, $context);
+        try {
+            $existingEdge = $this->entitlements->findByIdentity($identity);
+        } catch (\Throwable) {
+            return $this->stableCutoverFailure('entitlement_read_failed');
+        }
+        $edgeOwner = (string) ($existingEdge['owner'] ?? 'fchub');
+        $assignmentProvenance = (string) ($existingEdge['assignment_provenance'] ?? 'unknown');
+        $providerHasAccess = null;
+        if ($existingEdge === null && $provider === 'wordpress_core') {
+            $assignmentProvenance = 'fchub_created';
+        } elseif ($existingEdge === null && $provider !== 'learndash') {
+            $adapter = $this->adapters->resolve($provider);
+            if ($adapter && $adapter->supports($resourceType)) {
+                try {
+                    $providerHasAccess = $adapter->check($userId, $resourceType, $resourceId);
+                } catch (\Throwable) {
+                    $providerHasAccess = null;
+                }
+            }
+        }
+
+        $dripAvailableAt = $this->calculateDripDate($context['drip_rule'] ?? null);
+        $dripEligibility = $dripAvailableAt !== null
+            ? $this->clock->parseLocal($dripAvailableAt)
+            : null;
+        $isDeferredDrip = $dripEligibility !== null && $dripEligibility > $this->clock->now();
+        $aggregateMeta = is_array($context['meta'] ?? null) ? $context['meta'] : [];
+        if (!empty($context['is_trial']) && $existingEdge === null) {
+            $aggregateMeta['trial_started_at'] = $this->clock->storage($this->clock->now());
+        }
+        $attributes = [
+            'owner' => $edgeOwner,
+            'assignment_provenance' => $assignmentProvenance,
+            'expires_at' => !empty($context['is_trial'])
+                ? ($context['trial_ends_at'] ?? null)
+                : ($context['expires_at'] ?? null),
+            'drip_available_at' => $dripAvailableAt,
+            'policy' => is_array($context['policy'] ?? null) ? $context['policy'] : [],
+            'drip_rule_id' => (int) ($context['drip_rule']['id'] ?? 0),
+            'aggregate_meta' => $aggregateMeta,
+            'trial_ends_at' => $context['trial_ends_at'] ?? null,
+        ];
+
+        try {
+            if ($provider === 'wordpress_core') {
+                $edgeResult = $this->entitlements->activateLocal($identity, $attributes, $origin);
+            } elseif ($existingEdge === null) {
+                $edgeResult = $this->entitlements->activateFromProviderObservation(
+                    $identity,
+                    $attributes,
+                    $providerHasAccess,
+                    $isDeferredDrip
+                );
+            } else {
+                $edgeResult = $this->entitlements->activate($identity, $attributes, $isDeferredDrip);
+            }
+        } catch (\Throwable) {
+            return $this->stableCutoverFailure('entitlement_persistence_failed');
+        }
+        if (!in_array($edgeResult['action'], ['created', 'replayed'], true)) {
+            return $this->stableCutoverFailure('entitlement_identity_conflict');
+        }
+
+        $edge = $edgeResult['edge'];
+        $grant = $this->grants->findByGrantKey(GrantRepository::makeGrantKey(
+            $userId,
+            $provider,
+            $resourceType,
+            $resourceId
+        ));
+        $grantId = isset($grant['id']) ? (int) $grant['id'] : null;
+        $action = $edgeResult['action'] === 'created' ? 'created' : 'updated';
+        if ($provider === 'wordpress_core') {
+            if (!empty($edgeResult['renewed'])) {
+                $this->emitRenewalHook('updated', $grantId);
+            }
+            return [
+                'action' => $action,
+                'grant_id' => $grantId,
+                'provider_outcome' => ProviderOperationOutcome::alreadyApplied(
+                    'local_only_provider_operation',
+                    'WordPress content access is local-only.'
+                ),
+            ];
+        }
+
+        try {
+            $operation = $this->providerOperations->enqueue(
+                (int) $edge['id'],
+                'grant',
+                (string) $origin,
+                $isDeferredDrip ? $dripEligibility : null
+            );
+        } catch (\Throwable) {
+            return $this->stableCutoverFailure('provider_operation_persistence_failed', $grantId);
+        }
+        if ($operation === null) {
+            return $this->stableCutoverFailure('provider_operation_missing', $grantId);
+        }
+        if (($operation['state'] ?? '') === 'deferred') {
+            return [
+                'action' => 'pending',
+                'grant_id' => $grantId,
+                'provider_outcome' => ProviderOperationOutcome::deferred(
+                    'provider_operation_not_eligible',
+                    'The provider operation is waiting for its eligibility time.'
+                ),
+                'message' => __('Provider operation is pending recovery.', 'fchub-memberships'),
+            ];
+        }
+        try {
+            $outcome = $this->providerOperations->process((int) $operation['id']);
+        } catch (\Throwable) {
+            return [
+                'action' => 'pending',
+                'grant_id' => $grantId,
+                'message' => __('Provider operation is pending recovery.', 'fchub-memberships'),
+            ];
+        }
+
+        if (in_array($outcome->status, ['applied', 'already-applied'], true)) {
+            try {
+                $projection = $this->entitlements->projectAppliedGrant($edge, $attributes, (string) $origin);
+            } catch (\Throwable) {
+                return $this->stableCutoverFailure('entitlement_projection_failed', $grantId);
+            }
+            $grant = $this->grants->findByGrantKey(GrantRepository::makeGrantKey(
+                $userId,
+                $provider,
+                $resourceType,
+                $resourceId
+            ));
+            $grantId = isset($grant['id']) ? (int) $grant['id'] : null;
+            if (!empty($projection['renewed'])) {
+                $this->emitRenewalHook('updated', $grantId);
+            }
+            return [
+                'action' => $action,
+                'grant_id' => $grantId,
+                'provider_outcome' => $outcome,
+            ];
+        }
+        if (in_array($outcome->status, ['deferred', 'retryable-failure'], true)) {
+            return [
+                'action' => 'pending',
+                'grant_id' => $grantId,
+                'provider_outcome' => $outcome,
+                'message' => __('Provider operation is pending recovery.', 'fchub-memberships'),
+            ];
+        }
+
+        return [
+            'action' => 'failed',
+            'grant_id' => $grantId,
+            'provider_outcome' => $outcome,
+            'message' => __('Provider operation failed terminally.', 'fchub-memberships'),
+        ];
+    }
+
+    private function originEvent(string $action, array $identity, array $context): string
+    {
+        if (array_key_exists('origin_event', $context)) {
+            $origin = trim((string) $context['origin_event']);
+            if ($origin === ''
+                || strlen($origin) > 100
+                || preg_match('/^[a-zA-Z0-9_.:-]+$/', $origin) !== 1
+            ) {
+                throw new \InvalidArgumentException('Provider operation origin event is invalid.');
+            }
+            return $origin;
+        }
+
+        return $action . ':' . substr(hash('sha256', wp_json_encode($identity)), 0, 64);
+    }
+
+    private function stableCutoverFailure(string $code, ?int $grantId = null): array
+    {
+        return [
+            'action' => 'failed',
+            'grant_id' => $grantId,
+            'reason' => $code,
+            'message' => __('Membership entitlement could not be persisted.', 'fchub-memberships'),
+        ];
+    }
+
+    private function emitRenewalHook(string $action, ?int $grantId): void
+    {
+        if ($action !== 'updated' || $grantId === null) {
+            return;
+        }
+        $grant = $this->grants->find($grantId);
+        if ($grant !== null) {
+            do_action('fchub_memberships/grant_renewed', $grant, (int) ($grant['renewal_count'] ?? 0));
+        }
     }
 
     private function applyProviderGrant(
@@ -612,7 +862,7 @@ final class GrantCreationService
         }
 
         if ($dripRule['drip_type'] === 'delayed' && $dripRule['drip_delay_days'] > 0) {
-            return date('Y-m-d H:i:s', strtotime('+' . (int) $dripRule['drip_delay_days'] . ' days'));
+            return $this->clock->storage($this->clock->plusDays((int) $dripRule['drip_delay_days']));
         }
 
         if ($dripRule['drip_type'] === 'fixed_date' && !empty($dripRule['drip_date'])) {

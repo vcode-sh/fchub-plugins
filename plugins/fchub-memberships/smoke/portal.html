@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FCHub Membership Portal Smoke</title>
+  </head>
+  <body>
+    <div id="fchub-membership-portal"></div>
+    <script>
+      window.fchubMembershipsPortal = {
+        rest_url: '/wp-json/fchub-memberships/v1/',
+        nonce: 'smoke-nonce',
+      }
+    </script>
+    <script type="module" src="../resources/portal/main.js"></script>
+  </body>
+</html>

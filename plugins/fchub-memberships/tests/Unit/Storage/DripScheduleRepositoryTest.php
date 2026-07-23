@@ -5,10 +5,53 @@ declare(strict_types=1);
 namespace FChubMemberships\Tests\Unit\Storage;
 
 use FChubMemberships\Storage\DripScheduleRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class DripScheduleRepositoryTest extends PluginTestCase
 {
+    public function test_retry_backoff_uses_site_local_clock(): void
+    {
+        $updated = [];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = fn(): array => $this->row([
+            'status' => 'failed',
+            'retry_count' => 1,
+        ]);
+        $GLOBALS['_fchub_test_wpdb_overrides']['update'] = static function (string $table, array $data) use (&$updated): int {
+            $updated = $data;
+            return 1;
+        };
+        $timezone = new \DateTimeZone('Asia/Kolkata');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-14 12:30:00', $timezone), $timezone);
+
+        (new DripScheduleRepository($clock))->markFailed(1);
+
+        self::assertSame('2026-03-14 13:00:00', $updated['next_retry_at']);
+    }
+
+    public function test_deferred_cancelled_and_release_transitions_are_explicit(): void
+    {
+        $updates = [];
+        $GLOBALS['_fchub_test_wpdb_overrides']['update'] = static function (
+            string $table,
+            array $data,
+            array $where
+        ) use (&$updates): int {
+            $updates[] = [$data, $where];
+            return $where['grant_id'] ?? null ? 2 : 1;
+        };
+        $repo = new DripScheduleRepository();
+
+        self::assertTrue($repo->markDeferred(11));
+        self::assertTrue($repo->markCancelled(12));
+        self::assertSame(2, $repo->releaseDeferredForGrant(50));
+        self::assertSame([
+            [['status' => 'deferred'], ['id' => 11]],
+            [['status' => 'cancelled'], ['id' => 12]],
+            [['status' => 'pending'], ['grant_id' => 50, 'status' => 'deferred']],
+        ], $updates);
+    }
+
     private function row(array $overrides = []): array
     {
         return array_merge([
@@ -119,6 +162,7 @@ final class DripScheduleRepositoryTest extends PluginTestCase
 
         $queryDump = implode("\n", $queries);
         self::assertStringContainsString("retry_count < 3", $queryDump);
+        self::assertStringNotContainsString("status = 'deferred'", $queries[0]);
         self::assertStringContainsString("user_id = 31", $queryDump);
         self::assertStringContainsString("status = 'pending'", $queryDump);
         self::assertStringContainsString("notify_at >= '2026-03-21 00:00:00'", $queryDump);

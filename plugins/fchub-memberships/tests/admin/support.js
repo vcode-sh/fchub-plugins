@@ -175,6 +175,68 @@ function apiPayload(url) {
   if (url.includes('/admin/drip/overview')) {
     return { data: { total_rules: 1, pending: 1, sent_today: 0, failed: 0 } }
   }
+  if (url.includes('/admin/webhooks/health')) {
+    return {
+      data: {
+        status: 'off',
+        pending_count: 0,
+        processing_count: 0,
+        retrying_count: 0,
+        succeeded_count: 4,
+        failed_count: 1,
+        last_success_at: '2026-07-22 12:00:00',
+      },
+    }
+  }
+  if (url.includes('/admin/webhooks/deliveries/91/retry')) {
+    return { data: { id: 91, status: 'pending' } }
+  }
+  if (url.includes('/admin/webhooks/deliveries')) {
+    return {
+      data: {
+        deliveries: [{
+          id: 91,
+          event_id: 'evt_smoke_failed',
+          event_type: 'access.revoked',
+          destination_url: 'https://hooks.example.com/memberships',
+          status: 'failed',
+          attempt_count: 7,
+          response_code: 503,
+          error_message: 'webhook_http_503',
+          next_attempt_at: null,
+          last_attempt_at: '2026-07-22 12:05:00',
+          delivered_at: null,
+          created_at: '2026-07-22 12:00:00',
+          updated_at: '2026-07-22 12:05:00',
+        }],
+        page: 1,
+        per_page: 20,
+      },
+    }
+  }
+  if (url.includes('/admin/webhooks/test')) {
+    return {
+      data: {
+        event_id: 'evt_smoke_test',
+        success: false,
+        results: [{ id: 92, destination_url: 'https://hooks.example.com/memberships', status: 'retrying' }],
+      },
+    }
+  }
+  if (url.includes('/admin/settings/generate-api-key')) {
+    return {
+      data: {
+        api_key: 'fchub_one_time_smoke_key',
+        access_api: { configured: true, prefix: 'fchub_one_ti', rotated_at: '2026-07-22 12:10:00' },
+      },
+    }
+  }
+  if (url.includes('/admin/settings/revoke-api-key')) {
+    return { data: { access_api: { configured: false, prefix: null, rotated_at: null } } }
+  }
+  if (url.includes('/admin/settings/regenerate-webhook-secret')) {
+    return { data: { webhook_secret: 'webhook_one_time_smoke_secret' } }
+  }
   if (url.includes('/admin/settings')) {
     return {
       data: {
@@ -185,21 +247,24 @@ function apiPayload(url) {
         email_access_granted: 'yes',
         email_access_expiring: 'yes',
         expiry_warning_days: 7,
+        trial_expiry_notice_days: 3,
         email_access_revoked: 'yes',
         email_drip_unlocked: 'yes',
-        api_key: '',
+        hide_protected_in_archive: 'no',
+        uninstall_remove_data: 'no',
+        access_api: { configured: true, prefix: 'fchub_abc123', rotated_at: '2026-07-22 12:00:00' },
         debug_mode: 'no',
         webhook_enabled: 'no',
-        webhook_urls: '',
-        webhook_secret: '',
+        webhook_urls: 'https://127.0.0.1/webhook',
+        webhook_secret_configured: true,
+        webhook_destinations_configured: false,
+        webhook_status: 'needs_setup',
         fluentcrm_enabled: 'no',
         fluentcrm_tag_prefix: 'member:',
         fluentcrm_default_list: '',
         fluentcrm_auto_create_tags: 'yes',
         fc_enabled: 'no',
         fc_space_mappings: {},
-        fc_badge_mappings: {},
-        fc_remove_badge_on_revoke: 'no',
         membership_mode: 'stack',
       },
     }

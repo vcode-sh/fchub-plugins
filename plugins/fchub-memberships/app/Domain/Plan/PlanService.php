@@ -4,10 +4,12 @@ namespace FChubMemberships\Domain\Plan;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Domain\AuditLogger;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Storage\PlanRuleRepository;
 use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\ProtectionRuleRepository;
 
 class PlanService
 {
@@ -300,5 +302,8 @@ class PlanService
     private function invalidateHierarchyCache(): void
     {
         delete_transient('fchub_memberships_plan_hierarchy');
+        ProtectionRuleRepository::clearCache();
+        PlanRuleResolver::invalidateSharedCache();
+        AccessEvaluator::clearCache();
     }
 }

@@ -51,12 +51,14 @@ function dashboardPayload(overrides = {}) {
 
 async function installDashboardFixture(page, fixture) {
   await page.goto('/smoke/index.html#/plans')
-  await expect(page.getByRole('heading', { name: 'Plans', exact: true })).toBeVisible()
+  await expect(page.locator('.fchub-app-wrapper')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('heading', { name: 'Plans' })).toBeVisible({ timeout: 15_000 })
 
   await page.evaluate((initialFixture) => {
     const baseFetch = window.fetch
     window.__dashboardFixture = initialFixture
     window.__dashboardRequests = []
+    window.__dashboardReleaseRequest = null
     window.fetch = async (input, init = {}) => {
       const url = String(input)
       window.__dashboardRequests.push(url)
@@ -65,6 +67,11 @@ async function installDashboardFixture(page, fixture) {
       }
 
       const current = window.__dashboardFixture
+      if (current.hold) {
+        await new Promise((resolve) => {
+          window.__dashboardReleaseRequest = resolve
+        })
+      }
       if (current.delay) {
         await new Promise((resolve) => window.setTimeout(resolve, current.delay))
       }
@@ -84,17 +91,22 @@ async function installDashboardFixture(page, fixture) {
       }
     }
     if (initialFixture.darkMode) {
+      localStorage.setItem('fcart_admin_theme', 'dark')
       document.body.classList.add('dark')
     }
     window.location.hash = '#/'
   }, fixture)
 
-  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/#\/$/)
+  if (!fixture.hold) {
+    await expect(page.locator('.dashboard-content, .dashboard-error')).toBeVisible()
+  }
 }
 
 test('keeps loading, failure, and successful zero states honest', async ({ page }) => {
-  await installDashboardFixture(page, { error: 'Membership data is temporarily unavailable', delay: 250 })
+  await installDashboardFixture(page, { error: 'Membership data is temporarily unavailable', hold: true })
   await expect(page.locator('.dashboard-skeleton')).toBeVisible()
+  await page.evaluate(() => window.__dashboardReleaseRequest?.())
   const failure = page.getByRole('alert')
   await expect(failure).toContainText('Dashboard unavailable')
   await expect(failure).toContainText('Membership data is temporarily unavailable')
@@ -159,8 +171,11 @@ test('switches contextual actions between setup and operating states', async ({ 
   await page.evaluate((payload) => {
     window.__dashboardFixture = { payload }
     window.location.hash = '#/plans'
-    window.setTimeout(() => { window.location.hash = '#/' }, 0)
   }, dashboardPayload())
+  await expect(page).toHaveURL(/#\/plans$/)
+  await expect(page.getByRole('heading', { name: 'Plans' })).toBeVisible()
+  await page.evaluate(() => { window.location.hash = '#/' })
+  await page.waitForFunction(() => window.__dashboardRequests.filter((url) => url.includes('/admin/dashboard')).length >= 2)
   await expect(page.getByRole('link', { name: 'Grant access' })).toHaveAttribute('href', '#/members')
   await expect(page.getByRole('link', { name: 'Protect content' })).toHaveAttribute('href', '#/content')
   await expect(page.locator('.dashboard-action')).toHaveCount(2)
@@ -222,8 +237,11 @@ test('ranks plans and replaces an empty distribution with a truthful member stat
   await page.evaluate((payload) => {
     window.__dashboardFixture = { payload }
     window.location.hash = '#/plans'
-    window.setTimeout(() => { window.location.hash = '#/' }, 0)
   }, dashboardPayload({ plan_distribution: [] }))
+  await expect(page).toHaveURL(/#\/plans$/)
+  await expect(page.getByRole('heading', { name: 'Plans' })).toBeVisible()
+  await page.evaluate(() => { window.location.hash = '#/' })
+  await page.waitForFunction(() => window.__dashboardRequests.filter((url) => url.includes('/admin/dashboard')).length >= 2)
   await expect(page.getByRole('region', { name: 'Plan distribution' })).toContainText('No active members to compare yet')
 })
 

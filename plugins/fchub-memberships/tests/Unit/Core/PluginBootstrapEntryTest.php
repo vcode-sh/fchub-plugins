@@ -19,6 +19,6 @@ final class PluginBootstrapEntryTest extends PluginTestCase
         self::assertArrayHasKey('admin_menu', $GLOBALS['_fchub_test_actions']);
         self::assertArrayHasKey('admin_notices', $GLOBALS['_fchub_test_actions']);
         self::assertArrayHasKey('fchub_memberships_validity_check', $GLOBALS['_fchub_test_actions']);
-        self::assertArrayHasKey('fchub_memberships_dispatch_webhook', $GLOBALS['_fchub_test_actions']);
+        self::assertArrayHasKey('fchub_memberships_deliver_webhook', $GLOBALS['_fchub_test_actions']);
     }
 }

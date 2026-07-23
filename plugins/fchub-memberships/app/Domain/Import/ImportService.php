@@ -259,9 +259,21 @@ class ImportService
                 ];
 
             case 'overwrite':
-                $this->grantService->revokePlan($userId, $planId, [
+                $revokeResult = $this->grantService->revokePlan($userId, $planId, [
                     'reason' => 'Overwritten by import',
+                    'grace_period_days' => 0,
                 ]);
+                if (
+                    (array_key_exists('success', $revokeResult) && $revokeResult['success'] === false)
+                    || (int) ($revokeResult['failed'] ?? 0) > 0
+                    || (int) ($revokeResult['revoked'] ?? 0) === 0
+                ) {
+                    return [
+                        'email' => $email,
+                        'status' => 'failed',
+                        'message' => $this->revocationFailureMessage($revokeResult),
+                    ];
+                }
                 $this->grantService->grantPlan($userId, $planId, [
                     'source_type' => 'import',
                     'source_id'   => 0,
@@ -281,5 +293,17 @@ class ImportService
                     'message' => 'Active grant already exists.',
                 ];
         }
+    }
+
+    private function revocationFailureMessage(array $result): string
+    {
+        foreach (($result['errors'] ?? []) as $error) {
+            $message = is_array($error) ? ($error['message'] ?? '') : $error;
+            if (is_string($message) && $message !== '') {
+                return sprintf('Existing grant could not be revoked: %s', $message);
+            }
+        }
+
+        return 'Existing grant revocation could not be confirmed; replacement was not granted.';
     }
 }

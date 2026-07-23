@@ -64,6 +64,7 @@ final class MembershipContactProjector
      *     attached_lists:list<int>,
      *     detached_lists:list<int>,
      *     custom_fields:array<string, string>,
+     *     degraded:bool,
      *     errors:list<string>
      * }
      */
@@ -128,7 +129,9 @@ final class MembershipContactProjector
             $tagReadSucceeded = false;
             $currentTagIds = [];
         }
+        $visibleOwnedTagIds = [];
         if ($tagResolutionSucceeded && $tagReadSucceeded) {
+            $visibleOwnedTagIds = $this->normaliseIds(array_intersect($state['tag_ids'], $currentTagIds));
             $state['tag_ids'] = $this->applyOwnedDelta(
                 $contact,
                 'attachTags',
@@ -149,7 +152,9 @@ final class MembershipContactProjector
             : [];
         $listReadSucceeded = false;
         $currentListIds = $this->readRelationIds($contact, 'lists', $result['errors'], $listReadSucceeded);
+        $visibleOwnedListIds = [];
         if ($listReadSucceeded) {
+            $visibleOwnedListIds = $this->normaliseIds(array_intersect($state['list_ids'], $currentListIds));
             $state['list_ids'] = $this->applyOwnedDelta(
                 $contact,
                 'attachLists',
@@ -164,29 +169,49 @@ final class MembershipContactProjector
             );
         }
 
-        $result['custom_fields'] = $this->syncCustomFields(
-            $contactsApi,
-            $contact,
-            $projection,
-            $result['errors']
-        );
-
         if (!$this->stateRepository->save($userId, $state)) {
             $result['errors'][] = 'state_save_failed';
-            $this->rollbackNewAttachments(
+            $compensated = $this->rollbackNewAttachments(
                 $contact,
                 'tag',
                 'detachTags',
                 $result['attached_tags'],
                 $result['errors']
             );
-            $this->rollbackNewAttachments(
+            $compensated = $this->rollbackNewAttachments(
                 $contact,
                 'list',
                 'detachLists',
                 $result['attached_lists'],
                 $result['errors']
+            ) && $compensated;
+            $compensated = $this->restoreDetachedOwnedRelations(
+                $contact,
+                'tag',
+                'attachTags',
+                $visibleOwnedTagIds,
+                $result['detached_tags'],
+                $result['errors']
+            ) && $compensated;
+            $compensated = $this->restoreDetachedOwnedRelations(
+                $contact,
+                'list',
+                'attachLists',
+                $visibleOwnedListIds,
+                $result['detached_lists'],
+                $result['errors']
+            ) && $compensated;
+            $result['degraded'] = !$compensated;
+        } else {
+            $result['custom_fields'] = $this->syncCustomFields(
+                $contactsApi,
+                $contact,
+                $projection,
+                $result['errors']
             );
+            if (in_array('custom_field_sync_failed', $result['errors'], true)) {
+                $result['degraded'] = true;
+            }
         }
 
         $result['attached_tags'] = $this->normaliseIds($result['attached_tags']);
@@ -206,7 +231,7 @@ final class MembershipContactProjector
      * @return array{
      *     success:bool,
      *     desired:array{tag_names:list<string>, tag_ids:list<int>, list_ids:list<int>, custom_fields:array<string, string>},
-     *     current:array{contact_id:int, owned_tag_ids:list<int>, owned_list_ids:list<int>, tag_ids:list<int>, list_ids:list<int>},
+     *     current:array{contact_id:int, owned_tag_ids:list<int>, owned_list_ids:list<int>, tag_ids:list<int>, list_ids:list<int>, custom_fields:array<string, string>},
      *     drift:int,
      *     drift_scope:'owned_assets',
      *     errors:list<string>
@@ -217,10 +242,15 @@ final class MembershipContactProjector
         $result = [
             'success' => false,
             'desired' => ['tag_names' => [], 'tag_ids' => [], 'list_ids' => [], 'custom_fields' => []],
-            'current' => ['contact_id' => 0, 'owned_tag_ids' => [], 'owned_list_ids' => [], 'tag_ids' => [], 'list_ids' => []],
+            'current' => [
+                'contact_id' => 0,
+                'owned_tag_ids' => [],
+                'owned_list_ids' => [],
+                'tag_ids' => [],
+                'list_ids' => [],
+                'custom_fields' => [],
+            ],
             'drift' => 0,
-            // FluentCRM exposes custom-field definitions but not a portable per-contact read API.
-            // Preview therefore counts only observable FCHub-owned relation drift.
             'drift_scope' => 'owned_assets',
             'errors' => [],
         ];
@@ -255,10 +285,16 @@ final class MembershipContactProjector
             }
         }
         $result['desired']['tag_ids'] = $this->normaliseIds($result['desired']['tag_ids']);
+        $result['desired']['custom_fields'] = $this->projectCustomFields($contactsApi, $projection, $result['errors']);
 
         $contact = $this->findExistingContact($contactsApi, $userId, $result['errors']);
         if ($contact === null) {
-            $result['drift'] = count($result['desired']['tag_names']) + count($result['desired']['list_ids']);
+            $result['drift'] = count($result['desired']['tag_names'])
+                + count($result['desired']['list_ids'])
+                + count(array_filter(
+                    $result['desired']['custom_fields'],
+                    static fn(string $value): bool => $value !== ''
+                ));
             $result['success'] = $result['errors'] === [];
             return $result;
         }
@@ -282,7 +318,13 @@ final class MembershipContactProjector
         $listsRead = false;
         $result['current']['tag_ids'] = $this->readRelationIds($contact, 'tags', $result['errors'], $tagsRead);
         $result['current']['list_ids'] = $this->readRelationIds($contact, 'lists', $result['errors'], $listsRead);
-        $result['desired']['custom_fields'] = $this->projectCustomFields($contactsApi, $projection, $result['errors']);
+        $customFieldsRead = false;
+        $result['current']['custom_fields'] = $this->readCustomFields(
+            $contact,
+            array_keys($result['desired']['custom_fields']),
+            $result['errors'],
+            $customFieldsRead
+        );
 
         if ($tagsRead) {
             $result['drift'] += count(array_diff($state['tag_ids'], $result['desired']['tag_ids']));
@@ -292,6 +334,13 @@ final class MembershipContactProjector
         if ($listsRead) {
             $result['drift'] += count(array_diff($state['list_ids'], $result['desired']['list_ids']));
             $result['drift'] += count(array_diff($result['desired']['list_ids'], $result['current']['list_ids']));
+        }
+        if ($customFieldsRead) {
+            foreach ($result['desired']['custom_fields'] as $key => $value) {
+                if (($result['current']['custom_fields'][$key] ?? '') !== $value) {
+                    $result['drift']++;
+                }
+            }
         }
 
         $result['errors'] = array_values(array_unique($result['errors']));
@@ -318,7 +367,7 @@ final class MembershipContactProjector
     private function findExistingContact(object $contactsApi, int $userId, array &$errors): ?object
     {
         try {
-            $contact = $contactsApi->getContactByUserRef($userId);
+            $contact = $contactsApi->getContactByUserId($userId);
             if (is_object($contact)) {
                 return $contact;
             }
@@ -497,6 +546,11 @@ final class MembershipContactProjector
         $relation = $assetType . 's';
 
         foreach (array_values(array_diff($ownedIds, $desiredIds)) as $id) {
+            if (!in_array($id, $currentIds, true)) {
+                $ownedIds = array_values(array_diff($ownedIds, [$id]));
+                continue;
+            }
+
             try {
                 $contact->{$detachMethod}([$id]);
                 $verified = false;
@@ -556,8 +610,9 @@ final class MembershipContactProjector
         string $detachMethod,
         array &$attachedIds,
         array &$errors
-    ): void {
+    ): bool {
         $relation = $assetType . 's';
+        $compensated = true;
 
         foreach ($attachedIds as $id) {
             try {
@@ -566,17 +621,95 @@ final class MembershipContactProjector
                 $currentIds = $this->readRelationIds($contact, $relation, $errors, $verified);
                 if (!$verified) {
                     $errors[] = $assetType . '_rollback_verification_failed';
+                    $compensated = false;
                     continue;
                 }
                 if (in_array($id, $currentIds, true)) {
                     $errors[] = $assetType . '_rollback_unconfirmed';
+                    $compensated = false;
                     continue;
                 }
 
                 $attachedIds = array_values(array_diff($attachedIds, [$id]));
             } catch (\Throwable) {
                 $errors[] = $assetType . '_rollback_failed';
+                $compensated = false;
             }
+        }
+
+        return $compensated;
+    }
+
+    /**
+     * @param list<int> $visibleOwnedIds
+     * @param list<int> $detachedIds
+     * @param list<string> $errors
+     */
+    private function restoreDetachedOwnedRelations(
+        object $contact,
+        string $assetType,
+        string $attachMethod,
+        array $visibleOwnedIds,
+        array &$detachedIds,
+        array &$errors
+    ): bool {
+        $relation = $assetType . 's';
+        $compensated = true;
+        $restoreIds = $this->normaliseIds(array_intersect($visibleOwnedIds, $detachedIds));
+
+        foreach ($restoreIds as $id) {
+            try {
+                $contact->{$attachMethod}([$id]);
+                $verified = false;
+                $currentIds = $this->readRelationIds($contact, $relation, $errors, $verified);
+                if (!$verified) {
+                    $errors[] = $assetType . '_compensation_verification_failed';
+                    $compensated = false;
+                    continue;
+                }
+                if (!in_array($id, $currentIds, true)) {
+                    $errors[] = $assetType . '_compensation_attach_unconfirmed';
+                    $compensated = false;
+                    continue;
+                }
+
+                $detachedIds = array_values(array_diff($detachedIds, [$id]));
+            } catch (\Throwable) {
+                $errors[] = $assetType . '_compensation_attach_failed';
+                $compensated = false;
+            }
+        }
+
+        return $compensated;
+    }
+
+    /** @param list<string> $ownedKeys @return array<string, string> */
+    private function readCustomFields(
+        object $contact,
+        array $ownedKeys,
+        array &$errors,
+        bool &$succeeded
+    ): array {
+        $succeeded = false;
+        try {
+            $values = $contact->custom_fields();
+            if (!is_array($values)) {
+                $errors[] = 'custom_field_read_failed';
+                return [];
+            }
+
+            $ownedValues = [];
+            foreach ($ownedKeys as $key) {
+                if (array_key_exists($key, $values) && is_scalar($values[$key])) {
+                    $ownedValues[$key] = (string) $values[$key];
+                }
+            }
+
+            $succeeded = true;
+            return $ownedValues;
+        } catch (\Throwable) {
+            $errors[] = 'custom_field_read_failed';
+            return [];
         }
     }
 
@@ -650,6 +783,7 @@ final class MembershipContactProjector
             'attached_lists' => [],
             'detached_lists' => [],
             'custom_fields' => [],
+            'degraded' => false,
             'errors' => [],
         ];
     }

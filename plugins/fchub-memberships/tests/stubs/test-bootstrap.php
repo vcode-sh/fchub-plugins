@@ -136,6 +136,16 @@ if (!class_exists('WP_REST_Response')) {
         {
             return $this->headers;
         }
+
+        public function header(string $key, string $value, bool $replace = true): void
+        {
+            if (!$replace && isset($this->headers[$key])) {
+                $this->headers[$key] .= ', ' . $value;
+                return;
+            }
+
+            $this->headers[$key] = $value;
+        }
     }
 }
 
@@ -199,10 +209,12 @@ if (!class_exists('wpdb')) {
     class wpdb
     {
         public string $prefix = 'wp_';
+        public string $options = 'wp_options';
         public string $users = 'wp_users';
         public string $dbname = 'wordpress';
         public int $insert_id = 0;
         public int $rows_affected = 1;
+        public string $last_error = '';
 
         public function get_results(string $query, string $output = OBJECT): array
         {
@@ -232,6 +244,21 @@ if (!class_exists('wpdb')) {
 
             if (isset($GLOBALS['_fchub_test_wpdb_overrides']['get_var']) && is_callable($GLOBALS['_fchub_test_wpdb_overrides']['get_var'])) {
                 return $GLOBALS['_fchub_test_wpdb_overrides']['get_var']($query, $this);
+            }
+
+            if (str_contains($query, 'GET_LOCK(') || str_contains($query, 'RELEASE_LOCK(')) {
+                return 1;
+            }
+
+            if (str_contains($query, 'FROM wp_options')
+                && str_contains($query, 'fchub_memberships_settings')
+            ) {
+                if (!array_key_exists('fchub_memberships_settings', $GLOBALS['_fchub_test_options'])) {
+                    return null;
+                }
+
+                $value = $GLOBALS['_fchub_test_options']['fchub_memberships_settings'];
+                return is_array($value) || is_object($value) ? serialize($value) : (string) $value;
             }
 
             return 0;
@@ -379,6 +406,24 @@ if (!function_exists('add_action')) {
     }
 }
 
+if (!function_exists('has_action')) {
+    function has_action(string $hook, callable|false $callback = false): int|bool
+    {
+        $registrations = $GLOBALS['_fchub_test_action_registrations'][$hook] ?? [];
+        if ($callback === false) {
+            return $registrations !== [];
+        }
+
+        foreach ($registrations as $registration) {
+            if ($registration['callback'] === $callback) {
+                return $registration['priority'];
+            }
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('do_action')) {
     function do_action(string $hook, mixed ...$args): void
     {
@@ -425,6 +470,27 @@ if (!function_exists('update_option')) {
     }
 }
 
+if (!function_exists('delete_option')) {
+    function delete_option(string $option): bool
+    {
+        $GLOBALS['_fchub_test_deleted_options'][] = $option;
+        unset($GLOBALS['_fchub_test_options'][$option]);
+        return true;
+    }
+}
+
+if (!function_exists('maybe_unserialize')) {
+    function maybe_unserialize(mixed $value): mixed
+    {
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        $unserialized = @unserialize($value);
+        return $unserialized === false && $value !== 'b:0;' ? $value : $unserialized;
+    }
+}
+
 if (!function_exists('get_role')) {
     function get_role(string $role): ?object
     {
@@ -437,6 +503,10 @@ if (!function_exists('get_role')) {
 if (!function_exists('current_time')) {
     function current_time(string $type = 'mysql', bool $gmt = false): string|int
     {
+        if ($type === 'timestamp' && isset($GLOBALS['_fchub_test_current_timestamp'])) {
+            return (int) $GLOBALS['_fchub_test_current_timestamp'];
+        }
+
         return match ($type) {
             'mysql' => '2026-03-13 22:00:00',
             'timestamp' => 1773439200,
@@ -444,6 +514,62 @@ if (!function_exists('current_time')) {
             'c' => '2026-03-13T22:00:00+00:00',
             default => '2026-03-13 22:00:00',
         };
+    }
+}
+
+if (!function_exists('wp_get_environment_type')) {
+    function wp_get_environment_type(): string
+    {
+        return $GLOBALS['_fchub_test_environment_type'] ?? 'production';
+    }
+}
+
+if (!function_exists('wp_http_validate_url')) {
+    function wp_http_validate_url(string $url): string|false
+    {
+        if (isset($GLOBALS['_fchub_test_wp_http_validate_url_override'])) {
+            return $GLOBALS['_fchub_test_wp_http_validate_url_override']($url);
+        }
+
+        $parts = parse_url($url);
+        if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+            return false;
+        }
+
+        if (!in_array(strtolower((string) $parts['scheme']), ['http', 'https'], true)) {
+            return false;
+        }
+
+        $host = strtolower(trim((string) $parts['host'], '[]'));
+        if ($host === 'localhost' || str_ends_with($host, '.localhost')) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false
+            && filter_var(
+                $host,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            ) === false
+        ) {
+            return false;
+        }
+
+        return $url;
+    }
+}
+
+if (!function_exists('wp_timezone')) {
+    function wp_timezone(): \DateTimeZone
+    {
+        return new \DateTimeZone('UTC');
+    }
+}
+
+if (!function_exists('current_datetime')) {
+    function current_datetime(): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable((string) current_time('mysql'), wp_timezone());
     }
 }
 
@@ -493,6 +619,13 @@ if (!function_exists('sanitize_textarea_field')) {
     function sanitize_textarea_field(string $value): string
     {
         return trim(strip_tags($value));
+    }
+}
+
+if (!function_exists('sanitize_email')) {
+    function sanitize_email(string $email): string
+    {
+        return filter_var($email, FILTER_SANITIZE_EMAIL) ?: '';
     }
 }
 
@@ -613,7 +746,45 @@ if (!function_exists('plugin_dir_url')) {
 if (!function_exists('wp_next_scheduled')) {
     function wp_next_scheduled(string $hook, array $args = []): int|false
     {
+        if (isset($GLOBALS['_fchub_test_wp_next_scheduled_override'])
+            && is_callable($GLOBALS['_fchub_test_wp_next_scheduled_override'])
+        ) {
+            return $GLOBALS['_fchub_test_wp_next_scheduled_override']($hook, $args);
+        }
+
+        foreach ($GLOBALS['_fchub_test_single_events'] ?? [] as $event) {
+            if ($event[1] === $hook && $event[2] === $args) {
+                return $event[0];
+            }
+        }
+
         return false;
+    }
+}
+
+if (!function_exists('wp_schedule_single_event')) {
+    function wp_schedule_single_event(
+        int $timestamp,
+        string $hook,
+        array $args = [],
+        bool $wpError = false
+    ): bool|\WP_Error {
+        if (isset($GLOBALS['_fchub_test_wp_schedule_single_event_override'])
+            && is_callable($GLOBALS['_fchub_test_wp_schedule_single_event_override'])
+        ) {
+            return $GLOBALS['_fchub_test_wp_schedule_single_event_override'](
+                $timestamp,
+                $hook,
+                $args,
+                $wpError
+            );
+        }
+
+        $event = [$timestamp, $hook, $args];
+        $GLOBALS['_fchub_test_single_events'][] = $event;
+        $GLOBALS['_fchub_test_scheduled_events'][] = $event;
+
+        return true;
     }
 }
 
@@ -630,6 +801,32 @@ if (!function_exists('wp_clear_scheduled_hook')) {
     {
         $GLOBALS['_fchub_test_cleared_events'][] = [$hook, $args];
         return 1;
+    }
+}
+
+if (!function_exists('_get_cron_array')) {
+    function _get_cron_array(): array
+    {
+        return $GLOBALS['_fchub_test_cron_array'] ?? [];
+    }
+}
+
+if (!function_exists('wp_unschedule_event')) {
+    function wp_unschedule_event(
+        int $timestamp,
+        string $hook,
+        array $args = [],
+        bool $wpError = false
+    ): bool|\WP_Error {
+        $GLOBALS['_fchub_test_unscheduled_events'][] = [$timestamp, $hook, $args];
+        return true;
+    }
+}
+
+if (!function_exists('as_unschedule_all_actions')) {
+    function as_unschedule_all_actions(string $hook, array $args = [], string $group = ''): void
+    {
+        $GLOBALS['_fchub_test_as_unscheduled_actions'][] = [$hook, $args, $group];
     }
 }
 
@@ -662,9 +859,27 @@ if (!function_exists('wp_generate_password')) {
     }
 }
 
+if (!function_exists('wp_hash_password')) {
+    function wp_hash_password(string $password): string
+    {
+        return password_hash($password, PASSWORD_BCRYPT);
+    }
+}
+
+if (!function_exists('wp_check_password')) {
+    function wp_check_password(string $password, string $hash, string|int $userId = ''): bool
+    {
+        return password_verify($password, $hash);
+    }
+}
+
 if (!function_exists('wp_generate_uuid4')) {
     function wp_generate_uuid4(): string
     {
+        if (!empty($GLOBALS['_fchub_test_uuid_queue'])) {
+            return (string) array_shift($GLOBALS['_fchub_test_uuid_queue']);
+        }
+
         return '00000000-0000-4000-8000-000000000000';
     }
 }
@@ -672,8 +887,56 @@ if (!function_exists('wp_generate_uuid4')) {
 if (!function_exists('as_schedule_single_action')) {
     function as_schedule_single_action(int $timestamp, string $hook, array $args = [], string $group = '', bool $unique = false, int $priority = 10): int
     {
+        if (isset($GLOBALS['_fchub_test_as_schedule_single_action_override'])
+            && is_callable($GLOBALS['_fchub_test_as_schedule_single_action_override'])
+        ) {
+            return (int) $GLOBALS['_fchub_test_as_schedule_single_action_override'](
+                $timestamp,
+                $hook,
+                $args,
+                $group,
+                $unique,
+                $priority
+            );
+        }
+
+        if ($unique) {
+            foreach ($GLOBALS['_fchub_test_as_actions'] ?? [] as $action) {
+                if ($action[1] === $hook
+                    && $action[3] === $group
+                    && in_array($action[6] ?? 'pending', ['pending', 'in-progress'], true)
+                ) {
+                    return 0;
+                }
+            }
+        }
+
+        $GLOBALS['_fchub_test_as_actions'][] = [$timestamp, $hook, $args, $group, $unique, $priority, 'pending'];
         $GLOBALS['_fchub_test_scheduled_events'][] = [$timestamp, $hook, $args, $group, $unique, $priority];
-        return 1;
+        return count($GLOBALS['_fchub_test_as_actions']);
+    }
+}
+
+if (!function_exists('as_has_scheduled_action')) {
+    function as_has_scheduled_action(string $hook, ?array $args = null, string $group = ''): bool
+    {
+        if (isset($GLOBALS['_fchub_test_as_has_scheduled_action_override'])
+            && is_callable($GLOBALS['_fchub_test_as_has_scheduled_action_override'])
+        ) {
+            return (bool) $GLOBALS['_fchub_test_as_has_scheduled_action_override']($hook, $args, $group);
+        }
+
+        foreach ($GLOBALS['_fchub_test_as_actions'] ?? [] as $action) {
+            if ($action[1] === $hook
+                && $action[3] === $group
+                && ($args === null || $action[2] === $args)
+                && in_array($action[6] ?? 'pending', ['pending', 'in-progress'], true)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 
@@ -706,10 +969,40 @@ if (!function_exists('wp_remote_post')) {
     }
 }
 
+if (!function_exists('wp_safe_remote_post')) {
+    function wp_safe_remote_post(string $url, array $args = []): array|WP_Error
+    {
+        $GLOBALS['_fchub_test_safe_remote_posts'][] = [$url, $args];
+        return $GLOBALS['_fchub_test_safe_remote_post_result']
+            ?? $GLOBALS['_fchub_test_remote_post_result']
+            ?? ['response' => ['code' => 200]];
+    }
+}
+
 if (!function_exists('wp_remote_retrieve_response_code')) {
     function wp_remote_retrieve_response_code(array $response): int
     {
         return (int) ($response['response']['code'] ?? 0);
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_body')) {
+    function wp_remote_retrieve_body(array $response): string
+    {
+        return is_string($response['body'] ?? null) ? $response['body'] : '';
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_header')) {
+    function wp_remote_retrieve_header(array $response, string $header): mixed
+    {
+        foreach (($response['headers'] ?? []) as $name => $value) {
+            if (strcasecmp((string) $name, $header) === 0) {
+                return $value;
+            }
+        }
+
+        return '';
     }
 }
 
@@ -759,6 +1052,14 @@ if (!function_exists('wp_cache_set')) {
     function wp_cache_set(string $key, mixed $value, string $group = '', int $expiration = 0): bool
     {
         $GLOBALS['_fchub_test_cache'][$group . ':' . $key] = $value;
+        return true;
+    }
+}
+
+if (!function_exists('wp_cache_delete')) {
+    function wp_cache_delete(string $key, string $group = ''): bool
+    {
+        unset($GLOBALS['_fchub_test_cache'][$group . ':' . $key]);
         return true;
     }
 }
@@ -957,6 +1258,12 @@ if (!function_exists('get_term')) {
 if (!function_exists('get_terms')) {
     function get_terms(array $args = []): array|WP_Error
     {
+        if (isset($GLOBALS['_fchub_test_get_terms_override'])
+            && is_callable($GLOBALS['_fchub_test_get_terms_override'])
+        ) {
+            return $GLOBALS['_fchub_test_get_terms_override']($args);
+        }
+
         $taxonomy = (string) ($args['taxonomy'] ?? '');
         $terms = array_values($GLOBALS['_fchub_test_terms_by_taxonomy'][$taxonomy] ?? []);
         $search = trim((string) ($args['search'] ?? ''));
@@ -1197,6 +1504,7 @@ if (!function_exists('set_transient')) {
     function set_transient(string $key, mixed $value, int $expiration = 0): bool
     {
         $GLOBALS['_fchub_test_transients'][$key] = $value;
+        $GLOBALS['_fchub_test_transient_expirations'][$key] = $expiration;
         return true;
     }
 }

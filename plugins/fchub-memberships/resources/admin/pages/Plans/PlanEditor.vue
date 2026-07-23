@@ -768,7 +768,15 @@ function resourceIdRules(rule) {
   return [{
     trigger: ['blur', 'change'],
     validator: (_rule, value, callback) => {
-      if (/^[1-9]\d*$/.test(String(value ?? ''))) {
+      const identifier = getTypeConfig(rule.resource_type)?.identifier || 'positive_int'
+      const resourceId = String(value ?? '')
+
+      if (identifier === 'slug' && resourceId !== '' && /\D/.test(resourceId)) {
+        callback()
+        return
+      }
+
+      if (identifier === 'positive_int' && /^[1-9]\d*$/.test(resourceId)) {
         callback()
         return
       }
@@ -864,6 +872,7 @@ async function loadResourceTypes() {
         source,
         searchable: type.searchable !== false,
         allow_all: type.allow_all === true,
+        identifier: type.identifier || 'positive_int',
         displayLabel: source ? `${type.label} (${source})` : type.label,
       })
     }

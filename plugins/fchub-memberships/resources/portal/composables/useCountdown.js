@@ -1,4 +1,4 @@
-import { ref, computed, watch, onUnmounted, toValue } from 'vue'
+import { ref, computed, watch, onUnmounted, toValue, getCurrentInstance } from 'vue'
 
 export function useCountdown(targetDate) {
   const now = ref(Date.now())
@@ -52,7 +52,9 @@ export function useCountdown(targetDate) {
     { immediate: true },
   )
 
-  onUnmounted(stopTimer)
+  if (getCurrentInstance()) {
+    onUnmounted(stopTimer)
+  }
 
   return {
     days,

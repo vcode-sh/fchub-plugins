@@ -8,7 +8,7 @@ class StatusTransitionValidator
 {
     private const TRANSITIONS = [
         'active'  => ['expired', 'revoked', 'paused'],
-        'paused'  => ['active', 'revoked'],
+        'paused'  => ['active', 'revoked', 'expired'],
         'expired' => ['active'],
         'revoked' => ['active'],
     ];

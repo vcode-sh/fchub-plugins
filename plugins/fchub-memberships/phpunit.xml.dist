@@ -7,8 +7,13 @@
     </testsuites>
     <source>
         <include>
+            <directory suffix=".php">app/Adapters</directory>
+            <directory suffix=".php">app/CLI</directory>
             <directory suffix=".php">app/Core</directory>
             <directory suffix=".php">app/Domain</directory>
+            <directory suffix=".php">app/Email</directory>
+            <directory suffix=".php">app/FluentCRM</directory>
+            <directory suffix=".php">app/Frontend</directory>
             <directory suffix=".php">app/Http</directory>
             <directory suffix=".php">app/Integration</directory>
             <directory suffix=".php">app/Modules</directory>

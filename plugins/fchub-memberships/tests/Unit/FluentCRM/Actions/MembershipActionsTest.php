@@ -51,11 +51,37 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Actions {
     use FChubMemberships\FluentCRM\Actions\PauseMembershipAction;
     use FChubMemberships\FluentCRM\Actions\ResumeMembershipAction;
     use FChubMemberships\FluentCRM\Actions\RevokeMembershipAction;
+    use FChubMemberships\Support\Clock;
     use FChubMemberships\Tests\Unit\PluginTestCase;
     use PHPUnit\Framework\Attributes\DataProvider;
 
     final class MembershipActionsTest extends PluginTestCase
     {
+        public function test_grant_and_extend_actions_use_site_local_calendar_days(): void
+        {
+            $timezone = new \DateTimeZone('Europe/Warsaw');
+            $clock = new Clock(new \DateTimeImmutable('2026-03-28 12:30:00', $timezone), $timezone);
+            $grantRuntime = new MembershipActionsRuntimeSpy();
+            (new GrantMembershipAction($grantRuntime, $clock))->handle(
+                $this->subscriber(),
+                $this->sequence(['plan_id' => 5, 'validity_mode' => 'fixed_days', 'duration_days' => 1]),
+                77,
+                (object) []
+            );
+
+            $extendRuntime = new MembershipActionsRuntimeSpy();
+            $extendRuntime->activeExpiry = '2026-03-28 12:30:00';
+            (new ExtendMembershipAction($extendRuntime, $clock))->handle(
+                $this->subscriber(),
+                $this->sequence(['plan_id' => 5, 'extend_days' => 1, 'extend_mode' => 'from_current_expiry']),
+                77,
+                (object) []
+            );
+
+            self::assertSame('2026-03-29 12:30:00', $grantRuntime->mutations[0][3]['expires_at']);
+            self::assertSame('2026-03-29 12:30:00', $extendRuntime->mutations[0][3]);
+        }
+
         protected function setUp(): void
         {
             parent::setUp();
@@ -206,6 +232,7 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Actions {
         public string $failure = '';
         public array $mutations = [];
         public bool $multipleGrants = false;
+        public string $activeExpiry = '2026-09-01 00:00:00';
 
         public function planExists(int $planId): bool
         {
@@ -214,7 +241,7 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Actions {
 
         public function getActiveGrants(int $userId, ?int $planId): array
         {
-            $grants = [['id' => 12, 'plan_id' => $planId ?? 5, 'expires_at' => '2026-09-01 00:00:00']];
+            $grants = [['id' => 12, 'plan_id' => $planId ?? 5, 'expires_at' => $this->activeExpiry]];
             if ($this->multipleGrants) {
                 $grants[] = ['id' => 13, 'plan_id' => $planId ?? 5, 'expires_at' => '2026-09-01 00:00:00'];
             }

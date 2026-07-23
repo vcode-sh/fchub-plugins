@@ -4,25 +4,43 @@ namespace FChubMemberships\Domain;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Domain\Access\ResourceAccessPolicy;
+use FChubMemberships\Domain\Access\ResourceAccessPolicyResolver;
 use FChubMemberships\Domain\Plan\PlanRuleResolver;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\ProtectionRuleRepository;
 use FChubMemberships\Support\Constants;
+use FChubMemberships\Support\Clock;
 
 class AccessEvaluator
 {
     private GrantRepository $grantRepo;
     private PlanRuleResolver $ruleResolver;
     private ProtectionRuleRepository $protectionRepo;
+    private Clock $clock;
+    private ?ResourceAccessPolicyResolver $policyResolver;
 
     /** @var array Per-request cache */
     private static array $cache = [];
 
-    public function __construct()
+    /** @var array<string, array<int|string, int>> */
+    private static array $countCache = [];
+
+    private static ?object $cacheContext = null;
+
+    public function __construct(
+        ?GrantRepository $grantRepo = null,
+        ?PlanRuleResolver $ruleResolver = null,
+        ?ProtectionRuleRepository $protectionRepo = null,
+        ?Clock $clock = null,
+        ?ResourceAccessPolicyResolver $policyResolver = null
+    )
     {
-        $this->grantRepo = new GrantRepository();
-        $this->ruleResolver = new PlanRuleResolver();
-        $this->protectionRepo = new ProtectionRuleRepository();
+        $this->grantRepo = $grantRepo ?? new GrantRepository();
+        $this->ruleResolver = $ruleResolver ?? new PlanRuleResolver();
+        $this->protectionRepo = $protectionRepo ?? new ProtectionRuleRepository();
+        $this->clock = $clock ?? new Clock();
+        $this->policyResolver = $policyResolver;
     }
 
     /**
@@ -32,6 +50,7 @@ class AccessEvaluator
      */
     public function evaluate(int $userId, string $provider, string $resourceType, string $resourceId): array
     {
+        $this->ensureCacheContext();
         $cacheKey = "{$userId}:{$provider}:{$resourceType}:{$resourceId}";
         if (isset(self::$cache[$cacheKey])) {
             return self::$cache[$cacheKey];
@@ -44,18 +63,17 @@ class AccessEvaluator
             return $result;
         }
 
-        // Bug F fix: Check active grants FIRST, then paused. A paused grant from
-        // plan B must not mask an active grant from plan A for the same resource.
+        $dripLocked = null;
 
         // Check direct grant
         $grant = $this->grantRepo->getActiveGrant($userId, $provider, $resourceType, $resourceId);
 
         if ($grant) {
-            $now = current_time('timestamp', true);
-            $trialActive = !empty($grant['trial_ends_at']) && strtotime($grant['trial_ends_at']) > $now;
+            $now = $this->clock->now()->getTimestamp();
+            $trialActive = !empty($grant['trial_ends_at']) && $this->localTimestamp($grant['trial_ends_at']) > $now;
 
             // Check drip
-            if (!empty($grant['drip_available_at']) && strtotime($grant['drip_available_at']) > $now) {
+            if (!empty($grant['drip_available_at']) && $this->localTimestamp($grant['drip_available_at']) > $now) {
                 $result = [
                     'allowed'          => false,
                     'reason'           => Constants::REASON_DRIP_LOCKED,
@@ -64,87 +82,77 @@ class AccessEvaluator
                     'grant'            => $grant,
                     'trial_active'     => $trialActive,
                 ];
-                self::$cache[$cacheKey] = $result;
-                return $result;
-            }
-
-            $result = ['allowed' => true, 'reason' => Constants::REASON_DIRECT_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $grant, 'trial_active' => $trialActive];
-            self::$cache[$cacheKey] = $result;
-            return $result;
-        }
-
-        // Check plan-based grants (user has a plan that includes this resource)
-        $planGrants = $this->grantRepo->getByUserId($userId, ['status' => Constants::STATUS_ACTIVE]);
-        $checkedPlanIds = [];
-        $directProtectionRule = $this->protectionRepo->findByResource($resourceType, $resourceId);
-        $directPlanIds = array_map('intval', $directProtectionRule['plan_ids'] ?? []);
-
-        foreach ($planGrants as $planGrant) {
-            // Bug #5: Use strict null check instead of falsy check (plan_id=0 is valid)
-            if ($planGrant['plan_id'] === null || in_array($planGrant['plan_id'], $checkedPlanIds, true)) {
-                continue;
-            }
-            $checkedPlanIds[] = $planGrant['plan_id'];
-
-            if (
-                $directProtectionRule
-                && ($directPlanIds === [] || in_array((int) $planGrant['plan_id'], $directPlanIds, true))
-            ) {
-                $planTrialActive = !empty($planGrant['trial_ends_at']) && strtotime($planGrant['trial_ends_at']) > current_time('timestamp', true);
-                $result = ['allowed' => true, 'reason' => Constants::REASON_PLAN_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $planGrant, 'trial_active' => $planTrialActive];
-                self::$cache[$cacheKey] = $result;
-                return $result;
-            }
-
-            // Bug #7: Check both the exact provider and taxonomy resource types
-            $hasResource = $this->ruleResolver->planHasResource($planGrant['plan_id'], $provider, $resourceType, $resourceId);
-
-            if (!$hasResource && $provider === Constants::PROVIDER_WORDPRESS_CORE) {
-                // Also check if this resource is accessible via taxonomy rules in the plan
-                $hasResource = $this->planHasTaxonomyAccessForResource($planGrant['plan_id'], $resourceType, $resourceId);
-            }
-
-            if ($hasResource) {
-                $now = current_time('timestamp', true);
-
-                // Check drip for this plan's rule
-                $dripRule = $this->ruleResolver->getDripRule($planGrant['plan_id'], $provider, $resourceType, $resourceId);
-                if ($dripRule && $dripRule['drip_type'] !== Constants::DRIP_TYPE_IMMEDIATE) {
-                    $dripDate = $this->calculateDripDateForGrant($dripRule, $planGrant);
-                    if ($dripDate && strtotime($dripDate) > $now) {
-                        $planTrialActive = !empty($planGrant['trial_ends_at']) && strtotime($planGrant['trial_ends_at']) > $now;
-                        $result = [
-                            'allowed'          => false,
-                            'reason'           => Constants::REASON_DRIP_LOCKED,
-                            'drip_locked'      => true,
-                            'drip_available_at' => $dripDate,
-                            'grant'            => $planGrant,
-                            'trial_active'     => $planTrialActive,
-                        ];
-                        self::$cache[$cacheKey] = $result;
-                        return $result;
-                    }
-                }
-
-                $planTrialActive = !empty($planGrant['trial_ends_at']) && strtotime($planGrant['trial_ends_at']) > $now;
-                $result = ['allowed' => true, 'reason' => Constants::REASON_PLAN_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $planGrant, 'trial_active' => $planTrialActive];
+                $dripLocked = $result;
+            } else {
+                $result = ['allowed' => true, 'reason' => Constants::REASON_DIRECT_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $grant, 'trial_active' => $trialActive];
                 self::$cache[$cacheKey] = $result;
                 return $result;
             }
         }
 
-        // Check wildcard grants (resource_id = '*')
+        // Exact drip must not hide an independently accessible wildcard grant.
         $wildcardGrant = $this->grantRepo->getActiveGrant($userId, $provider, $resourceType, '*');
         if ($wildcardGrant) {
-            $now = current_time('timestamp', true);
-            $wildcardTrialActive = !empty($wildcardGrant['trial_ends_at']) && strtotime($wildcardGrant['trial_ends_at']) > $now;
-            $result = ['allowed' => true, 'reason' => Constants::REASON_WILDCARD_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $wildcardGrant, 'trial_active' => $wildcardTrialActive];
-            self::$cache[$cacheKey] = $result;
-            return $result;
+            $now = $this->clock->now()->getTimestamp();
+            $trialActive = !empty($wildcardGrant['trial_ends_at'])
+                && $this->localTimestamp($wildcardGrant['trial_ends_at']) > $now;
+            if (!empty($wildcardGrant['drip_available_at'])
+                && $this->localTimestamp($wildcardGrant['drip_available_at']) > $now
+            ) {
+                $candidate = [
+                    'allowed' => false,
+                    'reason' => Constants::REASON_DRIP_LOCKED,
+                    'drip_locked' => true,
+                    'drip_available_at' => $wildcardGrant['drip_available_at'],
+                    'grant' => $wildcardGrant,
+                    'trial_active' => $trialActive,
+                ];
+                $dripLocked = $this->earlierDripLock($dripLocked, $candidate);
+            } else {
+                $result = ['allowed' => true, 'reason' => Constants::REASON_WILDCARD_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $wildcardGrant, 'trial_active' => $trialActive];
+                self::$cache[$cacheKey] = $result;
+                return $result;
+            }
         }
 
-        // Bug F fix: Check paused grants only AFTER all active grant checks have been exhausted.
-        // This prevents a paused grant from plan B masking an active grant from plan A.
+        $policyResolver = $this->resourcePolicyResolver();
+        $policy = $policyResolver->resolve($provider, $resourceType, $resourceId);
+        foreach ($this->grantRepo->getEffectivePlanMembershipsForUser($userId) as $planGrant) {
+            $planId = (int) ($planGrant['plan_id'] ?? 0);
+            if ($planId <= 0) {
+                continue;
+            }
+            $policyResolver->ensurePlanPath($policy, $planId);
+            foreach ($policy->pathsForPlan($planId) as $path) {
+                $pathResult = $this->evaluatePolicyPath($path, $planGrant);
+                if (!$pathResult['applicable']) {
+                    continue;
+                }
+                $trialActive = !empty($planGrant['trial_ends_at'])
+                    && $this->localTimestamp($planGrant['trial_ends_at']) > $this->clock->now()->getTimestamp();
+                if ($pathResult['drip_available_at'] === null) {
+                    $result = ['allowed' => true, 'reason' => Constants::REASON_PLAN_GRANT, 'drip_locked' => false, 'drip_available_at' => null, 'grant' => $planGrant, 'trial_active' => $trialActive];
+                    self::$cache[$cacheKey] = $result;
+                    return $result;
+                }
+                $candidate = [
+                    'allowed' => false,
+                    'reason' => Constants::REASON_DRIP_LOCKED,
+                    'drip_locked' => true,
+                    'drip_available_at' => $pathResult['drip_available_at'],
+                    'grant' => $planGrant,
+                    'trial_active' => $trialActive,
+                ];
+                $dripLocked = $this->earlierDripLock($dripLocked, $candidate);
+            }
+        }
+
+        if ($dripLocked !== null) {
+            self::$cache[$cacheKey] = $dripLocked;
+            return $dripLocked;
+        }
+
+        // Check paused grants only after every independently active access path.
         $pausedGrant = $this->getPausedGrant($userId, $provider, $resourceType, $resourceId);
         if ($pausedGrant) {
             $result = [
@@ -166,6 +174,42 @@ class AccessEvaluator
     }
 
     /**
+     * Count effective access for a keyed page of resources.
+     *
+     * @param array<int|string, array{provider: string, resource_type: string, resource_id: string}> $resources
+     * @return array<int|string, int>
+     */
+    public function countDistinctUsersWithResourceAccessBatch(array $resources): array
+    {
+        $this->ensureCacheContext();
+        if ($resources === []) {
+            return [];
+        }
+
+        $cacheKey = md5(wp_json_encode($resources));
+        if (isset(self::$countCache[$cacheKey])) {
+            return self::$countCache[$cacheKey];
+        }
+
+        foreach ($resources as $resource) {
+            foreach (['provider', 'resource_type', 'resource_id'] as $required) {
+                if (!isset($resource[$required]) || !is_scalar($resource[$required])) {
+                    throw new \InvalidArgumentException('Each resource requires provider, resource_type and resource_id.');
+                }
+            }
+        }
+
+        $policies = $this->resourcePolicyResolver()->resolveBatch($resources);
+        $counts = $this->grantRepo->countDistinctUsersWithResourceAccessBatch($policies);
+        $normalised = [];
+        foreach (array_keys($resources) as $key) {
+            $normalised[$key] = (int) ($counts[$key] ?? 0);
+        }
+        self::$countCache[$cacheKey] = $normalised;
+        return self::$countCache[$cacheKey];
+    }
+
+    /**
      * Simple boolean check: does user have access?
      */
     public function canAccess(int $userId, string $provider, string $resourceType, string $resourceId): bool
@@ -179,6 +223,13 @@ class AccessEvaluator
      */
     public function isProtected(string $provider, string $resourceType, string $resourceId): bool
     {
+        $policyResolver = $this->resourcePolicyResolver();
+        if ($policyResolver->canUseGlobalRuleShortcut()
+            && !$policyResolver->hasAnyProtectionOrPlanRules()
+        ) {
+            return false;
+        }
+
         // Check explicit protection rules
         if ($this->protectionRepo->isProtected($resourceType, $resourceId)) {
             return true;
@@ -269,6 +320,12 @@ class AccessEvaluator
             'membership_paused' => __('Your membership is currently paused. Resume your membership to access this content.', 'fchub-memberships'),
         ];
 
+        if ($context === 'membership_paused') {
+            return $settings['restriction_message_paused']
+                ?? $settings['restriction_message_membership_paused']
+                ?? $defaults['membership_paused'];
+        }
+
         return $settings['restriction_message_' . $context] ?? $defaults[$context] ?? $defaults['no_access'];
     }
 
@@ -306,13 +363,24 @@ class AccessEvaluator
     public function getDripProgress(int $userId, int $planId): array
     {
         $rules = $this->ruleResolver->resolveUniqueRules($planId);
+        $memberships = $this->grantRepo->getEffectivePlanMembershipsForUserByPlan($userId, $planId);
         $totalItems = count($rules);
         $unlockedItems = 0;
+        $nextUnlock = null;
 
         foreach ($rules as $rule) {
-            $result = $this->evaluate($userId, $rule['provider'], $rule['resource_type'], $rule['resource_id']);
+            $result = $this->evaluatePlanDripRule($rule, $memberships);
             if ($result['allowed']) {
                 $unlockedItems++;
+                continue;
+            }
+
+            $candidate = $result['drip_available_at'];
+            if ($candidate !== null
+                && ($nextUnlock === null
+                    || $this->localTimestamp($candidate) < $this->localTimestamp($nextUnlock))
+            ) {
+                $nextUnlock = $candidate;
             }
         }
 
@@ -320,7 +388,7 @@ class AccessEvaluator
             'total'          => $totalItems,
             'unlocked'       => $unlockedItems,
             'percentage'     => $totalItems > 0 ? round(($unlockedItems / $totalItems) * 100) : 0,
-            'next_unlock'    => $this->getNextDripUnlock($userId, $planId),
+            'next_unlock'    => $nextUnlock,
         ];
     }
 
@@ -329,20 +397,7 @@ class AccessEvaluator
      */
     public function getNextDripUnlock(int $userId, int $planId): ?string
     {
-        $grants = $this->grantRepo->getByUserId($userId, ['plan_id' => $planId, 'status' => Constants::STATUS_ACTIVE]);
-        $now = current_time('timestamp', true);
-        $nextUnlock = null;
-
-        foreach ($grants as $grant) {
-            if (!empty($grant['drip_available_at'])) {
-                $dripTime = strtotime($grant['drip_available_at']);
-                if ($dripTime > $now && ($nextUnlock === null || $dripTime < strtotime($nextUnlock))) {
-                    $nextUnlock = $grant['drip_available_at'];
-                }
-            }
-        }
-
-        return $nextUnlock;
+        return $this->getDripProgress($userId, $planId)['next_unlock'];
     }
 
     /**
@@ -445,6 +500,7 @@ class AccessEvaluator
     public static function clearUserCache(int $userId): void
     {
         delete_transient('fchub_user_' . $userId . '_accessible_posts_active');
+        GrantRepository::clearRequestCache();
     }
 
     /**
@@ -453,6 +509,10 @@ class AccessEvaluator
     public static function clearCache(): void
     {
         self::$cache = [];
+        self::$countCache = [];
+        self::$cacheContext = null;
+        ResourceAccessPolicyResolver::clearRequestCache();
+        GrantRepository::clearRequestCache();
     }
 
     /**
@@ -485,7 +545,7 @@ class AccessEvaluator
     }
 
     /**
-     * Bug #2: Use wp_date() for consistent timezone handling.
+     * Bug #2: Use the site-local clock for consistent timezone handling.
      * Bug #3: Add null check for $grant['created_at'] with fallback and warning.
      */
     private function calculateDripDateForGrant(array $dripRule, array $grant): ?string
@@ -493,14 +553,17 @@ class AccessEvaluator
         if ($dripRule['drip_type'] === Constants::DRIP_TYPE_DELAYED && $dripRule['drip_delay_days'] > 0) {
             $grantDate = $grant['created_at'] ?? null;
             if ($grantDate === null) {
-                $grantDate = current_time('mysql', true);
+                $grantDate = $this->clock->storage($this->clock->now());
                 \FChubMemberships\Support\Logger::log(
                     'Grant created_at is null',
                     'Using current time as fallback for drip calculation',
                     ['grant_id' => $grant['id'] ?? 'unknown']
                 );
             }
-            return wp_date('Y-m-d H:i:s', strtotime($grantDate . ' +' . $dripRule['drip_delay_days'] . ' days'));
+            return $this->clock->storage($this->clock->plusDays(
+                (int) $dripRule['drip_delay_days'],
+                $this->clock->parseLocal($grantDate)
+            ));
         }
 
         if ($dripRule['drip_type'] === Constants::DRIP_TYPE_FIXED_DATE && !empty($dripRule['drip_date'])) {
@@ -508,6 +571,131 @@ class AccessEvaluator
         }
 
         return null;
+    }
+
+    private function localTimestamp(string $value): int
+    {
+        return $this->clock->parseLocal($value)->getTimestamp();
+    }
+
+    private function earlierDripLock(?array $current, array $candidate): array
+    {
+        if ($current === null) {
+            return $candidate;
+        }
+        $currentAt = (string) ($current['drip_available_at'] ?? '');
+        $candidateAt = (string) ($candidate['drip_available_at'] ?? '');
+        if ($currentAt === '' || ($candidateAt !== '' && $this->localTimestamp($candidateAt) < $this->localTimestamp($currentAt))) {
+            return $candidate;
+        }
+
+        return $current;
+    }
+
+    /**
+     * @param array<string, mixed> $path
+     * @param array<string, mixed> $membership
+     * @return array{applicable: bool, drip_available_at: ?string}
+     */
+    private function evaluatePolicyPath(array $path, array $membership): array
+    {
+        $basis = (string) ($path['basis'] ?? 'membership');
+        if ($basis === 'resource') {
+            $qualifier = is_array($path['qualifier'] ?? null) ? $path['qualifier'] : [];
+            $hasResourceIdentity = isset(
+                $membership['provider'],
+                $membership['resource_type'],
+                $membership['resource_id']
+            );
+            if (!$hasResourceIdentity || (
+                (string) $membership['provider'] !== (string) ($qualifier['provider'] ?? '')
+                || (string) $membership['resource_type'] !== (string) ($qualifier['resource_type'] ?? '')
+                || (string) $membership['resource_id'] !== (string) ($qualifier['resource_id'] ?? '')
+            )) {
+                return ['applicable' => false, 'drip_available_at' => null];
+            }
+        }
+
+        $unlockAt = null;
+        if ($basis === 'resource'
+            && isset($membership['provider'], $membership['resource_type'], $membership['resource_id'])
+            && !empty($membership['drip_available_at'])
+        ) {
+            $unlockAt = (string) $membership['drip_available_at'];
+        }
+        $ruleUnlockAt = $this->calculateDripDateForGrant($path, $membership);
+        if ($ruleUnlockAt !== null
+            && ($unlockAt === null || $this->localTimestamp($ruleUnlockAt) > $this->localTimestamp($unlockAt))
+        ) {
+            $unlockAt = $ruleUnlockAt;
+        }
+        if ($unlockAt !== null && $this->localTimestamp($unlockAt) <= $this->clock->now()->getTimestamp()) {
+            $unlockAt = null;
+        }
+
+        return ['applicable' => true, 'drip_available_at' => $unlockAt];
+    }
+
+    /**
+     * @param array<string, mixed> $rule
+     * @param list<array<string, mixed>> $memberships
+     * @return array{allowed: bool, drip_available_at: ?string}
+     */
+    private function evaluatePlanDripRule(array $rule, array $memberships): array
+    {
+        $path = array_merge([
+            'drip_type' => Constants::DRIP_TYPE_IMMEDIATE,
+            'drip_delay_days' => 0,
+            'drip_date' => null,
+        ], $rule, [
+            'basis' => 'resource',
+            'qualifier' => [
+                'provider' => (string) ($rule['provider'] ?? ''),
+                'resource_type' => (string) ($rule['resource_type'] ?? ''),
+                'resource_id' => (string) ($rule['resource_id'] ?? ''),
+            ],
+        ]);
+        $nextUnlock = null;
+
+        foreach ($memberships as $membership) {
+            $result = $this->evaluatePolicyPath($path, $membership);
+            if (!$result['applicable']) {
+                continue;
+            }
+            if ($result['drip_available_at'] === null) {
+                return ['allowed' => true, 'drip_available_at' => null];
+            }
+            if ($nextUnlock === null
+                || $this->localTimestamp($result['drip_available_at']) < $this->localTimestamp($nextUnlock)
+            ) {
+                $nextUnlock = $result['drip_available_at'];
+            }
+        }
+
+        return ['allowed' => false, 'drip_available_at' => $nextUnlock];
+    }
+
+    private function resourcePolicyResolver(): ResourceAccessPolicyResolver
+    {
+        if ($this->policyResolver === null) {
+            $this->policyResolver = new ResourceAccessPolicyResolver(
+                $this->ruleResolver,
+                $this->protectionRepo
+            );
+        }
+
+        return $this->policyResolver;
+    }
+
+    private function ensureCacheContext(): void
+    {
+        global $wpdb;
+        if (self::$cacheContext === $wpdb) {
+            return;
+        }
+
+        self::clearCache();
+        self::$cacheContext = $wpdb;
     }
 
     /**

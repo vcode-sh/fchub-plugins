@@ -2,6 +2,8 @@
 
 namespace FChubMemberships\Domain\Grant;
 
+use FChubMemberships\Support\Clock;
+
 defined('ABSPATH') || exit;
 
 /**
@@ -29,8 +31,9 @@ final class MembershipTermCalculator
      * @param string $referenceDate Any strtotime-parseable date (grant creation date)
      * @return ?string Y-m-d 23:59:59 or null if no term
      */
-    public static function calculateEndDate(array $termConfig, string $referenceDate): ?string
+    public static function calculateEndDate(array $termConfig, string $referenceDate, ?Clock $clock = null): ?string
     {
+        $clock ??= new Clock();
         $mode = $termConfig['mode'] ?? 'none';
 
         if ($mode === 'none') {
@@ -40,8 +43,11 @@ final class MembershipTermCalculator
         // Preset year modes
         if (isset(self::PRESET_YEARS[$mode])) {
             $years = self::PRESET_YEARS[$mode];
-            $time = strtotime("+{$years} year", strtotime($referenceDate));
-            return $time !== false ? date('Y-m-d', $time) . ' 23:59:59' : null;
+            try {
+                return $clock->parseLocal($referenceDate)->modify("+{$years} year")->format('Y-m-d') . ' 23:59:59';
+            } catch (\Throwable) {
+                return self::legacyModifiedDate($clock, $referenceDate, "+{$years} year");
+            }
         }
 
         // Custom duration
@@ -53,8 +59,11 @@ final class MembershipTermCalculator
                 return null;
             }
 
-            $time = strtotime("+{$value} {$unit}", strtotime($referenceDate));
-            return $time !== false ? date('Y-m-d', $time) . ' 23:59:59' : null;
+            try {
+                return $clock->parseLocal($referenceDate)->modify("+{$value} {$unit}")->format('Y-m-d') . ' 23:59:59';
+            } catch (\Throwable) {
+                return null;
+            }
         }
 
         // Specific date
@@ -63,8 +72,11 @@ final class MembershipTermCalculator
             if (!$date) {
                 return null;
             }
-            $time = strtotime($date);
-            return $time !== false ? date('Y-m-d', $time) . ' 23:59:59' : null;
+            try {
+                return $clock->parseLocal($date)->format('Y-m-d') . ' 23:59:59';
+            } catch (\Throwable) {
+                return null;
+            }
         }
 
         // Unknown mode
@@ -78,15 +90,19 @@ final class MembershipTermCalculator
      * @param ?string $now       Override current time for testing
      * @return bool True if term has expired
      */
-    public static function isTermExpired(array $grantMeta, ?string $now = null): bool
+    public static function isTermExpired(array $grantMeta, ?string $now = null, ?Clock $clock = null): bool
     {
         $termEndsAt = $grantMeta['membership_term_ends_at'] ?? null;
         if (!$termEndsAt) {
             return false;
         }
 
-        $now = $now ?? current_time('mysql');
-        return strtotime($termEndsAt) <= strtotime($now);
+        $clock ??= new Clock();
+        $nowTime = $now === null
+            ? $clock->now()->getTimestamp()
+            : self::compatibleTimestamp($clock, $now);
+
+        return self::compatibleTimestamp($clock, (string) $termEndsAt) <= $nowTime;
     }
 
     /**
@@ -96,20 +112,42 @@ final class MembershipTermCalculator
      * @param ?string $termEndsAt     The term end date, or null for no cap
      * @return string The earlier of the two dates
      */
-    public static function capExpiry(string $proposedExpiry, ?string $termEndsAt): string
+    public static function capExpiry(string $proposedExpiry, ?string $termEndsAt, ?Clock $clock = null): string
     {
         if ($termEndsAt === null) {
             return $proposedExpiry;
         }
 
-        $proposedTime = strtotime($proposedExpiry);
-        $termTime = strtotime($termEndsAt);
-
-        if ($proposedTime === false || $termTime === false) {
+        $clock ??= new Clock();
+        try {
+            $proposedTime = $clock->parseLocal($proposedExpiry)->getTimestamp();
+            $termTime = $clock->parseLocal($termEndsAt)->getTimestamp();
+        } catch (\Throwable) {
             return $proposedExpiry;
         }
 
         return $proposedTime <= $termTime ? $proposedExpiry : $termEndsAt;
+    }
+
+    private static function compatibleTimestamp(Clock $clock, string $value): int
+    {
+        try {
+            return $clock->parseLocal($value)->getTimestamp();
+        } catch (\Throwable) {
+            return (int) strtotime($value);
+        }
+    }
+
+    private static function legacyModifiedDate(Clock $clock, string $referenceDate, string $modifier): ?string
+    {
+        $timestamp = strtotime($modifier, (int) strtotime($referenceDate));
+        if ($timestamp === false) {
+            return null;
+        }
+
+        $stored = $clock->storage(new \DateTimeImmutable('@' . $timestamp));
+
+        return substr($stored, 0, 10) . ' 23:59:59';
     }
 
     /**
@@ -145,7 +183,15 @@ final class MembershipTermCalculator
 
         if ($mode === 'date') {
             $date = $termConfig['date'] ?? null;
-            if (!$date || !is_string($date) || trim($date) === '' || strtotime($date) === false) {
+            try {
+                $validDate = $date && is_string($date) && trim($date) !== '';
+                if ($validDate) {
+                    (new Clock())->parseLocal($date);
+                }
+            } catch (\Throwable) {
+                $validDate = false;
+            }
+            if (!$validDate) {
                 return __('Invalid membership term date.', 'fchub-memberships');
             }
         }

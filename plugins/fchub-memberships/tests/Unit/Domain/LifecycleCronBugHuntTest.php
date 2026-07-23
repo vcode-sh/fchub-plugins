@@ -10,6 +10,7 @@ use FChubMemberships\Domain\Grant\GrantStatusService;
 use FChubMemberships\Domain\Grant\MembershipTermCalculator;
 use FChubMemberships\Domain\SubscriptionGrantLifecycleService;
 use FChubMemberships\Domain\SubscriptionValidityCheckService;
+use FChubMemberships\Domain\Lifecycle\MembershipLifecycleCoordinator;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\GrantSourceRepository;
 use FChubMemberships\Storage\SubscriptionValidityLogRepository;
@@ -295,42 +296,28 @@ final class LifecycleCronBugHuntTest extends PluginTestCase
     // picked up by expireOverdueGrantsWithHooks in the same cron run
     // =========================================================================
 
-    public function test_no_double_expiry_in_same_cron_run(): void
+    public function test_authoritative_edge_expiry_runs_once_without_legacy_double_expiry(): void
     {
-        // This test verifies the ordering in SubscriptionValidityCheckService::run()
-        // ensures term expiry sets status='expired' before generic expiry queries for 'active'.
-        $grantService = new class() extends AccessGrantService {
-            public array $callOrder = [];
+        $grantService = new class() extends AccessGrantService { public function __construct() {} };
+        $coordinator = new class() extends MembershipLifecycleCoordinator {
+            public int $calls = 0;
             public function __construct() {}
-            public function pauseOverdueAnchorGrants(): int { return 0; }
-            public function expireTermExpiredGrants(): int
+            public function checkValidity(): array
             {
-                $this->callOrder[] = 'term_expire';
-                return 1;
-            }
-            public function revokeExpiredGracePeriodGrants(): int
-            {
-                $this->callOrder[] = 'grace_revoke';
-                return 0;
-            }
-            public function expireOverdueGrantsWithHooks(): int
-            {
-                $this->callOrder[] = 'generic_expire';
-                return 0;
+                $this->calls++;
+                return [
+                    'anchor_paused' => 0,
+                    'term_expired' => 0,
+                    'grace_completed' => 0,
+                    'expired' => 1,
+                ];
             }
         };
 
-        $service = new SubscriptionValidityCheckService($grantService);
+        $service = new SubscriptionValidityCheckService($grantService, $coordinator);
         $service->run();
 
-        // Term expiry must run before generic expiry to prevent double-processing.
-        // If term expiry sets status='expired', generic expiry won't pick it up
-        // because it queries WHERE status='active'.
-        $termIdx = array_search('term_expire', $grantService->callOrder, true);
-        $genericIdx = array_search('generic_expire', $grantService->callOrder, true);
-        self::assertNotFalse($termIdx);
-        self::assertNotFalse($genericIdx);
-        self::assertLessThan($genericIdx, $termIdx, 'Term expiry must run before generic expiry');
+        self::assertSame(1, $coordinator->calls);
     }
 
     // =========================================================================
@@ -425,40 +412,29 @@ final class LifecycleCronBugHuntTest extends PluginTestCase
     // should not block subsequent steps
     // =========================================================================
 
-    public function test_cron_run_anchor_pause_exception_blocks_remaining_steps(): void
+    public function test_cron_uses_coordinator_fail_closed_result_without_legacy_fallback_steps(): void
     {
-        // Currently, if pauseOverdueAnchorGrants throws, the remaining steps
-        // (term expiry, grace revoke, generic expiry) are never called.
-        // This documents the current behaviour as a known limitation.
-        $grantService = new class() extends AccessGrantService {
-            public bool $termExpireCalled = false;
-            public bool $genericExpireCalled = false;
+        $grantService = new class() extends AccessGrantService { public function __construct() {} };
+        $coordinator = new class() extends MembershipLifecycleCoordinator {
+            public int $calls = 0;
             public function __construct() {}
-            public function pauseOverdueAnchorGrants(): int
+            public function checkValidity(): array
             {
-                throw new \RuntimeException('Database connection lost');
-            }
-            public function expireTermExpiredGrants(): int
-            {
-                $this->termExpireCalled = true;
-                return 0;
-            }
-            public function revokeExpiredGracePeriodGrants(): int { return 0; }
-            public function expireOverdueGrantsWithHooks(): int
-            {
-                $this->genericExpireCalled = true;
-                return 0;
+                $this->calls++;
+                return [
+                    'anchor_paused' => 0,
+                    'term_expired' => 0,
+                    'grace_completed' => 0,
+                    'expired' => 0,
+                    'error' => 'lifecycle_processing_failed',
+                ];
             }
         };
 
-        $service = new SubscriptionValidityCheckService($grantService);
-
-        $this->expectException(\RuntimeException::class);
+        $service = new SubscriptionValidityCheckService($grantService, $coordinator);
         $service->run();
 
-        // After the exception, these should not have been called
-        // (the assertion is moot because expectException halts, but it
-        // documents the issue: an exception in one step blocks all others)
+        self::assertSame(1, $coordinator->calls);
     }
 
     // =========================================================================

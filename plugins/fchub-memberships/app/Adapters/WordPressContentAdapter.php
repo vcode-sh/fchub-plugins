@@ -5,8 +5,9 @@ namespace FChubMemberships\Adapters;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Adapters\Contracts\AccessAdapterInterface;
+use FChubMemberships\Adapters\Contracts\BatchResourceLabelAdapterInterface;
 
-class WordPressContentAdapter implements AccessAdapterInterface
+class WordPressContentAdapter implements AccessAdapterInterface, BatchResourceLabelAdapterInterface
 {
     public function supports(string $resourceType): bool
     {
@@ -78,6 +79,70 @@ class WordPressContentAdapter implements AccessAdapterInterface
         return sprintf(__('Post #%s', 'fchub-memberships'), $resourceId);
     }
 
+    public function getResourceLabels(string $resourceType, array $resourceIds): array
+    {
+        $resourceIds = array_values(array_unique(array_map('strval', $resourceIds)));
+        if ($resourceIds === []) {
+            return [];
+        }
+
+        if ($this->isTaxonomyType($resourceType) || taxonomy_exists($resourceType)) {
+            $labels = array_fill_keys($resourceIds, '');
+            $taxonomy = $this->resolveTaxonomy($resourceType);
+            $termIds = array_values(array_filter(array_map('intval', $resourceIds)));
+            $terms = get_terms([
+                'taxonomy' => $taxonomy,
+                'hide_empty' => false,
+                'include' => $termIds,
+                'number' => count($termIds),
+            ]);
+            if (is_wp_error($terms)) {
+                throw new \RuntimeException('Taxonomy resource labels could not be loaded.');
+            }
+            foreach ($terms as $term) {
+                $id = (string) $term->term_id;
+                if (array_key_exists($id, $labels)) {
+                    $labels[$id] = (string) $term->name;
+                }
+            }
+            foreach ($labels as $id => $label) {
+                if ($label === '') {
+                    $labels[$id] = sprintf(__('Term #%s', 'fchub-memberships'), $id);
+                }
+            }
+
+            return $labels;
+        }
+
+        $labels = array_fill_keys($resourceIds, '');
+        $postIds = array_values(array_filter(array_map('intval', $resourceIds)));
+        $posts = get_posts([
+            'post_type' => $this->resolvePostType($resourceType),
+            'post_status' => 'any',
+            'posts_per_page' => -1,
+            'post__in' => $postIds,
+            'orderby' => 'post__in',
+        ]);
+        foreach ($posts as $post) {
+            $id = (string) $post->ID;
+            if (array_key_exists($id, $labels)) {
+                $title = (string) $post->post_title;
+                if ($resourceType === 'menu_item') {
+                    $menuItem = wp_setup_nav_menu_item($post);
+                    $title = (string) ($menuItem->title ?? $title);
+                }
+                $labels[$id] = $title;
+            }
+        }
+        foreach ($labels as $id => $label) {
+            if ($label === '') {
+                $labels[$id] = sprintf(__('Post #%s', 'fchub-memberships'), $id);
+            }
+        }
+
+        return $labels;
+    }
+
     public function searchResources(string $query, string $resourceType, int $limit = 20): array
     {
         // Check if the resource type is directly a taxonomy
@@ -138,6 +203,10 @@ class WordPressContentAdapter implements AccessAdapterInterface
 
         if ($resourceType === 'tag') {
             return 'post_tag';
+        }
+
+        if (taxonomy_exists($resourceType)) {
+            return $resourceType;
         }
 
         return substr($resourceType, strlen('taxonomy:'));

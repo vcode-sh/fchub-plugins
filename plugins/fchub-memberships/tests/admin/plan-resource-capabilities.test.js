@@ -20,7 +20,13 @@ describe('plan resource capabilities', () => {
   it('validates nested external resource IDs as positive integers', () => {
     expect(editorSource).toContain(':rules="resourceIdRules(rule)"')
     expect(editorSource).toContain('function resourceIdRules(rule)')
-    expect(editorSource).toContain("/^[1-9]\\d*$/.test(String(value ?? ''))")
+    expect(editorSource).toContain("const identifier = getTypeConfig(rule.resource_type)?.identifier || 'positive_int'")
+    expect(editorSource).toContain("if (identifier === 'positive_int' && /^[1-9]\\d*$/.test(resourceId))")
+  })
+
+  it('preserves slug identifiers and validates them independently from numeric provider IDs', () => {
+    expect(editorSource).toContain("identifier: type.identifier || 'positive_int'")
+    expect(editorSource).toContain("if (identifier === 'slug' && resourceId !== '' && /\\D/.test(resourceId))")
   })
 
   it('normalises historical courses in the editor loader', () => {

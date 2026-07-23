@@ -12,7 +12,7 @@ Before installing, make sure your environment meets these requirements:
 
 | Requirement | Minimum Version |
 |---|---|
-| WordPress | 6.5+ |
+| WordPress | 6.7+ |
 | PHP | 8.3+ |
 | FluentCart | Installed and activated |
 
@@ -83,9 +83,13 @@ Go to **Plugins** in your WordPress admin and activate **FCHub - Memberships**.
 
 When you activate the plugin, several things happen automatically:
 
-1. **Database tables are created** — The plugin creates 10 custom tables for plans, grants, protection rules, drip notifications, audit logs, and stats. This uses WordPress `dbDelta()` so it is safe to run multiple times.
+1. **Database tables are created** — The plugin owns 16 custom tables for plans, grants, protection rules, drip notifications, audit logs, durable mutations, provider reconciliation, FluentCRM projection, webhooks, and stats. Migrations use WordPress `dbDelta()` and verify the resulting schema.
 
-2. **Cron jobs are registered** — Seven recurring cron events are scheduled for validity checking, drip processing, expiry notifications, daily stats, audit cleanup, trial checks, and plan schedule processing.
+2. **Recurring jobs are registered** — Seven core WP-Cron events run validity
+   checks every five minutes, drip and plan processing hourly, expiry, trial
+   and statistics work daily, and audit cleanup weekly. After the durable
+   webhook schema passes its readiness check, webhook recovery runs every five
+   minutes and webhook cleanup runs daily, for nine recurring jobs in total.
 
 3. **Admin menu appears** — A "Memberships" menu item appears in your WordPress admin sidebar (under the FluentCart section). This loads the single-page admin application where you manage plans, members, content rules, drip schedules, and settings.
 
@@ -110,10 +114,10 @@ These plugins are not required but enable additional features when active:
 | Plugin | What It Enables |
 |---|---|
 | **FluentCRM** | 15 automation triggers, 7 actions, 7 benchmarks, 25+ smart codes, contact profile section, segment filters |
-| **FluentCommunity** | Automatic space/group membership sync, badge assignment and revocation |
+| **FluentCommunity** | Automatic space and course access sync |
 | **LearnDash** | Course and lesson protection through membership plans |
 
-FluentCRM automation boots at `init` priority 30 (after FluentCart registers at priority 2 and memberships register at priority 3). This ensures all systems are available when automation triggers are evaluated.
+FluentCRM automation boots at `init` priority 1, before FluentCart registers at priority 2 and Memberships registers at priority 3. This makes the automation definitions available during the rest of initialisation.
 
 ## Development Setup
 
@@ -128,6 +132,17 @@ Run `npm install` and `npm run dev` from the plugin root to start the Vite devel
 
 ## Uninstalling
 
-Deactivating the plugin removes all cron jobs but preserves your database tables and data. This is by design — you can deactivate and reactivate without losing anything.
+Deactivating the plugin removes all nine recurring jobs but preserves your
+database tables and settings. This is by design — you can deactivate and
+reactivate without losing anything.
 
-To completely remove all data, enable the "Delete data on uninstall" option in **Memberships > Settings** before uninstalling. This will drop all 10 database tables and remove all plugin options from the `wp_options` table.
+To remove Memberships data during uninstall, open **Memberships > Settings >
+Advanced** and enable **Delete all Memberships data when the plugin is
+uninstalled**. The setting is off by default, and enabling it requires an
+explicit confirmation.
+
+When opted in, uninstall removes all 16 Memberships-owned tables, plugin-owned
+options and the plan hierarchy cache, recurring and queued Memberships jobs,
+and the Memberships capability added to the administrator role. It does not
+remove independently granted capabilities from other roles. Leave the setting
+off if you intend to reinstall the plugin or retain membership records.

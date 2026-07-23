@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMemberships\Tests\Unit\Modules;
 
 use FChubMemberships\Core\Container;
+use FChubMemberships\Http\ApplicationPasswordRequestContext;
 use FChubMemberships\Modules\Runtime\FluentCartRuntimeModule;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
@@ -18,8 +19,17 @@ final class RuntimeModuleFeatureTest extends PluginTestCase
     {
         $module = new FluentCartRuntimeModule();
         $module->register(new Container());
+        $module->register(new Container());
 
         self::assertArrayHasKey('init', $GLOBALS['_fchub_test_actions']);
+        self::assertSame(
+            [[
+                'callback' => [ApplicationPasswordRequestContext::class, 'authenticated'],
+                'priority' => 10,
+                'accepted_args' => 2,
+            ]],
+            $GLOBALS['_fchub_test_action_registrations']['application_password_did_authenticate'] ?? []
+        );
 
         $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static fn(string $query): array => str_contains($query, "SELECT * FROM wp_fchub_membership_plans WHERE 1=1 AND status = 'active'")
             ? [[

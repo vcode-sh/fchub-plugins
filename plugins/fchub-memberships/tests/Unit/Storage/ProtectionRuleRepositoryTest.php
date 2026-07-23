@@ -100,7 +100,8 @@ final class ProtectionRuleRepositoryTest extends PluginTestCase
         self::assertSame('{"updated":true}', $updated[0][1]['meta']);
 
         $queryDump = implode("\n", $queries);
-        self::assertStringContainsString("plan_ids LIKE '%\\\"5\\\"%'", $queryDump);
+        self::assertStringContainsString("JSON_CONTAINS(plan_ids, '5') = 1", $queryDump);
+        self::assertStringNotContainsString('\\"5\\"', $queryDump);
         self::assertStringContainsString("resource_id LIKE '%55%'", $queryDump);
     }
 

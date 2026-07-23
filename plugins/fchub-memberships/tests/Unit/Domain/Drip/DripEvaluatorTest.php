@@ -7,10 +7,87 @@ namespace FChubMemberships\Tests\Unit\Domain\Drip;
 use FChubMemberships\Domain\Drip\DripEvaluator;
 use FChubMemberships\Domain\Plan\PlanRuleResolver;
 use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class DripEvaluatorTest extends PluginTestCase
 {
+    public function test_availability_compares_site_local_storage_to_injected_now(): void
+    {
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-14 01:00:00', $timezone), $timezone);
+        $grants = new class extends GrantRepository {
+            public function getActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): ?array
+            {
+                return ['drip_available_at' => '2026-03-14 01:30:00'];
+            }
+        };
+        $evaluator = new DripEvaluator($grants, new PlanRuleResolver(), $clock);
+
+        $result = $evaluator->isAvailable(1, 'wordpress_core', 'post', '55');
+
+        self::assertFalse($result['available']);
+        self::assertSame('drip_locked', $result['reason']);
+    }
+
+    public function test_locked_payload_days_left_uses_calendar_days_and_rounds_partial_days(): void
+    {
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-10-24 12:30:00', $timezone), $timezone);
+        $grants = new class extends GrantRepository {
+            public function getActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): ?array
+            {
+                return ['drip_available_at' => match ($resourceId) {
+                    'fall-back' => '2026-10-25 12:30:00',
+                    'partial' => '2026-10-24 12:30:01',
+                }];
+            }
+        };
+        $evaluator = new DripEvaluator($grants, new PlanRuleResolver(), $clock);
+
+        self::assertSame(1, $evaluator->isAvailable(1, 'wordpress_core', 'post', 'fall-back')['days_left']);
+        self::assertSame(1, $evaluator->isAvailable(1, 'wordpress_core', 'post', 'partial')['days_left']);
+    }
+
+    public function test_timeline_days_left_counts_fall_back_as_one_calendar_day(): void
+    {
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-10-24 12:30:00', $timezone), $timezone);
+        $grants = new class extends GrantRepository {
+            public function getByUserId(int $userId, array $filters = []): array
+            {
+                return [[
+                    'provider' => 'wordpress_core',
+                    'resource_type' => 'post',
+                    'resource_id' => '55',
+                    'drip_available_at' => '2026-10-25 12:30:00',
+                    'status' => 'active',
+                ]];
+            }
+        };
+        $resolver = new class extends PlanRuleResolver {
+            public function resolveUniqueRules(int $planId): array
+            {
+                return [[
+                    'id' => 1,
+                    'provider' => 'wordpress_core',
+                    'resource_type' => 'post',
+                    'resource_id' => '55',
+                    'drip_type' => 'delayed',
+                    'drip_delay_days' => 1,
+                    'drip_date' => null,
+                    'sort_order' => 1,
+                ]];
+            }
+        };
+        $evaluator = new DripEvaluator($grants, $resolver, $clock);
+
+        $timeline = $evaluator->getTimeline(21, 5);
+
+        self::assertSame('upcoming', $timeline[0]['status']);
+        self::assertSame(1, $timeline[0]['days_left']);
+    }
+
     private function inject(DripEvaluator $evaluator, GrantRepository $grants, PlanRuleResolver $resolver): void
     {
         $grantReflection = new \ReflectionProperty(DripEvaluator::class, 'grantRepo');

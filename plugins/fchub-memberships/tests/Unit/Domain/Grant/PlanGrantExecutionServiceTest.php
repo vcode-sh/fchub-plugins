@@ -236,9 +236,30 @@ final class PlanGrantExecutionServiceTest extends PluginTestCase
         );
         $notifications = new GrantNotificationService($plans);
         $revocation = new GrantRevocationService(
-            new class extends GrantRepository { public function getByUserId(int $userId, array $filters = []): array { return []; } },
-            new class extends GrantSourceRepository {},
-            new class extends DripScheduleRepository {},
+            new class extends GrantRepository {
+                public function getByUserId(int $userId, array $filters = []): array
+                {
+                    return [[
+                        'id' => 301,
+                        'user_id' => $userId,
+                        'plan_id' => (int) ($filters['plan_id'] ?? 3),
+                        'provider' => 'plan_change',
+                        'resource_type' => 'post',
+                        'resource_id' => '77',
+                        'source_type' => 'manual',
+                        'source_ids' => [],
+                        'meta' => ['provider_access_owner' => 'preexisting'],
+                        'status' => 'active',
+                    ]];
+                }
+                public function update(int $id, array $data): bool { return true; }
+            },
+            new class extends GrantSourceRepository {
+                public function removeAllByGrant(int $grantId): bool { return true; }
+            },
+            new class extends DripScheduleRepository {
+                public function deleteByGrantId(int $grantId): int { return 1; }
+            },
             new GrantAdapterRegistry(),
             $notifications
         );

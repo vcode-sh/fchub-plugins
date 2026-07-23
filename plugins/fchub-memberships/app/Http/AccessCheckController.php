@@ -16,11 +16,22 @@ class AccessCheckController
             'methods'             => 'GET',
             'callback'            => [self::class, 'check'],
             'permission_callback' => [self::class, 'checkPermission'],
+            'args'                => AccessCheckRestArguments::all(),
         ]);
+
+        add_filter('rest_post_dispatch', [self::class, 'addRateLimitHeaders'], 10, 3);
     }
 
     public static function check(\WP_REST_Request $request): \WP_REST_Response
     {
+        $validation = AccessCheckRestArguments::validateRequest($request);
+        if ($validation instanceof \WP_Error) {
+            return new \WP_REST_Response([
+                'code' => $validation->get_error_code(),
+                'message' => $validation->get_error_message(),
+            ], (int) ($validation->get_error_data()['status'] ?? 422));
+        }
+
         $userId = (int) $request->get_param('user_id');
         $email = $request->get_param('email');
         $resourceType = $request->get_param('resource_type');
@@ -55,15 +66,16 @@ class AccessCheckController
             }
 
             $grantRepo = new \FChubMemberships\Storage\GrantRepository();
-            $grants = $grantRepo->getByUserId($userId, ['plan_id' => $plan['id'], 'status' => 'active']);
+            $grants = $grantRepo->getEffectivePlanMembershipsForUserByPlan($userId, (int) $plan['id']);
             $hasAccess = !empty($grants);
 
             $progress = $hasAccess ? $evaluator->getDripProgress($userId, $plan['id']) : null;
 
             return new \WP_REST_Response([
                 'has_access'  => $hasAccess,
+                'reason'      => $hasAccess ? 'active_grant' : 'no_active_grant',
                 'plan'        => $plan['slug'],
-                'grants'      => $grants,
+                'grants'      => array_map([self::class, 'projectGrant'], $grants),
                 'drip_status' => $progress,
             ]);
         }
@@ -77,29 +89,18 @@ class AccessCheckController
                 'reason'           => $result['reason'],
                 'drip_locked'      => $result['drip_locked'],
                 'drip_available_at' => $result['drip_available_at'],
-                'grant'            => $result['grant'],
+                'grant'            => self::projectGrant($result['grant'] ?? null),
             ]);
         }
 
         return new \WP_REST_Response(['message' => __('Specify either plan slug or resource_type + resource_id.', 'fchub-memberships')], 422);
     }
 
-    public static function checkPermission(\WP_REST_Request $request): bool
+    public static function checkPermission(\WP_REST_Request $request): bool|\WP_Error
     {
         // Admin can check any user
         if (current_user_can('manage_options')) {
             return true;
-        }
-
-        // API key authentication
-        $settings = get_option('fchub_memberships_settings', []);
-        $apiKey = $settings['api_key'] ?? '';
-
-        if ($apiKey) {
-            $providedKey = $request->get_header('X-API-Key') ?: $request->get_param('api_key');
-            if ($providedKey && hash_equals($apiKey, $providedKey)) {
-                return true;
-            }
         }
 
         // Authenticated user can check themselves
@@ -121,6 +122,79 @@ class AccessCheckController
             }
         }
 
-        return false;
+        $provided = trim((string) $request->get_header('X-API-Key'));
+        if ($provided === '') {
+            return false;
+        }
+
+        $settings = get_option('fchub_memberships_settings', []);
+        if (!AccessApiCredential::verify($provided, $settings)) {
+            return false;
+        }
+
+        $prefix = (string) ($settings['access_api_key_prefix'] ?? '');
+        if ($prefix === '') {
+            $prefix = substr(hash('sha256', $provided), 0, 12);
+        }
+        $limit = (new AccessApiRateLimiter())->consume($prefix);
+        if (!$limit['allowed']) {
+            return new \WP_Error(
+                'fchub_access_rate_limited',
+                __('Access API rate limit exceeded.', 'fchub-memberships'),
+                [
+                    'status' => 429,
+                    'retry_after' => $limit['retry_after'],
+                    'limit' => $limit['limit'],
+                    'remaining' => 0,
+                ]
+            );
+        }
+
+        return true;
+
+    }
+
+    public static function addRateLimitHeaders(mixed $response, mixed $server, \WP_REST_Request $request): mixed
+    {
+        if ($request->get_route() !== '/fchub-memberships/v1/check-access'
+            || !is_object($response)
+            || !method_exists($response, 'get_status')
+            || !method_exists($response, 'get_data')
+            || !method_exists($response, 'header')
+            || $response->get_status() !== 429
+        ) {
+            return $response;
+        }
+
+        $data = $response->get_data();
+        if (!is_array($data) || ($data['code'] ?? '') !== 'fchub_access_rate_limited') {
+            return $response;
+        }
+
+        $retryAfter = (int) ($data['data']['retry_after'] ?? 0);
+        if ($retryAfter > 0) {
+            $response->header('Retry-After', (string) $retryAfter);
+        }
+
+        return $response;
+    }
+
+    private static function projectGrant(?array $grant): ?array
+    {
+        if ($grant === null) {
+            return null;
+        }
+
+        return [
+            'id' => $grant['id'] ?? null,
+            'plan_id' => $grant['plan_id'] ?? null,
+            'status' => $grant['status'] ?? null,
+            'starts_at' => $grant['starts_at'] ?? null,
+            'expires_at' => $grant['expires_at'] ?? null,
+            'drip_available_at' => $grant['drip_available_at'] ?? null,
+            'resource_type' => $grant['resource_type'] ?? null,
+            'resource_id' => $grant['resource_id'] ?? null,
+        ];
+
     }
 }

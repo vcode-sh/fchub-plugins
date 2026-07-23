@@ -46,6 +46,9 @@ class GrantSourceRepository
             "SELECT * FROM {$this->table} WHERE grant_id = %d ORDER BY created_at ASC",
             $grantId
         ), ARRAY_A);
+        if (!is_array($rows) || !empty($wpdb->last_error)) {
+            throw new \RuntimeException('The entitlement backfill sources could not be read.');
+        }
 
         return $rows ?: [];
     }

@@ -2,33 +2,9 @@
 
 declare(strict_types=1);
 
-namespace FluentCommunity\App\Models;
-
-class Badge
-{
-    public static function query(): object
-    {
-        return new class {
-            public function where(string $column, string $operator, string $value): self
-            {
-                return $this;
-            }
-
-            public function limit(int $limit): self
-            {
-                return $this;
-            }
-
-            public function get(): array
-            {
-                return [(object) ['id' => 1, 'title' => 'VIP']];
-            }
-        };
-    }
-}
-
 namespace FChubMemberships\Tests\Unit\Http\Controllers;
 
+use FChubMemberships\Http\AccessApiCredential;
 use FChubMemberships\Http\AccessCheckController;
 use FChubMemberships\Http\DynamicOptionsController;
 use FChubMemberships\Http\Controllers\ContentController;
@@ -69,7 +45,7 @@ final class ControllerDeepSurfaceTest extends PluginTestCase
         $GLOBALS['_fchub_test_current_user'] = (object) ['ID' => 21, 'user_email' => 'alice@example.com'];
     }
 
-    public function test_dynamic_options_resource_types_plan_options_and_badges_cover_success_branches(): void
+    public function test_dynamic_options_cover_resource_types_plan_options_and_unsupported_badges(): void
     {
         $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static fn(string $query): array => str_contains($query, "SELECT * FROM wp_fchub_membership_plans WHERE 1=1 AND status = 'active'")
             ? [[
@@ -104,22 +80,27 @@ final class ControllerDeepSurfaceTest extends PluginTestCase
         self::assertSame('Gold Plan', $planOptions['data'][0]['label']);
         self::assertNotEmpty($resourceTypes['data']);
         self::assertContains('post', array_column($resourceTypes['data'], 'value'));
-        self::assertSame('VIP', $badges['data'][0]['label']);
+        self::assertSame([], $badges['data']);
     }
 
     public function test_access_check_permission_and_plan_not_found_paths_are_enforced(): void
     {
         $GLOBALS['_fchub_test_current_user_can'] = false;
-        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = ['api_key' => 'secret'];
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = AccessApiCredential::migratePlaintext([
+            'api_key' => 'secret',
+        ]);
 
         $emailRequest = new \WP_REST_Request('GET', '/check-access', ['email' => 'alice@example.com']);
         $badEmailRequest = new \WP_REST_Request('GET', '/check-access', ['email' => 'other@example.com']);
-        $headerRequest = new \WP_REST_Request('GET', '/check-access', []);
+        $headerRequest = new \WP_REST_Request('GET', '/check-access', ['user_id' => 999]);
         $headerRequest->set_header('X-API-Key', 'secret');
 
         self::assertTrue(AccessCheckController::checkPermission($emailRequest));
         self::assertFalse(AccessCheckController::checkPermission($badEmailRequest));
         self::assertTrue(AccessCheckController::checkPermission($headerRequest));
+
+        $queryRequest = new \WP_REST_Request('GET', '/check-access', ['api_key' => 'secret', 'user_id' => 999]);
+        self::assertFalse(AccessCheckController::checkPermission($queryRequest));
 
         $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static fn(string $query): ?array => null;
         $notFound = AccessCheckController::check(new \WP_REST_Request('GET', '/check-access', [
@@ -128,6 +109,54 @@ final class ControllerDeepSurfaceTest extends PluginTestCase
         ]));
 
         self::assertSame(404, $notFound->get_status());
+    }
+
+    public function test_access_key_rate_limit_returns_429_and_post_dispatch_adds_the_real_header(): void
+    {
+        $GLOBALS['_fchub_test_current_user_can'] = false;
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = AccessApiCredential::migratePlaintext([
+            'api_key' => 'secret',
+        ]);
+        add_filter('fchub_memberships/access_api_rate_limit', static fn(int $limit): int => 2);
+        $request = new \WP_REST_Request('GET', '/fchub-memberships/v1/check-access', ['user_id' => 999]);
+        $request->set_header('X-API-Key', 'secret');
+
+        self::assertTrue(AccessCheckController::checkPermission($request));
+        self::assertTrue(AccessCheckController::checkPermission($request));
+        $limited = AccessCheckController::checkPermission($request);
+
+        self::assertInstanceOf(\WP_Error::class, $limited);
+        self::assertSame('fchub_access_rate_limited', $limited->get_error_code());
+        self::assertSame(429, $limited->get_error_data()['status']);
+        self::assertSame(60, $limited->get_error_data()['retry_after']);
+
+        $response = new \WP_REST_Response([
+            'code' => $limited->get_error_code(),
+            'message' => $limited->get_error_message(),
+            'data' => $limited->get_error_data(),
+        ], 429);
+        AccessCheckController::addRateLimitHeaders($response, null, $request);
+
+        self::assertSame('60', $response->get_headers()['Retry-After']);
+    }
+
+    public function test_admin_and_authenticated_self_checks_do_not_consume_external_rate_limit(): void
+    {
+        $settings = AccessApiCredential::migratePlaintext(['api_key' => 'secret']);
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = $settings;
+        $adminRequest = new \WP_REST_Request('GET', '/check-access', ['user_id' => 999]);
+        $adminRequest->set_header('X-API-Key', 'secret');
+
+        self::assertTrue(AccessCheckController::checkPermission($adminRequest));
+        self::assertSame([], $GLOBALS['_fchub_test_transients']);
+
+        $GLOBALS['_fchub_test_current_user_can'] = false;
+        $GLOBALS['_fchub_test_current_user_id'] = 21;
+        $selfRequest = new \WP_REST_Request('GET', '/check-access', ['user_id' => 21]);
+        $selfRequest->set_header('X-API-Key', 'secret');
+
+        self::assertTrue(AccessCheckController::checkPermission($selfRequest));
+        self::assertSame([], $GLOBALS['_fchub_test_transients']);
     }
 
     public function test_content_controller_covers_wordpress_search_and_grouped_resource_types(): void

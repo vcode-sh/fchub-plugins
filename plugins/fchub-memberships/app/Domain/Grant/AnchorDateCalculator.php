@@ -2,6 +2,8 @@
 
 namespace FChubMemberships\Domain\Grant;
 
+use FChubMemberships\Support\Clock;
+
 defined('ABSPATH') || exit;
 
 /**
@@ -23,13 +25,14 @@ final class AnchorDateCalculator
      * @param string $referenceDate Any strtotime-parseable date
      * @return string Y-m-d 23:59:59
      */
-    public static function nextAnchorDate(int $anchorDay, string $referenceDate): string
+    public static function nextAnchorDate(int $anchorDay, string $referenceDate, ?Clock $clock = null): string
     {
+        $clock ??= new Clock();
         $anchorDay = self::clampDay($anchorDay);
-        $refTime = strtotime($referenceDate);
-        $refYear = (int) date('Y', $refTime);
-        $refMonth = (int) date('n', $refTime);
-        $refDay = (int) date('j', $refTime);
+        $reference = $clock->parseLocal($referenceDate);
+        $refYear = (int) $reference->format('Y');
+        $refMonth = (int) $reference->format('n');
+        $refDay = (int) $reference->format('j');
 
         $clampedThisMonth = min($anchorDay, self::daysInMonth($refMonth, $refYear));
 
@@ -50,12 +53,13 @@ final class AnchorDateCalculator
      * @param string $currentAnchor The current anchor date (Y-m-d ...)
      * @return string Y-m-d 23:59:59
      */
-    public static function nextAnchorAfter(int $anchorDay, string $currentAnchor): string
+    public static function nextAnchorAfter(int $anchorDay, string $currentAnchor, ?Clock $clock = null): string
     {
+        $clock ??= new Clock();
         $anchorDay = self::clampDay($anchorDay);
-        $time = strtotime($currentAnchor);
-        $year = (int) date('Y', $time);
-        $month = (int) date('n', $time);
+        $current = $clock->parseLocal($currentAnchor);
+        $year = (int) $current->format('Y');
+        $month = (int) $current->format('n');
 
         return self::advanceMonth($anchorDay, $year, $month);
     }
@@ -75,7 +79,7 @@ final class AnchorDateCalculator
 
     private static function daysInMonth(int $month, int $year): int
     {
-        return (int) date('t', mktime(0, 0, 0, $month, 1, $year));
+        return cal_days_in_month(CAL_GREGORIAN, $month, $year);
     }
 
     private static function formatAnchor(int $year, int $month, int $day): string

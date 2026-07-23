@@ -9,6 +9,9 @@ use FChubMemberships\Storage\PlanRuleRepository;
 
 class PlanRuleResolver
 {
+    private const CACHE_GROUP = 'fchub_memberships';
+    private const CACHE_GENERATION_KEY = 'access_policy_generation';
+
     /**
      * Maximum plan hierarchy depth to prevent infinite recursion.
      * Plans nested deeper than this level are silently excluded.
@@ -29,8 +32,8 @@ class PlanRuleResolver
      */
     public function resolvePlanIds(int $planId): array
     {
-        $cacheKey = 'fchub_memberships_hierarchy_' . $planId;
-        $cached = wp_cache_get($cacheKey, 'fchub_memberships');
+        $cacheKey = $this->cacheKey('hierarchy:' . $planId);
+        $cached = wp_cache_get($cacheKey, self::CACHE_GROUP);
         if ($cached !== false) {
             return $cached;
         }
@@ -38,7 +41,7 @@ class PlanRuleResolver
         $collected = [];
         $this->collectPlanIds($planId, $collected, 0);
 
-        wp_cache_set($cacheKey, $collected, 'fchub_memberships', 300);
+        wp_cache_set($cacheKey, $collected, self::CACHE_GROUP, 300);
         return $collected;
     }
 
@@ -47,8 +50,15 @@ class PlanRuleResolver
      */
     public function resolveRules(int $planId): array
     {
+        $cacheKey = $this->cacheKey('rules:' . $planId);
+        $cached = wp_cache_get($cacheKey, self::CACHE_GROUP);
+        if ($cached !== false) {
+            return $cached;
+        }
         $planIds = $this->resolvePlanIds($planId);
-        return $this->ruleRepo->getByPlanIds($planIds);
+        $rules = $this->ruleRepo->getByPlanIds($planIds);
+        wp_cache_set($cacheKey, $rules, self::CACHE_GROUP, 300);
+        return $rules;
     }
 
     /**
@@ -103,17 +113,20 @@ class PlanRuleResolver
     public function getDripRule(int $planId, string $provider, string $resourceType, string $resourceId): ?array
     {
         $rules = $this->resolveUniqueRules($planId);
+        $winner = null;
 
         foreach ($rules as $rule) {
             if ($rule['provider'] === $provider
                 && $rule['resource_type'] === $resourceType
                 && ($rule['resource_id'] === $resourceId || $rule['resource_id'] === '*')
             ) {
-                return $rule;
+                if ($winner === null || $this->isMorePermissive($rule, $winner)) {
+                    $winner = $rule;
+                }
             }
         }
 
-        return null;
+        return $winner;
     }
 
     /**
@@ -121,6 +134,13 @@ class PlanRuleResolver
      */
     public function findPlansWithResource(string $provider, string $resourceType, string $resourceId): array
     {
+        $cacheKey = implode("\0", [$provider, $resourceType, $resourceId]);
+        $sharedKey = $this->cacheKey('resource:' . hash('sha256', $cacheKey));
+        $cached = wp_cache_get($sharedKey, self::CACHE_GROUP);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $directPlanIds = $this->ruleRepo->findPlansWithResource($provider, $resourceType, $resourceId);
 
         // Also find plans that include these plans via hierarchy
@@ -141,7 +161,143 @@ class PlanRuleResolver
             }
         }
 
-        return array_unique($allPlanIds);
+        $allPlanIds = array_values(array_unique(array_map('intval', $allPlanIds)));
+        wp_cache_set($sharedKey, $allPlanIds, self::CACHE_GROUP, 300);
+        return $allPlanIds;
+    }
+
+    /**
+     * Expand explicitly eligible plans to active plans which include them.
+     *
+     * @param array<int> $planIds
+     * @return array<int>
+     */
+    public function findPlansIncluding(array $planIds): array
+    {
+        $planIds = array_values(array_unique(array_map('intval', $planIds)));
+        if ($planIds === []) {
+            return [];
+        }
+
+        $eligible = $planIds;
+        foreach ($this->planRepo->getActivePlans() as $plan) {
+            $candidateId = (int) $plan['id'];
+            if (in_array($candidateId, $eligible, true)) {
+                continue;
+            }
+            if (array_intersect($planIds, $this->resolvePlanIds($candidateId)) !== []) {
+                $eligible[] = $candidateId;
+            }
+        }
+
+        sort($eligible, SORT_NUMERIC);
+        return $eligible;
+    }
+
+    /**
+     * Resolve matching plan-rule paths for a keyed resource batch.
+     *
+     * @param array<int|string, array{provider: string, resource_type: string, resource_id: string}> $resources
+     * @return array<int|string, list<array{plan_id: int, rule: array<string, mixed>}>>
+     */
+    public function findPathsForResourcesBatch(array $resources): array
+    {
+        $result = array_fill_keys(array_keys($resources), []);
+        if ($resources === []) {
+            return $result;
+        }
+
+        $plans = $this->planRepo->getActivePlans();
+        $allRules = $this->ruleRepo->getAllForAccessResolution();
+        if ($allRules === []) {
+            return $result;
+        }
+
+        $rulesByPlan = [];
+        foreach ($allRules as $rule) {
+            $rulesByPlan[(int) $rule['plan_id']][] = $rule;
+        }
+        $planMap = [];
+        foreach ($plans as $plan) {
+            $planMap[(int) $plan['id']] = $plan;
+        }
+
+        $candidateIds = array_values(array_unique(array_merge(
+            array_map(static fn(array $plan): int => (int) $plan['id'], $plans),
+            array_map('intval', array_keys($rulesByPlan))
+        )));
+        foreach ($candidateIds as $candidateId) {
+            $resolvedPlanIds = [];
+            $this->collectPlanIdsFromMap($candidateId, $planMap, $resolvedPlanIds, 0);
+            foreach ($resources as $resourceKey => $resource) {
+                $winner = null;
+                foreach ($resolvedPlanIds as $resolvedPlanId) {
+                    foreach ($rulesByPlan[$resolvedPlanId] ?? [] as $rule) {
+                        if ((string) $rule['provider'] !== (string) $resource['provider']
+                            || (string) $rule['resource_type'] !== (string) $resource['resource_type']
+                            || !in_array((string) $rule['resource_id'], [(string) $resource['resource_id'], '*'], true)
+                        ) {
+                            continue;
+                        }
+                        if ($winner === null || $this->isMorePermissive($rule, $winner)) {
+                            $winner = $rule;
+                        }
+                    }
+                }
+                if ($winner !== null) {
+                    $result[$resourceKey][] = ['plan_id' => $candidateId, 'rule' => $winner];
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    public function hasAnyRules(): bool
+    {
+        return $this->ruleRepo->hasAnyRules();
+    }
+
+    public function clearRequestCache(): void
+    {
+        self::invalidateSharedCache();
+    }
+
+    public static function invalidateSharedCache(): void
+    {
+        $generation = (int) wp_cache_get(self::CACHE_GENERATION_KEY, self::CACHE_GROUP);
+        wp_cache_set(self::CACHE_GENERATION_KEY, max(1, $generation + 1), self::CACHE_GROUP);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $planMap
+     * @param array<int> $collected
+     */
+    private function collectPlanIdsFromMap(int $planId, array $planMap, array &$collected, int $depth): void
+    {
+        if ($depth > self::MAX_HIERARCHY_DEPTH || in_array($planId, $collected, true)) {
+            return;
+        }
+        $collected[] = $planId;
+        foreach ($planMap[$planId]['includes_plan_ids'] ?? [] as $includedId) {
+            $this->collectPlanIdsFromMap((int) $includedId, $planMap, $collected, $depth + 1);
+        }
+    }
+
+    private function cacheKey(string $suffix): string
+    {
+        return 'access_policy:' . self::cacheGeneration() . ':' . $suffix;
+    }
+
+    private static function cacheGeneration(): int
+    {
+        $generation = wp_cache_get(self::CACHE_GENERATION_KEY, self::CACHE_GROUP);
+        if ($generation === false) {
+            $generation = 1;
+            wp_cache_set(self::CACHE_GENERATION_KEY, $generation, self::CACHE_GROUP);
+        }
+
+        return (int) $generation;
     }
 
     private function collectPlanIds(int $planId, array &$collected, int $depth): void

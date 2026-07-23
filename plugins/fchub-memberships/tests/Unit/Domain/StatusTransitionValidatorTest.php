@@ -13,6 +13,7 @@ final class StatusTransitionValidatorTest extends PluginTestCase
     {
         self::assertTrue(StatusTransitionValidator::isValid('active', 'paused'));
         self::assertTrue(StatusTransitionValidator::isValid('paused', 'active'));
+        self::assertTrue(StatusTransitionValidator::isValid('paused', 'expired'));
         self::assertTrue(StatusTransitionValidator::isValid('expired', 'active'));
         self::assertTrue(StatusTransitionValidator::isValid('revoked', 'active'));
     }

@@ -4,7 +4,9 @@ namespace FChubMemberships\Http;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Adapters\FluentCommunityAdapter;
 use FChubMemberships\Domain\Plan\PlanService;
+use FChubMemberships\Domain\Reconciliation\ProviderReconciliationService;
 use FChubMemberships\Support\ResourceTypeRegistry;
 
 class DynamicOptionsController
@@ -75,24 +77,9 @@ class DynamicOptionsController
 
     public static function providers(\WP_REST_Request $request): \WP_REST_Response
     {
-        $labels = [
-            'wordpress_core' => __('WordPress Core', 'fchub-memberships'),
-            'learndash' => __('LearnDash', 'fchub-memberships'),
-            'fluentcrm' => __('FluentCRM', 'fchub-memberships'),
-            'fluent_community' => __('FluentCommunity', 'fchub-memberships'),
-        ];
-        $providers = [];
-
-        foreach (ResourceTypeRegistry::getInstance()->getAll() as $type) {
-            $provider = $type['provider'] ?? '';
-            if (!isset($labels[$provider]) || isset($providers[$provider])) {
-                continue;
-            }
-
-            $providers[$provider] = ['value' => $provider, 'label' => $labels[$provider]];
-        }
-
-        return new \WP_REST_Response(['data' => array_values($providers)]);
+        return new \WP_REST_Response([
+            'data' => (new ProviderReconciliationService())->providerSummaries(),
+        ]);
     }
 
     public static function fluentcrmTags(\WP_REST_Request $request): \WP_REST_Response
@@ -121,14 +108,16 @@ class DynamicOptionsController
         return new \WP_REST_Response(['data' => $lists]);
     }
 
-    public static function fcSpaces(\WP_REST_Request $request): \WP_REST_Response
-    {
+    public static function fcSpaces(
+        \WP_REST_Request $request,
+        ?FluentCommunityAdapter $adapter = null
+    ): \WP_REST_Response {
         if (!defined('FLUENT_COMMUNITY_PLUGIN_VERSION')) {
             return new \WP_REST_Response(['data' => []]);
         }
 
         $search = $request->get_param('search') ?: '';
-        $adapter = new \FChubMemberships\Adapters\FluentCommunityAdapter();
+        $adapter ??= new FluentCommunityAdapter();
         $spaces = $adapter->searchResources($search, 'fc_space', 50);
         $spaces = self::appendRequestedModelOptions(
             $spaces,
@@ -139,36 +128,16 @@ class DynamicOptionsController
         return new \WP_REST_Response(['data' => $spaces]);
     }
 
-    public static function fcBadges(\WP_REST_Request $request): \WP_REST_Response
-    {
-        if (!defined('FLUENT_COMMUNITY_PLUGIN_VERSION') || !class_exists('FluentCommunity\App\Models\Badge')) {
-            return new \WP_REST_Response(['data' => []]);
-        }
-
+    public static function fcBadges(
+        \WP_REST_Request $request,
+        ?FluentCommunityAdapter $adapter = null
+    ): \WP_REST_Response {
         $search = $request->get_param('search') ?: '';
-        $builder = \FluentCommunity\App\Models\Badge::query();
+        $adapter ??= new FluentCommunityAdapter();
 
-        if ($search !== '') {
-            $builder->where('title', 'LIKE', '%' . $search . '%');
-        }
-
-        $badges = $builder->limit(50)->get();
-        $results = [];
-
-        foreach ($badges as $badge) {
-            $results[] = [
-                'id'    => (string) $badge->id,
-                'label' => $badge->title,
-            ];
-        }
-
-        $results = self::appendRequestedModelOptions(
-            $results,
-            self::requestedIds($request),
-            'FluentCommunity\App\Models\Badge'
-        );
-
-        return new \WP_REST_Response(['data' => $results]);
+        return new \WP_REST_Response([
+            'data' => $adapter->searchResources($search, 'fc_badge', 50),
+        ]);
     }
 
     private static function requestedIds(\WP_REST_Request $request): array

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMemberships\Tests\Unit\Http;
 
 use FChubMemberships\Http\Controllers\MemberController;
+use FChubMemberships\Http\ApplicationPasswordRequestContext;
 use FChubMemberships\Http\MembershipMutationPermission;
 use FChubMemberships\Support\Migrations;
 use FChubMemberships\Tests\Unit\PluginTestCase;
@@ -88,6 +89,25 @@ final class MembershipMutationPermissionTest extends PluginTestCase
             ['manage_fchub_memberships'],
             $GLOBALS['_fchub_test_current_user_can_checks']
         );
+    }
+
+    public function test_idempotency_is_required_only_for_the_captured_application_password_user(): void
+    {
+        $user = new \WP_User();
+        $user->ID = 73;
+        ApplicationPasswordRequestContext::authenticated($user, []);
+
+        try {
+            $GLOBALS['_fchub_test_current_user_id'] = 73;
+            self::assertTrue(MembershipMutationPermission::requiresIdempotencyKey());
+
+            $GLOBALS['_fchub_test_current_user_id'] = 74;
+            self::assertFalse(MembershipMutationPermission::requiresIdempotencyKey());
+        } finally {
+            ApplicationPasswordRequestContext::clear();
+        }
+
+        self::assertFalse(MembershipMutationPermission::requiresIdempotencyKey());
     }
 
     public function test_only_the_eight_membership_mutations_use_the_dedicated_policy(): void

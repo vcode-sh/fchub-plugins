@@ -6,6 +6,9 @@ vendor/
 tests/
 docs/
 .phpunit.cache/
+coverage/
+smoke/
+test-results/
 composer.json
 composer.lock
 package.json

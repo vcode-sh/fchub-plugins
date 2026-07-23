@@ -10,6 +10,7 @@ use FChubMemberships\Domain\GrantPlanContextService;
 use FChubMemberships\Domain\SubscriptionGrantLifecycleService;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 /**
@@ -443,11 +444,13 @@ final class MembershipTermAdversarialTest extends PluginTestCase
             public function __construct() {}
         };
 
-        $service = new GrantPlanContextService($plans, $grants);
+        $timezone = new \DateTimeZone('UTC');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-13 22:00:00', $timezone), $timezone);
+        $service = new GrantPlanContextService($plans, $grants, $clock);
         $result = $service->resolve(3, 11, []);
 
         // 7 days << 3 years, so fixed_days should win
-        $sevenDays = date('Y-m-d H:i:s', strtotime('+7 days'));
+        $sevenDays = $clock->storage($clock->plusDays(7));
         self::assertSame($sevenDays, $result['context']['expires_at']);
         // But term_ends_at should still be set in meta
         self::assertArrayHasKey('membership_term_ends_at', $result['context']['meta']);
@@ -701,30 +704,25 @@ final class MembershipTermAdversarialTest extends PluginTestCase
 
     public function test_cron_run_expires_terms_even_without_subscriptions(): void
     {
-        // This was BUG 1: if no active subscription IDs, the old code returned
-        // early and never called expireTermExpiredGrants().
-        $grantService = new class() extends AccessGrantService {
-            public bool $termExpireCalled = false;
+        $coordinator = new class() extends \FChubMemberships\Domain\Lifecycle\MembershipLifecycleCoordinator {
+            public int $checks = 0;
             public function __construct() {}
-            public function pauseOverdueAnchorGrants(): int { return 0; }
-            public function expireTermExpiredGrants(): int
+            public function checkValidity(): array
             {
-                $this->termExpireCalled = true;
-                return 2;
+                $this->checks++;
+                return ['anchor_paused' => 0, 'term_expired' => 2, 'grace_completed' => 0, 'expired' => 0];
             }
-            public function revokeExpiredGracePeriodGrants(): int { return 0; }
-            public function expireOverdueGrantsWithHooks(): int { return 0; }
         };
 
-        $service = new \FChubMemberships\Domain\SubscriptionValidityCheckService($grantService);
+        $grantService = new class() extends AccessGrantService { public function __construct() {} };
+        $service = new \FChubMemberships\Domain\SubscriptionValidityCheckService($grantService, $coordinator);
         $service->run();
 
-        self::assertTrue($grantService->termExpireCalled, 'expireTermExpiredGrants must be called even with no subscriptions');
+        self::assertSame(1, $coordinator->checks, 'Authoritative expiry must run even with no subscriptions.');
     }
 
-    public function test_cron_run_expires_terms_before_generic_expiry(): void
+    public function test_cron_run_has_one_authoritative_lifecycle_owner(): void
     {
-        // Verify the call order: anchor pause → term expire → grace revoke → generic expire
         $grantService = new class() extends AccessGrantService {
             public array $callOrder = [];
             public function __construct() {}
@@ -749,14 +747,21 @@ final class MembershipTermAdversarialTest extends PluginTestCase
                 return 0;
             }
         };
+        $coordinator = new class() extends \FChubMemberships\Domain\Lifecycle\MembershipLifecycleCoordinator {
+            public int $checks = 0;
+            public function __construct() {}
+            public function checkValidity(): array
+            {
+                $this->checks++;
+                return ['anchor_paused' => 0, 'term_expired' => 0, 'grace_completed' => 0, 'expired' => 0];
+            }
+        };
 
-        $service = new \FChubMemberships\Domain\SubscriptionValidityCheckService($grantService);
+        $service = new \FChubMemberships\Domain\SubscriptionValidityCheckService($grantService, $coordinator);
         $service->run();
 
-        self::assertSame(
-            ['anchor_pause', 'term_expire', 'grace_revoke', 'generic_expire'],
-            $grantService->callOrder
-        );
+        self::assertSame(1, $coordinator->checks);
+        self::assertSame([], $grantService->callOrder, 'Legacy maintenance must not run beside the coordinator.');
     }
 
     // =========================================================================

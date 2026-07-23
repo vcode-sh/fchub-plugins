@@ -22,19 +22,19 @@ The plugin fires these WordPress action hooks during the membership lifecycle. A
 | `grant_term_expired` | `array $grant` | Access expired because membership term reached <Badge>v1.3.0</Badge> |
 | `grant_paused` | `array $grant, string $reason` | Membership paused |
 | `grant_resumed` | `array $grant` | Paused membership resumed |
-| `grant_renewed` | `array $grant` | Subscription renewed |
+| `grant_renewed` | `array $grant, int $renewalCount` | Subscription renewed |
 | `trial_converted` | `array $grant, int $planId, int $userId` | Trial converted to paid |
 | `trial_expired` | `array $grant` | Trial expired without payment |
 | `trial_expiring_soon` | `array $grant, int $daysLeft` | Trial approaching end |
 | `drip_unlocked` | `array $notification, array $grant, int $userId` | Drip content unlocked |
 | `drip_milestone_reached` | `array $grant, int $milestone, int $userId` | Drip completion milestone (25/50/75/100%) |
-| `access_expiring` | `array $grant` | Access approaching expiration |
-| `grant_anniversary` | `array $grant` | Annual anniversary of grant date |
-| `payment_failed` | `array $grant` | Subscription payment failed |
+| `grant_expiring_soon` | `array $grant, int $daysLeft` | Access approaching expiration |
+| `grant_anniversary` | `array $grant, int $days` | Annual anniversary of grant date |
+| `payment_failed` | `array $affectedGrants, object $subscription, mixed $eventData` | Subscription payment failed |
 
-### Filter Hooks
+### Extension Actions
 
-| Filter | Arguments | Purpose |
+| Action | Arguments | Purpose |
 |---|---|---|
 | `fchub_memberships/resource_types` | `ResourceTypeRegistry $registry` | Register custom resource types |
 
@@ -52,19 +52,53 @@ add_action('fchub_memberships/grant_created', function (int $userId, int $planId
 
 ## REST API
 
-All endpoints are under the `fchub-memberships/v1` namespace. Unless noted, endpoints require `manage_options` capability (administrator).
+All endpoints are under the `fchub-memberships/v1` namespace. Administrative
+requests from WordPress use cookie authentication, an `X-WP-Nonce` header, and
+the capability stated below.
+
+External membership writes use a WordPress Application Password over HTTPS.
+The authenticated user needs `manage_fchub_memberships` (or `manage_options`),
+and every Application Password write requires an `Idempotency-Key` header.
+Reusing that key with the same request replays the stored result; reusing it
+for different input returns a conflict.
+
+The dedicated FCHub access key is deliberately narrower: it authenticates only
+`GET /check-access` through the `X-API-Key` header. Query-string `api_key`
+credentials are not accepted. Settings, webhook operations, and general
+administration routes require `manage_options`; the membership mutation and
+reconciliation exceptions are called out explicitly below. The read-only key
+cannot call any admin route.
+
+Unless a table or note says otherwise, every `/admin` route requires
+`manage_options`. A same-origin WordPress request uses the logged-in cookie and
+an `X-WP-Nonce` header. An external client may instead use WordPress Application
+Password Basic authentication over HTTPS, with a user that has the stated
+capability. General admin writes do not require `Idempotency-Key`; that header
+is required only for the membership and reconciliation operations identified
+below.
 
 <Tabs items={['Plans', 'Members', 'Content', 'Drip', 'Reports', 'Settings', 'Import']}>
 <Tab value="Plans">
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/plans` | List all plans with optional filtering |
-| POST | `/plans` | Create a new plan |
-| GET | `/plans/{id}` | Get a single plan with rules |
-| PUT | `/plans/{id}` | Update a plan |
-| DELETE | `/plans/{id}` | Delete a plan (cascades to rules) |
-| POST | `/plans/{id}/duplicate` | Duplicate a plan |
+| GET | `/admin/plans` | List plans with optional filtering |
+| POST | `/admin/plans` | Create a plan |
+| GET | `/admin/plans/options` | List compact plan options |
+| GET | `/admin/plans/{id}` | Get a plan with its rules |
+| PUT, PATCH | `/admin/plans/{id}` | Update a plan |
+| DELETE | `/admin/plans/{id}` | Delete a plan |
+| POST | `/admin/plans/{id}/duplicate` | Duplicate a plan |
+| GET | `/admin/plans/{id}/drip-schedule` | Get the plan's drip schedule |
+| GET | `/admin/plans/{id}/linked-products` | List linked FluentCart products |
+| POST | `/admin/plans/{id}/link-product` | Link a FluentCart product |
+| DELETE | `/admin/plans/{id}/unlink-product/{feed_id}` | Remove a product feed link |
+| GET | `/admin/plans/search-products` | Search FluentCart products |
+| POST | `/admin/plans/resolve-resources` | Resolve saved resource labels |
+| GET | `/admin/plans/{id}/export` | Export one plan |
+| GET | `/admin/plans/export-all` | Export every plan |
+| POST | `/admin/plans/import` | Import a plan definition |
+| POST | `/admin/plans/{id}/schedule` | Schedule a plan status change |
 
 **Plan fields:** `title`, `slug`, `description`, `status`, `level`, `includes_plan_ids`, `restriction_message`, `redirect_url`, `duration_type`, `duration_days`, `trial_days`, `grace_period_days`, `settings`, `meta`, `scheduled_status`, `scheduled_at`
 
@@ -73,84 +107,143 @@ All endpoints are under the `fchub-memberships/v1` namespace. Unless noted, endp
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/members` | List members with grants (paginated) |
-| GET | `/members/{user_id}` | Get a member's grants and details |
-| POST | `/members/grant` | Manually grant a plan to a user |
-| POST | `/members/revoke` | Revoke a plan from a user |
-| POST | `/members/pause/{grant_id}` | Pause a specific grant |
-| POST | `/members/resume/{grant_id}` | Resume a paused grant |
-| POST | `/members/extend/{grant_id}` | Extend a grant by X days |
+| GET | `/admin/members` | List members with grants (paginated) |
+| GET | `/admin/members/{user_id}` | Get a member's grants and details |
+| POST | `/admin/members/grant` | Grant a plan; `user_id` and `plan_id` are in the JSON body |
+| POST | `/admin/members/revoke` | Revoke a plan; `user_id` and `plan_id` are in the JSON body |
+| POST | `/admin/members/pause` | Pause the body `grant_id` |
+| POST | `/admin/members/resume` | Resume the body `grant_id` |
+| POST | `/admin/members/extend` | Set `expires_at` for a user's plan |
+| POST | `/admin/members/bulk-grant` | Grant one plan to up to 100 users |
+| POST | `/admin/members/bulk-revoke` | Revoke one plan from up to 100 users |
+| POST | `/admin/members/bulk-extend` | Extend one plan for up to 100 users |
+| GET | `/admin/members/{user_id}/drip-timeline` | Get a member's drip timeline |
+| GET | `/admin/members/export` | Export the filtered member list |
+| POST | `/admin/members/bulk-export` | Export selected members |
+| GET | `/admin/members/{user_id}/audit-log` | Get membership audit records |
+| GET | `/admin/members/{user_id}/activity` | Get recent membership activity |
+
+The grant, revoke, pause, resume, extend, bulk-grant, bulk-revoke, and
+bulk-extend mutation routes accept `manage_fchub_memberships` or
+`manage_options`. All other member administration routes require
+`manage_options`.
 
 </Tab>
 <Tab value="Content">
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/content/rules` | List protection rules (paginated, filterable) |
-| POST | `/content/rules` | Create a protection rule |
-| PUT | `/content/rules/{id}` | Update a protection rule |
-| DELETE | `/content/rules/{id}` | Delete a protection rule |
-| GET | `/content/search` | Search resources by type and query |
+| GET | `/admin/content` | List protection rules (paginated, filterable) |
+| POST | `/admin/content/protect` | Create protection rules |
+| POST | `/admin/content/unprotect` | Remove protection rules by resource |
+| PUT, PATCH | `/admin/content/{id}` | Update a protection rule |
+| DELETE | `/admin/content/{id}` | Delete a protection rule |
+| GET | `/admin/content/search-resources` | Search resources by type and query |
+| GET | `/admin/content/resource-types` | List protectable resource types |
+| POST | `/admin/content/bulk-protect` | Protect multiple resources |
+| POST | `/admin/content/bulk-unprotect` | Unprotect multiple resources |
 
 </Tab>
 <Tab value="Drip">
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/drip/overview` | Drip overview data for all plans |
-| GET | `/drip/calendar` | Calendar data for a date range |
-| GET | `/drip/queue` | Notification queue (filterable by status) |
-| GET | `/drip/queue/stats` | Queue stats (pending/sent counts) |
-| POST | `/drip/retry/{id}` | Retry a failed notification |
+| GET | `/admin/drip/overview` | Drip overview data for all plans |
+| GET | `/admin/drip/calendar` | Calendar data for a date range |
+| GET | `/admin/drip/notifications` | Notification queue (filterable by status) |
+| GET | `/admin/drip/stats` | Queue stats |
+| POST | `/admin/drip/notifications/{id}/retry` | Retry a failed notification |
 
 </Tab>
 <Tab value="Reports">
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/reports/overview` | Dashboard overview metrics |
-| GET | `/reports/members-over-time` | Time-series member count |
-| GET | `/reports/plan-distribution` | Active members by plan |
-| GET | `/reports/churn` | Churn analysis |
-| GET | `/reports/revenue` | Revenue by plan |
-| GET | `/reports/content-popularity` | Most accessed protected content |
+| GET | `/admin/reports/overview` | Dashboard overview metrics |
+| GET | `/admin/reports/members-over-time` | Time-series member count |
+| GET | `/admin/reports/plan-distribution` | Active members by plan |
+| GET | `/admin/reports/churn` | Churn analysis |
+| GET | `/admin/reports/retention-cohort` | Retention cohorts |
+| GET | `/admin/reports/revenue` | Revenue by plan |
+| GET | `/admin/reports/content-popularity` | Most accessed protected content |
+| GET | `/admin/reports/expiring-soon` | Memberships approaching expiry |
+| GET | `/admin/reports/renewal-rate` | Renewal-rate metrics |
+| GET | `/admin/reports/trial-conversion` | Trial conversion metrics |
+| GET | `/admin/dashboard` | Dashboard readiness and summary data |
 
 </Tab>
 <Tab value="Settings">
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/settings` | Get all plugin settings |
-| PUT | `/settings` | Update plugin settings |
-| POST | `/settings/webhook-test` | Send a test webhook |
+| GET | `/admin/settings` | Get redacted plugin settings |
+| PUT, POST | `/admin/settings` | Update plugin settings |
+| POST | `/admin/settings/generate-api-key` | Generate or rotate the read-only key; returns it once |
+| POST | `/admin/settings/revoke-api-key` | Revoke the read-only key |
+| POST | `/admin/settings/regenerate-webhook-secret` | Rotate the signing secret; returns it once |
+| POST | `/admin/settings/test-webhook` | Compatibility alias for the production-path webhook test |
+| GET | `/admin/webhooks/health` | Read configuration and delivery health |
+| GET | `/admin/webhooks/deliveries` | List redacted delivery history |
+| POST | `/admin/webhooks/deliveries/{id}/retry` | Retry a terminal failed delivery |
+| POST | `/admin/webhooks/test` | Persist and synchronously attempt a test event |
+| GET | `/admin/email-notifications` | List Notification Studio definitions |
+| POST | `/admin/email-notifications/preview` | Render an email preview |
+| POST | `/admin/email-notifications/test` | Send a test notification |
+| POST | `/admin/email-notifications/brand-template` | Save the shared email brand template |
+| POST | `/admin/email-notifications/{key}` | Save one notification definition |
 
 </Tab>
 <Tab value="Import">
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/import/upload` | Upload a CSV file for import |
-| POST | `/import/preview` | Preview import results before committing |
-| POST | `/import/execute` | Execute the import |
+| POST | `/admin/import/parse` | Parse CSV content and return a preview |
+| POST | `/admin/import/prepare` | Prepare plan mappings |
+| POST | `/admin/import/execute` | Execute one import batch |
 
 </Tab>
 </Tabs>
 
-### Frontend API
-
-These endpoints are available to authenticated users (no admin requirement):
+### Read-only and frontend API
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/access/check` | Check if current user can access a resource |
-| GET | `/account/data` | Get current user's membership data for the account page |
+| GET | `/check-access` | Check a plan or WordPress resource for one user |
+| GET | `/my-access` | Get the logged-in user's membership account data |
+
+`/check-access` accepts either `plan=<slug>` or
+`resource_type=<type>&resource_id=<id>` (with optional
+`provider=wordpress_core`), and identifies the user by exactly one of `user_id`
+or `email`. A logged-in user may omit the identity for a self-check. External
+clients send `X-API-Key`; the secure default limit is 300 verified-key requests
+per 60 seconds. `/my-access` requires a logged-in WordPress user.
 
 ### Dynamic Options
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/options/resource-types` | Get available resource types for dropdowns |
-| GET | `/options/search/{resource_type}` | Search resources by type and query string |
+| GET | `/admin/resource-types` | Get available resource types |
+| GET | `/admin/providers` | Get available providers |
+| GET | `/admin/fluentcrm-tags` | Search FluentCRM tags |
+| GET | `/admin/fluentcrm-lists` | Search FluentCRM lists |
+| GET | `/admin/fc-spaces` | Search supported FluentCommunity spaces |
+| GET | `/admin/fc-badges` | Compatibility endpoint; returns no supported badge options |
+
+### Reconciliation and provider recovery
+
+| Method | Endpoint | Permission and idempotency |
+|---|---|---|
+| GET | `/admin/integrations/fluentcrm/health` | Requires `manage_options` |
+| POST | `/admin/integrations/fluentcrm/reconcile` | A single-user request accepts `manage_fchub_memberships` or `manage_options`; `scope=all` requires `manage_options`. Application Password requests with `dry_run=false` require `Idempotency-Key` |
+| GET | `/admin/provider-reconciliation` | Accepts `manage_fchub_memberships` or `manage_options` |
+| POST | `/admin/provider-reconciliation/repair` | Accepts `manage_fchub_memberships` or `manage_options` and always requires `Idempotency-Key` |
+
+External callers authenticate these routes with a WordPress Application
+Password over HTTPS. Cookie-authenticated WordPress requests use
+`X-WP-Nonce`. FluentCRM reconciliation defaults to `dry_run=true`; non-dry
+Application Password calls use the same durable idempotency and replay contract
+as membership writes. Provider repair requires an idempotency key for both
+authentication modes.
 
 <Separator />
 
@@ -230,15 +323,6 @@ wp fchub-membership backfill [--dry-run] [--limit=<n>]
 Scans FluentCart orders and creates missing membership grants. Useful after initial plugin installation on an existing store.
 
 </Accordion>
-<Accordion title="sync — Sync external systems">
-
-```bash
-wp fchub-membership sync [--dry-run]
-```
-
-Syncs membership grants with FluentCommunity (spaces/groups/badges) and other adapters.
-
-</Accordion>
 <Accordion title="expire-check — Run expiration check">
 
 ```bash
@@ -299,14 +383,26 @@ Exports member data. Supports CSV, JSON, and WP-CLI table formats.
 
 ## Webhooks
 
-Webhooks send membership events to external services as HTTP POST requests with JSON payloads.
+Webhooks send durable membership events to external services as signed HTTP
+POST requests with JSON bodies. Delivery is **at-least-once**: receivers must
+deduplicate by the stable event ID and must not assume exactly-once delivery.
 
 ### Configuration
 
 In **Memberships > Settings**:
-- **Webhook Enabled** (`webhook_enabled`) — master switch for webhooks
-- **Webhook URLs** (`webhook_urls`) — newline-separated list of endpoint URLs. Multiple URLs are supported
-- **Webhook Secret** (`webhook_secret`) — shared secret for HMAC-SHA256 signature verification
+
+- Add one to ten unique destination URLs. Production destinations require
+  HTTPS and must resolve only to public addresses.
+- Generate a signing secret. It is shown once; later settings responses expose
+  only whether it is configured.
+- Send a production-path test, then enable delivery. The server refuses to
+  enable an unsafe destination or an unsigned configuration.
+- Generate the read-only access key separately. It is also shown once, stored
+  as a password hash, and never returned by settings reads.
+
+Copy either credential before acknowledging its dialog. There is no “show it
+again” endpoint, because secrets are traditionally less useful when treated as
+decorative settings copy.
 
 ### Events
 
@@ -322,8 +418,10 @@ In **Memberships > Settings**:
 
 ```json
 {
+  "id": "8f14b86a-b3ec-4fe5-a8f7-8a01b694bf15",
+  "schema_version": "1.0",
   "event_type": "grant_created",
-  "timestamp": "2025-01-15T10:30:00+00:00",
+  "occurred_at": "2026-07-22T08:00:00+00:00",
   "site_url": "https://example.com",
   "data": {
     "user": {
@@ -346,7 +444,17 @@ In **Memberships > Settings**:
 
 ### Signature Verification
 
-Every webhook includes an `X-FCHub-Signature` header containing the HMAC-SHA256 signature of the request body:
+Every webhook includes these headers:
+
+| Header | Value |
+|---|---|
+| `Content-Type` | `application/json` |
+| `X-FCHub-Event` | Event type, such as `grant_created` |
+| `X-FCHub-Delivery` | Stable event ID from the envelope |
+| `X-FCHub-Timestamp` | UTC `occurred_at` value from the envelope |
+| `X-FCHub-Signature` | Lowercase hexadecimal HMAC-SHA256 of the exact raw body |
+
+The signature contract is:
 
 ```
 signature = HMAC-SHA256(request_body, webhook_secret)
@@ -363,24 +471,70 @@ if (!hash_equals($expected, $signature)) {
     http_response_code(403);
     exit('Invalid signature');
 }
+
+$event = json_decode($payload, true, flags: JSON_THROW_ON_ERROR);
+$delivery = $_SERVER['HTTP_X_FCHUB_DELIVERY'] ?? '';
+$eventType = $_SERVER['HTTP_X_FCHUB_EVENT'] ?? '';
+$timestamp = $_SERVER['HTTP_X_FCHUB_TIMESTAMP'] ?? '';
+
+if (!hash_equals((string) $event['id'], $delivery)
+    || !hash_equals((string) $event['event_type'], $eventType)
+    || !hash_equals((string) $event['occurred_at'], $timestamp)
+) {
+    http_response_code(400);
+    exit('Invalid webhook metadata');
+}
 ```
 
-The `X-FCHub-Event` header contains the event type string.
+Verify the HMAC against the untouched request bytes before decoding the JSON.
+Then verify delivery ID, event type, and timestamp against the envelope. Record
+the delivery ID durably before applying side effects, and return a 2xx response
+only after that record and the intended effect are safe to acknowledge.
 
 ### Delivery
 
-Webhooks are delivered asynchronously via Action Scheduler when available. The `fchub_memberships_dispatch_webhook` hook fires with the URL, body, and headers. If Action Scheduler is not available, delivery falls back to synchronous `wp_remote_post()` with a 15-second timeout.
+The plugin persists one immutable event and one delivery per unique destination
+before scheduling `fchub_memberships_deliver_webhook`. Action Scheduler is
+preferred; WP-Cron provides the scheduling fallback. Scheduled arguments
+contain only the delivery ID.
 
-Failed deliveries are logged via the `Logger` class.
+The worker re-reads the stored event and current secret, signs the exact stored
+body, and sends it through WordPress safe HTTP with a 15-second timeout and at
+most three redirects. Every transport error or non-2xx response is a failed
+attempt. Retry delays after the first attempt are
+`60, 300, 1800, 7200, 21600, 86400` seconds, for seven total attempts. Valid
+`Retry-After` values on HTTP 429 and 503 are honoured up to 86,400 seconds.
 
-### Test Webhook
+Successful deliveries are retained for 30 days and terminal failures for 90
+days. Pending, processing, and retrying rows are not purged. Stored response
+bodies are bounded, and history never exposes the event body or signing
+secret.
 
-Send a test event from **Memberships > Settings** or via the REST API:
+### Operations
+
+The WordPress admin calls these routes with cookie authentication and an
+`X-WP-Nonce` header. Their permission check is always `manage_options`; the
+read-only key and `manage_fchub_memberships` capability do not grant access.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/admin/webhooks/health` | Return `off`, `needs_setup`, `ready`, or `degraded` plus delivery counts |
+| GET | `/admin/webhooks/deliveries` | List redacted delivery history; supports `page`, `per_page`, and `status` |
+| POST | `/admin/webhooks/deliveries/{id}/retry` | Reset and schedule only a terminal failed delivery |
+| POST | `/admin/webhooks/test` | Persist a normal `test` event and attempt it through the production worker |
+| POST | `/admin/settings/test-webhook` | Compatibility alias for `/admin/webhooks/test` |
+
+Send a production-path test from **Memberships > Settings** or via REST:
 
 ```bash
-curl -X POST https://example.com/wp-json/fchub-memberships/v1/settings/webhook-test \
+curl -X POST https://example.com/wp-json/fchub-memberships/v1/admin/webhooks/test \
+  -H "Cookie: wordpress_logged_in_..." \
   -H "X-WP-Nonce: <nonce>"
 ```
+
+Secret rotation is refused while any delivery is pending, processing, or
+retrying. A terminal failed delivery may be retried after rotation and will be
+signed with the current secret.
 
 <Separator />
 
@@ -406,9 +560,9 @@ interface AccessAdapterInterface
 | Adapter | Provider | Resource Types |
 |---|---|---|
 | `WordPressContentAdapter` | `wordpress_core` | Posts, pages, custom post types, taxonomies, menus, URLs, comments, special pages |
-| `FluentCommunityAdapter` | `fluent_community` | `fc_space`, `fc_group` |
+| `FluentCommunityAdapter` | `fluent_community` | `fc_space`, `fc_course` |
 | `FluentCrmAdapter` | N/A | Contact tags and lists |
-| `LearnDashAdapter` | `learndash` | `sfwd-courses`, `sfwd-lessons` |
+| `LearnDashAdapter` | `learndash` | `ld_course`, `ld_group` |
 
 ### Registering Custom Adapters
 
@@ -558,12 +712,16 @@ Implement `CsvParserInterface` and register your parser via a hook to support ad
 | `fchub_memberships_trial_check` | Daily | `TrialLifecycleService::sendTrialExpiringNotifications()` + `checkTrialExpirations()` |
 | `fchub_memberships_plan_schedule` | Hourly | `PlanService::processScheduledStatuses()` |
 | `fchub_memberships_audit_cleanup` | Weekly | `AuditLogRepository::cleanup(90)` |
+| `fchub_memberships_webhook_reconcile` | 5 minutes | Recover due or interrupted durable webhook deliveries |
+| `fchub_memberships_webhook_cleanup` | Daily | Apply terminal webhook retention |
 
 ### Action Scheduler Hooks
 
 | Hook | Handler |
 |---|---|
 | `fchub_memberships_send_email` | `wp_mail($to, $subject, $body, $headers)` |
-| `fchub_memberships_dispatch_webhook` | `wp_remote_post($url, ...)` with error logging |
+| `fchub_memberships_deliver_webhook` | Load one durable delivery ID and send it with `wp_safe_remote_post()` |
 
-All cron handlers check for `FLUENTCART_VERSION` before executing to avoid errors when FluentCart is temporarily deactivated.
+Lifecycle cron handlers check for `FLUENTCART_VERSION` before using FluentCart.
+Webhook reconciliation and cleanup are scheduled only after schema 1.8.0 and
+the durable webhook tables pass their readiness checks.

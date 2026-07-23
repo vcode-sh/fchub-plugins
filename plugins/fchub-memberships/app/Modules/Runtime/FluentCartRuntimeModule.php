@@ -16,6 +16,7 @@ final class FluentCartRuntimeModule implements ModuleInterface
 
     public function register(Container $container): void
     {
+        \FChubMemberships\Http\ApplicationPasswordRequestContext::register();
         add_action('init', [$this, 'bootRuntime'], 3);
     }
 
@@ -28,15 +29,43 @@ final class FluentCartRuntimeModule implements ModuleInterface
         \FChubMemberships\Support\Migrations::ensureAdministratorCapability();
 
         $currentDbVersion = get_option('fchub_memberships_db_version', '0');
-        if (version_compare($currentDbVersion, FCHUB_MEMBERSHIPS_DB_VERSION, '<')) {
-            \FChubMemberships\Support\Migrations::run();
-            update_option('fchub_memberships_db_version', FCHUB_MEMBERSHIPS_DB_VERSION);
+        $needsMigration = version_compare($currentDbVersion, FCHUB_MEMBERSHIPS_DB_VERSION, '<');
+        if (!$needsMigration) {
+            $needsMigration = \FChubMemberships\Support\Migrations::verifySchema() !== [];
+        }
+        if ($needsMigration) {
+            $migrationResult = \FChubMemberships\Support\Migrations::run();
+            if ($migrationResult['success']) {
+                update_option('fchub_memberships_db_version', FCHUB_MEMBERSHIPS_DB_VERSION);
+            } else {
+                $failureDescription = implode('; ', $migrationResult['failures']);
+                \FChubMemberships\Support\Logger::error(
+                    'Membership database migration failed',
+                    'Required tables, columns, indexes, foreign keys, or referential integrity checks are incomplete. '
+                    . 'Review the database error log and repair the schema before retrying. Failures: '
+                    . $failureDescription,
+                    ['postcondition_failures' => $migrationResult['failures']]
+                );
+                do_action(
+                    'fchub_memberships/migration_failed',
+                    FCHUB_MEMBERSHIPS_DB_VERSION,
+                    $migrationResult['failures']
+                );
+            }
         }
 
         \FChubMemberships\Integration\MembershipSettings::register();
 
-        (new \FChubMemberships\Integration\MembershipAccessIntegration())->register();
-        (new \FChubMemberships\Domain\SubscriptionValidityWatcher())->registerHooks();
+        $membershipLifecycle = new \FChubMemberships\Domain\Lifecycle\MembershipLifecycleCoordinator();
+        (new \FChubMemberships\Integration\MembershipAccessIntegration(
+            null,
+            null,
+            null,
+            $membershipLifecycle
+        ))->register();
+        (new \FChubMemberships\Domain\SubscriptionValidityWatcher(
+            $membershipLifecycle
+        ))->registerHooks();
         (new \FChubMemberships\Integration\WebhookDispatcher())->register();
         (new \FChubMemberships\Integration\FluentCrmSync())->register();
         (new \FChubMemberships\Integration\FluentCommunitySync())->register();
@@ -60,6 +89,10 @@ final class FluentCartRuntimeModule implements ModuleInterface
 
         if (defined('WP_CLI') && WP_CLI) {
             \WP_CLI::add_command('fchub-membership', \FChubMemberships\CLI\GrantCommand::class);
+            \WP_CLI::add_command(
+                'fchub-membership provider-reconcile',
+                \FChubMemberships\CLI\ProviderReconcileCommand::class
+            );
         }
     }
 
@@ -112,5 +145,7 @@ final class FluentCartRuntimeModule implements ModuleInterface
         \FChubMemberships\Http\AccountController::registerRoutes();
         \FChubMemberships\Http\Controllers\ImportController::registerRoutes();
         \FChubMemberships\Http\Controllers\IntegrationHealthController::registerRoutes();
+        \FChubMemberships\Http\Controllers\ProviderReconciliationController::registerRoutes();
+        \FChubMemberships\Http\Controllers\WebhookController::registerRoutes();
     }
 }

@@ -35,7 +35,7 @@
         <label for="settings-category-select">Settings category</label>
         <el-select
           id="settings-category-select"
-          v-model="activeSettingsTab"
+          v-model="settingsTabModel"
           aria-label="Settings category"
           style="width: 100%"
         >
@@ -99,27 +99,28 @@
             :fluentcrm-lists="fluentcrmLists"
             :loading-spaces="loadingSpaces"
             :fc-spaces="fcSpaces"
-            :loading-badges="loadingBadges"
-            :fc-badges="fcBadges"
             :space-search-error="spaceSearchError"
-            :badge-search-error="badgeSearchError"
             :search-fluentcrm-lists="searchFluentcrmLists"
             :search-fc-spaces="searchFcSpaces"
-            :search-fc-badges="searchFcBadges"
             :reload-plan-options="loadPlanOptions"
           />
           <SettingsWebhooksApiSection
             v-else-if="activeSettingsTab === 'webhooks'"
             :form="form"
-            :regenerating="regenerating"
-            :regenerating-secret="regeneratingSecret"
-            :testing-webhook="testingWebhook"
+            :access-api="accessApi"
+            :webhook-status="webhookStatus"
+            :webhook-secret-configured="webhookSecretConfigured"
+            :webhook-configuration-valid="webhookConfigurationValid"
+            :one-time-credentials="oneTimeCredentials"
+            :busy="webhookBusy"
+            :actions="webhookActions"
             :test-results="testResults"
-            :copy-api-key="copyApiKey"
-            :regenerate-api-key="regenerateApiKey"
-            :copy-webhook-secret="copyWebhookSecret"
-            :regenerate-webhook-secret="regenerateWebhookSecret"
-            :send-test-webhook="sendTestWebhook"
+            :webhook-error="webhookError"
+            :history="webhookHistory"
+            @acknowledge-api-key="clearOneTimeApiKey"
+            @acknowledge-webhook-secret="clearOneTimeWebhookSecret"
+            @refresh-history="refreshWebhookOperationalState"
+            @retry-delivery="retryWebhookDelivery"
           />
           <SettingsAdvancedSection v-else :form="form" />
         </section>
@@ -145,7 +146,7 @@
 </template>
 
 <script setup>
-import { computed, markRaw, ref, onMounted } from 'vue'
+import { computed, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowRight,
@@ -173,10 +174,23 @@ import ListStatePanel from '@/components/workspace/ListStatePanel.vue'
 
 const loading = ref(false)
 const saving = ref(false)
-const regenerating = ref(false)
-const regeneratingSecret = ref(false)
+const apiKeyBusy = ref(false)
+const webhookSecretBusy = ref(false)
+const revokeApiKeyBusy = ref(false)
 const testingWebhook = ref(false)
 const testResults = ref([])
+const accessApi = ref({ configured: false, prefix: null, rotated_at: null })
+const webhookStatus = ref('off')
+const webhookSecretConfigured = ref(false)
+const webhookDestinationsConfigured = ref(false)
+const webhookError = ref('')
+const oneTimeCredentials = ref({ apiKey: '', webhookSecret: '' })
+const webhookDeliveries = ref([])
+const webhookHistoryLoading = ref(false)
+const webhookHistoryError = ref('')
+const retryingDeliveryId = ref(null)
+let webhookRequestVersion = 0
+let credentialRequestGeneration = 0
 const activeSettingsTab = ref('general')
 const savedSnapshot = ref('')
 const savedFormSnapshot = ref(null)
@@ -192,9 +206,6 @@ const fluentcrmLists = ref([])
 const loadingSpaces = ref(false)
 const fcSpaces = ref([])
 const spaceSearchError = ref('')
-const loadingBadges = ref(false)
-const fcBadges = ref([])
-const badgeSearchError = ref('')
 
 // Plan options for mappings
 const planOptions = ref([])
@@ -229,6 +240,7 @@ const form = ref({
   email_access_granted: true,
   email_access_expiring: true,
   email_expiring_days_before: 7,
+  trial_expiry_notice_days: 3,
   email_access_revoked: true,
   email_drip_unlocked: true,
   email_membership_paused: true,
@@ -238,12 +250,12 @@ const form = ref({
   email_templates: {},
   email_theme: defaultEmailTheme(),
   email_delivery: {},
-  api_key: '',
+  hide_protected_in_archive: false,
+  uninstall_remove_data: false,
   debug_mode: false,
   // Webhooks
   webhook_enabled: false,
   webhook_urls: '',
-  webhook_secret: '',
   // FluentCRM
   fluentcrm_enabled: false,
   fluentcrm_tag_prefix: 'member:',
@@ -252,8 +264,6 @@ const form = ref({
   // FluentCommunity
   fc_enabled: false,
   fc_space_mappings: {},
-  fc_badge_mappings: {},
-  fc_remove_badge_on_revoke: false,
   // Membership Rules
   membership_mode: 'stack',
 })
@@ -263,12 +273,42 @@ const spaceOptionsLoader = createRemoteOptionsLoader(async (query, include) => {
   return response.data ?? response ?? []
 })
 
-const badgeOptionsLoader = createRemoteOptionsLoader(async (query, include) => {
-  const response = await api.get('admin/fc-badges', { search: query, include })
-  return response.data ?? response ?? []
+const isDirty = computed(() => savedSnapshot.value !== '' && JSON.stringify(buildPayload()) !== savedSnapshot.value)
+
+const credentialMutationBusy = computed(() => (
+  apiKeyBusy.value || webhookSecretBusy.value || revokeApiKeyBusy.value
+))
+
+const webhookBusy = computed(() => ({
+  credentialMutation: credentialMutationBusy.value,
+  apiKey: apiKeyBusy.value,
+  webhookSecret: webhookSecretBusy.value,
+  revokeApiKey: revokeApiKeyBusy.value,
+  test: testingWebhook.value,
+}))
+
+const webhookHistory = computed(() => ({
+  deliveries: webhookDeliveries.value,
+  loading: webhookHistoryLoading.value,
+  error: webhookHistoryError.value,
+  retryingId: retryingDeliveryId.value,
+}))
+
+const webhookConfigurationValid = computed(() => {
+  const savedUrls = savedFormSnapshot.value?.webhook_urls ?? ''
+  return webhookSecretConfigured.value
+    && webhookDestinationsConfigured.value
+    && form.value.webhook_urls === savedUrls
 })
 
-const isDirty = computed(() => savedSnapshot.value !== '' && JSON.stringify(buildPayload()) !== savedSnapshot.value)
+const hasPendingCredentialAcknowledgement = computed(() => Boolean(
+  oneTimeCredentials.value.apiKey || oneTimeCredentials.value.webhookSecret
+))
+
+const settingsTabModel = computed({
+  get: () => activeSettingsTab.value,
+  set: (category) => selectCategory(category),
+})
 
 const enabledEmailCount = computed(() => activeDeliveryCount(
   form.value.email_delivery,
@@ -313,7 +353,9 @@ const settingsCategories = computed(() => [
     id: 'webhooks',
     label: 'Webhooks & API',
     description: 'Deliver membership events and manage credentials for external systems.',
-    summary: form.value.webhook_enabled ? 'Webhooks active' : (form.value.api_key ? 'API ready' : 'Not connected'),
+    summary: form.value.webhook_enabled
+      ? webhookStatusLabel(webhookStatus.value)
+      : (accessApi.value.configured ? 'API ready' : 'Not connected'),
     icon: markRaw(Link),
   },
   {
@@ -328,6 +370,9 @@ const settingsCategories = computed(() => [
 const activeCategory = computed(() => settingsCategories.value.find(({ id }) => id === activeSettingsTab.value) ?? settingsCategories.value[0])
 
 async function loadSettings() {
+  invalidateWebhookRequests()
+  invalidateCredentialRequests()
+  clearOneTimeCredentials()
   loading.value = true
   loadError.value = ''
   validationMessage.value = ''
@@ -335,6 +380,10 @@ async function loadSettings() {
   try {
     const settingsRes = await settings.get()
     const data = settingsRes.data ?? settingsRes
+    accessApi.value = normaliseAccessApi(data.access_api)
+    webhookSecretConfigured.value = data.webhook_secret_configured === true
+    webhookDestinationsConfigured.value = data.webhook_destinations_configured === true
+    webhookStatus.value = normaliseWebhookStatus(data.webhook_status)
     await loadPlanOptions(data)
 
     const emailDelivery = { ...(data.email_delivery ?? {}) }
@@ -352,6 +401,7 @@ async function loadSettings() {
       email_access_granted: data.email_access_granted === 'yes',
       email_access_expiring: data.email_access_expiring === 'yes',
       email_expiring_days_before: data.expiry_warning_days ?? 7,
+      trial_expiry_notice_days: data.trial_expiry_notice_days ?? 3,
       email_access_revoked: data.email_access_revoked === 'yes',
       email_drip_unlocked: data.email_drip_unlocked === 'yes',
       email_membership_paused: data.email_membership_paused === 'yes',
@@ -361,12 +411,12 @@ async function loadSettings() {
       email_templates: data.email_templates ?? {},
       email_theme: { ...defaultEmailTheme(), ...(data.email_theme ?? {}) },
       email_delivery: emailDelivery,
-      api_key: data.api_key ?? '',
+      hide_protected_in_archive: data.hide_protected_in_archive === 'yes',
+      uninstall_remove_data: data.uninstall_remove_data === 'yes',
       debug_mode: data.debug_mode === 'yes',
       // Webhooks
       webhook_enabled: data.webhook_enabled === 'yes',
       webhook_urls: data.webhook_urls ?? '',
-      webhook_secret: data.webhook_secret ?? '',
       // FluentCRM
       fluentcrm_enabled: data.fluentcrm_enabled === 'yes',
       fluentcrm_tag_prefix: data.fluentcrm_tag_prefix ?? 'member:',
@@ -375,14 +425,16 @@ async function loadSettings() {
       // FluentCommunity
       fc_enabled: data.fc_enabled === 'yes',
       fc_space_mappings: data.fc_space_mappings ?? {},
-      fc_badge_mappings: data.fc_badge_mappings ?? {},
-      fc_remove_badge_on_revoke: data.fc_remove_badge_on_revoke === 'yes',
       // Membership Rules
       membership_mode: data.membership_mode ?? 'stack',
     }
     savedSnapshot.value = JSON.stringify(buildPayload())
     savedFormSnapshot.value = cloneForm(form.value)
     settingsReady.value = true
+
+    if (activeSettingsTab.value === 'webhooks') {
+      refreshWebhookOperationalState()
+    }
 
     // Pre-load FluentCRM lists if a default is set
     if (form.value.fluentcrm_default_list) {
@@ -391,9 +443,6 @@ async function loadSettings() {
 
     if (mappedResourceIds(form.value.fc_space_mappings)) {
       await searchFcSpaces('')
-    }
-    if (mappedResourceIds(form.value.fc_badge_mappings)) {
-      await searchFcBadges('')
     }
   } catch (err) {
     loadError.value = err.message || 'The settings service did not return a usable response.'
@@ -408,10 +457,8 @@ function cloneForm(value) {
 
 async function loadPlanOptions(source = form.value) {
   planOptionsError.value = ''
-  const mappingKeys = [...new Set([
-    ...Object.keys(source.fc_space_mappings ?? {}),
-    ...Object.keys(source.fc_badge_mappings ?? {}),
-  ].filter((id) => Boolean(source.fc_space_mappings?.[id]) || Boolean(source.fc_badge_mappings?.[id])))]
+  const mappingKeys = Object.keys(source.fc_space_mappings ?? {})
+    .filter((id) => Boolean(source.fc_space_mappings?.[id]))
   const validPlanIds = mappingKeys.filter((id) => /^[1-9]\d*$/.test(id))
   const invalidRows = mappingKeys
     .filter((id) => !validPlanIds.includes(id))
@@ -444,6 +491,7 @@ async function loadPlanOptions(source = form.value) {
 }
 
 function selectCategory(category) {
+  if (category !== 'webhooks' && hasPendingCredentialAcknowledgement.value) return
   activeSettingsTab.value = category
   validationMessage.value = ''
 }
@@ -456,6 +504,7 @@ function buildPayload() {
     restriction_message_paused: f.restriction_message_paused,
     default_redirect_url: f.redirect_url,
     expiry_warning_days: f.email_expiring_days_before,
+    trial_expiry_notice_days: f.trial_expiry_notice_days,
     email_access_granted: f.email_access_granted ? 'yes' : 'no',
     email_access_expiring: f.email_access_expiring ? 'yes' : 'no',
     email_access_revoked: f.email_access_revoked ? 'yes' : 'no',
@@ -467,6 +516,8 @@ function buildPayload() {
     email_templates: f.email_templates,
     email_theme: f.email_theme,
     email_delivery: f.email_delivery,
+    hide_protected_in_archive: f.hide_protected_in_archive ? 'yes' : 'no',
+    uninstall_remove_data: f.uninstall_remove_data ? 'yes' : 'no',
     debug_mode: f.debug_mode ? 'yes' : 'no',
     // Webhooks
     webhook_enabled: f.webhook_enabled ? 'yes' : 'no',
@@ -479,8 +530,6 @@ function buildPayload() {
     // FluentCommunity
     fc_enabled: f.fc_enabled ? 'yes' : 'no',
     fc_space_mappings: f.fc_space_mappings,
-    fc_badge_mappings: f.fc_badge_mappings,
-    fc_remove_badge_on_revoke: f.fc_remove_badge_on_revoke ? 'yes' : 'no',
     // Membership Rules
     membership_mode: f.membership_mode,
   }
@@ -497,12 +546,26 @@ async function saveSettings() {
   saving.value = true
   validationMessage.value = ''
   try {
-    await settings.save(buildPayload())
+    const response = await settings.save(buildPayload())
+    const data = response.data ?? response
+    if (data.access_api) accessApi.value = normaliseAccessApi(data.access_api)
+    if (typeof data.webhook_secret_configured === 'boolean') {
+      webhookSecretConfigured.value = data.webhook_secret_configured
+    }
+    if (typeof data.webhook_destinations_configured === 'boolean') {
+      webhookDestinationsConfigured.value = data.webhook_destinations_configured
+    }
+    if (data.webhook_status) webhookStatus.value = normaliseWebhookStatus(data.webhook_status)
     savedSnapshot.value = JSON.stringify(buildPayload())
     savedFormSnapshot.value = cloneForm(form.value)
+    webhookError.value = ''
     ElMessage.success('Settings saved successfully.')
   } catch (err) {
-    ElMessage.error('Failed to save settings: ' + (err.message || 'Unknown error'))
+    if (activeSettingsTab.value === 'webhooks') {
+      webhookError.value = err.message || 'Webhook settings could not be saved.'
+    } else {
+      ElMessage.error('Failed to save settings: ' + (err.message || 'Unknown error'))
+    }
   } finally {
     saving.value = false
   }
@@ -534,10 +597,7 @@ function validateSettings() {
     }
   }
 
-  const hasCommunityMappings = [
-    ...Object.values(form.value.fc_space_mappings ?? {}),
-    ...Object.values(form.value.fc_badge_mappings ?? {}),
-  ].some(Boolean)
+  const hasCommunityMappings = Object.values(form.value.fc_space_mappings ?? {}).some(Boolean)
 
   if (form.value.fc_enabled && planOptionsError.value && hasCommunityMappings) {
     return {
@@ -546,19 +606,17 @@ function validateSettings() {
     }
   }
 
-  if (form.value.fc_enabled && (
-    invalidCommunityMapping(form.value.fc_space_mappings)
-    || invalidCommunityMapping(form.value.fc_badge_mappings)
-  )) {
+  if (form.value.fc_enabled && invalidCommunityMapping(form.value.fc_space_mappings)) {
     return {
       category: 'integrations',
       message: 'Review unavailable FluentCommunity mappings before saving.',
     }
   }
 
-  if (form.value.fc_enabled && (
-    unavailableCommunityMapping(form.value.fc_space_mappings, fcSpaces.value, spaceSearchError.value)
-    || unavailableCommunityMapping(form.value.fc_badge_mappings, fcBadges.value, badgeSearchError.value)
+  if (form.value.fc_enabled && unavailableCommunityMapping(
+    form.value.fc_space_mappings,
+    fcSpaces.value,
+    spaceSearchError.value,
   )) {
     return {
       category: 'integrations',
@@ -596,112 +654,260 @@ function isHttpUrl(value) {
   }
 }
 
-async function copyApiKey() {
-  if (!form.value.api_key) {
-    ElMessage.warning('No API key to copy.')
-    return
-  }
-  try {
-    await navigator.clipboard.writeText(form.value.api_key)
-    ElMessage.success('API key copied to clipboard.')
-  } catch {
-    ElMessage.error('Failed to copy API key.')
-  }
+async function generateApiKey() {
+  if (credentialMutationBusy.value) return
+  await issueApiKey()
 }
 
 async function regenerateApiKey() {
-  try {
-    await ElMessageBox.confirm(
-      'This will invalidate the current API key. Any external integrations using the old key will stop working. Continue?',
-      'Regenerate API Key',
-      {
-        confirmButtonText: 'Regenerate',
-        cancelButtonText: 'Cancel',
-        type: 'warning',
-      },
-    )
-  } catch {
-    return
-  }
+  if (credentialMutationBusy.value) return
+  const confirmed = await confirmDestructiveAction(
+    'This invalidates the current API key immediately. Continue?',
+    'Regenerate API key',
+    'Regenerate',
+  )
+  if (!confirmed) return
+  await issueApiKey()
+}
 
-  regenerating.value = true
+async function issueApiKey() {
+  if (activeSettingsTab.value !== 'webhooks' || credentialMutationBusy.value) return
+  const generation = credentialRequestGeneration
+  apiKeyBusy.value = true
+  webhookError.value = ''
   try {
     const response = await settings.generateApiKey()
+    if (!credentialRequestIsCurrent(generation)) return
     const data = response.data ?? response
-    form.value.api_key = data.api_key ?? form.value.api_key
-    if (savedFormSnapshot.value) savedFormSnapshot.value.api_key = form.value.api_key
-    ElMessage.success('API key regenerated successfully.')
+    if (typeof data.api_key !== 'string' || data.api_key === '') {
+      throw new Error('The settings service did not return the new API key.')
+    }
+    accessApi.value = normaliseAccessApi(data.access_api)
+    oneTimeCredentials.value = { apiKey: data.api_key, webhookSecret: '' }
   } catch (err) {
-    ElMessage.error('Failed to regenerate API key: ' + (err.message || 'Unknown error'))
+    if (!credentialRequestIsCurrent(generation)) return
+    webhookError.value = err.message || 'The API key could not be generated.'
   } finally {
-    regenerating.value = false
+    if (credentialRequestIsCurrent(generation)) apiKeyBusy.value = false
   }
 }
 
-async function copyWebhookSecret() {
-  if (!form.value.webhook_secret) {
-    ElMessage.warning('No webhook secret to copy.')
-    return
-  }
+async function revokeApiKey() {
+  if (credentialMutationBusy.value) return
+  const confirmed = await confirmDestructiveAction(
+    'This immediately rejects external requests using the current key. Continue?',
+    'Revoke API key',
+    'Revoke',
+  )
+  if (!confirmed) return
+  if (activeSettingsTab.value !== 'webhooks' || credentialMutationBusy.value) return
+
+  const generation = credentialRequestGeneration
+  revokeApiKeyBusy.value = true
+  webhookError.value = ''
+  clearOneTimeApiKey()
   try {
-    await navigator.clipboard.writeText(form.value.webhook_secret)
-    ElMessage.success('Webhook secret copied to clipboard.')
-  } catch {
-    ElMessage.error('Failed to copy webhook secret.')
+    const response = await settings.revokeApiKey()
+    if (!credentialRequestIsCurrent(generation)) return
+    const data = response.data ?? response
+    accessApi.value = normaliseAccessApi(data.access_api)
+  } catch (err) {
+    if (!credentialRequestIsCurrent(generation)) return
+    webhookError.value = err.message || 'The API key could not be revoked.'
+  } finally {
+    if (credentialRequestIsCurrent(generation)) revokeApiKeyBusy.value = false
   }
+}
+
+async function generateWebhookSecret() {
+  if (credentialMutationBusy.value) return
+  await issueWebhookSecret()
 }
 
 async function regenerateWebhookSecret() {
-  try {
-    await ElMessageBox.confirm(
-      'This will invalidate the current webhook secret. External services verifying signatures with the old secret will fail. Continue?',
-      'Regenerate Webhook Secret',
-      {
-        confirmButtonText: 'Regenerate',
-        cancelButtonText: 'Cancel',
-        type: 'warning',
-      },
-    )
-  } catch {
-    return
-  }
+  if (credentialMutationBusy.value) return
+  const confirmed = await confirmDestructiveAction(
+    'This invalidates the current signing secret immediately. Continue?',
+    'Regenerate webhook secret',
+    'Regenerate',
+  )
+  if (!confirmed) return
+  await issueWebhookSecret()
+}
 
-  regeneratingSecret.value = true
+async function issueWebhookSecret() {
+  if (activeSettingsTab.value !== 'webhooks' || credentialMutationBusy.value) return
+  const generation = credentialRequestGeneration
+  webhookSecretBusy.value = true
+  webhookError.value = ''
   try {
     const response = await settings.regenerateWebhookSecret()
+    if (!credentialRequestIsCurrent(generation)) return
     const data = response.data ?? response
-    form.value.webhook_secret = data.webhook_secret ?? form.value.webhook_secret
-    if (savedFormSnapshot.value) savedFormSnapshot.value.webhook_secret = form.value.webhook_secret
-    ElMessage.success('Webhook secret regenerated.')
+    if (typeof data.webhook_secret !== 'string' || data.webhook_secret === '') {
+      throw new Error('The settings service did not return the new webhook secret.')
+    }
+    webhookSecretConfigured.value = true
+    oneTimeCredentials.value = { apiKey: '', webhookSecret: data.webhook_secret }
   } catch (err) {
-    ElMessage.error('Failed to regenerate webhook secret: ' + (err.message || 'Unknown error'))
+    if (!credentialRequestIsCurrent(generation)) return
+    webhookError.value = err.message || 'The webhook secret could not be generated.'
   } finally {
-    regeneratingSecret.value = false
+    if (credentialRequestIsCurrent(generation)) webhookSecretBusy.value = false
   }
 }
 
 async function sendTestWebhook() {
   testingWebhook.value = true
+  webhookError.value = ''
   testResults.value = []
   try {
     const response = await settings.testWebhook()
     const data = response.data ?? response
-    testResults.value = data.results ?? []
-    if (data.success) {
-      const allOk = testResults.value.every(r => r.success)
-      if (allOk) {
-        ElMessage.success('All webhook URLs responded successfully.')
-      } else {
-        ElMessage.warning('Some webhook URLs failed. Check results below.')
-      }
-    } else {
-      ElMessage.error(data.message || 'Failed to send test webhook.')
-    }
+    testResults.value = normaliseTestResults(data.results)
+    await refreshWebhookOperationalState()
   } catch (err) {
-    ElMessage.error('Failed to send test webhook: ' + (err.message || 'Unknown error'))
+    webhookError.value = err.message || 'The test webhook could not be sent.'
   } finally {
     testingWebhook.value = false
   }
+}
+
+async function refreshWebhookOperationalState() {
+  if (activeSettingsTab.value !== 'webhooks') return
+
+  const requestVersion = ++webhookRequestVersion
+  webhookHistoryLoading.value = true
+  webhookHistoryError.value = ''
+  webhookError.value = ''
+
+  const [healthResult, historyResult] = await Promise.allSettled([
+    settings.getWebhookHealth(),
+    settings.listWebhookDeliveries({ page: 1, per_page: 20, status: '' }),
+  ])
+  if (requestVersion !== webhookRequestVersion || activeSettingsTab.value !== 'webhooks') return
+
+  if (healthResult.status === 'fulfilled') {
+    const health = healthResult.value.data ?? healthResult.value
+    webhookStatus.value = normaliseWebhookStatus(health.status)
+  } else {
+    webhookError.value = errorMessage(healthResult.reason, 'Webhook health could not be loaded.')
+  }
+
+  if (historyResult.status === 'fulfilled') {
+    const history = historyResult.value.data ?? historyResult.value
+    webhookDeliveries.value = Array.isArray(history.deliveries) ? history.deliveries.slice(0, 20) : []
+  } else {
+    webhookHistoryError.value = errorMessage(historyResult.reason, 'Delivery history could not be loaded.')
+  }
+  webhookHistoryLoading.value = false
+}
+
+async function retryWebhookDelivery(deliveryId) {
+  retryingDeliveryId.value = deliveryId
+  webhookHistoryError.value = ''
+  try {
+    await settings.retryWebhookDelivery(deliveryId)
+    await refreshWebhookOperationalState()
+  } catch (err) {
+    webhookHistoryError.value = errorMessage(err, 'The delivery could not be retried.')
+  } finally {
+    retryingDeliveryId.value = null
+  }
+}
+
+const webhookActions = {
+  generateApiKey,
+  regenerateApiKey,
+  revokeApiKey,
+  generateWebhookSecret,
+  regenerateWebhookSecret,
+  testWebhook: sendTestWebhook,
+}
+
+function normaliseAccessApi(value) {
+  return {
+    configured: value?.configured === true,
+    prefix: value?.configured === true ? (value.prefix ?? null) : null,
+    rotated_at: value?.configured === true ? (value.rotated_at ?? null) : null,
+  }
+}
+
+function normaliseWebhookStatus(value) {
+  return ['off', 'needs_setup', 'ready', 'degraded'].includes(value) ? value : 'off'
+}
+
+function webhookStatusLabel(value) {
+  return {
+    off: 'Webhooks off',
+    needs_setup: 'Needs setup',
+    ready: 'Webhooks ready',
+    degraded: 'Delivery failures',
+  }[value] ?? 'Webhooks off'
+}
+
+function normaliseTestResults(results) {
+  if (!Array.isArray(results)) return []
+  const labels = {
+    pending: 'Pending',
+    processing: 'Pending',
+    retrying: 'Retrying',
+    succeeded: 'Delivered',
+    failed: 'Failed',
+  }
+
+  return results.map((result) => ({
+    ...result,
+    url: result.destination_url ?? '',
+    success: result.status === 'succeeded',
+    error: result.status === 'succeeded' ? '' : (labels[result.status] ?? 'Pending'),
+  }))
+}
+
+async function confirmDestructiveAction(message, title, confirmButtonText) {
+  try {
+    await ElMessageBox.confirm(message, title, {
+      confirmButtonText,
+      cancelButtonText: 'Cancel',
+      type: 'warning',
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function clearOneTimeApiKey() {
+  oneTimeCredentials.value = { ...oneTimeCredentials.value, apiKey: '' }
+}
+
+function clearOneTimeWebhookSecret() {
+  oneTimeCredentials.value = { ...oneTimeCredentials.value, webhookSecret: '' }
+}
+
+function clearOneTimeCredentials() {
+  oneTimeCredentials.value = { apiKey: '', webhookSecret: '' }
+}
+
+function invalidateWebhookRequests() {
+  webhookRequestVersion += 1
+  webhookHistoryLoading.value = false
+  retryingDeliveryId.value = null
+}
+
+function invalidateCredentialRequests() {
+  credentialRequestGeneration += 1
+  apiKeyBusy.value = false
+  webhookSecretBusy.value = false
+  revokeApiKeyBusy.value = false
+}
+
+function credentialRequestIsCurrent(generation) {
+  return generation === credentialRequestGeneration && activeSettingsTab.value === 'webhooks'
+}
+
+function errorMessage(error, fallback) {
+  return error?.message || fallback
 }
 
 async function searchFluentcrmLists(query) {
@@ -732,24 +938,31 @@ async function searchFcSpaces(query) {
   loadingSpaces.value = false
 }
 
-async function searchFcBadges(query) {
-  const include = mappedResourceIds(form.value.fc_badge_mappings)
-  loadingBadges.value = true
-  badgeSearchError.value = ''
-  const result = await badgeOptionsLoader.search(query, include)
-  if (result.stale) return
-
-  if (result.error) {
-    fcBadges.value = []
-    badgeSearchError.value = 'Badges could not be loaded. Try opening the selector again.'
-  } else {
-    fcBadges.value = result.options
+watch(activeSettingsTab, (category, previousCategory) => {
+  if (previousCategory === 'webhooks' && category !== 'webhooks' && hasPendingCredentialAcknowledgement.value) {
+    activeSettingsTab.value = 'webhooks'
+    return
   }
-  loadingBadges.value = false
-}
+
+  validationMessage.value = ''
+  if (previousCategory === 'webhooks' || category !== 'webhooks') {
+    clearOneTimeCredentials()
+    invalidateWebhookRequests()
+    invalidateCredentialRequests()
+  }
+  if (category === 'webhooks' && settingsReady.value) {
+    refreshWebhookOperationalState()
+  }
+})
 
 onMounted(() => {
   loadSettings()
+})
+
+onBeforeUnmount(() => {
+  clearOneTimeCredentials()
+  invalidateWebhookRequests()
+  invalidateCredentialRequests()
 })
 </script>
 

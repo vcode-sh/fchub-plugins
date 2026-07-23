@@ -149,20 +149,29 @@ class MembershipSettings
     public static function saveGlobalSettings($args): void
     {
         $integration = Arr::get($args, 'integration', []);
+        $result = (new MembershipSettingsOptionCoordinator())->mutate(static function (array $settings) use ($integration): array {
+            $allowedModes = ['redirect', 'content_replace', '403'];
+            $mode = sanitize_text_field(Arr::get($integration, 'default_protection_mode', 'redirect'));
+            $settings['default_protection_mode'] = in_array($mode, $allowedModes, true) ? $mode : 'redirect';
 
-        $settings = self::getSettings();
-
-        $allowedModes = ['redirect', 'content_replace', '403'];
-        $mode = sanitize_text_field(Arr::get($integration, 'default_protection_mode', 'redirect'));
-        $settings['default_protection_mode'] = in_array($mode, $allowedModes, true) ? $mode : 'redirect';
-
-        $settings['default_redirect_url'] = esc_url_raw(Arr::get($integration, 'default_redirect_url', ''));
-        $settings['admin_bypass'] = Arr::get($integration, 'admin_bypass', 'yes') === 'yes' ? 'yes' : 'no';
-        $settings['auto_create_user'] = Arr::get($integration, 'auto_create_user', 'yes') === 'yes' ? 'yes' : 'no';
-        $settings['status'] = true;
-
-        update_option('fchub_memberships_settings', $settings);
+            $settings['default_redirect_url'] = esc_url_raw(Arr::get($integration, 'default_redirect_url', ''));
+            $settings['admin_bypass'] = Arr::get($integration, 'admin_bypass', 'yes') === 'yes' ? 'yes' : 'no';
+            $settings['auto_create_user'] = Arr::get($integration, 'auto_create_user', 'yes') === 'yes' ? 'yes' : 'no';
+            $settings['status'] = true;
+            return $settings;
+        });
         self::$cachedSettings = null;
+
+        if (!$result['success']) {
+            wp_send_json([
+                'data' => [
+                    'message' => __('Membership settings could not be saved. Please retry.', 'fchub-memberships'),
+                    'status' => false,
+                    'reason' => $result['reason'] ?? 'write_failed',
+                ],
+            ], 503);
+            return;
+        }
 
         wp_send_json([
             'data' => [

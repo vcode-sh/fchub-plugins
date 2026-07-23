@@ -4,11 +4,74 @@ declare(strict_types=1);
 
 namespace FChubMemberships\Tests\Unit\Http;
 
+use FChubMemberships\Http\ApplicationPasswordRequestContext;
 use FChubMemberships\Http\IdempotentMutation;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class IdempotentMutationTest extends PluginTestCase
 {
+    public function test_application_password_write_requires_an_idempotency_header_before_mutation_or_storage(): void
+    {
+        $GLOBALS['_fchub_test_current_user_id'] = 44;
+        $user = new \WP_User();
+        $user->ID = 44;
+        ApplicationPasswordRequestContext::authenticated($user, ['uuid' => 'not-retained']);
+        $runs = 0;
+        $inserts = 0;
+        $GLOBALS['_fchub_test_wpdb_overrides']['insert'] = static function () use (&$inserts): int {
+            $inserts++;
+            return 1;
+        };
+
+        try {
+            $response = (new IdempotentMutation())->execute(
+                new \WP_REST_Request('POST', '/grant', ['plan_id' => 2]),
+                'grant',
+                static function () use (&$runs): \WP_REST_Response {
+                    $runs++;
+                    return new \WP_REST_Response(['data' => []]);
+                }
+            );
+        } finally {
+            ApplicationPasswordRequestContext::clear();
+        }
+
+        self::assertSame(428, $response->get_status());
+        self::assertSame('fchub_idempotency_key_required', $response->get_data()['code']);
+        self::assertSame(0, $runs);
+        self::assertSame(0, $inserts);
+    }
+
+    public function test_application_password_write_with_a_key_is_stored_and_replayed(): void
+    {
+        $this->persistentRows();
+        $GLOBALS['_fchub_test_current_user_id'] = 44;
+        $user = new \WP_User();
+        $user->ID = 44;
+        ApplicationPasswordRequestContext::authenticated($user, []);
+        $request = $this->request('external-replay', ['plan_id' => 2]);
+        $runs = 0;
+        $coordinator = new IdempotentMutation();
+
+        try {
+            $first = $coordinator->execute($request, 'grant', static function () use (&$runs): \WP_REST_Response {
+                $runs++;
+                return new \WP_REST_Response(['data' => ['runs' => $runs]], 207);
+            });
+            $replay = $coordinator->execute($request, 'grant', static function () use (&$runs): \WP_REST_Response {
+                $runs++;
+                return new \WP_REST_Response(['data' => ['runs' => $runs]]);
+            });
+        } finally {
+            ApplicationPasswordRequestContext::clear();
+        }
+
+        self::assertSame(1, $runs);
+        self::assertSame(207, $first->get_status());
+        self::assertSame($first->get_data(), $replay->get_data());
+        self::assertSame('true', $replay->get_headers()['Idempotency-Replayed'] ?? null);
+    }
+
     public function test_executes_without_an_idempotency_header(): void
     {
         $runs = 0;
@@ -227,6 +290,41 @@ final class IdempotentMutationTest extends PluginTestCase
         }
     }
 
+    public function test_expired_matching_reservation_is_reclaimed_and_executes_at_least_once(): void
+    {
+        $GLOBALS['_fchub_test_current_user_id'] = 44;
+        $request = $this->request('abandoned', ['user_id' => 8, 'plan_id' => 2]);
+        $coordinator = new IdempotentMutation();
+        $fingerprint = $coordinator->fingerprint($request, 'grant');
+        $row = [
+            'request_key' => 'abandoned',
+            'fingerprint' => $fingerprint,
+            'user_id' => 44,
+            'state' => 'reserved',
+            'lease_token' => str_repeat('1', 64),
+            'lease_expires_at' => '2026-03-13 21:59:59',
+            'attempt_count' => 1,
+            'response_status' => null,
+            'response_body' => null,
+        ];
+        $runs = 0;
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static fn(): array => $row;
+        $GLOBALS['_fchub_test_wpdb_overrides']['insert'] = static fn(): false => false;
+        $GLOBALS['_fchub_test_wpdb_overrides']['query'] = static function (string $query, \wpdb $wpdb): int {
+            $wpdb->rows_affected = 1;
+            return 1;
+        };
+
+        $response = $coordinator->execute($request, 'grant', static function () use (&$runs): \WP_REST_Response {
+            $runs++;
+            return new \WP_REST_Response(['data' => ['reclaimed' => true]], 200);
+        });
+
+        self::assertSame(1, $runs);
+        self::assertSame(200, $response->get_status());
+        self::assertSame(['data' => ['reclaimed' => true]], $response->get_data());
+    }
+
     private function persistentRows(?callable $updatePolicy = null): void
     {
         $rows = [];
@@ -242,16 +340,35 @@ final class IdempotentMutationTest extends PluginTestCase
             $rows[$data['request_key']] = $data;
             return 1;
         };
-        $GLOBALS['_fchub_test_wpdb_overrides']['update'] = static function (string $table, array $data, array $where) use (&$rows, $updatePolicy): int|false {
+        $GLOBALS['_fchub_test_wpdb_overrides']['query'] = static function (string $query, \wpdb $wpdb) use (&$rows, $updatePolicy): int|false {
+            if (!str_contains($query, 'UPDATE wp_fchub_membership_mutation_requests')) {
+                return 0;
+            }
+
+            preg_match("/request_key = '([^']+)'/", $query, $keyMatch);
+            preg_match("/SET state = '([^']+)'/", $query, $stateMatch);
+            preg_match('/response_status = ([0-9]+)/', $query, $statusMatch);
+            preg_match("/response_body = '([^']*)'/", $query, $bodyMatch);
+            $key = $keyMatch[1] ?? '';
+            $data = [
+                'state' => $stateMatch[1] ?? 'reserved',
+                'response_status' => isset($statusMatch[1]) ? (int) $statusMatch[1] : null,
+                'response_body' => $bodyMatch[1] ?? null,
+                'lease_token' => null,
+                'lease_expires_at' => null,
+                'completed_at' => '2026-03-13 22:00:00',
+                'updated_at' => '2026-03-13 22:00:00',
+            ];
             if ($updatePolicy) {
                 $policyResult = $updatePolicy($data);
                 if ($policyResult === false || $policyResult === 0) {
+                    $wpdb->rows_affected = 0;
                     return $policyResult;
                 }
             }
 
-            $key = $where['request_key'];
             $rows[$key] = array_merge($rows[$key], $data);
+            $wpdb->rows_affected = 1;
             return 1;
         };
     }

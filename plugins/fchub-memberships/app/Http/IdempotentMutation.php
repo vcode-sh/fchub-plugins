@@ -17,8 +17,18 @@ class IdempotentMutation
 
     public function execute(\WP_REST_Request $request, string $operation, callable $mutation): \WP_REST_Response
     {
+        // Response replay is durable. Reclaim after a crash is intentionally
+        // at-least-once and therefore still relies on domain-idempotent writes.
         $key = trim((string) $request->get_header('Idempotency-Key'));
         if ($key === '') {
+            if (MembershipMutationPermission::requiresIdempotencyKey()) {
+                return $this->error(
+                    'fchub_idempotency_key_required',
+                    'Idempotency-Key is required for Application Password writes.',
+                    428
+                );
+            }
+
             return $mutation();
         }
 
@@ -31,14 +41,18 @@ class IdempotentMutation
         $existing = $this->requests->find($key);
 
         if ($existing) {
-            return $this->existingResponse($existing, $fingerprint);
+            $response = $this->existingResponse($existing, $fingerprint, $userId);
+            if (($existing['state'] ?? '') !== 'reserved' || $response->get_status() !== 409) {
+                return $response;
+            }
         }
 
-        if (!$this->requests->reserve($key, $fingerprint, $userId)) {
+        $leaseToken = $this->requests->reserve($key, $fingerprint, $userId);
+        if ($leaseToken === null) {
             $existing = $this->requests->find($key);
 
             if ($existing) {
-                return $this->existingResponse($existing, $fingerprint);
+                return $this->existingResponse($existing, $fingerprint, $userId);
             }
 
             return $this->error('fchub_idempotency_in_progress', 'The request is already being processed.', 409);
@@ -48,16 +62,16 @@ class IdempotentMutation
             $response = $mutation();
         } catch (\Throwable) {
             $response = $this->error('fchub_idempotency_mutation_failed', 'The mutation could not be completed.', 500);
-            if (!$this->requests->fail($key, $response->get_status(), $response->get_data())) {
-                return $this->persistenceFailure($key);
+            if (!$this->requests->fail($key, $leaseToken, $response->get_status(), $response->get_data())) {
+                return $this->persistenceFailure($key, $leaseToken);
             }
 
             return $response;
         }
 
         $body = $response->get_data();
-        if (!$this->requests->complete($key, $response->get_status(), $body)) {
-            return $this->persistenceFailure($key);
+        if (!$this->requests->complete($key, $leaseToken, $response->get_status(), $body)) {
+            return $this->persistenceFailure($key, $leaseToken);
         }
 
         return $response;
@@ -74,9 +88,11 @@ class IdempotentMutation
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
     }
 
-    private function existingResponse(array $existing, string $fingerprint): \WP_REST_Response
+    private function existingResponse(array $existing, string $fingerprint, int $userId): \WP_REST_Response
     {
-        if (!hash_equals((string) $existing['fingerprint'], $fingerprint)) {
+        if (!hash_equals((string) $existing['fingerprint'], $fingerprint)
+            || (int) ($existing['user_id'] ?? 0) !== $userId
+        ) {
             return $this->error('fchub_idempotency_conflict', 'Idempotency-Key is already associated with a different request.', 409);
         }
 
@@ -101,7 +117,7 @@ class IdempotentMutation
         ], $status);
     }
 
-    private function persistenceFailure(string $key): \WP_REST_Response
+    private function persistenceFailure(string $key, string $leaseToken): \WP_REST_Response
     {
         $response = $this->error(
             'fchub_idempotency_persistence_failed',
@@ -109,7 +125,7 @@ class IdempotentMutation
             500
         );
 
-        $this->requests->fail($key, $response->get_status(), $response->get_data());
+        $this->requests->fail($key, $leaseToken, $response->get_status(), $response->get_data());
 
         return $response;
     }

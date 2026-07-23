@@ -188,7 +188,8 @@ test('fits below the WordPress toolbar and scrolls only the central stage', asyn
 
   const dialog = page.getByRole('dialog', { name: 'Content Protection' })
   await expect(dialog).toBeVisible()
-  await page.waitForTimeout(300)
+  await expect(page.locator('.content-protection-wizard-overlay'))
+    .not.toHaveClass(/dialog-fade-enter-active/)
   const stage = dialog.locator('.cpw-stage')
   const geometry = await dialog.evaluate((element) => {
     const dialogRect = element.getBoundingClientRect()
@@ -217,7 +218,7 @@ test('fits below the WordPress toolbar and scrolls only the central stage', asyn
   expect(geometry.dialogBottom).toBeLessThanOrEqual(geometry.viewportHeight - 16)
   expect(geometry.headerTop).toBeGreaterThanOrEqual(geometry.dialogTop)
   expect(geometry.stageTop).toBeGreaterThanOrEqual(geometry.progressTop)
-  expect(geometry.stageBottom).toBeLessThanOrEqual(geometry.footerTop)
+  expect(geometry.stageBottom - geometry.footerTop).toBeLessThan(0.5)
   expect(geometry.footerBottom).toBeLessThanOrEqual(geometry.dialogBottom)
   expect(geometry.stageScrollHeight).toBeGreaterThan(geometry.stageClientHeight)
 

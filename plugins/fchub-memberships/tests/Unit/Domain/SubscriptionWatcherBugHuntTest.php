@@ -7,6 +7,7 @@ namespace FChubMemberships\Tests\Unit\Domain;
 use FChubMemberships\Domain\AccessGrantService;
 use FChubMemberships\Domain\SubscriptionGrantLifecycleService;
 use FChubMemberships\Domain\SubscriptionValidityWatcher;
+use FChubMemberships\Domain\Lifecycle\MembershipLifecycleCoordinator;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
@@ -325,9 +326,9 @@ final class SubscriptionWatcherBugHuntTest extends PluginTestCase
         $grantService = $grantService ?? $this->createTrackingGrantService();
         $grantRepo = $grantRepo ?? $this->createEmptyGrantRepo();
 
-        $lifecycle = new SubscriptionGrantLifecycleService($grantService, $grantRepo);
+        $coordinator = new WatcherTestLifecycleCoordinator($grantService, $grantRepo);
 
-        return new SubscriptionValidityWatcher($lifecycle, $grantRepo);
+        return new SubscriptionValidityWatcher($coordinator, $grantRepo, $grantService);
     }
 
     private function createTrackingGrantService(): object
@@ -392,5 +393,85 @@ final class SubscriptionWatcherBugHuntTest extends PluginTestCase
                 return $sourceId === $this->subscriptionId ? $this->grants : [];
             }
         };
+    }
+}
+
+final class WatcherTestLifecycleCoordinator extends MembershipLifecycleCoordinator
+{
+    public function __construct(
+        private AccessGrantService $access,
+        private GrantRepository $grants
+    ) {
+    }
+
+    public function pause(array|object $payload): array
+    {
+        foreach ($this->rows($payload) as $grant) {
+            if (($grant['status'] ?? '') === 'active') {
+                $this->access->pauseGrant((int) $grant['id'], 'Subscription paused');
+            }
+        }
+        return [];
+    }
+
+    public function resume(array|object $payload): array
+    {
+        foreach ($this->rows($payload) as $grant) {
+            if (($grant['status'] ?? '') === 'paused') {
+                $this->access->resumeGrant((int) $grant['id']);
+            }
+        }
+        return [];
+    }
+
+    public function cancel(array|object $payload): array
+    {
+        $seen = [];
+        foreach ($this->rows($payload) as $grant) {
+            $key = (int) $grant['user_id'] . ':' . (int) $grant['plan_id'];
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $this->access->revokePlan((int) $grant['user_id'], (int) $grant['plan_id'], [
+                'source_id' => $this->subscriptionId($payload),
+            ]);
+        }
+        return [];
+    }
+
+    public function renew(array $payload): array
+    {
+        $subscription = $payload['subscription'] ?? null;
+        if (!is_object($subscription) || empty($subscription->next_billing_date)) {
+            return [];
+        }
+        foreach ($this->rows($payload) as $grant) {
+            if (($grant['status'] ?? '') === 'active') {
+                $this->access->extendExpiry(
+                    (int) $grant['user_id'],
+                    (int) $grant['plan_id'],
+                    (string) $subscription->next_billing_date,
+                    (int) $subscription->id
+                );
+            }
+        }
+        return [];
+    }
+
+    public function checkValidity(): array
+    {
+        return [];
+    }
+
+    private function rows(array|object $payload): array
+    {
+        return $this->grants->getBySourceId($this->subscriptionId($payload), 'subscription');
+    }
+
+    private function subscriptionId(array|object $payload): int
+    {
+        $subscription = is_array($payload) ? ($payload['subscription'] ?? null) : $payload;
+        return is_object($subscription) ? (int) ($subscription->id ?? 0) : 0;
     }
 }

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace FChubMemberships\Http\Controllers;
 
 use FChubMemberships\FluentCRM\Projection\MembershipContactProjector;
+use FChubMemberships\Http\IdempotentMutation;
 use FChubMemberships\Http\MembershipMutationPermission;
 use FChubMemberships\Http\IntegrationHealthRestArguments;
 use FChubMemberships\Integration\FluentCrmIntegrationHealth;
+use FChubMemberships\Integration\FluentCrmSync;
 
 defined('ABSPATH') || exit;
 
@@ -17,29 +19,53 @@ final class IntegrationHealthController
 
     /** @var \Closure(int, bool): array<string, mixed> */
     private \Closure $reconciler;
-    /** @var \Closure(int, int): array */
+    /** @var \Closure(int, int, int): array */
     private \Closure $memberIdsResolver;
+    /** @var \Closure(): int */
+    private \Closure $watermarkResolver;
+    /** @var \Closure(int): array<string, mixed> */
+    private \Closure $projectionQueue;
 
     public function __construct(
         private FluentCrmIntegrationHealth $health = new FluentCrmIntegrationHealth(),
         ?callable $reconciler = null,
-        ?callable $usersResolver = null
+        ?callable $usersResolver = null,
+        ?callable $watermarkResolver = null,
+        ?callable $projectionQueue = null
     ) {
         $this->reconciler = \Closure::fromCallable($reconciler ?? static function (int $userId, bool $dryRun): array {
             $projector = new MembershipContactProjector();
 
             return $dryRun ? $projector->preview($userId) : $projector->reconcile($userId);
         });
-        $this->memberIdsResolver = \Closure::fromCallable($usersResolver ?? static function (int $offset, int $limit): array {
+        $this->memberIdsResolver = \Closure::fromCallable($usersResolver ?? static function (
+            int $cursor,
+            int $watermark,
+            int $limit
+        ): array {
             global $wpdb;
             $table = $wpdb->prefix . 'fchub_membership_grants';
 
             return array_map('intval', $wpdb->get_col($wpdb->prepare(
-                "SELECT DISTINCT user_id FROM {$table} WHERE user_id > 0 ORDER BY user_id ASC LIMIT %d OFFSET %d",
-                $limit,
-                $offset
+                "SELECT DISTINCT user_id FROM {$table}
+                 WHERE user_id > %d AND user_id <= %d
+                 ORDER BY user_id ASC LIMIT %d",
+                $cursor,
+                $watermark,
+                $limit
             )) ?: []);
         });
+        $this->watermarkResolver = \Closure::fromCallable($watermarkResolver ?? static function (): int {
+            global $wpdb;
+            $table = $wpdb->prefix . 'fchub_membership_grants';
+
+            return max(0, (int) $wpdb->get_var("SELECT MAX(user_id) FROM {$table} WHERE user_id > 0"));
+        });
+        if ($projectionQueue === null) {
+            $sync = new FluentCrmSync();
+            $projectionQueue = [$sync, 'queueProjection'];
+        }
+        $this->projectionQueue = \Closure::fromCallable($projectionQueue);
     }
 
     public static function registerRoutes(): void
@@ -101,19 +127,88 @@ final class IntegrationHealthController
             return new \WP_REST_Response(['code' => 'invalid_reconciliation_scope'], 400);
         }
 
+        $cursor = (int) $request->get_param('cursor');
+        $watermarkValue = $request->get_param('watermark');
+        if (!$allUsers && ($cursor !== 0 || $watermarkValue !== null)) {
+            return new \WP_REST_Response(['code' => 'invalid_reconciliation_scope'], 400);
+        }
+        if ($allUsers && $cursor === 0 && $watermarkValue !== null) {
+            return new \WP_REST_Response(['code' => 'reconciliation_watermark_not_allowed'], 400);
+        }
+        if ($allUsers && $cursor > 0 && $watermarkValue === null) {
+            return new \WP_REST_Response(['code' => 'reconciliation_watermark_required'], 400);
+        }
+        $watermark = $allUsers
+            ? ($watermarkValue === null ? max(0, (int) ($this->watermarkResolver)()) : (int) $watermarkValue)
+            : 0;
+        if ($allUsers && ($cursor < 0 || $watermark < 0 || $cursor > $watermark)) {
+            return new \WP_REST_Response(['code' => 'invalid_reconciliation_cursor'], 400);
+        }
+
         $dryRun = $this->dryRun($request->get_param('dry_run'));
-        $results = $allUsers ? $this->reconcileAll($dryRun) : [$this->reconcileUser($userId, $dryRun)];
+        if (!$dryRun) {
+            return (new IdempotentMutation())->execute(
+                $request,
+                'fluentcrm_reconciliation_apply',
+                fn(): \WP_REST_Response => $this->reconciliationResponse(
+                    $userId,
+                    $allUsers,
+                    false,
+                    $cursor,
+                    $watermark
+                )
+            );
+        }
+
+        return $this->reconciliationResponse($userId, $allUsers, true, $cursor, $watermark);
+    }
+
+    private function reconciliationResponse(
+        int $userId,
+        bool $allUsers,
+        bool $dryRun,
+        int $cursor = 0,
+        int $watermark = 0
+    ): \WP_REST_Response
+    {
+        if ($allUsers && !$dryRun && $cursor > 0 && !$this->health->canResume($cursor, $watermark)) {
+            return new \WP_REST_Response(['code' => 'reconciliation_resume_conflict'], 409);
+        }
+
+        try {
+            $page = $allUsers ? $this->reconcileAllPage($dryRun, $cursor, $watermark) : null;
+            $results = $page === null ? [$this->reconcileUser($userId, $dryRun)] : $page['results'];
+        } catch (\Throwable) {
+            return new \WP_REST_Response(['code' => 'reconciliation_page_failed'], 500);
+        }
         $processed = count($results);
-        $failed = count(array_filter($results, static fn(array $result): bool => !$result['success']));
+        $failed = count(array_filter($results, static fn(array $result): bool => $allUsers && !$dryRun
+            ? empty($result['accepted'])
+            : empty($result['success'])));
         $drift = array_sum(array_column($results, 'drift'));
         $appliedDrift = array_sum(array_column($results, 'applied_drift'));
         $remainingDrift = array_sum(array_column($results, 'remaining_drift'));
 
-        if (!$dryRun) {
+        $aggregate = null;
+        if (!$dryRun && $allUsers && $page !== null) {
+            try {
+                $aggregate = $this->health->recordPage(
+                    $watermark,
+                    $cursor,
+                    $page['last_cursor'],
+                    $page['complete'],
+                    $processed,
+                    $failed,
+                    $remainingDrift
+                );
+            } catch (\Throwable) {
+                return new \WP_REST_Response(['code' => 'reconciliation_summary_failed'], 500);
+            }
+        } elseif (!$dryRun) {
             $this->health->record($processed, $failed, $remainingDrift);
         }
 
-        return new \WP_REST_Response(['data' => [
+        $data = [
             'dry_run' => $dryRun,
             'processed' => $processed,
             'failed' => $failed,
@@ -121,27 +216,76 @@ final class IntegrationHealthController
             'applied_drift' => $appliedDrift,
             'remaining_drift' => $remainingDrift,
             'results' => $results,
-        ]]);
+        ];
+        if ($page !== null) {
+            $data = array_merge($data, [
+                'cursor' => $cursor,
+                'watermark' => $watermark,
+                'next_cursor' => $page['next_cursor'],
+                'complete' => $page['complete'],
+            ]);
+            if ($aggregate !== null) {
+                $data['aggregate'] = $aggregate;
+            }
+        }
+
+        return new \WP_REST_Response(['data' => $data]);
     }
 
-    /** @return list<array<string, mixed>> */
-    private function reconcileAll(bool $dryRun): array
+    /** @return array{results:list<array<string,mixed>>,last_cursor:int,next_cursor:?int,complete:bool} */
+    private function reconcileAllPage(bool $dryRun, int $cursor, int $watermark): array
     {
-        $offset = 0;
-        $results = [];
+        $memberIds = ($this->memberIdsResolver)($cursor, $watermark, self::PAGE_SIZE + 1);
+        $memberIds = array_values(array_unique(array_filter(
+            array_map('intval', is_array($memberIds) ? $memberIds : []),
+            static fn(int $userId): bool => $userId > $cursor && $userId <= $watermark
+        )));
+        sort($memberIds, SORT_NUMERIC);
+        $hasMore = count($memberIds) > self::PAGE_SIZE;
+        $memberIds = array_slice($memberIds, 0, self::PAGE_SIZE);
+        $results = array_map(
+            fn(int $memberId): array => $dryRun
+                ? $this->reconcileUser($memberId, true)
+                : $this->queueUser($memberId),
+            $memberIds
+        );
+        $lastCursor = $memberIds === [] ? $cursor : $memberIds[array_key_last($memberIds)];
 
-        do {
-            $memberIds = ($this->memberIdsResolver)($offset, self::PAGE_SIZE);
-            foreach ($memberIds as $userId) {
-                $userId = (int) $userId;
-                if ($userId > 0) {
-                    $results[] = $this->reconcileUser($userId, $dryRun);
-                }
-            }
-            $offset += count($memberIds);
-        } while (count($memberIds) === self::PAGE_SIZE);
+        return [
+            'results' => $results,
+            'last_cursor' => $lastCursor,
+            'next_cursor' => $hasMore ? $lastCursor : null,
+            'complete' => !$hasMore,
+        ];
+    }
 
-        return $results;
+    /** @return array<string, mixed> */
+    private function queueUser(int $userId): array
+    {
+        $preview = $this->runReconciler($userId, true);
+        $errors = $this->sanitiseErrors($preview['errors'] ?? []);
+        try {
+            $queued = ($this->projectionQueue)($userId);
+            $accepted = !empty($queued['accepted']);
+        } catch (\Throwable) {
+            $queued = [];
+            $accepted = false;
+            $errors[] = 'projection_queue_failed';
+        }
+
+        $drift = max(0, (int) ($preview['drift'] ?? 0));
+
+        return [
+            'user_id' => $userId,
+            'accepted' => $accepted,
+            'request_version' => $accepted ? max(1, (int) ($queued['request_version'] ?? 0)) : 0,
+            'status' => $accepted ? 'pending' : 'failed',
+            'scheduled' => $accepted && !empty($queued['scheduled']),
+            'drift' => $drift,
+            'applied_drift' => 0,
+            'remaining_drift' => $drift,
+            'errors' => array_values(array_unique($errors)),
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -208,6 +352,11 @@ final class IntegrationHealthController
             'custom_field_sync_failed', 'state_save_failed', 'projection_failed',
             'tag_rollback_verification_failed', 'tag_rollback_unconfirmed', 'tag_rollback_failed',
             'list_rollback_verification_failed', 'list_rollback_unconfirmed', 'list_rollback_failed',
+            'custom_field_read_failed',
+            'tag_compensation_verification_failed', 'tag_compensation_attach_unconfirmed',
+            'tag_compensation_attach_failed', 'list_compensation_verification_failed',
+            'list_compensation_attach_unconfirmed', 'list_compensation_attach_failed',
+            'projection_queue_failed',
         ];
 
         return array_values(array_unique(array_filter(
@@ -259,12 +408,13 @@ final class IntegrationHealthController
         return $ids;
     }
 
-    /** @return array{success:bool, attached_tags:list<int>, detached_tags:list<int>, attached_lists:list<int>, detached_lists:list<int>, custom_fields:list<string>, errors:list<string>} */
+    /** @return array{success:bool, degraded:bool, attached_tags:list<int>, detached_tags:list<int>, attached_lists:list<int>, detached_lists:list<int>, custom_fields:list<string>, errors:list<string>} */
     private function sanitiseOutcome(?array $outcome): array
     {
         if ($outcome === null) {
             return [
                 'success' => true,
+                'degraded' => false,
                 'attached_tags' => [],
                 'detached_tags' => [],
                 'attached_lists' => [],
@@ -278,6 +428,7 @@ final class IntegrationHealthController
 
         return [
             'success' => !empty($outcome['success']),
+            'degraded' => !empty($outcome['degraded']),
             'attached_tags' => $this->sanitiseIds($outcome['attached_tags'] ?? []),
             'detached_tags' => $this->sanitiseIds($outcome['detached_tags'] ?? []),
             'attached_lists' => $this->sanitiseIds($outcome['attached_lists'] ?? []),

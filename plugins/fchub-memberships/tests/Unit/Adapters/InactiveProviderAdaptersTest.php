@@ -28,4 +28,16 @@ final class InactiveProviderAdaptersTest extends PluginTestCase
             self::assertFalse($adapter->revoke(17, $resourceType, '41')['success']);
         }
     }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function test_inactive_community_badge_label_is_never_presented_as_a_course(): void
+    {
+        $adapter = new FluentCommunityAdapter();
+
+        self::assertSame('Badge founding-member', $adapter->getResourceLabel('fc_badge', 'founding-member'));
+        self::assertSame([
+            'founding-member' => 'Badge founding-member',
+        ], $adapter->getResourceLabels('fc_badge', ['founding-member']));
+    }
 }

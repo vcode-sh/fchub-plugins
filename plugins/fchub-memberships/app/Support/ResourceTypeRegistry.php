@@ -2,6 +2,8 @@
 
 namespace FChubMemberships\Support;
 
+use FChubMemberships\Integration\Community\CommunityCapabilityRegistry;
+
 defined('ABSPATH') || exit;
 
 class ResourceTypeRegistry
@@ -23,6 +25,11 @@ class ResourceTypeRegistry
     private array $types = [];
 
     private bool $initialized = false;
+
+    public function __construct(private ?CommunityCapabilityRegistry $communityCapabilities = null)
+    {
+        $this->communityCapabilities ??= new CommunityCapabilityRegistry();
+    }
 
     public static function getInstance(): self
     {
@@ -77,7 +84,8 @@ class ResourceTypeRegistry
      */
     public function getForRead(string $key): ?array
     {
-        $type = $this->get($this->resolveReadType($key));
+        $readKey = $this->resolveReadType($key);
+        $type = $this->get($readKey);
         if ($type !== null) {
             return $type;
         }
@@ -98,7 +106,103 @@ class ResourceTypeRegistry
             ];
         }
 
-        return null;
+        return match ($readKey) {
+            'ld_course' => [
+                'key'           => $readKey,
+                'label'         => __('LearnDash Course', 'fchub-memberships'),
+                'group'         => 'content',
+                'icon'          => 'welcome-learn-more',
+                'searchable'    => false,
+                'supports_bulk' => false,
+                'allow_all'     => false,
+                'provider'      => Constants::PROVIDER_LEARNDASH,
+                'adapter'       => \FChubMemberships\Adapters\LearnDashAdapter::class,
+                'source'        => 'LearnDash (inactive, read-only)',
+                'read_only'     => true,
+            ],
+            'ld_group' => [
+                'key'           => $readKey,
+                'label'         => __('LearnDash Group', 'fchub-memberships'),
+                'group'         => 'content',
+                'icon'          => 'welcome-learn-more',
+                'searchable'    => false,
+                'supports_bulk' => false,
+                'allow_all'     => false,
+                'provider'      => Constants::PROVIDER_LEARNDASH,
+                'adapter'       => \FChubMemberships\Adapters\LearnDashAdapter::class,
+                'source'        => 'LearnDash (inactive, read-only)',
+                'read_only'     => true,
+            ],
+            'fluentcrm_tag' => [
+                'key'           => $readKey,
+                'label'         => __('FluentCRM Tag', 'fchub-memberships'),
+                'group'         => 'content',
+                'icon'          => 'tag',
+                'searchable'    => false,
+                'supports_bulk' => false,
+                'allow_all'     => false,
+                'provider'      => Constants::PROVIDER_FLUENTCRM,
+                'adapter'       => \FChubMemberships\Adapters\FluentCrmAdapter::class,
+                'source'        => 'FluentCRM (inactive, read-only)',
+                'read_only'     => true,
+            ],
+            'fluentcrm_list' => [
+                'key'           => $readKey,
+                'label'         => __('FluentCRM List', 'fchub-memberships'),
+                'group'         => 'content',
+                'icon'          => 'list-view',
+                'searchable'    => false,
+                'supports_bulk' => false,
+                'allow_all'     => false,
+                'provider'      => Constants::PROVIDER_FLUENTCRM,
+                'adapter'       => \FChubMemberships\Adapters\FluentCrmAdapter::class,
+                'source'        => 'FluentCRM (inactive, read-only)',
+                'read_only'     => true,
+            ],
+            'fc_space' => [
+                'key'           => $readKey,
+                'label'         => __('Spaces', 'fchub-memberships'),
+                'group'         => 'content',
+                'icon'          => 'groups',
+                'searchable'    => false,
+                'supports_bulk' => false,
+                'allow_all'     => false,
+                'identifier'    => 'positive_int',
+                'provider'      => Constants::PROVIDER_FLUENT_COMMUNITY,
+                'adapter'       => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
+                'source'        => 'FluentCommunity (inactive, read-only)',
+                'read_only'     => true,
+            ],
+            'fc_course' => [
+                'key'           => $readKey,
+                'label'         => __('Courses', 'fchub-memberships'),
+                'group'         => 'content',
+                'icon'          => 'welcome-learn-more',
+                'searchable'    => false,
+                'supports_bulk' => false,
+                'allow_all'     => false,
+                'identifier'    => 'positive_int',
+                'provider'      => Constants::PROVIDER_FLUENT_COMMUNITY,
+                'adapter'       => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
+                'source'        => 'FluentCommunity (inactive, read-only)',
+                'read_only'     => true,
+            ],
+            'fc_badge' => [
+                'key'           => $readKey,
+                'label'         => __('Community Badge', 'fchub-memberships'),
+                'group'         => 'content',
+                'icon'          => 'awards',
+                'searchable'    => false,
+                'supports_bulk' => false,
+                'allow_all'     => false,
+                'identifier'    => 'slug',
+                'provider'      => Constants::PROVIDER_FLUENT_COMMUNITY,
+                'adapter'       => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
+                'source'        => 'FluentCommunity Pro (inactive, read-only)',
+                'read_only'     => true,
+            ],
+            default => null,
+        };
     }
 
     /**
@@ -512,7 +616,7 @@ class ResourceTypeRegistry
             ]);
         }
 
-        if (defined('FLUENT_COMMUNITY_PLUGIN_VERSION')) {
+        if ($this->communityCapabilities->supports('spaces')) {
             $this->register('fc_space', [
                 'label'          => __('Spaces', 'fchub-memberships'),
                 'group'          => 'content',
@@ -520,11 +624,14 @@ class ResourceTypeRegistry
                 'searchable'     => true,
                 'supports_bulk'  => false,
                 'allow_all'      => false,
+                'identifier'     => 'positive_int',
                 'provider'       => Constants::PROVIDER_FLUENT_COMMUNITY,
                 'adapter'        => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
                 'source'         => 'FluentCommunity',
             ]);
+        }
 
+        if ($this->communityCapabilities->supports('courses')) {
             $this->register('fc_course', [
                 'label'          => __('Courses', 'fchub-memberships'),
                 'group'          => 'content',
@@ -532,9 +639,25 @@ class ResourceTypeRegistry
                 'searchable'     => true,
                 'supports_bulk'  => false,
                 'allow_all'      => false,
+                'identifier'     => 'positive_int',
                 'provider'       => Constants::PROVIDER_FLUENT_COMMUNITY,
                 'adapter'        => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
                 'source'         => 'FluentCommunity',
+            ]);
+        }
+
+        if ($this->communityCapabilities->supports('badges')) {
+            $this->register('fc_badge', [
+                'label'          => __('Community Badge', 'fchub-memberships'),
+                'group'          => 'content',
+                'icon'           => 'awards',
+                'searchable'     => true,
+                'supports_bulk'  => false,
+                'allow_all'      => false,
+                'identifier'     => 'slug',
+                'provider'       => Constants::PROVIDER_FLUENT_COMMUNITY,
+                'adapter'        => \FChubMemberships\Adapters\FluentCommunityAdapter::class,
+                'source'         => 'FluentCommunity Pro',
             ]);
         }
     }

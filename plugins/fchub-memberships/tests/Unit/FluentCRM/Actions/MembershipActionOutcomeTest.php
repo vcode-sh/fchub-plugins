@@ -161,6 +161,13 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Actions {
                     'retained' => 1,
                     'failed' => 0,
                 ], false, 'retained'],
+                'deferred grace' => [[
+                    'success' => true,
+                    'revoked' => 0,
+                    'grace_started' => 2,
+                    'retained' => 0,
+                    'failed' => 0,
+                ], true, 'deferred'],
                 'failed' => [[
                     'success' => false,
                     'revoked' => 0,

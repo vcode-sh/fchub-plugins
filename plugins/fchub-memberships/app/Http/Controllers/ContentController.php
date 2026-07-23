@@ -4,14 +4,20 @@ namespace FChubMemberships\Http\Controllers;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Adapters\Contracts\AccessAdapterInterface;
+use FChubMemberships\Adapters\Contracts\BatchResourceLabelAdapterInterface;
 use FChubMemberships\Storage\ProtectionRuleRepository;
-use FChubMemberships\Storage\GrantRepository;
-use FChubMemberships\Domain\Plan\PlanRuleResolver;
+use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Support\Constants;
 use FChubMemberships\Support\ResourceTypeRegistry;
 
 class ContentController
 {
+    private const MAX_SCALAR_LABEL_LOOKUPS = 100;
+    private const MAX_BATCH_LABEL_IDS = 100;
+    private const MAX_TITLE_SEARCH_CANDIDATES = 1000;
+
     public static function registerRoutes(): void
     {
         $ns = 'fchub-memberships/v1';
@@ -74,67 +80,101 @@ class ContentController
 
     public static function index(\WP_REST_Request $request): \WP_REST_Response
     {
-        $repo = new ProtectionRuleRepository();
-        $grantRepo = new GrantRepository();
-        $ruleResolver = new PlanRuleResolver();
+        try {
+            return self::indexResponse($request);
+        } catch (\UnexpectedValueException) {
+            return new \WP_REST_Response([
+                'code' => 'fchub_content_label_provider_unavailable',
+                'message' => __('Provider resource labels could not be loaded. Please retry.', 'fchub-memberships'),
+            ], 503);
+        } catch (\RuntimeException) {
+            return new \WP_REST_Response([
+                'code' => 'fchub_content_storage_unavailable',
+                'message' => __('Membership content could not be loaded. Please retry.', 'fchub-memberships'),
+            ], 503);
+        }
+    }
 
+    private static function indexResponse(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $repo = new ProtectionRuleRepository();
         $filters = [
             'resource_type'   => $request->get_param('resource_type'),
             'protection_mode' => $request->get_param('protection_mode'),
             'plan_id'         => $request->get_param('plan_id'),
-            'search'          => $request->get_param('search'),
-            'per_page'        => $request->get_param('per_page') ?: 20,
-            'page'            => $request->get_param('page') ?: 1,
         ];
-
-        // If searching by title, we need to fetch all rules and filter post-hydration
-        $searchTerm = $filters['search'] ?? '';
-        if (!empty($searchTerm)) {
-            unset($filters['search']); // Don't search by resource_id in SQL
-        }
-
-        $rules = $repo->all($filters);
-
+        $page = max(1, (int) ($request->get_param('page') ?: 1));
+        $perPage = min(100, max(1, (int) ($request->get_param('per_page') ?: 20)));
+        $searchTerm = trim((string) ($request->get_param('search') ?? ''));
         $registry = ResourceTypeRegistry::getInstance();
 
-        // Enrich with resource titles and member counts
-        foreach ($rules as &$rule) {
-            $rule['resource_title'] = self::getResourceTitle($rule['resource_type'], $rule['resource_id']);
-            $rule['edit_url'] = self::getEditUrl($rule['resource_type'], $rule['resource_id']);
-
-            // Add type label from registry
-            $typeConfig = $registry->get($rule['resource_type']);
-            $rule['resource_type_label'] = $typeConfig ? $typeConfig['label'] : $rule['resource_type'];
-            $rule['resource_type_group'] = $typeConfig ? $typeConfig['group'] : 'advanced';
-
-            // Count active members with access to this resource
-            $planIds = $ruleResolver->findPlansWithResource(Constants::PROVIDER_WORDPRESS_CORE, $rule['resource_type'], $rule['resource_id']);
-            $memberCount = 0;
-            foreach ($planIds as $planId) {
-                $memberCount += $grantRepo->countActiveMembers($planId);
+        if ($searchTerm !== '') {
+            $matchedRules = [];
+            $candidateRules = $repo->all(array_merge($filters, [
+                'page' => 1,
+                'per_page' => self::MAX_TITLE_SEARCH_CANDIDATES + 1,
+            ]));
+            if (count($candidateRules) > self::MAX_TITLE_SEARCH_CANDIDATES) {
+                return new \WP_REST_Response([
+                    'code' => 'fchub_content_search_too_broad',
+                    'message' => __('Content search exceeds 1,000 candidates. Add a filter and retry.', 'fchub-memberships'),
+                ], 422);
             }
-            $rule['member_count'] = $memberCount;
+            if (self::exceedsScalarLabelLookupLimit($candidateRules, $registry)) {
+                return new \WP_REST_Response([
+                    'code' => 'fchub_content_search_too_broad',
+                    'message' => __(
+                        'Content search exceeds 100 candidates for a provider without batch label support. '
+                            . 'Add a filter and retry.',
+                        'fchub-memberships'
+                    ),
+                ], 422);
+            }
+            $searchableRules = self::enrichResourceMetadataBatch($candidateRules, $registry, true);
+            foreach ($searchableRules as $rule) {
+                if (stripos($rule['resource_title'], $searchTerm) !== false) {
+                    $matchedRules[] = $rule;
+                }
+            }
 
-            // Get plan names
-            $planRepo = new \FChubMemberships\Storage\PlanRepository();
+            $total = count($matchedRules);
+            $rules = array_slice($matchedRules, ($page - 1) * $perPage, $perPage);
+        } else {
+            $rules = self::enrichResourceMetadataBatch($repo->all(array_merge($filters, [
+                'page' => $page,
+                'per_page' => $perPage,
+            ])), $registry);
+            $total = $repo->count($filters);
+        }
+
+        $planIds = [];
+        $resources = [];
+        foreach ($rules as $key => $rule) {
+            array_push($planIds, ...array_map('intval', $rule['plan_ids'] ?? []));
+            $typeConfig = $registry->getForRead((string) $rule['resource_type']);
+            $resources[$key] = [
+                'provider' => (string) ($typeConfig['provider'] ?? Constants::PROVIDER_WORDPRESS_CORE),
+                'resource_type' => (string) $rule['resource_type'],
+                'resource_id' => (string) $rule['resource_id'],
+            ];
+        }
+
+        $plans = (new PlanRepository())->findMany($planIds);
+        $memberCounts = $resources !== []
+            ? (new AccessEvaluator())->countDistinctUsersWithResourceAccessBatch($resources)
+            : [];
+
+        foreach ($rules as $key => &$rule) {
+            $rule['member_count'] = (int) ($memberCounts[$key] ?? 0);
             $rule['plan_names'] = [];
             foreach ($rule['plan_ids'] ?? [] as $planId) {
-                $plan = $planRepo->find((int) $planId);
-                if ($plan) {
-                    $rule['plan_names'][] = $plan['title'];
+                $planId = (int) $planId;
+                if (isset($plans[$planId])) {
+                    $rule['plan_names'][] = $plans[$planId]['title'];
                 }
             }
         }
-
-        // Filter by title search term (post-hydration)
-        if (!empty($searchTerm)) {
-            $rules = array_values(array_filter($rules, function ($rule) use ($searchTerm) {
-                return stripos($rule['resource_title'], $searchTerm) !== false;
-            }));
-            $total = count($rules);
-        } else {
-            $total = $repo->count($filters);
-        }
+        unset($rule);
 
         return new \WP_REST_Response([
             'data'    => $rules,
@@ -391,7 +431,191 @@ class ContentController
         return $results;
     }
 
-    private static function getResourceTitle(string $type, string $id): string
+    /** @param array<string, mixed> $rule */
+    private static function enrichResourceMetadata(array $rule, ResourceTypeRegistry $registry): array
+    {
+        $type = (string) $rule['resource_type'];
+        $id = (string) $rule['resource_id'];
+        $typeConfig = $registry->getForRead($type);
+        $rule['resource_title'] = self::getResourceTitle($type, $id, $typeConfig);
+        $rule['edit_url'] = self::getEditUrl($type, $id);
+        $rule['resource_type_label'] = $typeConfig ? $typeConfig['label'] : $type;
+        $rule['resource_type_group'] = $typeConfig ? $typeConfig['group'] : 'advanced';
+
+        return $rule;
+    }
+
+    /**
+     * Resolve candidate labels once per known resource type before title matching.
+     *
+     * @param array<int, array<string, mixed>> $rules
+     * @return array<int, array<string, mixed>>
+     */
+    private static function enrichResourceMetadataBatch(
+        array $rules,
+        ResourceTypeRegistry $registry,
+        bool $strictProviderLabels = false
+    ): array {
+        $groups = [];
+        foreach ($rules as $key => $rule) {
+            $type = (string) $rule['resource_type'];
+            $groups[$type]['keys'][] = $key;
+            $groups[$type]['ids'][] = (string) $rule['resource_id'];
+        }
+
+        foreach ($groups as $type => $group) {
+            $typeConfig = $registry->getForRead($type);
+            $labels = self::batchLabelsForType(
+                $type,
+                array_values(array_unique($group['ids'])),
+                $typeConfig,
+                $registry,
+                $strictProviderLabels
+            );
+            foreach ($group['keys'] as $key) {
+                $id = (string) $rules[$key]['resource_id'];
+                $rules[$key]['resource_title'] = $labels[$id]
+                    ?? self::fallbackResourceTitle($type, $id, $typeConfig);
+                $rules[$key]['edit_url'] = self::getEditUrl($type, $id);
+                $rules[$key]['resource_type_label'] = $typeConfig ? $typeConfig['label'] : $type;
+                $rules[$key]['resource_type_group'] = $typeConfig ? $typeConfig['group'] : 'advanced';
+            }
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rules
+     */
+    private static function exceedsScalarLabelLookupLimit(
+        array $rules,
+        ResourceTypeRegistry $registry
+    ): bool {
+        $resourceIdsByType = [];
+        foreach ($rules as $rule) {
+            $type = (string) $rule['resource_type'];
+            $resourceId = (string) $rule['resource_id'];
+            if ($resourceId !== '*') {
+                $resourceIdsByType[$type][$resourceId] = true;
+            }
+        }
+
+        foreach ($resourceIdsByType as $type => $resourceIds) {
+            $adapterClass = $registry->getForRead($type)['adapter'] ?? null;
+            if (!is_string($adapterClass) || !class_exists($adapterClass)) {
+                continue;
+            }
+            if (is_a($adapterClass, AccessAdapterInterface::class, true)
+                && !is_a($adapterClass, BatchResourceLabelAdapterInterface::class, true)
+                && count($resourceIds) > self::MAX_SCALAR_LABEL_LOOKUPS
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param string[] $resourceIds
+     * @param array<string, mixed>|null $typeConfig
+     * @return array<string, string>
+     */
+    private static function batchLabelsForType(
+        string $type,
+        array $resourceIds,
+        ?array $typeConfig,
+        ResourceTypeRegistry $registry,
+        bool $strictProviderLabels
+    ): array {
+        if ($type === 'special_page') {
+            $specialPages = \FChubMemberships\Domain\SpecialPageProtection::getSpecialPageTypes();
+            return array_combine($resourceIds, array_map(
+                static fn(string $id): string => (string) ($specialPages[$id] ?? $id),
+                $resourceIds
+            )) ?: [];
+        }
+        if ($type === 'url_pattern') {
+            return array_combine($resourceIds, $resourceIds) ?: [];
+        }
+
+        $adapterClass = $typeConfig['adapter'] ?? null;
+        if (!is_string($adapterClass) || !class_exists($adapterClass)) {
+            return [];
+        }
+
+        try {
+            $adapter = new $adapterClass();
+            $readType = $type === 'comment' ? 'post' : $registry->resolveReadType($type);
+            $lookupIds = array_values(array_filter(
+                $resourceIds,
+                static fn(string $id): bool => $id !== '*'
+            ));
+            if ($adapter instanceof BatchResourceLabelAdapterInterface) {
+                $labels = [];
+                foreach (array_chunk($lookupIds, self::MAX_BATCH_LABEL_IDS) as $chunk) {
+                    $labels = array_replace($labels, $adapter->getResourceLabels($readType, $chunk));
+                }
+            } elseif ($adapter instanceof AccessAdapterInterface) {
+                $labels = [];
+                foreach (array_slice($lookupIds, 0, self::MAX_SCALAR_LABEL_LOOKUPS) as $id) {
+                    try {
+                        $labels[$id] = $adapter->getResourceLabel($readType, $id);
+                    } catch (\Throwable $exception) {
+                        if ($strictProviderLabels) {
+                            throw $exception;
+                        }
+                        continue;
+                    }
+                }
+            } else {
+                return [];
+            }
+            if ($type === 'comment') {
+                $labels = array_map(
+                    static fn(string $label): string => sprintf(
+                        __('Comments on: %s', 'fchub-memberships'),
+                        $label
+                    ),
+                    $labels
+                );
+                if (in_array('*', $resourceIds, true)) {
+                    $labels['*'] = __('All Protected Content Comments', 'fchub-memberships');
+                }
+            }
+
+            return $labels;
+        } catch (\Throwable $exception) {
+            if ($strictProviderLabels) {
+                throw new \UnexpectedValueException(
+                    'Unable to load provider resource labels.',
+                    0,
+                    $exception
+                );
+            }
+            return [];
+        }
+    }
+
+    /** @param array<string, mixed>|null $typeConfig */
+    private static function fallbackResourceTitle(string $type, string $id, ?array $typeConfig): string
+    {
+        if ($type === 'comment' && $id === '*') {
+            return __('All Protected Content Comments', 'fchub-memberships');
+        }
+        if ($type === 'url_pattern' || $type === 'special_page') {
+            return $id;
+        }
+        if ($typeConfig) {
+            return $typeConfig['label'] . ' #' . $id;
+        }
+
+        return $type . ' #' . $id;
+    }
+
+    /** @param array<string, mixed>|null $typeConfig */
+    private static function getResourceTitle(string $type, string $id, ?array $typeConfig = null): string
     {
         // Special page types
         if ($type === 'special_page') {
@@ -423,6 +647,23 @@ class ContentController
             return "#{$id}";
         }
 
+        $registry = ResourceTypeRegistry::getInstance();
+        $typeConfig ??= $registry->getForRead($type);
+        if (($typeConfig['provider'] ?? Constants::PROVIDER_WORDPRESS_CORE) !== Constants::PROVIDER_WORDPRESS_CORE) {
+            $adapterClass = $typeConfig['adapter'] ?? null;
+            if (is_string($adapterClass)
+                && class_exists($adapterClass)
+                && is_a($adapterClass, AccessAdapterInterface::class, true)
+            ) {
+                try {
+                    $adapter = new $adapterClass();
+                    return $adapter->getResourceLabel($registry->resolveReadType($type), $id);
+                } catch (\Throwable) {
+                    // Keep the persisted rule readable when its provider is unavailable.
+                }
+            }
+        }
+
         // Post types (built-in and custom)
         if (in_array($type, ['post', 'page'], true) || post_type_exists($type)) {
             return get_the_title((int) $id) ?: "#{$id}";
@@ -435,8 +676,6 @@ class ContentController
         }
 
         // Fallback: use registry label if available
-        $registry = ResourceTypeRegistry::getInstance();
-        $typeConfig = $registry->get($type);
         if ($typeConfig) {
             return $typeConfig['label'] . ' #' . $id;
         }

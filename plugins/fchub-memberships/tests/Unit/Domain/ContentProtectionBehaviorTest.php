@@ -20,6 +20,75 @@ final class ContentProtectionBehaviorTest extends PluginTestCase
         $reflection->setValue($protection, $evaluator);
     }
 
+    private function evaluator(
+        bool $protected,
+        bool $allowed = false,
+        bool $taxonomyAllowed = false,
+        string $deniedReason = 'no_access'
+    ): AccessEvaluator {
+        return new class ($protected, $allowed, $taxonomyAllowed, $deniedReason) extends AccessEvaluator {
+            public function __construct(
+                private readonly bool $protected,
+                private readonly bool $allowed,
+                private readonly bool $taxonomyAllowed,
+                private readonly string $deniedReason
+            ) {
+            }
+
+            public function isProtected(string $provider, string $resourceType, string $resourceId): bool
+            {
+                return $this->protected;
+            }
+
+            public function evaluate(int $userId, string $provider, string $resourceType, string $resourceId): array
+            {
+                return [
+                    'allowed' => $this->allowed,
+                    'reason' => $this->allowed ? 'active_grant' : $this->deniedReason,
+                    'drip_locked' => false,
+                    'drip_available_at' => null,
+                    'grant' => null,
+                ];
+            }
+
+            public function canAccess(int $userId, string $provider, string $resourceType, string $resourceId): bool
+            {
+                return $this->allowed
+                    || ($this->taxonomyAllowed && $resourceType === 'category' && $resourceId === '3');
+            }
+
+            public function getRestrictionMessage(
+                string $resourceType,
+                string $resourceId,
+                string $context = 'no_access'
+            ): string {
+                return 'Feed access required';
+            }
+        };
+    }
+
+    private function protectPost(int $postId = 55): void
+    {
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static fn(string $query): ?array => str_contains(
+            $query,
+            "resource_type = 'post' AND resource_id = '{$postId}'"
+        )
+            ? [
+                'id' => 1,
+                'resource_type' => 'post',
+                'resource_id' => (string) $postId,
+                'plan_ids' => '[]',
+                'protection_mode' => 'explicit',
+                'restriction_message' => 'Feed access required',
+                'redirect_url' => null,
+                'show_teaser' => 'yes',
+                'meta' => '{"teaser_mode":"words","teaser_word_count":100}',
+                'created_at' => '2026-03-01 00:00:00',
+                'updated_at' => '2026-03-01 00:00:00',
+            ]
+            : null;
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -57,6 +126,110 @@ final class ContentProtectionBehaviorTest extends PluginTestCase
         self::assertArrayHasKey('handle_bulk_action-edit-post', $GLOBALS['_fchub_test_filters']);
         self::assertArrayHasKey('template_redirect', $GLOBALS['_fchub_test_actions']);
         self::assertArrayHasKey('pre_get_posts', $GLOBALS['_fchub_test_actions']);
+    }
+
+    public function test_register_adds_dedicated_feed_filters(): void
+    {
+        $protection = new ContentProtection();
+        $protection->register();
+
+        self::assertArrayHasKey('the_content_feed', $GLOBALS['_fchub_test_filters']);
+        self::assertArrayHasKey('the_excerpt_rss', $GLOBALS['_fchub_test_filters']);
+        self::assertSame([$protection, 'filterFeedContent'], $GLOBALS['_fchub_test_filters']['the_content_feed'][0]);
+        self::assertSame([$protection, 'filterFeedExcerpt'], $GLOBALS['_fchub_test_filters']['the_excerpt_rss'][0]);
+
+        $source = file_get_contents(dirname(__DIR__, 3) . '/app/Domain/ContentProtection.php');
+        self::assertIsString($source);
+        self::assertStringContainsString(
+            "add_filter('the_content_feed', [\$this, 'filterFeedContent'], 999);",
+            $source
+        );
+        self::assertStringContainsString(
+            "add_filter('the_excerpt_rss', [\$this, 'filterFeedExcerpt'], 999);",
+            $source
+        );
+    }
+
+    public function test_anonymous_protected_feed_content_never_contains_the_source_body(): void
+    {
+        $this->protectPost();
+        $GLOBALS['_fchub_test_current_user_id'] = 0;
+        $protection = new ContentProtection();
+        $this->injectEvaluator($protection, $this->evaluator(true));
+
+        self::assertTrue(method_exists($protection, 'filterFeedContent'));
+        $output = $protection->filterFeedContent('PRIVATE FEED SOURCE');
+
+        self::assertStringNotContainsString('PRIVATE FEED SOURCE', $output);
+        self::assertStringContainsString('Feed access required', $output);
+        self::assertStringContainsString('fchub-restricted-logged_out', $output);
+    }
+
+    public function test_unprotected_feed_content_passes_through_unchanged(): void
+    {
+        $protection = new ContentProtection();
+        $this->injectEvaluator($protection, $this->evaluator(false));
+
+        self::assertTrue(method_exists($protection, 'filterFeedContent'));
+        self::assertSame('PUBLIC FEED SOURCE', $protection->filterFeedContent('PUBLIC FEED SOURCE'));
+    }
+
+    public function test_missing_feed_post_passes_through_unchanged(): void
+    {
+        unset($GLOBALS['_fchub_test_current_post']);
+        $protection = new ContentProtection();
+        $this->injectEvaluator($protection, $this->evaluator(true));
+
+        self::assertSame('ORPHANED FEED SOURCE', $protection->filterFeedContent('ORPHANED FEED SOURCE'));
+    }
+
+    public function test_protected_rss_excerpt_never_contains_the_source_excerpt(): void
+    {
+        $this->protectPost();
+        $GLOBALS['_fchub_test_current_user_id'] = 0;
+        $protection = new ContentProtection();
+        $this->injectEvaluator($protection, $this->evaluator(true));
+
+        self::assertTrue(method_exists($protection, 'filterFeedExcerpt'));
+        $output = $protection->filterFeedExcerpt('PRIVATE RSS EXCERPT');
+
+        self::assertStringNotContainsString('PRIVATE RSS EXCERPT', $output);
+        self::assertStringContainsString('Feed access required', $output);
+    }
+
+    public function test_authorised_feed_content_passes_through_unchanged(): void
+    {
+        $GLOBALS['_fchub_test_current_user_id'] = 9;
+        $protection = new ContentProtection();
+        $this->injectEvaluator($protection, $this->evaluator(true, true));
+
+        self::assertTrue(method_exists($protection, 'filterFeedContent'));
+        self::assertSame('MEMBER FEED SOURCE', $protection->filterFeedContent('MEMBER FEED SOURCE'));
+    }
+
+    public function test_authenticated_paused_feed_denial_uses_the_paused_context_without_source_content(): void
+    {
+        $this->protectPost();
+        $GLOBALS['_fchub_test_current_user_id'] = 9;
+        $protection = new ContentProtection();
+        $this->injectEvaluator($protection, $this->evaluator(true, false, false, 'membership_paused'));
+
+        $output = $protection->filterFeedContent('PRIVATE PAUSED SOURCE');
+
+        self::assertStringNotContainsString('PRIVATE PAUSED SOURCE', $output);
+        self::assertStringContainsString('fchub-restricted-membership_paused', $output);
+        self::assertStringContainsString('Feed access required', $output);
+    }
+
+    public function test_taxonomy_access_preserves_feed_content(): void
+    {
+        $GLOBALS['_fchub_test_current_post'] = $GLOBALS['_fchub_test_posts'][201];
+        $GLOBALS['_fchub_test_current_user_id'] = 9;
+        $protection = new ContentProtection();
+        $this->injectEvaluator($protection, $this->evaluator(true, false, true));
+
+        self::assertTrue(method_exists($protection, 'filterFeedContent'));
+        self::assertSame('TAXONOMY FEED SOURCE', $protection->filterFeedContent('TAXONOMY FEED SOURCE'));
     }
 
     public function test_filter_excerpt_and_rest_content_use_teaser_and_paused_contexts(): void

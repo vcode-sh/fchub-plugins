@@ -11,6 +11,19 @@ use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class ContentProtectionPausedMessageTest extends PluginTestCase
 {
+    public function test_canonical_paused_message_takes_precedence_over_legacy_fallback(): void
+    {
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = [
+            'restriction_message_paused' => 'Canonical paused message.',
+            'restriction_message_membership_paused' => 'Legacy paused message.',
+        ];
+
+        self::assertSame(
+            'Canonical paused message.',
+            (new AccessEvaluator())->getRestrictionMessage('post', '55', 'membership_paused')
+        );
+    }
+
     public function test_filter_content_uses_paused_membership_context_message(): void
     {
         $GLOBALS['_fchub_test_current_user_id'] = 9;

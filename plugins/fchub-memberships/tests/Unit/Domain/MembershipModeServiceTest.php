@@ -72,12 +72,12 @@ final class MembershipModeServiceTest extends PluginTestCase
         $service = new MembershipModeService($grants, $plans);
         $revoked = [];
         $service->enforce(5, 9, ['level' => 20], [], static function (int $userId, int $planId, array $context) use (&$revoked): array {
-            $revoked[] = [$userId, $planId, $context['reason']];
-            return [];
+            $revoked[] = [$userId, $planId, $context['reason'], $context['grace_period_days']];
+            return ['success' => true, 'revoked' => 1, 'failed' => 0];
         });
 
         self::assertCount(2, $revoked);
-        self::assertSame([5, 7, 'Replaced by plan #9 (exclusive mode)'], $revoked[0]);
-        self::assertSame([5, 8, 'Replaced by plan #9 (exclusive mode)'], $revoked[1]);
+        self::assertSame([5, 7, 'Replaced by plan #9 (exclusive mode)', 0], $revoked[0]);
+        self::assertSame([5, 8, 'Replaced by plan #9 (exclusive mode)', 0], $revoked[1]);
     }
 }

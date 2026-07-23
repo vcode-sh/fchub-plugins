@@ -8,15 +8,18 @@ use FluentCrm\App\Services\Funnel\BaseAction;
 use FluentCrm\Framework\Support\Arr;
 use FChubMemberships\FluentCRM\Actions\Contracts\MembershipActionRuntimeInterface;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Support\Clock;
 use Throwable;
 
 class GrantMembershipAction extends BaseAction
 {
     private MembershipActionRuntimeInterface $runtime;
+    private Clock $clock;
 
-    public function __construct(?MembershipActionRuntimeInterface $runtime = null)
+    public function __construct(?MembershipActionRuntimeInterface $runtime = null, ?Clock $clock = null)
     {
         $this->runtime = $runtime ?? new MembershipActionRuntime();
+        $this->clock = $clock ?? new Clock();
         $this->actionName = 'fchub_grant_membership';
         $this->priority = 20;
         parent::__construct();
@@ -113,7 +116,7 @@ class GrantMembershipAction extends BaseAction
         if ($validityMode === 'fixed_days') {
             $days = (int) Arr::get($sequence->settings, 'duration_days', 0);
             if ($days > 0) {
-                $expiresAt = gmdate('Y-m-d H:i:s', strtotime('+' . $days . ' days'));
+                $expiresAt = $this->clock->storage($this->clock->plusDays($days));
             }
         } elseif ($validityMode === 'custom_date') {
             $expiresAt = Arr::get($sequence->settings, 'custom_expires_at');

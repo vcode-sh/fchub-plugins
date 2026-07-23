@@ -6,6 +6,7 @@ use FChubMemberships\Domain\Grant\AnchorDateCalculator;
 use FChubMemberships\Domain\Grant\MembershipTermCalculator;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Support\Clock;
 
 defined('ABSPATH') || exit;
 
@@ -13,11 +14,13 @@ final class GrantPlanContextService
 {
     private PlanRepository $plans;
     private GrantRepository $grants;
+    private Clock $clock;
 
-    public function __construct(?PlanRepository $plans = null, ?GrantRepository $grants = null)
+    public function __construct(?PlanRepository $plans = null, ?GrantRepository $grants = null, ?Clock $clock = null)
     {
         $this->plans = $plans ?? new PlanRepository();
         $this->grants = $grants ?? new GrantRepository();
+        $this->clock = $clock ?? new Clock();
     }
 
     /**
@@ -27,6 +30,8 @@ final class GrantPlanContextService
     {
         $plan = $this->plans->find($planId);
         $preserveExpiry = !empty($context['preserve_expiry']);
+        $now = $this->clock->now();
+        $nowStorage = $this->clock->storage($now);
 
         if ($plan && ($plan['trial_days'] ?? 0) > 0) {
             $existingGrants = $this->grants->getByUserId($userId, ['plan_id' => $planId]);
@@ -37,7 +42,9 @@ final class GrantPlanContextService
 
             if (empty($hasActiveOrPaused)) {
                 $context['is_trial'] = true;
-                $context['trial_ends_at'] = date('Y-m-d H:i:s', strtotime('+' . (int) $plan['trial_days'] . ' days'));
+                $context['trial_ends_at'] = $this->clock->storage(
+                    $this->clock->plusDays((int) $plan['trial_days'], $now)
+                );
             }
         }
 
@@ -45,11 +52,13 @@ final class GrantPlanContextService
             $durationType = $plan['duration_type'] ?? 'lifetime';
 
             if ($durationType === 'fixed_days' && ($plan['duration_days'] ?? 0) > 0) {
-                $context['expires_at'] = date('Y-m-d H:i:s', strtotime('+' . (int) $plan['duration_days'] . ' days'));
+                $context['expires_at'] = $this->clock->storage(
+                    $this->clock->plusDays((int) $plan['duration_days'], $now)
+                );
             } elseif ($durationType === 'fixed_anchor') {
                 $planMeta = $plan['meta'] ?? [];
                 $anchorDay = (int) ($planMeta['billing_anchor_day'] ?? 1);
-                $context['expires_at'] = AnchorDateCalculator::nextAnchorDate($anchorDay, current_time('mysql'));
+                $context['expires_at'] = AnchorDateCalculator::nextAnchorDate($anchorDay, $nowStorage, $this->clock);
                 $context['meta'] = array_merge($context['meta'] ?? [], [
                     'billing_anchor_day' => $anchorDay,
                 ]);
@@ -63,7 +72,7 @@ final class GrantPlanContextService
         if ($plan && !$preserveExpiry && empty($context['meta']['membership_term_ends_at'])) {
             $termConfig = $plan['meta']['membership_term'] ?? null;
             if ($termConfig && ($termConfig['mode'] ?? 'none') !== 'none') {
-                $termEndsAt = MembershipTermCalculator::calculateEndDate($termConfig, current_time('mysql'));
+                $termEndsAt = MembershipTermCalculator::calculateEndDate($termConfig, $nowStorage, $this->clock);
                 if ($termEndsAt) {
                     $context['meta'] = array_merge($context['meta'] ?? [], [
                         'membership_term_ends_at' => $termEndsAt,
@@ -77,7 +86,8 @@ final class GrantPlanContextService
                         // Cap existing expiry at term end
                         $context['expires_at'] = MembershipTermCalculator::capExpiry(
                             $currentExpiry,
-                            $termEndsAt
+                            $termEndsAt,
+                            $this->clock
                         );
                     }
                 }

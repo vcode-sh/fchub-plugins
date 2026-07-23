@@ -5,8 +5,9 @@ namespace FChubMemberships\Adapters;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Adapters\Contracts\AccessAdapterInterface;
+use FChubMemberships\Adapters\Contracts\BatchResourceLabelAdapterInterface;
 
-class FluentCrmAdapter implements AccessAdapterInterface
+class FluentCrmAdapter implements AccessAdapterInterface, BatchResourceLabelAdapterInterface
 {
     public function supports(string $resourceType): bool
     {
@@ -178,6 +179,36 @@ class FluentCrmAdapter implements AccessAdapterInterface
         }
 
         return sprintf('#%s', $resourceId);
+    }
+
+    public function getResourceLabels(string $resourceType, array $resourceIds): array
+    {
+        $resourceIds = array_values(array_unique(array_map('strval', $resourceIds)));
+        $prefix = $resourceType === 'fluentcrm_tag'
+            ? __('Tag', 'fchub-memberships')
+            : __('List', 'fchub-memberships');
+        $labels = [];
+        foreach ($resourceIds as $resourceId) {
+            $labels[$resourceId] = sprintf('%s #%s', $prefix, $resourceId);
+        }
+        if ($resourceIds === [] || !$this->isFluentCrmActive()) {
+            return $labels;
+        }
+
+        $resource = $resourceType === 'fluentcrm_tag' ? 'tags' : 'lists';
+        $models = FluentCrmApi($resource)
+            ->getInstance()
+            ->newQuery()
+            ->whereIn('id', array_values(array_filter(array_map('intval', $resourceIds))))
+            ->get();
+        foreach ($models as $model) {
+            $id = (string) $model->id;
+            if (array_key_exists($id, $labels)) {
+                $labels[$id] = (string) $model->title;
+            }
+        }
+
+        return $labels;
     }
 
     public function searchResources(string $query, string $resourceType, int $limit = 20): array

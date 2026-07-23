@@ -2,16 +2,27 @@
 
 namespace FChubMemberships\Storage;
 
+use FChubMemberships\Domain\AccessEvaluator;
+use FChubMemberships\Domain\Access\ResourceAccessPolicy;
+use FChubMemberships\Support\Clock;
+
 defined('ABSPATH') || exit;
 
 class GrantRepository
 {
     private string $table;
+    private Clock $clock;
 
-    public function __construct()
+    /** @var array<string, mixed> */
+    private static array $requestCache = [];
+
+    private static ?object $cacheContext = null;
+
+    public function __construct(?Clock $clock = null)
     {
         global $wpdb;
         $this->table = $wpdb->prefix . 'fchub_membership_grants';
+        $this->clock = $clock ?? new Clock();
     }
 
     public function find(int $id): ?array
@@ -25,6 +36,38 @@ class GrantRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    public function getEntitlementBackfillWatermark(): int
+    {
+        global $wpdb;
+
+        $watermark = $wpdb->get_var("SELECT COALESCE(MAX(id), 0) FROM {$this->table}");
+        if ($watermark === null || !empty($wpdb->last_error)) {
+            throw new \RuntimeException('The entitlement backfill watermark could not be read.');
+        }
+
+        return (int) $watermark;
+    }
+
+    public function getEntitlementBackfillBatch(int $after, int $through, int $limit): array
+    {
+        global $wpdb;
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE id > %d AND id <= %d
+             ORDER BY id ASC
+             LIMIT %d",
+            $after,
+            $through,
+            $limit
+        ), ARRAY_A);
+        if (!is_array($rows) || !empty($wpdb->last_error)) {
+            throw new \RuntimeException('The entitlement backfill grants could not be read.');
+        }
+
+        return array_map([$this, 'hydrate'], $rows ?: []);
+    }
+
     public function findByGrantKey(string $grantKey): ?array
     {
         global $wpdb;
@@ -32,6 +75,9 @@ class GrantRepository
             "SELECT * FROM {$this->table} WHERE grant_key = %s",
             $grantKey
         ), ARRAY_A);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read grant by key.');
+        }
 
         return $row ? $this->hydrate($row) : null;
     }
@@ -46,6 +92,12 @@ class GrantRepository
 
     public function getByUserId(int $userId, array $filters = []): array
     {
+        $this->ensureCacheContext();
+        $cacheKey = 'user:' . $userId . ':' . md5(wp_json_encode($filters));
+        if (array_key_exists($cacheKey, self::$requestCache)) {
+            return self::$requestCache[$cacheKey];
+        }
+
         global $wpdb;
 
         $where = ['user_id = %d'];
@@ -69,7 +121,8 @@ class GrantRepository
         $sql = "SELECT * FROM {$this->table} WHERE " . implode(' AND ', $where) . " ORDER BY created_at DESC";
 
         $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
-        return array_map([$this, 'hydrate'], $rows ?: []);
+        self::$requestCache[$cacheKey] = array_map([$this, 'hydrate'], $rows ?: []);
+        return self::$requestCache[$cacheKey];
     }
 
     public function getByPlanId(int $planId, array $filters = []): array
@@ -104,7 +157,7 @@ class GrantRepository
     {
         global $wpdb;
 
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
         $insert = [
             'user_id'          => (int) $data['user_id'],
             'plan_id'          => isset($data['plan_id']) ? (int) $data['plan_id'] : null,
@@ -131,6 +184,7 @@ class GrantRepository
         ];
 
         $wpdb->insert($this->table, $insert);
+        AccessEvaluator::clearCache();
         return (int) $wpdb->insert_id;
     }
 
@@ -138,7 +192,7 @@ class GrantRepository
     {
         global $wpdb;
 
-        $update = ['updated_at' => current_time('mysql')];
+        $update = ['updated_at' => $this->nowStorage()];
 
         $directFields = ['status', 'starts_at', 'expires_at', 'drip_available_at', 'source_type', 'trial_ends_at', 'cancellation_requested_at', 'cancellation_effective_at', 'cancellation_reason'];
         foreach ($directFields as $field) {
@@ -161,13 +215,21 @@ class GrantRepository
             }
         }
 
-        return $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        $updated = $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        if ($updated) {
+            AccessEvaluator::clearCache();
+        }
+        return $updated;
     }
 
     public function delete(int $id): bool
     {
         global $wpdb;
-        return $wpdb->delete($this->table, ['id' => $id]) !== false;
+        $deleted = $wpdb->delete($this->table, ['id' => $id]) !== false;
+        if ($deleted) {
+            AccessEvaluator::clearCache();
+        }
+        return $deleted;
     }
 
     /**
@@ -176,7 +238,7 @@ class GrantRepository
     public function hasActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): bool
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         return (bool) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM {$this->table}
@@ -202,7 +264,7 @@ class GrantRepository
     public function hasAccessibleGrant(int $userId, string $provider, string $resourceType, string $resourceId): bool
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         return (bool) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM {$this->table}
@@ -229,8 +291,14 @@ class GrantRepository
      */
     public function getActiveGrant(int $userId, string $provider, string $resourceType, string $resourceId): ?array
     {
+        $this->ensureCacheContext();
+        $cacheKey = 'active:' . implode("\0", [$userId, $provider, $resourceType, $resourceId]);
+        if (array_key_exists($cacheKey, self::$requestCache)) {
+            return self::$requestCache[$cacheKey];
+        }
+
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$this->table}
@@ -251,7 +319,314 @@ class GrantRepository
             $now
         ), ARRAY_A);
 
-        return $row ? $this->hydrate($row) : null;
+        self::$requestCache[$cacheKey] = $row ? $this->hydrate($row) : null;
+        return self::$requestCache[$cacheKey];
+    }
+
+    /**
+     * Return currently effective plan lineages for scalar access evaluation.
+     *
+     * Typed entitlement edges are authoritative for managed lineages. Manual
+     * and legacy grants remain eligible only when they are not compatibility
+     * mirrors of a typed edge.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getEffectivePlanMembershipsForUser(int $userId): array
+    {
+        return $this->getEffectivePlanMemberships($userId);
+    }
+
+    /**
+     * Return currently effective membership lineages for one plan.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getEffectivePlanMembershipsForUserByPlan(int $userId, int $planId): array
+    {
+        if ($planId <= 0) {
+            return [];
+        }
+
+        return $this->getEffectivePlanMemberships($userId, $planId);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function getEffectivePlanMemberships(int $userId, ?int $planId = null): array
+    {
+        $this->ensureCacheContext();
+        $cacheKey = 'memberships:' . $userId . ':' . ($planId ?? 'all');
+        if (array_key_exists($cacheKey, self::$requestCache)) {
+            return self::$requestCache[$cacheKey];
+        }
+
+        global $wpdb;
+        $now = $this->nowStorage();
+        $edgeTable = $wpdb->prefix . 'fchub_membership_entitlement_edges';
+        $edgePlanSql = '';
+        $edgeParams = [$userId, $now, $now];
+        if ($planId !== null) {
+            $edgePlanSql = ' AND edge.plan_id = %d';
+            $edgeParams[] = $planId;
+        }
+        $sql = $wpdb->prepare(
+            "SELECT edge.id, edge.plan_id, edge.provider, edge.resource_type, edge.resource_id,
+                    edge.starts_at, edge.expires_at, edge.created_at, edge.drip_available_at,
+                    NULL AS trial_ends_at, edge.access_status
+             FROM {$edgeTable} edge
+             WHERE edge.user_id = %d
+               AND edge.plan_id > 0
+               AND edge.lifecycle = 'active'
+               AND edge.access_status = 'active'
+               AND (edge.starts_at IS NULL OR edge.starts_at <= %s)
+               AND (edge.expires_at IS NULL OR edge.expires_at > %s)
+               {$edgePlanSql}",
+            ...$edgeParams
+        );
+        $rows = $wpdb->get_results($sql, ARRAY_A);
+        if (!is_array($rows) || !empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read effective plan memberships.');
+        }
+        $rows = array_values(array_filter(
+            $rows,
+            static fn(array $row): bool => (int) ($row['plan_id'] ?? 0) > 0
+        ));
+
+        $identityRows = $wpdb->get_results($wpdb->prepare(
+            "SELECT DISTINCT edge.provider, edge.resource_type, edge.resource_id
+             FROM {$edgeTable} edge
+             WHERE edge.user_id = %d",
+            $userId
+        ), ARRAY_A);
+        if (!is_array($identityRows) || !empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read typed membership identities.');
+        }
+        $typedIdentities = [];
+        foreach ($identityRows as $identityRow) {
+            $typedIdentities[implode("\0", [
+                (string) ($identityRow['provider'] ?? ''),
+                (string) ($identityRow['resource_type'] ?? ''),
+                (string) ($identityRow['resource_id'] ?? ''),
+            ])] = true;
+        }
+
+        $grantFilters = ['status' => 'active'];
+        if ($planId !== null) {
+            $grantFilters['plan_id'] = $planId;
+        }
+        foreach ($this->getByUserId($userId, $grantFilters) as $grant) {
+            if ((int) ($grant['plan_id'] ?? 0) <= 0 || !$this->grantIsCurrentlyAccessible($grant, $now)) {
+                continue;
+            }
+            $identity = implode("\0", [
+                (string) ($grant['provider'] ?? ''),
+                (string) ($grant['resource_type'] ?? ''),
+                (string) ($grant['resource_id'] ?? ''),
+            ]);
+            $hasCompleteIdentity = isset($grant['provider'], $grant['resource_type'], $grant['resource_id']);
+            if ($hasCompleteIdentity && isset($typedIdentities[$identity])) {
+                continue;
+            }
+            $grant['access_status'] = 'active';
+            $rows[] = $grant;
+        }
+
+        self::$requestCache[$cacheKey] = array_map(static function (array $row): array {
+            $row['plan_id'] = (int) $row['plan_id'];
+            $row['status'] = 'active';
+            return $row;
+        }, $rows);
+
+        return self::$requestCache[$cacheKey];
+    }
+
+    /**
+     * Count distinct users with effective access for a keyed resource batch.
+     *
+     * @param array<int|string, ResourceAccessPolicy> $policies
+     * @return array<int|string, int>
+     */
+    public function countDistinctUsersWithResourceAccessBatch(array $policies): array
+    {
+        $counts = array_fill_keys(array_keys($policies), 0);
+        if ($policies === []) {
+            return $counts;
+        }
+
+        global $wpdb;
+        $now = $this->nowStorage();
+        $edgeTable = $wpdb->prefix . 'fchub_membership_entitlement_edges';
+        $selects = [];
+
+        foreach ($policies as $resourceKey => $policy) {
+            if (!$policy instanceof ResourceAccessPolicy) {
+                throw new \InvalidArgumentException('Resource access policies must be ResourceAccessPolicy instances.');
+            }
+
+            $key = (string) $resourceKey;
+            $selects[] = $wpdb->prepare(
+                "SELECT %s AS _resource_key, direct.user_id
+                 FROM {$this->table} direct
+                 WHERE direct.provider = %s
+                   AND direct.resource_type = %s
+                   AND direct.resource_id IN (%s, '*')
+                   AND direct.status = 'active'
+                   AND (direct.starts_at IS NULL OR direct.starts_at <= %s)
+                   AND (direct.expires_at IS NULL OR direct.expires_at > %s)
+                   AND (direct.drip_available_at IS NULL OR direct.drip_available_at <= %s)",
+                $key,
+                $policy->provider(),
+                $policy->resourceType(),
+                $policy->resourceId(),
+                $now,
+                $now,
+                $now
+            );
+
+            if (!$policy->hasPlanAccess()) {
+                continue;
+            }
+
+            $edgePlanPredicate = $this->policyPlanSql($policy, 'edge', $now);
+            $selects[] = $wpdb->prepare(
+                "SELECT %s AS _resource_key, edge.user_id
+                 FROM {$edgeTable} edge
+                 WHERE edge.lifecycle = 'active'
+                   AND edge.access_status = 'active'
+                   AND (edge.starts_at IS NULL OR edge.starts_at <= %s)
+                   AND (edge.expires_at IS NULL OR edge.expires_at > %s)
+                   AND ({$edgePlanPredicate})",
+                $key,
+                $now,
+                $now
+            );
+
+            $legacyPlanPredicate = $this->policyPlanSql($policy, 'membership', $now);
+            $selects[] = $wpdb->prepare(
+                "SELECT %s AS _resource_key, membership.user_id
+                 FROM {$this->table} membership
+                 WHERE membership.plan_id IS NOT NULL
+                   AND membership.status = 'active'
+                   AND (membership.starts_at IS NULL OR membership.starts_at <= %s)
+                   AND (membership.expires_at IS NULL OR membership.expires_at > %s)
+                   AND ({$legacyPlanPredicate})
+                   AND NOT EXISTS (
+                       SELECT 1 FROM {$edgeTable} typed
+                       WHERE typed.user_id = membership.user_id
+                         AND typed.provider = membership.provider
+                         AND typed.resource_type = membership.resource_type
+                         AND typed.resource_id = membership.resource_id
+                   )",
+                $key,
+                $now,
+                $now
+            );
+        }
+
+        $sql = "SELECT access_rows._resource_key, COUNT(DISTINCT access_rows.user_id) AS member_count
+                FROM (" . implode("\nUNION ALL\n", $selects) . ") access_rows
+                GROUP BY access_rows._resource_key";
+        $rows = $wpdb->get_results($sql, ARRAY_A);
+        if (!is_array($rows) || !empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read effective resource access counts.');
+        }
+        foreach ($rows ?: [] as $row) {
+            $key = (string) ($row['_resource_key'] ?? '');
+            if (array_key_exists($key, $counts)) {
+                $counts[$key] = (int) ($row['member_count'] ?? 0);
+            }
+        }
+
+        return $counts;
+    }
+
+    public static function clearRequestCache(): void
+    {
+        self::$requestCache = [];
+        self::$cacheContext = null;
+    }
+
+    private function policyPlanSql(ResourceAccessPolicy $policy, string $alias, string $now): string
+    {
+        global $wpdb;
+
+        if ($policy->allowsAnyActivePlan()) {
+            return "{$alias}.plan_id > 0";
+        }
+
+        $predicates = [];
+        foreach ($policy->eligiblePlanIds() as $planId) {
+            $pathPredicates = [];
+            foreach ($policy->pathsForPlan($planId) as $path) {
+                $pathPredicates[] = $this->policyPathSql($path, $alias, $now);
+            }
+            $predicates[] = $wpdb->prepare(
+                "{$alias}.plan_id = %d AND (" . implode(' OR ', $pathPredicates) . ')',
+                $planId
+            );
+        }
+
+        return $predicates === [] ? '0 = 1' : implode(' OR ', array_map(
+            static fn(string $predicate): string => '(' . $predicate . ')',
+            $predicates
+        ));
+    }
+
+    /** @param array<string, mixed> $path */
+    private function policyPathSql(array $path, string $alias, string $now): string
+    {
+        global $wpdb;
+        $conditions = [];
+        if (($path['basis'] ?? 'membership') === 'resource') {
+            $qualifier = is_array($path['qualifier'] ?? null) ? $path['qualifier'] : [];
+            $conditions[] = $wpdb->prepare(
+                "{$alias}.provider = %s AND {$alias}.resource_type = %s AND {$alias}.resource_id = %s",
+                (string) ($qualifier['provider'] ?? ''),
+                (string) ($qualifier['resource_type'] ?? ''),
+                (string) ($qualifier['resource_id'] ?? '')
+            );
+            $conditions[] = $wpdb->prepare(
+                "({$alias}.drip_available_at IS NULL OR {$alias}.drip_available_at <= %s)",
+                $now
+            );
+        }
+
+        $type = (string) ($path['drip_type'] ?? 'immediate');
+        if ($type === 'delayed') {
+            $days = max(0, (int) ($path['drip_delay_days'] ?? 0));
+            $conditions[] = $wpdb->prepare(
+                "DATE_ADD({$alias}.created_at, INTERVAL {$days} DAY) <= %s",
+                $now
+            );
+        }
+        if ($type === 'fixed_date' && !empty($path['drip_date'])) {
+            $conditions[] = $wpdb->prepare('%s >= %s', $now, (string) $path['drip_date']);
+        }
+
+        return $conditions === [] ? '1 = 1' : implode(' AND ', $conditions);
+    }
+
+    /** @param array<string, mixed> $grant */
+    private function grantIsCurrentlyAccessible(array $grant, string $now): bool
+    {
+        if (!empty($grant['starts_at']) && strcmp((string) $grant['starts_at'], $now) > 0) {
+            return false;
+        }
+
+        return empty($grant['expires_at']) || strcmp((string) $grant['expires_at'], $now) > 0;
+    }
+
+    private function ensureCacheContext(): void
+    {
+        global $wpdb;
+        if (self::$cacheContext === $wpdb) {
+            return;
+        }
+
+        self::$requestCache = [];
+        self::$cacheContext = $wpdb;
     }
 
     /**
@@ -315,7 +690,7 @@ class GrantRepository
     public function getActiveByUserGroupedByPlan(int $userId): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table}
@@ -345,8 +720,8 @@ class GrantRepository
     public function getExpiringSoon(int $days = 7, int $limit = 50): array
     {
         global $wpdb;
-        $now = current_time('mysql');
-        $future = gmdate('Y-m-d H:i:s', strtotime("+{$days} days"));
+        $now = $this->nowStorage();
+        $future = $this->futureStorage($days);
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table}
@@ -371,8 +746,8 @@ class GrantRepository
     {
         global $wpdb;
 
-        $now = current_time('mysql');
-        $future = gmdate('Y-m-d H:i:s', strtotime($now . " +{$days} days"));
+        $now = $this->nowStorage();
+        $future = $this->futureStorage($days, $now);
 
         return (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM {$this->table}
@@ -408,7 +783,7 @@ class GrantRepository
     public function countActiveMembers(?int $planId = null, ?string $asOf = null): int
     {
         global $wpdb;
-        $now = $asOf ?: current_time('mysql');
+        $now = $asOf ?: $this->nowStorage();
 
         $sql = "SELECT COUNT(DISTINCT user_id) FROM {$this->table}
                 WHERE status = 'active'
@@ -469,7 +844,7 @@ class GrantRepository
     public function getMembers(array $filters = []): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
         [$where, $params] = $this->buildAdminMemberWhere($filters, $now);
         $plansTable = $wpdb->prefix . 'fchub_membership_plans';
 
@@ -518,7 +893,7 @@ class GrantRepository
     public function countMembers(array $filters = []): int
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
         [$where, $params] = $this->buildAdminMemberWhere($filters, $now);
 
         $sql = "SELECT COUNT(*) FROM (
@@ -544,8 +919,8 @@ class GrantRepository
     public function getAdminSummary(int $expiringDays = 7): array
     {
         global $wpdb;
-        $now = current_time('mysql');
-        $future = gmdate('Y-m-d H:i:s', strtotime($now . " +{$expiringDays} days"));
+        $now = $this->nowStorage();
+        $future = $this->futureStorage($expiringDays, $now);
 
         $sql = "SELECT
                     SUM(CASE WHEN access_status = 'active' THEN 1 ELSE 0 END) AS active,
@@ -627,7 +1002,7 @@ class GrantRepository
 
         if (!empty($filters['expires_within'])) {
             $days = (int) $filters['expires_within'];
-            $future = gmdate('Y-m-d H:i:s', strtotime($now . " +{$days} days"));
+            $future = $this->futureStorage($days, $now);
             $where[] = "g.status = 'active' AND (g.starts_at IS NULL OR g.starts_at <= %s) AND g.expires_at IS NOT NULL AND g.expires_at > %s AND g.expires_at <= %s";
             $params[] = $now;
             $params[] = $now;
@@ -644,7 +1019,7 @@ class GrantRepository
     public function getOverdueGrants(): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table}
@@ -666,7 +1041,7 @@ class GrantRepository
     public function expireOverdueGrants(): int
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         return (int) $wpdb->query($wpdb->prepare(
             "UPDATE {$this->table}
@@ -688,7 +1063,7 @@ class GrantRepository
     public function getOverdueAnchorGrants(): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table}
@@ -709,7 +1084,7 @@ class GrantRepository
     public function getUserIdsForPlan(int $planId): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT DISTINCT user_id FROM {$this->table}
@@ -761,7 +1136,7 @@ class GrantRepository
     public function getTermExpiredGrants(?string $now = null): array
     {
         global $wpdb;
-        $now = $now ?? current_time('mysql');
+        $now = $now ?? $this->nowStorage();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table}
@@ -778,7 +1153,11 @@ class GrantRepository
         foreach ($rows as $row) {
             $hydrated = $this->hydrate($row);
             $termEndsAt = $hydrated['meta']['membership_term_ends_at'] ?? null;
-            if ($termEndsAt && strtotime($termEndsAt) <= strtotime($now)) {
+            if (
+                $termEndsAt
+                && $this->clock->parseLocal($termEndsAt)->getTimestamp()
+                    <= $this->clock->parseLocal($now)->getTimestamp()
+            ) {
                 $expired[] = $hydrated;
             }
         }
@@ -789,7 +1168,7 @@ class GrantRepository
     public function getDueGracePeriodGrants(int $limit = 100): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table}
@@ -812,7 +1191,7 @@ class GrantRepository
     public function getAllUserResourceIds(int $userId): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT DISTINCT resource_type, resource_id FROM {$this->table}
@@ -841,7 +1220,7 @@ class GrantRepository
     public function getUserActivePlanIds(int $userId): array
     {
         global $wpdb;
-        $now = current_time('mysql');
+        $now = $this->nowStorage();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT DISTINCT plan_id FROM {$this->table}
@@ -856,6 +1235,17 @@ class GrantRepository
         ), ARRAY_A);
 
         return array_map('intval', array_column($rows ?: [], 'plan_id'));
+    }
+
+    private function nowStorage(): string
+    {
+        return $this->clock->storage($this->clock->now());
+    }
+
+    private function futureStorage(int $days, ?string $from = null): string
+    {
+        $base = $from === null ? $this->clock->now() : $this->clock->parseLocal($from);
+        return $this->clock->storage($this->clock->plusDays($days, $base));
     }
 
     /**

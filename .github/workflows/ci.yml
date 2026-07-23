@@ -4,8 +4,28 @@ on:
   pull_request:
     paths:
       - 'plugins/**'
+      - 'web-docs/lib/versions.json'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/ci-memberships-contract.test.mjs'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/release-memberships-contract.test.mjs'
 
 jobs:
+  workflow-contract:
+    name: Workflow contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Memberships workflow contracts
+        run: node --test .github/workflows/ci-memberships-contract.test.mjs .github/workflows/release-memberships-contract.test.mjs
+
   phpunit:
     name: PHPUnit (${{ matrix.plugin }})
     runs-on: ubuntu-latest
@@ -27,7 +47,11 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/${{ matrix.plugin }}/ | wc -l)
+          if [ "${{ matrix.plugin }}" = "fchub-memberships" ]; then
+            CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/${{ matrix.plugin }}/ web-docs/lib/versions.json | wc -l)
+          else
+            CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/${{ matrix.plugin }}/ | wc -l)
+          fi
           echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
 
       - name: Setup PHP
@@ -42,6 +66,11 @@ jobs:
         if: steps.changes.outputs.count > 0
         working-directory: plugins/${{ matrix.plugin }}
         run: composer install --no-interaction --prefer-dist
+
+      - name: Audit Composer dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/${{ matrix.plugin }}
+        run: composer audit --locked --no-interaction
 
       - name: Run PHPUnit
         if: steps.changes.outputs.count > 0
@@ -74,12 +103,42 @@ jobs:
           cache: 'npm'
           cache-dependency-path: plugins/fchub-memberships/package-lock.json
 
-      - name: Install and build
+      - name: Install dependencies
         if: steps.changes.outputs.count > 0
         working-directory: plugins/fchub-memberships
-        run: |
-          npm ci
-          npm run build
+        run: npm ci
+
+      - name: Audit JavaScript dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-memberships
+        run: npm audit --audit-level=high
+
+      - name: Run JavaScript tests
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-memberships
+        run: npm test
+
+      - name: Cache Playwright browsers
+        if: steps.changes.outputs.count > 0
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('plugins/fchub-memberships/package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-memberships
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser smoke tests
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-memberships
+        run: npx playwright test
+
+      - name: Build production assets
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub-memberships
+        run: npm run build
 
       - name: Validate build output
         if: steps.changes.outputs.count > 0

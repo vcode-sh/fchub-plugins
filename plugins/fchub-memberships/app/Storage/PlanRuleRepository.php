@@ -4,8 +4,14 @@ namespace FChubMemberships\Storage;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Domain\AccessEvaluator;
+use FChubMemberships\Domain\Plan\PlanRuleResolver;
+
 class PlanRuleRepository
 {
+    private const CACHE_GROUP = 'fchub_memberships';
+    private const ANY_RULE_CACHE_KEY = 'plan_rules:any';
+
     private string $table;
 
     public function __construct()
@@ -52,6 +58,21 @@ class PlanRuleRepository
         return array_map([$this, 'hydrate'], $rows ?: []);
     }
 
+    /** @return list<array<string, mixed>> */
+    public function getAllForAccessResolution(): array
+    {
+        global $wpdb;
+        $rows = $wpdb->get_results(
+            "SELECT * FROM {$this->table} ORDER BY plan_id ASC, sort_order ASC, id ASC",
+            ARRAY_A
+        );
+        if (!is_array($rows) || !empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read membership plan rules for access resolution.');
+        }
+
+        return array_map([$this, 'hydrate'], $rows);
+    }
+
     public function create(array $data): int
     {
         global $wpdb;
@@ -75,7 +96,10 @@ class PlanRuleRepository
             throw new \InvalidArgumentException('drip_date is required when drip_type is fixed_date');
         }
 
-        $wpdb->insert($this->table, $insert);
+        $created = $wpdb->insert($this->table, $insert);
+        if ($created !== false) {
+            self::invalidateAfterWrite();
+        }
         return (int) $wpdb->insert_id;
     }
 
@@ -103,19 +127,31 @@ class PlanRuleRepository
             $update['meta'] = wp_json_encode($data['meta']);
         }
 
-        return $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        $updated = $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        if ($updated) {
+            self::invalidateAfterWrite();
+        }
+        return $updated;
     }
 
     public function delete(int $id): bool
     {
         global $wpdb;
-        return $wpdb->delete($this->table, ['id' => $id]) !== false;
+        $deleted = $wpdb->delete($this->table, ['id' => $id]) !== false;
+        if ($deleted) {
+            self::invalidateAfterWrite();
+        }
+        return $deleted;
     }
 
     public function deleteByPlanId(int $planId): int
     {
         global $wpdb;
-        return (int) $wpdb->delete($this->table, ['plan_id' => $planId]);
+        $deleted = (int) $wpdb->delete($this->table, ['plan_id' => $planId]);
+        if ($deleted > 0) {
+            self::invalidateAfterWrite();
+        }
+        return $deleted;
     }
 
     public function bulkCreate(int $planId, array $rules): array
@@ -167,6 +203,29 @@ class PlanRuleRepository
             "SELECT COUNT(*) FROM {$this->table} WHERE plan_id = %d",
             $planId
         ));
+    }
+
+    public function hasAnyRules(): bool
+    {
+        $cached = wp_cache_get(self::ANY_RULE_CACHE_KEY, self::CACHE_GROUP);
+        if ($cached !== false) {
+            return (bool) $cached;
+        }
+
+        global $wpdb;
+        $hasRules = (bool) $wpdb->get_var("SELECT EXISTS(SELECT 1 FROM {$this->table} LIMIT 1)");
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to determine whether membership plan rules exist.');
+        }
+        wp_cache_set(self::ANY_RULE_CACHE_KEY, $hasRules ? 1 : 0, self::CACHE_GROUP);
+        return $hasRules;
+    }
+
+    private static function invalidateAfterWrite(): void
+    {
+        wp_cache_delete(self::ANY_RULE_CACHE_KEY, self::CACHE_GROUP);
+        PlanRuleResolver::invalidateSharedCache();
+        AccessEvaluator::clearCache();
     }
 
     private function hydrate(array $row): array

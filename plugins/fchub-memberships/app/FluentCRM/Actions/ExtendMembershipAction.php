@@ -8,15 +8,18 @@ use FluentCrm\App\Services\Funnel\BaseAction;
 use FluentCrm\Framework\Support\Arr;
 use FChubMemberships\FluentCRM\Actions\Contracts\MembershipActionRuntimeInterface;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Support\Clock;
 use Throwable;
 
 class ExtendMembershipAction extends BaseAction
 {
     private MembershipActionRuntimeInterface $runtime;
+    private Clock $clock;
 
-    public function __construct(?MembershipActionRuntimeInterface $runtime = null)
+    public function __construct(?MembershipActionRuntimeInterface $runtime = null, ?Clock $clock = null)
     {
         $this->runtime = $runtime ?? new MembershipActionRuntime();
+        $this->clock = $clock ?? new Clock();
         $this->actionName = 'fchub_extend_membership';
         $this->priority = 20;
         parent::__construct();
@@ -104,11 +107,11 @@ class ExtendMembershipAction extends BaseAction
 
         $grant = $grants[0];
         if ($extendMode === 'from_current_expiry' && !empty($grant['expires_at'])) {
-            $baseTime = strtotime($grant['expires_at']);
+            $base = $this->clock->parseLocal($grant['expires_at']);
         } else {
-            $baseTime = time();
+            $base = $this->clock->now();
         }
-        $newExpiresAt = gmdate('Y-m-d H:i:s', strtotime('+' . $extendDays . ' days', $baseTime));
+        $newExpiresAt = $this->clock->storage($this->clock->plusDays($extendDays, $base));
 
         try {
             $outcome = MembershipActionOutcome::fromAffectedRows(

@@ -53,13 +53,13 @@ jobs:
           echo "Version validated: $VERSION"
 
       - name: Check versions.json consistency
-        continue-on-error: true
         run: |
           SLUG="${{ steps.tag.outputs.slug }}"
           VERSION="${{ steps.tag.outputs.version }}"
           DOCS_VERSION=$(node -e "const v=JSON.parse(require('fs').readFileSync('web-docs/lib/versions.json','utf8'));console.log(v.plugins['${SLUG}']?.version??'NOT_FOUND')")
           if [ "$DOCS_VERSION" != "$VERSION" ]; then
-            echo "::warning::versions.json has ${SLUG} at v${DOCS_VERSION}, tag is v${VERSION}. Update versions.json after this release."
+            echo "::error::versions.json has ${SLUG} at v${DOCS_VERSION}, tag is v${VERSION}."
+            exit 1
           fi
 
       - name: Setup Node.js
@@ -68,11 +68,47 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Composer dependencies (fchub-memberships)
+        if: steps.tag.outputs.slug == 'fchub-memberships'
+        working-directory: plugins/fchub-memberships
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit Composer dependencies (fchub-memberships)
+        if: steps.tag.outputs.slug == 'fchub-memberships'
+        working-directory: plugins/fchub-memberships
+        run: composer audit --locked --no-interaction
+
+      - name: Run PHPUnit (fchub-memberships)
+        if: steps.tag.outputs.slug == 'fchub-memberships'
+        working-directory: plugins/fchub-memberships
+        run: ./vendor/bin/phpunit
+
+      - name: Install npm dependencies (fchub-memberships)
+        if: steps.tag.outputs.slug == 'fchub-memberships'
+        working-directory: plugins/fchub-memberships
+        run: npm ci
+
+      - name: Audit npm dependencies (fchub-memberships)
+        if: steps.tag.outputs.slug == 'fchub-memberships'
+        working-directory: plugins/fchub-memberships
+        run: npm audit --audit-level=high
+
+      - name: Run Vitest (fchub-memberships)
+        if: steps.tag.outputs.slug == 'fchub-memberships'
+        working-directory: plugins/fchub-memberships
+        run: npm run test
+
+      - name: Run Playwright (fchub-memberships)
+        if: steps.tag.outputs.slug == 'fchub-memberships'
+        working-directory: plugins/fchub-memberships
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:smoke
+
       - name: Build assets (fchub-memberships)
         if: steps.tag.outputs.slug == 'fchub-memberships'
         working-directory: plugins/fchub-memberships
         run: |
-          npm ci
           npm run build
 
           if [ ! -d "assets/dist" ] || [ -z "$(ls -A assets/dist)" ]; then
@@ -143,15 +179,15 @@ jobs:
           tmp_dir=$(mktemp -d)
 
           # Build rsync exclude args from .distignore
-          exclude_args=""
+          exclude_args=()
           if [ -f "${PLUGIN_DIR}/.distignore" ]; then
             while IFS= read -r line || [ -n "$line" ]; do
               [[ -z "$line" || "$line" =~ ^# ]] && continue
-              exclude_args="$exclude_args --exclude=$line"
+              exclude_args+=(--exclude="$line")
             done < "${PLUGIN_DIR}/.distignore"
           fi
 
-          rsync -a $exclude_args "${PLUGIN_DIR}/" "${tmp_dir}/${SLUG}/"
+          rsync -a "${exclude_args[@]}" "${PLUGIN_DIR}/" "${tmp_dir}/${SLUG}/"
 
           (cd "$tmp_dir" && zip -qr "${GITHUB_WORKSPACE}/${ZIP_NAME}" "${SLUG}/")
 

@@ -12,7 +12,7 @@ namespace {
     }
 
     if (!defined('FLUENT_COMMUNITY_PLUGIN_VERSION')) {
-        define('FLUENT_COMMUNITY_PLUGIN_VERSION', '1.0.0');
+        define('FLUENT_COMMUNITY_PLUGIN_VERSION', '2.7.0');
     }
 
     final class FchubTestFluentCrmQuery
@@ -172,8 +172,12 @@ namespace FluentCommunity\App\Models {
 
 namespace FChubMemberships\Tests\Unit\Http\Controllers {
 
+    use FChubMemberships\Adapters\FluentCommunityAdapter;
     use FChubMemberships\Http\DynamicOptionsController;
+    use FChubMemberships\Integration\Community\CommunityCapabilityRegistry;
     use FChubMemberships\Tests\Unit\PluginTestCase;
+    use PHPUnit\Framework\Attributes\PreserveGlobalState;
+    use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 
     final class DynamicOptionsControllerFeatureTest extends PluginTestCase
     {
@@ -185,10 +189,13 @@ namespace FChubMemberships\Tests\Unit\Http\Controllers {
                 (object) ['id' => 99, 'title' => 'Legacy Lounge'],
             ];
 
-            $response = DynamicOptionsController::fcSpaces(new \WP_REST_Request('GET', '/fc-spaces', [
-                'search' => 'Start',
-                'include' => '99',
-            ]))->get_data();
+            $response = DynamicOptionsController::fcSpaces(
+                new \WP_REST_Request('GET', '/fc-spaces', [
+                    'search' => 'Start',
+                    'include' => '99',
+                ]),
+                new FluentCommunityAdapter($this->spaceCapabilities())
+            )->get_data();
 
             self::assertSame(['31', '99'], array_column($response['data'], 'id'));
             self::assertSame([], $GLOBALS['_fchub_test_fluent_community_space_finds']);
@@ -214,13 +221,29 @@ namespace FChubMemberships\Tests\Unit\Http\Controllers {
             $lists = DynamicOptionsController::fluentcrmLists(new \WP_REST_Request('GET', '/fluentcrm-lists', [
                 'search' => 'premium',
             ]))->get_data();
-            $spaces = DynamicOptionsController::fcSpaces(new \WP_REST_Request('GET', '/fc-spaces', [
-                'search' => 'vip',
-            ]))->get_data();
+            $spaces = DynamicOptionsController::fcSpaces(
+                new \WP_REST_Request('GET', '/fc-spaces', [
+                    'search' => 'vip',
+                ]),
+                new FluentCommunityAdapter($this->spaceCapabilities())
+            )->get_data();
 
-            self::assertContains(['value' => 'fluentcrm', 'label' => 'FluentCRM'], $providers['data']);
-            self::assertContains(['value' => 'learndash', 'label' => 'LearnDash'], $providers['data']);
-            self::assertContains(['value' => 'fluent_community', 'label' => 'FluentCommunity'], $providers['data']);
+            $providersByValue = array_column($providers['data'], null, 'value');
+            self::assertSame('FluentCRM', $providersByValue['fluentcrm']['label']);
+            self::assertSame('LearnDash', $providersByValue['learndash']['label']);
+            self::assertSame('FluentCommunity', $providersByValue['fluent_community']['label']);
+            self::assertSame([
+                'value',
+                'label',
+                'status',
+                'version',
+                'reason',
+                'capabilities',
+                'pending_operations',
+                'failed_operations',
+                'last_successful_reconciliation',
+                'repair_url',
+            ], array_keys($providersByValue['fluent_community']));
             self::assertSame([
                 ['value' => 'fluentcrm_tag', 'label' => 'FluentCRM Tag'],
                 ['value' => 'fluentcrm_list', 'label' => 'FluentCRM List'],
@@ -232,6 +255,103 @@ namespace FChubMemberships\Tests\Unit\Http\Controllers {
             $GLOBALS['_fchub_test_current_user_can'] = false;
 
             self::assertFalse(DynamicOptionsController::adminPermission());
+        }
+
+        public function test_badge_endpoint_exposes_no_options_for_the_unsupported_numeric_contract(): void
+        {
+            $response = DynamicOptionsController::fcBadges(new \WP_REST_Request('GET', '/fc-badges', [
+                'search' => 'legacy',
+                'include' => '12,34',
+            ]))->get_data();
+
+            self::assertSame(['data' => []], $response);
+        }
+
+        #[RunInSeparateProcess]
+        #[PreserveGlobalState(false)]
+        public function test_badge_endpoint_exposes_only_exact_installed_slugs_for_certified_pro(): void
+        {
+            define('FLUENT_COMMUNITY_PRO', true);
+            define('FLUENT_COMMUNITY_PRO_VERSION', '2.7.0');
+            class_alias(CertifiedProHelper::class, 'FluentCommunity\\App\\Services\\Helper');
+            class_alias(CertifiedProUtility::class, 'FluentCommunity\\App\\Functions\\Utility');
+            class_alias(CertifiedProXProfile::class, 'FluentCommunity\\App\\Models\\XProfile');
+            class_alias(
+                CertifiedProLeaderBoardHelper::class,
+                'FluentCommunityPro\\App\\Modules\\LeaderBoard\\Services\\LeaderBoardHelper'
+            );
+            CertifiedProUtility::$options = [
+                'user_badges' => [
+                    'founding-member' => ['title' => 'Founding Member'],
+                    'legacy_number' => ['title' => 'Legacy Number'],
+                ],
+            ];
+
+            $response = DynamicOptionsController::fcBadges(new \WP_REST_Request('GET', '/fc-badges', [
+                'search' => 'founding',
+            ]))->get_data();
+
+            self::assertSame([
+                'data' => [['id' => 'founding-member', 'label' => 'Founding Member']],
+            ], $response);
+        }
+
+        public function test_dynamic_options_controller_contains_no_executable_numeric_badge_contract(): void
+        {
+            $source = file_get_contents(dirname(__DIR__, 4) . '/app/Http/DynamicOptionsController.php');
+
+            self::assertIsString($source);
+            self::assertStringNotContainsString('FluentCommunity\\App\\Models\\Badge', $source);
+            self::assertStringNotContainsString('Badge::query', $source);
+        }
+
+        private function spaceCapabilities(): CommunityCapabilityRegistry
+        {
+            return new CommunityCapabilityRegistry(
+                static fn(): array => [
+                    'core_active' => true,
+                    'core_version' => '2.7.0',
+                    'pro_active' => false,
+                    'pro_version' => null,
+                ],
+                static fn(string $feature): bool => $feature === 'course_module',
+                static fn(string $capability): bool => $capability === 'spaces'
+            );
+        }
+    }
+
+    final class CertifiedProHelper
+    {
+        public static function isFeatureEnabled(string $feature): bool
+        {
+            return in_array($feature, ['course_module', 'user_badge', 'leader_board_module'], true);
+        }
+    }
+
+    final class CertifiedProUtility
+    {
+        /** @var array<string, mixed> */
+        public static array $options = [];
+
+        public static function getOption(string $key, mixed $default = null): mixed
+        {
+            return self::$options[$key] ?? $default;
+        }
+    }
+
+    final class CertifiedProXProfile
+    {
+        public static function query(): object
+        {
+            return new \stdClass();
+        }
+    }
+
+    final class CertifiedProLeaderBoardHelper
+    {
+        public static function getLevelByPoint(): array
+        {
+            return [];
         }
     }
 }

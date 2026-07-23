@@ -7,6 +7,7 @@ namespace FChubMemberships\Tests\Unit\Domain;
 use FChubMemberships\Domain\TrialLifecycleService;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 require_once dirname(__DIR__, 2) . '/stubs/controller-stubs.php';
@@ -26,9 +27,13 @@ final class TrialLifecycleBugHuntTest extends PluginTestCase
     /**
      * Create a testable TrialLifecycleService with injectable dependencies.
      */
-    private function createService(GrantRepository $grantRepo, PlanRepository $planRepo): TrialLifecycleService
+    private function createService(
+        GrantRepository $grantRepo,
+        PlanRepository $planRepo,
+        ?Clock $clock = null
+    ): TrialLifecycleService
     {
-        $service = new TrialLifecycleService();
+        $service = new TrialLifecycleService($clock);
 
         $ref = new \ReflectionClass($service);
 
@@ -449,7 +454,9 @@ final class TrialLifecycleBugHuntTest extends PluginTestCase
             }
         };
 
-        $service = $this->createService($grantRepo, $planRepo);
+        $timezone = new \DateTimeZone('UTC');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-13 22:00:00', $timezone), $timezone);
+        $service = $this->createService($grantRepo, $planRepo, $clock);
         $grant = [
             'id' => 1,
             'user_id' => 10,
@@ -464,8 +471,8 @@ final class TrialLifecycleBugHuntTest extends PluginTestCase
         self::assertNotEmpty($updates);
         $update = $updates[0]['data'];
 
-        // 30 days from now, no term cap
-        $expected = date('Y-m-d H:i:s', strtotime('+30 days'));
+        // 30 site-local calendar days from the injected time, with no term cap.
+        $expected = $clock->storage($clock->plusDays(30));
         self::assertSame($expected, $update['expires_at']);
         self::assertSame('subscription', $update['source_type']);
         self::assertNull($update['trial_ends_at']);

@@ -3,7 +3,7 @@
     <LoadingState v-if="loading" />
 
     <template v-else-if="error">
-      <div class="fchub-error">
+      <div class="fchub-error" role="alert">
         <div class="fchub-error__icon">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
             <circle cx="16" cy="16" r="12" stroke="currentColor" stroke-width="1.5" />
@@ -16,12 +16,18 @@
       </div>
     </template>
 
-    <template v-else-if="!hasPlans && !hasHistory">
+    <template v-else-if="!hasPlans && !hasHistory && !hasCommunity">
       <EmptyState />
     </template>
 
     <template v-else>
-      <section v-if="hasPlans" class="fchub-plans-section">
+      <CommunityAccess v-if="hasCommunity" :community="community" />
+
+      <section
+        v-if="hasPlans"
+        class="fchub-plans-section"
+        :class="{ 'fchub-plans-section--after-community': hasCommunity }"
+      >
         <div class="fchub-plans-section__list">
           <PlanCard v-for="plan in plans" :key="plan.membership_key" :plan="plan" />
         </div>
@@ -40,10 +46,21 @@
 import { useMyAccess } from '../composables/useMyAccess.js'
 import LoadingState from './LoadingState.vue'
 import EmptyState from './EmptyState.vue'
+import CommunityAccess from './CommunityAccess.vue'
 import PlanCard from './PlanCard.vue'
 import MembershipHistory from './MembershipHistory.vue'
 
-const { plans, history, loading, error, refresh, hasPlans, hasHistory } = useMyAccess()
+const {
+  plans,
+  history,
+  community,
+  loading,
+  error,
+  refresh,
+  hasPlans,
+  hasHistory,
+  hasCommunity,
+} = useMyAccess()
 </script>
 
 <style scoped>
@@ -51,6 +68,10 @@ const { plans, history, loading, error, refresh, hasPlans, hasHistory } = useMyA
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.fchub-plans-section--after-community {
+  margin-top: 16px;
 }
 
 .fchub-error {

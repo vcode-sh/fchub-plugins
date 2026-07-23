@@ -7,10 +7,52 @@ namespace FChubMemberships\Tests\Unit\Domain;
 use FChubMemberships\Domain\AccessGrantService;
 use FChubMemberships\Domain\SubscriptionGrantLifecycleService;
 use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class SubscriptionGrantLifecycleServiceTest extends PluginTestCase
 {
+    public function test_late_anchor_renewal_uses_injected_site_local_now(): void
+    {
+        $grantService = new class extends AccessGrantService {
+            public array $extended = [];
+            public function __construct()
+            {
+            }
+            public function resumeGrant(int $grantId): array
+            {
+                return ['success' => true];
+            }
+            public function extendExpiry(int $userId, int $planId, string $newExpiresAt, ?int $renewalSourceId = null): int
+            {
+                $this->extended[] = $newExpiresAt;
+                return 1;
+            }
+        };
+        $grantRepo = new class extends GrantRepository {
+            public function __construct()
+            {
+            }
+            public function getBySourceId(int $sourceId, string $sourceType = 'order'): array
+            {
+                return [[
+                    'id' => 7,
+                    'user_id' => 10,
+                    'plan_id' => 3,
+                    'status' => 'paused',
+                    'expires_at' => '2026-02-10 23:59:59',
+                    'meta' => ['billing_anchor_day' => 10],
+                ]];
+            }
+        };
+        $timezone = new \DateTimeZone('Pacific/Honolulu');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-05 12:30:00', $timezone), $timezone);
+
+        (new SubscriptionGrantLifecycleService($grantService, $grantRepo, $clock))->renew((object) ['id' => 55]);
+
+        self::assertSame(['2026-03-10 23:59:59'], $grantService->extended);
+    }
+
     public function test_pause_only_pauses_active_subscription_grants(): void
     {
         $grantService = new class() extends AccessGrantService {

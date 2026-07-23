@@ -5,11 +5,18 @@ namespace FChubMemberships\Email;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Support\Logger;
+use FChubMemberships\Support\Clock;
 
 class AccessExpiringEmail
 {
     private const SETTING_KEY = 'email_access_expiring';
     private const TEMPLATE_KEY = 'access_expiring';
+    private Clock $clock;
+
+    public function __construct(?Clock $clock = null)
+    {
+        $this->clock = $clock ?? new Clock();
+    }
 
     /**
      * Send the access expiring notification.
@@ -37,7 +44,7 @@ class AccessExpiringEmail
         $expiresAt = $data['expires_at'] ?? '';
         $daysLeft  = '';
         if ($expiresAt) {
-            $diff     = (new \DateTime($expiresAt))->diff(new \DateTime('now'));
+            $diff = $this->clock->parseLocal($expiresAt)->diff($this->clock->now());
             $daysLeft = max(0, (int) $diff->days);
         }
 
@@ -66,11 +73,12 @@ class AccessExpiringEmail
         global $wpdb;
 
         $settings   = get_option('fchub_memberships_settings', []);
-        $noticeDays = (int) ($settings['expiry_notice_days'] ?? 7);
+        $noticeDays = (int) ($settings['expiry_warning_days'] ?? $settings['expiry_notice_days'] ?? 7);
 
         $table   = $wpdb->prefix . 'fchub_membership_grants';
-        $cutoff  = gmdate('Y-m-d H:i:s', strtotime("+{$noticeDays} days"));
-        $now     = gmdate('Y-m-d H:i:s');
+        $nowValue = $this->clock->now();
+        $cutoff = $this->clock->storage($this->clock->plusDays($noticeDays, $nowValue));
+        $now = $this->clock->storage($nowValue);
 
         // Find active grants expiring within notice period, not yet notified
         $grants = $wpdb->get_results($wpdb->prepare(
@@ -107,7 +115,10 @@ class AccessExpiringEmail
 
             $planTitle = $plan ? $plan->title : __('Membership', 'fchub-memberships');
 
-            $daysLeft = max(0, (int) ceil((strtotime($grant->expires_at) - time()) / DAY_IN_SECONDS));
+            $daysLeft = $this->clock->calendarDaysUntil(
+                $this->clock->parseLocal($grant->expires_at),
+                $nowValue
+            );
 
             // Fire hook for FluentCRM automation triggers (always, regardless of email setting)
             $grantArray = [
@@ -133,7 +144,7 @@ class AccessExpiringEmail
             }
 
             // Mark as notified
-            $meta['expiry_notified'] = gmdate('Y-m-d H:i:s');
+            $meta['expiry_notified'] = $now;
             $wpdb->update(
                 $table,
                 ['meta' => wp_json_encode($meta)],

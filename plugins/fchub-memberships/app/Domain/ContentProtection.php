@@ -21,6 +21,8 @@ class ContentProtection
         // Content filtering
         add_filter('the_content', [$this, 'filterContent'], 999);
         add_filter('get_the_excerpt', [$this, 'filterExcerpt'], 999);
+        add_filter('the_content_feed', [$this, 'filterFeedContent'], 999);
+        add_filter('the_excerpt_rss', [$this, 'filterFeedExcerpt'], 999);
 
         // Template redirect for full-page protection
         add_action('template_redirect', [$this, 'templateRedirect']);
@@ -152,6 +154,60 @@ class ContentProtection
         }
 
         return '';
+    }
+
+    /**
+     * Filter full feed content without exposing teaser or source content.
+     */
+    public function filterFeedContent(string $content): string
+    {
+        return $this->filterFeedOutput($content);
+    }
+
+    /**
+     * Filter RSS excerpts without exposing teaser or source content.
+     */
+    public function filterFeedExcerpt(string $excerpt): string
+    {
+        return $this->filterFeedOutput($excerpt);
+    }
+
+    private function filterFeedOutput(string $output): string
+    {
+        $post = get_post();
+        if (!$post) {
+            return $output;
+        }
+
+        $postType = $post->post_type;
+        $postId = (string) $post->ID;
+
+        if (!$this->evaluator->isProtected(Constants::PROVIDER_WORDPRESS_CORE, $postType, $postId)) {
+            return $output;
+        }
+
+        $userId = get_current_user_id();
+        $context = 'logged_out';
+
+        if ($userId) {
+            $result = $this->evaluator->evaluate(
+                $userId,
+                Constants::PROVIDER_WORDPRESS_CORE,
+                $postType,
+                $postId
+            );
+
+            if ($result['allowed'] || $this->hasAccessViaTaxonomy($userId, $post)) {
+                return $output;
+            }
+
+            $context = $this->contextForEvaluation($result);
+        }
+
+        $protectionRepo = new ProtectionRuleRepository();
+        $rule = $protectionRepo->findByResource($postType, $postId);
+
+        return $this->renderRestrictionBlock($rule, $context, $postType, $postId);
     }
 
     /**

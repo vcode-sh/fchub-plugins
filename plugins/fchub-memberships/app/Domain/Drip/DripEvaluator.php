@@ -7,16 +7,23 @@ defined('ABSPATH') || exit;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRuleRepository;
 use FChubMemberships\Domain\Plan\PlanRuleResolver;
+use FChubMemberships\Support\Clock;
 
 class DripEvaluator
 {
     private GrantRepository $grantRepo;
     private PlanRuleResolver $ruleResolver;
+    private Clock $clock;
 
-    public function __construct()
+    public function __construct(
+        ?GrantRepository $grantRepo = null,
+        ?PlanRuleResolver $ruleResolver = null,
+        ?Clock $clock = null
+    )
     {
-        $this->grantRepo = new GrantRepository();
-        $this->ruleResolver = new PlanRuleResolver();
+        $this->grantRepo = $grantRepo ?? new GrantRepository();
+        $this->ruleResolver = $ruleResolver ?? new PlanRuleResolver();
+        $this->clock = $clock ?? new Clock();
     }
 
     /**
@@ -34,8 +41,11 @@ class DripEvaluator
             return ['available' => true, 'reason' => 'immediate'];
         }
 
-        $dripTime = strtotime($grant['drip_available_at']);
-        if ($dripTime <= time()) {
+        $dripAvailableAt = $this->clock->parseLocal($grant['drip_available_at']);
+        $dripTime = $dripAvailableAt->getTimestamp();
+        $nowValue = $this->clock->now();
+        $now = $nowValue->getTimestamp();
+        if ($dripTime <= $now) {
             return ['available' => true, 'reason' => 'unlocked'];
         }
 
@@ -43,7 +53,7 @@ class DripEvaluator
             'available'    => false,
             'reason'       => 'drip_locked',
             'available_at' => $grant['drip_available_at'],
-            'days_left'    => max(0, (int) ceil(($dripTime - time()) / DAY_IN_SECONDS)),
+            'days_left'    => $this->clock->calendarDaysUntil($dripAvailableAt, $nowValue),
         ];
     }
 
@@ -54,7 +64,8 @@ class DripEvaluator
     {
         $rules = $this->ruleResolver->resolveUniqueRules($planId);
         $grants = $this->grantRepo->getByUserId($userId, ['plan_id' => $planId, 'status' => 'active']);
-        $now = time();
+        $nowValue = $this->clock->now();
+        $now = $nowValue->getTimestamp();
 
         // Index grants by resource key for quick lookup
         $grantIndex = [];
@@ -84,13 +95,13 @@ class DripEvaluator
             if ($grant) {
                 if (empty($grant['drip_available_at'])) {
                     $item['status'] = 'unlocked';
-                } elseif (strtotime($grant['drip_available_at']) <= $now) {
+                } elseif (($dripAvailableAt = $this->clock->parseLocal($grant['drip_available_at']))->getTimestamp() <= $now) {
                     $item['status'] = 'unlocked';
                     $item['available_at'] = $grant['drip_available_at'];
                 } else {
                     $item['status'] = 'upcoming';
                     $item['available_at'] = $grant['drip_available_at'];
-                    $item['days_left'] = max(0, (int) ceil((strtotime($grant['drip_available_at']) - $now) / DAY_IN_SECONDS));
+                    $item['days_left'] = $this->clock->calendarDaysUntil($dripAvailableAt, $nowValue);
                 }
             }
 

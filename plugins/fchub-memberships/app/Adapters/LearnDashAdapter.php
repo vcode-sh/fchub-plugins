@@ -5,8 +5,9 @@ namespace FChubMemberships\Adapters;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Adapters\Contracts\AccessAdapterInterface;
+use FChubMemberships\Adapters\Contracts\BatchResourceLabelAdapterInterface;
 
-class LearnDashAdapter implements AccessAdapterInterface
+class LearnDashAdapter implements AccessAdapterInterface, BatchResourceLabelAdapterInterface
 {
     public function supports(string $resourceType): bool
     {
@@ -167,6 +168,38 @@ class LearnDashAdapter implements AccessAdapterInterface
             : __('Group', 'fchub-memberships');
 
         return sprintf('%s #%s', $prefix, $resourceId);
+    }
+
+    public function getResourceLabels(string $resourceType, array $resourceIds): array
+    {
+        $resourceIds = array_values(array_unique(array_map('strval', $resourceIds)));
+        $prefix = $resourceType === 'ld_course'
+            ? __('Course', 'fchub-memberships')
+            : __('Group', 'fchub-memberships');
+        $labels = [];
+        foreach ($resourceIds as $resourceId) {
+            $labels[$resourceId] = sprintf('%s #%s', $prefix, $resourceId);
+        }
+        if ($resourceIds === [] || !$this->isLearnDashActive()) {
+            return $labels;
+        }
+
+        $postType = $resourceType === 'ld_course' ? 'sfwd-courses' : 'groups';
+        $posts = get_posts([
+            'post_type' => $postType,
+            'post_status' => 'any',
+            'posts_per_page' => -1,
+            'post__in' => array_values(array_filter(array_map('intval', $resourceIds))),
+            'orderby' => 'post__in',
+        ]);
+        foreach ($posts as $post) {
+            $id = (string) $post->ID;
+            if (array_key_exists($id, $labels) && $post->post_title !== '') {
+                $labels[$id] = (string) $post->post_title;
+            }
+        }
+
+        return $labels;
     }
 
     public function searchResources(string $query, string $resourceType, int $limit = 20): array

@@ -12,6 +12,7 @@ use FChubMemberships\Http\MembershipMutationPermission;
 use FChubMemberships\Http\MembershipRestArguments;
 use FChubMemberships\Http\IdempotentMutation;
 use FChubMemberships\Support\AdminRequestFilters;
+use FChubMemberships\Support\CsvSanitizer;
 
 class MemberController
 {
@@ -281,17 +282,33 @@ class MemberController
     public static function revokeResultResponse(array $result): \WP_REST_Response
     {
         $revoked = (int) ($result['revoked'] ?? 0);
+        $graceStarted = (int) ($result['grace_started'] ?? 0);
         $retained = (int) ($result['retained'] ?? 0);
         $failed = (int) ($result['failed'] ?? 0);
 
         if ($failed > 0 || (array_key_exists('success', $result) && $result['success'] === false)) {
-            $partial = $revoked > 0 || $retained > 0 || !empty($result['partial']);
+            $partial = $revoked > 0 || $graceStarted > 0 || $retained > 0 || !empty($result['partial']);
             return new \WP_REST_Response([
                 'data' => $result,
                 'message' => $partial
-                    ? sprintf(__('%d resources were revoked, %d retained, and %d failed. Access was partially revoked.', 'fchub-memberships'), $revoked, $retained, $failed)
+                    ? sprintf(
+                        __('%d resources were revoked, %d scheduled after grace, %d retained, and %d failed. Access was partially revoked or scheduled.', 'fchub-memberships'),
+                        $revoked,
+                        $graceStarted,
+                        $retained,
+                        $failed
+                    )
                     : sprintf(__('Access could not be revoked. %d resources failed.', 'fchub-memberships'), $failed),
             ], $partial ? 207 : 502);
+        }
+
+        if ($graceStarted > 0) {
+            return new \WP_REST_Response([
+                'data' => $result,
+                'message' => $revoked > 0
+                    ? sprintf(__('%d resources revoked and %d scheduled after grace.', 'fchub-memberships'), $revoked, $graceStarted)
+                    : __('Access revocation scheduled for the end of the grace period.', 'fchub-memberships'),
+            ]);
         }
 
         return new \WP_REST_Response([
@@ -437,10 +454,27 @@ class MemberController
         }
         return (new IdempotentMutation())->execute($request, 'bulk_revoke', static function () use ($userIds, $planId, $reason): \WP_REST_Response {
             $result = self::accessGrantService()->bulkRevoke($userIds, $planId, ['reason' => $reason]);
-            $status = $result['failed'] > 0 ? ($result['revoked'] > 0 ? 207 : 502) : 200;
-            $message = $result['failed'] > 0
-                ? sprintf(__('%d memberships revoked and %d failed.', 'fchub-memberships'), $result['revoked'], $result['failed'])
-                : sprintf(__('%d memberships revoked.', 'fchub-memberships'), $result['revoked']);
+            $graceStarted = (int) ($result['grace_started'] ?? 0);
+            $succeeded = (int) $result['revoked'] + $graceStarted;
+            $status = $result['failed'] > 0 ? ($succeeded > 0 ? 207 : 502) : 200;
+            $message = match (true) {
+                $result['failed'] > 0 => sprintf(
+                    __('%d memberships revoked, %d scheduled after grace, and %d failed.', 'fchub-memberships'),
+                    $result['revoked'],
+                    $graceStarted,
+                    $result['failed']
+                ),
+                $graceStarted > 0 && $result['revoked'] > 0 => sprintf(
+                    __('%d memberships revoked and %d scheduled after grace.', 'fchub-memberships'),
+                    $result['revoked'],
+                    $graceStarted
+                ),
+                $graceStarted > 0 => sprintf(
+                    __('%d membership revocations scheduled after grace.', 'fchub-memberships'),
+                    $graceStarted
+                ),
+                default => sprintf(__('%d memberships revoked.', 'fchub-memberships'), $result['revoked']),
+            };
             return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
         });
     }
@@ -541,7 +575,8 @@ class MemberController
             $csv .= implode(',', array_keys($rows[0])) . "\n";
             foreach ($rows as $row) {
                 $csv .= implode(',', array_map(function ($v) {
-                    return '"' . str_replace('"', '""', (string) $v) . '"';
+                    $value = CsvSanitizer::sanitizeCell((string) $v);
+                    return '"' . str_replace('"', '""', $value) . '"';
                 }, $row)) . "\n";
             }
         }

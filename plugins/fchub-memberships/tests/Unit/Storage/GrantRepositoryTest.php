@@ -4,11 +4,253 @@ declare(strict_types=1);
 
 namespace FChubMemberships\Tests\Unit\Storage;
 
+use FChubMemberships\Domain\Access\ResourceAccessPolicy;
+use FChubMemberships\Domain\Access\ResourceAccessPolicyResolver;
+use FChubMemberships\Domain\AccessEvaluator;
+use FChubMemberships\Domain\Plan\PlanRuleResolver;
 use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Storage\ProtectionRuleRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class GrantRepositoryTest extends PluginTestCase
 {
+    public function test_grant_write_clears_shared_effective_access_counts(): void
+    {
+        AccessEvaluator::clearCache();
+        $countReads = 0;
+        $countingGrants = new class($countReads) extends GrantRepository {
+            public function __construct(private int &$countReads)
+            {
+            }
+
+            public function countDistinctUsersWithResourceAccessBatch(array $policies): array
+            {
+                $this->countReads++;
+                return ['resource' => $this->countReads];
+            }
+        };
+        $policyResolver = new class extends ResourceAccessPolicyResolver {
+            public function resolveBatch(array $resources): array
+            {
+                return ['resource' => new ResourceAccessPolicy('wordpress_core', 'post', '42')];
+            }
+        };
+        $evaluator = new AccessEvaluator(
+            $countingGrants,
+            new PlanRuleResolver(),
+            new ProtectionRuleRepository(),
+            null,
+            $policyResolver
+        );
+        $resources = [
+            'resource' => [
+                'provider' => 'wordpress_core',
+                'resource_type' => 'post',
+                'resource_id' => '42',
+            ],
+        ];
+        $GLOBALS['_fchub_test_wpdb_overrides']['update'] = static fn(): int => 1;
+
+        self::assertSame(1, $evaluator->countDistinctUsersWithResourceAccessBatch($resources)['resource']);
+        self::assertTrue((new GrantRepository())->update(9, ['status' => 'paused']));
+        self::assertSame(2, $evaluator->countDistinctUsersWithResourceAccessBatch($resources)['resource']);
+        self::assertSame(2, $countReads);
+    }
+
+    public function test_batch_effective_access_count_uses_distinct_users_and_active_lineage_state(): void
+    {
+        $query = '';
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static function (string $sql) use (&$query): array {
+            $query = $sql;
+            return [
+                ['_resource_key' => 'post-42', 'member_count' => '4'],
+            ];
+        };
+        $policy = new ResourceAccessPolicy('wordpress_core', 'post', '42');
+        $policy->addPlanPath(5, [
+            'drip_type' => 'delayed',
+            'drip_delay_days' => 7,
+            'drip_date' => null,
+        ], 'resource', [
+            'provider' => 'wordpress_core',
+            'resource_type' => 'category',
+            'resource_id' => '7',
+        ]);
+        $policy->addPlanPath(9, [
+            'drip_type' => 'fixed_date',
+            'drip_delay_days' => 0,
+            'drip_date' => '2026-03-01 00:00:00',
+        ]);
+
+        $counts = (new GrantRepository())->countDistinctUsersWithResourceAccessBatch([
+            'post-42' => $policy,
+            'empty' => new ResourceAccessPolicy('wordpress_core', 'post', '99'),
+        ]);
+
+        self::assertSame(['post-42' => 4, 'empty' => 0], $counts);
+        self::assertStringContainsString('COUNT(DISTINCT access_rows.user_id)', $query);
+        self::assertStringContainsString("resource_id IN ('42', '*')", $query);
+        self::assertStringContainsString("status = 'active'", $query);
+        self::assertStringContainsString('drip_available_at IS NULL', $query);
+        self::assertStringContainsString("edge.lifecycle = 'active'", $query);
+        self::assertStringContainsString("edge.access_status = 'active'", $query);
+        self::assertStringContainsString('edge.plan_id = 5', $query);
+        self::assertStringContainsString('edge.plan_id = 9', $query);
+        self::assertStringContainsString("edge.resource_type = 'category'", $query);
+        self::assertStringContainsString("edge.resource_id = '7'", $query);
+        self::assertStringContainsString('DATE_ADD(edge.created_at, INTERVAL 7 DAY)', $query);
+        self::assertStringContainsString("'2026-03-01 00:00:00'", $query);
+    }
+
+    public function test_any_active_membership_excludes_plan_zero_in_scalar_and_batch_paths(): void
+    {
+        $queries = [];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static function (string $query) use (&$queries): array {
+            $queries[] = $query;
+            if (str_contains($query, 'fchub_membership_entitlement_edges')
+                && !str_contains($query, 'GROUP BY access_rows._resource_key')
+            ) {
+                return [
+                    [
+                        'plan_id' => 0,
+                        'provider' => 'wordpress_core',
+                        'resource_type' => 'post',
+                        'resource_id' => '42',
+                        'created_at' => '2026-01-01 00:00:00',
+                        'drip_available_at' => null,
+                        'trial_ends_at' => null,
+                        'access_status' => 'active',
+                    ],
+                    [
+                        'plan_id' => 5,
+                        'provider' => 'wordpress_core',
+                        'resource_type' => 'post',
+                        'resource_id' => '42',
+                        'created_at' => '2026-01-01 00:00:00',
+                        'drip_available_at' => null,
+                        'trial_ends_at' => null,
+                        'access_status' => 'active',
+                    ],
+                ];
+            }
+
+            return [];
+        };
+
+        $repo = new GrantRepository();
+        self::assertSame([5], array_column($repo->getEffectivePlanMembershipsForUser(17), 'plan_id'));
+
+        $policy = new ResourceAccessPolicy('wordpress_core', 'post', '42');
+        $policy->allowAnyActivePlan();
+        $repo->countDistinctUsersWithResourceAccessBatch(['post-42' => $policy]);
+
+        $queryDump = implode("\n", $queries);
+        self::assertStringContainsString('edge.plan_id > 0', $queryDump);
+        self::assertStringContainsString('membership.plan_id > 0', $queryDump);
+    }
+
+    public function test_batch_legacy_resource_paths_require_the_qualifier_and_persisted_drip_gate(): void
+    {
+        $query = '';
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static function (string $sql) use (&$query): array {
+            $query = $sql;
+            return [];
+        };
+        $policy = new ResourceAccessPolicy('wordpress_core', 'post', '42');
+        $policy->addPlanPath(5, null, 'resource', [
+            'provider' => 'wordpress_core',
+            'resource_type' => 'category',
+            'resource_id' => '7',
+        ]);
+
+        (new GrantRepository())->countDistinctUsersWithResourceAccessBatch(['post-42' => $policy]);
+
+        self::assertStringContainsString("membership.provider = 'wordpress_core'", $query);
+        self::assertStringContainsString("membership.resource_type = 'category'", $query);
+        self::assertStringContainsString("membership.resource_id = '7'", $query);
+        self::assertStringContainsString(
+            "membership.drip_available_at IS NULL OR membership.drip_available_at <= ",
+            $query
+        );
+    }
+
+    public function test_typed_membership_read_error_stops_before_legacy_fallback(): void
+    {
+        $legacyFallbackRead = false;
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static function (
+            string $query,
+            string $output,
+            \wpdb $wpdb
+        ) use (&$legacyFallbackRead): array {
+            if (str_contains($query, 'fchub_membership_entitlement_edges')) {
+                $wpdb->last_error = 'typed edge read failed';
+                return [];
+            }
+
+            $legacyFallbackRead = true;
+            $wpdb->last_error = '';
+            return [];
+        };
+
+        try {
+            (new GrantRepository())->getEffectivePlanMembershipsForUser(17);
+            self::fail('Expected the typed edge read failure to stop legacy fallback.');
+        } catch (\RuntimeException $exception) {
+            self::assertStringContainsString('effective plan memberships', $exception->getMessage());
+        }
+
+        self::assertFalse($legacyFallbackRead);
+    }
+
+    public function test_batch_effective_access_read_errors_are_explicit(): void
+    {
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static function (
+            string $query,
+            string $output,
+            \wpdb $wpdb
+        ): array {
+            $wpdb->last_error = 'batch access read failed';
+            return [];
+        };
+        $policy = new ResourceAccessPolicy('wordpress_core', 'post', '42');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('effective resource access counts');
+
+        (new GrantRepository())->countDistinctUsersWithResourceAccessBatch(['post-42' => $policy]);
+    }
+
+    public function test_find_by_grant_key_throws_when_sql_fails_instead_of_reporting_missing(): void
+    {
+        $database = new class extends \wpdb {
+            public string $last_error = 'aggregate read failed';
+        };
+        $GLOBALS['wpdb'] = $database;
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static fn(): null => null;
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to read grant by key');
+
+        (new GrantRepository())->findByGrantKey(str_repeat('a', 32));
+    }
+
+    public function test_expiring_window_uses_site_local_calendar_days_across_dst(): void
+    {
+        $query = '';
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_var'] = static function (string $sql) use (&$query): int {
+            $query = $sql;
+            return 0;
+        };
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-28 12:30:00', $timezone), $timezone);
+
+        (new GrantRepository($clock))->countExpiringSoon(1);
+
+        self::assertStringContainsString("expires_at > '2026-03-28 12:30:00'", $query);
+        self::assertStringContainsString("expires_at <= '2026-03-29 12:30:00'", $query);
+    }
+
     private function sampleGrantRow(array $overrides = []): array
     {
         return array_merge([

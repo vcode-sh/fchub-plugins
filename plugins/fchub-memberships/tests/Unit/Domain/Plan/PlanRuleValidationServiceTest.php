@@ -136,4 +136,71 @@ final class PlanRuleValidationServiceTest extends PluginTestCase
             'malformed' => ['12abc'],
         ];
     }
+
+    public function test_slug_identity_requires_an_already_sanitised_non_numeric_resource_slug(): void
+    {
+        $service = new PlanRuleValidationService(new class() extends ResourceTypeRegistry {
+            public function isValid(string $key): bool
+            {
+                return $key === 'future_slug_resource';
+            }
+
+            public function get(string $key): ?array
+            {
+                return [
+                    'provider' => 'future_provider',
+                    'allow_all' => false,
+                    'identifier' => 'slug',
+                ];
+            }
+        });
+
+        self::assertNull($service->validate([[
+            'resource_type' => 'future_slug_resource',
+            'resource_id' => 'gold-member',
+            'drip_type' => 'immediate',
+        ]]));
+        foreach (['', 'Gold Member', 'gold_member', '*', '12'] as $resourceId) {
+            self::assertStringContainsString('sanitised resource slug', (string) $service->validate([[
+                'resource_type' => 'future_slug_resource',
+                'resource_id' => $resourceId,
+                'drip_type' => 'immediate',
+            ]]));
+        }
+    }
+
+    public function test_fluentcommunity_badge_slug_must_exist_in_the_installed_catalogue(): void
+    {
+        $service = new PlanRuleValidationService(
+            new class() extends ResourceTypeRegistry {
+                public function isValid(string $key): bool
+                {
+                    return $key === 'fc_badge';
+                }
+
+                public function get(string $key): ?array
+                {
+                    return [
+                        'provider' => 'fluent_community',
+                        'allow_all' => false,
+                        'identifier' => 'slug',
+                    ];
+                }
+            },
+            static fn(): array => [
+                'founding-member' => ['title' => 'Founding Member'],
+            ]
+        );
+
+        self::assertNull($service->validate([[
+            'resource_type' => 'fc_badge',
+            'resource_id' => 'founding-member',
+            'drip_type' => 'immediate',
+        ]]));
+        self::assertStringContainsString('is not installed', (string) $service->validate([[
+            'resource_type' => 'fc_badge',
+            'resource_id' => 'unknown-badge',
+            'drip_type' => 'immediate',
+        ]]));
+    }
 }

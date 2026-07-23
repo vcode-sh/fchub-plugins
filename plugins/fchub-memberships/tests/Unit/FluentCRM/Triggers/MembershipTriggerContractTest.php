@@ -40,6 +40,7 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Triggers {
     use FChubMemberships\Storage\GrantRepository;
     use FChubMemberships\Storage\GrantSourceRepository;
     use FChubMemberships\Storage\PlanRepository;
+    use FChubMemberships\Support\Clock;
     use FChubMemberships\Tests\Unit\PluginTestCase;
     use PHPUnit\Framework\Attributes\PreserveGlobalState;
     use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -1060,7 +1061,9 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Triggers {
                 $this->funnel(['plan_ids' => [7], 'min_days_left' => 5, 'max_days_left' => 5])
             );
 
-            $expiresAt = gmdate('Y-m-d H:i:s', time() + (5 * DAY_IN_SECONDS));
+            $timezone = new \DateTimeZone('UTC');
+            $clock = new Clock(new \DateTimeImmutable('2026-03-13 22:00:00', $timezone), $timezone);
+            $expiresAt = $clock->storage($clock->plusDays(5));
             $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static fn(): array => [(object) [
                 'id' => 77,
                 'user_id' => 44,
@@ -1073,7 +1076,7 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Triggers {
                 'slug' => 'gold',
             ];
 
-            (new AccessExpiringEmail())->sendPendingNotifications();
+            (new AccessExpiringEmail($clock))->sendPendingNotifications();
 
             $arguments = $GLOBALS['_fchub_test_trigger_bridge_args']['fchub_memberships/grant_expiring_soon'];
             self::assertSame(77, $arguments[0][0]['id']);
@@ -1096,7 +1099,9 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Triggers {
                 $this->funnel(['plan_ids' => [7], 'min_days_left' => 2, 'max_days_left' => 2])
             );
 
-            $trialEndsAt = gmdate('Y-m-d H:i:s', time() + (2 * DAY_IN_SECONDS));
+            $timezone = new \DateTimeZone('UTC');
+            $clock = new Clock(new \DateTimeImmutable('2026-03-13 22:00:00', $timezone), $timezone);
+            $trialEndsAt = $clock->storage($clock->plusDays(2));
             $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = static fn(): array => [[
                 'id' => 78,
                 'user_id' => 44,
@@ -1108,7 +1113,7 @@ namespace FChubMemberships\Tests\Unit\FluentCRM\Triggers {
                 'title' => 'Gold',
                 'slug' => 'gold',
             ];
-            $service = new TrialLifecycleService();
+            $service = new TrialLifecycleService($clock);
             (new \ReflectionProperty(TrialLifecycleService::class, 'queries'))->setValue(
                 $service,
                 new TrialGrantQueryService()

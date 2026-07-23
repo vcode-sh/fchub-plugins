@@ -5,6 +5,7 @@ namespace FChubMemberships\Frontend;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Domain\ContentProtection;
+use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Frontend\FrontendAssets;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Storage\PlanRuleRepository;
@@ -184,23 +185,19 @@ class Shortcodes
         }
 
         $grantRepo = new GrantRepository();
-        $grants = $grantRepo->getByUserId($userId, ['plan_id' => $plan['id'], 'status' => 'active']);
+        $grants = self::effectivePlanMemberships($grantRepo, $userId, (int) $plan['id']);
 
         if (empty($grants)) {
             return '';
         }
 
-        $now = current_time('mysql');
-        $total = count($grants);
-        $unlocked = 0;
+        $progress = (new AccessEvaluator())->getDripProgress($userId, (int) $plan['id']);
 
-        foreach ($grants as $grant) {
-            if (empty($grant['drip_available_at']) || $grant['drip_available_at'] <= $now) {
-                $unlocked++;
-            }
-        }
-
-        return self::buildProgressBar($unlocked, $total, $plan['title']);
+        return self::buildProgressBar(
+            (int) $progress['unlocked'],
+            (int) $progress['total'],
+            $plan['title']
+        );
     }
 
     /**
@@ -230,6 +227,7 @@ class Shortcodes
         $planRepo = new PlanRepository();
         $grantRepo = new GrantRepository();
         $now = current_time('mysql');
+        $dripLocked = null;
 
         foreach ($planSlugs as $slug) {
             $plan = $planRepo->findBySlug($slug);
@@ -237,18 +235,9 @@ class Shortcodes
                 continue;
             }
 
-            $grants = $grantRepo->getByUserId($userId, ['plan_id' => $plan['id'], 'status' => 'active']);
+            $grants = self::effectivePlanMemberships($grantRepo, $userId, (int) $plan['id']);
 
             foreach ($grants as $grant) {
-                // Skip if starts_at is in the future
-                if (!empty($grant['starts_at']) && $grant['starts_at'] > $now) {
-                    continue;
-                }
-                // Skip if expired
-                if (!empty($grant['expires_at']) && $grant['expires_at'] <= $now) {
-                    continue;
-                }
-
                 // If checking a specific resource, match it
                 if (!empty($resourceType) && !empty($resourceId)) {
                     if ($grant['resource_type'] !== $resourceType || $grant['resource_id'] !== $resourceId) {
@@ -258,22 +247,34 @@ class Shortcodes
 
                 // Check drip availability
                 if (!empty($grant['drip_available_at']) && $grant['drip_available_at'] > $now) {
-                    return [
+                    $candidate = [
                         'status'           => 'drip_locked',
                         'drip_available_at' => $grant['drip_available_at'],
                     ];
+                    if ($dripLocked === null
+                        || $candidate['drip_available_at'] < $dripLocked['drip_available_at']
+                    ) {
+                        $dripLocked = $candidate;
+                    }
+                    continue;
                 }
 
                 return ['status' => 'granted'];
             }
-
-            // If no specific resource check, having any active grant for this plan is enough
-            if ((empty($resourceType) || empty($resourceId)) && !empty($grants)) {
-                return ['status' => 'granted'];
-            }
         }
 
-        return ['status' => 'denied'];
+        return $dripLocked ?? ['status' => 'denied'];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function effectivePlanMemberships(
+        GrantRepository $grantRepo,
+        int $userId,
+        int $planId
+    ): array {
+        return $grantRepo->getEffectivePlanMembershipsForUserByPlan($userId, $planId);
     }
 
     /**

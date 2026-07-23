@@ -94,6 +94,56 @@ final class MemberControllerActivityExportTest extends PluginTestCase
         self::assertStringContainsString('"alice@example.com"', $bulk['csv']);
     }
 
+    public function test_bulk_export_neutralises_formula_prefixes_in_every_csv_cell(): void
+    {
+        $GLOBALS['_fchub_test_users'][21] = (object) [
+            'ID' => 21,
+            'display_name' => '+display',
+            'user_email' => '=email',
+        ];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = fn(): array => [$this->grantRow([
+            'status' => '@status',
+            'source_type' => "\tsource",
+            'created_at' => "\rcreated",
+            'expires_at' => "\nexpires",
+        ])];
+        $GLOBALS['_fchub_test_wpdb_overrides']['get_row'] = static fn(): array => [
+            'id' => 5,
+            'title' => '-plan',
+            'slug' => 'plan',
+            'description' => '',
+            'status' => 'active',
+            'level' => 0,
+            'duration_type' => 'lifetime',
+            'duration_days' => null,
+            'trial_days' => 0,
+            'grace_period_days' => 0,
+            'includes_plan_ids' => '[]',
+            'restriction_message' => null,
+            'redirect_url' => null,
+            'settings' => '{}',
+            'meta' => '{}',
+            'created_at' => '2026-01-01 00:00:00',
+            'updated_at' => '2026-01-01 00:00:00',
+        ];
+
+        $csv = MemberController::bulkExport(new \WP_REST_Request('POST', '/members/bulk-export', [
+            'user_ids' => [21],
+        ]))->get_data()['csv'];
+
+        foreach ([
+            "\"'=email\"",
+            "\"'+display\"",
+            "\"'-plan\"",
+            "\"'@status\"",
+            "\"'\tsource\"",
+            "\"'\rcreated\"",
+            "\"'\nexpires\"",
+        ] as $safeCell) {
+            self::assertStringContainsString($safeCell, $csv);
+        }
+    }
+
     public function test_activity_and_audit_log_merge_and_paginate_member_events(): void
     {
         $GLOBALS['_fchub_test_wpdb_overrides']['get_results'] = fn(string $query): array => match (true) {

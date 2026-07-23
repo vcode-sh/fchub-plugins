@@ -6,18 +6,18 @@ defined('ABSPATH') || exit;
 
 use FChubMemberships\Support\Logger;
 use FChubMemberships\Storage\GrantRepository;
+use FChubMemberships\Domain\Lifecycle\MembershipLifecycleCoordinator;
 
 /**
  * Cron job that maintains membership grants while FluentCart owns subscription validity events.
  */
 class SubscriptionValidityWatcher
 {
-    private SubscriptionGrantLifecycleService $subscriptionGrants;
-    private SubscriptionValidityCheckService $validityChecks;
     private SubscriptionPaymentFailureService $paymentFailures;
+    private MembershipLifecycleCoordinator $coordinator;
 
     public function __construct(
-        ?SubscriptionGrantLifecycleService $subscriptionGrants = null,
+        ?MembershipLifecycleCoordinator $coordinator = null,
         ?GrantRepository $grantRepo = null,
         ?AccessGrantService $grantService = null
     )
@@ -25,9 +25,8 @@ class SubscriptionValidityWatcher
         $grantRepo = $grantRepo ?? new GrantRepository();
         $grantService = $grantService ?? new AccessGrantService();
 
-        $this->subscriptionGrants = $subscriptionGrants ?? new SubscriptionGrantLifecycleService();
-        $this->validityChecks = new SubscriptionValidityCheckService($grantService);
         $this->paymentFailures = new SubscriptionPaymentFailureService($grantRepo);
+        $this->coordinator = $coordinator ?? new MembershipLifecycleCoordinator($grantService, null, $grantRepo);
     }
 
     public function registerHooks(): void
@@ -35,6 +34,9 @@ class SubscriptionValidityWatcher
         // Event-based hooks (fired via EventDispatcher, no /payments/ prefix).
         add_action('fluent_cart/subscription_renewed', [$this, 'onSubscriptionRenewed'], 10, 1);
         add_action('fluent_cart/subscription_canceled', [$this, 'onSubscriptionCancelled'], 10, 1);
+        add_action('fluent_cart/subscription_eot', [$this, 'onSubscriptionEndOfTerm'], 10, 1);
+        add_action('fluent_cart/subscription_expired_validity', [$this, 'onSubscriptionExpired'], 10, 1);
+        add_action('fluent_cart/subscription_reactivated', [$this, 'onSubscriptionReactivated'], 10, 1);
 
         // Dynamic status hooks (fired via /payments/ prefix, no event class exists).
         add_action('fluent_cart/payments/subscription_paused', [$this, 'onSubscriptionPaused'], 10, 1);
@@ -47,10 +49,7 @@ class SubscriptionValidityWatcher
 
     public function onSubscriptionRenewed($data): void
     {
-        $subscription = is_array($data) ? ($data['subscription'] ?? null) : $data;
-        if ($subscription) {
-            $this->handleSubscriptionRenewed($subscription);
-        }
+        $this->coordinator->renew(is_array($data) ? $data : ['subscription' => $data]);
     }
 
     public function onSubscriptionCancelled($data): void
@@ -82,27 +81,37 @@ class SubscriptionValidityWatcher
      */
     public function check(): void
     {
-        $this->validityChecks->run();
+        $this->coordinator->checkValidity();
     }
 
     private function handleSubscriptionPaused($subscription): void
     {
-        $this->subscriptionGrants->pause($subscription);
+        $this->coordinator->pause($subscription);
     }
 
     private function handleSubscriptionResumed($subscription): void
     {
-        $this->subscriptionGrants->resume($subscription);
+        $this->coordinator->resume($subscription);
     }
 
     private function handleSubscriptionCancelled($subscription): void
     {
-        $this->subscriptionGrants->cancel($subscription);
+        $this->coordinator->cancel($subscription);
     }
 
-    private function handleSubscriptionRenewed($subscription): void
+    public function onSubscriptionEndOfTerm($data): void
     {
-        $this->subscriptionGrants->renew($subscription);
+        $this->coordinator->endOfTerm(is_array($data) ? $data : ['subscription' => $data]);
+    }
+
+    public function onSubscriptionExpired($data): void
+    {
+        $this->coordinator->expire(is_array($data) ? $data : ['subscription' => $data]);
+    }
+
+    public function onSubscriptionReactivated($data): void
+    {
+        $this->coordinator->reactivate(is_array($data) ? $data : ['subscription' => $data]);
     }
 
     /**

@@ -19,6 +19,7 @@ final readonly class MembershipActionOutcome
         'total',
         'failed',
         'revoked',
+        'grace_started',
         'retained',
         'affected',
     ];
@@ -69,6 +70,10 @@ final readonly class MembershipActionOutcome
 
         if ($details['failed'] > 0 || empty($result['success'])) {
             return new self(false, false, 'failed', $details);
+        }
+
+        if ($details['grace_started'] > 0) {
+            return new self(true, false, 'deferred', $details);
         }
 
         if ($details['revoked'] === 0) {

@@ -14,6 +14,7 @@ use FChubMemberships\Storage\DripScheduleRepository;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\GrantSourceRepository;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 // Stubs needed by GrantCreationService -> AuditLogger
@@ -29,6 +30,24 @@ require_once dirname(__DIR__, 2) . '/stubs/controller-stubs.php';
  */
 final class ContextWiringBugHuntTest extends PluginTestCase
 {
+    public function test_grant_creation_uses_site_local_clock_for_delayed_drip(): void
+    {
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-28 12:30:00', $timezone), $timezone);
+        $service = new GrantCreationService(
+            new class extends GrantRepository {},
+            new class extends GrantSourceRepository {},
+            new class extends DripScheduleRepository {},
+            new GrantAdapterRegistry([]),
+            $clock
+        );
+        $method = new \ReflectionMethod($service, 'calculateDripDate');
+
+        $result = $method->invoke($service, ['drip_type' => 'delayed', 'drip_delay_days' => 1]);
+
+        self::assertSame('2026-03-29 12:30:00', $result);
+    }
+
 
     // =========================================================================
     // 1. GrantCreationService: renewal path does NOT merge context meta

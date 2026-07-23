@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMemberships\Tests\Unit\Domain;
 
 use FChubMemberships\Domain\AccessGrantService;
+use FChubMemberships\Domain\Event\EventClaimResult;
 use FChubMemberships\Domain\GrantPlanContextService;
 use FChubMemberships\Domain\GrantNotificationService;
 use FChubMemberships\Domain\MembershipModeService;
@@ -18,7 +19,39 @@ use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class AccessGrantServiceTest extends PluginTestCase
 {
-    public function test_service_covers_grant_revoke_bulk_and_lock_wrappers(): void
+    public function test_bulk_revoke_separates_immediate_deferred_and_failed_users(): void
+    {
+        $service = new class extends AccessGrantService {
+            public function __construct()
+            {
+            }
+
+            public function revokePlan(int $userId, int $planId, array $context = []): array
+            {
+                return match ($userId) {
+                    9 => ['success' => true, 'revoked' => 1, 'grace_started' => 0, 'retained' => 0, 'failed' => 0],
+                    10 => ['success' => true, 'revoked' => 0, 'grace_started' => 1, 'retained' => 0, 'failed' => 0],
+                    default => [
+                        'success' => false,
+                        'revoked' => 0,
+                        'grace_started' => 0,
+                        'retained' => 0,
+                        'failed' => 1,
+                        'errors' => [['message' => 'Provider unavailable']],
+                    ],
+                };
+            }
+        };
+
+        $result = $service->bulkRevoke([9, 10, 11], 5, ['reason' => 'Owner request']);
+
+        self::assertSame(1, $result['revoked']);
+        self::assertSame(1, $result['grace_started']);
+        self::assertSame(1, $result['failed']);
+        self::assertStringContainsString('Provider unavailable', $result['errors'][0]);
+    }
+
+    public function test_service_covers_plan_bulk_maintenance_and_lock_wrappers(): void
     {
         $lockPayloads = [];
 
@@ -156,9 +189,32 @@ final class AccessGrantServiceTest extends PluginTestCase
             {
             }
 
-            public function acquire(array $data): bool
+            public function claim(
+                string $eventHash,
+                array $context,
+                string $ownerToken,
+                int $leaseSeconds = 300
+            ): EventClaimResult {
+                $this->payloads[] = ['claim', $eventHash, $context, $ownerToken, $leaseSeconds];
+
+                return EventClaimResult::acquired();
+            }
+
+            public function succeed(string $eventHash, string $ownerToken): bool
             {
-                $this->payloads[] = $data;
+                $this->payloads[] = ['succeed', $eventHash, $ownerToken];
+
+                return true;
+            }
+
+            public function fail(
+                string $eventHash,
+                string $ownerToken,
+                string $error,
+                bool $retryable = true
+            ): bool {
+                $this->payloads[] = ['fail', $eventHash, $ownerToken, $error, $retryable];
+
                 return true;
             }
         };
@@ -208,36 +264,49 @@ final class AccessGrantServiceTest extends PluginTestCase
 
         $grant = $service->grantPlan(9, 5, []);
         $manual = $service->manualGrant(9, 5, '2026-04-01 00:00:00');
-        $resource = $service->grantResource(9, 'wordpress_core', 'post', '55', []);
-        $revokePlan = $service->revokePlan(9, 5, ['reason' => 'Stop']);
-        $revokeSource = $service->revokeBySource(77, 'order', ['reason' => 'Stop']);
         $extend = $service->extendExpiry(9, 5, '2026-05-01 00:00:00', 88);
         $pause = $service->pauseGrant(100, 'Paused');
         $resume = $service->resumeGrant(100);
         $bulkGrant = $service->bulkGrant([9, 10], 5, []);
-        $bulkRevoke = $service->bulkRevoke([9, 10], 5, ['reason' => 'Stop']);
-        $locked = $service->acquireEventLock(99, 7, 'created', 123);
+        self::assertTrue(method_exists(AccessGrantService::class, 'orderEventHash'));
+        $eventHash = $service->orderEventHash(99, 'product', 7, 'created', 'grant');
+        $renewalHash = $service->subscriptionRenewalEventHash([
+            'subscription' => (object) ['id' => 123],
+            'order' => (object) ['id' => 456],
+        ]);
+        $claim = $service->claimOrderEvent(99, 'product', 7, 'created', 'grant', 'owner-a', 120);
+        $succeeded = $service->succeedEventLock($eventHash, 'owner-a');
+        $failed = $service->failEventLock($eventHash, 'owner-b', 'Broken', false);
         $pausedAnchors = $service->pauseOverdueAnchorGrants();
         $termExpired = $service->expireTermExpiredGrants();
         $expired = $service->expireOverdueGrantsWithHooks();
-        $grace = $service->revokeExpiredGracePeriodGrants();
 
         self::assertSame(['created' => 0, 'updated' => 0, 'total' => 0], $grant);
         self::assertSame(['created' => 0, 'updated' => 0, 'total' => 0], $manual);
-        self::assertSame('created', $resource['action']);
-        self::assertSame(1, $revokePlan['revoked']);
-        self::assertSame(1, $revokeSource['revoked']);
         self::assertSame(1, $extend);
         self::assertSame(['success' => true, 'grant_id' => 100], $pause);
         self::assertSame(['success' => true, 'grant_id' => 100], $resume);
         self::assertSame(2, $bulkGrant['granted']);
-        self::assertSame(2, $bulkRevoke['revoked']);
-        self::assertTrue($locked);
+        self::assertSame(EventClaimResult::ACQUIRED, $claim->outcome);
+        self::assertSame(
+            hash('sha256', 'subscription:123|renewal_order:456|trigger:subscription_renewed'),
+            $renewalHash
+        );
+        self::assertTrue($succeeded);
+        self::assertTrue($failed);
         self::assertSame(1, $pausedAnchors);
         self::assertSame(1, $termExpired);
         self::assertSame(1, $expired);
-        self::assertSame(1, $grace);
-        self::assertCount(1, $lockPayloads);
-        self::assertSame(99, $lockPayloads[0]['order_id']);
+        self::assertSame([
+            [
+                'claim',
+                hash('sha256', 'order:99|scope:product|feed:7|trigger:created|mode:grant'),
+                ['order_id' => 99, 'feed_id' => 7, 'trigger' => 'created'],
+                'owner-a',
+                120,
+            ],
+            ['succeed', $eventHash, 'owner-a'],
+            ['fail', $eventHash, 'owner-b', 'Broken', false],
+        ], $lockPayloads);
     }
 }

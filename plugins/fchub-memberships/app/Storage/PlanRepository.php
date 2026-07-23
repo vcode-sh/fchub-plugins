@@ -4,11 +4,24 @@ namespace FChubMemberships\Storage;
 
 defined('ABSPATH') || exit;
 
+use FChubMemberships\Domain\AccessEvaluator;
+use FChubMemberships\Domain\Plan\PlanRuleResolver;
 use FChubMemberships\Support\PlanStatus;
 
 class PlanRepository
 {
     private string $table;
+
+    /** @var array<int, array<string, mixed>|null> */
+    private static array $byId = [];
+
+    /** @var array<string, array<string, mixed>|null> */
+    private static array $bySlug = [];
+
+    /** @var array<int, array<string, mixed>>|null */
+    private static ?array $activePlans = null;
+
+    private static ?object $cacheContext = null;
 
     public function __construct()
     {
@@ -18,24 +31,104 @@ class PlanRepository
 
     public function find(int $id): ?array
     {
+        $this->ensureCacheContext();
+        if (array_key_exists($id, self::$byId)) {
+            return self::$byId[$id];
+        }
+
         global $wpdb;
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read membership plan.');
+        }
 
-        return $row ? $this->hydrate($row) : null;
+        $plan = $row ? $this->hydrate($row) : null;
+        self::$byId[$id] = $plan;
+        if ($plan !== null) {
+            self::$bySlug[(string) $plan['slug']] = $plan;
+        }
+
+        return $plan;
+    }
+
+    /**
+     * Return plans keyed by ID in the caller's first-seen order.
+     *
+     * @param int[] $ids
+     * @return array<int, array<string, mixed>>
+     */
+    public function findMany(array $ids): array
+    {
+        $this->ensureCacheContext();
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $ids),
+            static fn(int $id): bool => $id > 0
+        )));
+        if ($ids === []) {
+            return [];
+        }
+
+        $missing = array_values(array_filter(
+            $ids,
+            static fn(int $id): bool => !array_key_exists($id, self::$byId)
+        ));
+        if ($missing !== []) {
+            global $wpdb;
+            $placeholders = implode(', ', array_fill(0, count($missing), '%d'));
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$this->table} WHERE id IN ({$placeholders})",
+                ...$missing
+            ), ARRAY_A);
+            if (!empty($wpdb->last_error)) {
+                throw new \RuntimeException('Unable to read membership plans.');
+            }
+
+            foreach ($missing as $id) {
+                self::$byId[$id] = null;
+            }
+            foreach ($rows ?: [] as $row) {
+                $plan = $this->hydrate($row);
+                self::$byId[(int) $plan['id']] = $plan;
+                self::$bySlug[(string) $plan['slug']] = $plan;
+            }
+        }
+
+        $plans = [];
+        foreach ($ids as $id) {
+            if (self::$byId[$id] !== null) {
+                $plans[$id] = self::$byId[$id];
+            }
+        }
+
+        return $plans;
     }
 
     public function findBySlug(string $slug): ?array
     {
+        $this->ensureCacheContext();
+        if (array_key_exists($slug, self::$bySlug)) {
+            return self::$bySlug[$slug];
+        }
+
         global $wpdb;
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$this->table} WHERE slug = %s",
             $slug
         ), ARRAY_A);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read membership plan.');
+        }
 
-        return $row ? $this->hydrate($row) : null;
+        $plan = $row ? $this->hydrate($row) : null;
+        self::$bySlug[$slug] = $plan;
+        if ($plan !== null) {
+            self::$byId[(int) $plan['id']] = $plan;
+        }
+
+        return $plan;
     }
 
     public function all(array $filters = []): array
@@ -76,7 +169,11 @@ class PlanRepository
         }
 
         $rows = $wpdb->get_results($sql, ARRAY_A);
-        return array_map([$this, 'hydrate'], $rows ?: []);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read membership plans.');
+        }
+
+        return $this->hydrateMany($rows ?: []);
     }
 
     /**
@@ -135,7 +232,11 @@ class PlanRepository
         }
 
         $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
-        return array_map([$this, 'hydrate'], $rows ?: []);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to read membership plans.');
+        }
+
+        return $this->hydrateMany($rows ?: []);
     }
 
     public function count(array $filters = []): int
@@ -163,7 +264,12 @@ class PlanRepository
             $sql = $wpdb->prepare($sql, ...$params);
         }
 
-        return (int) $wpdb->get_var($sql);
+        $count = $wpdb->get_var($sql);
+        if (!empty($wpdb->last_error)) {
+            throw new \RuntimeException('Unable to count membership plans.');
+        }
+
+        return (int) $count;
     }
 
     public function create(array $data): int
@@ -190,7 +296,11 @@ class PlanRepository
             'updated_at'          => $now,
         ];
 
-        $wpdb->insert($this->table, $insert);
+        $created = $wpdb->insert($this->table, $insert);
+        if ($created !== false) {
+            self::invalidateAfterWrite();
+        }
+
         return (int) $wpdb->insert_id;
     }
 
@@ -225,18 +335,33 @@ class PlanRepository
             }
         }
 
-        return $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        $updated = $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        if ($updated) {
+            self::invalidateAfterWrite();
+        }
+
+        return $updated;
     }
 
     public function delete(int $id): bool
     {
         global $wpdb;
-        return $wpdb->delete($this->table, ['id' => $id]) !== false;
+        $deleted = $wpdb->delete($this->table, ['id' => $id]) !== false;
+        if ($deleted) {
+            self::invalidateAfterWrite();
+        }
+
+        return $deleted;
     }
 
     public function getActivePlans(): array
     {
-        return $this->all(['status' => 'active', 'order_by' => 'level', 'order' => 'ASC']);
+        $this->ensureCacheContext();
+        if (self::$activePlans === null) {
+            self::$activePlans = $this->all(['status' => 'active', 'order_by' => 'level', 'order' => 'ASC']);
+        }
+
+        return self::$activePlans;
     }
 
     public function getMemberCount(int $planId): int
@@ -335,7 +460,7 @@ class PlanRepository
     {
         global $wpdb;
 
-        return $wpdb->update(
+        $updated = $wpdb->update(
             $this->table,
             [
                 'scheduled_status' => $scheduledStatus,
@@ -344,6 +469,11 @@ class PlanRepository
             ],
             ['id' => $id]
         ) !== false;
+        if ($updated) {
+            self::invalidateAfterWrite();
+        }
+
+        return $updated;
     }
 
     public function getDueScheduledPlans(): array
@@ -356,7 +486,50 @@ class PlanRepository
             $now
         ), ARRAY_A);
 
-        return array_map([$this, 'hydrate'], $rows ?: []);
+        return $this->hydrateMany($rows ?: []);
+    }
+
+    public static function clearCache(): void
+    {
+        self::$byId = [];
+        self::$bySlug = [];
+        self::$activePlans = null;
+        self::$cacheContext = null;
+    }
+
+    private static function invalidateAfterWrite(): void
+    {
+        self::clearCache();
+        PlanRuleResolver::invalidateSharedCache();
+        AccessEvaluator::clearCache();
+    }
+
+    /** @param array<int, array<string, mixed>> $rows */
+    private function hydrateMany(array $rows): array
+    {
+        $this->ensureCacheContext();
+        $plans = [];
+        foreach ($rows as $row) {
+            $plan = $this->hydrate($row);
+            self::$byId[(int) $plan['id']] = $plan;
+            self::$bySlug[(string) $plan['slug']] = $plan;
+            $plans[] = $plan;
+        }
+
+        return $plans;
+    }
+
+    private function ensureCacheContext(): void
+    {
+        global $wpdb;
+        if (self::$cacheContext === $wpdb) {
+            return;
+        }
+
+        self::$byId = [];
+        self::$bySlug = [];
+        self::$activePlans = null;
+        self::$cacheContext = $wpdb;
     }
 
     private function hydrate(array $row): array

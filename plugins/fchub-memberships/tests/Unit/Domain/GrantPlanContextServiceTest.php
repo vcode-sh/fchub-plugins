@@ -7,10 +7,41 @@ namespace FChubMemberships\Tests\Unit\Domain;
 use FChubMemberships\Domain\GrantPlanContextService;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Support\Clock;
 use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class GrantPlanContextServiceTest extends PluginTestCase
 {
+    public function test_resolve_uses_site_local_calendar_days_across_dst(): void
+    {
+        $timezone = new \DateTimeZone('Europe/Warsaw');
+        $clock = new Clock(new \DateTimeImmutable('2026-03-28 12:30:00', $timezone), $timezone);
+        $plans = new class extends PlanRepository {
+            public function find(int $id): ?array
+            {
+                return [
+                    'id' => $id,
+                    'trial_days' => 1,
+                    'duration_type' => 'fixed_days',
+                    'duration_days' => 1,
+                    'meta' => ['membership_term' => ['mode' => 'custom', 'value' => 1, 'unit' => 'days']],
+                ];
+            }
+        };
+        $grants = new class extends GrantRepository {
+            public function getByUserId(int $userId, array $filters = []): array
+            {
+                return [];
+            }
+        };
+
+        $result = (new GrantPlanContextService($plans, $grants, $clock))->resolve(3, 11, []);
+
+        self::assertSame('2026-03-29 12:30:00', $result['context']['trial_ends_at']);
+        self::assertSame('2026-03-29 12:30:00', $result['context']['expires_at']);
+        self::assertSame('2026-03-29 23:59:59', $result['context']['meta']['membership_term_ends_at']);
+    }
+
     public function test_resolve_adds_trial_for_first_time_grant(): void
     {
         $plans = new class() extends PlanRepository {

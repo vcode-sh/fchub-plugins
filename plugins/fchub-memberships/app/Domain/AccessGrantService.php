@@ -3,17 +3,21 @@
 namespace FChubMemberships\Domain;
 
 use FChubMemberships\Domain\Grant\GrantCreationService;
+use FChubMemberships\Domain\Event\EventClaimResult;
 use FChubMemberships\Domain\Grant\GrantLockService;
 use FChubMemberships\Domain\Grant\GrantMaintenanceService;
 use FChubMemberships\Domain\Grant\GrantRevocationService;
 use FChubMemberships\Domain\Grant\GrantStatusService;
 use FChubMemberships\Domain\Grant\PlanGrantExecutionService;
 use FChubMemberships\Domain\Plan\PlanRuleResolver;
+use FChubMemberships\Integration\FluentCommunitySync;
 use FChubMemberships\Storage\DripScheduleRepository;
+use FChubMemberships\Storage\EntitlementEdgeRepository;
 use FChubMemberships\Storage\EventLockRepository;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\GrantSourceRepository;
 use FChubMemberships\Storage\PlanRepository;
+use FChubMemberships\Storage\ProviderOperationRepository;
 
 defined('ABSPATH') || exit;
 
@@ -35,7 +39,8 @@ class AccessGrantService
         ?GrantNotificationService $notifications = null,
         ?GrantAdapterRegistry $adapters = null,
         ?MembershipModeService $membershipModes = null,
-        ?GrantPlanContextService $planContext = null
+        ?GrantPlanContextService $planContext = null,
+        ?FluentCommunitySync $communitySync = null
     ) {
         $grantRepo = $grantRepo ?? new GrantRepository();
         $sourceRepo = $sourceRepo ?? new GrantSourceRepository();
@@ -46,9 +51,38 @@ class AccessGrantService
         $adapters = $adapters ?? new GrantAdapterRegistry();
         $membershipModes = $membershipModes ?? new MembershipModeService($grantRepo);
         $planContext = $planContext ?? new GrantPlanContextService(new PlanRepository(), $grantRepo);
+        $communitySync = $communitySync ?? new FluentCommunitySync();
 
-        $this->creation = new GrantCreationService($grantRepo, $sourceRepo, $dripRepo, $adapters);
-        $this->revocation = new GrantRevocationService($grantRepo, $sourceRepo, $dripRepo, $adapters, $notifications);
+        $edgeRepo = new EntitlementEdgeRepository();
+        $providerOperationRepo = new ProviderOperationRepository();
+        $entitlements = new Entitlement\EntitlementService(
+            $edgeRepo,
+            $grantRepo,
+            null,
+            $sourceRepo,
+            $dripRepo,
+            $providerOperationRepo
+        );
+        $providerOperations = new ProviderOperationWorker($providerOperationRepo, $edgeRepo, $adapters);
+        $this->creation = new GrantCreationService(
+            $grantRepo,
+            $sourceRepo,
+            $dripRepo,
+            $adapters,
+            null,
+            $entitlements,
+            $providerOperations
+        );
+        $this->revocation = new GrantRevocationService(
+            $grantRepo,
+            $sourceRepo,
+            $dripRepo,
+            $adapters,
+            $notifications,
+            null,
+            $entitlements,
+            $providerOperations
+        );
         $this->status = new GrantStatusService($grantRepo, $notifications);
         $this->maintenance = new GrantMaintenanceService($grantRepo, $sourceRepo, $this->status);
         $this->locks = new GrantLockService($lockRepo);
@@ -58,7 +92,9 @@ class AccessGrantService
             $planContext,
             $this->creation,
             $this->revocation,
-            $notifications
+            $notifications,
+            null,
+            $communitySync->ensurePlanReady(...)
         );
     }
 
@@ -96,9 +132,61 @@ class AccessGrantService
         ]);
     }
 
-    public function acquireEventLock(int $orderId, int $feedId, string $trigger, ?int $subscriptionId = null): bool
+    public function orderEventHash(
+        int $orderId,
+        string $scope,
+        int $integrationId,
+        string $trigger,
+        string $mode
+    ): string {
+        return $this->locks->orderEventHash($orderId, $scope, $integrationId, $trigger, $mode);
+    }
+
+    public function subscriptionRenewalEventHash(array $payload): string
     {
-        return $this->locks->acquireEventLock($orderId, $feedId, $trigger, $subscriptionId);
+        return $this->locks->subscriptionRenewalEventHash($payload);
+    }
+
+    public function claimOrderEvent(
+        int $orderId,
+        string $scope,
+        int $integrationId,
+        string $trigger,
+        string $mode,
+        string $ownerToken,
+        int $leaseSeconds = 300
+    ): EventClaimResult {
+        return $this->locks->claimOrderEvent(
+            $orderId,
+            $scope,
+            $integrationId,
+            $trigger,
+            $mode,
+            $ownerToken,
+            $leaseSeconds
+        );
+    }
+
+    public function claimSubscriptionRenewalEvent(
+        array $payload,
+        string $ownerToken,
+        int $leaseSeconds = 300
+    ): EventClaimResult {
+        return $this->locks->claimSubscriptionRenewalEvent($payload, $ownerToken, $leaseSeconds);
+    }
+
+    public function succeedEventLock(string $eventHash, string $ownerToken): bool
+    {
+        return $this->locks->succeedEventLock($eventHash, $ownerToken);
+    }
+
+    public function failEventLock(
+        string $eventHash,
+        string $ownerToken,
+        string $error,
+        bool $retryable = true
+    ): bool {
+        return $this->locks->failEventLock($eventHash, $ownerToken, $error, $retryable);
     }
 
     public function pauseGrant(int $grantId, string $reason = ''): array
@@ -139,7 +227,7 @@ class AccessGrantService
 
     public function bulkRevoke(array $userIds, int $planId, array $context = []): array
     {
-        $results = ['revoked' => 0, 'failed' => 0, 'errors' => []];
+        $results = ['revoked' => 0, 'grace_started' => 0, 'failed' => 0, 'errors' => []];
         foreach ($userIds as $userId) {
             try {
                 $result = $this->revokePlan((int) $userId, $planId, $context);
@@ -153,7 +241,11 @@ class AccessGrantService
                     continue;
                 }
 
-                $results['revoked']++;
+                if ((int) ($result['revoked'] ?? 0) > 0) {
+                    $results['revoked']++;
+                } elseif ((int) ($result['grace_started'] ?? 0) > 0) {
+                    $results['grace_started']++;
+                }
             } catch (\Throwable $e) {
                 $results['failed']++;
                 $results['errors'][] = sprintf('User #%d: %s', $userId, $e->getMessage());

@@ -9,6 +9,7 @@ defined('ABSPATH') || exit;
 use Closure;
 use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Domain\Drip\DripEvaluator;
+use FChubMemberships\Integration\Community\CommunityMemberContext;
 use FChubMemberships\Storage\GrantRepository;
 use FChubMemberships\Storage\PlanRepository;
 
@@ -18,6 +19,7 @@ final class MembershipAccountQuery
     private Closure $planById;
     private Closure $progressForPlan;
     private Closure $timelineForPlan;
+    private Closure $communityForUser;
     private MembershipAccountProjector $projector;
     private MembershipCommerceResolver $commerce;
 
@@ -27,7 +29,8 @@ final class MembershipAccountQuery
         ?callable $progressForPlan = null,
         ?callable $timelineForPlan = null,
         ?MembershipAccountProjector $projector = null,
-        ?MembershipCommerceResolver $commerce = null
+        ?MembershipCommerceResolver $commerce = null,
+        ?callable $communityForUser = null
     ) {
         $this->grantsForUser = Closure::fromCallable(
             $grantsForUser ?? static fn(int $userId): array => (new GrantRepository())->getByUserId($userId)
@@ -41,16 +44,28 @@ final class MembershipAccountQuery
         $this->timelineForPlan = Closure::fromCallable(
             $timelineForPlan ?? static fn(int $userId, int $planId): array => (new DripEvaluator())->getTimeline($userId, $planId)
         );
+        $this->communityForUser = Closure::fromCallable(
+            $communityForUser ?? static fn(int $userId): array => (new CommunityMemberContext())->forUser($userId)
+        );
         $this->projector = $projector ?? new MembershipAccountProjector();
         $this->commerce = $commerce ?? new MembershipCommerceResolver();
     }
 
     /**
-     * @return array{plans: array<int, array>, history: array<int, array>}
+     * @return array{
+     *     plans: array<int, array>,
+     *     history: array<int, array>,
+     *     community: array<string, mixed>
+     * }
      */
     public function get(int $userId): array
     {
         $projection = $this->projector->project(($this->grantsForUser)($userId));
+        try {
+            $community = ($this->communityForUser)($userId);
+        } catch (\Throwable) {
+            $community = $this->degradedCommunity();
+        }
 
         return [
             'plans' => array_map(
@@ -61,6 +76,7 @@ final class MembershipAccountQuery
                 fn(array $episode): array => $this->buildHistoryMembership($episode),
                 $projection['history']
             ),
+            'community' => $community,
         ];
     }
 
@@ -122,5 +138,25 @@ final class MembershipAccountQuery
             $episode['source_type'] ?? 'manual',
             $episode['source_id'] ?? 0,
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function degradedCommunity(): array
+    {
+        return [
+            'state' => 'degraded',
+            'profile' => ['is_verified' => null],
+            'spaces' => [],
+            'courses' => [],
+            'pending_access_count' => 0,
+            'capabilities' => array_fill_keys([
+                'spaces',
+                'courses',
+                'profile_verification_read',
+                'badges',
+                'points',
+                'leaderboard_levels',
+            ], 'unverified'),
+        ];
     }
 }
