@@ -24,7 +24,7 @@ function provider(overrides = {}) {
     pending_operations: 0,
     failed_operations: 0,
     last_successful_reconciliation: '2026-07-23 11:30:00',
-    repair_url: '/settings',
+    repair_url: null,
     ...overrides,
   }
 }
@@ -92,6 +92,7 @@ describe('ProviderHealthCards', () => {
         pending_operations: 2,
         failed_operations: 1,
         last_successful_reconciliation: null,
+        repair_url: '/integrations?provider=fluentcrm',
       }),
       provider({
         version: '2.7.0',
@@ -122,8 +123,9 @@ describe('ProviderHealthCards', () => {
     expect(wrapper.text()).toContain('2026-07-23 11:30')
     expect(wrapper.text()).not.toContain('SecretService')
     expect(wrapper.text()).not.toContain('do-not-render')
-    expect(wrapper.findAll('a')).toHaveLength(3)
-    expect(wrapper.findAll('a').every((link) => link.attributes('href') === '#/settings')).toBe(true)
+    expect(wrapper.findAll('a')).toHaveLength(1)
+    expect(wrapper.get('a').attributes('href')).toBe('#/integrations?provider=fluentcrm')
+    expect(wrapper.get('a').text()).toContain('Review issues')
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/admin/providers'),
       expect.objectContaining({ method: 'GET' }),
@@ -181,11 +183,42 @@ describe('ProviderHealthCards', () => {
     expect(wrapper.text()).toContain('No provider information is available')
   })
 
-  it('rejects provider repair links outside the known settings route', async () => {
+  it('labels contextual settings actions as configuration', async () => {
+    global.fetch.mockResolvedValue(response([
+      provider({
+        value: 'fluentcrm',
+        label: 'FluentCRM',
+        status: 'disabled',
+        repair_url: '/settings?category=integrations&provider=fluentcrm',
+      }),
+      provider({
+        value: 'fluent_community',
+        label: 'FluentCommunity',
+        status: 'inactive',
+        repair_url: '/settings?category=integrations&provider=fluent_community',
+      }),
+    ]))
+
+    const wrapper = mountCards()
+    await flushPromises()
+
+    const links = wrapper.findAll('a')
+    expect(links).toHaveLength(2)
+    expect(links.every((link) => link.text().includes('Configure integration'))).toBe(true)
+    expect(links.map((link) => link.attributes('href'))).toEqual([
+      '#/settings?category=integrations&provider=fluentcrm',
+      '#/settings?category=integrations&provider=fluent_community',
+    ])
+  })
+
+  it('rejects provider action links outside the exact known routes', async () => {
     global.fetch.mockResolvedValue(response([
       provider({ repair_url: '/members' }),
       provider({ value: 'absolute', repair_url: 'https://evil.example/settings' }),
       provider({ value: 'protocol_relative', repair_url: '//evil.example/settings' }),
+      provider({ value: 'bad_category', repair_url: '/settings?category=advanced&provider=fluentcrm' }),
+      provider({ value: 'bad_provider', repair_url: '/integrations?provider=wordpress_core' }),
+      provider({ value: 'extra_query', repair_url: '/integrations?provider=fluentcrm&apply=1' }),
     ]))
 
     const wrapper = mountCards()

@@ -1,6 +1,13 @@
 <template>
-  <div class="fchub-settings-section">
-    <div class="fchub-settings-section-title">FluentCRM Integration</div>
+  <section
+    id="integration-fluentcrm"
+    ref="fluentCrmSection"
+    class="fchub-settings-section"
+    :class="{ 'is-focused': focusProvider === 'fluentcrm' }"
+    aria-labelledby="integration-fluentcrm-title"
+    tabindex="-1"
+  >
+    <h3 id="integration-fluentcrm-title" class="fchub-settings-section-title">FluentCRM Integration</h3>
 
     <div class="fchub-setting-row">
       <div class="fchub-setting-label">
@@ -49,10 +56,17 @@
         <div class="fchub-setting-control"><el-switch v-model="form.fluentcrm_auto_create_tags" aria-label="Auto-create FluentCRM tags" /></div>
       </div>
     </template>
-  </div>
+  </section>
 
-  <div class="fchub-settings-section">
-    <div class="fchub-settings-section-title">FluentCommunity Integration</div>
+  <section
+    id="integration-fluent-community"
+    ref="fluentCommunitySection"
+    class="fchub-settings-section"
+    :class="{ 'is-focused': focusProvider === 'fluent_community' }"
+    aria-labelledby="integration-fluent-community-title"
+    tabindex="-1"
+  >
+    <h3 id="integration-fluent-community-title" class="fchub-settings-section-title">FluentCommunity Integration</h3>
 
     <div class="fchub-setting-row">
       <div class="fchub-setting-label">
@@ -136,11 +150,11 @@
         </div>
       </section>
     </template>
-  </div>
+  </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -154,9 +168,24 @@ const props = defineProps({
   searchFluentcrmLists: { type: Function, required: true },
   searchFcSpaces: { type: Function, required: true },
   reloadPlanOptions: { type: Function, required: true },
+  focusProvider: { type: String, default: '' },
 })
 
+const fluentCrmSection = ref(null)
+const fluentCommunitySection = ref(null)
 const configuredMappingCount = computed(() => Object.values(props.form.fc_space_mappings ?? {}).filter(Boolean).length)
+
+function focusProviderSection(provider) {
+  const section = {
+    fluentcrm: fluentCrmSection,
+    fluent_community: fluentCommunitySection,
+  }[provider]
+
+  nextTick(() => {
+    section?.value?.focus({ preventScroll: true })
+    section?.value?.scrollIntoView({ block: 'nearest' })
+  })
+}
 
 function mappingStatus(planId) {
   return props.form.fc_space_mappings?.[planId]
@@ -172,9 +201,13 @@ function isMissingOption(value, options, loading, error) {
   if (!value || loading || error) return false
   return !options.some((option) => String(option.id) === String(value))
 }
+
+watch(() => props.focusProvider, focusProviderSection)
+onMounted(() => focusProviderSection(props.focusProvider))
 </script>
 
 <style scoped>
+.fchub-settings-section.is-focused { outline: 2px solid color-mix(in srgb, var(--el-color-primary) 48%, transparent); outline-offset: -2px; }
 .community-mapping-workspace { margin: 4px 0 20px; overflow: hidden; border: 1px solid var(--fchub-border-color); border-radius: 12px; background: var(--fchub-card-bg); }
 .community-mapping-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 18px 20px; border-bottom: 1px solid var(--fchub-border-color); background: color-mix(in srgb, var(--fchub-page-bg) 46%, var(--fchub-card-bg)); }
 .community-mapping-header > div { min-width: 0; }

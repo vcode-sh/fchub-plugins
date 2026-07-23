@@ -116,7 +116,7 @@ function providerPayload() {
       pending_operations: 0,
       failed_operations: 0,
       last_successful_reconciliation: null,
-      repair_url: '/settings',
+      repair_url: null,
     },
     {
       value: 'fluentcrm',
@@ -130,7 +130,7 @@ function providerPayload() {
       pending_operations: 2,
       failed_operations: 1,
       last_successful_reconciliation: null,
-      repair_url: '/settings',
+      repair_url: '/integrations?provider=fluentcrm',
     },
     {
       value: 'fluent_community',
@@ -148,9 +148,19 @@ function providerPayload() {
       pending_operations: 0,
       failed_operations: 0,
       last_successful_reconciliation: '2026-07-23 11:30:00',
-      repair_url: '/settings',
+      repair_url: null,
     },
   ]
+}
+
+function fluentCrmHealthPayload() {
+  return {
+    action: 'Run a dry reconciliation and resolve failures.',
+    pending_projections: 2,
+    failed_projections: 1,
+    failed_reconciliations: 0,
+    drift: 1,
+  }
 }
 
 for (const viewport of viewports) {
@@ -180,7 +190,7 @@ for (const viewport of viewports) {
     await page.goto('/smoke/index.html#/plans')
     await expect(page.getByRole('heading', { name: 'Plans' })).toBeVisible()
 
-    await page.evaluate(({ dashboard, providers }) => {
+    await page.evaluate(({ dashboard, providers, crmHealth }) => {
       const baseFetch = window.fetch
       window.fetch = async (input, init = {}) => {
         const url = String(input)
@@ -190,10 +200,17 @@ for (const viewport of viewports) {
         if (url.includes('/admin/providers')) {
           return { ok: true, status: 200, json: async () => ({ data: providers }) }
         }
+        if (url.includes('/admin/integrations/fluentcrm/health')) {
+          return { ok: true, status: 200, json: async () => ({ data: crmHealth }) }
+        }
         return baseFetch(input, init)
       }
       window.location.hash = '#/'
-    }, { dashboard: dashboardPayload(), providers: providerPayload() })
+    }, {
+      dashboard: dashboardPayload(),
+      providers: providerPayload(),
+      crmHealth: fluentCrmHealthPayload(),
+    })
 
     const compactHealth = page.getByRole('region', { name: 'Provider health' })
     await expect(compactHealth).toBeVisible()
@@ -218,8 +235,14 @@ for (const viewport of viewports) {
     await expect(detailedHealth).toContainText('Not yet verified')
     await expect(detailedHealth).toContainText('Needs attention')
     await expect(detailedHealth).toContainText('Inactive')
-    await expect(detailedHealth.getByRole('link', { name: 'Review provider' })).toHaveCount(3)
-    await expect(detailedHealth.getByRole('link', { name: 'Review provider' }).first()).toHaveAttribute('href', '#/settings')
+    const reviewIssues = detailedHealth.getByRole('link', { name: 'Review issues' })
+    await expect(reviewIssues).toHaveCount(1)
+    await expect(reviewIssues).toHaveAttribute('href', '#/integrations?provider=fluentcrm')
+    await reviewIssues.click()
+    const issuePanel = page.locator('.provider-issue-panel')
+    await expect(issuePanel).toContainText('Run a dry reconciliation and resolve failures.')
+    await expect(issuePanel).toContainText('Pending projections')
+    expect(await issuePanel.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
     expect(await detailedHealth.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })

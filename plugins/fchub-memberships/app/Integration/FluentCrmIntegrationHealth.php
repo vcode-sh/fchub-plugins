@@ -281,7 +281,7 @@ final class FluentCrmIntegrationHealth
 
         $triggers = apply_filters('fluentcrm_funnel_triggers', []);
         $blocks = apply_filters('fluentcrm_funnel_blocks', [], (object) ['settings' => [], 'conditions' => []]);
-        $smartCodeGroups = apply_filters('fluent_crm_funnel_context_smart_codes', []);
+        $smartCodeGroups = apply_filters('fluent_crm_funnel_context_smart_codes', [], '');
         $filterGroups = apply_filters('fluentcrm_advanced_filter_options', []);
 
         $membershipBlocks = array_filter($blocks, static fn(mixed $block): bool => is_array($block)

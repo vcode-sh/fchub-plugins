@@ -63,6 +63,17 @@ function buildSettingsPayload(formValue) {
 }
 
 describe('FluentCommunity plan mappings', () => {
+  it('opens contextual integration settings and focuses only known providers', () => {
+    expect(pageSource).toContain("import { useRoute } from 'vue-router'")
+    expect(pageSource).toContain("const allowedIntegrationProviders = new Set(['fluentcrm', 'fluent_community'])")
+    expect(pageSource).toContain("route.query.category === 'integrations'")
+    expect(pageSource).toContain(':focus-provider="focusedIntegrationProvider"')
+    expect(componentSource).toContain('id="integration-fluentcrm"')
+    expect(componentSource).toContain('id="integration-fluent-community"')
+    expect(componentSource).toContain("'is-focused': focusProvider === 'fluentcrm'")
+    expect(componentSource).toContain("'is-focused': focusProvider === 'fluent_community'")
+  })
+
   it('renders one plan-led row with a labelled space control', () => {
     expect(componentSource).toContain('class="community-mapping-row"')
     expect(componentSource).toContain('{{ plan.label }}')

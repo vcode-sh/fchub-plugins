@@ -100,7 +100,6 @@ final class ProviderReconciliationService
             'fluentcrm' => __('FluentCRM', 'fchub-memberships'),
             'fluent_community' => __('FluentCommunity', 'fchub-memberships'),
         ];
-        $repairUrl = '/settings';
         $community = $this->communitySummary($communityCapabilities);
         $crmStatus = self::providerStatus((string) ($crm['status'] ?? 'degraded'));
         $crmReason = 'fluentcrm_' . $crmStatus;
@@ -146,7 +145,7 @@ final class ProviderReconciliationService
                 'pending_operations' => 0,
                 'failed_operations' => 0,
                 'last_successful_reconciliation' => null,
-                'repair_url' => $repairUrl,
+                'repair_url' => null,
             ],
             [
                 'value' => 'fluentcrm',
@@ -166,7 +165,7 @@ final class ProviderReconciliationService
                 'last_successful_reconciliation' => $crmHasUnresolvedFailures
                     ? null
                     : self::safeDate($crm['last_successful_projection'] ?? null),
-                'repair_url' => $repairUrl,
+                'repair_url' => self::providerActionUrl('fluentcrm', $crmStatus),
             ],
             [
                 'value' => 'fluent_community',
@@ -178,7 +177,7 @@ final class ProviderReconciliationService
                 'pending_operations' => 0,
                 'failed_operations' => 0,
                 'last_successful_reconciliation' => null,
-                'repair_url' => $repairUrl,
+                'repair_url' => self::providerActionUrl('fluent_community', $community['status']),
             ],
         ];
 
@@ -203,6 +202,10 @@ final class ProviderReconciliationService
                 $summary['status'] = 'degraded';
                 $summary['reason'] = 'provider_operations_unavailable';
             }
+            $summary['repair_url'] = self::providerActionUrl(
+                (string) $summary['value'],
+                (string) $summary['status']
+            );
         }
         unset($summary);
 
@@ -737,6 +740,21 @@ final class ProviderReconciliationService
             ['inactive', 'disabled', 'incompatible', 'unverified', 'degraded', 'healthy'],
             true
         ) ? $status : 'degraded';
+    }
+
+    private static function providerActionUrl(string $provider, string $status): ?string
+    {
+        if (!in_array($provider, ['fluentcrm', 'fluent_community'], true)) {
+            return null;
+        }
+
+        if (in_array($status, ['inactive', 'disabled', 'incompatible'], true)) {
+            return '/settings?category=integrations&provider=' . $provider;
+        }
+
+        return $status === 'degraded'
+            ? '/integrations?provider=' . $provider
+            : null;
     }
 
     private static function safeVersion(mixed $version): ?string

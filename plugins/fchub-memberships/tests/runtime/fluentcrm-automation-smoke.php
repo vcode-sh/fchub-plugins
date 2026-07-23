@@ -63,7 +63,7 @@ foreach (array_merge(array_keys($actions), array_keys($benchmarks)) as $name) {
     }
 }
 
-$smartCodeGroups = apply_filters('fluent_crm_funnel_context_smart_codes', []);
+$smartCodeGroups = apply_filters('fluent_crm_funnel_context_smart_codes', [], '');
 $membershipSmartCodes = array_values(array_filter($smartCodeGroups, static fn(array $group): bool => ($group['key'] ?? '') === 'membership'));
 if (count($membershipSmartCodes) !== 1 || count($membershipSmartCodes[0]['shortcodes'] ?? []) !== 25) {
     fwrite(STDERR, "Expected the Membership smart-code group with 25 values.\n");

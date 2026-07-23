@@ -17,5 +17,8 @@ describe('operator provider health integration', () => {
     expect(dashboardSource).toContain('<ProviderHealthCards compact />')
     expect(integrationsSource).toContain("import ProviderHealthCards from '@/components/dashboard/ProviderHealthCards.vue'")
     expect(integrationsSource).toContain('<ProviderHealthCards />')
+    expect(integrationsSource).toContain("import ProviderIssuePanel from '@/components/integrations/ProviderIssuePanel.vue'")
+    expect(integrationsSource).toContain('<ProviderIssuePanel')
+    expect(integrationsSource).toContain('to="/settings?category=integrations"')
   })
 })

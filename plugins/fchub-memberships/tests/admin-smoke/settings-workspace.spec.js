@@ -24,6 +24,17 @@ test('presents settings as an operational console instead of a wide tab form', a
   await expect(page.getByRole('button', { name: /Save/ })).toHaveCount(0)
 })
 
+test('opens a contextual provider configuration link on Integrations', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/smoke/index.html#/settings?category=integrations&provider=fluentcrm')
+
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Integrations', exact: true })).toBeVisible()
+  await expect(page.locator('#integration-fluentcrm')).toHaveClass(/is-focused/)
+  await expect(page.locator('#integration-fluent-community')).not.toHaveClass(/is-focused/)
+  await expect(page.locator('#integration-fluentcrm')).toBeFocused()
+})
+
 test('loads, confirms, and saves active runtime settings without badge payloads', async ({ page }) => {
   await openSettings(page)
 

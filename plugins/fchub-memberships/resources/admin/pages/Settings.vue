@@ -103,6 +103,7 @@
             :search-fluentcrm-lists="searchFluentcrmLists"
             :search-fc-spaces="searchFcSpaces"
             :reload-plan-options="loadPlanOptions"
+            :focus-provider="focusedIntegrationProvider"
           />
           <SettingsWebhooksApiSection
             v-else-if="activeSettingsTab === 'webhooks'"
@@ -147,6 +148,7 @@
 
 <script setup>
 import { computed, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowRight,
@@ -172,6 +174,8 @@ import { activeDeliveryCount } from '@/components/settings/notificationStudioUi.
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 import ListStatePanel from '@/components/workspace/ListStatePanel.vue'
 
+const route = useRoute()
+const allowedIntegrationProviders = new Set(['fluentcrm', 'fluent_community'])
 const loading = ref(false)
 const saving = ref(false)
 const apiKeyBusy = ref(false)
@@ -191,7 +195,7 @@ const webhookHistoryError = ref('')
 const retryingDeliveryId = ref(null)
 let webhookRequestVersion = 0
 let credentialRequestGeneration = 0
-const activeSettingsTab = ref('general')
+const activeSettingsTab = ref(route.query.category === 'integrations' ? 'integrations' : 'general')
 const savedSnapshot = ref('')
 const savedFormSnapshot = ref(null)
 const loadError = ref('')
@@ -309,6 +313,14 @@ const settingsTabModel = computed({
   get: () => activeSettingsTab.value,
   set: (category) => selectCategory(category),
 })
+
+const focusedIntegrationProvider = computed(() => (
+  activeSettingsTab.value === 'integrations'
+    && route.query.category === 'integrations'
+    && allowedIntegrationProviders.has(route.query.provider)
+    ? route.query.provider
+    : ''
+))
 
 const enabledEmailCount = computed(() => activeDeliveryCount(
   form.value.email_delivery,
@@ -953,6 +965,10 @@ watch(activeSettingsTab, (category, previousCategory) => {
   if (category === 'webhooks' && settingsReady.value) {
     refreshWebhookOperationalState()
   }
+})
+
+watch(() => route.query.category, (category) => {
+  if (category === 'integrations') selectCategory('integrations')
 })
 
 onMounted(() => {

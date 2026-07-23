@@ -240,6 +240,32 @@ final class FluentCrmIntegrationHealthTest extends TestCase
         ], $health->status()['catalogue']);
     }
 
+    public function test_default_catalogue_resolver_supplies_the_registered_context_filter_contract(): void
+    {
+        $receivedContext = null;
+        add_filter(
+            'fluent_crm_funnel_context_smart_codes',
+            static function (array $groups, string $context) use (&$receivedContext): array {
+                $receivedContext = $context;
+                return $groups;
+            },
+            12,
+            2
+        );
+
+        $health = new FluentCrmIntegrationHealth(
+            static fn(): array => ['active' => true, 'version' => '3.1.8'],
+            static fn(): bool => true,
+            static fn(): array => ['fluentcrm_enabled' => 'yes'],
+            null,
+            static fn(): array => []
+        );
+
+        $health->status();
+
+        self::assertSame('', $receivedContext);
+    }
+
     /** @param array{active:bool, version:string} $provider */
     private function health(
         array $provider,

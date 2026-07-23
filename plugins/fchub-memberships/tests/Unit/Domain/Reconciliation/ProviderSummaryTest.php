@@ -96,9 +96,12 @@ final class ProviderSummaryTest extends PluginTestCase
         self::assertSame(2, $byProvider['fluent_community']['pending_operations']);
         self::assertSame('inactive', $byProvider['fluent_community']['capabilities']['badges']['status']);
         self::assertNull($byProvider['wordpress_core']['repair_url']);
-        foreach (['learndash', 'fluentcrm', 'fluent_community'] as $provider) {
-            self::assertSame('/settings', $byProvider[$provider]['repair_url']);
-        }
+        self::assertNull($byProvider['learndash']['repair_url']);
+        self::assertNull($byProvider['fluentcrm']['repair_url']);
+        self::assertSame(
+            '/integrations?provider=fluent_community',
+            $byProvider['fluent_community']['repair_url']
+        );
     }
 
     public function test_crm_success_timestamp_is_hidden_while_drift_or_projection_failures_remain(): void
@@ -120,13 +123,64 @@ final class ProviderSummaryTest extends PluginTestCase
         }
     }
 
-    public function test_provider_repair_navigation_uses_an_existing_vue_route_path(): void
+    public function test_healthy_and_unverified_providers_do_not_offer_repair_navigation(): void
     {
         $byProvider = array_column($this->providerSummaries([], []), null, 'value');
 
-        self::assertNull($byProvider['wordpress_core']['repair_url']);
-        foreach (['learndash', 'fluentcrm', 'fluent_community'] as $provider) {
-            self::assertSame('/settings', $byProvider[$provider]['repair_url']);
+        foreach (['wordpress_core', 'learndash', 'fluentcrm', 'fluent_community'] as $provider) {
+            self::assertNull($byProvider[$provider]['repair_url']);
+        }
+    }
+
+    public function test_unavailable_configurable_providers_link_to_contextual_integration_settings(): void
+    {
+        foreach ([
+            'inactive' => [
+                'crm_provider' => ['active' => false, 'version' => null],
+                'crm_compatible' => true,
+                'crm_enabled' => 'yes',
+                'community_environment' => ['core_active' => false],
+                'community_feature' => true,
+                'community_contract' => true,
+            ],
+            'disabled' => [
+                'crm_provider' => ['active' => true, 'version' => '3.1.8'],
+                'crm_compatible' => true,
+                'crm_enabled' => 'no',
+                'community_environment' => ['core_active' => true, 'core_version' => '2.7.0'],
+                'community_feature' => false,
+                'community_contract' => true,
+            ],
+            'incompatible' => [
+                'crm_provider' => ['active' => true, 'version' => '3.1.8'],
+                'crm_compatible' => false,
+                'crm_enabled' => 'yes',
+                'community_environment' => ['core_active' => true, 'core_version' => '2.7.0'],
+                'community_feature' => true,
+                'community_contract' => false,
+            ],
+        ] as $status => $scenario) {
+            $byProvider = array_column($this->providerSummaries(
+                [],
+                [],
+                crmProvider: $scenario['crm_provider'],
+                crmCompatible: $scenario['crm_compatible'],
+                crmEnabled: $scenario['crm_enabled'],
+                communityEnvironment: $scenario['community_environment'],
+                communityFeature: $scenario['community_feature'],
+                communityContract: $scenario['community_contract']
+            ), null, 'value');
+
+            self::assertSame($status, $byProvider['fluentcrm']['status']);
+            self::assertSame(
+                '/settings?category=integrations&provider=fluentcrm',
+                $byProvider['fluentcrm']['repair_url']
+            );
+            self::assertSame($status, $byProvider['fluent_community']['status']);
+            self::assertSame(
+                '/settings?category=integrations&provider=fluent_community',
+                $byProvider['fluent_community']['repair_url']
+            );
         }
     }
 
@@ -155,6 +209,7 @@ final class ProviderSummaryTest extends PluginTestCase
         self::assertSame(3, $summary['pending_operations']);
         self::assertSame(2, $summary['failed_operations']);
         self::assertNull($summary['last_successful_reconciliation']);
+        self::assertSame('/integrations?provider=fluentcrm', $summary['repair_url']);
     }
 
     public function test_unreadable_crm_projection_jobs_fail_read_safe_without_generic_operation_counts(): void
@@ -176,7 +231,19 @@ final class ProviderSummaryTest extends PluginTestCase
         array $summaryOverrides,
         array $jobOverrides,
         array $operationSummaries = [],
-        bool $jobsReadable = true
+        bool $jobsReadable = true,
+        array $crmProvider = ['active' => true, 'version' => '3.1.8'],
+        bool $crmCompatible = true,
+        string $crmEnabled = 'yes',
+        array $communityEnvironment = [
+            'core_active' => true,
+            'core_version' => '2.7.0',
+            'pro_active' => false,
+            'pro_version' => '2.7.0',
+            'pro_certified' => false,
+        ],
+        bool $communityFeature = true,
+        bool $communityContract = true
     ): array
     {
         $operations = new class($operationSummaries) extends ProviderOperationRepository {
@@ -190,15 +257,9 @@ final class ProviderSummaryTest extends PluginTestCase
             }
         };
         $community = new CommunityCapabilityRegistry(
-            static fn(): array => [
-                'core_active' => true,
-                'core_version' => '2.7.0',
-                'pro_active' => false,
-                'pro_version' => '2.7.0',
-                'pro_certified' => false,
-            ],
-            static fn(string $feature): bool => $feature === 'course_module',
-            static fn(string $capability): bool => true
+            static fn(): array => $communityEnvironment,
+            static fn(string $feature): bool => $communityFeature,
+            static fn(string $capability): bool => $communityContract
         );
         $jobSummaryResolver = $jobsReadable
             ? static fn(): array => array_replace([
@@ -210,9 +271,9 @@ final class ProviderSummaryTest extends PluginTestCase
                 throw new \RuntimeException('Projection job storage is unreadable.');
             };
         $crm = new FluentCrmIntegrationHealth(
-            static fn(): array => ['active' => true, 'version' => '3.1.8'],
-            static fn(): bool => true,
-            static fn(): array => ['fluentcrm_enabled' => 'yes'],
+            static fn(): array => $crmProvider,
+            static fn(): bool => $crmCompatible,
+            static fn(): array => ['fluentcrm_enabled' => $crmEnabled],
             static fn(): array => ['tags' => 2, 'lists' => 1],
             static fn(): array => array_replace([
                 'last_reconciliation' => '2026-07-23 10:00:00',

@@ -92,11 +92,11 @@
           </p>
 
           <router-link
-            v-if="safeRepairUrl(provider.repair_url)"
-            :to="safeRepairUrl(provider.repair_url)"
+            v-if="safeRepairUrl(provider.repair_url, provider.value)"
+            :to="safeRepairUrl(provider.repair_url, provider.value)"
             class="provider-card__link"
           >
-            Review provider
+            {{ providerActionLabel(provider) }}
           </router-link>
         </article>
       </div>
@@ -214,8 +214,21 @@ function lastSuccess(value) {
   return value ? formatWpDateTime(value, 'Not recorded') : 'Not recorded'
 }
 
-function safeRepairUrl(value) {
-  return value === '/settings' ? value : ''
+function safeRepairUrl(value, provider) {
+  if (!['fluentcrm', 'fluent_community'].includes(provider)) return ''
+
+  const knownRoutes = [
+    `/settings?category=integrations&provider=${provider}`,
+    `/integrations?provider=${provider}`,
+  ]
+
+  return knownRoutes.includes(value) ? value : ''
+}
+
+function providerActionLabel(provider) {
+  return safeRepairUrl(provider.repair_url, provider.value).startsWith('/settings?')
+    ? 'Configure integration'
+    : 'Review issues'
 }
 
 onMounted(loadProviders)
