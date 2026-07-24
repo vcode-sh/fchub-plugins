@@ -43,6 +43,9 @@ window.__fchubSmokeReleaseCredential = null
 let smokeWebhookUrls = 'https://127.0.0.1/webhook'
 let smokeWebhookDestinationsConfigured = false
 let smokeWebhookRetried = false
+let smokeWebhookCancelled = false
+let smokeWebhookEndpointSequence = 0
+let smokeWebhookEndpoints = []
 let smokeAccessApi = {
   configured: true,
   prefix: 'fchub_abc123',
@@ -540,7 +543,94 @@ window.fetch = async (input, init = {}) => {
   }
   if (url.includes('/admin/webhooks/deliveries/91/retry')) {
     smokeWebhookRetried = true
+    smokeWebhookCancelled = false
     return { ok: true, status: 202, json: async () => ({ data: { id: 91, status: 'pending' } }) }
+  }
+  if (url.includes('/admin/webhooks/deliveries/91/cancel')) {
+    smokeWebhookCancelled = true
+    return { ok: true, status: 200, json: async () => ({ data: { id: 91, status: 'cancelled' } }) }
+  }
+  const endpointAction = url.match(/\/admin\/webhooks\/endpoints\/([^/?]+)\/(secret|test|activate|pause)$/)
+  if (endpointAction) {
+    const [, endpointId, action] = endpointAction
+    const endpointIndex = smokeWebhookEndpoints.findIndex(({ id }) => id === endpointId)
+    const endpoint = smokeWebhookEndpoints[endpointIndex]
+    if (!endpoint) {
+      return { ok: false, status: 404, json: async () => ({ message: 'Webhook endpoint not found.' }) }
+    }
+    if (action === 'secret') {
+      smokeWebhookEndpoints[endpointIndex] = {
+        ...endpoint,
+        status: 'paused',
+        secret_configured: true,
+        requires_rotation: false,
+        last_test_status: '',
+        last_tested_at: null,
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: {
+            endpoint: { ...smokeWebhookEndpoints[endpointIndex] },
+            secret: 'webhook_endpoint_one_time_smoke_secret',
+          },
+        }),
+      }
+    }
+    if (action === 'test') {
+      smokeWebhookEndpoints[endpointIndex] = {
+        ...endpoint,
+        last_test_status: 'succeeded',
+        last_tested_at: '2026-07-24 10:00:00',
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: {
+            endpoint: { ...smokeWebhookEndpoints[endpointIndex] },
+            delivery: { id: 93, status: 'succeeded', response_code: 204 },
+          },
+        }),
+      }
+    }
+    smokeWebhookEndpoints[endpointIndex] = {
+      ...endpoint,
+      status: action === 'activate' ? 'active' : 'paused',
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { endpoint: { ...smokeWebhookEndpoints[endpointIndex] } } }),
+    }
+  }
+  const endpointDelete = url.match(/\/admin\/webhooks\/endpoints\/([^/?]+)$/)
+  if (endpointDelete && method === 'DELETE') {
+    smokeWebhookEndpoints = smokeWebhookEndpoints.filter(({ id }) => id !== endpointDelete[1])
+    return { ok: true, status: 200, json: async () => ({ data: { deleted: true } }) }
+  }
+  if (url.includes('/admin/webhooks/endpoints')) {
+    if (method === 'POST') {
+      smokeWebhookEndpointSequence += 1
+      const endpoint = {
+        id: `we_smoke_${smokeWebhookEndpointSequence}`,
+        name: String(requestBody?.name || ''),
+        url: String(requestBody?.url || ''),
+        status: 'draft',
+        secret_configured: false,
+        requires_rotation: false,
+        last_test_status: '',
+        last_tested_at: null,
+      }
+      smokeWebhookEndpoints.push(endpoint)
+      return { ok: true, status: 201, json: async () => ({ data: { endpoint: { ...endpoint } } }) }
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { endpoints: smokeWebhookEndpoints.map((endpoint) => ({ ...endpoint })) } }),
+    }
   }
   if (url.includes('/admin/webhooks/deliveries')) {
     window.__fchubSmokeWebhookHistoryReads += 1
@@ -554,11 +644,11 @@ window.fetch = async (input, init = {}) => {
             event_id: 'evt_smoke_failed',
             event_type: 'access.revoked',
             destination_url: 'https://hooks.example.com/memberships',
-            status: smokeWebhookRetried ? 'pending' : 'failed',
+            status: smokeWebhookCancelled ? 'cancelled' : (smokeWebhookRetried ? 'pending' : 'failed'),
             attempt_count: smokeWebhookRetried ? 0 : 7,
             response_code: smokeWebhookRetried ? null : 503,
             error_message: smokeWebhookRetried ? '' : 'webhook_http_503',
-            next_attempt_at: smokeWebhookRetried ? '2026-07-22 12:06:00' : null,
+            next_attempt_at: smokeWebhookRetried && !smokeWebhookCancelled ? '2026-07-22 12:06:00' : null,
             last_attempt_at: '2026-07-22 12:05:00',
             delivered_at: null,
             created_at: '2026-07-22 12:00:00',

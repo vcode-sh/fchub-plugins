@@ -87,6 +87,49 @@ final class WebhookDeliveryWorkerTest extends PluginTestCase
         self::assertSame(['retry-cas', 'schedule'], $fixture['order']);
     }
 
+    public function test_one_shot_test_failure_is_terminal_and_never_scheduled(): void
+    {
+        $fixture = $this->fixture($this->delivery(), $this->event());
+        $GLOBALS['_fchub_test_safe_remote_post_result'] = [
+            'response' => ['code' => 405],
+            'body' => 'method not allowed',
+            'headers' => [],
+        ];
+
+        $result = $fixture['worker']->deliverNow(7, false);
+
+        self::assertSame('failed', $result['status']);
+        self::assertSame(405, $fixture['deliveries']->failed[0][3]);
+        self::assertSame([], $fixture['deliveries']->retrying);
+        self::assertSame([], $fixture['queue']->scheduled);
+    }
+
+    public function test_delivery_uses_the_secret_owned_by_its_endpoint_url(): void
+    {
+        $settings = [
+            'webhook_endpoints' => [[
+                'id' => 'endpoint-a',
+                'name' => 'Endpoint A',
+                'url' => 'https://hooks.example.com/memberships',
+                'secret' => 'endpoint-secret',
+                'status' => 'active',
+            ]],
+        ];
+        $fixture = $this->fixture($this->delivery(), $this->event(), '', false, null, $settings);
+        $GLOBALS['_fchub_test_safe_remote_post_result'] = [
+            'response' => ['code' => 204],
+            'body' => '',
+            'headers' => [],
+        ];
+
+        self::assertSame('succeeded', $fixture['worker']->deliverNow(7)['status']);
+        $headers = $GLOBALS['_fchub_test_safe_remote_posts'][0][1]['headers'];
+        self::assertSame(
+            hash_hmac('sha256', '{"raw":"body-sentinel"}', 'endpoint-secret'),
+            $headers['X-FCHub-Signature']
+        );
+    }
+
     public function test_scheduler_failure_leaves_retry_state_durable_and_is_logged_without_sensitive_values(): void
     {
         $fixture = $this->fixture($this->delivery(), $this->event());
@@ -248,7 +291,8 @@ final class WebhookDeliveryWorkerTest extends PluginTestCase
         ?array $event,
         string $secret = 'current-secret',
         bool $useDefaultSettings = false,
-        ?callable $nowProvider = null
+        ?callable $nowProvider = null,
+        ?array $resolvedSettings = null
     ): array
     {
         $order = [];
@@ -311,7 +355,10 @@ final class WebhookDeliveryWorkerTest extends PluginTestCase
             $queue,
             new WebhookRetryPolicy(),
             $clock,
-            $useDefaultSettings ? null : static function () use (&$settingsCalls, $secret): array { $settingsCalls++; return ['webhook_secret' => $secret]; },
+            $useDefaultSettings ? null : static function () use (&$settingsCalls, $secret, $resolvedSettings): array {
+                $settingsCalls++;
+                return $resolvedSettings ?? ['webhook_secret' => $secret];
+            },
             null,
             static fn(): string => str_repeat('a', 32),
             static function (string $title, string $description, array $context = []) use (&$logs): void {

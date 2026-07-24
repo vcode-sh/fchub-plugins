@@ -154,8 +154,8 @@ final class WebhookDispatcher
         $settings = $loaded['success'] && is_array($loaded['value'] ?? null)
             ? $loaded['value']
             : [];
-        $urls = $this->readyDestinations($settings, false);
-        if ($urls === []) {
+        $endpoints = $this->readyEndpoints($settings, false);
+        if ($endpoints === []) {
             return ['success' => false, 'message' => 'No webhook URLs configured'];
         }
 
@@ -169,9 +169,10 @@ final class WebhookDispatcher
             return ['success' => false, 'message' => 'Unable to encode test webhook'];
         }
 
-        $signature = hash_hmac('sha256', $body, (string) $settings['webhook_secret']);
         $results = [];
-        foreach ($urls as $url) {
+        foreach ($endpoints as $endpoint) {
+            $url = (string) $endpoint['url'];
+            $signature = hash_hmac('sha256', $body, (string) $endpoint['secret']);
             $response = wp_remote_post($url, [
                 'timeout' => 15,
                 'headers' => [
@@ -204,18 +205,34 @@ final class WebhookDispatcher
     /** @param array<string, mixed> $settings @return list<string> */
     private function readyDestinations(array $settings, bool $requireEnabled = true): array
     {
-        if (($requireEnabled && ($settings['webhook_enabled'] ?? 'no') !== 'yes')
-            || empty($settings['webhook_secret'])
-        ) {
-            return [];
+        return array_column($this->readyEndpoints($settings, $requireEnabled), 'url');
+    }
+
+    /** @param array<string, mixed> $settings @return list<array<string, mixed>> */
+    private function readyEndpoints(array $settings, bool $requireEnabled = true): array
+    {
+        $endpoints = $requireEnabled
+            ? WebhookEndpointConfig::active($settings)
+            : array_values(array_filter(
+                WebhookEndpointConfig::all($settings),
+                static fn(array $endpoint): bool => (string) ($endpoint['secret'] ?? '') !== ''
+            ));
+        $ready = [];
+        foreach ($endpoints as $endpoint) {
+            $url = (string) ($endpoint['url'] ?? '');
+            if ($this->endpointPolicy->validate($url) !== true) {
+                continue;
+            }
+            $normalised = $this->endpointPolicy->normalise($url);
+            if (count($normalised) === 1) {
+                $ready[$normalised[0]] = [
+                    ...$endpoint,
+                    'url' => $normalised[0],
+                ];
+            }
         }
 
-        $raw = (string) ($settings['webhook_urls'] ?? '');
-        if ($raw === '' || $this->endpointPolicy->validate($raw) !== true) {
-            return [];
-        }
-
-        return $this->endpointPolicy->normalise($raw);
+        return array_values($ready);
     }
 
     /** @param array<string, mixed> $grant */

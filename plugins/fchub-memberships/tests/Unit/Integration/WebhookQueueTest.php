@@ -15,6 +15,7 @@ final class WebhookQueueTest extends PluginTestCase
         parent::setUp();
 
         $GLOBALS['_fchub_test_as_actions'] = [];
+        $GLOBALS['_fchub_test_as_unscheduled_actions'] = [];
         $GLOBALS['_fchub_test_single_events'] = [];
         unset(
             $GLOBALS['_fchub_test_as_has_scheduled_action_override'],
@@ -105,6 +106,19 @@ final class WebhookQueueTest extends PluginTestCase
             new \WP_Error('schedule_failed', 'No cron storage');
 
         self::assertFalse((new WebhookQueue(false))->schedule(12, 1, 1773439200));
+    }
+
+    public function test_cancel_unschedules_the_delivery_from_action_scheduler_or_wp_cron(): void
+    {
+        self::assertTrue((new WebhookQueue(true))->cancel(12));
+        self::assertSame([
+            [WebhookQueue::HOOK, [12], ''],
+        ], $GLOBALS['_fchub_test_as_unscheduled_actions']);
+
+        self::assertTrue((new WebhookQueue(false))->cancel(13));
+        self::assertSame([
+            [WebhookQueue::HOOK, [13]],
+        ], $GLOBALS['_fchub_test_cleared_events']);
     }
 
     public function test_wp_cron_false_or_error_succeeds_when_exact_event_appears_after_scheduling(): void

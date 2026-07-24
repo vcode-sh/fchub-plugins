@@ -51,6 +51,22 @@ final class WebhookQueue
         return wp_next_scheduled(self::HOOK, $args) !== false;
     }
 
+    public function cancel(int $deliveryId): bool
+    {
+        if ($deliveryId <= 0) {
+            throw new \InvalidArgumentException('Invalid webhook delivery identity.');
+        }
+
+        $args = [$deliveryId];
+        if ($this->usesActionScheduler()) {
+            as_unschedule_all_actions(self::HOOK, $args);
+            return true;
+        }
+
+        wp_clear_scheduled_hook(self::HOOK, $args);
+        return true;
+    }
+
     private function usesActionScheduler(): bool
     {
         return $this->actionSchedulerAvailable

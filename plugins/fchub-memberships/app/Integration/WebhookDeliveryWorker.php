@@ -80,7 +80,7 @@ final class WebhookDeliveryWorker
     }
 
     /** @return array<string, mixed> */
-    public function deliverNow(int $deliveryId): array
+    public function deliverNow(int $deliveryId, bool $allowRetry = true): array
     {
         $delivery = $this->deliveryRepository->find($deliveryId);
         if (!is_array($delivery)) {
@@ -121,7 +121,24 @@ final class WebhookDeliveryWorker
 
         $settings = ($this->settingsResolver)();
         $settings = is_array($settings) ? $settings : [];
-        $signature = WebhookSecret::sign((string) ($event['body'] ?? ''), $settings);
+        $destinationUrl = (string) ($claimed['destination_url'] ?? '');
+        $endpoint = WebhookEndpointConfig::findByUrl($settings, $destinationUrl);
+        if ($allowRetry && $endpoint !== null && ($endpoint['status'] ?? 'draft') !== 'active') {
+            $completedAt = $this->now();
+            $updated = $this->deliveryRepository->markCancelled(
+                (int) ($claimed['id'] ?? 0),
+                $owner,
+                $attempt,
+                $this->clock->storage($completedAt)
+            );
+
+            return $updated ? ['status' => 'cancelled'] : ['status' => 'lost'];
+        }
+
+        $secret = WebhookEndpointConfig::secretForUrl($settings, $destinationUrl, $allowRetry);
+        $signature = $secret === null
+            ? ''
+            : hash_hmac('sha256', (string) ($event['body'] ?? ''), $secret);
         if ($signature === '') {
             $completedAt = $this->now();
             return $this->complete(
@@ -146,7 +163,7 @@ final class WebhookDeliveryWorker
             'X-FCHub-Timestamp' => $timestamp,
             'X-FCHub-Signature' => $signature,
         ];
-        $response = ($this->httpClient)((string) ($claimed['destination_url'] ?? ''), [
+        $response = ($this->httpClient)($destinationUrl, [
             'timeout' => 15,
             'redirection' => 3,
             'headers' => $headers,
@@ -156,10 +173,14 @@ final class WebhookDeliveryWorker
 
         $completedAt = $this->now();
         $classification = $this->retryPolicy->classify($attempt, $response, $completedAt->getTimestamp());
+        if (!$allowRetry && $classification['outcome'] === 'retry') {
+            $classification['outcome'] = 'failed';
+            $classification['next_timestamp'] = null;
+        }
         $classification = $this->redactClassification($classification, [
-            (string) ($settings['webhook_secret'] ?? ''),
+            $secret ?? '',
             $signature,
-            (string) ($claimed['destination_url'] ?? ''),
+            $destinationUrl,
             $body,
         ]);
 

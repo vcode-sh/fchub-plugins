@@ -18,6 +18,7 @@ final class WebhookControllerTest extends PluginTestCase
             'fchub-memberships/v1/admin/webhooks/health',
             'fchub-memberships/v1/admin/webhooks/deliveries',
             'fchub-memberships/v1/admin/webhooks/deliveries/(?P<id>\d+)/retry',
+            'fchub-memberships/v1/admin/webhooks/deliveries/(?P<id>\d+)/cancel',
             'fchub-memberships/v1/admin/webhooks/test',
         ], array_keys($GLOBALS['_fchub_test_routes']));
         self::assertSame(
@@ -76,6 +77,21 @@ final class WebhookControllerTest extends PluginTestCase
 
         $ready = $this->fixture();
         self::assertSame('ready', $ready['controller']->healthResponse()->get_data()['data']['status']);
+    }
+
+    public function test_health_uses_active_endpoint_records_as_the_current_configuration(): void
+    {
+        $fixture = $this->fixture([
+            'webhook_endpoints' => [[
+                'id' => 'endpoint-a',
+                'name' => 'Endpoint A',
+                'url' => 'https://hooks.example.com/a',
+                'secret' => 'endpoint-secret',
+                'status' => 'active',
+            ]],
+        ]);
+
+        self::assertSame('ready', $fixture['controller']->healthResponse()->get_data()['data']['status']);
     }
 
     public function test_history_returns_only_the_explicit_public_projection(): void
@@ -196,6 +212,23 @@ final class WebhookControllerTest extends PluginTestCase
         self::assertStringNotContainsString('database-sentinel', serialize($unavailable->get_data()));
     }
 
+    public function test_cancel_stops_a_pending_or_retrying_delivery_and_unschedules_it(): void
+    {
+        foreach (['pending', 'retrying'] as $status) {
+            $fixture = $this->fixture();
+            $fixture['deliveries']->found = ['id' => 9, 'status' => $status];
+
+            $response = $fixture['controller']->cancelDelivery(
+                new \WP_REST_Request('POST', '', ['id' => 9])
+            );
+
+            self::assertSame(200, $response->get_status());
+            self::assertSame(['id' => 9, 'status' => 'cancelled'], $response->get_data()['data']);
+            self::assertSame([9], $fixture['deliveries']->cancelledIds);
+            self::assertSame([9], $fixture['queue']->cancelled);
+        }
+    }
+
     public function test_production_test_persists_under_lock_then_uses_worker_after_release_and_continues_failures(): void
     {
         $fixture = $this->fixture([
@@ -271,12 +304,14 @@ final class WebhookControllerTest extends PluginTestCase
             public bool $throw = false;
             public array $resetIds = [];
             public array $created = [];
+            public array $cancelledIds = [];
             private int $findCount = 0;
             public function __construct(private array &$order) {}
             public function summary(): array { if ($this->throw) throw new \RuntimeException('database-sentinel'); return $this->summary; }
             public function recent(array $filters): array { if ($this->throw) throw new \RuntimeException('database-sentinel'); $this->recentFilters = [$filters['page'], $filters['per_page'], $filters['status']]; return $this->recent; }
             public function find(int $id): ?array { $this->order[] = 'find'; if ($this->throw) throw new \RuntimeException('database-sentinel'); if (array_key_exists($id, $this->foundById)) return $this->foundById[$id]; $this->findCount++; return $this->findCount > 1 && $this->afterReset !== null ? $this->afterReset : $this->found; }
             public function resetForManualRetry(int $id): bool { $this->order[] = 'reset'; $this->resetIds[] = $id; if ($this->throw) throw new \RuntimeException('database-sentinel'); return $this->reset; }
+            public function cancel(int $id): bool { $this->cancelledIds[] = $id; return true; }
             public function createMany(string $eventId, array $destinations): array { $this->order[] = 'deliveries'; return $this->created; }
         };
         $events = new class($order) {
@@ -287,8 +322,10 @@ final class WebhookControllerTest extends PluginTestCase
         $queue = new class($order) {
             public array $scheduled = [];
             public bool $result = true;
+            public array $cancelled = [];
             public function __construct(private array &$order) {}
             public function schedule(int $id, int $attempt, int $timestamp): bool { $this->order[] = 'schedule'; $this->scheduled[] = func_get_args(); return $this->result; }
+            public function cancel(int $id): bool { $this->cancelled[] = $id; return true; }
         };
         $worker = new class($order) {
             public array $results = [];

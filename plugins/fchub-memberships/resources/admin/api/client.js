@@ -35,6 +35,10 @@ async function request(method, endpoint, { params, body } = {}) {
     })
   }
 
+  if (response.status === 204) {
+    return undefined
+  }
+
   return response.json()
 }
 

@@ -10,7 +10,7 @@ defined('ABSPATH') || exit;
 
 final class WebhookDeliveryRepository
 {
-    private const STATUSES = ['pending', 'processing', 'retrying', 'succeeded', 'failed'];
+    private const STATUSES = ['pending', 'processing', 'retrying', 'succeeded', 'failed', 'cancelled'];
 
     private string $table;
     private string $eventTable;
@@ -222,6 +222,46 @@ final class WebhookDeliveryRepository
             $code,
             $body,
             $error,
+            null,
+            null,
+            $at
+        );
+    }
+
+    public function cancel(int $id): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+
+        global $wpdb;
+
+        $updated = $wpdb->query($wpdb->prepare(
+            "UPDATE {$this->table}
+             SET status = 'cancelled',
+                 lease_owner = NULL, lease_expires_at = NULL, next_attempt_at = NULL,
+                 updated_at = %s
+             WHERE id = %d AND status IN ('pending', 'retrying')",
+            $this->storageNow(),
+            $id
+        ));
+        if ($updated === false) {
+            throw new \RuntimeException('Unable to cancel webhook delivery.');
+        }
+
+        return $updated === 1;
+    }
+
+    public function markCancelled(int $id, string $owner, int $attempt, string $at): bool
+    {
+        return $this->complete(
+            $id,
+            $owner,
+            $attempt,
+            'cancelled',
+            null,
+            '',
+            'webhook_delivery_cancelled',
             null,
             null,
             $at

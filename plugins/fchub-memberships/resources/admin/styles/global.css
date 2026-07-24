@@ -48,6 +48,20 @@
   outline: none;
 }
 
+/* Native endpoint fields deliberately own their visible container. */
+#fchub-memberships-app .endpoint-create-card input {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #9aa5b5;
+  border-radius: 8px;
+  background: var(--fchub-card-bg);
+}
+
+#fchub-memberships-app .endpoint-create-card input:focus {
+  border: 1px solid var(--el-color-primary);
+  outline: 3px solid color-mix(in srgb, var(--el-color-primary) 16%, transparent);
+}
+
 /* Restore Element Plus component-specific padding/bg stripped by the reset above */
 #fchub-memberships-app .el-textarea__inner {
   padding: 5px 11px;

@@ -148,6 +148,38 @@ final class WebhookDispatcherTest extends PluginTestCase
         self::assertSame([], $GLOBALS['_fchub_test_as_actions']);
     }
 
+    public function test_dispatches_only_to_active_endpoint_records(): void
+    {
+        $events = [];
+        $deliveries = [];
+        $timeline = [];
+        $this->installDurableDatabase($events, $deliveries, $timeline);
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = [
+            'webhook_endpoints' => [
+                [
+                    'id' => 'active',
+                    'name' => 'Active',
+                    'url' => 'https://active.example/hook',
+                    'secret' => 'active-secret',
+                    'status' => 'active',
+                ],
+                [
+                    'id' => 'paused',
+                    'name' => 'Paused',
+                    'url' => 'https://paused.example/hook',
+                    'secret' => 'paused-secret',
+                    'status' => 'paused',
+                ],
+            ],
+        ];
+
+        (new WebhookDispatcher(endpointPolicy: $this->endpointPolicy()))
+            ->dispatch('grant_created', ['user' => ['id' => 21]]);
+
+        self::assertCount(1, $events);
+        self::assertSame(['https://active.example/hook'], array_column($deliveries, 'destination_url'));
+    }
+
     public function test_projects_all_five_events_without_recursive_credentials_and_normalises_typed_expiry(): void
     {
         $events = [];
@@ -301,17 +333,47 @@ final class WebhookDispatcherTest extends PluginTestCase
         self::assertStringNotContainsString('body-sentinel', $logs);
     }
 
-    public function test_send_test_keeps_the_legacy_direct_response_until_task_six(): void
+    public function test_send_test_signs_each_structured_endpoint_with_its_own_secret(): void
     {
-        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = $this->readySettings(
-            "https://example.com/one\nhttps://example.com/two"
-        );
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = [
+            'webhook_endpoints' => [
+                [
+                    'id' => 'one',
+                    'name' => 'One',
+                    'url' => 'https://example.com/one',
+                    'secret' => 'endpoint-one-secret',
+                    'status' => 'paused',
+                ],
+                [
+                    'id' => 'two',
+                    'name' => 'Two',
+                    'url' => 'https://example.com/two',
+                    'secret' => 'endpoint-two-secret',
+                    'status' => 'paused',
+                ],
+            ],
+        ];
 
         $result = (new WebhookDispatcher(endpointPolicy: $this->endpointPolicy()))->sendTest();
 
         self::assertTrue($result['success']);
         self::assertCount(2, $result['results']);
         self::assertCount(2, $GLOBALS['_fchub_test_remote_posts']);
+        $first = $GLOBALS['_fchub_test_remote_posts'][0][1];
+        $second = $GLOBALS['_fchub_test_remote_posts'][1][1];
+        self::assertSame($first['body'], $second['body']);
+        self::assertSame(
+            hash_hmac('sha256', $first['body'], 'endpoint-one-secret'),
+            $first['headers']['X-FCHub-Signature']
+        );
+        self::assertSame(
+            hash_hmac('sha256', $second['body'], 'endpoint-two-secret'),
+            $second['headers']['X-FCHub-Signature']
+        );
+        self::assertNotSame(
+            $first['headers']['X-FCHub-Signature'],
+            $second['headers']['X-FCHub-Signature']
+        );
     }
 
     private function endpointPolicy(): WebhookEndpointPolicy

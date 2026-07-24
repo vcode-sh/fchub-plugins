@@ -7,6 +7,7 @@ namespace FChubMemberships\Http\Controllers;
 use FChubMemberships\Http\WebhookRestArguments;
 use FChubMemberships\Integration\MembershipSettingsOptionCoordinator;
 use FChubMemberships\Integration\WebhookDeliveryWorker;
+use FChubMemberships\Integration\WebhookEndpointConfig;
 use FChubMemberships\Integration\WebhookEndpointPolicy;
 use FChubMemberships\Integration\WebhookEnvelope;
 use FChubMemberships\Integration\WebhookQueue;
@@ -75,6 +76,12 @@ final class WebhookController
             'permission_callback' => [self::class, 'permission'],
             'args' => WebhookRestArguments::retry(),
         ]);
+        register_rest_route($namespace, '/admin/webhooks/deliveries/(?P<id>\d+)/cancel', [
+            'methods' => 'POST',
+            'callback' => [self::class, 'cancel'],
+            'permission_callback' => [self::class, 'permission'],
+            'args' => WebhookRestArguments::retry(),
+        ]);
         register_rest_route($namespace, '/admin/webhooks/test', [
             'methods' => 'POST',
             'callback' => [self::class, 'test'],
@@ -107,6 +114,11 @@ final class WebhookController
         return (new self())->testDelivery($request);
     }
 
+    public static function cancel(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return (new self())->cancelDelivery($request);
+    }
+
     public function healthResponse(): \WP_REST_Response
     {
         if (!$this->isReady()) {
@@ -128,9 +140,9 @@ final class WebhookController
         $processing = (int) ($summary['processing'] ?? 0);
         $retrying = (int) ($summary['retrying'] ?? 0);
         $failed = (int) ($summary['failed'] ?? 0);
-        $status = ($settings['webhook_enabled'] ?? 'no') !== 'yes'
-            ? 'off'
-            : (!$configured ? 'needs_setup' : (($retrying + $failed) > 0 ? 'degraded' : 'ready'));
+        $status = !$configured
+            ? (($settings['webhook_enabled'] ?? 'no') === 'yes' ? 'needs_setup' : 'off')
+            : (($retrying + $failed) > 0 ? 'degraded' : 'ready');
 
         return new \WP_REST_Response(['data' => [
             'status' => $status,
@@ -216,6 +228,47 @@ final class WebhookController
                 }
 
                 return new \WP_REST_Response(['data' => ['id' => $deliveryId, 'status' => 'pending']], 202);
+            });
+        } catch (\Throwable) {
+            return $this->error('fchub_webhook_storage_unavailable', 503);
+        }
+
+        if (!$result['success'] || !$result['value'] instanceof \WP_REST_Response) {
+            return $this->error('fchub_webhook_storage_unavailable', 503);
+        }
+
+        return $result['value'];
+    }
+
+    public function cancelDelivery(\WP_REST_Request $request): \WP_REST_Response
+    {
+        if (!$this->isReady()) {
+            return $this->error('fchub_webhook_storage_unavailable', 503);
+        }
+
+        $deliveryId = (int) $request->get_param('id');
+        try {
+            $result = $this->settingsCoordinator->synchronized(function () use ($deliveryId): \WP_REST_Response {
+                $delivery = $this->deliveryRepository->find($deliveryId);
+                if (!is_array($delivery)) {
+                    return $this->error('fchub_webhook_delivery_not_found', 404);
+                }
+                if (!in_array((string) ($delivery['status'] ?? ''), ['pending', 'retrying'], true)) {
+                    return $this->error(
+                        'fchub_webhook_cancel_not_allowed',
+                        409,
+                        ['status' => (string) ($delivery['status'] ?? '')]
+                    );
+                }
+                if (!$this->deliveryRepository->cancel($deliveryId)) {
+                    return $this->error('fchub_webhook_cancel_not_allowed', 409);
+                }
+                $this->queue->cancel($deliveryId);
+
+                return new \WP_REST_Response(['data' => [
+                    'id' => $deliveryId,
+                    'status' => 'cancelled',
+                ]]);
             });
         } catch (\Throwable) {
             return $this->error('fchub_webhook_storage_unavailable', 503);
@@ -334,22 +387,27 @@ final class WebhookController
     /** @param array<string, mixed> $settings */
     private function configured(array $settings): bool
     {
-        return $this->safeDestinations($settings) !== [];
+        return WebhookEndpointConfig::active($settings) !== [];
     }
 
     /** @param array<string, mixed> $settings @return list<string> */
     private function safeDestinations(array $settings): array
     {
-        if (empty($settings['webhook_secret'])) {
-            return [];
+        $urls = [];
+        foreach (WebhookEndpointConfig::all($settings) as $endpoint) {
+            $url = (string) ($endpoint['url'] ?? '');
+            if ((string) ($endpoint['secret'] ?? '') === ''
+                || $this->endpointPolicy->validate($url) !== true
+            ) {
+                continue;
+            }
+            $normalised = $this->endpointPolicy->normalise($url);
+            if (count($normalised) === 1) {
+                $urls[] = $normalised[0];
+            }
         }
 
-        $raw = (string) ($settings['webhook_urls'] ?? '');
-        if ($this->endpointPolicy->validate($raw) !== true) {
-            return [];
-        }
-
-        return $this->endpointPolicy->normalise($raw);
+        return array_values(array_unique($urls));
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
@@ -389,6 +447,7 @@ final class WebhookController
         $messages = [
             'fchub_webhook_delivery_not_found' => 'Webhook delivery was not found.',
             'fchub_webhook_retry_not_allowed' => 'Webhook delivery cannot be retried in its current state.',
+            'fchub_webhook_cancel_not_allowed' => 'Webhook delivery cannot be stopped in its current state.',
             'fchub_webhook_retry_schedule_failed' => 'Webhook retry could not be scheduled.',
             'fchub_webhook_not_ready' => 'Configure safe webhook destinations and a signing secret first.',
             'fchub_webhook_storage_unavailable' => 'Webhook storage is temporarily unavailable.',

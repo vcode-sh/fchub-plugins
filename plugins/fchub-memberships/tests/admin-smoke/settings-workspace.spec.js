@@ -149,14 +149,15 @@ test('uses public metadata and loads truthful webhook health and history on dema
   expect(await page.evaluate(() => window.__fchubSmokeWebhookHistoryReads)).toBe(0)
 
   await webhooksCategory.click()
-  await expect(page.getByText('Off', { exact: true })).toBeVisible()
-  await expect(page.getByText('Configured (never reveal again)', { exact: true })).toBeVisible()
+  await expect(page.getByText('No webhook endpoints yet', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Latest webhook deliveries' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Retry Access\.revoked delivery/ })).toBeVisible()
 
   const readsBeforeRetry = await page.evaluate(() => window.__fchubSmokeWebhookHistoryReads)
   await page.getByRole('button', { name: /Retry Access\.revoked delivery/ }).click()
   await expect(page.getByLabel('Delivery status: Pending')).toBeVisible()
+  await page.getByRole('button', { name: /Stop retrying Access\.revoked delivery/ }).click()
+  await expect(page.getByLabel('Delivery status: Stopped')).toBeVisible()
   expect(await page.evaluate(() => window.__fchubSmokeWebhookHistoryReads)).toBeGreaterThan(readsBeforeRetry)
 })
 
@@ -170,6 +171,8 @@ test('explains webhook destinations and exposes the exact Access API endpoint in
   await page.locator('[data-open-webhook-guide]').click()
   const webhookGuide = page.getByRole('dialog', { name: 'Connect a webhook receiver' })
   await expect(webhookGuide).toContainText('The webhook URL is the public HTTPS endpoint in your other system.')
+  await expect(webhookGuide).toContainText('No other endpoint shares it.')
+  await expect(webhookGuide).toContainText('failed test never enters the retry queue')
   await expect(webhookGuide).toContainText('X-FCHub-Signature')
   await expect(webhookGuide).toContainText('X-FCHub-Delivery')
   await webhookGuide.getByRole('button', { name: 'Close connection guide' }).click()
@@ -185,31 +188,48 @@ test('explains webhook destinations and exposes the exact Access API endpoint in
   await expect(apiGuide.getByRole('button', { name: 'Copied' })).toBeVisible()
 })
 
-test('requires a saved signed destination before webhooks can be enabled', async ({ page }) => {
+test('guides one endpoint from receiver details through secret, test and activation', async ({ page }) => {
   await openSettings(page)
 
   await page.getByRole('navigation', { name: 'Settings categories' })
     .getByRole('button', { name: /Webhooks & API/ })
     .click()
 
-  const enableWebhooks = page.getByRole('switch', { name: 'Enable webhooks' })
-  await expect(page.getByRole('textbox', { name: 'Webhook URLs' })).toHaveValue('https://127.0.0.1/webhook')
-  await expect(enableWebhooks).toBeDisabled()
-  await page.getByRole('textbox', { name: 'Webhook URLs' }).fill('https://hooks.example.com/memberships')
-  await expect(enableWebhooks).toBeDisabled()
+  await expect(page.getByRole('switch', { name: 'Enable webhooks' })).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: 'Webhook URLs' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Add endpoint' }).click()
+  const endpointUrl = page.getByRole('textbox', { name: 'Endpoint URL' })
+  await page.getByRole('textbox', { name: 'Endpoint name' }).fill('CRM receiver')
+  await endpointUrl.fill('https://hooks.example.com/memberships')
+  expect(await endpointUrl.evaluate((element) => getComputedStyle(element).borderStyle)).toBe('solid')
+  await page.locator('[data-endpoint-create-form]').getByRole('button', { name: 'Add endpoint' }).click()
 
-  await page.getByRole('region', { name: 'Unsaved settings' }).getByRole('button', { name: 'Save' }).click()
-  await expect(enableWebhooks).toBeEnabled()
-  await page.getByRole('button', { name: 'Send test' }).click()
-  const testResults = page.getByLabel('Webhook test results')
-  await expect(testResults).toContainText('hooks.example.com/memberships')
-  await expect(testResults).toContainText('Retrying')
+  const endpointCard = page.locator('[data-webhook-endpoint]')
+  await expect(endpointCard).toContainText('Setup required')
+  await expect(endpointCard.getByRole('button', { name: 'Activate' })).toBeDisabled()
+  await endpointCard.getByRole('button', { name: 'Generate secret' }).click()
 
-  const settingsMutations = await page.evaluate(() => window.__fchubSmokeRequests.filter(({ url }) => url.endsWith('/admin/settings')))
-  expect(settingsMutations).toHaveLength(1)
-  expect(settingsMutations[0].body.webhook_urls).toBe('https://hooks.example.com/memberships')
-  expect(settingsMutations[0].body).not.toHaveProperty('api_key')
-  expect(settingsMutations[0].body).not.toHaveProperty('webhook_secret')
+  const secretDialog = page.getByRole('dialog', { name: 'Save the secret for CRM receiver' })
+  await expect(secretDialog).toContainText('webhook_endpoint_one_time_smoke_secret')
+  await expect(secretDialog.getByRole('button', { name: 'Close' })).toBeEnabled()
+  await secretDialog.getByRole('button', { name: 'Close' }).click()
+  await expect(page.getByText('webhook_endpoint_one_time_smoke_secret')).toHaveCount(0)
+
+  await endpointCard.getByRole('button', { name: 'Test endpoint' }).click()
+  await expect(endpointCard).toContainText('Last test passed')
+  await expect(endpointCard.getByRole('button', { name: 'Activate' })).toBeEnabled()
+  await endpointCard.getByRole('button', { name: 'Activate' }).click()
+  await expect(endpointCard).toContainText('Active')
+  await expect(endpointCard.getByRole('button', { name: 'Pause' })).toBeVisible()
+
+  const endpointRequests = await page.evaluate(() => window.__fchubSmokeRequests.filter(({ url }) => (
+    url.includes('/admin/webhooks/endpoints')
+  )))
+  expect(endpointRequests.some(({ method, body }) => (
+    method === 'POST'
+      && body?.name === 'CRM receiver'
+      && body?.url === 'https://hooks.example.com/memberships'
+  ))).toBe(true)
 })
 
 test('shows generated credentials once and clears them after acknowledgement and reload', async ({ page }) => {
@@ -223,7 +243,7 @@ test('shows generated credentials once and clears them after acknowledgement and
 
   const oneTimeDialog = page.getByRole('dialog', { name: 'Save the new API key' })
   await expect(oneTimeDialog).toContainText('fchub_one_time_smoke_key')
-  await expect(oneTimeDialog.getByRole('button', { name: 'Done' })).toBeDisabled()
+  await expect(oneTimeDialog.getByRole('button', { name: 'Close' })).toBeEnabled()
 
   await page.getByRole('navigation', { name: 'Settings categories' })
     .getByRole('button', { name: /General/ })
@@ -231,9 +251,7 @@ test('shows generated credentials once and clears them after acknowledgement and
   await expect(page.getByRole('heading', { name: 'Webhooks & API', exact: true })).toBeVisible()
   await expect(oneTimeDialog).toContainText('fchub_one_time_smoke_key')
 
-  await oneTimeDialog.getByRole('button', { name: /Copy/ }).click()
-  await oneTimeDialog.getByRole('checkbox', { name: 'I have copied and safely stored this key.' }).check()
-  await oneTimeDialog.getByRole('button', { name: 'Done' }).click()
+  await oneTimeDialog.getByRole('button', { name: 'Close' }).click()
   await expect(page.getByText('fchub_one_time_smoke_key')).toHaveCount(0)
 
   await page.reload()
@@ -265,7 +283,7 @@ test('ignores a late credential response after leaving and returning to Webhooks
   await expect(page.getByText('fchub_abc123')).toBeVisible()
 })
 
-test('serializes competing credential mutations and preserves the first one-time value', async ({ page }) => {
+test('prevents competing API key mutations while a key rotation is pending', async ({ page }) => {
   await openSettings(page)
   await page.getByRole('navigation', { name: 'Settings categories' })
     .getByRole('button', { name: /Webhooks & API/ })
@@ -276,19 +294,14 @@ test('serializes competing credential mutations and preserves the first one-time
   await page.getByRole('dialog').getByRole('button', { name: 'Regenerate' }).click()
   await expect.poll(() => page.evaluate(() => typeof window.__fchubSmokeReleaseCredential)).toBe('function')
 
-  const regenerateSecret = page.getByRole('button', { name: 'Regenerate secret' })
   const revokeKey = page.getByRole('button', { name: 'Revoke', exact: true })
-  await expect(regenerateSecret).toBeDisabled()
   await expect(revokeKey).toBeDisabled()
 
-  await regenerateSecret.dispatchEvent('click')
-  await expect(page.getByRole('dialog', { name: 'Regenerate webhook secret' })).toHaveCount(0)
   await revokeKey.dispatchEvent('click')
   await expect(page.getByRole('dialog', { name: 'Revoke API key' })).toHaveCount(0)
 
   const competingRequests = await page.evaluate(() => window.__fchubSmokeRequests.filter(({ url }) => (
-    url.includes('/admin/settings/regenerate-webhook-secret')
-    || url.includes('/admin/settings/revoke-api-key')
+    url.includes('/admin/settings/revoke-api-key')
   )))
   expect(competingRequests).toHaveLength(0)
 
@@ -298,7 +311,7 @@ test('serializes competing credential mutations and preserves the first one-time
   })
   const oneTimeDialog = page.getByRole('dialog', { name: 'Save the new API key' })
   await expect(oneTimeDialog).toContainText('fchub_one_time_smoke_key')
-  await expect(page.getByText('webhook_one_time_smoke_secret')).toHaveCount(0)
+  await expect(oneTimeDialog.getByRole('button', { name: 'Close' })).toBeEnabled()
 })
 
 test('keeps a one-time credential mounted when the mobile category selector attempts to leave', async ({ page }) => {

@@ -74,7 +74,15 @@ const cases = [
     '/admin/webhooks/deliveries?page=2&per_page=20&status=failed',
   ],
   ['settings.retryWebhookDelivery', () => settings.retryWebhookDelivery(91), 'POST', '/admin/webhooks/deliveries/91/retry'],
+  ['settings.cancelWebhookDelivery', () => settings.cancelWebhookDelivery(91), 'POST', '/admin/webhooks/deliveries/91/cancel'],
   ['settings.testWebhook', () => settings.testWebhook(), 'POST', '/admin/webhooks/test'],
+  ['settings.listWebhookEndpoints', () => settings.listWebhookEndpoints(), 'GET', '/admin/webhooks/endpoints'],
+  ['settings.createWebhookEndpoint', () => settings.createWebhookEndpoint({ name: 'CRM', url: 'https://crm.example/hook' }), 'POST', '/admin/webhooks/endpoints'],
+  ['settings.rotateWebhookEndpointSecret', () => settings.rotateWebhookEndpointSecret('we_1'), 'POST', '/admin/webhooks/endpoints/we_1/secret'],
+  ['settings.testWebhookEndpoint', () => settings.testWebhookEndpoint('we_1'), 'POST', '/admin/webhooks/endpoints/we_1/test'],
+  ['settings.activateWebhookEndpoint', () => settings.activateWebhookEndpoint('we_1'), 'POST', '/admin/webhooks/endpoints/we_1/activate'],
+  ['settings.pauseWebhookEndpoint', () => settings.pauseWebhookEndpoint('we_1'), 'POST', '/admin/webhooks/endpoints/we_1/pause'],
+  ['settings.deleteWebhookEndpoint', () => settings.deleteWebhookEndpoint('we_1'), 'DELETE', '/admin/webhooks/endpoints/we_1'],
   ['importMembers.parse', () => importMembers.parse({ content: 'email' }), 'POST', '/admin/import/parse'],
   ['importMembers.prepare', () => importMembers.prepare({ mappings: [] }), 'POST', '/admin/import/prepare'],
   ['importMembers.execute', () => importMembers.execute({ members: [], mappings: [] }), 'POST', '/admin/import/execute'],
@@ -107,6 +115,19 @@ describe('admin api wrappers', () => {
       message: 'Broken request',
       status: 422,
     })
+  })
+
+  it('accepts successful no-content responses without parsing JSON', async () => {
+    const json = vi.fn()
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: 'No Content',
+      json,
+    })
+
+    await expect(settings.deleteWebhookEndpoint('we_1')).resolves.toBeUndefined()
+    expect(json).not.toHaveBeenCalled()
   })
 
   it('drops empty query params from GET requests', async () => {

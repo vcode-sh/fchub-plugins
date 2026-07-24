@@ -35,10 +35,10 @@
         </div>
 
         <ol class="connection-guide-steps" aria-label="Webhook setup steps">
-          <li><span>1</span><div><strong>Save the destination</strong><p>Paste one receiver URL per line, then save the settings.</p></div></li>
-          <li><span>2</span><div><strong>Generate the signing secret</strong><p>Copy it when shown. Your receiver uses it to verify every request.</p></div></li>
-          <li><span>3</span><div><strong>Send a test</strong><p>FCHub sends a real signed test through the same delivery worker used for membership events.</p></div></li>
-          <li><span>4</span><div><strong>Enable delivery</strong><p>Only enable webhooks after the destination accepts the test with a 2xx response.</p></div></li>
+          <li><span>1</span><div><strong>Add one endpoint</strong><p>Name the receiver and paste its public HTTPS URL. Each receiver is managed independently.</p></div></li>
+          <li><span>2</span><div><strong>Generate its signing secret</strong><p>Copy the one-time secret into that receiver. No other endpoint shares it.</p></div></li>
+          <li><span>3</span><div><strong>Send a one-shot test</strong><p>The test uses the production signature contract, but a failed test never enters the retry queue.</p></div></li>
+          <li><span>4</span><div><strong>Activate the endpoint</strong><p>Activation unlocks after a 2xx test response. Pause it whenever delivery should stop.</p></div></li>
         </ol>
 
         <section class="connection-guide-block">

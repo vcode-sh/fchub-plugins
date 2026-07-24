@@ -276,4 +276,29 @@ final class WebhookDeliveryRepositoryTest extends PluginTestCase
         self::assertStringNotContainsString("status = 'processing' AND", $sql);
         self::assertStringNotContainsString("status = 'retrying' AND", $sql);
     }
+
+    public function test_cancel_stops_only_pending_or_retrying_deliveries(): void
+    {
+        $queries = [];
+        $GLOBALS['_fchub_test_wpdb_overrides']['query'] = static function (string $query) use (&$queries): int {
+            $queries[] = $query;
+            return 1;
+        };
+
+        $repository = new WebhookDeliveryRepository();
+
+        self::assertTrue($repository->cancel(9));
+        self::assertTrue($repository->markCancelled(
+            10,
+            'owner-a',
+            2,
+            '2026-07-24 08:00:00'
+        ));
+
+        $sql = implode("\n", $queries);
+        self::assertStringContainsString("status = 'cancelled'", $sql);
+        self::assertStringContainsString("status IN ('pending', 'retrying')", $sql);
+        self::assertStringContainsString("status = 'processing'", $sql);
+        self::assertStringContainsString("lease_owner = 'owner-a'", $sql);
+    }
 }

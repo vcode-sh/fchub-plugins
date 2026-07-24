@@ -147,5 +147,6 @@ final class FluentCartRuntimeModule implements ModuleInterface
         \FChubMemberships\Http\Controllers\IntegrationHealthController::registerRoutes();
         \FChubMemberships\Http\Controllers\ProviderReconciliationController::registerRoutes();
         \FChubMemberships\Http\Controllers\WebhookController::registerRoutes();
+        \FChubMemberships\Http\Controllers\WebhookEndpointController::registerRoutes();
     }
 }

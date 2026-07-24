@@ -107,21 +107,20 @@
           />
           <SettingsWebhooksApiSection
             v-else-if="activeSettingsTab === 'webhooks'"
-            :form="form"
             :access-api="accessApi"
-            :webhook-status="webhookStatus"
-            :webhook-secret-configured="webhookSecretConfigured"
-            :webhook-configuration-valid="webhookConfigurationValid"
+            :endpoints="webhookEndpoints"
+            :endpoint-busy="endpointBusy"
+            :one-time-endpoint-secret="oneTimeEndpointSecret"
             :one-time-credentials="oneTimeCredentials"
             :busy="webhookBusy"
             :actions="webhookActions"
-            :test-results="testResults"
             :webhook-error="webhookError"
             :history="webhookHistory"
             @acknowledge-api-key="clearOneTimeApiKey"
-            @acknowledge-webhook-secret="clearOneTimeWebhookSecret"
+            @close-endpoint-secret="clearOneTimeEndpointSecret"
             @refresh-history="refreshWebhookOperationalState"
             @retry-delivery="retryWebhookDelivery"
+            @cancel-delivery="cancelWebhookDelivery"
           />
           <SettingsAdvancedSection v-else :form="form" />
         </section>
@@ -190,6 +189,9 @@ const webhookDestinationsConfigured = ref(false)
 const webhookError = ref('')
 const oneTimeCredentials = ref({ apiKey: '', webhookSecret: '' })
 const webhookDeliveries = ref([])
+const webhookEndpoints = ref([])
+const endpointBusy = ref({ create: false })
+const oneTimeEndpointSecret = ref({ secret: '', name: '' })
 const webhookHistoryLoading = ref(false)
 const webhookHistoryError = ref('')
 const retryingDeliveryId = ref(null)
@@ -330,7 +332,7 @@ const enabledEmailCount = computed(() => activeDeliveryCount(
 const enabledConnectionCount = computed(() => [
   form.value.fluentcrm_enabled,
   form.value.fc_enabled,
-  form.value.webhook_enabled,
+  webhookEndpoints.value.some((endpoint) => endpoint.status === 'active'),
 ].filter(Boolean).length)
 
 const restrictionModeLabel = computed(() => ({
@@ -365,8 +367,8 @@ const settingsCategories = computed(() => [
     id: 'webhooks',
     label: 'Webhooks & API',
     description: 'Deliver membership events and manage credentials for external systems.',
-    summary: form.value.webhook_enabled
-      ? webhookStatusLabel(webhookStatus.value)
+    summary: webhookEndpoints.value.some((endpoint) => endpoint.status === 'active')
+      ? `${webhookEndpoints.value.filter((endpoint) => endpoint.status === 'active').length} active`
       : (accessApi.value.configured ? 'API ready' : 'Not connected'),
     icon: markRaw(Link),
   },
@@ -793,9 +795,10 @@ async function refreshWebhookOperationalState() {
   webhookHistoryError.value = ''
   webhookError.value = ''
 
-  const [healthResult, historyResult] = await Promise.allSettled([
+  const [healthResult, historyResult, endpointsResult] = await Promise.allSettled([
     settings.getWebhookHealth(),
     settings.listWebhookDeliveries({ page: 1, per_page: 20, status: '' }),
+    settings.listWebhookEndpoints(),
   ])
   if (requestVersion !== webhookRequestVersion || activeSettingsTab.value !== 'webhooks') return
 
@@ -811,6 +814,12 @@ async function refreshWebhookOperationalState() {
     webhookDeliveries.value = Array.isArray(history.deliveries) ? history.deliveries.slice(0, 20) : []
   } else {
     webhookHistoryError.value = errorMessage(historyResult.reason, 'Delivery history could not be loaded.')
+  }
+  if (endpointsResult.status === 'fulfilled') {
+    const endpointData = endpointsResult.value.data ?? endpointsResult.value
+    webhookEndpoints.value = Array.isArray(endpointData.endpoints) ? endpointData.endpoints : []
+  } else {
+    webhookError.value = errorMessage(endpointsResult.reason, 'Webhook endpoints could not be loaded.')
   }
   webhookHistoryLoading.value = false
 }
@@ -828,13 +837,96 @@ async function retryWebhookDelivery(deliveryId) {
   }
 }
 
+async function cancelWebhookDelivery(deliveryId) {
+  webhookHistoryError.value = ''
+  try {
+    await settings.cancelWebhookDelivery(deliveryId)
+    await refreshWebhookOperationalState()
+  } catch (err) {
+    webhookHistoryError.value = errorMessage(err, 'The delivery could not be stopped.')
+  }
+}
+
+function setEndpointBusy(id, action, value) {
+  if (id === 'create') {
+    endpointBusy.value = { ...endpointBusy.value, create: value }
+    return
+  }
+  endpointBusy.value = {
+    ...endpointBusy.value,
+    [id]: { ...(endpointBusy.value[id] || {}), [action]: value },
+  }
+}
+
+async function createWebhookEndpoint(payload) {
+  setEndpointBusy('create', 'create', true)
+  webhookError.value = ''
+  try {
+    await settings.createWebhookEndpoint(payload)
+    await refreshWebhookOperationalState()
+    return true
+  } catch (err) {
+    webhookError.value = errorMessage(err, 'The webhook endpoint could not be added.')
+    return false
+  } finally {
+    setEndpointBusy('create', 'create', false)
+  }
+}
+
+async function rotateWebhookEndpointSecret(endpointId) {
+  setEndpointBusy(endpointId, 'secret', true)
+  webhookError.value = ''
+  try {
+    const response = await settings.rotateWebhookEndpointSecret(endpointId)
+    const data = response.data ?? response
+    if (!data.secret) throw new Error('The endpoint service did not return the new secret.')
+    const endpoint = data.endpoint || webhookEndpoints.value.find(({ id }) => id === endpointId) || {}
+    oneTimeEndpointSecret.value = { secret: data.secret, name: endpoint.name || 'webhook endpoint' }
+    await refreshWebhookOperationalState()
+  } catch (err) {
+    webhookError.value = errorMessage(err, 'The endpoint secret could not be generated.')
+  } finally {
+    setEndpointBusy(endpointId, 'secret', false)
+  }
+}
+
+async function runEndpointAction(endpointId, action, request, fallback) {
+  setEndpointBusy(endpointId, action, true)
+  webhookError.value = ''
+  try {
+    await request(endpointId)
+    await refreshWebhookOperationalState()
+  } catch (err) {
+    webhookError.value = errorMessage(err, fallback)
+  } finally {
+    setEndpointBusy(endpointId, action, false)
+  }
+}
+
+const testWebhookEndpoint = (id) => runEndpointAction(id, 'test', settings.testWebhookEndpoint, 'The one-shot endpoint test failed.')
+const activateWebhookEndpoint = (id) => runEndpointAction(id, 'activate', settings.activateWebhookEndpoint, 'The endpoint could not be activated.')
+const pauseWebhookEndpoint = (id) => runEndpointAction(id, 'pause', settings.pauseWebhookEndpoint, 'The endpoint could not be paused.')
+
+async function deleteWebhookEndpoint(id) {
+  const confirmed = await confirmDestructiveAction(
+    'This removes the endpoint secret and stops future deliveries. Continue?',
+    'Delete webhook endpoint',
+    'Delete',
+  )
+  if (!confirmed) return
+  await runEndpointAction(id, 'delete', settings.deleteWebhookEndpoint, 'The endpoint could not be deleted.')
+}
+
 const webhookActions = {
   generateApiKey,
   regenerateApiKey,
   revokeApiKey,
-  generateWebhookSecret,
-  regenerateWebhookSecret,
-  testWebhook: sendTestWebhook,
+  createEndpoint: createWebhookEndpoint,
+  rotateEndpointSecret: rotateWebhookEndpointSecret,
+  testEndpoint: testWebhookEndpoint,
+  activateEndpoint: activateWebhookEndpoint,
+  pauseEndpoint: pauseWebhookEndpoint,
+  deleteEndpoint: deleteWebhookEndpoint,
 }
 
 function normaliseAccessApi(value) {
@@ -897,8 +989,13 @@ function clearOneTimeWebhookSecret() {
   oneTimeCredentials.value = { ...oneTimeCredentials.value, webhookSecret: '' }
 }
 
+function clearOneTimeEndpointSecret() {
+  oneTimeEndpointSecret.value = { secret: '', name: '' }
+}
+
 function clearOneTimeCredentials() {
   oneTimeCredentials.value = { apiKey: '', webhookSecret: '' }
+  clearOneTimeEndpointSecret()
 }
 
 function invalidateWebhookRequests() {

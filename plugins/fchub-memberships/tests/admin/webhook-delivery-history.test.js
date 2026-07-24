@@ -88,6 +88,17 @@ describe('webhook delivery history', () => {
     expect(wrapper.emitted('retry')).toEqual([[17]])
   })
 
+  it('offers stop retrying for active retry states', async () => {
+    const wrapper = mount(WebhookDeliveryHistory, {
+      props: {
+        deliveries: [delivery({ id: 91, event_type: 'test', status: 'retrying', attempt_count: 2 })],
+      },
+    })
+
+    await wrapper.get('[data-cancel-delivery]').trigger('click')
+    expect(wrapper.emitted('cancel')).toEqual([[91]])
+  })
+
   it('renders loading, error and empty states with a refresh action', async () => {
     const loading = mount(WebhookDeliveryHistory, { props: { loading: true } })
     expect(loading.get('[role="status"]').text()).toContain('Loading delivery history')

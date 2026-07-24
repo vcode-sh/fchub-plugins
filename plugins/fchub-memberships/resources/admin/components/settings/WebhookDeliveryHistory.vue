@@ -55,6 +55,14 @@
             :aria-label="`Delivery status: ${statusLabel(delivery.status)}`"
           >{{ statusLabel(delivery.status) }}</span>
           <button
+            v-if="['pending', 'retrying'].includes(delivery.status)"
+            type="button"
+            class="webhook-delivery-retry"
+            data-cancel-delivery
+            :aria-label="`Stop retrying ${eventLabel(delivery.event_type)} delivery to ${destinationHost(delivery.destination_url)}`"
+            @click="emit('cancel', delivery.id)"
+          >Stop retrying</button>
+          <button
             v-if="delivery.status === 'failed'"
             type="button"
             class="webhook-delivery-retry"
@@ -79,7 +87,7 @@ const props = defineProps({
   retryingId: { type: [Number, String], default: null },
 })
 
-const emit = defineEmits(['refresh', 'retry'])
+const emit = defineEmits(['refresh', 'retry', 'cancel'])
 
 const recentDeliveries = computed(() => props.deliveries.slice(0, 20))
 
@@ -89,6 +97,7 @@ const STATUS_LABELS = {
   retrying: 'Retrying',
   succeeded: 'Delivered',
   failed: 'Failed',
+  cancelled: 'Stopped',
 }
 
 function eventLabel(value) {
