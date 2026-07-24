@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 if (!defined('ABSPATH')) {
-    define('ABSPATH', '/tmp/wordpress/');
+    define('ABSPATH', __DIR__ . '/stubs/wordpress/');
 }
 
 if (!defined('DAY_IN_SECONDS')) {
@@ -27,7 +27,7 @@ if (!defined('OBJECT')) {
 }
 
 if (!defined('FCHUB_MEMBERSHIPS_VERSION')) {
-    define('FCHUB_MEMBERSHIPS_VERSION', '1.3.1');
+    define('FCHUB_MEMBERSHIPS_VERSION', '1.4.0');
 }
 
 if (!defined('FCHUB_MEMBERSHIPS_FILE')) {
