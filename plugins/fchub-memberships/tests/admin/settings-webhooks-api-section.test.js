@@ -240,4 +240,18 @@ describe('settings webhooks and API section', () => {
     expect(wrapper.emitted('refresh-history')).toHaveLength(1)
     expect(wrapper.emitted('retry-delivery')).toEqual([[14]])
   })
+
+  it('opens focused connection guides from both section headings', async () => {
+    const wrapper = mountSection()
+
+    await wrapper.get('[data-open-webhook-guide]').trigger('click')
+    expect(wrapper.get('[data-connection-guide]').text()).toContain('Connect a webhook receiver')
+    expect(wrapper.get('[data-connection-guide]').text()).toContain('your other system')
+    await wrapper.get('[data-close-guide]').trigger('click')
+
+    await wrapper.get('[data-open-api-guide]').trigger('click')
+    const guide = wrapper.get('[data-connection-guide]')
+    expect(guide.text()).toContain('Connect to the Access API')
+    expect(guide.text()).toContain('https://example.com/wp-json/fchub-memberships/v1/check-access')
+  })
 })

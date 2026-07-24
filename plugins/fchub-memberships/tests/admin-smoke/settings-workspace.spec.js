@@ -160,6 +160,31 @@ test('uses public metadata and loads truthful webhook health and history on dema
   expect(await page.evaluate(() => window.__fchubSmokeWebhookHistoryReads)).toBeGreaterThan(readsBeforeRetry)
 })
 
+test('explains webhook destinations and exposes the exact Access API endpoint in context', async ({ page }) => {
+  await openSettings(page)
+
+  await page.getByRole('navigation', { name: 'Settings categories' })
+    .getByRole('button', { name: /Webhooks & API/ })
+    .click()
+
+  await page.locator('[data-open-webhook-guide]').click()
+  const webhookGuide = page.getByRole('dialog', { name: 'Connect a webhook receiver' })
+  await expect(webhookGuide).toContainText('The webhook URL is the public HTTPS endpoint in your other system.')
+  await expect(webhookGuide).toContainText('X-FCHub-Signature')
+  await expect(webhookGuide).toContainText('X-FCHub-Delivery')
+  await webhookGuide.getByRole('button', { name: 'Close connection guide' }).click()
+
+  await page.locator('[data-open-api-guide]').click()
+  const apiGuide = page.getByRole('dialog', { name: 'Connect to the Access API' })
+  await expect(apiGuide.locator('[data-api-endpoint]')).toHaveText(
+    'https://example.com/wp-json/fchub-memberships/v1/check-access',
+  )
+  await expect(apiGuide).toContainText('WordPress Application Passwords')
+  await expect(apiGuide).toContainText('Idempotency-Key')
+  await apiGuide.getByRole('button', { name: 'Copy URL' }).click()
+  await expect(apiGuide.getByRole('button', { name: 'Copied' })).toBeVisible()
+})
+
 test('requires a saved signed destination before webhooks can be enabled', async ({ page }) => {
   await openSettings(page)
 

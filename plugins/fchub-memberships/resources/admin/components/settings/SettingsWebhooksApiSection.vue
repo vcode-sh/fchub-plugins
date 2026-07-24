@@ -2,7 +2,15 @@
   <div class="fchub-settings-section webhook-settings-section">
     <div class="fchub-settings-section-title settings-section-heading">
       <span>Webhooks</span>
-      <span class="settings-status" :class="`is-${webhookStatus}`" data-webhook-status>{{ webhookStatusLabel }}</span>
+      <div class="settings-heading-actions">
+        <button
+          type="button"
+          class="settings-guide-trigger"
+          data-open-webhook-guide
+          @click="guideTopic = 'webhooks'"
+        >How it works</button>
+        <span class="settings-status" :class="`is-${webhookStatus}`" data-webhook-status>{{ webhookStatusLabel }}</span>
+      </div>
     </div>
 
     <div v-if="webhookError" class="settings-inline-error" data-webhook-error role="alert">
@@ -114,9 +122,17 @@
   <div class="fchub-settings-section api-settings-section">
     <div class="fchub-settings-section-title settings-section-heading">
       <span>Access API</span>
-      <span class="settings-status" :class="accessApi.configured ? 'is-ready' : 'is-off'" data-access-api-status>
-        {{ accessApi.configured ? 'Ready' : 'Not configured' }}
-      </span>
+      <div class="settings-heading-actions">
+        <button
+          type="button"
+          class="settings-guide-trigger"
+          data-open-api-guide
+          @click="guideTopic = 'api'"
+        >How it works</button>
+        <span class="settings-status" :class="accessApi.configured ? 'is-ready' : 'is-off'" data-access-api-status>
+          {{ accessApi.configured ? 'Ready' : 'Not configured' }}
+        </span>
+      </div>
     </div>
 
     <div class="fchub-setting-row">
@@ -160,6 +176,13 @@
       </div>
     </div>
   </div>
+
+  <SettingsConnectionGuideDialog
+    v-if="guideTopic"
+    :topic="guideTopic"
+    :api-root="apiRoot"
+    @close="guideTopic = ''"
+  />
 
   <div
     v-if="oneTimeCredentials.apiKey"
@@ -235,6 +258,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import WebhookDeliveryHistory from './WebhookDeliveryHistory.vue'
+import SettingsConnectionGuideDialog from './SettingsConnectionGuideDialog.vue'
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -267,6 +291,7 @@ const apiKeyCopyError = ref('')
 const webhookSecretCopied = ref(false)
 const webhookSecretAcknowledged = ref(false)
 const webhookSecretCopyError = ref('')
+const guideTopic = ref('')
 const apiKeyDialog = ref(null)
 const apiKeyCopyButton = ref(null)
 const apiKeyActionButton = ref(null)
@@ -287,6 +312,10 @@ const webhookStatusLabel = computed(() => WEBHOOK_STATUS_LABELS[props.webhookSta
 const webhookSecretLabel = computed(() => (
   props.webhookSecretConfigured ? 'Configured (never reveal again)' : 'Not configured'
 ))
+const apiRoot = computed(() => {
+  const configured = window.fchubMembershipsAdmin?.rest_url || '/wp-json/fchub-memberships/v1/'
+  return `${String(configured).replace(/\/+$/, '')}/`
+})
 
 watch(() => props.oneTimeCredentials.apiKey, (value, previousValue) => {
   apiKeyCopied.value = false
@@ -381,6 +410,10 @@ async function copyOneTime(kind) {
 
 <style scoped>
 .settings-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settings-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.settings-guide-trigger { min-height: 28px; padding: 4px 8px; border: 1px solid transparent; border-radius: 7px; color: var(--el-color-primary); background: transparent; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+.settings-guide-trigger:hover { border-color: color-mix(in srgb, var(--el-color-primary) 28%, var(--fchub-border-color)); background: color-mix(in srgb, var(--el-color-primary) 7%, var(--fchub-card-bg)); }
+.settings-guide-trigger:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
 .settings-status, .credential-state { display: inline-flex; align-items: center; width: fit-content; padding: 4px 9px; border-radius: 999px; color: var(--fchub-text-secondary); background: var(--fchub-page-bg); font-size: 11px; font-weight: 700; }
 .settings-status.is-ready { color: #19733f; background: color-mix(in srgb, var(--el-color-success) 14%, var(--fchub-card-bg)); }
 .settings-status.is-needs_setup { color: #785b18; background: color-mix(in srgb, var(--el-color-warning) 15%, var(--fchub-card-bg)); }
