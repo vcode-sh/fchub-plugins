@@ -45,6 +45,9 @@ jobs:
       - name: Verify Memberships route documentation
         run: node --test scripts/check-memberships-route-docs.mjs
 
+      - name: Verify Fumadocs accordion structure
+        run: node --test scripts/check-fumadocs-accordion-structure.mjs
+
       - name: Verify tool counts match source
         run: node scripts/count-mcp-tools.mjs --check
 

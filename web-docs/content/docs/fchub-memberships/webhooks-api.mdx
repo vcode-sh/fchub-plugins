@@ -1,0 +1,183 @@
+---
+title: Webhooks & API
+description: Connect FCHub Memberships to another service with guided API credentials, independent webhook endpoints, delivery history, retries, and safe recovery.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Separator } from '@/components/ui/separator';
+
+FCHub Memberships can answer access questions, accept membership changes from
+trusted systems, and tell other services when access changes.
+
+Version 1.4.0 adds connection guides inside **Memberships > Settings >
+Webhooks & API**, so you can copy the right endpoint, credential, and example
+without assembling the request from three separate documentation tabs. Luxury.
+
+## Choose the connection you need
+
+<Cards>
+  <Card title="Check access">
+    Use the dedicated read-only API key when another service only needs to know
+    whether a member can access a plan or WordPress resource.
+  </Card>
+  <Card title="Manage memberships">
+    Use a WordPress Application Password when a trusted system needs to grant,
+    revoke, pause, resume, or extend access.
+  </Card>
+  <Card title="Receive membership events">
+    Add a webhook endpoint when another service should react to grants,
+    revocations, expiries, pauses, or resumptions.
+  </Card>
+</Cards>
+
+## Read-only access checks
+
+<Steps>
+<Step>
+
+**Generate an access key**
+
+Open **Memberships > Settings > Webhooks & API** and generate the read-only
+key. Copy it immediately: it is shown once and cannot be revealed later.
+
+</Step>
+<Step>
+
+**Open the connection guide**
+
+Choose **Connect access API**. The guide provides the site-specific endpoint,
+required header, and a ready-to-copy request.
+
+</Step>
+<Step>
+
+**Send the key as a header**
+
+Use `X-API-Key`. Keys in query strings are rejected so they do not wander into
+browser history, analytics, and server logs like tiny security confetti.
+
+</Step>
+</Steps>
+
+The access endpoint can check a plan or a WordPress resource for a user. It
+cannot change memberships or open admin routes.
+
+## Membership changes from another system
+
+External membership changes use WordPress Application Passwords over HTTPS.
+Create a dedicated WordPress integration user and give it only the
+`manage_fchub_memberships` capability.
+
+Every change also sends an `Idempotency-Key`: a unique request identifier that
+makes retries safe. Repeating the same request returns the stored result;
+reusing the key for different input is rejected.
+
+<Callout type="info" title="Use the built-in guide">
+Open **Connect membership API** in Settings for a site-specific endpoint,
+authentication example, required headers, and a request you can copy without
+translating documentation placeholders.
+</Callout>
+
+## Add a webhook endpoint
+
+Each destination gets its own name, URL, secret, test result, and status.
+
+<Steps>
+<Step>
+
+**Create the endpoint**
+
+Add a clear name and a public HTTPS destination. New endpoints begin in setup
+mode and do not receive live membership events.
+
+</Step>
+<Step>
+
+**Generate its secret**
+
+Copy the one-time signing secret and store it in the receiving service. Each
+endpoint owns an independent secret, so rotating one connection does not break
+every other integration for sport.
+
+</Step>
+<Step>
+
+**Test the real delivery path**
+
+Send a one-shot test. Activation remains unavailable until the test succeeds.
+The test uses the same signing and network safety rules as live delivery but
+does not enter the retry queue.
+
+</Step>
+<Step>
+
+**Activate the endpoint**
+
+Once active, the endpoint receives membership lifecycle events. Pause it when
+the receiver is under maintenance, rotate its secret when needed, or delete it
+when the integration is retired.
+
+</Step>
+</Steps>
+
+## Delivery history and recovery
+
+The delivery history shows whether an event is pending, processing, retrying,
+successful, failed, or cancelled. Failed deliveries retry automatically with
+increasing delays.
+
+You can:
+
+- inspect the destination, event, attempt count, response, and next action;
+- retry a terminal failed delivery after fixing the receiver;
+- cancel a pending or retrying delivery that should no longer run;
+- pause an endpoint without deleting its history;
+- see degraded health on the dashboard and in Settings.
+
+Webhook delivery is **at least once**. A receiver should remember the event ID
+before applying its effect so a safe retry does not create the same result
+twice.
+
+## Membership events
+
+The receiving service can react when access is granted, deliberately removed,
+reaches its natural end, pauses, or becomes available again. The connection
+guide supplies the exact event names and a test payload when you are ready to
+wire them up.
+
+<Accordions type="single">
+<Accordion title="How are webhook requests verified?">
+
+Every webhook includes a signature created from the exact request body and the
+endpoint's secret. Verify the signature before processing the event, then
+compare the event ID and timestamp with their request headers.
+
+The complete header, payload, signature, retry, and retention contract lives in
+the [Developer Reference](/docs/fchub-memberships/developer-reference#webhooks).
+
+</Accordion>
+<Accordion title="Can the read-only API key manage members?">
+
+No. It can only check access. Membership changes require a WordPress
+Application Password, the dedicated membership capability, and an idempotency
+key.
+
+</Accordion>
+<Accordion title="Can I see a secret again?">
+
+No. Generate or rotate it, copy the value once, and store it in the connected
+service. Settings show whether a credential exists, not the credential itself.
+
+</Accordion>
+</Accordions>
+
+<Separator />
+
+## Exact contracts
+
+This guide covers the safe setup flow. For route tables, payloads, signature
+verification, command-line examples, and extension hooks, continue to the
+[Developer Reference](/docs/fchub-memberships/developer-reference).

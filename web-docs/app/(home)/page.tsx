@@ -116,7 +116,7 @@ const cartPlugins: Plugin[] = [
   {
     title: "Memberships",
     description:
-      "Plans, content gating, drip scheduling. 15k lines so people can pay to read your blog.",
+      "A calmer way to run memberships: guided setup, protected content, member care, automation, and fewer mystery fires.",
     icon: Users,
     docsHref: "/docs/fchub-memberships",
     downloadUrl: versions["fchub-memberships"].releaseUrl,

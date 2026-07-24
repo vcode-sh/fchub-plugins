@@ -1,278 +1,205 @@
 ---
 title: Troubleshooting
-description: Common issues with FCHub Memberships and how to resolve them.
+description: Start with the Memberships workspace, follow the visible issue, and fix common access, content, email, provider, API, and webhook problems.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-This page covers the most common issues you might encounter with FCHub Memberships and how to diagnose and fix them.
+Start with **Memberships > Dashboard**. Version 1.4.0 brings setup readiness,
+failed notifications, provider health, and recent activity into the workspace
+so many problems can be found without beginning in the database. Progress.
 
-## Content Not Protected
-
-<Accordions type="single">
-<Accordion title="Protected content is visible to everyone">
-
-**Symptoms:** Non-members can see content that should be restricted.
-
-**Diagnosis steps:**
+## A purchase did not grant access
 
 <Steps>
 <Step>
 
-**Check if the resource is protected**
+**Confirm the payment**
 
-Go to **Memberships > Content** and verify the resource has a protection rule. Alternatively, edit the post and check the **Membership Protection** meta box.
-
-If the post is protected through plan rules (not explicit protection), verify the plan has the correct content rules in its **Content Rules** tab.
-
-</Step>
-<Step>
-
-**Check the plan status**
-
-Go to **Memberships > Plans** and make sure the plan status is `active`. Draft or inactive plans don't enforce protection.
+Open the FluentCart order and make sure payment completed. Pending, failed, and
+abandoned orders do not grant membership access.
 
 </Step>
 <Step>
 
-**Check admin bypass**
+**Check the product connection**
 
-By default, administrators bypass all protection. Log in as a non-admin user to test, or temporarily disable admin bypass in **Memberships > Settings** (`admin_bypass` = "No").
-
-</Step>
-<Step>
-
-**Check caching**
-
-If you use a page caching plugin (WP Super Cache, W3 Total Cache, LiteSpeed Cache, etc.), cached pages will serve the same content to all visitors. You need to:
-- Exclude protected pages from the cache, or
-- Use a cache plugin that supports user-level caching (varies content by logged-in state)
+Open **Memberships > Plans**, edit the expected plan, and check **Linked
+Products**. For an advanced FluentCart feed, confirm that the feed is enabled
+and points to the right plan.
 
 </Step>
 <Step>
 
-**Verify the hook priority**
+**Find the customer**
 
-`ContentProtection` hooks into `the_content` at priority 999. If another plugin removes or overrides content at a later priority, protection may be bypassed. Check for plugins that modify `the_content` at priority 1000+.
+Open **Memberships > Members** and search by the order email. If the order was
+placed as a guest, confirm that the connection is allowed to create or match a
+WordPress user.
+
+</Step>
+<Step>
+
+**Review recent activity**
+
+The dashboard and member profile show whether access was granted, skipped, or
+later changed. The FluentCart order log provides the matching purchase-side
+message.
 
 </Step>
 </Steps>
 
+## A member cannot open protected content
+
+<Accordions type="single">
+<Accordion title="The member has no active plan">
+
+Open the member profile and check whether access is active, paused, expired, or
+revoked. Also check future start dates and upcoming or passed expiry dates.
+
 </Accordion>
-<Accordion title="Taxonomy-protected posts are not restricted">
+<Accordion title="The content is still waiting to unlock">
 
-Make sure the taxonomy protection rule has `inheritance_mode` set to `all_posts`. Without this, the taxonomy term is protected but individual posts in that term are not.
-
-Also verify the post is actually assigned to the protected taxonomy term.
+Open the plan's drip timeline. A member may own the content while its delay or
+fixed unlock date is still in the future.
 
 </Accordion>
-<Accordion title="REST API returns full content">
+<Accordion title="The content belongs to another plan">
 
-The plugin filters REST API responses via `rest_prepare_{post_type}` hooks. Make sure the post type has `show_in_rest => true` and `public => true` — the hooks are only registered for public REST-enabled post types.
+Open **Memberships > Content** and inspect the protection rule, then compare it
+with the member's active plans. Plan relationships can include lower tiers, but
+an unrelated plan does not.
+
+</Accordion>
+<Accordion title="A cache keeps showing the wrong version">
+
+Exclude protected pages from public full-page caching, or use a cache that
+varies by signed-in member. Purge the affected page after changing protection
+or access.
+
+</Accordion>
+</Accordions>
+
+## Protected content is public
+
+1. Open **Memberships > Content** and confirm the rule exists.
+2. Make sure at least one selected plan is active.
+3. Test while logged out or as a non-administrator; administrators bypass
+   protection by default.
+4. Check the feed, archive, search, and REST view as well as the main page.
+5. Purge page and object caches after changing the rule.
+
+If only one public channel leaks full content, record the exact URL and request
+type before changing the rule. “WordPress did something” is emotionally valid
+but not yet a reproduction.
+
+## Email issues
+
+<Accordions type="single">
+<Accordion title="No built-in email was sent">
+
+Open **Memberships > Settings > Email Studio** and confirm the message uses
+**Built-in email** rather than **FluentCRM automation** or **Off**. Send a test,
+then inspect **Tools > Scheduled Actions** for a failed Memberships email.
+
+Finally, verify normal WordPress email delivery and sender-domain
+authentication with your mail provider.
+
+</Accordion>
+<Accordion title="The message looks wrong">
+
+Preview the message in Email Studio, check its individual style override, and
+compare it with the shared brand template. Send a fresh test after saving.
+
+</Accordion>
+<Accordion title="A FluentCRM automation did not start">
+
+Confirm FluentCRM is active, the automation is published, the member has a
+matching FluentCRM contact, and that the notification is assigned to
+**FluentCRM automation** where applicable.
+
+Open **Memberships > Integrations** for pending, failed, or drifted CRM work.
+
+</Accordion>
+</Accordions>
+
+## Provider access is out of sync
+
+Open **Memberships > Integrations** before manually changing the provider.
+
+1. Check whether the provider and required capability are available.
+2. Review pending and failed operations.
+3. Preview reconciliation to see what Memberships believes should change.
+4. Repair one member first.
+5. Use the bounded all-member repair only after the preview is sensible.
+
+Optional provider features stay hidden or unavailable when their runtime
+contract is not supported. Installing a plugin and activating a supported
+capability are not the same achievement.
+
+## Webhook problems
+
+<Accordions type="single">
+<Accordion title="An endpoint cannot be activated">
+
+The endpoint needs its own secret and a successful one-shot test. Confirm that
+the destination is public HTTPS, generate or rotate the secret, update the
+receiver, and run the test again.
+
+</Accordion>
+<Accordion title="Deliveries keep retrying">
+
+Open delivery history and inspect the latest response. Fix the receiver first;
+automatic retries use increasing delays. A terminal failure can be retried
+manually after the destination is healthy.
+
+</Accordion>
+<Accordion title="A delivery should not run anymore">
+
+Cancel it while it is pending or retrying. Pause the endpoint if no new events
+should be created for that destination.
+
+</Accordion>
+<Accordion title="The receiver processed an event twice">
+
+Webhook delivery is at least once. The receiver must remember the stable event
+ID before applying the effect and treat a repeated ID as the same event.
+
+</Accordion>
+</Accordions>
+
+## API connection problems
+
+<Accordions type="single">
+<Accordion title="The read-only access check is unauthorised">
+
+Generate a current access key and send it in the `X-API-Key` header. Query-string
+keys are rejected. The built-in connection guide contains the exact endpoint
+for this site.
+
+</Accordion>
+<Accordion title="A membership change is rejected">
+
+External writes require HTTPS, a WordPress Application Password, a user with
+the membership-management capability, and a unique `Idempotency-Key` header.
+The read-only FCHub key cannot manage members.
+
+</Accordion>
+<Accordion title="Reusing an idempotency key returns a conflict">
+
+The same key may repeat the same operation and payload. A different operation
+or payload needs a new key.
 
 </Accordion>
 </Accordions>
 
 <Separator />
 
-## Access Not Granted After Purchase
-
-<Accordions type="single">
-<Accordion title="User purchased but has no membership">
-
-**Diagnosis steps:**
-
-<Steps>
-<Step>
-
-**Check the integration feed**
-
-Go to the FluentCart product editor and verify the **Memberships** integration feed is present and enabled. Check that:
-- A plan is selected
-- The event trigger includes `order_paid_done`
-- The feed is not disabled
-
-</Step>
-<Step>
-
-**Check event locks**
-
-The plugin uses an event lock table to prevent duplicate processing. If a feed fired but encountered an error, it may have created a lock that prevents re-processing. Check the `fchub_membership_event_locks` table for entries with `result = 'error'`.
-
-</Step>
-<Step>
-
-**Check the order status**
-
-The integration feed only fires on paid orders. Make sure the FluentCart order status is "Paid" or "Completed". Pending or failed orders do not trigger membership grants.
-
-</Step>
-<Step>
-
-**Check the order log**
-
-In the FluentCart order detail page, look at the order notes/log. The membership integration logs messages like "Membership access granted" or "Membership grant skipped" with details about what happened.
-
-</Step>
-<Step>
-
-**Check for user mismatch**
-
-The integration resolves the user from the order. If the order has no `user_id` and no matching email account exists, the user might not be found. Check if "Auto-Create User" is enabled in the feed settings.
-
-</Step>
-</Steps>
-
-</Accordion>
-<Accordion title="Grant exists but user can't access content">
-
-1. Check the grant status in **Memberships > Members** — it should be `active`
-2. Check if the grant has a `starts_at` date in the future
-3. Check if the grant has an `expires_at` date in the past
-4. Check if the content is drip-locked (check `drip_available_at`)
-5. Check if the membership is paused (status = `paused`)
-6. Use WP-CLI to debug: `wp fchub-membership debug --member=<email>`
-
-</Accordion>
-</Accordions>
-
-<Separator />
-
-## Drip Content Issues
-
-<Accordions type="single">
-<Accordion title="Drip content not unlocking">
-
-Drip unlock notifications are processed by the `fchub_memberships_drip_process` hourly cron. If content is not unlocking:
-
-1. **Check WP-Cron** — Go to **Tools > Site Health** and verify WP-Cron is running. If your site has low traffic, WP-Cron may not fire regularly. Consider setting up a real cron job:
-```
-*/5 * * * * wget -q -O - https://example.com/wp-cron.php?doing_wp_cron > /dev/null 2>&1
-```
-
-2. **Check the drip_available_at field** — The `drip_available_at` column on the grant record should have the expected unlock date. If it's null, the drip rule might not have been applied correctly during grant creation.
-
-3. **Check the notification queue** — Go to the drip admin page and look at the notification queue. Failed notifications can be retried individually.
-
-4. **Force processing** — Run `wp fchub-membership drip-process` from the command line to process pending notifications immediately.
-
-</Accordion>
-<Accordion title="Drip emails not sending">
-
-1. Check that `email_drip_unlocked` is set to "Yes" in settings
-2. Check Action Scheduler for pending or failed `fchub_memberships_send_email` actions
-3. Check the notification's `retry_count` — after 3 failures, notifications are permanently marked as failed
-4. Verify basic WordPress email delivery works (use WP Mail SMTP or a test email plugin)
-
-</Accordion>
-</Accordions>
-
-<Separator />
-
-## Email Issues
-
-<Accordions type="single">
-<Accordion title="No emails being sent">
-
-1. **Check the email setting** — Each email type can be individually disabled. Verify the specific email is enabled in **Memberships > Settings**
-2. **Check Action Scheduler** — Go to **Tools > Scheduled Actions** and look for `fchub_memberships_send_email` entries. Pending actions are queued but not yet processed. Failed actions show error details
-3. **Check wp_mail** — Test basic email delivery with another plugin. FCHub Memberships uses standard `wp_mail()` for delivery
-4. **Check From address** — Emails are sent from your `admin_email`. Make sure your email provider doesn't reject these (SPF/DKIM configuration)
-
-</Accordion>
-<Accordion title="Emails arriving with broken formatting">
-
-The emails are sent as HTML (`Content-Type: text/html; charset=UTF-8`). If they arrive as plain text:
-1. Check if another plugin is forcing plain text emails
-2. Check if your mail provider strips HTML
-3. Verify the email headers include the Content-Type header
-
-</Accordion>
-</Accordions>
-
-<Separator />
-
-## FluentCRM Issues
-
-<Accordions type="single">
-<Accordion title="Triggers not firing">
-
-FluentCRM automation components boot at `init` priority 30. If triggers are not firing:
-
-1. **Verify FluentCRM is active** — The `FLUENTCRM` constant must be defined
-2. **Check boot timing** — The automation module loads at init priority 30. If the membership event fires before priority 30 (during early init), the trigger might not be registered yet. Normal purchase flows fire well after init, so this should only affect custom code that fires events very early
-3. **Check the automation** — Make sure the FluentCRM automation is published and active
-4. **Check the contact** — The trigger needs a FluentCRM contact with a matching WordPress user. If the contact doesn't exist, the trigger won't fire
-
-</Accordion>
-<Accordion title="Smart codes returning empty values">
-
-Smart codes resolve data from the contact's latest active grant. If they return empty:
-
-1. The contact may not have a `user_id` set in FluentCRM
-2. The user may not have any active grants
-3. For coupon-related smart codes, verify a CreateFluentCartCoupon action has run for this contact
-
-</Accordion>
-</Accordions>
-
-<Separator />
-
-## Subscription Sync Issues
-
-<Accordions type="single">
-<Accordion title="Membership not expiring when subscription ends">
-
-The `SubscriptionValidityWatcher` checks subscription validity every 5 minutes via the `fchub_memberships_validity_check` cron.
-
-1. **Check the grant's source_type** — It should be `subscription`, not `order`. The V3 migration fixes grants that were incorrectly created with `source_type = 'order'`. If you see grants with `source_type = 'order'` that should be `subscription`, re-run migrations by incrementing the DB version in settings
-2. **Check WP-Cron** — The validity check runs every 5 minutes. Verify cron is executing
-3. **Check the feed settings** — If "Cancellation Behavior" is set to "Keep access until validity expires", the grant won't be revoked immediately on cancellation — it waits for the `expires_at` date
-
-</Accordion>
-<Accordion title="Grants created with wrong source_type">
-
-The V3 migration automatically fixes grants that should have `source_type = 'subscription'` but were created with `source_type = 'order'`. It detects this by joining the grants table with FluentCart's subscriptions table.
-
-If you suspect grants still have the wrong source_type:
-
-```bash
-wp fchub-membership debug --member=<email>
-```
-
-This shows the grant details including source_type and source_ids.
-
-</Accordion>
-</Accordions>
-
-<Separator />
-
-## Performance Issues
-
-<Accordions type="single">
-<Accordion title="Slow page loads on protected content">
-
-The `AccessEvaluator` uses two levels of caching:
-
-1. **Per-request cache** — static array, zero overhead on repeated checks within the same request
-2. **Transient cache** — WordPress transients with 5-minute TTL for batch access checks (used in archive filtering)
-
-If pages with many protected items are slow:
-- Check if archive filtering is scanning too many posts. The `canAccessMultiple()` method uses batch checking with transient caching
-- Consider using an object cache plugin (Redis, Memcached) to speed up transient reads
-- Check if a caching plugin can cache member-specific pages
-
-</Accordion>
-<Accordion title="Database queries are slow">
-
-The plugin creates indexes on all frequently-queried columns. If queries are still slow:
-
-1. Check that indexes were created successfully during migration
-2. For very large grant tables (100k+ rows), consider the `purge-expired` WP-CLI command to remove old expired/revoked grants
-3. The audit log is cleaned up weekly (entries older than 90 days). If it's grown large, you can run manual cleanup
-
-</Accordion>
-</Accordions>
+## Still stuck?
+
+Collect the affected member, plan, content or endpoint, the time of the latest
+attempt, and the visible workspace error. Then use the
+[Developer Reference](/docs/fchub-memberships/developer-reference) for exact
+routes, hooks, commands, and payload contracts.

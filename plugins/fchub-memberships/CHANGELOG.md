@@ -1,13 +1,39 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 - 2026-07-24
 
-- Changed the read-only access check to accept `X-API-Key` only; query-string keys are no longer accepted. Membership write routes remain on WordPress Application Passwords, the dedicated membership capability, and required idempotency keys.
-- Made access keys and webhook secrets one-time values shown only when generated or rotated. Settings now expose safe configuration metadata rather than reusable credentials.
-- Added the replayable V8 / schema 1.8.0 migration, which hashes existing plaintext access keys without changing the client-visible value and creates the durable webhook event and delivery tables without enabling webhooks.
-- Added signed, durable at-least-once webhook delivery with stable event IDs for receiver deduplication. This does not promise exactly-once delivery, because apparently distributed systems still refuse to read the marketing copy.
-- Added seven-attempt webhook delivery using retry delays of 60, 300, 1,800, 7,200, 21,600, and 86,400 seconds, with successful deliveries retained for 30 days and terminal failures for 90 days.
-- Added `manage_options` operations at `GET /admin/webhooks/health`, `GET /admin/webhooks/deliveries`, `POST /admin/webhooks/test`, and `POST /admin/webhooks/deliveries/{id}/retry` for health, history, production-path testing, and terminal-delivery manual retry.
+Eighteen Memberships commits landed in 72 hours. Apparently the reasonable
+response to “the plugin could feel nicer” was to rebuild nearly every important
+journey.
+
+- **A redesigned membership workspace** — a clearer dashboard, consistent
+  navigation, useful status summaries, better mobile layouts, and visible work
+  that needs attention.
+- **Guided setup** — new plan and content-protection builders turn large forms
+  into short, reviewable steps with live summaries and friendlier search.
+- **Better member care** — improved member discovery, profiles, bulk actions,
+  activity history, Community context, and safer imports and exports.
+- **Notification Studio** — branded lifecycle emails now have a visual editor,
+  realistic previews, test sends, shared styles, and a per-message choice
+  between built-in delivery, FluentCRM, or silence.
+- **Healthier integrations** — FluentCRM and FluentCommunity status, drift, and
+  recovery are visible in one workspace, with supported Pro capabilities
+  appearing only when they can actually work.
+- **More dependable access** — purchases, subscriptions, manual access, plan
+  relationships, drip schedules, grace periods, and provider access now retain
+  clearer ownership and recover more safely when external systems misbehave.
+- **Production-ready connections** — guided API setup, one-time credentials,
+  independent webhook endpoints, required testing before activation, delivery
+  history, automatic retries, manual recovery, pausing, and cancellation.
+- **Stronger release confidence** — expanded PHP, browser, JavaScript, runtime,
+  documentation, route, workflow, and package checks now guard the release
+  before a ZIP reaches users. Revolutionary concept, admittedly.
+
+### Connection note
+
+Existing external connections should open the new **Webhooks & API** guide
+before updating. It walks through the safer credential flow and refreshed
+setup without requiring a small archaeology degree.
 
 ## 1.3.1
 

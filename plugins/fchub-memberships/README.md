@@ -1,14 +1,14 @@
 # FCHub Memberships
 
-Version: `1.3.1`
+Version: `1.4.0`
 
-FCHub Memberships is a WordPress membership plugin for FluentCart with:
+FCHub Memberships is a complete membership workspace for FluentCart with:
 
-- plan management
-- content protection
-- drip scheduling
-- member lifecycle management
-- reporting and admin tooling
+- guided plan and content-protection workflows
+- member management and lifecycle automation
+- drip scheduling, trials, and Notification Studio
+- FluentCRM and FluentCommunity integrations
+- provider health, reporting, webhooks, and API connections
 
 ## Requirements
 
@@ -44,4 +44,4 @@ standard WordPress administration, as civilisation intended.
 
 ## Versioning
 
-Current plugin version: `1.3.1`
+Current plugin version: `1.4.0`

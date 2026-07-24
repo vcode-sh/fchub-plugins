@@ -8,7 +8,28 @@ import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-FCHub Memberships integrates deeply with FluentCRM to give you full automation control over the membership lifecycle. When FluentCRM is active (`FLUENTCRM` constant defined), the automation module boots at `init` priority 30 — after both FluentCart (priority 2) and the membership system (priority 3) have initialized.
+FCHub Memberships connects the full membership lifecycle to FluentCRM. Start
+automations when access changes, manage memberships from automation actions,
+personalise messages with membership data, and segment contacts by their
+current relationship with your plans.
+
+Version 1.4.0 also adds visible provider health and recovery. If a CRM update
+falls behind, **Memberships > Integrations** shows the problem and can preview
+or repair the difference without asking you to infer production health from a
+green toggle.
+
+## Health and Recovery
+
+The Integrations workspace brings together:
+
+- current FluentCRM availability and compatibility;
+- pending or failed membership updates;
+- contacts whose CRM state has drifted from membership access;
+- a safe preview before repair;
+- single-member and bounded all-member recovery.
+
+Membership changes remain the source of truth while FluentCRM catches up. A
+temporary CRM failure does not roll back valid member access.
 
 <Callout type="warn" title="Priority 30 Boot">
 FluentCRM automation components register at `init` priority 30. If you're hooking into membership CRM events from your own code, make sure your hooks run after priority 30 to ensure all triggers and actions are available.
@@ -60,7 +81,7 @@ The `DripMilestone` trigger passes the milestone percentage (25, 50, 75, or 100)
 
 | Trigger | Hook | When It Fires |
 |---|---|---|
-| **MembershipExpiringSoon** | `fchub_memberships/access_expiring` | Membership approaching expiration (daily cron) |
+| **MembershipExpiringSoon** | `fchub_memberships/grant_expiring_soon` | Membership approaching expiration (daily check) |
 | **MembershipAnniversary** | `fchub_memberships/grant_anniversary` | Annual anniversary of membership grant date |
 
 The `MembershipAnniversary` trigger is checked during the daily stats cron. It fires on the exact anniversary date of the original grant, making it perfect for loyalty rewards, renewal reminders, or celebration emails.

@@ -1,205 +1,147 @@
 ---
 title: Email Notifications
-description: The eight transactional emails FCHub Memberships sends across the membership lifecycle, with smart codes, templates, and delivery details.
+description: Design branded membership emails, preview them with realistic member data, send tests, or hand each lifecycle moment to FluentCRM.
 ---
 
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-FCHub Memberships sends 8 transactional emails that cover the full membership lifecycle. Each email can be individually enabled or disabled, and templates are customizable with smart code placeholders.
+Membership emails should feel like part of the experience, not an automated
+receipt from a printer that has seen things.
 
-## Delivery Method
+Notification Studio gives every membership moment a clear delivery choice:
+send a built-in branded email, use a FluentCRM automation, or keep it off.
 
-All emails are dispatched through **Action Scheduler** when available (which FluentCart includes). This means emails are sent asynchronously — they don't block the main request. If Action Scheduler is not available, emails fall back to synchronous `wp_mail()`.
+## Open Notification Studio
 
-The async hook is `fchub_memberships_send_email`, which receives the recipient email, subject, body, and headers as arguments.
+Go to **Memberships > Settings > Email Studio**.
 
-Every email is sent as HTML with a responsive template wrapper. The wrapper includes a branded header (using your site name), a content area, and a footer with copyright notice.
+The overview groups messages into Access, Membership lifecycle, Trials, and
+Content. You can see what is active before opening an individual email.
 
-<Separator />
+![Email Studio showing the shared brand template and membership messages grouped by lifecycle moment](/memberships/memberships-email-studio.webp)
 
-## Email Types
+<Cards>
+  <Card title="Access granted">
+    Welcome a new member and point them towards their account, available
+    resources, and upcoming drip content.
+  </Card>
+  <Card title="Access expiring">
+    Give members time to renew before their access ends.
+  </Card>
+  <Card title="Access revoked">
+    Explain that access ended and provide the right support or purchase route.
+  </Card>
+  <Card title="Membership paused">
+    Tell the member that access is temporarily unavailable and what they can do
+    next.
+  </Card>
+  <Card title="Membership resumed">
+    Confirm that access is back and return the member to their account.
+  </Card>
+  <Card title="Trial expiring">
+    Remind a trial member before the decision arrives on its own.
+  </Card>
+  <Card title="Trial converted">
+    Confirm the move from trial to paid membership.
+  </Card>
+  <Card title="Drip content unlocked">
+    Bring a member back when the next resource becomes available.
+  </Card>
+</Cards>
 
-<Tabs items={['Welcome', 'Expiring', 'Revoked', 'Drip Unlocked', 'Paused', 'Resumed', 'Trial Converted', 'Trial Expiring']}>
-<Tab value="Welcome">
+## Design a built-in email
 
-Sent when a membership is first granted to a user. This is the welcome email.
+<Steps>
+<Step>
 
-**When it fires:** On `fchub_memberships/grant_created` event
+**Choose the delivery**
 
-**Data included:**
+Select **Built-in email** for a message designed and sent by Memberships.
+When FluentCRM is active, you can choose **FluentCRM automation** instead.
+Choose **Off** when that moment should stay quiet.
 
-| Field | Description |
-|---|---|
-| `plan_id` | The membership plan ID |
-| `plan_title` | The plan name |
-| `resources` | Array of immediately accessible resources with title and URL |
-| `drip_items` | Array of upcoming drip-scheduled items with title and unlock date |
+</Step>
+<Step>
 
-**Default subject:** "Welcome to \{plan_name\}!"
+**Write the subject and preview text**
 
-**Smart codes:**
+Use member, plan, date, and link variables to keep one template useful for
+every recipient.
 
-| Code | Value |
-|---|---|
-| `{user_name}` | Member's display name |
-| `{user_email}` | Member's email address |
-| `{plan_name}` | Membership plan title |
-| `{site_name}` | WordPress site name |
-| `{account_url}` | Account page URL |
-| `{resources_list}` | HTML list of immediately accessible resources with links |
-| `{drip_schedule}` | HTML list of upcoming drip content with unlock dates |
+</Step>
+<Step>
 
-</Tab>
-<Tab value="Expiring">
+**Build the message**
 
-Sent when a membership is approaching its expiration date. The notification window is configurable in settings.
+Add text, headings, buttons, images, dividers, spacing, and member data blocks.
+Reorder the content until it reads like a useful email rather than a settings
+dump wearing a logo.
 
-**When it fires:** Via the `fchub_memberships_expiry_notify` daily cron
+</Step>
+<Step>
 
-**Data included:**
+**Preview realistic data**
 
-| Field | Description |
-|---|---|
-| `plan_title` | The plan name |
-| `expires_at` | Expiration date |
-| `renewal_url` | URL to renew the membership |
+The preview replaces variables with representative member and plan values so
+you can catch awkward gaps before a customer does.
 
-This email gives members advance warning so they can renew before losing access.
+</Step>
+<Step>
 
-</Tab>
-<Tab value="Revoked">
+**Send a test**
 
-Sent when a membership is revoked — whether by cancellation, refund, or manual admin action.
+Send the current message to a test address and check it in a real inbox. Save
+when the subject, links, and layout behave.
 
-**When it fires:** On `fchub_memberships/grant_revoked` event
+</Step>
+</Steps>
 
-**Data included:**
+## Share a brand style
 
-| Field | Description |
-|---|---|
-| `plan_title` | The plan name |
-| `reason` | The revocation reason (e.g., "Order #123 refunded") |
-| `resubscribe_url` | URL to resubscribe |
+The brand template controls the common shell used by built-in messages:
+colours, logo, typography, background, content width, and footer presentation.
 
-</Tab>
-<Tab value="Drip Unlocked">
+Individual emails can follow the shared style or override it when a particular
+message needs a different treatment. Change the shared template once and the
+other built-in emails keep their content while adopting the new look.
 
-Sent when a drip-scheduled piece of content becomes available to a member.
+## Choose Memberships or FluentCRM
 
-**When it fires:** Via the `fchub_memberships_drip_process` hourly cron
+<Accordions type="single">
+<Accordion title="Use the built-in email when…">
 
-**Data included:**
+- the message is transactional and closely tied to access;
+- you want a visual editor without building an automation;
+- a direct preview and test-send flow is enough;
+- the site does not use FluentCRM.
 
-| Field | Description |
-|---|---|
-| `resource_title` | Title of the newly unlocked content |
-| `resource_url` | Direct URL to the content |
-| `plan_title` | The plan name |
-| `next_drip_item` | Title of the next item in the drip sequence (if any) |
-| `progress` | Drip progress data: `{total, unlocked, percentage, next_unlock}` |
+</Accordion>
+<Accordion title="Use FluentCRM when…">
 
-This email keeps members engaged by notifying them when new content is ready to consume.
+- the message belongs to a longer onboarding, renewal, or win-back journey;
+- delivery depends on tags, segments, delays, or branching;
+- you want other customer data in the same automation;
+- your team already manages communication in FluentCRM.
 
-<Callout type="info" title="Disabling Drip Emails">
-Set `email_drip_unlocked` to "No" in settings to disable drip unlock emails. The drip schedule processing and milestone tracking will still run — only the email is suppressed.
-</Callout>
+Changing delivery does not change the membership event itself. It only decides
+who owns the message.
 
-</Tab>
-<Tab value="Paused">
-
-Sent when a membership is paused (e.g., due to subscription pause or manual admin action).
-
-**When it fires:** On `fchub_memberships/grant_paused` event
-
-**Data included:**
-
-| Field | Description |
-|---|---|
-| `plan_title` | The plan name |
-| `reason` | The pause reason |
-| `resume_url` | URL to resume the membership |
-
-While paused, the member retains their grant but cannot access protected content. The `AccessEvaluator` returns a `membership_paused` reason with a specific message.
-
-</Tab>
-<Tab value="Resumed">
-
-Sent when a paused membership is resumed.
-
-**When it fires:** On `fchub_memberships/grant_resumed` event
-
-**Data included:**
-
-| Field | Description |
-|---|---|
-| `plan_title` | The plan name |
-| `account_url` | Account page URL |
-
-</Tab>
-<Tab value="Trial Converted">
-
-Sent when a trial period ends and the member's subscription payment has been confirmed, converting to a paid membership.
-
-**When it fires:** Via `TrialLifecycleService::convertTrial()` during the daily cron
-
-**Data included:**
-
-| Field | Description |
-|---|---|
-| `plan_title` | The plan name |
-| `expires_at` | New expiration date (null for lifetime plans) |
-
-</Tab>
-<Tab value="Trial Expiring">
-
-Sent a configurable number of days before a trial period ends (default: 3 days).
-
-**When it fires:** Via `TrialLifecycleService::sendTrialExpiringNotifications()` during the daily cron
-
-**Data included:**
-
-| Field | Description |
-|---|---|
-| `plan_title` | The plan name |
-| `trial_ends_at` | The trial end date |
-| `upgrade_url` | URL to upgrade to a paid plan |
-
-</Tab>
-</Tabs>
+</Accordion>
+</Accordions>
 
 <Separator />
 
-## Email Settings
+## If an email does not arrive
 
-All email settings are managed in **Memberships > Settings**:
+1. Check that the message is set to **Built-in email**, not **Off** or
+   **FluentCRM automation**.
+2. Send a test from Email Studio.
+3. Check **Tools > Scheduled Actions** for a failed Memberships email.
+4. Verify that normal WordPress email works with your mail provider.
+5. Confirm that the sender domain has the authentication your provider expects.
 
-| Setting | Description |
-|---|---|
-| `email_access_granted` | Enable/disable the welcome email (default: yes) |
-| `email_access_expiring` | Enable/disable the expiring notification (default: yes) |
-| `email_access_revoked` | Enable/disable the revocation email (default: yes) |
-| `email_drip_unlocked` | Enable/disable drip unlock notifications (default: yes) |
-| `email_membership_paused` | Enable/disable the pause notification (default: yes) |
-| `email_membership_resumed` | Enable/disable the resume notification (default: yes) |
-| `email_trial_converted` | Enable/disable the trial conversion email (default: yes) |
-| `email_trial_expiring` | Enable/disable the trial expiring email (default: yes) |
-
-### Custom Templates
-
-Each email type has a customizable template stored in the `email_templates` setting. Templates use the smart codes listed above and support full HTML. If no custom template is set, the plugin uses a default template.
-
-### From Address
-
-Emails are sent from your WordPress admin email (`get_option('admin_email')`) with your site name as the sender name. Headers include `Content-Type: text/html; charset=UTF-8`.
-
-## Troubleshooting Emails
-
-If emails are not being delivered:
-
-1. **Check Action Scheduler** — Go to **Tools > Scheduled Actions** and look for pending or failed `fchub_memberships_send_email` actions
-2. **Check the setting** — Make sure the specific email type is not disabled in settings
-3. **Check wp_mail** — Test basic WordPress email delivery with a plugin like WP Mail SMTP
-4. **Check the logs** — Failed email dispatches are logged via the `Logger` class
+For deeper diagnosis, continue to
+[Troubleshooting](/docs/fchub-memberships/troubleshooting#email-issues).

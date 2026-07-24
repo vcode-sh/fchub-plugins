@@ -5,25 +5,70 @@ description: How FCHub Memberships protects content across your WordPress site �
 
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-Content protection is how FCHub Memberships controls who sees what on your site. The plugin hooks into WordPress at multiple levels — from individual post content to URL routing — to enforce membership access rules.
+Content protection decides who can see what and what everyone else sees
+instead. Version 1.4.0 adds a guided workflow so the first decision is “what
+should I protect?” rather than “which internal resource key sparks joy?”
+
+## Guided Protection Wizard
+
+Go to **Memberships > Content** and choose **Protect content**.
+
+![Content Protection wizard showing four setup steps and the available WordPress content types](/memberships/memberships-protection-wizard.webp)
+
+<Steps>
+<Step>
+
+**Choose content**
+
+Start with posts and pages, categories and tags, custom post types, menu items,
+URL patterns, special pages, or comments.
+
+</Step>
+<Step>
+
+**Select the resource**
+
+Browse or search for the exact item. The picker uses friendly labels and keeps
+the technical identifiers out of the way.
+
+</Step>
+<Step>
+
+**Set access**
+
+Choose the plans that unlock it and decide whether visitors should see a
+message, follow a redirect, or get a teaser.
+
+</Step>
+<Step>
+
+**Review**
+
+Confirm the resource, audience, and visitor experience, then apply the rule.
+
+</Step>
+</Steps>
 
 ## How Protection Works
 
-When a visitor requests a page, the plugin evaluates whether that content is protected and whether the visitor has access. This evaluation happens through the `AccessEvaluator` class, which checks:
+When a visitor requests protected content, Memberships looks at every valid
+source of access before deciding what to show:
 
-1. **Is the resource protected?** — Check explicit protection rules and plan-based rules
-2. **Is the user an admin?** — Admins bypass all protection by default (configurable)
-3. **Does the user have a paused membership?** — Paused members see a specific message
-4. **Does the user have a direct grant?** — Check for an active grant matching this resource
-5. **Does the user have plan-based access?** — Check if any of the user's plans include this resource
-6. **Is the content drip-locked?** — The user may have access but the drip date hasn't arrived yet
-7. **Does the user have a wildcard grant?** — Check for `resource_id: *` grants
-8. **Taxonomy inheritance** — Does the user have access to a taxonomy term that covers this post?
+- direct access to the resource;
+- access through one or more membership plans;
+- access inherited from a protected category or taxonomy;
+- access that begins later through a drip schedule;
+- paused or ended memberships;
+- the configurable administrator preview.
 
-If all checks fail, the user sees a restriction message, is redirected, or sees teaser content, depending on your configuration.
+If access is not available, the visitor sees the message, redirect, or teaser
+you selected. Protected content is also filtered from feeds, archives, search,
+and REST responses where applicable, because hiding the page while publishing
+the full article elsewhere would be an ambitious interpretation of protection.
 
 ## Protection Modes
 

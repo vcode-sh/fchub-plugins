@@ -18,6 +18,36 @@ function routeKey(method, route) {
   return `${method.trim().toUpperCase()} ${normaliseRoute(route.trim())}`;
 }
 
+function expandDynamicRoutes(route, source, file) {
+  let routes = [route.replaceAll('{$idPattern}', '{id}')];
+  const variables = new Set(
+    [...route.matchAll(/\{\$(\w+)\}/g)]
+      .map((match) => match[1])
+      .filter((name) => name !== 'idPattern'),
+  );
+
+  for (const variable of variables) {
+    const loop = source.match(
+      new RegExp(`foreach\\s*\\(\\s*\\[([^\\]]+)\\]\\s+as\\s+\\$${variable}\\s*\\)`),
+    );
+    assert.ok(loop, `Dynamic route values for $${variable} missing in ${file}`);
+
+    const values = [...loop[1].matchAll(/['"]([^'"]+)['"]/g)]
+      .map((match) => match[1]);
+    assert.ok(values.length > 0, `Dynamic route values for $${variable} are empty in ${file}`);
+
+    routes = routes.flatMap((candidate) =>
+      values.map((value) => candidate.replaceAll(`{$${variable}}`, value))
+    );
+  }
+
+  for (const candidate of routes) {
+    assert.doesNotMatch(candidate, /\{\$\w+\}/, `Unexpanded dynamic route in ${file}`);
+  }
+
+  return routes;
+}
+
 function registeredControllerFiles() {
   const registrar = readFileSync(runtimeRegistrar, 'utf8');
   const classes = [
@@ -88,9 +118,11 @@ function registeredRoutePairs() {
       ];
       assert.ok(methodDeclarations.length > 0, `Route methods missing for ${route} in ${file}`);
 
-      for (const declaration of methodDeclarations) {
-        for (const method of declaration[1].split(',')) {
-          pairs.add(routeKey(method, route));
+      for (const expandedRoute of expandDynamicRoutes(route, source, file)) {
+        for (const declaration of methodDeclarations) {
+          for (const method of declaration[1].split(',')) {
+            pairs.add(routeKey(method, expandedRoute));
+          }
         }
       }
     }
@@ -133,7 +165,7 @@ test('developer reference matches every registered route method and path', () =>
   const difference = compareRoutePairs(registered, documented);
 
   assert.deepEqual(difference, { undocumented: [], stale: [] });
-  assert.equal(registered.size, 90);
+  assert.equal(registered.size, 98);
 });
 
 test('route comparison rejects documented pairs absent from registration', () => {

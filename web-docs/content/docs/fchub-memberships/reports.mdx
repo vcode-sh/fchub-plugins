@@ -1,147 +1,93 @@
 ---
 title: Reports & Analytics
-description: Dashboard analytics with member counts, plan distribution, churn analysis, revenue tracking, and content popularity metrics.
+description: Understand member growth, plan performance, churn, revenue, renewals, trials, content interest, and retention without exporting the entire universe.
 ---
 
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-FCHub Memberships includes a built-in analytics system that tracks membership metrics over time. Data is aggregated daily via cron and served through REST API endpoints to the admin dashboard.
+The dashboard tells you what needs attention today. **Memberships > Reports**
+helps explain what is changing over time and where the membership offer deserves
+a closer look.
 
-## Overview Dashboard
+Choose a date range once and move between the report views without rebuilding
+the same question in a spreadsheet.
 
-The reports overview shows key metrics at a glance:
+<Cards>
+  <Card title="Overview">
+    Follow active members, recent growth, upcoming expiries, and the membership
+    trend across the selected period.
+  </Card>
+  <Card title="Plans">
+    Compare member distribution and see which offers account for the largest
+    share of active access.
+  </Card>
+  <Card title="Churn">
+    See when access ended, how the rate changes, and which plans deserve a
+    better renewal or retention conversation.
+  </Card>
+  <Card title="Revenue">
+    Compare membership revenue by plan using the currency presentation from
+    FluentCart.
+  </Card>
+  <Card title="Renewals">
+    Review renewal rates, renewed members, and the average number of renewals
+    across plans.
+  </Card>
+  <Card title="Trials">
+    See trial starts, conversions, expiries, and conversion performance by
+    plan.
+  </Card>
+  <Card title="Content">
+    Discover which protected resources are available to the most members and
+    where the membership library is concentrated.
+  </Card>
+  <Card title="Retention">
+    Follow cohorts over time instead of treating every member as if they joined
+    on the same Tuesday.
+  </Card>
+</Cards>
 
-| Metric | Description |
-|---|---|
-| **Active Members** | Total number of users with at least one active grant |
-| **Active Plans** | Number of plans with status `active` |
-| **Content Protected** | Total number of protection rules configured |
-| **Grants This Month** | New grants created in the current calendar month |
-| **New This Month** | New unique members this month |
-| **Churned This Month** | Members who lost access this month (expired, revoked) |
-| **Churn Rate** | Percentage: churned / (active + churned) * 100 |
+## Reading the numbers
 
-These metrics are calculated in real-time from the grants table by the `MemberStatsReport::getOverview()` method.
+<Accordions type="single">
+<Accordion title="Why does a new site have empty charts?">
 
-## Members Over Time
+Trend, retention, and cohort views need history. The dashboard becomes useful
+immediately, while time-based reports fill in as daily snapshots accumulate.
 
-A time-series chart showing total active member count over a configurable period. The data comes from the `stats_daily` table, which is populated by the daily aggregation cron.
+</Accordion>
+<Accordion title="Where does revenue come from?">
 
-**Available periods:**
-- `30d` — last 30 days
-- `6m` — last 6 months
-- `12m` — last 12 months
+Membership revenue follows the FluentCart orders connected to membership
+access and uses the store's configured currency presentation. FluentCart
+remains the detailed source for full commerce and subscription accounting.
 
-Each data point represents the total active member count on that date, aggregated across all plans.
+</Accordion>
+<Accordion title="Is churn always bad?">
 
-## Plan Distribution
+No. A fixed-term programme ending exactly when promised is not the same problem
+as a monthly plan losing members after one cycle. Use plan, period, renewal, and
+retention views together before declaring an emergency in the group chat.
 
-A breakdown of active members by plan, showing:
+</Accordion>
+<Accordion title="Can I retrieve report data externally?">
 
-| Field | Description |
-|---|---|
-| Plan Title | Name of the membership plan |
-| Member Count | Number of unique active users with grants for this plan |
+Yes. Administrative report routes are documented in the
+[Developer Reference](/docs/fchub-memberships/developer-reference#rest-api).
 
-This helps you understand which plans are most popular and identify opportunities for upselling or plan restructuring. Plans are sorted by member count in descending order.
-
-## Churn Analysis
-
-The `ChurnReport` class provides detailed churn data:
-
-- Monthly churn rate over time
-- Churn by plan (which plans have the highest churn)
-- Churn reasons (expiration vs. revocation vs. cancellation)
-
-Churn is calculated as the number of members who transitioned from `active` to `expired` or `revoked` within a given period.
-
-## Revenue by Plan
-
-Revenue tracking links membership grants to FluentCart order totals:
-
-| Field | Description |
-|---|---|
-| Plan | Membership plan name |
-| Daily Revenue | Sum of order totals for grants created that day |
-| Monthly Revenue | Aggregate revenue for the month |
-
-Revenue is calculated by joining the grants table with FluentCart's orders table (`fct_orders`) where `source_type = 'order'` and matching the grant's `source_id` to the order ID. Amounts are converted from FluentCart's internal cent storage to whole currency units before display.
-
-<Callout type="info" title="Currency">
-Revenue figures use your FluentCart store currency — symbol, position, and decimal separator are all pulled from the store settings automatically. No hardcoded dollar signs.
-</Callout>
-
-<Callout type="info" title="Revenue Accuracy">
-Revenue figures reflect the total order amount at the time of grant creation. For subscriptions with multiple payments, only the initial order amount is captured in the grant. Subscription renewal revenue is tracked separately through FluentCart's own reporting.
-</Callout>
-
-## Content Popularity
-
-The `ContentPopularityReport` tracks which protected content items receive the most access:
-
-- Most accessed protected pages
-- Content with the highest number of unique member views
-- Content that drives the most new sign-ups
-
-This helps you understand what content is most valuable to your members and can inform your content creation strategy.
+</Accordion>
+</Accordions>
 
 <Separator />
 
-## Daily Aggregation
+## Useful next actions
 
-The `fchub_memberships_daily_stats` cron runs daily and calls `MemberStatsReport::aggregateDaily()`. This method:
-
-1. Iterates through all plans
-2. For each plan, counts active members, new members, churned members, and daily revenue
-3. Inserts or updates a row in the `stats_daily` table for today's date and this plan
-4. Aggregates totals (with `plan_id = 0`) for all-plan summaries
-
-The aggregation also triggers the `MembershipAnniversaryTrigger::checkAnniversaries()` method, which checks for grant anniversaries and fires FluentCRM triggers.
-
-### Stats Table Schema
-
-| Column | Type | Description |
-|---|---|---|
-| `stat_date` | DATE | The date for this row |
-| `plan_id` | BIGINT | Plan ID (0 = aggregate across all plans) |
-| `active_count` | INT | Active member count on this date |
-| `new_count` | INT | New members on this date |
-| `churned_count` | INT | Churned members on this date |
-| `revenue` | BIGINT | Revenue in the smallest currency unit |
-
-The table has a unique index on `(stat_date, plan_id)` to ensure one row per plan per day.
-
-## REST API Endpoints
-
-Reports are exposed through the REST API under the `fchub-memberships/v1` namespace:
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/reports/overview` | GET | Dashboard overview metrics |
-| `/reports/members-over-time` | GET | Time-series member count (accepts `period` param) |
-| `/reports/plan-distribution` | GET | Active members by plan |
-| `/reports/churn` | GET | Churn analysis data |
-| `/reports/revenue` | GET | Revenue by plan |
-| `/reports/content-popularity` | GET | Most accessed protected content |
-
-All report endpoints require `manage_options` capability.
-
-## WP-CLI Stats
-
-You can also pull stats from the command line:
-
-```bash
-# Overview stats
-wp fchub-membership stats
-
-# Stats for a specific period
-wp fchub-membership stats --period=30d
-
-# Force daily aggregation
-wp fchub-membership stats --aggregate
-```
-
-The `stats` command outputs a formatted table with the overview metrics and optionally triggers the daily aggregation.
+- Open expiring members from the dashboard and decide whether they need a
+  renewal message.
+- Compare trials with paid conversions before changing an offer.
+- Use FluentCRM segments for targeted renewal or win-back journeys.
+- Review plan distribution before retiring or combining plans.
+- Treat revenue as a membership view, not a replacement for FluentCart
+  accounting.

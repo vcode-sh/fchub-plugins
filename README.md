@@ -18,7 +18,7 @@ This whole thing runs on caffeine and spite. If any of these plugins saved you f
 |--------|-----------|-------|
 | [fchub-p24](plugins/fchub-p24/) | Przelewy24 gateway. Stripe doesn't speak Polish, someone had to | FluentCart |
 | [fchub-fakturownia](plugins/fchub-fakturownia/) | Fakturownia invoices + KSeF 2.0. Automate the paperwork before the tax office automates you | FluentCart |
-| [fchub-memberships](plugins/fchub-memberships/) | Memberships, content gating, drip scheduling. 15k lines of PHP and Vue so people can pay to read your blog | FluentCart |
+| [fchub-memberships](plugins/fchub-memberships/) | A complete membership workspace: guided setup, protected content, member care, automation, integrations, and fewer mystery fires | FluentCart |
 | [fchub-multi-currency](plugins/fchub-multi-currency/) | Display-layer multi-currency with exchange rates. Not everyone lives in USD-land, shocking I know | FluentCart |
 | [fchub-portal-extender](plugins/fchub-portal-extender/) | Custom portal pages without writing PHP. For the "I'm not a developer" crowd, and fair enough | FluentCart |
 | [fchub-stream](plugins/fchub-stream/) | **Discontinued.** Video streaming via Cloudflare Stream & Bunny.net. Retained as-is, without support or updates | FluentCommunity |

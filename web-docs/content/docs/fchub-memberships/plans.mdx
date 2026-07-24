@@ -9,7 +9,47 @@ import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-Plans are the core building block of FCHub Memberships. A plan defines what content a member can access, when they can access it, and how long their access lasts. Every membership grant is tied to a plan.
+Plans are the core building block of FCHub Memberships. A plan defines the
+offer, how long access lasts, and what the member receives.
+
+![Plans workspace showing plan health, readiness, search, and existing membership offers](/memberships/memberships-plans.webp)
+
+## Guided Plan Builder
+
+Choose **Memberships > Plans > Create Plan** to open the three-step builder:
+
+![Guided plan builder showing offer details, three clear setup steps, and a live plan summary](/memberships/memberships-plan-builder.webp)
+
+<Steps>
+<Step>
+
+**Shape the offer**
+
+Name the plan, choose its availability, and decide how long access lasts.
+Trials, grace periods, membership terms, hierarchy, and restriction behaviour
+remain available under advanced options.
+
+</Step>
+<Step>
+
+**Choose content access**
+
+Add WordPress content or supported provider resources and choose whether each
+item unlocks immediately, after a delay, or on a fixed date. This step can be
+skipped when the offer is not ready for content yet.
+
+</Step>
+<Step>
+
+**Review the member experience**
+
+Confirm availability, duration, content, and trial behaviour before creating
+the plan. The builder returns you to the relevant step if something needs
+attention instead of merely announcing that somewhere, somehow, a field is
+wrong.
+
+</Step>
+</Steps>
 
 ## Creating a Plan
 
@@ -202,40 +242,40 @@ Setting `resource_id` to `*` creates a wildcard rule. For example, a rule with `
 
 ## Linking Plans to FluentCart Products
 
-Plans are connected to FluentCart products through integration feeds. This is what makes the purchase-to-access flow work automatically.
+Plans connect to FluentCart products so a successful purchase can grant the
+right access automatically. The quickest route starts inside the saved plan.
 
 <Steps>
 <Step>
 
-**Open the product editor**
+**Open Linked Products**
 
-In FluentCart, edit the product you want to sell as a membership.
-
-</Step>
-<Step>
-
-**Add a Memberships feed**
-
-Under the **Integrations** tab, add a new feed and select **Memberships**.
+Edit the membership plan and choose **Linked Products**.
 
 </Step>
 <Step>
 
-**Configure the feed**
+**Find the product**
 
-- **Membership Plan** — select your plan from the dropdown (populated via the `fluent_cart/integration/integration_options_plan_id` filter)
-- **Validity Mode** — lifetime, fixed duration (with days), mirror subscription, or fixed billing anchor (with anchor day)
-- **Grace Period** — days to keep access after cancellation
-- **Cancellation Behavior** — revoke immediately or wait until validity expires
-- **Auto-Create User** — create a WordPress user from the order email if one doesn't exist
-- **Access Revocation** — enable to revoke access on cancel/refund events
+Choose **Link product**, search by product or variation name, and select the
+offer customers will buy.
 
 </Step>
 <Step>
 
-**Set the event trigger**
+**Confirm the connection**
 
-The default trigger is `order_paid_done`, which fires when payment is confirmed. For subscriptions, the feed also handles renewal events through the `SubscriptionValidityWatcher`.
+The plan editor creates the FluentCart membership connection and shows it in
+the linked-products list. You can unlink it from the same place later.
+
+</Step>
+<Step>
+
+**Use FluentCart feeds for advanced setups**
+
+If a product needs multiple membership feeds or feed-specific overrides, open
+the FluentCart product, add a **Memberships** integration, and configure the
+plan, validity, cancellation, user creation, and revocation behaviour there.
 
 </Step>
 </Steps>

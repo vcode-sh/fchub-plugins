@@ -182,9 +182,16 @@ bulk-extend mutation routes accept `manage_fchub_memberships` or
 | POST | `/admin/settings/revoke-api-key` | Revoke the read-only key |
 | POST | `/admin/settings/regenerate-webhook-secret` | Rotate the signing secret; returns it once |
 | POST | `/admin/settings/test-webhook` | Compatibility alias for the production-path webhook test |
+| GET, POST | `/admin/webhooks/endpoints` | List endpoints or create a draft endpoint |
+| POST | `/admin/webhooks/endpoints/{id}/secret` | Generate or rotate this endpoint's one-time secret |
+| POST | `/admin/webhooks/endpoints/{id}/test` | Send a one-shot test outside the retry queue |
+| POST | `/admin/webhooks/endpoints/{id}/activate` | Activate an endpoint after a successful test |
+| POST | `/admin/webhooks/endpoints/{id}/pause` | Pause live delivery to an endpoint |
+| DELETE | `/admin/webhooks/endpoints/{id}` | Delete an endpoint and cancel its unfinished deliveries |
 | GET | `/admin/webhooks/health` | Read configuration and delivery health |
 | GET | `/admin/webhooks/deliveries` | List redacted delivery history |
 | POST | `/admin/webhooks/deliveries/{id}/retry` | Retry a terminal failed delivery |
+| POST | `/admin/webhooks/deliveries/{id}/cancel` | Cancel a pending or retrying delivery |
 | POST | `/admin/webhooks/test` | Persist and synchronously attempt a test event |
 | GET | `/admin/email-notifications` | List Notification Studio definitions |
 | POST | `/admin/email-notifications/preview` | Render an email preview |
@@ -389,14 +396,15 @@ deduplicate by the stable event ID and must not assume exactly-once delivery.
 
 ### Configuration
 
-In **Memberships > Settings**:
+In **Memberships > Settings > Webhooks & API**:
 
-- Add one to ten unique destination URLs. Production destinations require
-  HTTPS and must resolve only to public addresses.
-- Generate a signing secret. It is shown once; later settings responses expose
-  only whether it is configured.
-- Send a production-path test, then enable delivery. The server refuses to
-  enable an unsafe destination or an unsigned configuration.
+- Create up to ten named endpoints. Production destinations require HTTPS and
+  must resolve only to public addresses.
+- Generate an independent signing secret for each endpoint. It is shown once;
+  later responses expose only whether it is configured.
+- Send a one-shot test through the endpoint's real signing and network-safety
+  path. The endpoint cannot activate until that test succeeds.
+- Activate, pause, rotate, or delete each endpoint independently.
 - Generate the read-only access key separately. It is also shown once, stored
   as a password hash, and never returned by settings reads.
 
@@ -518,9 +526,16 @@ read-only key and `manage_fchub_memberships` capability do not grant access.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
+| GET, POST | `/admin/webhooks/endpoints` | List endpoints or create a draft endpoint |
+| POST | `/admin/webhooks/endpoints/{id}/secret` | Generate or rotate an endpoint secret and return it once |
+| POST | `/admin/webhooks/endpoints/{id}/test` | Run a one-shot test that never enters the retry queue |
+| POST | `/admin/webhooks/endpoints/{id}/activate` | Activate an endpoint after its test succeeds |
+| POST | `/admin/webhooks/endpoints/{id}/pause` | Pause an active endpoint |
+| DELETE | `/admin/webhooks/endpoints/{id}` | Delete an endpoint and cancel unfinished deliveries |
 | GET | `/admin/webhooks/health` | Return `off`, `needs_setup`, `ready`, or `degraded` plus delivery counts |
 | GET | `/admin/webhooks/deliveries` | List redacted delivery history; supports `page`, `per_page`, and `status` |
 | POST | `/admin/webhooks/deliveries/{id}/retry` | Reset and schedule only a terminal failed delivery |
+| POST | `/admin/webhooks/deliveries/{id}/cancel` | Cancel a pending or retrying delivery |
 | POST | `/admin/webhooks/test` | Persist a normal `test` event and attempt it through the production worker |
 | POST | `/admin/settings/test-webhook` | Compatibility alias for `/admin/webhooks/test` |
 
@@ -532,9 +547,11 @@ curl -X POST https://example.com/wp-json/fchub-memberships/v1/admin/webhooks/tes
   -H "X-WP-Nonce: <nonce>"
 ```
 
-Secret rotation is refused while any delivery is pending, processing, or
-retrying. A terminal failed delivery may be retried after rotation and will be
-signed with the current secret.
+Rotating one endpoint secret pauses that endpoint and requires a fresh
+successful test before reactivation. A terminal failed delivery may be retried
+after rotation and will be signed with the endpoint's current secret. Deleting
+an endpoint cancels its unfinished deliveries while preserving terminal
+history.
 
 <Separator />
 
