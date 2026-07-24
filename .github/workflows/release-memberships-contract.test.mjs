@@ -35,6 +35,18 @@ const membershipsGate = (name, command) => {
 
 const headerValidation = step('Validate version in plugin header');
 const versionsValidation = step('Check versions.json consistency');
+const phpSetup = step('Setup PHP (fchub-memberships)');
+assert.match(
+  phpSetup.content,
+  /if: steps\.tag\.outputs\.slug == 'fchub-memberships'/,
+  'PHP 8.4 setup must only run for Memberships releases',
+);
+assert.match(phpSetup.content, /shivammathur\/setup-php@v2/);
+assert.match(
+  phpSetup.content,
+  /php-version: '8\.4'/,
+  'PHPUnit 13 requires PHP 8.4 or newer in the release runner',
+);
 assert.doesNotMatch(
   versionsValidation.content,
   /continue-on-error:\s*true/,
@@ -54,6 +66,7 @@ assert.match(
 const orderedSteps = [
   ['Validate version in plugin header', headerValidation.start],
   ['Check versions.json consistency', versionsValidation.start],
+  ['Setup PHP (fchub-memberships)', phpSetup.start],
   ['Install Composer dependencies (fchub-memberships)', membershipsGate('Install Composer dependencies (fchub-memberships)', /composer install/)],
   ['Audit Composer dependencies (fchub-memberships)', membershipsGate('Audit Composer dependencies (fchub-memberships)', /composer audit --locked --no-interaction/)],
   ['Run PHPUnit (fchub-memberships)', membershipsGate('Run PHPUnit (fchub-memberships)', /\.\/vendor\/bin\/phpunit/)],

@@ -68,6 +68,14 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup PHP (fchub-memberships)
+        if: steps.tag.outputs.slug == 'fchub-memberships'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+
       - name: Install Composer dependencies (fchub-memberships)
         if: steps.tag.outputs.slug == 'fchub-memberships'
         working-directory: plugins/fchub-memberships

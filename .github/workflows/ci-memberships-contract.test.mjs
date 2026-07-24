@@ -60,7 +60,12 @@ for (const name of ['Install dependencies', 'Audit Composer dependencies', 'Run 
 test('Memberships remains in the shared ordered PHP gate sequence', () => {
   const phpunit = job('phpunit')
 
-  assert.match(phpunit, /- plugin: fchub-memberships\n\s+has_tests: true/)
+  assert.match(phpunit, /- plugin: fchub-memberships\n\s+has_tests: true\n\s+php_version: '8\.4'/)
+  assert.match(
+    step(phpunit, 'Setup PHP'),
+    /php-version: \$\{\{ matrix\.php_version \}\}/,
+    'Each plugin must use its declared PHP test runtime',
+  )
   assert.match(phpunit, /name: Audit Composer dependencies[\s\S]*?run: composer audit --locked --no-interaction/)
 
   assert.ok(

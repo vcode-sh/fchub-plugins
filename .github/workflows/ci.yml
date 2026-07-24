@@ -34,12 +34,16 @@ jobs:
         include:
           - plugin: fchub-p24
             has_tests: true
+            php_version: '8.3'
           - plugin: fchub-memberships
             has_tests: true
+            php_version: '8.4'
           - plugin: fchub-stream
             has_tests: true
+            php_version: '8.3'
           - plugin: fchub-wishlist
             has_tests: true
+            php_version: '8.3'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,7 +62,7 @@ jobs:
         if: steps.changes.outputs.count > 0
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php_version }}
           tools: composer:v2
           coverage: none
 
