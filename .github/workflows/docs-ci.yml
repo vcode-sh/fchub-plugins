@@ -10,6 +10,7 @@ on:
       - 'fluentcart-mcp/src/tools/**'
       - 'plugins/fchub-memberships/app/Http/**/*.php'
       - 'plugins/fchub-memberships/app/Modules/Runtime/FluentCartRuntimeModule.php'
+      - 'scripts/check-memberships-image-zoom.mjs'
       - 'scripts/check-memberships-route-docs.mjs'
       - 'scripts/count-mcp-tools.mjs'
       - '.github/workflows/docs-ci.yml'
@@ -20,6 +21,7 @@ on:
       - 'fluentcart-mcp/src/tools/**'
       - 'plugins/fchub-memberships/app/Http/**/*.php'
       - 'plugins/fchub-memberships/app/Modules/Runtime/FluentCartRuntimeModule.php'
+      - 'scripts/check-memberships-image-zoom.mjs'
       - 'scripts/check-memberships-route-docs.mjs'
       - 'scripts/count-mcp-tools.mjs'
       - '.github/workflows/docs-ci.yml'
@@ -47,6 +49,9 @@ jobs:
 
       - name: Verify Fumadocs accordion structure
         run: node --test scripts/check-fumadocs-accordion-structure.mjs
+
+      - name: Verify Memberships image lightboxes
+        run: node --test scripts/check-memberships-image-zoom.mjs
 
       - name: Verify tool counts match source
         run: node scripts/count-mcp-tools.mjs --check

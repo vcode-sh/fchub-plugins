@@ -6,6 +6,7 @@ description: Design branded membership emails, preview them with realistic membe
 import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
 import { Separator } from '@/components/ui/separator';
 
 Membership emails should feel like part of the experience, not an automated
@@ -21,7 +22,13 @@ Go to **Memberships > Settings > Email Studio**.
 The overview groups messages into Access, Membership lifecycle, Trials, and
 Content. You can see what is active before opening an individual email.
 
-![Email Studio showing the shared brand template and membership messages grouped by lifecycle moment](/memberships/memberships-email-studio.webp)
+<ImageZoom
+  src="/memberships/memberships-email-studio.webp"
+  alt="Email Studio showing the shared brand template and membership messages grouped by lifecycle moment"
+  width={1492}
+  height={840}
+  className="rounded-xl border my-6"
+/>
 
 <Cards>
   <Card title="Access granted">

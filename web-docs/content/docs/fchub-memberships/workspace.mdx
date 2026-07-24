@@ -6,6 +6,7 @@ description: Meet the redesigned Memberships admin — a clearer dashboard, guid
 import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
 import { Separator } from '@/components/ui/separator';
 
 Version 1.4.0 gives Memberships a proper workspace. It is designed around the
@@ -40,13 +41,25 @@ The dashboard answers four useful questions:
   </Card>
 </Cards>
 
-![Memberships dashboard with attention items, provider health, member summaries, readiness checks, and the member trend](/memberships/memberships-dashboard.webp)
+<ImageZoom
+  src="/memberships/memberships-dashboard.webp"
+  alt="Memberships dashboard with attention items, provider health, member summaries, readiness checks, and the member trend"
+  width={1492}
+  height={840}
+  className="rounded-xl border my-6"
+/>
 
 ## Build a plan in three steps
 
 Go to **Memberships > Plans** and choose **Create Plan**.
 
-![Guided membership plan builder showing the offer step, progress navigation, and plan summary](/memberships/memberships-plan-builder.webp)
+<ImageZoom
+  src="/memberships/memberships-plan-builder.webp"
+  alt="Guided membership plan builder showing the offer step, progress navigation, and plan summary"
+  width={1492}
+  height={840}
+  className="rounded-xl border my-6"
+/>
 
 <Steps>
 <Step>
@@ -142,7 +155,13 @@ touched anything” has already become the leading incident theory.
 **Memberships > Integrations** shows the current state of FluentCRM,
 FluentCommunity, WordPress content, and any available learning provider.
 
-![Integration health workspace showing provider availability, supported capabilities, and operational status](/memberships/memberships-integrations.webp)
+<ImageZoom
+  src="/memberships/memberships-integrations.webp"
+  alt="Integration health workspace showing provider availability, supported capabilities, and operational status"
+  width={1492}
+  height={840}
+  className="rounded-xl border my-6"
+/>
 
 Healthy providers stay quiet. Issues show the affected work and the next useful
 action. Recovery tools can preview drift before applying a repair, and work in
