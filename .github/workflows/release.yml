@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Parse tag
         id: tag
@@ -74,7 +74,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.tag.outputs.slug == 'fchub-memberships' || steps.tag.outputs.slug == 'fchub-portal-extender' || steps.tag.outputs.slug == 'fchub-stream'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -181,7 +181,7 @@ jobs:
 
       - name: Setup Node.js (fchub)
         if: steps.tag.outputs.slug == 'fchub'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # Vite 8 wants ^20.19 || >=22.12, and Node 20 left maintenance in April
           # 2026. The rest of this repository's newer workflows are already on 22.
@@ -282,7 +282,7 @@ jobs:
         # mismatch is the likeliest way this goes red, and the diff images live
         # here — as do the lifecycle traces.
         if: failure() && steps.tag.outputs.slug == 'fchub'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fchub-release-failures
           path: plugins/fchub/test-results/

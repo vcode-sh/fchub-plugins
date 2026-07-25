@@ -25,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -78,7 +78,7 @@ jobs:
             fetch_depth: 0
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: ${{ matrix.fetch_depth }}
 
@@ -125,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # `Check for changes` below diffs against the pull request base, which
           # a depth-1 checkout does not contain: the diff fails, the count comes
@@ -141,7 +141,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
@@ -164,7 +164,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: steps.changes.outputs.count > 0
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('plugins/fchub-memberships/package-lock.json') }}
@@ -206,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # `Check for changes` below diffs against the pull request base, which
           # a depth-1 checkout does not contain: the diff fails, the count comes
@@ -222,7 +222,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
@@ -262,7 +262,7 @@ jobs:
       # job remains because the repository asserts Stream is still here for a
       # possible return, not because anything is expected to run.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check for changes
         id: changes
@@ -272,7 +272,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -331,7 +331,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # The diff below asks for the pull request base commit, which is not in
           # a depth-1 checkout.
@@ -351,7 +351,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -374,7 +374,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: steps.changes.outputs.count > 0
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('plugins/fchub/package-lock.json') }}
@@ -391,7 +391,7 @@ jobs:
 
       - name: Upload smoke failures
         if: failure() && steps.changes.outputs.count > 0
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fchub-smoke-failures
           path: plugins/fchub/test-results/
@@ -428,10 +428,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -456,7 +456,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -481,7 +481,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -504,7 +504,7 @@ jobs:
 
       - name: Upload lifecycle failures
         if: failure() && steps.changes.outputs.count > 0
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fchub-lifecycle-failures
           path: plugins/fchub/test-results/
