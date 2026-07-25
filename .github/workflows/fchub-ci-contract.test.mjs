@@ -19,6 +19,7 @@ const read = (name) => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8
 const strip = (yaml) => yaml.replace(/^[ \t]*#.*$/gm, '')
 
 const ci = strip(read('ci.yml'))
+const release = strip(read('release.yml'))
 const docs = strip(read('docs-ci.yml'))
 
 const unquote = (value) => value.trim().replace(/^(['"])(.*)\1$/, '$2')
@@ -126,43 +127,6 @@ function matrixEntry(jobBody, plugin) {
   return found.body
 }
 
-test('CI runs the FCHub workflow contracts on every input that can break them', () => {
-  const filters = paths(ci, 'pull_request')
-
-  for (const required of [
-    'plugins/**',
-    '.github/workflows/ci.yml',
-    '.github/workflows/release.yml',
-    '.github/workflows/docs-ci.yml',
-    '.github/workflows/fchub-ci-contract.test.mjs',
-    '.github/workflows/fchub-release-contract.test.mjs',
-    'scripts/sync-fchub-catalog.mjs',
-    'scripts/check-fchub-docs.mjs',
-    'tests/repository/fchub-catalog.test.mjs',
-    'web-docs/lib/fchub-products.json',
-    'web-docs/lib/versions.json',
-    'build.sh',
-  ]) {
-    assert.ok(filters.includes(required), `CI must react to changes in ${required}`)
-  }
-
-  const contract = job(ci, 'workflow-contract')
-  assert.match(
-    contract,
-    /node --test [^\n]*fchub-ci-contract\.test\.mjs[^\n]*fchub-release-contract\.test\.mjs/,
-    'The workflow-contract job must run both FCHub contracts',
-  )
-})
-
-test('FCHub joins the shared PHP matrix on the floor it declares', () => {
-  const phpunit = job(ci, 'phpunit')
-  const fchub = matrixEntry(phpunit, 'fchub')
-
-  assert.equal(value(fchub, 'php_version'), '8.1', 'FCHub is tested on its composer.lock platform floor')
-  assert.equal(value(fchub, 'has_tests'), 'true')
-  assert.match(step(phpunit, 'Setup PHP'), /php-version: \$\{\{ matrix\.php_version \}\}/)
-})
-
 test('Every PHPUnit matrix entry declares the history its change detector needs', () => {
   const phpunit = job(ci, 'phpunit')
 
@@ -183,11 +147,6 @@ test('Every PHPUnit matrix entry declares the history its change detector needs'
     )
   }
 
-  assert.equal(
-    value(matrixEntry(phpunit, 'fchub'), 'fetch_depth'),
-    '0',
-    'FCHub diffs against the pull request base, which a depth-1 checkout does not contain',
-  )
 })
 
 test('Every job that diffs against the pull request base can actually fail', () => {
@@ -222,48 +181,6 @@ test('Every job that diffs against the pull request base can actually fail', () 
   }
 })
 
-test('FCHub JavaScript gates all run, in order, inside the plugin', () => {
-  const node = job(ci, 'vite-build-fchub')
-
-  assert.match(
-    node,
-    /runs-on: ubuntu-latest/,
-    'The smoke suite compares committed Linux screenshots, so it must run on Linux',
-  )
-  assert.match(node, /cache-dependency-path: plugins\/fchub\/package-lock\.json/)
-  assert.doesNotMatch(node, /vendor\/bin\/phpunit/, 'The JavaScript job is not where PHP is tested')
-
-  const gates = [
-    ['Install dependencies', /npm ci/],
-    ['Audit JavaScript dependencies', /npm audit --audit-level=high/],
-    ['Run JavaScript tests', /npm test/],
-    ['Install Chromium', /npx playwright install --with-deps chromium/],
-    ['Run browser smoke tests', /npm run test:smoke/],
-    ['Build production assets', /npm run build/],
-    ['Validate build output', /assets\/dist\/\.vite\/manifest\.json/],
-  ]
-
-  for (const [name, command] of gates) {
-    const body = step(node, name)
-    assert.match(body, command, `${name} must run its gate`)
-    assert.match(body, /if: steps\.changes\.outputs\.count > 0/, `${name} must keep the changed-path guard`)
-    assert.equal(value(body, 'working-directory'), 'plugins/fchub', `${name} must run inside FCHub`)
-    assert.doesNotMatch(body, /continue-on-error:\s*true/, `${name} must be able to fail the job`)
-  }
-
-  const order = steps(node).map((entry) => entry.name)
-  const positions = gates.map(([name]) => order.indexOf(name))
-
-  for (let index = 1; index < positions.length; index += 1) {
-    assert.ok(
-      positions[index - 1] < positions[index],
-      `${gates[index][0]} must follow ${gates[index - 1][0]}`,
-    )
-  }
-
-  assert.match(step(node, 'Cache Playwright browsers'), /actions\/cache@v4/)
-})
-
 test('The repository contract job checks the catalogue and the documentation', () => {
   const contract = job(ci, 'repository-contract')
 
@@ -273,83 +190,13 @@ test('The repository contract job checks the catalogue and the documentation', (
   assert.doesNotMatch(contract, /continue-on-error:\s*true/)
 })
 
-test('The lifecycle job runs on FCHub, catalogue, build and workflow changes only', () => {
-  const lifecycle = job(ci, 'fchub-lifecycle')
-
-  const detector = step(lifecycle, 'Check for changes')
-
-  for (const watched of [
-    'plugins/fchub/',
-    'scripts/sync-fchub-catalog.mjs',
-    'web-docs/lib/fchub-products.json',
-    'web-docs/lib/versions.json',
-    'build.sh',
-    '.github/workflows/ci.yml',
-    // The harness is the only thing that proves a built archive installs, and
-    // release.yml owns the other implementation of the ZIP build.
-    '.github/workflows/release.yml',
-  ]) {
-    assert.ok(detector.includes(watched), `The lifecycle gate must watch ${watched}`)
-  }
-
-  const harness = step(lifecycle, 'Run the disposable WordPress lifecycle')
-  assert.match(harness, /bash tests\/e2e\/run-lifecycle\.sh/)
-  assert.equal(value(harness, 'working-directory'), 'plugins/fchub')
-  assert.match(harness, /if: steps\.changes\.outputs\.count > 0/)
-  assert.doesNotMatch(harness, /continue-on-error:\s*true/)
-
-  assert.match(
-    value(lifecycle, 'timeout-minutes') ?? '',
-    /^\d+$/,
-    'A job that stands up Docker needs a ceiling',
-  )
-})
-
-test('No FCHub job can be neutered at job level', () => {
-  // Every other assertion in this file is scoped to a step, and a step-scoped
-  // assertion cannot see the cheaper edit: one line on the job disables every
-  // gate inside it at once, and it is the line a hurried human reaches for when
-  // a queue is blocked.
-  for (const name of ['vite-build-fchub', 'repository-contract', 'fchub-lifecycle']) {
-    const body = job(ci, name)
-
-    assert.equal(
-      value(body, 'continue-on-error'),
-      null,
-      `${name} must be able to fail the workflow — a job-level continue-on-error makes every gate in it advisory`,
-    )
-    assert.equal(
-      value(body, 'if'),
-      null,
-      `${name} must not be gated off at job level — path gating belongs in Check for changes, where it is visible`,
-    )
-  }
-})
-
-test('FCHub change detection fails loudly rather than reporting no changes', () => {
-  for (const name of ['vite-build-fchub', 'fchub-lifecycle']) {
-    const body = job(ci, name)
-
-    assert.match(
-      step(body, 'Checkout'),
-      /fetch-depth: 0/,
-      `${name} diffs against the pull request base, which a shallow checkout does not contain`,
-    )
-    assert.match(
-      step(body, 'Check for changes'),
-      /set -o pipefail/,
-      `${name} must fail on a broken diff instead of counting zero changes and skipping every gate`,
-    )
-  }
-})
-
 test('Docs CI watches the FCHub sources its own checks read', () => {
   for (const event of ['push', 'pull_request']) {
     const filters = paths(docs, event)
 
+    // The plugin's own sources left this repository with it. What remains
+    // here is what this repository still owns and its own checks still read.
     for (const required of [
-      'plugins/fchub/resources/admin/components/ProductCard.vue',
-      'plugins/fchub/resources/catalog.json',
       'scripts/check-fchub-docs.mjs',
       'scripts/sync-fchub-catalog.mjs',
     ]) {
@@ -360,4 +207,50 @@ test('Docs CI watches the FCHub sources its own checks read', () => {
   const consistency = job(docs, 'consistency')
   assert.match(consistency, /node scripts\/check-fchub-docs\.mjs/)
   assert.match(consistency, /node scripts\/sync-fchub-catalog\.mjs --check/)
+})
+
+/**
+ * Carried over when FCHub's source moved to its own repository. The guarantee
+ * is not FCHub's: every product's release publishes a sidecar, because FCHub
+ * verifies what it downloads and a release without one silently downgrades
+ * every install that follows into checksum_unavailable.
+ */
+test('Every release publishes a SHA-256 sidecar beside its ZIP', () => {
+  const bypass = /if:\s*['"]?\s*(?:\$\{\{\s*)?always\s*\(\s*\)/
+  const releaseSteps = steps(job(release, 'release'))
+
+  const named = (name) => {
+    const found = releaseSteps.find((entry) => entry.name === name)
+    assert.ok(found, `Expected a "${name}" step in the release job`)
+    return found
+  }
+
+  const zip = named('Build ZIP')
+  const sidecar = named('Create checksum sidecar')
+  const publish = named('Create GitHub Release')
+
+  assert.match(sidecar.body, /sha256sum/, 'The sidecar is produced by sha256sum on the Linux runner')
+  assert.match(
+    sidecar.body,
+    /checksum_path=[^\n]*\.sha256[^\n]*>>[^\n]*GITHUB_ENV/,
+    'The sidecar path must be exported for the release step',
+  )
+  assert.doesNotMatch(
+    sidecar.body,
+    /if: steps\.tag\.outputs\.slug/,
+    'Sidecars are for every product, not one of them',
+  )
+  assert.doesNotMatch(sidecar.body, /continue-on-error:\s*true/)
+  assert.doesNotMatch(sidecar.body, bypass)
+
+  assert.ok(zip.at < sidecar.at, 'The sidecar describes the ZIP, so it comes after it')
+  assert.ok(
+    sidecar.at < publish.at,
+    'The sidecar must exist before the release that publishes it — checksum_path is empty otherwise',
+  )
+
+  assert.match(publish.body, /gh release create/)
+  assert.match(publish.body, /\$\{?zip_path\}?/, 'The ZIP must be published')
+  assert.match(publish.body, /\$\{?checksum_path\}?/, 'The sidecar must be published alongside it')
+  assert.doesNotMatch(publish.body, bypass)
 })

@@ -15,8 +15,6 @@ on:
       - 'scripts/check-fchub-docs.mjs'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
-      - 'plugins/fchub/resources/catalog.json'
-      - 'plugins/fchub/resources/admin/components/ProductCard.vue'
       - '.github/workflows/docs-ci.yml'
   pull_request:
     branches: [main]
@@ -30,8 +28,6 @@ on:
       - 'scripts/check-fchub-docs.mjs'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
-      - 'plugins/fchub/resources/catalog.json'
-      - 'plugins/fchub/resources/admin/components/ProductCard.vue'
       - '.github/workflows/docs-ci.yml'
 
 concurrency:

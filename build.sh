@@ -23,7 +23,6 @@ ALL_PLUGINS=(
     "fchub-wishlist|fchub-wishlist.php"
     "fchub-multi-currency|fchub-multi-currency.php"
     "cartshift|cartshift.php"
-    "fchub|fchub.php"
 )
 
 # Discontinued, but still buildable on purpose.
@@ -307,16 +306,9 @@ fi
 # used to copy a file into every plugin directory in the repository, including
 # discontinued Stream, which nobody asked it to touch — and the lifecycle
 # harness runs exactly that command on every default run.
-#
-# FCHub is skipped because it owns a namespaced updater of its own. The shared
-# one would be a second, conflicting copy that ships in the archive.
 info "Syncing GitHubUpdater into plugins ..."
 for entry in "${PLUGINS[@]}"; do
     IFS='|' read -r sync_slug _ <<< "$entry"
-
-    if [ "$sync_slug" = "fchub" ]; then
-        continue
-    fi
 
     sync_dir="$PLUGINS_DIR/$sync_slug"
 
@@ -392,22 +384,6 @@ for entry in "${PLUGINS[@]}"; do
     fi
 
     # Run npm build for fchub
-    if [ "$slug" = "fchub" ]; then
-        if [ -f "$plugin_dir/package.json" ]; then
-            info "Running npm build for $slug ..."
-            (cd "$plugin_dir" && npm ci --silent && npm run build --silent)
-            # The manifest is what AdminMenu resolves the entry through, so a
-            # build that produced assets but no manifest ships a blank screen.
-            if [ ! -f "$plugin_dir/assets/dist/.vite/manifest.json" ]; then
-                error "npm build failed — assets/dist/.vite/manifest.json is missing"
-            fi
-            if [ -z "$(find "$plugin_dir/assets/dist" -name '*.js' -type f -print -quit 2>/dev/null)" ]; then
-                error "npm build failed — assets/dist/ contains no JavaScript"
-            fi
-            success "npm build complete"
-        fi
-    fi
-
     # Run npm build for fchub-stream (admin-app + portal-app)
     if [ "$slug" = "fchub-stream" ]; then
         if [ -d "$plugin_dir/admin-app" ]; then

@@ -27,7 +27,7 @@ test('catalogue contains exactly the six stable FCHub products', async () => {
 })
 
 test('catalogue excludes discontinued, experimental, and separate products', async () => {
-  const bundled = await readJson('plugins/fchub/resources/catalog.json')
+  const bundled = await readJson('web-docs/lib/fchub-catalog.json')
 
   for (const slug of [
     'fchub-stream',
@@ -39,16 +39,3 @@ test('catalogue excludes discontinued, experimental, and separate products', asy
   }
 })
 
-test('bundled catalogue matches generated source exactly', async () => {
-  const metadata = await readJson('web-docs/lib/fchub-products.json')
-  const versions = await readJson('web-docs/lib/versions.json')
-  const bundled = await readJson('plugins/fchub/resources/catalog.json')
-
-  assert.deepEqual(bundled, buildCatalogue(metadata, versions))
-})
-
-test('website and plugin catalogue copies are identical', async () => {
-  const bundled = await readJson('plugins/fchub/resources/catalog.json')
-  const website = await readJson('web-docs/lib/fchub-catalog.json')
-  assert.deepEqual(website, bundled)
-})

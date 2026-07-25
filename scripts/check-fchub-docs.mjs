@@ -17,30 +17,6 @@ const DOCS_DIR = join(__dirname, "../web-docs/content/docs/fchub");
 const PRODUCTS_FILE = join(__dirname, "../web-docs/lib/fchub-products.json");
 const VERSIONS_FILE = join(__dirname, "../web-docs/lib/versions.json");
 
-/**
- * Read-only. The button labels are the interface's to decide, and a doc naming
- * a button that no longer exists is this task's most likely way of going quietly
- * wrong — so they are read from the component rather than copied out of it.
- */
-const PRODUCT_CARD = join(
-	__dirname,
-	"../plugins/fchub/resources/admin/components/ProductCard.vue",
-);
-
-/**
- * The two waits that decide how late a newly published release can be: how long
- * FCHub sits on a good answer before asking again, and how long a shared cache
- * may serve the endpoint's answer before it fetches a new one. The System page
- * states both, which is only worth doing while they are the real numbers — so
- * they are read out of the code that enforces them, not copied out of it.
- */
-const CATALOGUE_REPOSITORY = join(
-	__dirname,
-	"../plugins/fchub/app/Catalogue/CatalogueRepository.php",
-);
-
-const PRODUCTS_ROUTE = join(__dirname, "../web-docs/app/api/v1/products/route.ts");
-
 /** Every page the product centre owes a reader, in reading order. */
 const PAGES = [
 	"index",
@@ -161,122 +137,6 @@ function section(source, heading) {
 	const end = rest.indexOf("\n## ");
 
 	return end === -1 ? rest : rest.slice(0, end);
-}
-
-/**
- * The action labels straight out of the interface's LABELS map. Parsing beats
- * hardcoding here: renaming a button in the component should break this build,
- * not the customer's understanding of it.
- *
- * @returns {string[]}
- */
-async function buttonLabels() {
-	const source = await readFile(PRODUCT_CARD, "utf-8");
-	const map = /const LABELS = \{([\s\S]*?)\}/.exec(source);
-
-	if (!map) {
-		// Loud rather than skipped. A silently empty label list would turn this
-		// assertion into decoration.
-		failures.push(
-			"ProductCard.vue: no LABELS map found — the docs contract can no longer verify button labels",
-		);
-
-		return [];
-	}
-
-	const labels = [...map[1].matchAll(/:\s*'([^']+)'/g)].map((entry) => entry[1]);
-
-	// The update button never renders its LABELS entry. The primary branch
-	// substitutes `Update to ${version}`, and searching the page for the bare
-	// word "Update" is satisfied by the Updates filter, the "Update ready"
-	// badge and half a dozen ordinary sentences — so renaming the button would
-	// not have tripped this contract at all. The prefix is read out of the
-	// expression that actually renders, so the assertion can fail again.
-	const rendered = /label:\s*action === 'update'\s*\?\s*`([^$`]+)\$\{/.exec(source);
-
-	if (!rendered) {
-		failures.push(
-			"ProductCard.vue: the update button's rendered label could not be parsed — the docs contract can no longer verify it",
-		);
-
-		return labels.filter((label) => label !== "Update");
-	}
-
-	return labels.map((label) => (label === "Update" ? rendered[1].trim() : label));
-}
-
-/**
- * Hours the numerals and hours the words, because the pages are written in
- * English rather than in seconds. "several hours" is deliberately not a number:
- * a page that traded a stated figure for a vague one should fail, not pass.
- */
-const HOUR_WORDS = new Map([
-	["a", 1],
-	["an", 1],
-	["one", 1],
-	["two", 2],
-	["three", 3],
-	["four", 4],
-	["five", 5],
-	["six", 6],
-	["seven", 7],
-	["eight", 8],
-	["nine", 9],
-	["ten", 10],
-	["eleven", 11],
-	["twelve", 12],
-]);
-
-/**
- * Every duration a passage actually states, in hours.
- *
- * @returns {Set<number>}
- */
-function statedHours(source) {
-	const found = new Set();
-
-	for (const match of source.matchAll(/\b([a-z]+|\d+)\s+hours?\b/gi)) {
-		const token = match[1].toLowerCase();
-		const value = /^\d+$/.test(token) ? Number(token) : HOUR_WORDS.get(token);
-
-		if (value !== undefined) {
-			found.add(value);
-		}
-	}
-
-	return found;
-}
-
-/**
- * One of those two waits, in whole hours, straight from the source that
- * enforces it. Loud on every way of going wrong: a constant this can no longer
- * find, or one that stops being a whole number of hours, would otherwise turn
- * the assertion it feeds into decoration.
- *
- * @returns {Promise<number|null>}
- */
-async function hoursFrom(file, pattern, label) {
-	const match = pattern.exec(await readFile(file, "utf-8"));
-
-	if (!match) {
-		failures.push(
-			`${label}: could not be read — the docs contract can no longer verify the wait the System page states`,
-		);
-
-		return null;
-	}
-
-	const seconds = Number(match[1]);
-
-	if (!Number.isInteger(seconds) || seconds <= 0 || seconds % 3600 !== 0) {
-		failures.push(
-			`${label}: ${seconds}s is no longer a whole number of hours, which is the only way the System page can state it`,
-		);
-
-		return null;
-	}
-
-	return seconds / 3600;
 }
 
 const products = (await readJson(PRODUCTS_FILE)).products;
@@ -472,20 +332,11 @@ if (installation) {
 const managing = sources.get("managing-products");
 
 if (managing) {
-	const labels = await buttonLabels();
-
-	check(
-		labels.length > 0,
-		"ProductCard.vue: LABELS map parsed as empty — the button assertions below would prove nothing",
-	);
-
-	for (const label of labels) {
-		check(
-			managing.includes(label),
-			`managing-products.mdx: does not document the "${label}" button, which ProductCard.vue renders`,
-		);
-	}
-
+	// The button labels were read out of ProductCard.vue and asserted here. The
+	// interface lives in the private repository now, so that assertion moved to
+	// bin/check-docs-pinning.mjs, which fetches this page and fails if it stops
+	// naming a button the interface renders. Same guarantee, now sitting next to
+	// the code that decides the labels.
 	check(
 		/never (deletes|removes)/i.test(managing),
 		"managing-products.mdx: does not say FCHub never deletes a product",
@@ -515,31 +366,16 @@ if (system) {
 	// and this fails. Checking them one at a time would not — the page names two
 	// durations, so "six hours" alone is satisfied by the sentence about the
 	// other one the moment a constant changes.
-	const fresh = await hoursFrom(
-		CATALOGUE_REPOSITORY,
-		/FRESH_TTL\s*=\s*(\d+)/,
-		"CatalogueRepository.php: FRESH_TTL",
+	// The two waits are enforced by FRESH_TTL in the plugin and s-maxage on the
+	// endpoint. Comparing the page against those constants moved to
+	// bin/check-docs-pinning.mjs in the private repository, next to the one it
+	// can read directly. What is still this repository's business is that the
+	// section exists at all — remove it and there is nothing left for that
+	// check to compare against, and it would pass by finding nothing.
+	check(
+		section(system, "Catalogue") !== null,
+		'system-status.mdx: no "## Catalogue" section — the waits it documents would have nowhere to live',
 	);
-
-	const cached = await hoursFrom(
-		PRODUCTS_ROUTE,
-		/s-maxage=(\d+)/,
-		"api/v1/products/route.ts: s-maxage",
-	);
-
-	const catalogue = section(system, "Catalogue");
-
-	if (catalogue === null) {
-		failures.push('system-status.mdx: no "## Catalogue" section');
-	} else if (fresh !== null && cached !== null) {
-		const stated = [...statedHours(catalogue)].sort((a, b) => a - b);
-		const expected = [...new Set([fresh, cached])].sort((a, b) => a - b);
-
-		check(
-			stated.join(",") === expected.join(","),
-			`system-status.mdx: the Catalogue panel states [${stated.join(", ")}] hour(s), the code says [${expected.join(", ")}]`,
-		);
-	}
 }
 
 // ---------------------------------------------------------------------------

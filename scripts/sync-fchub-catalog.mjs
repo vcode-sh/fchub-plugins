@@ -16,7 +16,6 @@ const ROOT = join(__dirname, "..");
 
 const METADATA_FILE = join(ROOT, "web-docs/lib/fchub-products.json");
 const VERSIONS_FILE = join(ROOT, "web-docs/lib/versions.json");
-const PLUGIN_OUTPUT = join(ROOT, "plugins/fchub/resources/catalog.json");
 const WEBSITE_OUTPUT = join(ROOT, "web-docs/lib/fchub-catalog.json");
 
 export const STABLE_SLUGS = Object.freeze([
@@ -111,7 +110,11 @@ async function main() {
   }
 
   const output = serialise(catalogue);
-  const targets = [PLUGIN_OUTPUT, WEBSITE_OUTPUT];
+  // The plugin bundles its own copy, fetched from the published endpoint by
+  // its own build. It used to be written here, back when the source lived in
+  // this repository; comparing two files this script wrote said less than
+  // comparing what ships against what is served.
+  const targets = [WEBSITE_OUTPUT];
 
   if (process.argv.includes("--check")) {
     const drifted = [];
