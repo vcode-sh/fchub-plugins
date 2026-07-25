@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Parse tag
         id: tag
@@ -73,7 +73,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.tag.outputs.slug == 'fchub-memberships' || steps.tag.outputs.slug == 'fchub-portal-extender' || steps.tag.outputs.slug == 'fchub-stream'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
