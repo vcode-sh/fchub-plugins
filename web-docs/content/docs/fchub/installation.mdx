@@ -1,0 +1,102 @@
+---
+title: Installation
+description: Download FCHub, install it, switch it on, open it. Four steps, none of them interesting, which is the point.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+
+## What you need
+
+| Requirement | Version |
+|---|---|
+| **WordPress** | 6.4 or newer |
+| **PHP** | 8.1 or newer |
+| **FluentCart** | Not required |
+
+That is the whole list. No account, no licence key, no API credentials, no ceremonial handshake.
+
+<Callout type="info" title="FCHub asks for less than the products it manages">
+Some products in the suite need WordPress 6.7 and PHP 8.3. FCHub deliberately does not — it should be installable on the site that is *behind*, so it can tell you what that site is missing. See [what each product needs](/docs/fchub#what-each-product-needs).
+</Callout>
+
+You will also need an administrator account. Installing, updating, and switching plugins on and off are the things WordPress reserves for administrators, and FCHub does not invent a way around that.
+
+## Download
+
+FCHub ships as an ordinary WordPress plugin ZIP:
+
+<PluginDownload plugin="fchub" /> — grab <PluginZip plugin="fchub" /> from the release page.
+
+## Install it
+
+<Steps>
+<Step>
+**Upload the ZIP**
+
+In WordPress admin, go to **Plugins → Add New Plugin**, click **Upload Plugin**, choose the file you just downloaded, and click **Install Now**.
+</Step>
+
+<Step>
+**Activate**
+
+Click **Activate Plugin**. An **FCHub** item appears in the admin sidebar with three entries under it: Overview, Products, and System.
+</Step>
+
+<Step>
+**Open it**
+
+Click **FCHub**. The Overview loads, reads the product list, and tells you where you stand. When nothing needs you it says so — *Everything is ticking along nicely* — which is the most boring sentence in the plugin and the one we are proudest of.
+
+On a brand-new site it will have rather more to say: nothing from the suite is installed yet, and anything waiting on FluentCart or a newer PHP will name what it is waiting for. The list is there so you know what exists. No pressure.
+</Step>
+</Steps>
+
+<Tabs items={['Manual upload', 'WP-CLI']}>
+<Tab value="Manual upload">
+
+If you would rather move files around yourself:
+
+1. Unzip the download on your machine
+2. Upload the `fchub` folder to `/wp-content/plugins/`
+3. Go to **Plugins** in WordPress admin and activate **FCHub**
+
+</Tab>
+<Tab value="WP-CLI">
+
+```bash
+# Install and switch it on in one go
+wp plugin install /path/to/fchub.zip --activate
+
+# Confirm WordPress agrees
+wp plugin list --name=fchub --fields=name,status,version
+```
+
+</Tab>
+</Tabs>
+
+## What happens next
+
+Nothing dramatic. FCHub reads the product list, works out what is installed on this site, and renders it. It does not install anything, enable anything, or change a single product setting until you press a button that says it will.
+
+If your site cannot reach the internet at that moment, FCHub falls back to the product list that shipped inside it and carries on. The screen still works. See [System](/docs/fchub/system-status) for how it tells you which list you are looking at.
+
+## Keeping FCHub updated
+
+FCHub updates arrive through WordPress like any other plugin — the **Plugins** screen, the **Updates** screen, or WP-CLI. The **System** page carries a link straight to the WordPress Updates screen for the days you cannot be bothered to find it.
+
+FCHub does not update itself behind your back, and it never updates a product without being asked.
+
+## Removing it
+
+Deactivate or delete FCHub whenever you like. Every product stays installed, stays switched on, and keeps its data. FCHub tidies up after itself and touches nothing else — see [Troubleshooting](/docs/fchub/troubleshooting#removing-fchub-safely) for the full account.
+
+<Cards>
+  <Card title="Managing products" href="/docs/fchub/managing-products">
+    What the badges mean and what each button actually does.
+  </Card>
+  <Card title="System" href="/docs/fchub/system-status">
+    Compatibility, the product list, and the refresh button.
+  </Card>
+</Cards>

@@ -1,0 +1,59 @@
+---
+title: System
+description: What this site can run, what is holding a product back, where the product list came from, and how to make FCHub look again.
+---
+
+import { Separator } from '@/components/ui/separator';
+
+The **System** page is where FCHub stops being reassuring and starts being specific. Four panels, no charts, nothing that needs interpreting.
+
+## This site
+
+The versions every decision on the other two screens was made against — read from your server, not guessed at in the browser.
+
+| Row | What you see |
+|---|---|
+| **WordPress** | The version this site runs |
+| **PHP** | The version this site runs |
+| **FluentCart** | Its version, or *Not running on this site* |
+
+A fourth row, **Your account**, appears only when something is genuinely being withheld from you — for example, *Your account cannot install products or update them on this site.* If your account can do everything, the row stays away rather than reciting a list of privileges you already have.
+
+## Compatibility
+
+One row per requirement, listing the products waiting on it.
+
+| Row | Says |
+|---|---|
+| **WordPress** | Which products need a newer WordPress than this site has |
+| **PHP** | Which products need a newer PHP |
+| **FluentCart** | Which products are waiting for FluentCart |
+| **Other requirements** | Anything else, on the rare occasion there is anything else |
+
+When a row has nothing to report it says so — *Nothing is waiting on a newer PHP* — which is a more useful sight than an empty space where a problem might be hiding.
+
+<Separator className="my-8" />
+
+## Catalogue
+
+FCHub keeps a list of the products, what they need, and where their releases live. It asks `fchub.co` for that list, and this panel tells you which copy you are actually looking at.
+
+| Source | Meaning |
+|---|---|
+| **Straight from fchub.co** | The current list. All is well. |
+| **Using the last saved catalogue** | `fchub.co` could not be reached, so FCHub kept the last copy it trusted. |
+| **Using the catalogue included with FCHub** | FCHub has not managed to reach `fchub.co` at all, so this is the copy that shipped inside the plugin. |
+
+**Last checked** gives the date and time of the most recent successful check, in your own locale — or an honest *FCHub has not managed a successful check yet* when there has not been one.
+
+The **Check for updates** button asks again, right now, ignoring whatever waiting period FCHub had settled into. Use it after a release you were expecting, or after the network comes back. It reads a list; it installs nothing.
+
+<Callout type="info" title="An outage is meant to be boring">
+None of those three states breaks the screen. Products still list, states still resolve, buttons still work — the only thing an older list can cost you is knowledge of a release published since. See [Troubleshooting](/docs/fchub/troubleshooting#the-product-list-is-out-of-date) if a source line surprises you.
+</Callout>
+
+<Separator className="my-8" />
+
+## FCHub
+
+The version of the hub itself, and a link to the WordPress **Updates** screen. FCHub updates arrive through WordPress exactly like any other plugin — there is no separate updater, no background upgrade, and no clever timing.

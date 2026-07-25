@@ -12,7 +12,11 @@ on:
       - 'plugins/fchub-memberships/app/Modules/Runtime/FluentCartRuntimeModule.php'
       - 'scripts/check-memberships-image-zoom.mjs'
       - 'scripts/check-memberships-route-docs.mjs'
+      - 'scripts/check-fchub-docs.mjs'
+      - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
+      - 'plugins/fchub/resources/catalog.json'
+      - 'plugins/fchub/resources/admin/components/ProductCard.vue'
       - '.github/workflows/docs-ci.yml'
   pull_request:
     branches: [main]
@@ -23,7 +27,11 @@ on:
       - 'plugins/fchub-memberships/app/Modules/Runtime/FluentCartRuntimeModule.php'
       - 'scripts/check-memberships-image-zoom.mjs'
       - 'scripts/check-memberships-route-docs.mjs'
+      - 'scripts/check-fchub-docs.mjs'
+      - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
+      - 'plugins/fchub/resources/catalog.json'
+      - 'plugins/fchub/resources/admin/components/ProductCard.vue'
       - '.github/workflows/docs-ci.yml'
 
 concurrency:
@@ -52,6 +60,16 @@ jobs:
 
       - name: Verify Memberships image lightboxes
         run: node --test scripts/check-memberships-image-zoom.mjs
+
+      - name: Verify FCHub product-centre documentation
+        run: node scripts/check-fchub-docs.mjs
+
+      # The catalogue is generated from versions.json and fchub-products.json,
+      # and copied into both the website and the plugin. Bumping a version
+      # without regenerating it leaves two stale copies and a product centre
+      # offering an older release than the docs page beside it.
+      - name: Check FCHub catalogue drift
+        run: node scripts/sync-fchub-catalog.mjs --check
 
       - name: Verify tool counts match source
         run: node scripts/count-mcp-tools.mjs --check

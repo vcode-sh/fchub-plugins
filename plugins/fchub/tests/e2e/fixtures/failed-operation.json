@@ -1,0 +1,380 @@
+{
+  "_note": "Four mutations, four failures: FCHub’s error shape, WordPress core’s, the 200 that means it worked but the re-read did not, and the one that failed with the site already changed underneath it.",
+  "snapshot": {
+    "products": [
+      {
+        "slug": "fchub-p24",
+        "name": "Przelewy24",
+        "description": "Przelewy24 payment gateway for FluentCart, built for the Polish market. Handles checkout, IPN callbacks, and refunds so nobody has to explain BLIK to a support ticket.",
+        "version": "1.0.3",
+        "requires_wp": "6.4",
+        "requires_php": "8.1",
+        "dependencies": [
+          "fluentcart"
+        ],
+        "docs_url": "https://fchub.co/docs/fchub-p24",
+        "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.3",
+        "lifecycle": "active",
+        "update": "current",
+        "compatibility": "compatible",
+        "compatibility_reason": null,
+        "health": "healthy",
+        "health_message": null,
+        "installed_version": "1.0.3",
+        "admin_url": "https://fchub.test/wp-admin/admin.php?page=fluent-cart#/settings/payment-methods",
+        "actions": [
+          "deactivate"
+        ]
+      },
+      {
+        "slug": "fchub-fakturownia",
+        "name": "Fakturownia",
+        "description": "Invoice automation with Fakturownia and KSeF 2.0 for FluentCart orders. Generates, sends, and tracks invoices automatically, including real-time submission to the tax office.",
+        "version": "1.1.1",
+        "requires_wp": "6.4",
+        "requires_php": "8.1",
+        "dependencies": [
+          "fluentcart"
+        ],
+        "docs_url": "https://fchub.co/docs/fchub-fakturownia",
+        "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.1",
+        "lifecycle": "active",
+        "update": "current",
+        "compatibility": "compatible",
+        "compatibility_reason": null,
+        "health": "healthy",
+        "health_message": null,
+        "installed_version": "1.1.1",
+        "admin_url": "https://fchub.test/wp-admin/admin.php?page=fluent-cart#/integrations/fakturownia",
+        "actions": [
+          "deactivate"
+        ]
+      },
+      {
+        "slug": "fchub-memberships",
+        "name": "Memberships",
+        "description": "A complete membership system for FluentCart: plans, access rules, and drip content. Grants and revokes access automatically as subscriptions change, so nobody keeps access they stopped paying for.",
+        "version": "1.4.0",
+        "requires_wp": "6.7",
+        "requires_php": "8.3",
+        "dependencies": [
+          "fluentcart"
+        ],
+        "docs_url": "https://fchub.co/docs/fchub-memberships",
+        "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.0",
+        "lifecycle": "active",
+        "update": "current",
+        "compatibility": "compatible",
+        "compatibility_reason": null,
+        "health": "healthy",
+        "health_message": null,
+        "installed_version": "1.4.0",
+        "admin_url": "https://fchub.test/wp-admin/admin.php?page=fchub-memberships",
+        "actions": [
+          "deactivate"
+        ]
+      },
+      {
+        "slug": "fchub-portal-extender",
+        "name": "Portal Extender",
+        "description": "Build custom customer portal pages for FluentCart without writing PHP. Add your own sections and layouts through a visual admin screen.",
+        "version": "1.0.3",
+        "requires_wp": "6.4",
+        "requires_php": "8.1",
+        "dependencies": [
+          "fluentcart"
+        ],
+        "docs_url": "https://fchub.co/docs/fchub-portal-extender",
+        "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.3",
+        "lifecycle": "active",
+        "update": "current",
+        "compatibility": "compatible",
+        "compatibility_reason": null,
+        "health": "healthy",
+        "health_message": null,
+        "installed_version": "1.0.3",
+        "admin_url": "https://fchub.test/wp-admin/admin.php?page=fchub-portal-extender",
+        "actions": [
+          "deactivate"
+        ]
+      },
+      {
+        "slug": "fchub-wishlist",
+        "name": "Wishlist",
+        "description": "Wishlists for FluentCart shoppers. Lets customers save products for later instead of abandoning their cart in despair.",
+        "version": "1.0.1",
+        "requires_wp": "6.7",
+        "requires_php": "8.3",
+        "dependencies": [
+          "fluentcart"
+        ],
+        "docs_url": "https://fchub.co/docs/fchub-wishlist",
+        "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-wishlist/v1.0.1",
+        "lifecycle": "not_installed",
+        "update": "unknown",
+        "compatibility": "compatible",
+        "compatibility_reason": null,
+        "health": "unknown",
+        "health_message": null,
+        "installed_version": null,
+        "admin_url": null,
+        "actions": [
+          "install",
+          "install-and-activate"
+        ]
+      },
+      {
+        "slug": "fchub-multi-currency",
+        "name": "Multi-Currency",
+        "description": "Automatic currency conversion for FluentCart storefronts. Shows prices in the customer's local currency, so pricing complaints arrive in more languages.",
+        "version": "1.4.0",
+        "requires_wp": "6.7",
+        "requires_php": "8.3",
+        "dependencies": [
+          "fluentcart"
+        ],
+        "docs_url": "https://fchub.co/docs/fchub-multi-currency",
+        "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.0",
+        "lifecycle": "active",
+        "update": "available",
+        "compatibility": "compatible",
+        "compatibility_reason": null,
+        "health": "healthy",
+        "health_message": null,
+        "installed_version": "1.3.0",
+        "admin_url": "https://fchub.test/wp-admin/admin.php?page=fluent-cart#/settings/multi-currency",
+        "actions": [
+          "update",
+          "deactivate"
+        ]
+      }
+    ],
+    "summary": {
+      "active": 5,
+      "updates": 1,
+      "compatibility_issues": 0
+    },
+    "catalogue": {
+      "source": "remote",
+      "last_refresh": "2026-07-24T09:15:00+00:00"
+    },
+    "site": {
+      "wp": "6.8.1",
+      "php": "8.3.11",
+      "fluentcart": "1.2.0"
+    },
+    "capabilities": {
+      "install": true,
+      "activate": true,
+      "update": true
+    }
+  },
+  "operations": {
+    "products/fchub-multi-currency/update": {
+      "status": 502,
+      "body": {
+        "success": false,
+        "code": "package_unavailable",
+        "message": "The download could not be reached, so nothing was changed. Worth another go in a minute.",
+        "product": "fchub-multi-currency"
+      }
+    },
+    "products/fchub-p24/deactivate": {
+      "status": 403,
+      "body": {
+        "code": "rest_cookie_invalid_nonce",
+        "message": "Cookie check failed",
+        "data": {
+          "status": 403
+        }
+      }
+    },
+    "products/fchub-wishlist/install-and-activate": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "code": "refresh_failed_after_operation",
+        "message": "That worked, but FCHub could not read its catalogue afterwards. A page reload should sort it out.",
+        "product": "fchub-wishlist"
+      }
+    },
+    "products/fchub-wishlist/install": {
+      "status": 500,
+      "body": {
+        "success": false,
+        "code": "version_mismatch",
+        "message": "Wishlist installed, but the files are not the 1.0.1 release we expected. Worth a look on the Plugins screen.",
+        "product": "fchub-wishlist",
+        "state": {
+          "products": [
+            {
+              "slug": "fchub-p24",
+              "name": "Przelewy24",
+              "description": "Przelewy24 payment gateway for FluentCart, built for the Polish market. Handles checkout, IPN callbacks, and refunds so nobody has to explain BLIK to a support ticket.",
+              "version": "1.0.3",
+              "requires_wp": "6.4",
+              "requires_php": "8.1",
+              "dependencies": [
+                "fluentcart"
+              ],
+              "docs_url": "https://fchub.co/docs/fchub-p24",
+              "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.3",
+              "lifecycle": "active",
+              "update": "current",
+              "compatibility": "compatible",
+              "compatibility_reason": null,
+              "health": "healthy",
+              "health_message": null,
+              "installed_version": "1.0.3",
+              "admin_url": "https://fchub.test/wp-admin/admin.php?page=fluent-cart#/settings/payment-methods",
+              "actions": [
+                "deactivate"
+              ]
+            },
+            {
+              "slug": "fchub-fakturownia",
+              "name": "Fakturownia",
+              "description": "Invoice automation with Fakturownia and KSeF 2.0 for FluentCart orders. Generates, sends, and tracks invoices automatically, including real-time submission to the tax office.",
+              "version": "1.1.1",
+              "requires_wp": "6.4",
+              "requires_php": "8.1",
+              "dependencies": [
+                "fluentcart"
+              ],
+              "docs_url": "https://fchub.co/docs/fchub-fakturownia",
+              "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.1",
+              "lifecycle": "active",
+              "update": "current",
+              "compatibility": "compatible",
+              "compatibility_reason": null,
+              "health": "healthy",
+              "health_message": null,
+              "installed_version": "1.1.1",
+              "admin_url": "https://fchub.test/wp-admin/admin.php?page=fluent-cart#/integrations/fakturownia",
+              "actions": [
+                "deactivate"
+              ]
+            },
+            {
+              "slug": "fchub-memberships",
+              "name": "Memberships",
+              "description": "A complete membership system for FluentCart: plans, access rules, and drip content. Grants and revokes access automatically as subscriptions change, so nobody keeps access they stopped paying for.",
+              "version": "1.4.0",
+              "requires_wp": "6.7",
+              "requires_php": "8.3",
+              "dependencies": [
+                "fluentcart"
+              ],
+              "docs_url": "https://fchub.co/docs/fchub-memberships",
+              "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.0",
+              "lifecycle": "active",
+              "update": "current",
+              "compatibility": "compatible",
+              "compatibility_reason": null,
+              "health": "healthy",
+              "health_message": null,
+              "installed_version": "1.4.0",
+              "admin_url": "https://fchub.test/wp-admin/admin.php?page=fchub-memberships",
+              "actions": [
+                "deactivate"
+              ]
+            },
+            {
+              "slug": "fchub-portal-extender",
+              "name": "Portal Extender",
+              "description": "Build custom customer portal pages for FluentCart without writing PHP. Add your own sections and layouts through a visual admin screen.",
+              "version": "1.0.3",
+              "requires_wp": "6.4",
+              "requires_php": "8.1",
+              "dependencies": [
+                "fluentcart"
+              ],
+              "docs_url": "https://fchub.co/docs/fchub-portal-extender",
+              "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.3",
+              "lifecycle": "active",
+              "update": "current",
+              "compatibility": "compatible",
+              "compatibility_reason": null,
+              "health": "healthy",
+              "health_message": null,
+              "installed_version": "1.0.3",
+              "admin_url": "https://fchub.test/wp-admin/admin.php?page=fchub-portal-extender",
+              "actions": [
+                "deactivate"
+              ]
+            },
+            {
+              "slug": "fchub-wishlist",
+              "name": "Wishlist",
+              "description": "Wishlists for FluentCart shoppers. Lets customers save products for later instead of abandoning their cart in despair.",
+              "version": "1.0.1",
+              "requires_wp": "6.7",
+              "requires_php": "8.3",
+              "dependencies": [
+                "fluentcart"
+              ],
+              "docs_url": "https://fchub.co/docs/fchub-wishlist",
+              "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-wishlist/v1.0.1",
+              "lifecycle": "inactive",
+              "update": "available",
+              "compatibility": "compatible",
+              "compatibility_reason": null,
+              "health": "unknown",
+              "health_message": null,
+              "installed_version": "1.0.0",
+              "admin_url": null,
+              "actions": [
+                "activate",
+                "update"
+              ]
+            },
+            {
+              "slug": "fchub-multi-currency",
+              "name": "Multi-Currency",
+              "description": "Automatic currency conversion for FluentCart storefronts. Shows prices in the customer's local currency, so pricing complaints arrive in more languages.",
+              "version": "1.4.0",
+              "requires_wp": "6.7",
+              "requires_php": "8.3",
+              "dependencies": [
+                "fluentcart"
+              ],
+              "docs_url": "https://fchub.co/docs/fchub-multi-currency",
+              "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.0",
+              "lifecycle": "active",
+              "update": "available",
+              "compatibility": "compatible",
+              "compatibility_reason": null,
+              "health": "healthy",
+              "health_message": null,
+              "installed_version": "1.3.0",
+              "admin_url": "https://fchub.test/wp-admin/admin.php?page=fluent-cart#/settings/multi-currency",
+              "actions": [
+                "update",
+                "deactivate"
+              ]
+            }
+          ],
+          "summary": {
+            "active": 5,
+            "updates": 2,
+            "compatibility_issues": 0
+          },
+          "catalogue": {
+            "source": "remote",
+            "last_refresh": "2026-07-24T09:15:00+00:00"
+          },
+          "site": {
+            "wp": "6.8.1",
+            "php": "8.3.11",
+            "fluentcart": "1.2.0"
+          },
+          "capabilities": {
+            "install": true,
+            "activate": true,
+            "update": true
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+# Playwright's working directory: traces and failure diffs, regenerated on
+# every run. The approved screenshots live in tests/e2e/screenshots/ and are
+# committed on purpose.
+test-results/
+playwright-report/

@@ -1,0 +1,58 @@
+### v1.0.0 <Badge>Latest</Badge>
+
+*Released July 2026* — <PluginDownload plugin="fchub">GitHub Release</PluginDownload>
+
+Six products, and until now six separate trips around wp-admin to work out
+whether any of them needed anything. FCHub replaces that with one screen.
+
+#### One screen for the whole suite
+
+**Overview** opens with the answer rather than a dashboard: everything is fine,
+or these two things are not. **Products** lists all six with a state, a badge,
+and one obvious next step each — filtered by all, installed, or updates waiting.
+**System** says what this site runs, what is holding a product back, and where
+the product list came from.
+
+No account, no licence key, no telemetry, no remote management. It reads your
+site and shows you what it found.
+
+#### Product actions that stay in their lane
+
+Install, install and activate, switch on, update, switch off. Installing never
+switches anything on unless the button said it would, and there is no Delete
+button at all — removing a plugin is the WordPress Plugins screen's job and it
+already does it properly.
+
+Downloads come only from official FCHub releases on GitHub, checked against the
+published checksum, where one is published, before WordPress is handed anything.
+A download that fails its check is deleted and the operation stops without
+changing a thing. Every
+failure message says what it changed, including the awkward middle case where an
+install landed but the activation did not.
+
+#### Compatibility, said out loud
+
+Three of the six products want WordPress 6.7 and PHP 8.3; the other three are
+happy on 6.4 and 8.1. FCHub itself asks for 6.4 and 8.1 on purpose, so it
+installs on the site that is behind and can tell you what that site is missing.
+
+Rather than hiding a button and leaving you to wonder, it names the requirement
+and what you actually have: *Memberships needs PHP 8.3. This site runs 8.1.*
+
+#### Offline is boring, as intended
+
+FCHub asks fchub.co for the product list. If it cannot be reached, the last
+saved copy is used; if there has never been one, the copy that shipped inside
+the plugin. The System page says which, in plain words, and the screen carries
+on working in all three cases.
+
+#### Nothing depends on it
+
+Every product installs, updates, and uninstalls exactly as it did before FCHub
+existed, whether FCHub is present or not. Deactivate or delete FCHub and every
+product stays installed, stays running, and keeps its data — FCHub removes the
+four values it stored for itself and nothing else.
+
+That is not a claim from memory. An automated test installs a product through
+FCHub, updates it, deletes FCHub through the WordPress Plugins screen, and then
+checks that the product is still there and still running.

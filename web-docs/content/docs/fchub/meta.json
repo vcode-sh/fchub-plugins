@@ -1,5 +1,16 @@
 {
   "title": "FCHub",
   "root": true,
-  "description": "Core FCHub documentation"
+  "description": "One calm place for every FCHub product on this site.",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "---Using FCHub---",
+    "managing-products",
+    "system-status",
+    "---Reference---",
+    "troubleshooting",
+    "changelog"
+  ]
 }

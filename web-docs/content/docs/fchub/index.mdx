@@ -1,62 +1,134 @@
 ---
 title: What is FCHub?
-description: Open-source WordPress plugins for FluentCart and FluentCommunity. Payments, invoicing, memberships, video, migrations — the bits nobody else shipped.
+description: One calm place for every FCHub product on this site. See what is installed, what needs attention, and update the lot from one screen.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Separator } from '@/components/ui/separator';
 
-FCHub is a collection of open-source plugins for [FluentCart](https://www.flavor.dev/wordpress-plugins/fluent-cart/) and [FluentCommunity](https://www.flavor.dev/wordpress-plugins/fluent-community/) — the WordPress e-commerce and community platforms by WPManageNinja.
+**One calm place for every FCHub product on this site.**
 
-Payments, invoicing, memberships, video streaming, WooCommerce migrations — things people actually need but nobody got around to building. So I did.
+FCHub is a small, optional plugin that adds a single place to your WordPress admin. From it you can see which FCHub products are installed, which ones are switched on, which have an update waiting, and which cannot run on this site yet — and then act on it without leaving the page.
 
-## FluentCart Plugins
+That is the entire job. FCHub sells nothing, reports nothing about your site to anyone, and asks for no account.
+
+<Callout type="info" title="Optional, always">
+Nothing needs FCHub. Every product installs, updates, and uninstalls perfectly well on its own, exactly as it did before FCHub existed. FCHub is a nicer way to do those things, not a new requirement for doing them.
+</Callout>
+
+<Separator className="my-8" />
+
+## Three screens, and that is all
 
 <Cards>
-  <Card
-    title="Przelewy24"
-    href="/docs/fchub-p24"
-  >
-    Polish payment gateway. Because Stripe doesn't speak Polish.
+  <Card title="Overview" href="/docs/fchub/managing-products#overview">
+    Opens with the answer to "is anything wrong?" Counts what is active, what has an update, and what this site cannot run, then lists the products underneath.
   </Card>
-  <Card
-    title="Fakturownia"
-    href="/docs/fchub-fakturownia"
-  >
-    Invoice automation with KSeF 2.0. Automate paperwork before the tax office automates you.
+  <Card title="Products" href="/docs/fchub/managing-products#products">
+    Everything in the suite, filtered by **All**, **Installed**, or **Updates**. Each card shows its state and offers exactly one obvious next step.
   </Card>
-  <Card
-    title="Memberships"
-    href="/docs/fchub-memberships"
-  >
-    Plans, content gating, drip scheduling. 15k lines so people can pay to read your blog.
-  </Card>
-  <Card
-    title="CartShift"
-    href="/docs/cartshift"
-  >
-    Products, orders, subscriptions, customers. Your WooCommerce escape hatch.
+  <Card title="System" href="/docs/fchub/system-status">
+    What this site runs, what is holding a product back, where the product list came from, and when it was last checked.
   </Card>
 </Cards>
 
-## FluentCommunity Plugins
+<Separator className="my-8" />
+
+## The products
+
+Six of them, all for [FluentCart](https://www.flavor.dev/wordpress-plugins/fluent-cart/), all free, all GPLv2.
+
+{/* fchub:catalogue-start */}
+<Cards>
+  <Card title="Przelewy24" href="/docs/fchub-p24">
+    Polish payment gateway for FluentCart. Checkout, callbacks, refunds — so nobody has to explain BLIK to a support ticket.
+  </Card>
+  <Card title="Fakturownia" href="/docs/fchub-fakturownia">
+    Invoice automation with KSeF 2.0. Generates, sends, and tracks invoices, including real-time submission to the tax office.
+  </Card>
+  <Card title="Memberships" href="/docs/fchub-memberships">
+    Plans, access rules, and drip content. Grants and revokes access as subscriptions change, so nobody keeps access they stopped paying for.
+  </Card>
+  <Card title="Portal Extender" href="/docs/fchub-portal-extender">
+    Custom pages in the FluentCart customer portal, built on an admin screen rather than in PHP.
+  </Card>
+  <Card title="Wishlist" href="/docs/fchub-wishlist">
+    Lets customers save things for later instead of abandoning their cart in despair. Guest wishlists included.
+  </Card>
+  <Card title="Multi-Currency" href="/docs/fchub-multi-currency">
+    Automatic currency conversion, so pricing complaints arrive in more languages.
+  </Card>
+</Cards>
+{/* fchub:catalogue-end */}
+
+<Separator className="my-8" />
+
+## What each product needs
+
+They do not all agree, which is precisely why FCHub shows you compatibility instead of assuming it. Three of them want a newer WordPress and a newer PHP than the other three; all six want FluentCart.
+
+| Product | WordPress | PHP | Also needs |
+|---|---|---|---|
+| Przelewy24 | 6.4 | 8.1 | FluentCart |
+| Fakturownia | 6.4 | 8.1 | FluentCart |
+| Portal Extender | 6.4 | 8.1 | FluentCart |
+| Memberships | 6.7 | 8.3 | FluentCart |
+| Wishlist | 6.7 | 8.3 | FluentCart |
+| Multi-Currency | 6.7 | 8.3 | FluentCart |
+
+If your site falls short of any of those, FCHub says so in a sentence — which product, which requirement, and what this site actually runs — rather than offering a button that would fail.
+
+### What FCHub itself needs
+
+| Requirement | Version |
+|---|---|
+| WordPress | 6.4 or newer |
+| PHP | 8.1 or newer |
+| FluentCart | Not required |
+
+FCHub runs happily without FluentCart. It will still list the six products and still tell you, plainly, that they need FluentCart before they can do anything useful.
+
+<Separator className="my-8" />
+
+## What FCHub will and will not do
+
+**It will** install a product, install and switch it on, switch an installed one on or off, and update one that has a newer release. It downloads only from official FCHub releases on GitHub, checks each download against its published checksum where one exists, and stops without changing anything if that check fails. WordPress does the actual installing, the same way it does for any plugin you upload yourself.
+
+**It will not** delete a product, touch a product's settings or data, or change anything you did not ask it to. There is no Delete button, and that is deliberate: deleting a plugin is the WordPress Plugins screen's job, and it does it perfectly well.
+
+## Removing FCHub
+
+Deactivate it or delete it, and every product stays installed, stays switched on, and keeps its settings and data. Delete it and FCHub also clears the four values it stored for itself, leaving everything else exactly where it was.
+
+This is not a promise we make from memory. An automated test installs a product through FCHub, deletes FCHub through the WordPress Plugins screen, and then checks that the product is still there and still running.
+
+<Separator className="my-8" />
+
+## Get FCHub
+
+<PluginDownload plugin="fchub" /> — then see [Installation](/docs/fchub/installation) for the thirty seconds that follow.
 
 <Cards>
-  <Card
-    title="FCHub Stream (Discontinued)"
-    href="/docs/fchub-stream"
-  >
-    Retained as-is without support or updates. Historical video uploads via Cloudflare Stream and Bunny.net.
+  <Card title="Installation" href="/docs/fchub/installation">
+    Download, install, activate, open. The usual WordPress ritual, shorter than most.
+  </Card>
+  <Card title="Managing products" href="/docs/fchub/managing-products">
+    What each badge means and what each button does.
+  </Card>
+  <Card title="System" href="/docs/fchub/system-status">
+    Compatibility, where the product list came from, and how to make it check again.
+  </Card>
+  <Card title="Troubleshooting" href="/docs/fchub/troubleshooting">
+    For the days when the internet, the permissions, or the PHP version disagree with you.
   </Card>
 </Cards>
 
-## How It Works
+<Separator className="my-8" />
 
-- **Separate plugins** — Install only what you need. No bloat.
-- **Open source** — GPLv2. Code's on [GitHub](https://github.com/vcode-sh/fchub-plugins). Read it, fork it, improve it.
-- **Independent updates** — Each plugin has its own release cycle.
-- **PHP 8.3+** — Modern PHP only. Not negotiable.
-- **WordPress 6.8+** — Keeps things sane.
+## The one that is not here
 
-## Who Makes This
+FCHub Stream was a video plugin for FluentCommunity. It is discontinued — retained as-is, with no support, no updates, and no place in the hub. It is not in the product list above and FCHub will not install it.
 
-[Vibe Code](https://x.com/vcode_sh). One person. No committee. No roadmap meetings.
+## Who makes this
+
+[Vibe Code](https://x.com/vcode_sh). One person. No committee, no roadmap meetings, no quarterly synergy review. The code is on [GitHub](https://github.com/vcode-sh/fchub-plugins) under GPLv2 — read it, fork it, improve it.

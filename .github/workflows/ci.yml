@@ -9,6 +9,15 @@ on:
       - '.github/workflows/ci-memberships-contract.test.mjs'
       - '.github/workflows/release.yml'
       - '.github/workflows/release-memberships-contract.test.mjs'
+      - '.github/workflows/docs-ci.yml'
+      - '.github/workflows/fchub-ci-contract.test.mjs'
+      - '.github/workflows/fchub-release-contract.test.mjs'
+      - 'scripts/sync-fchub-catalog.mjs'
+      - 'scripts/check-fchub-docs.mjs'
+      - 'tests/repository/fchub-catalog.test.mjs'
+      - 'web-docs/lib/fchub-products.json'
+      - 'build.sh'
+      - 'lib/GitHubUpdater.php'
 
 jobs:
   workflow-contract:
@@ -26,27 +35,47 @@ jobs:
       - name: Run Memberships workflow contracts
         run: node --test .github/workflows/ci-memberships-contract.test.mjs .github/workflows/release-memberships-contract.test.mjs
 
+      - name: Run FCHub workflow contracts
+        run: node --test .github/workflows/fchub-ci-contract.test.mjs .github/workflows/fchub-release-contract.test.mjs
+
   phpunit:
     name: PHPUnit (${{ matrix.plugin }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
+          # fetch_depth is per entry rather than a job-wide setting on purpose.
+          # `Check for changes` below diffs against the pull request base, and a
+          # depth-1 checkout does not contain that commit — the diff fails, `wc
+          # -l` reports zero, and every gate in the job skips itself quietly. A
+          # depth of 0 fetches the history the diff needs. The plugins already
+          # here keep the depth they have always had; changing it would turn
+          # gates on for products this task was not asked to touch.
           - plugin: fchub-p24
             has_tests: true
             php_version: '8.3'
+            fetch_depth: 1
           - plugin: fchub-memberships
             has_tests: true
             php_version: '8.4'
+            fetch_depth: 1
           - plugin: fchub-stream
             has_tests: true
             php_version: '8.3'
+            fetch_depth: 1
           - plugin: fchub-wishlist
             has_tests: true
             php_version: '8.3'
+            fetch_depth: 1
+          - plugin: fchub
+            has_tests: true
+            php_version: '8.1'
+            fetch_depth: 0
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ matrix.fetch_depth }}
 
       - name: Check for changes
         id: changes
@@ -270,3 +299,192 @@ jobs:
           fi
 
           echo "portal-app build validation passed: $JS_COUNT JS file(s)"
+
+  vite-build-fchub:
+    name: Vite Build (fchub)
+    # Linux, and not for the usual reasons. The smoke suite compares screenshots
+    # against committed baselines, and both platform sets are in the repository:
+    # a macOS runner would compare the -darwin ones and prove nothing about what
+    # CI renders.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The diff below asks for the pull request base commit, which is not in
+          # a depth-1 checkout.
+          fetch-depth: 0
+
+      - name: Check for changes
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Without pipefail a failed diff still exits zero through `wc -l`, so
+          # the count is zero, so every gate below skips — a green job that
+          # tested nothing. This makes that a failure instead.
+          set -o pipefail
+          CHANGED=$(git diff --name-only "$BASE_SHA"..HEAD -- plugins/fchub/ | wc -l)
+          echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.count > 0
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: plugins/fchub/package-lock.json
+
+      - name: Install dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: npm ci
+
+      - name: Audit JavaScript dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: npm audit --audit-level=high
+
+      - name: Run JavaScript tests
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: npm test
+
+      - name: Cache Playwright browsers
+        if: steps.changes.outputs.count > 0
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('plugins/fchub/package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser smoke tests
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: npm run test:smoke
+
+      - name: Upload smoke failures
+        if: failure() && steps.changes.outputs.count > 0
+        uses: actions/upload-artifact@v4
+        with:
+          name: fchub-smoke-failures
+          path: plugins/fchub/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Build production assets
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: npm run build
+
+      - name: Validate build output
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: |
+          # The manifest, not merely the directory. AdminMenu resolves the entry
+          # through it, so a build that emitted assets without one ships a blank
+          # screen that no unit test would notice.
+          if [ ! -f "assets/dist/.vite/manifest.json" ]; then
+            echo "::error::Build produced no assets/dist/.vite/manifest.json"
+            exit 1
+          fi
+
+          JS_COUNT=$(find assets/dist -name "*.js" | wc -l)
+          if [ "$JS_COUNT" -eq 0 ]; then
+            echo "::error::No JS files found in assets/dist/"
+            exit 1
+          fi
+
+          echo "Build validation passed: $JS_COUNT JS file(s) in assets/dist/"
+
+  repository-contract:
+    name: Repository contract (catalogue, docs)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Cheap enough to run unconditionally, and the things it guards are exactly
+      # the ones a changed-path filter would have missed: the catalogue is
+      # generated from files in two directories and consumed from a third.
+      - name: Check catalogue drift
+        run: node scripts/sync-fchub-catalog.mjs --check
+
+      - name: Run catalogue contract
+        run: node --test tests/repository/fchub-catalog.test.mjs
+
+      - name: Verify FCHub documentation
+        run: node scripts/check-fchub-docs.mjs
+
+  fchub-lifecycle:
+    name: FCHub lifecycle (disposable WordPress)
+    runs-on: ubuntu-latest
+    # The only job here that stands up containers. The harness sets its own
+    # 20-minute ceiling on the browser suite; this one bounds everything around
+    # it, so a wedged image pull cannot hold a runner for six hours.
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -o pipefail
+          CHANGED=$(git diff --name-only "$BASE_SHA"..HEAD -- \
+            plugins/fchub/ \
+            scripts/sync-fchub-catalog.mjs \
+            web-docs/lib/fchub-products.json \
+            web-docs/lib/versions.json \
+            build.sh \
+            lib/GitHubUpdater.php \
+            .github/workflows/ci.yml \
+            .github/workflows/fchub-ci-contract.test.mjs \
+            .github/workflows/release.yml \
+            .github/workflows/fchub-release-contract.test.mjs | wc -l)
+          echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.count > 0
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: plugins/fchub/package-lock.json
+
+      - name: Install dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: npm ci
+
+      - name: Install Chromium
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the disposable WordPress lifecycle
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/fchub
+        run: bash tests/e2e/run-lifecycle.sh
+
+      - name: Upload lifecycle failures
+        if: failure() && steps.changes.outputs.count > 0
+        uses: actions/upload-artifact@v4
+        with:
+          name: fchub-lifecycle-failures
+          path: plugins/fchub/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

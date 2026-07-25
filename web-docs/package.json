@@ -9,7 +9,8 @@
     "postinstall": "fumadocs-mdx",
     "generate-openapi": "bun run scripts/generate-openapi.mts",
     "lint": "biome check",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "catalogue:check": "node ../scripts/sync-fchub-catalog.mjs --check"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

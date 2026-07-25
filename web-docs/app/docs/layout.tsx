@@ -56,7 +56,7 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
             };
 
             const descriptionMap: Record<string, string> = {
-              "/docs/fchub": "FluentCommunity",
+              "/docs/fchub": "Product centre",
               "/docs/fchub-stream": "Discontinued - no support",
               "/docs/fchub-chat": "FluentCommunity",
               "/docs/fchub-mobile": "FluentCommunity",

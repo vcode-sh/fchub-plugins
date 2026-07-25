@@ -20,12 +20,18 @@ Thumbs.db
 # Local build output
 /dist/
 
+# Advisory locks held by build.sh while a plugin is being built
+/.build-locks/
+
 # Next.js / Fumadocs (web-docs)
 .next/
 .source/
 
 # Debug
 *.log
+
+# Agent workspace scratch (session tokens, task briefs, review packages)
+/.superpowers/
 
 # Local
 .claude/

@@ -6,6 +6,12 @@
       "zipFilename": null,
       "mcpbFilename": "fluentcart-mcp.mcpb"
     },
+    "fchub": {
+      "version": "1.0.0",
+      "tagName": "fchub/v1.0.0",
+      "zipFilename": "fchub-1.0.0.zip",
+      "mcpbFilename": null
+    },
     "fchub-p24": {
       "version": "1.0.3",
       "tagName": "fchub-p24/v1.0.3",

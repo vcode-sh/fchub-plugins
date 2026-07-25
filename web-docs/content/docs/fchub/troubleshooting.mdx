@@ -1,0 +1,103 @@
+---
+title: Troubleshooting
+description: What FCHub says when something goes wrong, what it means, and what it changed — which, more often than not, is nothing at all.
+---
+
+import { Separator } from '@/components/ui/separator';
+
+FCHub's failure messages are written to answer one question before any other: *did that actually happen?* Where the answer is no, the message says so outright. Where the answer is "halfway", it says that too, because a reassuring lie is discovered on the Plugins screen about forty seconds later.
+
+## The product list is out of date
+
+FCHub asks `fchub.co` for the list of products. When it cannot get an answer, it falls back — quietly, and in a fixed order.
+
+1. The last list it saved successfully. The **System** page shows **Using the last saved catalogue**.
+2. Failing that, the list that shipped inside the plugin. The System page shows **Using the catalogue included with FCHub**.
+
+Neither breaks anything. Every product still lists, every state still resolves, every button still works. The only thing an older list costs you is knowledge of a release published since it was written.
+
+**What to do:** nothing, usually. FCHub retries on its own — soon after a failure, and at a relaxed pace once things are healthy again. If you would rather not wait, press **Check for updates** on the System page. If it keeps failing, something between your server and the outside world is blocking outbound requests, which is worth knowing for reasons far beyond FCHub.
+
+<Callout type="warn" title="The rare fatal version">
+*The FCHub catalogue could not be read. Reinstalling FCHub should sort it out.* This one means even the copy inside the plugin is unreadable, which is a damaged installation rather than a network problem. Reinstalling FCHub replaces the file. No product is affected.
+</Callout>
+
+<Separator className="my-8" />
+
+## The buttons are missing
+
+**Your account is not allowed to make that change on this site.** Installing, updating, and switching plugins on and off are administrator privileges, and FCHub does not invent a way around them. Buttons it knows would be refused either do not appear at all or refuse to fire, with that sentence underneath — and the **Your account** row on the [System](/docs/fchub/system-status) page names exactly which of the three you are missing.
+
+**What to do:** ask whoever administers the site. If that is you, and the row still appears, a security plugin or a custom role definition is usually the culprit.
+
+## A product says it cannot run here
+
+FCHub checks each product's requirements against your site before offering to install it, so the sentence names the requirement and what you actually have:
+
+- *Memberships needs PHP 8.3. This site runs 8.1.*
+- *Wishlist needs FluentCart installed and active first.*
+- *Multi-Currency needs WordPress 6.7. This site runs 6.4.*
+
+**What to do:** meet the requirement, or leave it. Three of the six products want WordPress 6.7 and PHP 8.3; the other three are happy on 6.4 and 8.1. Your host can usually change the PHP version in about a minute, and it is worth doing for reasons that have nothing to do with us. See [what each product needs](/docs/fchub#what-each-product-needs).
+
+There is also a quieter variant — *has a requirement FCHub cannot check here, so it was left alone*. Something about this site makes the check unreliable, so FCHub declines to guess rather than install something that may not run. Nothing stops you installing that product the ordinary way, from its own documentation page.
+
+<Separator className="my-8" />
+
+## A download was refused or failed its check
+
+FCHub installs only from official FCHub releases on GitHub, and checks each download against its published checksum — where one is published — before handing anything to WordPress. Four things can go wrong, and none of them leave a half-installed plugin behind.
+
+| Message | What happened |
+|---|---|
+| *That download is not a trusted FCHub release, so it was refused.* | The download would have come from somewhere FCHub does not trust. It never asked for it. |
+| *The download could not be reached, so nothing was changed. Worth another go in a minute.* | GitHub, your network, or a firewall. Genuinely worth another go. |
+| *The release checksum could not be read.* | The published checksum arrived unreadable, so there was nothing to verify against. |
+| *The package did not pass its safety check, so nothing was changed.* | The file that arrived is not the file the release says it should be. FCHub deleted it and stopped. |
+
+**What to do:** try again. If a download keeps failing its safety check, stop and tell us — that is exactly the signal the check exists to raise, and it should never happen twice.
+
+## An install or activation failed
+
+| Message | What it changed |
+|---|---|
+| *WordPress could not install that package. No other product was touched.* | Nothing. Usually file permissions on `wp-content/plugins`, or a full disk. |
+| *X could not be switched on, so nothing was changed.* | Nothing. The plugin is still installed and still off. |
+| *X is installed, but it could not be switched on.* | The install landed; the activation did not. Try **Switch on** again from the card. |
+| *X installed, but the files are not the x.y.z release we expected. Worth a look on the Plugins screen.* | The install landed, but the version WordPress now reports is not the one that was ordered. Worth a look, exactly as it says. |
+| *That worked, but FCHub could not read its catalogue afterwards. A page reload should sort it out.* | Your action succeeded. Only the refreshed screen is missing. Reload. |
+
+That last one exists purely so nobody ever has to wonder whether to press the button twice.
+
+## Every button suddenly refuses
+
+*Your WordPress login session expired before the request arrived, so nothing was changed. Reload the page and try again.*
+
+WordPress signs every request FCHub makes with a token that goes stale after a while — typically on a tab that has been sitting open since yesterday. The token is fixed at the moment the page loads, so once it is refused, every button afterwards is refused in exactly the same way. FCHub does not renew it quietly behind WordPress's back, because a page that can talk its way past an expired session is not a page anyone should want.
+
+**What to do:** reload the page, and sign in again if WordPress asks. Nothing was changed, so whatever you were about to do is still waiting to be done.
+
+<Callout type="info" title="WordPress phrases this one differently">
+Elsewhere in wp-admin the same refusal reads *Cookie check failed*, which is accurate, four words long, and about as helpful as a locked door with no sign on it. FCHub says what it actually means.
+</Callout>
+
+<Separator className="my-8" />
+
+## Removing FCHub safely
+
+This is the part worth being unambiguous about.
+
+Deactivating FCHub, or deleting it entirely from the WordPress **Plugins** screen, leaves every product exactly as it was:
+
+- Products stay installed. FCHub has no Delete button and never removes a product's files.
+- Products that were switched on stay switched on and keep running.
+- Product settings, database tables, orders, memberships, wishlists — untouched. FCHub never wrote to them and does not clean them up.
+- Each product keeps updating the way it always did. None of them acquired a dependency on FCHub by being installed through it.
+
+Deleting FCHub also clears the four values it stored for itself — all of them to do with caching the product list — and nothing else. Deactivating leaves that cache sitting there harmlessly, ready for the day you switch FCHub back on.
+
+<Callout type="info" title="Proved, not asserted">
+An automated test installs a product through FCHub, updates it through FCHub, deletes FCHub through the WordPress Plugins screen, and then checks that the product is still installed, still active, and still holding its own data. Reinstalling FCHub afterwards finds the product exactly where it was left.
+</Callout>
+
+If you reinstall FCHub later, it reads the site fresh and picks up where you left off. There is no state to migrate, because there was never any state worth keeping.

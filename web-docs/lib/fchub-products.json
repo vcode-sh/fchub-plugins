@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "products": {
+    "fchub-p24": {
+      "name": "Przelewy24",
+      "description": "Przelewy24 payment gateway for FluentCart, built for the Polish market. Handles checkout, IPN callbacks, and refunds so nobody has to explain BLIK to a support ticket.",
+      "status": "stable",
+      "plugin_file": "fchub-p24/fchub-p24.php",
+      "requires_wp": "6.4",
+      "requires_php": "8.1",
+      "dependencies": ["fluentcart"],
+      "docs_path": "/docs/fchub-p24",
+      "admin_path": "admin.php?page=fluent-cart#/settings/payment-methods"
+    },
+    "fchub-fakturownia": {
+      "name": "Fakturownia",
+      "description": "Invoice automation with Fakturownia and KSeF 2.0 for FluentCart orders. Generates, sends, and tracks invoices automatically, including real-time submission to the tax office.",
+      "status": "stable",
+      "plugin_file": "fchub-fakturownia/fchub-fakturownia.php",
+      "requires_wp": "6.4",
+      "requires_php": "8.1",
+      "dependencies": ["fluentcart"],
+      "docs_path": "/docs/fchub-fakturownia",
+      "admin_path": "admin.php?page=fluent-cart#/integrations/fakturownia"
+    },
+    "fchub-memberships": {
+      "name": "Memberships",
+      "description": "A complete membership system for FluentCart: plans, access rules, and drip content. Grants and revokes access automatically as subscriptions change, so nobody keeps access they stopped paying for.",
+      "status": "stable",
+      "plugin_file": "fchub-memberships/fchub-memberships.php",
+      "requires_wp": "6.7",
+      "requires_php": "8.3",
+      "dependencies": ["fluentcart"],
+      "docs_path": "/docs/fchub-memberships",
+      "admin_path": "admin.php?page=fchub-memberships"
+    },
+    "fchub-portal-extender": {
+      "name": "Portal Extender",
+      "description": "Build custom customer portal pages for FluentCart without writing PHP. Add your own sections and layouts through a visual admin screen.",
+      "status": "stable",
+      "plugin_file": "fchub-portal-extender/fchub-portal-extender.php",
+      "requires_wp": "6.4",
+      "requires_php": "8.1",
+      "dependencies": ["fluentcart"],
+      "docs_path": "/docs/fchub-portal-extender",
+      "admin_path": "admin.php?page=fchub-portal-extender"
+    },
+    "fchub-wishlist": {
+      "name": "Wishlist",
+      "description": "Wishlists for FluentCart shoppers. Lets customers save products for later instead of abandoning their cart in despair.",
+      "status": "stable",
+      "plugin_file": "fchub-wishlist/fchub-wishlist.php",
+      "requires_wp": "6.7",
+      "requires_php": "8.3",
+      "dependencies": ["fluentcart"],
+      "docs_path": "/docs/fchub-wishlist",
+      "admin_path": "admin.php?page=fluent-cart#/settings/wishlist"
+    },
+    "fchub-multi-currency": {
+      "name": "Multi-Currency",
+      "description": "Automatic currency conversion for FluentCart storefronts. Shows prices in the customer's local currency, so pricing complaints arrive in more languages.",
+      "status": "stable",
+      "plugin_file": "fchub-multi-currency/fchub-multi-currency.php",
+      "requires_wp": "6.7",
+      "requires_php": "8.3",
+      "dependencies": ["fluentcart"],
+      "docs_path": "/docs/fchub-multi-currency",
+      "admin_path": "admin.php?page=fluent-cart#/settings/multi-currency"
+    }
+  }
+}

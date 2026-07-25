@@ -2,15 +2,20 @@ name: Release Plugin
 
 on:
   push:
+    # fchub-stream is deliberately absent. It is discontinued, and publishing a
+    # plugin nobody maintains should take more than pushing a tag out of habit.
+    # Its build steps further down stay exactly where they are — the project may
+    # return, and other people may fork it — so restoring the trigger is a
+    # one-line decision for whoever makes it.
     tags:
       - 'fchub-p24/v*'
       - 'fchub-fakturownia/v*'
       - 'fchub-memberships/v*'
       - 'fchub-portal-extender/v*'
-      - 'fchub-stream/v*'
       - 'fchub-wishlist/v*'
       - 'fchub-multi-currency/v*'
       - 'cartshift/v*'
+      - 'fchub/v*'
 
 permissions:
   contents: write
@@ -18,6 +23,11 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # An FCHub tag runs the disposable-WordPress harness and a Playwright
+    # install in this job, so it can stand up containers and pull images. The
+    # default ceiling is six hours; a wedged pull should not hold a runner for
+    # most of a working day when the whole job takes minutes.
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -169,7 +179,121 @@ jobs:
           echo "portal-app build output:"
           ls -la dist/
 
+      - name: Setup Node.js (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        uses: actions/setup-node@v4
+        with:
+          # Vite 8 wants ^20.19 || >=22.12, and Node 20 left maintenance in April
+          # 2026. The rest of this repository's newer workflows are already on 22.
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: plugins/fchub/package-lock.json
+
+      - name: Setup PHP (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        uses: shivammathur/setup-php@v2
+        with:
+          # The floor the plugin header declares and composer.lock is pinned to.
+          # Testing on anything newer would prove the wrong thing.
+          php-version: '8.1'
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Composer dependencies (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit Composer dependencies (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        run: composer audit --locked --no-interaction
+
+      - name: Run PHPUnit (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        run: ./vendor/bin/phpunit
+
+      - name: Install npm dependencies (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        run: npm ci
+
+      - name: Audit npm dependencies (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        run: npm audit --audit-level=high
+
+      - name: Run Vitest (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        run: npm run test
+
+      - name: Run Playwright (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:smoke
+
+      - name: Build assets (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        run: |
+          npm run build
+
+          # The manifest, not merely the directory: AdminMenu resolves the entry
+          # through it, and a build without one ships a blank screen.
+          if [ ! -f "assets/dist/.vite/manifest.json" ]; then
+            echo "::error::Build failed — assets/dist/.vite/manifest.json is missing"
+            exit 1
+          fi
+
+          if [ -z "$(find assets/dist -name '*.js' -type f -print -quit)" ]; then
+            echo "::error::Build failed — assets/dist/ contains no JavaScript"
+            exit 1
+          fi
+
+          echo "Build output:"
+          ls -la assets/dist/
+
+      - name: Check catalogue drift (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        run: |
+          node scripts/sync-fchub-catalog.mjs --check
+          node --test tests/repository/fchub-catalog.test.mjs
+
+      - name: Verify documentation (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        run: node scripts/check-fchub-docs.mjs
+
+      - name: Run lifecycle test (fchub)
+        if: steps.tag.outputs.slug == 'fchub'
+        working-directory: plugins/fchub
+        # The one test that installs the archive into a real WordPress, updates a
+        # real product through the real interface, refuses a release whose
+        # checksum does not match, and removes the hub again. Everything it
+        # creates it destroys, and it fails if it did not.
+        run: bash tests/e2e/run-lifecycle.sh
+
+      - name: Upload FCHub failure artefacts
+        # A tag is already pushed by the time this job runs, so a red release has
+        # to leave something to look at. With `maxDiffPixels: 0` a screenshot
+        # mismatch is the likeliest way this goes red, and the diff images live
+        # here — as do the lifecycle traces.
+        if: failure() && steps.tag.outputs.slug == 'fchub'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fchub-release-failures
+          path: plugins/fchub/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Sync GitHubUpdater
+        # Every product except the hub. FCHub carries a namespaced updater of its
+        # own, and the shared one would ship beside it as a second, conflicting
+        # copy of the same job.
+        if: steps.tag.outputs.slug != 'fchub'
         run: |
           SLUG="${{ steps.tag.outputs.slug }}"
           PLUGIN_DIR="plugins/${SLUG}"
@@ -205,6 +329,23 @@ jobs:
           echo "Created: $ZIP_NAME"
           ls -lh "${GITHUB_WORKSPACE}/${ZIP_NAME}"
 
+      - name: Create checksum sidecar
+        # Every product, not only the hub. FCHub verifies what it downloads
+        # against `<package>.sha256` beside the package, and treats a missing one
+        # as `checksum_unavailable` — installing anyway, because releases published
+        # before sidecars existed still have to be installable. That concession
+        # only stays a legacy path if every release from here on ships one.
+        #
+        # Run from the directory holding the archive so the sidecar names the
+        # file rather than a path on a runner that no longer exists, which is
+        # what `sha256sum -c` needs after a download.
+        run: |
+          (cd "$(dirname "${zip_path}")" && sha256sum "$(basename "${zip_path}")" > "$(basename "${zip_path}").sha256")
+
+          echo "checksum_path=${zip_path}.sha256" >> "$GITHUB_ENV"
+
+          cat "${zip_path}.sha256"
+
       - name: Generate release notes
         id: notes
         run: |
@@ -236,5 +377,6 @@ jobs:
 
           gh release create "${GITHUB_REF_NAME}" \
             "${zip_path}" \
+            "${checksum_path}" \
             --title "${SLUG} v${VERSION}" \
             --notes-file release_notes.txt

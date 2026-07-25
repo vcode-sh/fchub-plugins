@@ -39,6 +39,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
           on: "menu",
           text: "Docs",
           items: [
+            { text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
             {
               text: "Przelewy24",
               url: "/docs/fchub-p24",
@@ -74,7 +75,6 @@ export default function Layout({ children }: LayoutProps<"/">) {
               url: "/docs/fchub-multi-currency",
               icon: <Globe size={16} />,
             },
-            { text: "FCHub", url: "/docs/fchub", icon: <Home size={16} /> },
             {
               text: "FCHub Stream (Discontinued)",
               url: "/docs/fchub-stream",
@@ -103,6 +103,16 @@ export default function Layout({ children }: LayoutProps<"/">) {
                   <div className="px-2 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     FluentCart
                   </div>
+                  <NavigationMenuLink render={<Link href="/docs/fchub" />}>
+                    <Home size={16} />
+                    FCHub
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto text-[10px] h-4"
+                    >
+                      New
+                    </Badge>
+                  </NavigationMenuLink>
                   <NavigationMenuLink render={<Link href="/docs/fchub-p24" />}>
                     <CreditCard size={16} />
                     Przelewy24
@@ -182,10 +192,6 @@ export default function Layout({ children }: LayoutProps<"/">) {
                   <div className="px-2 pb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     FluentCommunity
                   </div>
-                  <NavigationMenuLink render={<Link href="/docs/fchub" />}>
-                    <Home size={16} />
-                    FCHub
-                  </NavigationMenuLink>
                   <NavigationMenuLink
                     render={<Link href="/docs/fchub-stream" />}
                   >

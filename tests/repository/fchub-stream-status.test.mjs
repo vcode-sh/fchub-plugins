@@ -86,5 +86,26 @@ test("Stream remains available for a possible future return", () => {
 
   assert.match(buildScript, /fchub-stream\|fchub-stream\.php/);
   assert.match(continuousIntegration, /plugin: fchub-stream/);
-  assert.match(releaseWorkflow, /'fchub-stream\/v\*'/);
+  assert.match(releaseWorkflow, /slug == 'fchub-stream'/);
+});
+
+test("nothing builds or publishes Stream unless somebody names it", () => {
+  const buildScript = readRepositoryFile("build.sh");
+  const releaseWorkflow = readRepositoryFile(".github/workflows/release.yml");
+
+  // A bare `./build.sh` iterates ALL_PLUGINS. Stream sits in a second list
+  // that only the explicit-slug paths consult, so the default run cannot copy
+  // the shared updater into it, run npm in its app directories, or ZIP it.
+  const allPlugins = buildScript.match(/^ALL_PLUGINS=\(\n([\s\S]*?)^\)$/m);
+  assert.ok(allPlugins, "Expected an ALL_PLUGINS array in build.sh");
+  assert.doesNotMatch(allPlugins[1], /fchub-stream/);
+
+  assert.match(buildScript, /^ARCHIVED_PLUGINS=\(\n(?:.*\n)*?\s*"fchub-stream\|/m);
+
+  // And a pushed tag is no longer enough to publish it.
+  const tags = releaseWorkflow.match(
+    /^[ \t]*tags:[ \t]*\n((?:[ \t]*-[ \t]*\S.*\n?)+)/m,
+  );
+  assert.ok(tags, "Expected tag filters on the release trigger");
+  assert.doesNotMatch(tags[1], /fchub-stream/);
 });

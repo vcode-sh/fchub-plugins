@@ -1,0 +1,96 @@
+---
+title: Managing products
+description: What every badge means, what every button does, and the one thing FCHub will never do to a product.
+---
+
+import { Separator } from '@/components/ui/separator';
+
+Two screens do the work: **Overview**, which opens with how things stand, and **Products**, which lists everything.
+
+## Overview
+
+The top of the page answers the only question worth asking on arrival. When nothing needs you, it says so — *Everything is ticking along nicely* — and when something does, it says how many things and what kind.
+
+Underneath sit three counts:
+
+| Count | What it means |
+|---|---|
+| **Active products** | How many of the suite are switched on here, out of how many exist |
+| **Useful updates** | Installed products with a newer release waiting |
+| **Compatibility issues** | Products this site is not ready to run — a requirement it does not meet, or one FCHub cannot confirm |
+
+The last one deliberately counts both. A requirement FCHub could not check is unconfirmed rather than unmet, and the card underneath says which of the two it is.
+
+If anything is waiting — an update, a requirement, or a product reporting a problem of its own — a **Worth a look** panel spells out each one in a sentence. Then the products themselves, split into **On this site** and **The rest of the suite**. The second group is there so you know what exists, not to nag you.
+
+## Products
+
+The same cards, all of them, with a filter at the top:
+
+| Filter | Shows |
+|---|---|
+| **All** | Every product in the suite |
+| **Installed** | The ones present on this site, switched on or off |
+| **Updates** | Installed products with a newer release waiting |
+
+Each filter carries its own count, so you can tell there is nothing to see without clicking to find out.
+
+<Separator className="my-8" />
+
+## What the badges mean
+
+Every card wears the badges that apply to it, and no more.
+
+| Badge | Meaning |
+|---|---|
+| **Active** | Installed and switched on |
+| **Switched off** | Installed, but not running |
+| **Not installed** | Not on this site at all |
+| **Update ready** | A newer release is available for an installed product |
+| **Version unclear** | Installed, but FCHub cannot tell which version — so it will not guess whether an update applies |
+| **Cannot run here** | This site does not meet one of the product's requirements |
+| **Cannot be checked** | A requirement FCHub cannot verify on this site, so it left the product alone |
+| **Needs attention** | The product itself is reporting a problem, and says what in a line beneath |
+
+Underneath the badges, a version line: the latest release for something not installed, the installed version for something current, and both — *1.3.0 installed · 1.4.0 ready* — when an update is waiting. On the rare product that is installed but does not declare a version, it reads a bare *Installed*, which pairs with the **Version unclear** badge above it.
+
+<Separator className="my-8" />
+
+## What the buttons do
+
+Every card leads with one obvious next step, decided by the state it is in.
+
+| State | Primary action | Also offered |
+|---|---|---|
+| Not installed | **Install and activate** | **Install only** |
+| Installed, switched off | **Switch on** | — |
+| Active, update waiting | **Update to 1.4.0**, with the real version named | **Switch off** |
+| Active and current | **Open settings**, where the product has one | **Switch off** |
+
+And in full:
+
+- **Install and activate** — downloads the product, hands it to WordPress to install, then switches it on.
+- **Install only** — downloads and installs it, and leaves it switched off. Installing never switches anything on unless the button said it would.
+- **Switch on** — activates a product that is already installed.
+- **Update to *x.y.z*** — downloads the named release and installs it over the current one. Your settings and data are the product's, not FCHub's, and are left alone.
+- **Switch off** — deactivates the product. Always available on an active product, even one that has become incompatible, because trapping you with a plugin you cannot turn off would be a bold reading of "calm".
+
+Alongside them, three links where they apply: **Settings** (the product's own admin screen), **Documentation**, and **Release notes**.
+
+While an action runs, the button says what it is doing — *Installing…*, *Switching on…*, *Updating…* — and the card refuses to start a second one on top of it.
+
+<Callout type="warn" title="There is no Delete button">
+FCHub never deletes a product. Removing a plugin, along with whatever it decides to clean up on the way out, is the WordPress **Plugins** screen's job, and it already does that job properly. FCHub does not offer a second, more dangerous route to the same place.
+</Callout>
+
+<Separator className="my-8" />
+
+## When a button is missing or refuses
+
+Two reasons, and FCHub says which.
+
+**This site cannot run it.** The card explains it in a sentence naming the requirement and what you actually have — *Memberships needs PHP 8.3. This site runs 8.1.* — or, for a missing platform, *Wishlist needs FluentCart installed and active first.* The button stays visible so you know what the next step would be; it simply will not fire until the requirement is met.
+
+**Your account is not allowed.** Installing, updating, and switching plugins on and off are administrator privileges. If yours does not have them, the button will not fire and the card says why — *Your account cannot make that change on this site.* The [System](/docs/fchub/system-status) page names exactly which of the three is missing.
+
+Either way, nothing changes until something can change. Read [Troubleshooting](/docs/fchub/troubleshooting) when an action does fail — every failure message tells you whether anything was altered, because "did that install happen?" is not a question anyone should have to guess at.

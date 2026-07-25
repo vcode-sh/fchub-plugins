@@ -21,16 +21,36 @@ ALL_PLUGINS=(
     "fchub-memberships|fchub-memberships.php"
     "fchub-portal-extender|fchub-portal-extender.php"
     "fchub-wishlist|fchub-wishlist.php"
-    "fchub-stream|fchub-stream.php"
     "fchub-multi-currency|fchub-multi-currency.php"
     "cartshift|cartshift.php"
+    "fchub|fchub.php"
+)
+
+# Discontinued, but still buildable on purpose.
+#
+# Stream's source and tooling stay in the repository — the project may return,
+# and other people may fork it — so `./build.sh fchub-stream` still works. What
+# it must not do is happen by accident: a bare `./build.sh` used to copy the
+# shared updater into Stream, run `npm ci` in both of its app directories, and
+# emit a ZIP for a plugin nobody asked about. Keeping the entry out of
+# ALL_PLUGINS is the whole fix — everything below iterates the selection, so the
+# only way to reach Stream now is to name it.
+ARCHIVED_PLUGINS=(
+    "fchub-stream|fchub-stream.php"
 )
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
-info()    { printf "${CYAN}▸${NC} %s\n" "$*"; }
+#
+# Progress, warnings and failures go to stderr. The lifecycle harness runs this
+# script as `bash build.sh fchub >/dev/null`, and on stdout a lock wait ("waiting
+# for another build") is invisible there — it reads as a hang of up to fifteen
+# minutes — while the reason for a failed build was swallowed entirely. Only the
+# per-artefact `success` lines and the summary table stay on stdout, so a quiet
+# run stays quiet.
+info()    { printf "${CYAN}▸${NC} %s\n" "$*" >&2; }
 success() { printf "${GREEN}✓${NC} %s\n" "$*"; }
-warn()    { printf "${YELLOW}⚠${NC} %s\n" "$*"; }
-error()   { printf "${RED}✗${NC} %s\n" "$*"; exit 1; }
+warn()    { printf "${YELLOW}⚠${NC} %s\n" "$*" >&2; }
+error()   { printf "${RED}✗${NC} %s\n" "$*" >&2; exit 1; }
 
 human_size() {
     local bytes=$1
@@ -42,15 +62,193 @@ human_size() {
 
 usage() {
     printf "${BOLD}Usage:${NC} ./build.sh [plugin-slug]\n\n"
-    printf "Build distribution ZIPs for FCHub plugins.\n\n"
+    printf "Build distribution ZIPs for FCHub plugins, each with a SHA-256 sidecar.\n\n"
     printf "${BOLD}Arguments:${NC}\n"
     printf "  plugin-slug    Build only the specified plugin (optional)\n"
-    printf "                 Valid slugs: fchub-p24, fchub-fakturownia, fchub-memberships, fchub-portal-extender, fchub-wishlist, fchub-stream, fchub-multi-currency, cartshift\n\n"
+    printf "                 Valid slugs: fchub, fchub-p24, fchub-fakturownia, fchub-memberships, fchub-portal-extender, fchub-wishlist, fchub-multi-currency, cartshift\n"
+    printf "                 Archived (built only when named): fchub-stream\n\n"
     printf "${BOLD}Examples:${NC}\n"
-    printf "  ./build.sh                    Build all plugins\n"
+    printf "  ./build.sh                    Build all plugins except the archived ones\n"
     printf "  ./build.sh fchub-p24          Build only fchub-p24\n"
     printf "  ./build.sh fchub-memberships  Build only fchub-memberships (runs npm build)\n"
+    printf "  ./build.sh fchub              Build only the FCHub product centre (runs npm build)\n\n"
+    printf "${BOLD}Environment:${NC}\n"
+    printf "  FCHUB_BUILD_LOCK_TIMEOUT  Seconds to wait for a concurrent build of the\n"
+    printf "                            same plugin to finish (default: 900)\n"
     exit 0
+}
+
+# ── Build locks ──────────────────────────────────────────────────────────────
+#
+# Two builds of the same plugin in one checkout share a node_modules and an
+# output path: `npm ci` in one process deletes the directory the other is
+# reading from, and both write the same ZIP. The lifecycle harness runs
+# `build.sh fchub` on every default run, so two of those overlapping is a
+# nameable way to lose an afternoon.
+#
+# mkdir is the portable atomic test-and-set. flock is not on macOS, and this
+# repository is written there and built on Linux.
+LOCK_ROOT="$ROOT_DIR/.build-locks"
+LOCK_TIMEOUT="${FCHUB_BUILD_LOCK_TIMEOUT:-900}"
+BUILD_LOCK_DIR=""
+BUILD_REAP_DIR=""
+CURRENT_TMP_DIR=""
+
+# The pid a lock claims to be held by, or nothing if it claims nothing legible.
+#
+# Only a well-formed pid is returned. A lock holding anything else was not
+# written by this script, and "unreadable" is not the same as "dead": the caller
+# waits it out and says which directory to remove, rather than guessing.
+lock_holder() {
+    local lock_dir="$1"
+    local pid=""
+
+    if [ -f "$lock_dir/pid" ]; then
+        pid=$(cat "$lock_dir/pid" 2>/dev/null || true)
+    fi
+
+    case "$pid" in
+        ''|*[!0-9]*) printf '' ;;
+        *)           printf '%s' "$pid" ;;
+    esac
+}
+
+# Clear a lock whose owner no longer exists.
+#
+# A lock whose owner is gone is not a lock, it is litter. Only a -9 or a power
+# cut leaves one behind, and refusing to ever build again would be a worse
+# outcome than the collision the lock prevents — but the clearing itself has to
+# be atomic, or it becomes the bug:
+#
+#   B and C both read the dead holder's pid and both decide to reap. B clears
+#   the lock, wins the mkdir, writes its pid and starts building. C — still
+#   between its own check and its clear — then removes B's *live* lock, wins a
+#   mkdir of its own, and starts building too. Two builds, one node_modules, one
+#   ZIP, and neither process any the wiser.
+#
+# Renaming before deleting narrows that window but does not close it: once B has
+# re-created the lock, C's `mv` finds a source again and takes B's live lock with
+# it. What closes it is doing the check and the act under a second lock that is
+# never itself reaped, and re-reading the pid inside it. In there the state
+# cannot move: nobody else can be reaping, and nobody can acquire while the stale
+# directory still stands. The `mv` is kept because it means another waiter never
+# observes a half-deleted lock — a directory whose pid file has already gone.
+#
+# Worst case, a -9 inside the reap window leaks the reap directory and reaping
+# stops working. Locking still works; a stale lock then waits out the timeout,
+# which names the directory to remove. Degradation, not corruption.
+#
+# One known limit, harmless here: `kill -0` also fails with EPERM for a live
+# process owned by a *different* user, so on a shared box a lock held by another
+# account would be judged stale. Every runner this builds on is single-user.
+reap_build_lock() {
+    local slug="$1"
+    local lock_dir="$2"
+    local reap_dir="$LOCK_ROOT/$slug.reap"
+    local holder=""
+    local stale_dir=""
+
+    mkdir "$reap_dir" 2>/dev/null || return 0
+    BUILD_REAP_DIR="$reap_dir"
+
+    holder=$(lock_holder "$lock_dir")
+
+    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+        stale_dir="$lock_dir.stale.$$"
+
+        if mv "$lock_dir" "$stale_dir" 2>/dev/null; then
+            warn "Removed stale $slug build lock left by process $holder"
+            rm -rf "$stale_dir"
+        fi
+    fi
+
+    BUILD_REAP_DIR=""
+    rmdir "$reap_dir" 2>/dev/null || true
+}
+
+acquire_build_lock() {
+    local slug="$1"
+    local lock_dir="$LOCK_ROOT/$slug.lock"
+    local waited=0
+    local holder=""
+
+    mkdir -p "$LOCK_ROOT"
+
+    until mkdir "$lock_dir" 2>/dev/null; do
+        holder=$(lock_holder "$lock_dir")
+
+        if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+            reap_build_lock "$slug" "$lock_dir"
+            continue
+        fi
+
+        if [ "$waited" -eq 0 ]; then
+            info "Another build of $slug is running (process ${holder:-unknown}) — waiting ..."
+        fi
+
+        if [ "$waited" -ge "$LOCK_TIMEOUT" ]; then
+            error "Timed out after ${LOCK_TIMEOUT}s waiting for $lock_dir"
+        fi
+
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    echo "$$" > "$lock_dir/pid"
+    BUILD_LOCK_DIR="$lock_dir"
+}
+
+release_build_lock() {
+    if [ -n "$BUILD_LOCK_DIR" ]; then
+        rm -rf "$BUILD_LOCK_DIR"
+        BUILD_LOCK_DIR=""
+    fi
+}
+
+# One trap for the working directory, the lock and the reap mutex, on every exit
+# path. A per-iteration `trap rm -rf $tmp_dir EXIT` could only ever clean up the
+# last one, and could not release a lock at all.
+cleanup() {
+    if [ -n "$CURRENT_TMP_DIR" ]; then
+        rm -rf "$CURRENT_TMP_DIR"
+        CURRENT_TMP_DIR=""
+    fi
+
+    if [ -n "$BUILD_REAP_DIR" ]; then
+        rmdir "$BUILD_REAP_DIR" 2>/dev/null || true
+        BUILD_REAP_DIR=""
+    fi
+
+    release_build_lock
+}
+
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+
+# ── Checksums ────────────────────────────────────────────────────────────────
+#
+# The two-field layout sha256sum writes — digest, two spaces, the name of the
+# file it describes — which is what FCHub's VerifiedPackageDownloader parses and
+# what `sha256sum -c` expects after a download. Written from inside dist/ so the
+# sidecar names the archive rather than somebody's home directory.
+#
+# macOS has no sha256sum. shasum -a 256 writes the same shape.
+write_checksum() {
+    local file="$1"
+    local dir
+    local name
+
+    dir="$(dirname "$file")"
+    name="$(basename "$file")"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        (cd "$dir" && sha256sum "$name" > "$name.sha256")
+    elif command -v shasum >/dev/null 2>&1; then
+        (cd "$dir" && shasum -a 256 "$name" > "$name.sha256")
+    else
+        error "neither sha256sum nor shasum is available — cannot write a checksum sidecar"
+    fi
 }
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
@@ -62,9 +260,10 @@ fi
 
 if [ -n "$1" ]; then
     FILTER_SLUG="$1"
-    # Validate slug
+    # Validate slug. Archived plugins are valid here and only here — naming one
+    # is the deliberate act that makes building it acceptable.
     found=0
-    for entry in "${ALL_PLUGINS[@]}"; do
+    for entry in "${ALL_PLUGINS[@]}" "${ARCHIVED_PLUGINS[@]}"; do
         IFS='|' read -r slug _ <<< "$entry"
         if [ "$slug" = "$FILTER_SLUG" ]; then
             found=1
@@ -79,7 +278,7 @@ fi
 # ── Determine which plugins to build ─────────────────────────────────────────
 PLUGINS=()
 if [ -n "$FILTER_SLUG" ]; then
-    for entry in "${ALL_PLUGINS[@]}"; do
+    for entry in "${ALL_PLUGINS[@]}" "${ARCHIVED_PLUGINS[@]}"; do
         IFS='|' read -r slug _ <<< "$entry"
         if [ "$slug" = "$FILTER_SLUG" ]; then
             PLUGINS+=("$entry")
@@ -87,6 +286,8 @@ if [ -n "$FILTER_SLUG" ]; then
         fi
     done
 else
+    # ARCHIVED_PLUGINS is deliberately absent: a bare run builds what is
+    # maintained, and nothing else.
     PLUGINS=("${ALL_PLUGINS[@]}")
 fi
 
@@ -97,15 +298,31 @@ printf "%s\n\n" "─────────────────────
 if [ -n "$FILTER_SLUG" ]; then
     info "Building: $FILTER_SLUG"
 else
-    info "Building all plugins"
+    info "Building all maintained plugins"
 fi
 
-# Sync shared updater into all plugins
+# Sync the shared updater into the plugins actually being built.
+#
+# Iterating the selection rather than a glob is the point: `./build.sh fchub`
+# used to copy a file into every plugin directory in the repository, including
+# discontinued Stream, which nobody asked it to touch — and the lifecycle
+# harness runs exactly that command on every default run.
+#
+# FCHub is skipped because it owns a namespaced updater of its own. The shared
+# one would be a second, conflicting copy that ships in the archive.
 info "Syncing GitHubUpdater into plugins ..."
-for dir in "$PLUGINS_DIR"/fchub-* "$PLUGINS_DIR"/cartshift; do
-    if [ -d "$dir" ]; then
-        mkdir -p "$dir/lib"
-        cp "$ROOT_DIR/lib/GitHubUpdater.php" "$dir/lib/GitHubUpdater.php"
+for entry in "${PLUGINS[@]}"; do
+    IFS='|' read -r sync_slug _ <<< "$entry"
+
+    if [ "$sync_slug" = "fchub" ]; then
+        continue
+    fi
+
+    sync_dir="$PLUGINS_DIR/$sync_slug"
+
+    if [ -d "$sync_dir" ]; then
+        mkdir -p "$sync_dir/lib"
+        cp "$ROOT_DIR/lib/GitHubUpdater.php" "$sync_dir/lib/GitHubUpdater.php"
     fi
 done
 success "GitHubUpdater synced"
@@ -133,10 +350,18 @@ for entry in "${PLUGINS[@]}"; do
         continue
     fi
 
+    # Held for this plugin only, so two builds of different plugins still run
+    # side by side.
+    acquire_build_lock "$slug"
+
     # Read version from plugin header
     version=$(grep -i "^[[:space:]]*\*[[:space:]]*Version:" "$plugin_dir/$main_file" | head -1 | sed 's/.*Version:[[:space:]]*//' | tr -d '[:space:]')
     if [ -z "$version" ]; then
         warn "Could not read version from $main_file — skipping"
+        # Released here rather than at the bottom of the loop: skipping past the
+        # release would hold this plugin's lock for the rest of the run and then
+        # leak the directory, because the next acquire overwrites the handle.
+        release_build_lock
         echo ""
         continue
     fi
@@ -166,6 +391,23 @@ for entry in "${PLUGINS[@]}"; do
         fi
     fi
 
+    # Run npm build for fchub
+    if [ "$slug" = "fchub" ]; then
+        if [ -f "$plugin_dir/package.json" ]; then
+            info "Running npm build for $slug ..."
+            (cd "$plugin_dir" && npm ci --silent && npm run build --silent)
+            # The manifest is what AdminMenu resolves the entry through, so a
+            # build that produced assets but no manifest ships a blank screen.
+            if [ ! -f "$plugin_dir/assets/dist/.vite/manifest.json" ]; then
+                error "npm build failed — assets/dist/.vite/manifest.json is missing"
+            fi
+            if [ -z "$(find "$plugin_dir/assets/dist" -name '*.js' -type f -print -quit 2>/dev/null)" ]; then
+                error "npm build failed — assets/dist/ contains no JavaScript"
+            fi
+            success "npm build complete"
+        fi
+    fi
+
     # Run npm build for fchub-stream (admin-app + portal-app)
     if [ "$slug" = "fchub-stream" ]; then
         if [ -d "$plugin_dir/admin-app" ]; then
@@ -188,7 +430,7 @@ for entry in "${PLUGINS[@]}"; do
 
     # Temp working directory
     tmp_dir=$(mktemp -d)
-    trap "rm -rf '$tmp_dir'" EXIT
+    CURRENT_TMP_DIR="$tmp_dir"
 
     # Build rsync exclude args from .distignore
     exclude_args=()
@@ -235,10 +477,21 @@ for entry in "${PLUGINS[@]}"; do
 
     success "Created $zip_name"
 
+    # Every release ships one. FCHub treats a missing sidecar as
+    # `checksum_unavailable` and installs the package anyway — a concession to
+    # releases published before sidecars existed, and one that stays a legacy
+    # path only for as long as every new archive comes with its digest.
+    rm -f "$zip_path.sha256"
+    write_checksum "$zip_path"
+    success "Created $zip_name.sha256"
+
     BUILT_ZIPS+=("$zip_path")
 
     # Cleanup temp
     rm -rf "$tmp_dir"
+    CURRENT_TMP_DIR=""
+
+    release_build_lock
 
     echo ""
 done

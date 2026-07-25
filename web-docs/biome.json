@@ -14,7 +14,8 @@
       "!dist",
       "!build",
       "!.source",
-      "!components/ui"
+      "!components/ui",
+      "!lib/fchub-catalog.json"
     ]
   },
   "formatter": {

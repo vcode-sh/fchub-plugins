@@ -49,12 +49,6 @@ type Plugin = {
 
 const communityPlugins: Plugin[] = [
   {
-    title: "FCHub",
-    description: "The mothership. Core docs and guides for everything FCHub.",
-    icon: Home,
-    docsHref: "/docs/fchub",
-  },
-  {
     title: "FCHub Stream",
     description:
       "Discontinued and retained as-is. Historical video uploads via Cloudflare Stream & Bunny.net.",
@@ -80,6 +74,14 @@ const communityPlugins: Plugin[] = [
 ];
 
 const cartPlugins: Plugin[] = [
+  {
+    title: "FCHub",
+    description:
+      "One calm screen for every FCHub product on your site — install, switch on, update. Entirely optional; nothing depends on it.",
+    icon: Home,
+    docsHref: "/docs/fchub",
+    downloadUrl: versions.fchub.releaseUrl,
+  },
   {
     title: "Wishlist",
     description:
