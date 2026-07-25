@@ -190,6 +190,38 @@ test('Every PHPUnit matrix entry declares the history its change detector needs'
   )
 })
 
+test('Every job that diffs against the pull request base can actually fail', () => {
+  // The class of bug this pins: `actions/checkout` defaults to depth 1, which
+  // does not contain the pull request base. The diff then errors, `wc -l`
+  // returns zero, and every gate guarded by that count skips itself while the
+  // job reports success — a green tick for a suite that never ran.
+  //
+  // fchub-stream is the one permitted exception: it is discontinued and must
+  // not be built or tested, so its gate is inert on purpose.
+  const inertByDesign = new Set(['vite-build-stream'])
+
+  const names = [...ci.matchAll(/^ {2}([a-z0-9-]+):$/gm)].map((m) => m[1])
+  assert.ok(names.length > 0, 'Expected to find jobs in ci.yml')
+
+  const diffing = names.filter((name) => job(ci, name).includes('pull_request.base.sha'))
+  assert.ok(diffing.length > 0, 'Expected at least one job to diff against the base')
+
+  for (const name of diffing) {
+    const checkout = step(job(ci, name), 'Checkout')
+    const depth = value(checkout.replace(/^.*?with:\n/s, ''), 'fetch-depth')
+
+    if (inertByDesign.has(name)) {
+      assert.notEqual(depth, '0', `${name} is discontinued and must stay inert`)
+      continue
+    }
+
+    assert.ok(
+      depth === '0' || depth === '${{ matrix.fetch_depth }}',
+      `${name} diffs against the pull request base, so it must fetch the history that diff needs — found fetch-depth ${depth}`,
+    )
+  }
+})
+
 test('FCHub JavaScript gates all run, in order, inside the plugin', () => {
   const node = job(ci, 'vite-build-fchub')
 

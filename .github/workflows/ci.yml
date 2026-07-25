@@ -48,17 +48,22 @@ jobs:
           # `Check for changes` below diffs against the pull request base, and a
           # depth-1 checkout does not contain that commit — the diff fails, `wc
           # -l` reports zero, and every gate in the job skips itself quietly. A
-          # depth of 0 fetches the history the diff needs. The plugins already
-          # here keep the depth they have always had; changing it would turn
-          # gates on for products this task was not asked to touch.
+          # green tick for a suite that never ran is worse than a red one, so
+          # every maintained plugin asks for the history its diff needs.
+          #
+          # fchub-stream is the deliberate exception. It is discontinued and
+          # must not be tested, so its gate stays inert at depth 1 — the entry
+          # remains only because the repository asserts Stream is still here for
+          # a possible return. Give it depth 0 and its suite starts running,
+          # which is precisely what the discontinuation says not to do.
           - plugin: fchub-p24
             has_tests: true
             php_version: '8.3'
-            fetch_depth: 1
+            fetch_depth: 0
           - plugin: fchub-memberships
             has_tests: true
             php_version: '8.4'
-            fetch_depth: 1
+            fetch_depth: 0
           - plugin: fchub-stream
             has_tests: true
             php_version: '8.3'
@@ -66,7 +71,7 @@ jobs:
           - plugin: fchub-wishlist
             has_tests: true
             php_version: '8.3'
-            fetch_depth: 1
+            fetch_depth: 0
           - plugin: fchub
             has_tests: true
             php_version: '8.1'
@@ -121,6 +126,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # `Check for changes` below diffs against the pull request base, which
+          # a depth-1 checkout does not contain: the diff fails, the count comes
+          # back zero, and every gate here skips itself while the job reports
+          # green. Fetch the history the diff actually needs.
+          fetch-depth: 0
 
       - name: Check for changes
         id: changes
@@ -196,6 +207,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # `Check for changes` below diffs against the pull request base, which
+          # a depth-1 checkout does not contain: the diff fails, the count comes
+          # back zero, and every gate here skips itself while the job reports
+          # green. Fetch the history the diff actually needs.
+          fetch-depth: 0
 
       - name: Check for changes
         id: changes
@@ -239,6 +256,11 @@ jobs:
     name: Vite Build (fchub-stream)
     runs-on: ubuntu-latest
     steps:
+      # No fetch-depth here, deliberately. Stream is discontinued and must not
+      # be built or tested; a depth-1 checkout cannot reach the pull request
+      # base, so the change count stays zero and every step below skips. The
+      # job remains because the repository asserts Stream is still here for a
+      # possible return, not because anything is expected to run.
       - name: Checkout
         uses: actions/checkout@v4
 
