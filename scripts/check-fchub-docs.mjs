@@ -27,6 +27,20 @@ const PRODUCT_CARD = join(
 	"../plugins/fchub/resources/admin/components/ProductCard.vue",
 );
 
+/**
+ * The two waits that decide how late a newly published release can be: how long
+ * FCHub sits on a good answer before asking again, and how long a shared cache
+ * may serve the endpoint's answer before it fetches a new one. The System page
+ * states both, which is only worth doing while they are the real numbers — so
+ * they are read out of the code that enforces them, not copied out of it.
+ */
+const CATALOGUE_REPOSITORY = join(
+	__dirname,
+	"../plugins/fchub/app/Catalogue/CatalogueRepository.php",
+);
+
+const PRODUCTS_ROUTE = join(__dirname, "../web-docs/app/api/v1/products/route.ts");
+
 /** Every page the product centre owes a reader, in reading order. */
 const PAGES = [
 	"index",
@@ -189,6 +203,80 @@ async function buttonLabels() {
 	}
 
 	return labels.map((label) => (label === "Update" ? rendered[1].trim() : label));
+}
+
+/**
+ * Hours the numerals and hours the words, because the pages are written in
+ * English rather than in seconds. "several hours" is deliberately not a number:
+ * a page that traded a stated figure for a vague one should fail, not pass.
+ */
+const HOUR_WORDS = new Map([
+	["a", 1],
+	["an", 1],
+	["one", 1],
+	["two", 2],
+	["three", 3],
+	["four", 4],
+	["five", 5],
+	["six", 6],
+	["seven", 7],
+	["eight", 8],
+	["nine", 9],
+	["ten", 10],
+	["eleven", 11],
+	["twelve", 12],
+]);
+
+/**
+ * Every duration a passage actually states, in hours.
+ *
+ * @returns {Set<number>}
+ */
+function statedHours(source) {
+	const found = new Set();
+
+	for (const match of source.matchAll(/\b([a-z]+|\d+)\s+hours?\b/gi)) {
+		const token = match[1].toLowerCase();
+		const value = /^\d+$/.test(token) ? Number(token) : HOUR_WORDS.get(token);
+
+		if (value !== undefined) {
+			found.add(value);
+		}
+	}
+
+	return found;
+}
+
+/**
+ * One of those two waits, in whole hours, straight from the source that
+ * enforces it. Loud on every way of going wrong: a constant this can no longer
+ * find, or one that stops being a whole number of hours, would otherwise turn
+ * the assertion it feeds into decoration.
+ *
+ * @returns {Promise<number|null>}
+ */
+async function hoursFrom(file, pattern, label) {
+	const match = pattern.exec(await readFile(file, "utf-8"));
+
+	if (!match) {
+		failures.push(
+			`${label}: could not be read — the docs contract can no longer verify the wait the System page states`,
+		);
+
+		return null;
+	}
+
+	const seconds = Number(match[1]);
+
+	if (!Number.isInteger(seconds) || seconds <= 0 || seconds % 3600 !== 0) {
+		failures.push(
+			`${label}: ${seconds}s is no longer a whole number of hours, which is the only way the System page can state it`,
+		);
+
+		return null;
+	}
+
+	return seconds / 3600;
 }
 
 const products = (await readJson(PRODUCTS_FILE)).products;
@@ -419,6 +507,38 @@ if (system) {
 		"Using the catalogue included with FCHub",
 	]) {
 		check(system.includes(line), `system-status.mdx: does not explain "${line}"`);
+	}
+
+	// A release does not appear the instant it is published, and the Catalogue
+	// panel is where a reader goes to find out why. Both waits are asserted as a
+	// set: state a figure that is no longer true, drop one, or invent a third,
+	// and this fails. Checking them one at a time would not — the page names two
+	// durations, so "six hours" alone is satisfied by the sentence about the
+	// other one the moment a constant changes.
+	const fresh = await hoursFrom(
+		CATALOGUE_REPOSITORY,
+		/FRESH_TTL\s*=\s*(\d+)/,
+		"CatalogueRepository.php: FRESH_TTL",
+	);
+
+	const cached = await hoursFrom(
+		PRODUCTS_ROUTE,
+		/s-maxage=(\d+)/,
+		"api/v1/products/route.ts: s-maxage",
+	);
+
+	const catalogue = section(system, "Catalogue");
+
+	if (catalogue === null) {
+		failures.push('system-status.mdx: no "## Catalogue" section');
+	} else if (fresh !== null && cached !== null) {
+		const stated = [...statedHours(catalogue)].sort((a, b) => a - b);
+		const expected = [...new Set([fresh, cached])].sort((a, b) => a - b);
+
+		check(
+			stated.join(",") === expected.join(","),
+			`system-status.mdx: the Catalogue panel states [${stated.join(", ")}] hour(s), the code says [${expected.join(", ")}]`,
+		);
 	}
 }
 

@@ -15,6 +15,25 @@ defined('ABSPATH') || exit;
  * plugin file — its own — using the catalogue's top-level hub record. Every
  * product keeps whatever updater it already had; none of them gain a
  * dependency on this one, and this one gains nothing from them.
+ *
+ * One asymmetry, deliberate and reviewed twice: every product FCHub installs
+ * is checked against its published .sha256 sidecar before WordPress is
+ * allowed near it — VerifiedPackageDownloader does nothing else — and FCHub's
+ * own update is not checked at all. Past the filter below the archive is
+ * entirely core's business. The payload core documents for this hook carries
+ * a version, a URL and a package, and no field for a digest; WP_Upgrader then
+ * fetches that package with signature checking explicitly off. FCHub never
+ * holds the file, so it cannot verify it, and the one interception point core
+ * offers — upgrader_pre_download — means taking over the download for every
+ * upgrade on the site in order to guard a single plugin.
+ *
+ * What is left is worth stating, because it is not nothing. The package URL
+ * came out of a catalogue CatalogueValidator accepted, which holds the hub
+ * record to the same HTTPS-only, release-host allow-list as any product and
+ * throws a catalogue out whole rather than repairing it. The sidecar is
+ * published for the hub as well and rides along in the catalogue as
+ * checksum_url; this path simply has nowhere to spend it. Accepted on those
+ * terms — not a defect waiting for someone with a free afternoon.
  */
 final class HubUpdater
 {

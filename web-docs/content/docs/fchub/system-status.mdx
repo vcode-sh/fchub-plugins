@@ -46,7 +46,9 @@ FCHub keeps a list of the products, what they need, and where their releases liv
 
 **Last checked** gives the date and time of the most recent successful check, in your own locale — or an honest *FCHub has not managed a successful check yet* when there has not been one.
 
-The **Check for updates** button asks again, right now, ignoring whatever waiting period FCHub had settled into. Use it after a release you were expecting, or after the network comes back. It reads a list; it installs nothing.
+FCHub does not ask again every time you open the page. A successful check buys six hours of quiet, and the answer it gets may itself have been cached for up to an hour on the way. So a version published this morning can be several hours late arriving at a site nobody prods, and **Last checked** will cheerfully report a recent, successful, slightly out-of-date answer. That is the list behaving, not failing.
+
+The **Check for updates** button asks again, right now, ignoring whatever waiting period FCHub had settled into. Use it after a release you were expecting, or after the network comes back. It reads a list; it installs nothing. What it cannot skip is that cache in front of `fchub.co` — so for a release published in the last hour, the honest answer is one more press a little later.
 
 <Callout type="info" title="An outage is meant to be boring">
 None of those three states breaks the screen. Products still list, states still resolve, buttons still work — the only thing an older list can cost you is knowledge of a release published since. See [Troubleshooting](/docs/fchub/troubleshooting#the-product-list-is-out-of-date) if a source line surprises you.

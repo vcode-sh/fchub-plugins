@@ -18,6 +18,8 @@ Neither breaks anything. Every product still lists, every state still resolves, 
 
 **What to do:** nothing, usually. FCHub retries on its own — soon after a failure, and at a relaxed pace once things are healthy again. If you would rather not wait, press **Check for updates** on the System page. If it keeps failing, something between your server and the outside world is blocking outbound requests, which is worth knowing for reasons far beyond FCHub.
 
+An out-of-date list is not always a failed one. Even with the source reading **Straight from fchub.co** and a recent **Last checked**, FCHub asks only periodically and the answer can have been cached for a while before it arrived — so a release published a few hours ago may genuinely not have reached this site yet. The [System page](/docs/fchub/system-status#catalogue) sets out the timings. **Check for updates** is still the shortcut; for something published very recently, a second press a little later is the rest of it.
+
 <Callout type="warn" title="The rare fatal version">
 *The FCHub catalogue could not be read. Reinstalling FCHub should sort it out.* This one means even the copy inside the plugin is unreadable, which is a damaged installation rather than a network problem. Reinstalling FCHub replaces the file. No product is affected.
 </Callout>
@@ -46,7 +48,7 @@ There is also a quieter variant — *has a requirement FCHub cannot check here, 
 
 ## A download was refused or failed its check
 
-FCHub installs only from official FCHub releases on GitHub, and checks each download against its published checksum — where one is published — before handing anything to WordPress. Four things can go wrong, and none of them leave a half-installed plugin behind.
+FCHub installs only from official FCHub releases on GitHub, and checks every product download against its published checksum — where one is published — before handing anything to WordPress. Four things can go wrong, and none of them leave a half-installed plugin behind.
 
 | Message | What happened |
 |---|---|
