@@ -29,7 +29,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.8.0",
     "eslint-plugin-vue-scoped-css": "^3.0.0",
-    "postcss": "^8.5.8",
+    "postcss": "^8.5.23",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.2.1",
     "vite": "^8.0.0"
