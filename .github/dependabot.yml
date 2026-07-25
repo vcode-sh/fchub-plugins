@@ -1,0 +1,108 @@
+# Dependabot, configured so the alerts stay readable.
+#
+# Security alerts arrive from the dependency graph whether this file exists or
+# not. What it adds is something that opens the pull requests — without it the
+# backlog only ever grows, which is how a repository ends up with two hundred
+# open advisories and nobody able to spot the one that matters.
+#
+# Grouped on purpose. Twelve packages across eight lockfiles, ungrouped, is a
+# pull request flood — the same failure mode as the alert flood, wearing a
+# different hat. Development dependencies travel together because they never
+# reach a user's site; production ones are separated because they do.
+#
+# plugins/fchub-stream is absent deliberately. It is discontinued, it is not
+# built by a bare ./build.sh, and it accounts for roughly half of the open
+# advisories on its own. Listing it here would invite updates to a plugin the
+# project has committed to not maintaining.
+version: 2
+
+updates:
+  # Ships to users: published to npm, and bundled into the .mcpb and the
+  # Docker image. Production updates here deserve their own pull requests.
+  - package-ecosystem: npm
+    directory: /fluentcart-mcp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      production:
+        dependency-type: production
+      development:
+        dependency-type: development
+
+  # Ships to users: this is the live documentation site, deployed from main.
+  - package-ecosystem: npm
+    directory: /web-docs
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      production:
+        dependency-type: production
+      development:
+        dependency-type: development
+
+  # Build tooling for the plugins. None of it reaches a WordPress site except
+  # where a bundle is committed, so one grouped pull request per plugin is
+  # plenty.
+  - package-ecosystem: npm
+    directory: /plugins/fchub
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      all:
+        patterns:
+          - '*'
+
+  - package-ecosystem: npm
+    directory: /plugins/fchub-memberships
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      all:
+        patterns:
+          - '*'
+
+  - package-ecosystem: npm
+    directory: /plugins/fchub-portal-extender
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      all:
+        patterns:
+          - '*'
+
+  - package-ecosystem: npm
+    directory: /plugins/cartshift
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      all:
+        patterns:
+          - '*'
+
+  - package-ecosystem: npm
+    directory: /plugins/fchub-thank-you/admin
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      all:
+        patterns:
+          - '*'
+
+  # The workflows themselves. Pinned actions go stale quietly, and a stale
+  # action is the one part of CI nobody reads until it breaks.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - '*'

@@ -1384,7 +1384,7 @@ Expected: audit clean, Vitest PASS, production build succeeds, and Playwright sm
 - [ ] **Step 3: Run catalogue and workflow contracts**
 
 ```bash
-cd /Users/tomrobak/_projects_/fchub-plugins
+cd "$(git rev-parse --show-toplevel)"
 node scripts/sync-fchub-catalog.mjs --check
 node --test tests/repository/fchub-catalog.test.mjs
 node --test .github/workflows/fchub-ci-contract.test.mjs .github/workflows/fchub-release-contract.test.mjs
@@ -1395,7 +1395,7 @@ Expected: no catalogue drift and all contracts PASS.
 - [ ] **Step 4: Run documentation gates**
 
 ```bash
-cd /Users/tomrobak/_projects_/fchub-plugins
+cd "$(git rev-parse --show-toplevel)"
 node scripts/check-fchub-docs.mjs
 node scripts/check-fumadocs-accordion-structure.mjs
 cd web-docs
@@ -1408,7 +1408,7 @@ Expected: docs contracts, lint, and Next.js production build PASS.
 - [ ] **Step 5: Run the disposable lifecycle gate**
 
 ```bash
-cd /Users/tomrobak/_projects_/fchub-plugins/plugins/fchub
+cd "$(git rev-parse --show-toplevel)/plugins/fchub"
 bash tests/e2e/run-lifecycle.sh
 ```
 
@@ -1417,7 +1417,7 @@ Expected: clean install, activation, fixture install, fixture update, FCHub remo
 - [ ] **Step 6: Build and inspect the release candidate**
 
 ```bash
-cd /Users/tomrobak/_projects_/fchub-plugins
+cd "$(git rev-parse --show-toplevel)"
 ./build.sh fchub
 unzip -t dist/fchub-1.0.0.zip
 unzip -l dist/fchub-1.0.0.zip
