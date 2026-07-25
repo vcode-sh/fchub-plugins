@@ -132,6 +132,24 @@ footprint() {
 fixture_dir="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/fchub-lifecycle-XXXXXXXX")" && pwd -P)"
 export FCHUB_FIXTURE_DIR="$fixture_dir"
 
+# Deliberate, and please leave it alone.
+#
+# `mktemp -d` creates 0700 owned by the invoking user. The wpcli service is
+# pinned to uid 33 — it has to be, because Debian's www-data is 33 and Alpine's
+# is 82, and Apache must be able to overwrite what the CLI wrote. On Linux uid
+# 33 cannot traverse a 0700 directory owned by somebody else, so
+# /fchub-fixtures is simply invisible inside that container: WP-CLI reports
+# "plugin could not be found", falls back to treating the path as a
+# wordpress.org slug, and the run dies forty lines further on than the actual
+# fault. That is how a GitHub runner failed while this had been green here nine
+# times in a row — Docker Desktop virtualises bind-mount ownership, so macOS
+# never sees it.
+#
+# Nothing under here is secret: generated fixture plugins, catalogues, and a
+# copy of an archive that is about to be published anyway. The directory is
+# removed on every exit path.
+chmod 0755 "$fixture_dir"
+
 cleanup_done=0
 
 cleanup() {
@@ -262,6 +280,14 @@ step 'Generating fixtures'
 
 node "$here/prepare-fixtures.mjs" "$fixture_dir" "$hub_zip" | sed 's/^/  /'
 
+# The rest of the same problem. Node's mkdir and writeFile take their mode from
+# the umask, and so does zip: under the 022 most people run, that is 0755 and
+# 0644 and everything is readable. Under a hardened 077 it is 0700 and 0600, and
+# then neither uid 33 in the CLI container nor uid 101 in the Nginx one can read
+# a thing — the fixture host included. `a+rX` adds read everywhere and execute
+# on directories only, which is the whole of what these containers need.
+chmod -R a+rX "$fixture_dir"
+
 success 'three P24 releases (one with a deliberately wrong sidecar), a FluentCart, three catalogues'
 
 # ── The disposable site ──────────────────────────────────────────────────────
@@ -361,6 +387,31 @@ blocked="$(
   || fail "this site can reach the public internet: api.wordpress.org gave '$blocked'"
 
 success 'fixture host reachable, everything else refused'
+
+# ── And that the containers can actually read the fixtures ───────────────────
+
+step 'Checking the fixtures are readable inside the containers'
+
+# Asserted as its own step because the failure is otherwise unrecognisable.
+# When uid 33 cannot traverse the fixture directory, WP-CLI does not say
+# "permission denied" — it says the plugin could not be found, then treats the
+# path as a wordpress.org slug and blames the network. The real fault is here,
+# and this is where it should be named.
+#
+# Both readers are checked: the CLI container mounts the whole tree, while the
+# fixture host mounts only www/ and so never traverses the top directory. That
+# asymmetry is exactly why a CI run reported the fixture host healthy one step
+# before failing to see a file inside it.
+if ! dc run --rm --no-deps -T --entrypoint sh wpcli \
+  -c "test -r /fchub-fixtures/www/packages/$(basename "$hub_zip") && test -r /fchub-fixtures/mu-plugins/fchub-lifecycle-harness.php" \
+  >/dev/null 2>&1; then
+  fail "the CLI container (uid 33) cannot read $fixture_dir — its permissions are wrong for this platform"
+fi
+
+dc exec -T catalogue test -r /usr/share/nginx/html/catalogue.json \
+  || fail 'the fixture host cannot read its own catalogue'
+
+success 'uid 33 can read the packages, and Nginx can read the catalogue'
 
 # ── Seeding ──────────────────────────────────────────────────────────────────
 
