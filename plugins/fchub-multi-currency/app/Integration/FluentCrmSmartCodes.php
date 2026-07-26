@@ -71,7 +71,9 @@ final class FluentCrmSmartCodes
                 return $defaultValue;
             }
 
-            $funnelSub = \FluentCrm\App\Models\FunnelSubscriber::where('id', $funnelSubscriberId)->first();
+            $funnelSub = \FluentCrm\App\Models\FunnelSubscriber::query()
+                ->where('id', $funnelSubscriberId)
+                ->first();
 
             if (!$funnelSub) {
                 return $defaultValue;
@@ -83,7 +85,7 @@ final class FluentCrmSmartCodes
                 return $defaultValue;
             }
 
-            $order = \FluentCart\App\Models\Order::find((int) $sourceRefId);
+            $order = \FluentCart\App\Models\Order::query()->find((int) $sourceRefId);
 
             if (!$order) {
                 return $defaultValue;

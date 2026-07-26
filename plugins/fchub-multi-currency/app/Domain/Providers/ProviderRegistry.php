@@ -15,10 +15,10 @@ final class ProviderRegistry
     public static function resolve(OptionStore $optionStore): ProviderContract
     {
         $settings = $optionStore->all();
-        $providerSlug = $settings['rate_provider'] ?? 'exchange_rate_api';
+        $providerSlug = $settings['rate_provider'] ?? 'manual';
         $apiKey = $settings['rate_provider_api_key'] ?? '';
 
-        $provider = RateProvider::tryFrom($providerSlug) ?? RateProvider::ExchangeRateApi;
+        $provider = RateProvider::tryFrom($providerSlug) ?? RateProvider::Manual;
 
         return match ($provider) {
             RateProvider::ExchangeRateApi   => new ExchangeRateApiProvider($apiKey),
@@ -26,5 +26,12 @@ final class ProviderRegistry
             RateProvider::Ecb               => new EcbProvider(),
             RateProvider::Manual            => new ManualProvider(new ExchangeRateRepository()),
         };
+    }
+
+    public static function usesRemoteProvider(OptionStore $optionStore): bool
+    {
+        $provider = RateProvider::tryFrom((string) $optionStore->get('rate_provider', 'manual'));
+
+        return $provider !== null && $provider !== RateProvider::Manual;
     }
 }

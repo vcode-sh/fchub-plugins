@@ -101,6 +101,7 @@ final class PlanReadController
         $typeLabel = $typeConfig ? $typeConfig['label'] : ucfirst($type);
 
         if ($id === '*' || $id === '0' || $id === '') {
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return sprintf(__('All %s', 'fchub-memberships'), $typeLabel);
         }
 
@@ -123,6 +124,7 @@ final class PlanReadController
 
         if ($type === 'comment') {
             $title = get_the_title((int) $id);
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return $title ? sprintf(__('Comments on: %s', 'fchub-memberships'), $title) : __('(Deleted)', 'fchub-memberships');
         }
 

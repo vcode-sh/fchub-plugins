@@ -129,7 +129,7 @@ final class FrontendWiringTest extends PluginTestCase
         $fields = $response['data']['settings'];
 
         $this->assertArrayHasKey('logo', $fields);
-        $this->assertStringContainsString('fakturownia.webp', $fields['logo']);
+        $this->assertStringContainsString('fchub-fakturownia.svg', $fields['logo']);
     }
 
     public function testGlobalFieldsContainsAllExpectedFields(): void

@@ -21,14 +21,14 @@ class GrantRepository
     public function __construct(?Clock $clock = null)
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_grants';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
         $this->clock = $clock ?? new Clock();
     }
 
     public function find(int $id): ?array
     {
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
@@ -40,7 +40,12 @@ class GrantRepository
     {
         global $wpdb;
 
-        $watermark = $wpdb->get_var("SELECT COALESCE(MAX(id), 0) FROM {$this->table}");
+        $watermark = \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT COALESCE(MAX(id), 0) FROM {$this->table} WHERE 1 = %d",
+                1,
+            ),
+        );
         if ($watermark === null || !empty($wpdb->last_error)) {
             throw new \RuntimeException('The entitlement backfill watermark could not be read.');
         }
@@ -52,7 +57,7 @@ class GrantRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE id > %d AND id <= %d
              ORDER BY id ASC
@@ -71,7 +76,7 @@ class GrantRepository
     public function findByGrantKey(string $grantKey): ?array
     {
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE grant_key = %s",
             $grantKey
         ), ARRAY_A);
@@ -120,7 +125,7 @@ class GrantRepository
 
         $sql = "SELECT * FROM {$this->table} WHERE " . implode(' AND ', $where) . " ORDER BY created_at DESC";
 
-        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params), ARRAY_A);
         self::$requestCache[$cacheKey] = array_map([$this, 'hydrate'], $rows ?: []);
         return self::$requestCache[$cacheKey];
     }
@@ -146,10 +151,10 @@ class GrantRepository
             $page = max(1, (int) ($filters['page'] ?? 1));
             $perPage = (int) $filters['per_page'];
             $offset = ($page - 1) * $perPage;
-            $sql .= $wpdb->prepare(' LIMIT %d OFFSET %d', $perPage, $offset);
+            $sql .= \FChubMemberships\Support\CustomTableDatabase::prepare(' LIMIT %d OFFSET %d', $perPage, $offset)->sql();
         }
 
-        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params), ARRAY_A);
         return array_map([$this, 'hydrate'], $rows ?: []);
     }
 
@@ -183,7 +188,7 @@ class GrantRepository
             'updated_at'       => $now,
         ];
 
-        $wpdb->insert($this->table, $insert);
+        \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $insert);
         AccessEvaluator::clearCache();
         return (int) $wpdb->insert_id;
     }
@@ -215,7 +220,7 @@ class GrantRepository
             }
         }
 
-        $updated = $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        $updated = \FChubMemberships\Support\CustomTableDatabase::update($this->table, $update, ['id' => $id]) !== false;
         if ($updated) {
             AccessEvaluator::clearCache();
         }
@@ -225,7 +230,7 @@ class GrantRepository
     public function delete(int $id): bool
     {
         global $wpdb;
-        $deleted = $wpdb->delete($this->table, ['id' => $id]) !== false;
+        $deleted = \FChubMemberships\Support\CustomTableDatabase::delete($this->table, ['id' => $id]) !== false;
         if ($deleted) {
             AccessEvaluator::clearCache();
         }
@@ -240,7 +245,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        return (bool) $wpdb->get_var($wpdb->prepare(
+        return (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table}
              WHERE user_id = %d
                AND provider = %s
@@ -266,7 +271,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        return (bool) $wpdb->get_var($wpdb->prepare(
+        return (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table}
              WHERE user_id = %d
                AND provider = %s
@@ -300,7 +305,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE user_id = %d
                AND provider = %s
@@ -364,14 +369,14 @@ class GrantRepository
 
         global $wpdb;
         $now = $this->nowStorage();
-        $edgeTable = $wpdb->prefix . 'fchub_membership_entitlement_edges';
+        $edgeTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_entitlement_edges');
         $edgePlanSql = '';
         $edgeParams = [$userId, $now, $now];
         if ($planId !== null) {
             $edgePlanSql = ' AND edge.plan_id = %d';
             $edgeParams[] = $planId;
         }
-        $sql = $wpdb->prepare(
+        $sql = \FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT edge.id, edge.plan_id, edge.provider, edge.resource_type, edge.resource_id,
                     edge.starts_at, edge.expires_at, edge.created_at, edge.drip_available_at,
                     NULL AS trial_ends_at, edge.access_status
@@ -385,7 +390,7 @@ class GrantRepository
                {$edgePlanSql}",
             ...$edgeParams
         );
-        $rows = $wpdb->get_results($sql, ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults($sql, ARRAY_A);
         if (!is_array($rows) || !empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to read effective plan memberships.');
         }
@@ -394,7 +399,7 @@ class GrantRepository
             static fn(array $row): bool => (int) ($row['plan_id'] ?? 0) > 0
         ));
 
-        $identityRows = $wpdb->get_results($wpdb->prepare(
+        $identityRows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT DISTINCT edge.provider, edge.resource_type, edge.resource_id
              FROM {$edgeTable} edge
              WHERE edge.user_id = %d",
@@ -457,7 +462,7 @@ class GrantRepository
 
         global $wpdb;
         $now = $this->nowStorage();
-        $edgeTable = $wpdb->prefix . 'fchub_membership_entitlement_edges';
+        $edgeTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_entitlement_edges');
         $selects = [];
 
         foreach ($policies as $resourceKey => $policy) {
@@ -466,7 +471,7 @@ class GrantRepository
             }
 
             $key = (string) $resourceKey;
-            $selects[] = $wpdb->prepare(
+            $selects[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT %s AS _resource_key, direct.user_id
                  FROM {$this->table} direct
                  WHERE direct.provider = %s
@@ -483,14 +488,14 @@ class GrantRepository
                 $now,
                 $now,
                 $now
-            );
+            )->sql();
 
             if (!$policy->hasPlanAccess()) {
                 continue;
             }
 
             $edgePlanPredicate = $this->policyPlanSql($policy, 'edge', $now);
-            $selects[] = $wpdb->prepare(
+            $selects[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT %s AS _resource_key, edge.user_id
                  FROM {$edgeTable} edge
                  WHERE edge.lifecycle = 'active'
@@ -501,10 +506,10 @@ class GrantRepository
                 $key,
                 $now,
                 $now
-            );
+            )->sql();
 
             $legacyPlanPredicate = $this->policyPlanSql($policy, 'membership', $now);
-            $selects[] = $wpdb->prepare(
+            $selects[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT %s AS _resource_key, membership.user_id
                  FROM {$this->table} membership
                  WHERE membership.plan_id IS NOT NULL
@@ -522,13 +527,17 @@ class GrantRepository
                 $key,
                 $now,
                 $now
-            );
+            )->sql();
         }
 
         $sql = "SELECT access_rows._resource_key, COUNT(DISTINCT access_rows.user_id) AS member_count
                 FROM (" . implode("\nUNION ALL\n", $selects) . ") access_rows
-                GROUP BY access_rows._resource_key";
-        $rows = $wpdb->get_results($sql, ARRAY_A);
+                GROUP BY access_rows._resource_key
+                HAVING %d = 1";
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare($sql, 1),
+            ARRAY_A,
+        );
         if (!is_array($rows) || !empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to read effective resource access counts.');
         }
@@ -562,10 +571,10 @@ class GrantRepository
             foreach ($policy->pathsForPlan($planId) as $path) {
                 $pathPredicates[] = $this->policyPathSql($path, $alias, $now);
             }
-            $predicates[] = $wpdb->prepare(
+            $predicates[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 "{$alias}.plan_id = %d AND (" . implode(' OR ', $pathPredicates) . ')',
                 $planId
-            );
+            )->sql();
         }
 
         return $predicates === [] ? '0 = 1' : implode(' OR ', array_map(
@@ -581,28 +590,32 @@ class GrantRepository
         $conditions = [];
         if (($path['basis'] ?? 'membership') === 'resource') {
             $qualifier = is_array($path['qualifier'] ?? null) ? $path['qualifier'] : [];
-            $conditions[] = $wpdb->prepare(
+            $conditions[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 "{$alias}.provider = %s AND {$alias}.resource_type = %s AND {$alias}.resource_id = %s",
                 (string) ($qualifier['provider'] ?? ''),
                 (string) ($qualifier['resource_type'] ?? ''),
                 (string) ($qualifier['resource_id'] ?? '')
-            );
-            $conditions[] = $wpdb->prepare(
+            )->sql();
+            $conditions[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 "({$alias}.drip_available_at IS NULL OR {$alias}.drip_available_at <= %s)",
                 $now
-            );
+            )->sql();
         }
 
         $type = (string) ($path['drip_type'] ?? 'immediate');
         if ($type === 'delayed') {
             $days = max(0, (int) ($path['drip_delay_days'] ?? 0));
-            $conditions[] = $wpdb->prepare(
+            $conditions[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 "DATE_ADD({$alias}.created_at, INTERVAL {$days} DAY) <= %s",
                 $now
-            );
+            )->sql();
         }
         if ($type === 'fixed_date' && !empty($path['drip_date'])) {
-            $conditions[] = $wpdb->prepare('%s >= %s', $now, (string) $path['drip_date']);
+            $conditions[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
+                '%s >= %s',
+                $now,
+                (string) $path['drip_date'],
+            )->sql();
         }
 
         return $conditions === [] ? '1 = 1' : implode(' AND ', $conditions);
@@ -644,7 +657,7 @@ class GrantRepository
         global $wpdb;
 
         // Fall back to JSON source_ids search
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE source_type = %s
                AND (source_id = %d OR source_ids LIKE %s)",
@@ -666,14 +679,19 @@ class GrantRepository
     public function getBySourceIdFromJunction(int $sourceId, string $sourceType = 'order'): array
     {
         global $wpdb;
-        $sourcesTable = $wpdb->prefix . 'fchub_membership_grant_sources';
+        $sourcesTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grant_sources');
 
         // Check if junction table exists
-        if (!$wpdb->get_var("SHOW TABLES LIKE '{$sourcesTable}'")) {
+        if (!\FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                'SHOW TABLES LIKE %s',
+                $sourcesTable,
+            ),
+        )) {
             return [];
         }
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT g.* FROM {$this->table} g
              INNER JOIN {$sourcesTable} gs ON g.id = gs.grant_id
              WHERE gs.source_id = %d AND gs.source_type = %s",
@@ -692,7 +710,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE user_id = %d
                AND status = 'active'
@@ -723,7 +741,7 @@ class GrantRepository
         $now = $this->nowStorage();
         $future = $this->futureStorage($days);
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE status = 'active'
                AND expires_at IS NOT NULL
@@ -749,7 +767,7 @@ class GrantRepository
         $now = $this->nowStorage();
         $future = $this->futureStorage($days, $now);
 
-        return (int) $wpdb->get_var($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table}
              WHERE status = 'active'
                AND (starts_at IS NULL OR starts_at <= %s)
@@ -769,7 +787,7 @@ class GrantRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} ORDER BY updated_at DESC LIMIT %d",
             $limit
         ), ARRAY_A);
@@ -796,7 +814,7 @@ class GrantRepository
             $params[] = $planId;
         }
 
-        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params));
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params));
     }
 
     /**
@@ -815,7 +833,7 @@ class GrantRepository
             $params[] = $planId;
         }
 
-        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params));
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params));
     }
 
     /**
@@ -835,7 +853,7 @@ class GrantRepository
             $params[] = $planId;
         }
 
-        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params));
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params));
     }
 
     /**
@@ -846,7 +864,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
         [$where, $params] = $this->buildAdminMemberWhere($filters, $now);
-        $plansTable = $wpdb->prefix . 'fchub_membership_plans';
+        $plansTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
 
         $perPage = (int) ($filters['per_page'] ?? 20);
         $page = max(1, (int) ($filters['page'] ?? 1));
@@ -875,13 +893,11 @@ class GrantRepository
                 GROUP BY g.user_id, g.plan_id
                 ORDER BY MIN(g.created_at) DESC";
 
-        $sql .= $wpdb->prepare(' LIMIT %d OFFSET %d', $perPage, $offset);
+        $sql .= \FChubMemberships\Support\CustomTableDatabase::prepare(' LIMIT %d OFFSET %d', $perPage, $offset)->sql();
 
-        if ($params) {
-            $sql = $wpdb->prepare($sql, ...$params);
-        }
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params);
 
-        $rows = $wpdb->get_results($sql, ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults($query, ARRAY_A);
 
         return array_map(function ($row) {
             $row['grant_count'] = (int) ($row['grant_count'] ?? 1);
@@ -904,11 +920,9 @@ class GrantRepository
                     GROUP BY g.user_id, g.plan_id
                 ) AS grouped";
 
-        if ($params) {
-            $sql = $wpdb->prepare($sql, ...$params);
-        }
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params);
 
-        return (int) $wpdb->get_var($sql);
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar($query);
     }
 
     /**
@@ -942,7 +956,7 @@ class GrantRepository
                     GROUP BY g.user_id, g.plan_id
                 ) access_rows";
 
-        $row = $wpdb->get_row($wpdb->prepare($sql, $now, $future, $now, $now), ARRAY_A) ?: [];
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, $now, $future, $now, $now), ARRAY_A) ?: [];
 
         return [
             'active' => (int) ($row['active'] ?? 0),
@@ -959,8 +973,8 @@ class GrantRepository
     {
         global $wpdb;
 
-        $where = ['1=1'];
-        $params = [];
+        $where = ['1=%d'];
+        $params = [1];
 
         if (!empty($filters['status'])) {
             if ($filters['status'] === 'active') {
@@ -1021,7 +1035,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE status = 'active'
                AND expires_at IS NOT NULL
@@ -1043,7 +1057,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        return (int) $wpdb->query($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET status = 'expired', updated_at = %s
              WHERE status = 'active'
@@ -1065,7 +1079,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE status = 'active'
                AND expires_at IS NOT NULL
@@ -1086,7 +1100,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT DISTINCT user_id FROM {$this->table}
              WHERE plan_id = %d
                AND status = 'active'
@@ -1103,7 +1117,7 @@ class GrantRepository
     public function getPausedGrants(int $userId): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE user_id = %d AND status = 'paused' ORDER BY updated_at DESC",
             $userId
         ), ARRAY_A);
@@ -1117,12 +1131,16 @@ class GrantRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results(
-            "SELECT DISTINCT source_id
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT DISTINCT source_id
              FROM {$this->table}
-             WHERE status = 'active'
-               AND source_type = 'subscription'
-               AND source_id > 0",
+             WHERE status = %s
+               AND source_type = %s
+               AND source_id > %d",
+                'active',
+                'subscription',
+                0,
+            ),
             ARRAY_A
         );
 
@@ -1138,7 +1156,7 @@ class GrantRepository
         global $wpdb;
         $now = $now ?? $this->nowStorage();
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE status IN ('active', 'paused')
                AND meta LIKE %s",
@@ -1170,7 +1188,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE status = 'active'
                AND cancellation_effective_at IS NOT NULL
@@ -1193,7 +1211,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT DISTINCT resource_type, resource_id FROM {$this->table}
              WHERE user_id = %d
                AND status = 'active'
@@ -1222,7 +1240,7 @@ class GrantRepository
         global $wpdb;
         $now = $this->nowStorage();
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT DISTINCT plan_id FROM {$this->table}
              WHERE user_id = %d
                AND plan_id IS NOT NULL
@@ -1273,8 +1291,11 @@ class GrantRepository
     public function countByStatus(): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT status, COUNT(*) as count FROM {$this->table} GROUP BY status",
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT status, COUNT(*) as count FROM {$this->table} WHERE 1 = %d GROUP BY status",
+                1,
+            ),
             ARRAY_A
         );
         $counts = [];

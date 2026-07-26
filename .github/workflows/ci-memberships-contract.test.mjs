@@ -30,13 +30,13 @@ function step(jobBody, name) {
 test('CI runs both workflow contracts for every owned workflow input', () => {
   assert.match(
     workflow,
-    /pull_request:\n\s+paths:\n\s+- 'plugins\/\*\*'\n\s+- 'web-docs\/lib\/versions\.json'\n\s+- '\.github\/workflows\/ci\.yml'\n\s+- '\.github\/workflows\/ci-memberships-contract\.test\.mjs'\n\s+- '\.github\/workflows\/release\.yml'\n\s+- '\.github\/workflows\/release-memberships-contract\.test\.mjs'/,
+    /pull_request:\n\s+paths:\n[\s\S]*?- 'plugins\/\*\*'[\s\S]*?- 'web-docs\/lib\/versions\.json'[\s\S]*?- '\.github\/workflows\/ci\.yml'[\s\S]*?- '\.github\/workflows\/ci-memberships-contract\.test\.mjs'[\s\S]*?- '\.github\/workflows\/release\.yml'[\s\S]*?- '\.github\/workflows\/release-memberships-contract\.test\.mjs'/,
   )
 
   const workflowContract = job('workflow-contract')
   assert.match(
     workflowContract,
-    /node --test \.github\/workflows\/ci-memberships-contract\.test\.mjs \.github\/workflows\/release-memberships-contract\.test\.mjs/,
+    /node --test \.github\/workflows\/ci-memberships-contract\.test\.mjs \.github\/workflows\/ci-wporg-contract\.test\.mjs \.github\/workflows\/release-memberships-contract\.test\.mjs/,
   )
 })
 
@@ -57,10 +57,20 @@ for (const name of ['Install dependencies', 'Audit Composer dependencies', 'Run 
   })
 }
 
-test('Memberships remains in the shared ordered PHP gate sequence', () => {
+test('Memberships remains in the shared PHPUnit 13 PHP 8.4 and 8.5 gate sequence', () => {
   const phpunit = job('phpunit')
 
-  assert.match(phpunit, /- plugin: fchub-memberships\n\s+has_tests: true\n\s+php_version: '8\.4'/)
+  for (const version of ['8.4', '8.5']) {
+    assert.match(
+      phpunit,
+      new RegExp(`- plugin: fchub-memberships\\n\\s+php_version: '${version.replace('.', '\\.')}'`),
+    )
+  }
+  assert.doesNotMatch(
+    phpunit,
+    /- plugin: fchub-memberships\n\s+php_version: '8\.3'/,
+    'PHPUnit 13 requires PHP 8.4.1 or newer',
+  )
   assert.match(
     step(phpunit, 'Setup PHP'),
     /php-version: \$\{\{ matrix\.php_version \}\}/,

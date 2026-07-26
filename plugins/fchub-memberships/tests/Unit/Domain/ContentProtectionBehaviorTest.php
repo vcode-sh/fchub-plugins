@@ -481,10 +481,11 @@ final class ContentProtectionBehaviorTest extends PluginTestCase
 
         $_GET['fchub_bulk_action'] = 'fchub_protect';
         $_GET['fchub_bulk_count'] = '2';
+        $_GET['fchub_bulk_nonce'] = 'nonce';
         ob_start();
         $protection->bulkActionAdminNotice();
         $notice = ob_get_clean();
-        unset($_GET['fchub_bulk_action'], $_GET['fchub_bulk_count']);
+        unset($_GET['fchub_bulk_action'], $_GET['fchub_bulk_count'], $_GET['fchub_bulk_nonce']);
 
         $protection->invalidateUserCache(9, 5, []);
         $protection->invalidateRevokedUsersCache([], 5, 9, 'reason');

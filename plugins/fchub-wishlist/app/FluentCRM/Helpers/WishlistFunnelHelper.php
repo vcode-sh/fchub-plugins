@@ -55,29 +55,22 @@ class WishlistFunnelHelper
      */
     public static function getProductOptions(string $search = ''): array
     {
-        global $wpdb;
+        $query = [
+            'post_type'      => 'fluent-products',
+            'post_status'    => 'publish',
+            'posts_per_page' => 200,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+        ];
 
-        $sql = "SELECT ID, post_title FROM {$wpdb->posts}
-                WHERE post_type = 'fluent-products' AND post_status = 'publish'";
-
-        $params = [];
         if ($search !== '') {
-            $sql .= " AND post_title LIKE %s";
-            $params[] = '%' . $wpdb->esc_like($search) . '%';
+            $query['s'] = $search;
         }
 
-        $sql .= " ORDER BY post_title ASC LIMIT 200";
-
-        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $sql built from safe table names; user input uses prepare()
-        $rows = $params
-            ? $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A)
-            : $wpdb->get_results($sql, ARRAY_A);
-        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
-
-        return array_map(fn(array $row) => [
-            'id'    => (string) $row['ID'],
-            'title' => $row['post_title'],
-        ], $rows ?: []);
+        return array_map(static fn(\WP_Post $product): array => [
+            'id'    => (string) $product->ID,
+            'title' => $product->post_title,
+        ], get_posts($query));
     }
 
     /**
@@ -90,26 +83,44 @@ class WishlistFunnelHelper
         global $wpdb;
         $table = $wpdb->prefix . 'fct_product_variations';
 
-        $sql = "SELECT id, variation_title, post_id FROM {$table} WHERE item_status = 'active'";
-        $params = [];
+        $searchLike = '%' . $wpdb->esc_like($search) . '%';
 
-        if ($productId > 0) {
-            $sql .= " AND post_id = %d";
-            $params[] = $productId;
+        if ($productId > 0 && $search !== '') {
+            $sql = $wpdb->prepare(
+                "SELECT id, variation_title, post_id FROM %i
+                 WHERE item_status = 'active' AND post_id = %d AND variation_title LIKE %s
+                 ORDER BY variation_title ASC LIMIT 200",
+                $table,
+                $productId,
+                $searchLike
+            );
+        } elseif ($productId > 0) {
+            $sql = $wpdb->prepare(
+                "SELECT id, variation_title, post_id FROM %i
+                 WHERE item_status = 'active' AND post_id = %d
+                 ORDER BY variation_title ASC LIMIT 200",
+                $table,
+                $productId
+            );
+        } elseif ($search !== '') {
+            $sql = $wpdb->prepare(
+                "SELECT id, variation_title, post_id FROM %i
+                 WHERE item_status = 'active' AND variation_title LIKE %s
+                 ORDER BY variation_title ASC LIMIT 200",
+                $table,
+                $searchLike
+            );
+        } else {
+            $sql = $wpdb->prepare(
+                "SELECT id, variation_title, post_id FROM %i
+                 WHERE item_status = 'active'
+                 ORDER BY variation_title ASC LIMIT 200",
+                $table
+            );
         }
 
-        if ($search !== '') {
-            $sql .= " AND variation_title LIKE %s";
-            $params[] = '%' . $wpdb->esc_like($search) . '%';
-        }
-
-        $sql .= " ORDER BY variation_title ASC LIMIT 200";
-
-        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $sql built from safe table names; user input uses prepare()
-        $rows = $params
-            ? $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A)
-            : $wpdb->get_results($sql, ARRAY_A);
-        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- FluentCart exposes no variation selector API; the closed branches prepare every identifier and value before this live lookup.
+        $rows = $wpdb->get_results($sql, ARRAY_A);
 
         return array_map(fn(array $row) => [
             'id'    => (string) $row['id'],

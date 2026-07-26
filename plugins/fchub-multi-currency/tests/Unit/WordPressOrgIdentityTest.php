@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+namespace FChubMultiCurrency\Tests\Unit;
+
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+final class WordPressOrgIdentityTest extends TestCase
+{
+    #[Test]
+    public function mainPluginFileDeclaresTheWordPressOrgIdentity(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 2) . '/fchub-multi-currency.php');
+
+        self::assertIsString($source);
+        self::assertStringContainsString('Plugin Name: FCHub Multi-Currency', $source);
+        self::assertStringContainsString('Plugin URI: https://fchub.co/docs/fchub-multi-currency', $source);
+        self::assertStringContainsString('Version: 1.4.1', $source);
+        self::assertStringContainsString('Requires at least: 7.0', $source);
+        self::assertStringContainsString('Tested up to: 7.0', $source);
+        self::assertStringContainsString('Requires PHP: 8.3', $source);
+        self::assertStringContainsString('Requires Plugins: fluent-cart', $source);
+        self::assertStringContainsString('Text Domain: fchub-multi-currency', $source);
+        self::assertStringContainsString("define('FCHUB_MC_VERSION', '1.4.1');", $source);
+        self::assertStringNotContainsString('Update URI:', $source);
+        self::assertStringNotContainsString('GitHubUpdater', $source);
+    }
+}

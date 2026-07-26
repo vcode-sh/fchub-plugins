@@ -13,7 +13,7 @@ final class MigrationV6
     {
         global $wpdb;
 
-        $table = $wpdb->prefix . 'fchub_membership_crm_projection_jobs';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_crm_projection_jobs');
         $charset = $wpdb->get_charset_collate();
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';

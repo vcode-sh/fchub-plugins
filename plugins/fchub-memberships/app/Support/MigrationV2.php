@@ -17,7 +17,7 @@ class MigrationV2
     private static function addPlanColumns(): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'fchub_membership_plans';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
 
         $columns = [
             'duration_type'    => "VARCHAR(30) NOT NULL DEFAULT 'lifetime' AFTER redirect_url",
@@ -28,7 +28,13 @@ class MigrationV2
 
         foreach ($columns as $column => $definition) {
             if (!self::columnExists($table, $column)) {
-                $wpdb->query("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
+                \FChubMemberships\Support\CustomTableDatabase::query(
+                    \FChubMemberships\Support\CustomTableDatabase::prepare(
+                        "ALTER TABLE %i ADD COLUMN %i {$definition}",
+                        $table,
+                        $column,
+                    ),
+                );
             }
         }
     }
@@ -36,7 +42,7 @@ class MigrationV2
     private static function addGrantColumns(): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'fchub_membership_grants';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
 
         $columns = [
             'trial_ends_at'             => "DATETIME DEFAULT NULL AFTER drip_available_at",
@@ -48,7 +54,13 @@ class MigrationV2
 
         foreach ($columns as $column => $definition) {
             if (!self::columnExists($table, $column)) {
-                $wpdb->query("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
+                \FChubMemberships\Support\CustomTableDatabase::query(
+                    \FChubMemberships\Support\CustomTableDatabase::prepare(
+                        "ALTER TABLE %i ADD COLUMN %i {$definition}",
+                        $table,
+                        $column,
+                    ),
+                );
             }
         }
     }
@@ -56,7 +68,7 @@ class MigrationV2
     private static function addDripNotificationColumns(): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'fchub_membership_drip_notifications';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_drip_notifications');
 
         $columns = [
             'retry_count'  => "INT UNSIGNED NOT NULL DEFAULT 0 AFTER status",
@@ -65,7 +77,13 @@ class MigrationV2
 
         foreach ($columns as $column => $definition) {
             if (!self::columnExists($table, $column)) {
-                $wpdb->query("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
+                \FChubMemberships\Support\CustomTableDatabase::query(
+                    \FChubMemberships\Support\CustomTableDatabase::prepare(
+                        "ALTER TABLE %i ADD COLUMN %i {$definition}",
+                        $table,
+                        $column,
+                    ),
+                );
             }
         }
     }
@@ -99,7 +117,7 @@ class MigrationV2
     private static function columnExists(string $table, string $column): bool
     {
         global $wpdb;
-        $result = $wpdb->get_results($wpdb->prepare(
+        $result = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SHOW COLUMNS FROM {$table} LIKE %s",
             $column
         ));

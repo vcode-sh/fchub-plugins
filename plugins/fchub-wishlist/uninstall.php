@@ -18,7 +18,8 @@ if ($fchub_wishlist_remove) {
     ];
 
     foreach ($fchub_wishlist_tables as $fchub_wishlist_table) {
-        $wpdb->query("DROP TABLE IF EXISTS {$fchub_wishlist_table}");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Confirmed uninstall erasure targets only this plugin's prepared table identifiers.
+        $wpdb->query($wpdb->prepare("DROP TABLE IF EXISTS %i", $fchub_wishlist_table));
     }
 
     // Delete options
@@ -27,12 +28,7 @@ if ($fchub_wishlist_remove) {
     delete_option('fchub_wishlist_feature_flags');
 
     // Remove reminder marker user meta from all users.
-    if (isset($wpdb->usermeta)) {
-        $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s",
-            '_fchub_wishlist_last_reminder'
-        ));
-    }
+    delete_metadata('user', 0, '_fchub_wishlist_last_reminder', '', true);
 
     // Clean up Action Scheduler hooks.
     if (function_exists('as_unschedule_all_actions')) {

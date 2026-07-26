@@ -100,7 +100,7 @@ final class UninstallContractTest extends PluginTestCase
         ));
         $droppedTableSuffixes = array_map(
             static fn (array $query): string => substr(
-                $query[1],
+                str_replace('`', '', $query[1]),
                 strlen('DROP TABLE IF EXISTS wp_fchub_membership_')
             ),
             $dropQueries

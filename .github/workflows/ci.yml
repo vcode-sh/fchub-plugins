@@ -7,13 +7,24 @@ on:
       - 'web-docs/lib/versions.json'
       - '.github/workflows/ci.yml'
       - '.github/workflows/ci-memberships-contract.test.mjs'
+      - '.github/workflows/ci-wporg-contract.test.mjs'
+      - '.github/workflows/fchub-ci-contract.test.mjs'
       - '.github/workflows/release.yml'
       - '.github/workflows/release-memberships-contract.test.mjs'
+      - '.github/workflows/release-wporg-gates-contract.test.mjs'
+      - '.github/workflows/wporg-release-gates.yml'
       - '.github/workflows/docs-ci.yml'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/check-fchub-docs.mjs'
       - 'tests/repository/fchub-catalog.test.mjs'
+      - 'tests/repository/wporg-package-contract.test.mjs'
+      - 'tests/repository/wporg-updater-sync-contract.test.mjs'
+      - 'tests/repository/wporg-metadata-contract.test.mjs'
+      - 'tests/repository/wporg-previous-release-contract.test.mjs'
+      - 'tests/repository/wporg-lifecycle-update-contract.test.mjs'
       - 'web-docs/lib/fchub-products.json'
+      - 'wporg/**'
+      - 'scripts/wporg/**'
       - 'build.sh'
       - 'lib/GitHubUpdater.php'
 
@@ -28,10 +39,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
-      - name: Run Memberships workflow contracts
-        run: node --test .github/workflows/ci-memberships-contract.test.mjs .github/workflows/release-memberships-contract.test.mjs
+      - name: Run owned workflow contracts
+        run: node --test .github/workflows/ci-memberships-contract.test.mjs .github/workflows/ci-wporg-contract.test.mjs .github/workflows/release-memberships-contract.test.mjs .github/workflows/release-wporg-gates-contract.test.mjs
+
+      - name: Run WordPress.org directory asset contracts
+        run: node --test tests/repository/wporg-directory-assets-contract.test.mjs tests/repository/wporg-directory-screenshots-contract.test.mjs tests/repository/wporg-asset-approval-contract.test.mjs
+
+      - name: Run WordPress.org release artifact contracts
+        run: node --test tests/repository/wporg-metadata-contract.test.mjs tests/repository/wporg-previous-release-contract.test.mjs tests/repository/wporg-lifecycle-update-contract.test.mjs
 
       - name: Run FCHub workflow contracts
         run: node --test .github/workflows/fchub-ci-contract.test.mjs
@@ -42,33 +59,41 @@ jobs:
     strategy:
       matrix:
         include:
-          # fetch_depth is per entry rather than a job-wide setting on purpose.
-          # `Check for changes` below diffs against the pull request base, and a
-          # depth-1 checkout does not contain that commit — the diff fails, `wc
-          # -l` reports zero, and every gate in the job skips itself quietly. A
-          # green tick for a suite that never ran is worse than a red one, so
-          # every maintained plugin asks for the history its diff needs.
-          #
-          # fchub-stream is the deliberate exception. It is discontinued and
-          # must not be tested, so its gate stays inert at depth 1 — the entry
-          # remains only because the repository asserts Stream is still here for
-          # a possible return. Give it depth 0 and its suite starts running,
-          # which is precisely what the discontinuation says not to do.
-          - plugin: fchub-p24
-            has_tests: true
-            php_version: '8.3'
-            fetch_depth: 0
-          - plugin: fchub-memberships
-            has_tests: true
+          - plugin: fchub-fakturownia
             php_version: '8.4'
             fetch_depth: 0
+          - plugin: fchub-fakturownia
+            php_version: '8.5'
+            fetch_depth: 0
+          - plugin: fchub-memberships
+            php_version: '8.4'
+            fetch_depth: 0
+          - plugin: fchub-memberships
+            php_version: '8.5'
+            fetch_depth: 0
+          - plugin: fchub-multi-currency
+            php_version: '8.4'
+            fetch_depth: 0
+          - plugin: fchub-multi-currency
+            php_version: '8.5'
+            fetch_depth: 0
+          - plugin: fchub-p24
+            php_version: '8.4'
+            fetch_depth: 0
+          - plugin: fchub-p24
+            php_version: '8.5'
+            fetch_depth: 0
+          # Retain the discontinued Stream marker for the reversible-hiatus
+          # contract. Its depth-1 checkout deliberately keeps the existing
+          # change detector inert, so this does not resume Stream testing.
           - plugin: fchub-stream
-            has_tests: true
             php_version: '8.3'
             fetch_depth: 1
           - plugin: fchub-wishlist
-            has_tests: true
-            php_version: '8.3'
+            php_version: '8.4'
+            fetch_depth: 0
+          - plugin: fchub-wishlist
+            php_version: '8.5'
             fetch_depth: 0
     steps:
       - name: Checkout
@@ -109,10 +134,49 @@ jobs:
         working-directory: plugins/${{ matrix.plugin }}
         run: ./vendor/bin/phpunit
 
+      - name: Run static quality checks
+        if: steps.changes.outputs.count > 0 && matrix.php_version == '8.5' && (matrix.plugin == 'fchub-fakturownia' || matrix.plugin == 'fchub-multi-currency' || matrix.plugin == 'fchub-p24' || matrix.plugin == 'fchub-wishlist')
+        working-directory: plugins/${{ matrix.plugin }}
+        run: composer check
+
       - name: Run LOC budget check (fchub-wishlist)
         if: steps.changes.outputs.count > 0 && matrix.plugin == 'fchub-wishlist'
         working-directory: plugins/fchub-wishlist
         run: bash scripts/check-loc.sh
+
+  wporg-package:
+    name: WordPress.org package (${{ matrix.plugin }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - plugin: fchub-fakturownia
+          - plugin: fchub-memberships
+          - plugin: fchub-multi-currency
+          - plugin: fchub-p24
+          - plugin: fchub-wishlist
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build and inspect archive
+        run: bash build.sh "${{ matrix.plugin }}"
+
+      - name: Upload rejected package evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wporg-package-${{ matrix.plugin }}-failure
+          path: |
+            dist/${{ matrix.plugin }}-*.zip
+            dist/${{ matrix.plugin }}-*.inspection.json
+          if-no-files-found: warn
 
   vite-build-memberships:
     name: Vite Build (fchub-memberships)
@@ -339,4 +403,3 @@ jobs:
 
       - name: Verify FCHub documentation
         run: node scripts/check-fchub-docs.mjs
-

@@ -16,7 +16,7 @@ final class PluginLinksTest extends PluginTestCase
 
         self::assertIsString($source);
         self::assertStringContainsString('Plugin URI: https://fchub.co/docs/fchub-memberships', $source);
-        self::assertStringContainsString('Update URI: https://fchub.co/docs/fchub-memberships', $source);
+        self::assertStringNotContainsString('Update URI:', $source);
         self::assertStringContainsString('Author URI: https://x.com/vcode_sh', $source);
     }
 

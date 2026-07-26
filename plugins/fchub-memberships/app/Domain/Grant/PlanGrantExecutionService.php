@@ -154,7 +154,8 @@ final class PlanGrantExecutionService
             Logger::orderLog(
                 $order,
                 __('Membership plan granted', 'fchub-memberships'),
-                sprintf(__('Plan #%d: %d resources granted', 'fchub-memberships'), $planId, $created + $updated)
+                /* translators: Placeholder values are runtime membership details included in this message. */
+                sprintf(__('Plan #%1$d: %2$d resources granted', 'fchub-memberships'), $planId, $created + $updated)
             );
         }
 

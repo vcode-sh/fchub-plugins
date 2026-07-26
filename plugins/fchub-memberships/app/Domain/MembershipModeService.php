@@ -91,7 +91,8 @@ final class MembershipModeService
                     $order,
                     __('Membership grant blocked', 'fchub-memberships'),
                     sprintf(
-                        __('Plan level %d is lower than current level %d. Upgrade-only mode prevents downgrades.', 'fchub-memberships'),
+                        /* translators: Placeholder values are runtime membership details included in this message. */
+                        __('Plan level %1$d is lower than current level %2$d. Upgrade-only mode prevents downgrades.', 'fchub-memberships'),
                         $planLevel,
                         $currentHighest
                     ),

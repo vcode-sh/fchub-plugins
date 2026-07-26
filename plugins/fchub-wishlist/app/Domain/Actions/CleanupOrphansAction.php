@@ -24,19 +24,25 @@ class CleanupOrphansAction
         $postsTable = $wpdb->posts;
 
         // Get affected wishlist IDs before deletion
-        $affectedWishlistIds = $wpdb->get_col(
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This scheduled maintenance sweep must use live item and post state before deleting orphans.
+        $affectedWishlistIds = $wpdb->get_col($wpdb->prepare(
             "SELECT DISTINCT wi.wishlist_id
-             FROM {$itemsTable} wi
-             LEFT JOIN {$postsTable} p ON wi.product_id = p.ID
-             WHERE p.ID IS NULL OR p.post_status = 'trash'"
-        );
+             FROM %i wi
+             LEFT JOIN %i p ON wi.product_id = p.ID
+             WHERE p.ID IS NULL OR p.post_status = 'trash'",
+            $itemsTable,
+            $postsTable
+        ));
 
         // Delete orphaned items
-        $deleted = (int) $wpdb->query(
-            "DELETE wi FROM {$itemsTable} wi
-             LEFT JOIN {$postsTable} p ON wi.product_id = p.ID
-             WHERE p.ID IS NULL OR p.post_status = 'trash'"
-        );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- A joined delete has no WordPress API; the maintenance query acts on live state and the repository recalculates affected counts below.
+        $deleted = (int) $wpdb->query($wpdb->prepare(
+            "DELETE wi FROM %i wi
+             LEFT JOIN %i p ON wi.product_id = p.ID
+             WHERE p.ID IS NULL OR p.post_status = 'trash'",
+            $itemsTable,
+            $postsTable
+        ));
 
         // Recalculate item counts for affected wishlists
         if (!empty($affectedWishlistIds)) {

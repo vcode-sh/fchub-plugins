@@ -25,7 +25,7 @@ class ProtectionRuleRepository
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_protection_rules';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_protection_rules');
     }
 
     public function find(int $id): ?array
@@ -36,7 +36,7 @@ class ProtectionRuleRepository
         }
 
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
@@ -62,7 +62,7 @@ class ProtectionRuleRepository
         }
 
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE resource_type = %s AND resource_id = %s",
             $resourceType,
             $resourceId
@@ -84,8 +84,8 @@ class ProtectionRuleRepository
     {
         global $wpdb;
 
-        $where = ['1=1'];
-        $params = [];
+        $where = ['1=%d'];
+        $params = [1];
 
         if (!empty($filters['resource_type'])) {
             $where[] = 'resource_type = %s';
@@ -121,14 +121,12 @@ class ProtectionRuleRepository
             $page = max(1, (int) ($filters['page'] ?? 1));
             $perPage = (int) $filters['per_page'];
             $offset = ($page - 1) * $perPage;
-            $sql .= $wpdb->prepare(' LIMIT %d OFFSET %d', $perPage, $offset);
+            $sql .= \FChubMemberships\Support\CustomTableDatabase::prepare(' LIMIT %d OFFSET %d', $perPage, $offset)->sql();
         }
 
-        if ($params) {
-            $sql = $wpdb->prepare($sql, ...$params);
-        }
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params);
 
-        $rows = $wpdb->get_results($sql, ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults($query, ARRAY_A);
         if (!empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to read protection rules.');
         }
@@ -140,8 +138,8 @@ class ProtectionRuleRepository
     {
         global $wpdb;
 
-        $where = ['1=1'];
-        $params = [];
+        $where = ['1=%d'];
+        $params = [1];
 
         if (!empty($filters['resource_type'])) {
             $where[] = 'resource_type = %s';
@@ -173,11 +171,9 @@ class ProtectionRuleRepository
 
         $sql = "SELECT COUNT(*) FROM {$this->table} WHERE " . implode(' AND ', $where);
 
-        if ($params) {
-            $sql = $wpdb->prepare($sql, ...$params);
-        }
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params);
 
-        $count = $wpdb->get_var($sql);
+        $count = \FChubMemberships\Support\CustomTableDatabase::getVar($query);
         if (!empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to count protection rules.');
         }
@@ -200,13 +196,15 @@ class ProtectionRuleRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results(
-            "SELECT resource_type,
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT resource_type,
                     COUNT(*) AS total_rules,
-                    SUM(CASE WHEN show_teaser = 'yes' THEN 1 ELSE 0 END) AS teaser_rules,
+                    SUM(CASE WHEN show_teaser = %s THEN 1 ELSE 0 END) AS teaser_rules,
                     SUM(CASE WHEN plan_ids IS NULL OR plan_ids = '' OR plan_ids = '[]' THEN 1 ELSE 0 END) AS unassigned_rules
              FROM {$this->table}
              GROUP BY resource_type",
+                'yes',
+            ),
             ARRAY_A
         );
         if (!empty($wpdb->last_error)) {
@@ -264,7 +262,7 @@ class ProtectionRuleRepository
             'updated_at'          => $now,
         ];
 
-        $created = $wpdb->insert($this->table, $insert);
+        $created = \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $insert);
         if ($created !== false) {
             self::invalidateAfterWrite();
         }
@@ -302,7 +300,7 @@ class ProtectionRuleRepository
             $update['meta'] = wp_json_encode($data['meta'] ?? []);
         }
 
-        $updated = $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        $updated = \FChubMemberships\Support\CustomTableDatabase::update($this->table, $update, ['id' => $id]) !== false;
         if ($updated) {
             self::invalidateAfterWrite();
         }
@@ -313,7 +311,7 @@ class ProtectionRuleRepository
     public function delete(int $id): bool
     {
         global $wpdb;
-        $deleted = $wpdb->delete($this->table, ['id' => $id]) !== false;
+        $deleted = \FChubMemberships\Support\CustomTableDatabase::delete($this->table, ['id' => $id]) !== false;
         if ($deleted) {
             self::invalidateAfterWrite();
         }
@@ -351,7 +349,12 @@ class ProtectionRuleRepository
         }
 
         global $wpdb;
-        $hasRules = (bool) $wpdb->get_var("SELECT EXISTS(SELECT 1 FROM {$this->table} LIMIT 1)");
+        $hasRules = (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT EXISTS(SELECT 1 FROM {$this->table} WHERE 1 = %d LIMIT 1)",
+                1,
+            ),
+        );
         if (!empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to determine whether protection rules exist.');
         }
@@ -366,7 +369,7 @@ class ProtectionRuleRepository
     public function getProtectedResourceIds(string $resourceType): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT resource_id FROM {$this->table} WHERE resource_type = %s",
             $resourceType
         ), ARRAY_A);
@@ -396,7 +399,7 @@ class ProtectionRuleRepository
         $placeholders = implode(',', array_fill(0, count($taxonomies), '%s'));
         $params = $taxonomies;
 
-        $rules = $wpdb->get_results($wpdb->prepare(
+        $rules = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT resource_type, resource_id, meta FROM {$this->table} WHERE resource_type IN ({$placeholders})",
             ...$params
         ), ARRAY_A);
@@ -421,26 +424,34 @@ class ProtectionRuleRepository
             return [];
         }
 
-        // Get all post IDs assigned to these terms
-        $postIds = [];
+        // Resolve taxonomy relationships first, then filter the resulting IDs by post type and status.
+        $candidateIds = [];
         foreach ($inheritedTerms as $termInfo) {
-            $termPostIds = get_posts([
-                'post_type'      => $postType,
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-                'tax_query'      => [
-                    [
-                        'taxonomy' => $termInfo['taxonomy'],
-                        'terms'    => $termInfo['term_id'],
-                        'field'    => 'term_id',
-                    ],
-                ],
-            ]);
-            $postIds = array_merge($postIds, array_map('strval', $termPostIds));
+            $termObjectIds = get_objects_in_term(
+                $termInfo['term_id'],
+                $termInfo['taxonomy'],
+            );
+            if (is_wp_error($termObjectIds)) {
+                continue;
+            }
+
+            $candidateIds = array_merge($candidateIds, array_map('intval', $termObjectIds));
         }
 
-        return array_unique($postIds);
+        $candidateIds = array_values(array_unique(array_filter($candidateIds)));
+        if ($candidateIds === []) {
+            return [];
+        }
+
+        $postIds = get_posts([
+            'post_type'      => $postType,
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'post__in'       => $candidateIds,
+        ]);
+
+        return array_map('strval', $postIds);
     }
 
     public static function clearCache(): void

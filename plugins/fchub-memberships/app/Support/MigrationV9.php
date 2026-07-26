@@ -15,17 +15,19 @@ final class MigrationV9
         $grants = $wpdb->prefix . 'fchub_membership_grants';
 
         if (!self::columnExists($edges, 'access_status')) {
-            if ($wpdb->query(
-                "ALTER TABLE {$edges}
-                 ADD COLUMN access_status VARCHAR(20) NOT NULL DEFAULT 'active' AFTER lifecycle"
+            if (\FChubMemberships\Support\CustomTableDatabase::query(
+                \FChubMemberships\Support\CustomTableDatabase::prepare("ALTER TABLE %i
+                 ADD COLUMN access_status VARCHAR(20) NOT NULL DEFAULT 'active' AFTER lifecycle",
+                    $edges,
+                )
             ) === false) {
                 return ['entitlement_edges: failed adding access_status'];
             }
         }
 
-        $backfilled = $wpdb->query(
-            "UPDATE {$edges} edge
-             INNER JOIN {$grants} aggregate
+        $backfilled = \FChubMemberships\Support\CustomTableDatabase::query(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("UPDATE %i edge
+             INNER JOIN %i aggregate
                ON aggregate.user_id = edge.user_id
               AND aggregate.provider = edge.provider
               AND aggregate.resource_type = edge.resource_type
@@ -33,16 +35,22 @@ final class MigrationV9
              SET edge.access_status = 'paused'
              WHERE edge.lifecycle = 'active'
                AND edge.access_status = 'active'
-               AND aggregate.status = 'paused'"
+               AND aggregate.status = %s",
+                $edges,
+                $grants,
+                'paused',
+            )
         );
         if ($backfilled === false) {
             return ['entitlement_edges: failed backfilling paused access status'];
         }
 
         if (!self::indexExists($edges, 'plan_access_lifecycle_user')) {
-            if ($wpdb->query(
-                "ALTER TABLE {$edges}
-                 ADD INDEX plan_access_lifecycle_user (plan_id, access_status, lifecycle, user_id)"
+            if (\FChubMemberships\Support\CustomTableDatabase::query(
+                \FChubMemberships\Support\CustomTableDatabase::prepare("ALTER TABLE %i
+                 ADD INDEX plan_access_lifecycle_user (plan_id, access_status, lifecycle, user_id)",
+                    $edges,
+                )
             ) === false) {
                 return ['entitlement_edges: failed adding plan access index'];
             }
@@ -55,7 +63,7 @@ final class MigrationV9
     {
         global $wpdb;
 
-        return !empty($wpdb->get_results($wpdb->prepare(
+        return !empty(\FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SHOW COLUMNS FROM {$table} LIKE %s",
             $column
         ), ARRAY_A));
@@ -65,7 +73,7 @@ final class MigrationV9
     {
         global $wpdb;
 
-        return !empty($wpdb->get_results($wpdb->prepare(
+        return !empty(\FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SHOW INDEX FROM {$table} WHERE Key_name = %s",
             $index
         ), ARRAY_A));

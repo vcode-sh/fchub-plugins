@@ -15,8 +15,8 @@ final class WebhookEventRepository
     {
         global $wpdb;
 
-        $this->table = $wpdb->prefix . 'fchub_membership_webhook_events';
-        $this->deliveryTable = $wpdb->prefix . 'fchub_membership_webhook_deliveries';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_webhook_events');
+        $this->deliveryTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_webhook_deliveries');
     }
 
     /** @param array<string, mixed> $event */
@@ -28,7 +28,7 @@ final class WebhookEventRepository
 
         $previousSuppression = $wpdb->suppress_errors(true);
         try {
-            $inserted = $wpdb->insert($this->table, $record);
+            $inserted = \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $record);
         } finally {
             $wpdb->suppress_errors($previousSuppression);
         }
@@ -53,7 +53,7 @@ final class WebhookEventRepository
 
         global $wpdb;
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE event_id = %s",
             $eventId
         ), ARRAY_A);
@@ -76,7 +76,7 @@ final class WebhookEventRepository
 
         global $wpdb;
 
-        $deleted = $wpdb->query($wpdb->prepare(
+        $deleted = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "DELETE event FROM {$this->table} event
              WHERE event.created_at < %s
                AND NOT EXISTS (

@@ -1,0 +1,23 @@
+<?php
+
+namespace FluentCart\App\Models;
+
+/**
+ * FluentCart order attributes and model methods are resolved dynamically.
+ *
+ * @property int $id
+ * @property string|null $invoice_no
+ * @property string|null $payment_method
+ * @property string|null $paid_at
+ * @property string|null $created_at
+ * @property string|null $currency
+ * @property int|float|null $shipping_total
+ * @property int|float|null $shipping_tax
+ * @property mixed $billing_address
+ * @property mixed $customer
+ * @property mixed $order_items
+ * @method static self|null find(int $id)
+ */
+class Order
+{
+}

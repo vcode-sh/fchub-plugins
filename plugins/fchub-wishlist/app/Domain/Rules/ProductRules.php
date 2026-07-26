@@ -13,12 +13,11 @@ class ProductRules
      */
     public function productExists(int $productId): bool
     {
-        global $wpdb;
+        $product = get_post($productId);
 
-        return (bool) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->posts} WHERE ID = %d AND post_status = 'publish' AND post_type = 'fluent-products'",
-            $productId
-        ));
+        return $product instanceof \WP_Post
+            && $product->post_status === 'publish'
+            && $product->post_type === 'fluent-products';
     }
 
     /**
@@ -30,8 +29,10 @@ class ProductRules
 
         $variationsTable = $wpdb->prefix . 'fct_product_variations';
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- FluentCart exposes no variation lookup API, and add-to-cart validation requires current status.
         return (bool) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$variationsTable} WHERE id = %d AND item_status = 'active'",
+            "SELECT COUNT(*) FROM %i WHERE id = %d AND item_status = 'active'",
+            $variationsTable,
             $variantId
         ));
     }
@@ -63,8 +64,10 @@ class ProductRules
 
         $variationsTable = $wpdb->prefix . 'fct_product_variations';
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- FluentCart exposes no variation price API, and wishlist prices must reflect the current catalogue value.
         $price = $wpdb->get_var($wpdb->prepare(
-            "SELECT item_price FROM {$variationsTable} WHERE id = %d",
+            "SELECT item_price FROM %i WHERE id = %d",
+            $variationsTable,
             $variantId
         ));
 

@@ -27,10 +27,20 @@ class WishlistStatsQuery
     {
         global $wpdb;
 
-        $totalWishlists = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$this->listsTable}");
-        $totalItems = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$this->itemsTable}");
-        $userWishlists = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$this->listsTable} WHERE user_id IS NOT NULL");
-        $guestWishlists = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$this->listsTable} WHERE user_id IS NULL");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard statistics intentionally reflect current plugin-owned rows.
+        $totalWishlists = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM %i", $this->listsTable));
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard statistics intentionally reflect current plugin-owned rows.
+        $totalItems = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM %i", $this->itemsTable));
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard statistics intentionally reflect current plugin-owned rows.
+        $userWishlists = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM %i WHERE user_id IS NOT NULL",
+            $this->listsTable
+        ));
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard statistics intentionally reflect current plugin-owned rows.
+        $guestWishlists = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM %i WHERE user_id IS NULL",
+            $this->listsTable
+        ));
 
         return [
             'total_wishlists' => $totalWishlists,
@@ -55,15 +65,14 @@ class WishlistStatsQuery
         }
 
         $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
-        // phpcs:disable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- dynamic placeholder count
+        $params = array_merge([$this->itemsTable], array_map('intval', $productIds));
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard counts intentionally reflect current plugin-owned rows.
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT product_id, COUNT(*) AS cnt
-             FROM {$this->itemsTable}
-             WHERE product_id IN ({$placeholders})
-             GROUP BY product_id",
-            ...array_map('intval', $productIds)
+            'SELECT product_id, COUNT(*) AS cnt FROM %i WHERE product_id IN ('
+            . $placeholders // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Generated %d placeholders.
+            . ') GROUP BY product_id',
+            ...$params
         ), ARRAY_A);
-        // phpcs:enable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 
         $counts = [];
         foreach ($rows ?: [] as $row) {
@@ -82,12 +91,14 @@ class WishlistStatsQuery
     {
         global $wpdb;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard rankings intentionally reflect current plugin-owned rows.
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT product_id, COUNT(*) AS wishlist_count
-             FROM {$this->itemsTable}
+             FROM %i
              GROUP BY product_id
              ORDER BY wishlist_count DESC
              LIMIT %d",
+            $this->itemsTable,
             $limit
         ), ARRAY_A);
 
@@ -108,16 +119,19 @@ class WishlistStatsQuery
 
         $postsTable = $wpdb->posts;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard rankings intentionally reflect current plugin-owned rows and titles.
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT
                 i.product_id,
                 p.post_title AS product_title,
                 COUNT(*) AS wishlist_count
-             FROM {$this->itemsTable} i
-             LEFT JOIN {$postsTable} p ON i.product_id = p.ID
+             FROM %i i
+             LEFT JOIN %i p ON i.product_id = p.ID
              GROUP BY i.product_id, p.post_title
              ORDER BY wishlist_count DESC
              LIMIT %d",
+            $this->itemsTable,
+            $postsTable,
             $limit
         ), ARRAY_A);
 
@@ -141,14 +155,16 @@ class WishlistStatsQuery
 
         $startDate = gmdate('Y-m-d', strtotime("-{$days} days"));
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard activity intentionally reflects current plugin-owned rows.
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT
                 DATE(created_at) AS date,
                 COUNT(*) AS items_added
-             FROM {$this->itemsTable}
+             FROM %i
              WHERE created_at >= %s
              GROUP BY DATE(created_at)
              ORDER BY date ASC",
+            $this->itemsTable,
             $startDate
         ), ARRAY_A);
 
@@ -167,9 +183,11 @@ class WishlistStatsQuery
     {
         global $wpdb;
 
-        $avg = $wpdb->get_var(
-            "SELECT AVG(item_count) FROM {$this->listsTable} WHERE item_count > 0"
-        );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard averages intentionally reflect current plugin-owned rows.
+        $avg = $wpdb->get_var($wpdb->prepare(
+            "SELECT AVG(item_count) FROM %i WHERE item_count > 0",
+            $this->listsTable
+        ));
 
         return round((float) ($avg ?? 0), 1);
     }
@@ -183,8 +201,10 @@ class WishlistStatsQuery
 
         $cutoff = gmdate('Y-m-d H:i:s', time() - ($days * DAY_IN_SECONDS));
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard activity intentionally reflects current plugin-owned rows.
         return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->listsTable} WHERE updated_at >= %s AND item_count > 0",
+            "SELECT COUNT(*) FROM %i WHERE updated_at >= %s AND item_count > 0",
+            $this->listsTable,
             $cutoff
         ));
     }

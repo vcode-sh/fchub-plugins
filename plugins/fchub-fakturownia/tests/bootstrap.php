@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('FCHUB_FAKTUROWNIA_VERSION')) {
-    define('FCHUB_FAKTUROWNIA_VERSION', '1.1.1-test');
+    define('FCHUB_FAKTUROWNIA_VERSION', '1.1.2-test');
 }
 
 if (!defined('FCHUB_FAKTUROWNIA_PATH')) {
@@ -28,6 +28,10 @@ if (!defined('FCHUB_FAKTUROWNIA_URL')) {
 
 if (!defined('HOUR_IN_SECONDS')) {
     define('HOUR_IN_SECONDS', 3600);
+}
+
+if (!defined('MB_IN_BYTES')) {
+    define('MB_IN_BYTES', 1048576);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -99,6 +103,12 @@ if (!function_exists('wp_parse_args')) {
             $args = get_object_vars($args);
         }
         return array_merge($defaults, (array) $args);
+    }
+}
+
+if (!function_exists('wp_json_encode')) {
+    function wp_json_encode($value, $flags = 0, $depth = 512) {
+        return json_encode($value, $flags, $depth);
     }
 }
 
@@ -289,6 +299,10 @@ if (!function_exists('wp_enqueue_script')) {
 
 if (!function_exists('wp_add_inline_script')) {
     function wp_add_inline_script() {}
+}
+
+if (!function_exists('wp_localize_script')) {
+    function wp_localize_script() {}
 }
 
 if (!function_exists('admin_url')) {

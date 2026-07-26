@@ -64,7 +64,7 @@
 	<rule ref="WordPress.Security.NonceVerification"/>
 
 	<!-- i18n text domain -->
-	<config name="minimum_supported_wp_version" value="6.7"/>
+	<config name="minimum_supported_wp_version" value="7.0"/>
 	<rule ref="WordPress.WP.I18n">
 		<properties>
 			<property name="text_domain" type="array">

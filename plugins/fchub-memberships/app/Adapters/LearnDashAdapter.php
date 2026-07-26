@@ -40,6 +40,7 @@ class LearnDashAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
             return [
                 'success' => true,
                 'message' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('Course access granted: %s', 'fchub-memberships'),
                     get_the_title((int) $resourceId)
                 ),
@@ -65,6 +66,7 @@ class LearnDashAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
             return [
                 'success' => true,
                 'message' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('Group access granted: %s', 'fchub-memberships'),
                     get_the_title($groupId)
                 ),
@@ -100,6 +102,7 @@ class LearnDashAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
             return [
                 'success' => true,
                 'message' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('Course access revoked: %s', 'fchub-memberships'),
                     get_the_title((int) $resourceId)
                 ),
@@ -122,6 +125,7 @@ class LearnDashAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
             return [
                 'success' => true,
                 'message' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('Group access revoked: %s', 'fchub-memberships'),
                     get_the_title($groupId)
                 ),

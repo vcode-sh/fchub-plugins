@@ -120,8 +120,8 @@ class StatusControllerTest extends TestCase
         $data = $response->get_data();
         $this->assertTrue($data['success']);
         $this->assertSame(1, $data['data']['total']);
-        $this->assertQueryContains('LEFT JOIN wp_posts');
-        $this->assertQueryContains('LEFT JOIN wp_fct_product_variations');
+        $this->assertQueryContains('LEFT JOIN `wp_posts`');
+        $this->assertQueryContains('LEFT JOIN `wp_fct_product_variations`');
     }
 
     #[Test]

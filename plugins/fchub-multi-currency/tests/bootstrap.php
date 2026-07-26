@@ -2,7 +2,7 @@
 
 define('FCHUB_TESTING', true);
 define('ABSPATH', '/tmp/wordpress/');
-define('FCHUB_MC_VERSION', '1.2.0');
+define('FCHUB_MC_VERSION', '1.4.1');
 define('FCHUB_MC_PATH', dirname(__DIR__) . '/');
 define('FCHUB_MC_URL', 'http://localhost/wp-content/plugins/fchub-multi-currency/');
 define('FCHUB_MC_DB_VERSION', '1.0.0');
@@ -33,7 +33,22 @@ if (!isset($GLOBALS['wpdb'])) {
         public function prepare($query, ...$args)
         {
             $this->queries[] = $query;
-            return $query;
+            $index = 0;
+
+            return preg_replace_callback(
+                '/%(?:\d+\$)?([idsf])/',
+                static function (array $matches) use (&$index, $args): string {
+                    $value = $args[$index++] ?? null;
+
+                    return match ($matches[1]) {
+                        'i' => '`' . str_replace('`', '``', (string) $value) . '`',
+                        'd' => (string) (int) $value,
+                        'f' => (string) (float) $value,
+                        's' => "'" . addslashes((string) $value) . "'",
+                    };
+                },
+                $query,
+            );
         }
 
         public function get_results($query, $output = 'OBJECT')
@@ -125,6 +140,9 @@ $GLOBALS['wp_localized_scripts'] = [];
 $GLOBALS['wp_registered_blocks'] = [];
 $GLOBALS['wp_registered_block_patterns'] = [];
 $GLOBALS['wp_registered_block_pattern_categories'] = [];
+$GLOBALS['wp_scheduled_events'] = [];
+$GLOBALS['wp_remote_requests'] = [];
+$GLOBALS['fluent_cart_logs'] = [];
 
 // wpdb mock return values
 $GLOBALS['wpdb_mock_results'] = [];
@@ -429,6 +447,21 @@ if (!function_exists('delete_user_meta')) {
     }
 }
 
+if (!function_exists('delete_metadata')) {
+    function delete_metadata($metaType, $objectId, $metaKey, $metaValue = '', $deleteAll = false)
+    {
+        if ($metaType !== 'user' || !$deleteAll) {
+            return false;
+        }
+
+        foreach ($GLOBALS['wp_mock_user_meta'] as $userId => $metadata) {
+            unset($GLOBALS['wp_mock_user_meta'][$userId][$metaKey]);
+        }
+
+        return true;
+    }
+}
+
 if (!function_exists('get_post_meta')) {
     function get_post_meta($postId, $key = '', $single = false)
     {
@@ -566,6 +599,11 @@ if (!function_exists('register_rest_route')) {
 if (!function_exists('wp_schedule_event')) {
     function wp_schedule_event($timestamp, $recurrence, $hook, $args = [])
     {
+        $GLOBALS['wp_scheduled_events'][$hook] = [
+            'timestamp'  => $timestamp,
+            'recurrence' => $recurrence,
+            'args'       => $args,
+        ];
         return true;
     }
 }
@@ -573,14 +611,16 @@ if (!function_exists('wp_schedule_event')) {
 if (!function_exists('wp_clear_scheduled_hook')) {
     function wp_clear_scheduled_hook($hook, $args = [])
     {
-        return 0;
+        $cleared = isset($GLOBALS['wp_scheduled_events'][$hook]) ? 1 : 0;
+        unset($GLOBALS['wp_scheduled_events'][$hook]);
+        return $cleared;
     }
 }
 
 if (!function_exists('wp_next_scheduled')) {
     function wp_next_scheduled($hook, $args = [])
     {
-        return false;
+        return $GLOBALS['wp_scheduled_events'][$hook]['timestamp'] ?? false;
     }
 }
 
@@ -713,6 +753,10 @@ if (!function_exists('get_block_wrapper_attributes')) {
 if (!function_exists('wp_remote_get')) {
     function wp_remote_get($url, $args = [])
     {
+        $GLOBALS['wp_remote_requests'][] = [
+            'url'  => $url,
+            'args' => $args,
+        ];
         return $GLOBALS['wp_mock_remote_response'] ?? new \WP_Error('mock', 'No mock response set');
     }
 }
@@ -721,6 +765,13 @@ if (!function_exists('wp_remote_retrieve_body')) {
     function wp_remote_retrieve_body($response)
     {
         return $GLOBALS['wp_mock_remote_body'] ?? '';
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_response_code')) {
+    function wp_remote_retrieve_response_code($response)
+    {
+        return is_array($response) ? (int) ($response['response']['code'] ?? 0) : 0;
     }
 }
 
@@ -785,7 +836,13 @@ if (!function_exists('add_shortcode')) {
 }
 
 if (!function_exists('fluent_cart_log')) {
-    function fluent_cart_log($message, $context = []) {}
+    function fluent_cart_log($message, $context = [])
+    {
+        $GLOBALS['fluent_cart_logs'][] = [
+            'message' => $message,
+            'context' => $context,
+        ];
+    }
 }
 
 // WP_Error stub

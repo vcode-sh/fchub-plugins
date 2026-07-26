@@ -1,33 +1,28 @@
 <?php
 /**
- * Plugin Name: FCHub - Memberships
+ * Plugin Name: FCHub Memberships
  * Plugin URI: https://fchub.co/docs/fchub-memberships
  * Description: Membership workspace for FluentCart with guided plans, protected content, member care, automation, integrations, and reporting
- * Version: 1.4.0
+ * Version: 1.4.1
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: fchub-memberships
  * Domain Path: /languages
- * Requires at least: 6.7
+ * Requires at least: 7.0
  * Tested up to:    7.0
  * Requires PHP: 8.3
- * Update URI: https://fchub.co/docs/fchub-memberships
+ * Requires Plugins: fluent-cart
  */
 
 defined('ABSPATH') || exit;
 
-defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.4.0');
+defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.4.1');
 defined('FCHUB_MEMBERSHIPS_FILE') || define('FCHUB_MEMBERSHIPS_FILE', __FILE__);
 defined('FCHUB_MEMBERSHIPS_PATH') || define('FCHUB_MEMBERSHIPS_PATH', plugin_dir_path(__FILE__));
 defined('FCHUB_MEMBERSHIPS_URL') || define('FCHUB_MEMBERSHIPS_URL', plugin_dir_url(__FILE__));
 defined('FCHUB_MEMBERSHIPS_DB_VERSION') || define('FCHUB_MEMBERSHIPS_DB_VERSION', '1.9.0');
-
-if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
-    require_once __DIR__ . '/lib/GitHubUpdater.php';
-    FCHub_GitHub_Updater::register('fchub-memberships', plugin_basename(__FILE__), FCHUB_MEMBERSHIPS_VERSION);
-}
 
 // Autoloader
 spl_autoload_register(function ($class) {

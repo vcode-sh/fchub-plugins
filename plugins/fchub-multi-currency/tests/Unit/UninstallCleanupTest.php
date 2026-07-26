@@ -88,7 +88,10 @@ final class UninstallCleanupTest extends TestCase
         // Find the query that deletes rate limiter transients
         $found = false;
         foreach ($queries as $query) {
-            if (str_contains($query, '_transient_fchub_mc_rl_') || str_contains($query, '_transient_timeout_fchub_mc_rl_')) {
+            if (
+                str_contains($query, '\\\\_transient\\\\_fchub\\\\_mc\\\\_rl\\\\_')
+                || str_contains($query, '\\\\_transient\\\\_timeout\\\\_fchub\\\\_mc\\\\_rl\\\\_')
+            ) {
                 $found = true;
                 break;
             }
@@ -146,6 +149,22 @@ final class UninstallCleanupTest extends TestCase
             wp_cache_get('test_key', 'fchub_mc_rates'),
             'Object cache group should be flushed during uninstall',
         );
+    }
+
+    #[Test]
+    public function testCurrencyUserMetadataIsDeletedForEveryUser(): void
+    {
+        $this->setUserMeta(10, '_fchub_mc_currency', 'EUR');
+        $this->setUserMeta(10, '_fcom_preferred_currency', 'EUR');
+        $this->setUserMeta(20, '_fchub_mc_currency', 'USD');
+        $this->setUserMeta(20, '_fcom_preferred_currency', 'USD');
+
+        $this->runUninstall();
+
+        $this->assertArrayNotHasKey('_fchub_mc_currency', $GLOBALS['wp_mock_user_meta'][10] ?? []);
+        $this->assertArrayNotHasKey('_fcom_preferred_currency', $GLOBALS['wp_mock_user_meta'][10] ?? []);
+        $this->assertArrayNotHasKey('_fchub_mc_currency', $GLOBALS['wp_mock_user_meta'][20] ?? []);
+        $this->assertArrayNotHasKey('_fcom_preferred_currency', $GLOBALS['wp_mock_user_meta'][20] ?? []);
     }
 
     #[Test]

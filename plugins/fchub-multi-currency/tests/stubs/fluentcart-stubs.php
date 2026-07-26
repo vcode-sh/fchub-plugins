@@ -91,6 +91,16 @@ class Order
         self::$mockOrders = [];
     }
 
+    public static function query(): object
+    {
+        return new class {
+            public function find(int $id): ?Order
+            {
+                return Order::find($id);
+            }
+        };
+    }
+
     public static function find(int $id): ?self
     {
         return self::$mockOrders[$id] ?? null;

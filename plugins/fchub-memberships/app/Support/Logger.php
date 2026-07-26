@@ -24,7 +24,7 @@ class Logger
     public static function log(string $title, string $description = '', array $context = []): void
     {
         if (!function_exists('fluent_cart_add_log')) {
-            error_log("[FCHub Memberships] {$title}: {$description}");
+            wp_trigger_error(__METHOD__, "[FCHub Memberships] {$title}: {$description}", E_USER_NOTICE);
             return;
         }
 
@@ -45,7 +45,7 @@ class Logger
             return;
         }
 
-        error_log("[FCHub Memberships ERROR] {$title}: {$description}");
+        wp_trigger_error(__METHOD__, "[FCHub Memberships ERROR] {$title}: {$description}", E_USER_WARNING);
     }
 
     /**

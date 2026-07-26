@@ -19,13 +19,8 @@ final class VersionMetadataContractTest extends PluginTestCase
             512,
             JSON_THROW_ON_ERROR,
         );
-        $versions = json_decode(
-            (string) file_get_contents(dirname($pluginRoot, 2) . '/web-docs/lib/versions.json'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
         $readme = (string) file_get_contents($pluginRoot . '/README.md');
+        $wordpressOrgReadme = (string) file_get_contents($pluginRoot . '/readme.txt');
 
         self::assertIsString($header);
         self::assertMatchesRegularExpression('/^\s*\*\s+Version:\s*(?<version>[^\r\n*]+)/m', $header);
@@ -33,11 +28,11 @@ final class VersionMetadataContractTest extends PluginTestCase
 
         $headerVersion = trim($matches['version']);
 
-        self::assertSame($headerVersion, $versions['plugins']['fchub-memberships']['version']);
         self::assertSame($headerVersion, $package['version']);
         self::assertSame($headerVersion, $packageLock['version']);
         self::assertSame($headerVersion, $packageLock['packages']['']['version']);
         self::assertStringContainsString('Version: `' . $headerVersion . '`', $readme);
         self::assertStringContainsString('Current plugin version: `' . $headerVersion . '`', $readme);
+        self::assertStringContainsString('Stable tag: ' . $headerVersion, $wordpressOrgReadme);
     }
 }

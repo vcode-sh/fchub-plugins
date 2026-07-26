@@ -9,6 +9,7 @@ use FChubMultiCurrency\Domain\Enums\RateProvider;
 use FChubMultiCurrency\Domain\Enums\RoundingMode;
 use FChubMultiCurrency\Storage\OptionStore;
 use FChubMultiCurrency\Support\Constants;
+use FChubMultiCurrency\Support\RateSchedule;
 use FluentCart\App\Helpers\CurrenciesHelper;
 
 defined('ABSPATH') || exit;
@@ -40,6 +41,16 @@ final class SettingsAdminController
         $optionStore = new OptionStore();
 
         $previousInterval = (int) $optionStore->get('rate_refresh_interval_hrs', 6);
+        $previousProvider = RateProvider::tryFrom(
+            (string) $optionStore->get('rate_provider', 'manual'),
+        ) ?? RateProvider::Manual;
+
+        if (array_key_exists('rate_provider', $params)) {
+            $submittedProvider = sanitize_text_field((string) $params['rate_provider']);
+            if (RateProvider::tryFrom($submittedProvider) === null) {
+                return self::validationError('Select a valid exchange-rate provider.');
+            }
+        }
 
         $allowedKeys = array_keys(Constants::DEFAULT_SETTINGS);
         $sanitized = [];
@@ -68,7 +79,7 @@ final class SettingsAdminController
                 'base_currency',
                 'default_display_currency' => strtoupper(sanitize_text_field((string) $value)),
                 'url_param_key' => self::sanitizeUrlParamKey((string) $value),
-                'rate_provider' => self::sanitizeEnum((string) $value, array_column(RateProvider::cases(), 'value'), 'exchange_rate_api'),
+                'rate_provider' => self::sanitizeEnum((string) $value, array_column(RateProvider::cases(), 'value'), 'manual'),
                 'stale_fallback' => self::sanitizeEnum((string) $value, ['base', 'last_known'], 'base'),
                 'rounding_mode' => self::sanitizeEnum((string) $value, array_column(RoundingMode::cases(), 'value'), 'half_up'),
                 'cookie_lifetime_days' => max(1, min(365, (int) $value)),
@@ -79,14 +90,28 @@ final class SettingsAdminController
             };
         }
 
+        $provider = RateProvider::tryFrom(
+            (string) ($sanitized['rate_provider'] ?? $optionStore->get('rate_provider', 'manual')),
+        ) ?? RateProvider::Manual;
+        $apiKey = trim(
+            (string) ($sanitized['rate_provider_api_key'] ?? $optionStore->get('rate_provider_api_key', '')),
+        );
+        $providerChangedWithoutNewKey = $provider->requiresApiKey()
+            && $provider !== $previousProvider
+            && trim((string) ($sanitized['rate_provider_api_key'] ?? '')) === '';
+
+        if (($provider->requiresApiKey() && $apiKey === '') || $providerChangedWithoutNewKey) {
+            return self::validationError('An API key is required for the selected exchange-rate provider.');
+        }
+
         $optionStore->save($sanitized);
 
-        // Reschedule cron if the rate refresh interval changed
+        // A changed interval needs a fresh recurrence; provider consent controls whether it returns.
         $newInterval = (int) ($sanitized['rate_refresh_interval_hrs'] ?? $previousInterval);
         if ($newInterval !== $previousInterval) {
             wp_clear_scheduled_hook('fchub_mc_refresh_rates');
-            wp_schedule_event(time(), 'fchub_mc_rate_interval', 'fchub_mc_refresh_rates');
         }
+        RateSchedule::sync($optionStore);
 
         return new \WP_REST_Response([
             'data' => [
@@ -218,6 +243,15 @@ final class SettingsAdminController
     private static function sanitizeYesNo(mixed $value): string
     {
         return ((string) $value === 'yes') ? 'yes' : 'no';
+    }
+
+    private static function validationError(string $message): \WP_REST_Response
+    {
+        return new \WP_REST_Response([
+            'data' => [
+                'message' => $message,
+            ],
+        ], 422);
     }
 
     /**

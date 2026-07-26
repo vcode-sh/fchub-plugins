@@ -18,6 +18,6 @@ composer.json
 composer.lock
 package.json
 package-lock.json
-*.md
+README.md
 .DS_Store
 Thumbs.db

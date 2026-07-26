@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Payment</title>
+  <rect x="6" y="14" width="52" height="36" rx="7" fill="#334155"/>
+  <path d="M6 24h52v8H6z" fill="#f8fafc"/>
+  <circle cx="46" cy="42" r="4" fill="#94a3b8"/>
+</svg>

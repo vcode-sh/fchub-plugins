@@ -61,7 +61,8 @@ class InvoiceHandler
         $order->addLog(
             __('Fakturownia: Invoice created', 'fchub-fakturownia'),
             sprintf(
-                __('Invoice %s created in Fakturownia (ID: %d)', 'fchub-fakturownia'),
+                /* translators: 1: invoice number, 2: Fakturownia invoice ID. */
+                __('Invoice %1$s created in Fakturownia (ID: %2$d)', 'fchub-fakturownia'),
                 Arr::get($result, 'number', ''),
                 Arr::get($result, 'id', 0)
             ),
@@ -132,8 +133,10 @@ class InvoiceHandler
         } else {
             // B2C invoice - Fakturownia requires buyer_first_name + buyer_last_name
             $invoice['buyer_company'] = false;
-            $firstName = $billingAddress?->first_name ?? ($customer?->first_name ?? '');
-            $lastName = $billingAddress?->last_name ?? ($customer?->last_name ?? '');
+            $firstName = $billingAddress ? ($billingAddress->first_name ?? '') : '';
+            $lastName = $billingAddress ? ($billingAddress->last_name ?? '') : '';
+            $firstName = $firstName ?: ($customer ? ($customer->first_name ?? '') : '');
+            $lastName = $lastName ?: ($customer ? ($customer->last_name ?? '') : '');
 
             // If only a single name field is available, split it
             if (!$firstName && !$lastName && $billingAddress && $billingAddress->name) {
@@ -167,7 +170,7 @@ class InvoiceHandler
         }
 
         // Buyer contact
-        $buyerEmail = $customer?->email ?? '';
+        $buyerEmail = $customer ? ($customer->email ?? '') : '';
         if ($buyerEmail) {
             $invoice['buyer_email'] = mb_substr($buyerEmail, 0, 255);
         }
@@ -188,7 +191,7 @@ class InvoiceHandler
                     break;
                 }
             }
-            if ($hasExempt && empty($invoice['exempt_tax_kind'])) {
+            if ($hasExempt) {
                 $invoice['exempt_tax_kind'] = 'art. 43 ust. 1';
             }
         }

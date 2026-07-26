@@ -102,6 +102,19 @@ final class RefreshRatesLockTest extends TestCase
     }
 
     #[Test]
+    public function testSuccessfulStaleLockCasInvalidatesTheOptionsCache(): void
+    {
+        $this->setOption('fchub_mc_rate_refresh_lock', (string) (time() - 200));
+        $this->seedValidSettings();
+        wp_cache_set('fchub_mc_rate_refresh_lock', 'stale', 'options');
+
+        $GLOBALS['wpdb_mock_update_result'] = 1;
+        $this->makeAction()->execute();
+
+        $this->assertFalse(wp_cache_get('fchub_mc_rate_refresh_lock', 'options'));
+    }
+
+    #[Test]
     public function testStaleLockCasFailurePreventsExecution(): void
     {
         // Lock set 200 seconds ago — past the 120-second TTL

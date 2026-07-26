@@ -148,6 +148,30 @@ final class FakturowniaAPITest extends PluginTestCase
         $this->assertSame('GET', $capturedMethod);
     }
 
+    public function testJsonRequestsUseBoundedSecureTransport(): void
+    {
+        $capturedArgs = null;
+        $this->mockApiHandler(function ($method, $url, $args) use (&$capturedArgs) {
+            $capturedArgs = $args;
+
+            return [
+                'response' => ['code' => 200],
+                'body'     => json_encode(['id' => 42]),
+                'headers'  => ['content-type' => 'application/json'],
+            ];
+        });
+
+        (new FakturowniaAPI('test', 'token'))->getInvoice(42);
+
+        $this->assertSame(0, $capturedArgs['redirection']);
+        $this->assertTrue($capturedArgs['sslverify']);
+        $this->assertSame(2 * MB_IN_BYTES, $capturedArgs['limit_response_size']);
+        $this->assertSame(
+            'FCHub Fakturownia/' . FCHUB_FAKTUROWNIA_VERSION,
+            $capturedArgs['headers']['User-Agent']
+        );
+    }
+
     public function testApiErrorReturnsErrorArray(): void
     {
         $this->mockApiResponse(
@@ -209,6 +233,82 @@ final class FakturowniaAPITest extends PluginTestCase
         $this->assertArrayNotHasKey('error', $result);
         $this->assertStringStartsWith('%PDF', $result['body']);
         $this->assertSame('application/pdf', $result['content_type']);
+    }
+
+    public function testPdfRequestsUseBoundedSecureTransport(): void
+    {
+        $capturedArgs = null;
+        $this->mockApiHandler(function ($method, $url, $args) use (&$capturedArgs) {
+            $capturedArgs = $args;
+
+            return [
+                'response' => ['code' => 200],
+                'body'     => '%PDF-1.4 fake pdf content',
+                'headers'  => ['content-type' => 'application/pdf'],
+            ];
+        });
+
+        (new FakturowniaAPI('test', 'token'))->downloadInvoicePdf(42);
+
+        $this->assertSame(0, $capturedArgs['redirection']);
+        $this->assertTrue($capturedArgs['sslverify']);
+        $this->assertSame(20 * MB_IN_BYTES, $capturedArgs['limit_response_size']);
+        $this->assertSame(
+            'FCHub Fakturownia/' . FCHUB_FAKTUROWNIA_VERSION,
+            $capturedArgs['headers']['User-Agent']
+        );
+    }
+
+    public function testDownloadPdfRejectsUnexpectedContentType(): void
+    {
+        $this->mockApiHandler(fn () => [
+            'response' => ['code' => 200],
+            'body'     => '%PDF-1.4 fake pdf content',
+            'headers'  => ['content-type' => 'text/html'],
+        ]);
+
+        $result = (new FakturowniaAPI('test', 'token'))->downloadInvoicePdf(42);
+
+        $this->assertArrayHasKey('error', $result);
+    }
+
+    public function testDownloadPdfRejectsInvalidSignature(): void
+    {
+        $this->mockApiHandler(fn () => [
+            'response' => ['code' => 200],
+            'body'     => '<html>not a pdf</html>',
+            'headers'  => ['content-type' => 'application/pdf'],
+        ]);
+
+        $result = (new FakturowniaAPI('test', 'token'))->downloadInvoicePdf(42);
+
+        $this->assertArrayHasKey('error', $result);
+    }
+
+    public function testDownloadPdfRejectsNon200SuccessStatus(): void
+    {
+        $this->mockApiHandler(fn () => [
+            'response' => ['code' => 201],
+            'body'     => '%PDF-1.4 fake pdf content',
+            'headers'  => ['content-type' => 'application/pdf'],
+        ]);
+
+        $result = (new FakturowniaAPI('test', 'token'))->downloadInvoicePdf(42);
+
+        $this->assertArrayHasKey('error', $result);
+    }
+
+    public function testDownloadPdfRejectsOversizedBody(): void
+    {
+        $this->mockApiHandler(fn () => [
+            'response' => ['code' => 200],
+            'body'     => '%PDF-' . str_repeat('x', (20 * MB_IN_BYTES) + 1),
+            'headers'  => ['content-type' => 'application/pdf'],
+        ]);
+
+        $result = (new FakturowniaAPI('test', 'token'))->downloadInvoicePdf(42);
+
+        $this->assertArrayHasKey('error', $result);
     }
 
     public function testDownloadPdf404ReturnsError(): void

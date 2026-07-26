@@ -16,11 +16,11 @@ use PHPUnit\Framework\Attributes\Test;
 final class ProviderRegistryTest extends TestCase
 {
     #[Test]
-    public function testResolvesExchangeRateApiByDefault(): void
+    public function testResolvesManualProviderByDefault(): void
     {
         $provider = ProviderRegistry::resolve(new OptionStore());
 
-        $this->assertInstanceOf(ExchangeRateApiProvider::class, $provider);
+        $this->assertInstanceOf(ManualProvider::class, $provider);
     }
 
     #[Test]
@@ -54,12 +54,12 @@ final class ProviderRegistryTest extends TestCase
     }
 
     #[Test]
-    public function testInvalidSlugFallsBackToExchangeRateApi(): void
+    public function testInvalidSlugFallsBackToManualProvider(): void
     {
         $this->setOption('fchub_mc_settings', ['rate_provider' => 'invalid_slug']);
 
         $provider = ProviderRegistry::resolve(new OptionStore());
 
-        $this->assertInstanceOf(ExchangeRateApiProvider::class, $provider);
+        $this->assertInstanceOf(ManualProvider::class, $provider);
     }
 }

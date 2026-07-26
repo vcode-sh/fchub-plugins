@@ -19,8 +19,8 @@ class MemberStatsReport
         global $wpdb;
         $this->grantRepo = new GrantRepository();
         $this->planRepo = new PlanRepository();
-        $this->statsTable = $wpdb->prefix . 'fchub_membership_stats_daily';
-        $this->grantsTable = $wpdb->prefix . 'fchub_membership_grants';
+        $this->statsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_stats_daily');
+        $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
     }
 
     /**
@@ -42,16 +42,22 @@ class MemberStatsReport
             $churnRate = round(($churnedThisMonth / ($activeMembers + $churnedThisMonth)) * 100, 2);
         }
 
-        $plansTable = $wpdb->prefix . 'fchub_membership_plans';
-        $protectionTable = $wpdb->prefix . 'fchub_membership_protection_rules';
+        $plansTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
+        $protectionTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_protection_rules');
 
-        $activePlans = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$plansTable} WHERE status = 'active'"
+        $activePlans = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT COUNT(*) FROM {$plansTable} WHERE status = %s",
+                'active',
+            )
         );
-        $contentProtected = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$protectionTable}"
+        $contentProtected = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT COUNT(*) FROM {$protectionTable} WHERE 1 = %d",
+                1,
+            )
         );
-        $grantsThisMonth = (int) $wpdb->get_var($wpdb->prepare(
+        $grantsThisMonth = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->grantsTable} WHERE created_at >= %s AND created_at <= %s",
             $range['from_datetime'],
             $range['to_datetime']
@@ -80,7 +86,7 @@ class MemberStatsReport
 
         $range = $this->resolveRange($period, $from, $to);
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT stat_date AS date, SUM(active_count) AS count
              FROM {$this->statsTable}
              WHERE stat_date >= %s AND stat_date <= %s
@@ -108,9 +114,9 @@ class MemberStatsReport
         global $wpdb;
         $range = $this->resolveRange('30d', $from, $to);
         $now = $range['to_datetime'];
-        $plansTable = $wpdb->prefix . 'fchub_membership_plans';
+        $plansTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT g.plan_id, p.title AS plan_title, COUNT(DISTINCT g.user_id) AS count
              FROM {$this->grantsTable} g
              LEFT JOIN {$plansTable} p ON g.plan_id = p.id
@@ -159,14 +165,14 @@ class MemberStatsReport
             // Get revenue from orders linked to this plan's grants today
             $revenue = $this->getDailyRevenue($planId, $dayStart, $dayEnd);
 
-            $existing = $wpdb->get_var($wpdb->prepare(
+            $existing = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT id FROM {$this->statsTable} WHERE stat_date = %s AND plan_id = %d",
                 $today,
                 $planId
             ));
 
             if ($existing) {
-                $wpdb->update(
+                \FChubMemberships\Support\CustomTableDatabase::update(
                     $this->statsTable,
                     [
                         'active_count'  => $activeCount,
@@ -177,7 +183,7 @@ class MemberStatsReport
                     ['id' => (int) $existing]
                 );
             } else {
-                $wpdb->insert($this->statsTable, [
+                \FChubMemberships\Support\CustomTableDatabase::insert($this->statsTable, [
                     'stat_date'     => $today,
                     'plan_id'       => $planId,
                     'active_count'  => $activeCount,
@@ -194,13 +200,13 @@ class MemberStatsReport
         $totalChurned = $this->grantRepo->countChurnedMembers($dayStart, $dayEnd);
         $totalRevenue = $this->getDailyRevenue(null, $dayStart, $dayEnd);
 
-        $existing = $wpdb->get_var($wpdb->prepare(
+        $existing = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT id FROM {$this->statsTable} WHERE stat_date = %s AND plan_id = 0",
             $today
         ));
 
         if ($existing) {
-            $wpdb->update(
+            \FChubMemberships\Support\CustomTableDatabase::update(
                 $this->statsTable,
                 [
                     'active_count'  => $totalActive,
@@ -211,7 +217,7 @@ class MemberStatsReport
                 ['id' => (int) $existing]
             );
         } else {
-            $wpdb->insert($this->statsTable, [
+            \FChubMemberships\Support\CustomTableDatabase::insert($this->statsTable, [
                 'stat_date'     => $today,
                 'plan_id'       => 0,
                 'active_count'  => $totalActive,
@@ -229,10 +235,10 @@ class MemberStatsReport
     {
         global $wpdb;
 
-        $ordersTable = $wpdb->prefix . 'fct_orders';
+        $ordersTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_orders');
 
         if ($planId !== null) {
-            $revenue = $wpdb->get_var($wpdb->prepare(
+            $revenue = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT COALESCE(SUM(o.total_amount), 0)
                  FROM {$this->grantsTable} g
                  JOIN {$ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
@@ -244,7 +250,7 @@ class MemberStatsReport
                 $to
             ));
         } else {
-            $revenue = $wpdb->get_var($wpdb->prepare(
+            $revenue = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT COALESCE(SUM(o.total_amount), 0)
                  FROM {$this->grantsTable} g
                  JOIN {$ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'

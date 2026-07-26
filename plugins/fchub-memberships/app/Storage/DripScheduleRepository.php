@@ -14,14 +14,14 @@ class DripScheduleRepository
     public function __construct(?Clock $clock = null)
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_drip_notifications';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_drip_notifications');
         $this->clock = $clock ?? new Clock();
     }
 
     public function find(int $id): ?array
     {
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
@@ -45,7 +45,7 @@ class DripScheduleRepository
             'status'       => 'pending',
         ];
 
-        $wpdb->insert($this->table, $insert);
+        \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $insert);
         return (int) $wpdb->insert_id;
     }
 
@@ -60,7 +60,7 @@ class DripScheduleRepository
         global $wpdb;
         $now = $this->clock->storage($this->clock->now());
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE (status = 'pending' AND notify_at <= %s)
                 OR (status = 'failed' AND retry_count < 3 AND next_retry_at IS NOT NULL AND next_retry_at <= %s)
@@ -80,7 +80,7 @@ class DripScheduleRepository
     public function markSent(int $id): bool
     {
         global $wpdb;
-        return $wpdb->update(
+        return \FChubMemberships\Support\CustomTableDatabase::update(
             $this->table,
             ['status' => 'sent', 'sent_at' => $this->clock->storage($this->clock->now())],
             ['id' => $id]
@@ -90,7 +90,7 @@ class DripScheduleRepository
     public function markDeferred(int $id): bool
     {
         global $wpdb;
-        return $wpdb->update(
+        return \FChubMemberships\Support\CustomTableDatabase::update(
             $this->table,
             ['status' => 'deferred'],
             ['id' => $id]
@@ -100,7 +100,7 @@ class DripScheduleRepository
     public function markCancelled(int $id): bool
     {
         global $wpdb;
-        return $wpdb->update(
+        return \FChubMemberships\Support\CustomTableDatabase::update(
             $this->table,
             ['status' => 'cancelled'],
             ['id' => $id]
@@ -110,7 +110,7 @@ class DripScheduleRepository
     public function releaseDeferredForGrant(int $grantId): int
     {
         global $wpdb;
-        $released = $wpdb->update(
+        $released = \FChubMemberships\Support\CustomTableDatabase::update(
             $this->table,
             ['status' => 'pending'],
             ['grant_id' => $grantId, 'status' => 'deferred']
@@ -151,7 +151,7 @@ class DripScheduleRepository
             $update['next_retry_at'] = null;
         }
 
-        return $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        return \FChubMemberships\Support\CustomTableDatabase::update($this->table, $update, ['id' => $id]) !== false;
     }
 
     /**
@@ -160,7 +160,7 @@ class DripScheduleRepository
     public function getByGrantId(int $grantId): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE grant_id = %d ORDER BY notify_at ASC",
             $grantId
         ), ARRAY_A);
@@ -189,10 +189,10 @@ class DripScheduleRepository
             $page = max(1, (int) ($filters['page'] ?? 1));
             $perPage = (int) $filters['per_page'];
             $offset = ($page - 1) * $perPage;
-            $sql .= $wpdb->prepare(' LIMIT %d OFFSET %d', $perPage, $offset);
+            $sql .= \FChubMemberships\Support\CustomTableDatabase::prepare(' LIMIT %d OFFSET %d', $perPage, $offset)->sql();
         }
 
-        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params), ARRAY_A);
         return array_map([$this, 'hydrate'], $rows ?: []);
     }
 
@@ -202,7 +202,7 @@ class DripScheduleRepository
     public function deleteByGrantId(int $grantId): int
     {
         global $wpdb;
-        return (int) $wpdb->delete($this->table, ['grant_id' => $grantId]);
+        return (int) \FChubMemberships\Support\CustomTableDatabase::delete($this->table, ['grant_id' => $grantId]);
     }
 
     /**
@@ -211,8 +211,11 @@ class DripScheduleRepository
     public function countPending(): int
     {
         global $wpdb;
-        return (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$this->table} WHERE status = 'pending'"
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT COUNT(*) FROM {$this->table} WHERE status = %s",
+                'pending',
+            )
         );
     }
 
@@ -222,8 +225,11 @@ class DripScheduleRepository
     public function countSent(): int
     {
         global $wpdb;
-        return (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$this->table} WHERE status = 'sent'"
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT COUNT(*) FROM {$this->table} WHERE status = %s",
+                'sent',
+            )
         );
     }
 
@@ -234,8 +240,8 @@ class DripScheduleRepository
     {
         global $wpdb;
 
-        $where = ['1=1'];
-        $params = [];
+        $where = ['1=%d'];
+        $params = [1];
 
         if (!empty($filters['status'])) {
             $where[] = 'status = %s';
@@ -261,14 +267,12 @@ class DripScheduleRepository
             $page = max(1, (int) ($filters['page'] ?? 1));
             $perPage = (int) $filters['per_page'];
             $offset = ($page - 1) * $perPage;
-            $sql .= $wpdb->prepare(' LIMIT %d OFFSET %d', $perPage, $offset);
+            $sql .= \FChubMemberships\Support\CustomTableDatabase::prepare(' LIMIT %d OFFSET %d', $perPage, $offset)->sql();
         }
 
-        if ($params) {
-            $sql = $wpdb->prepare($sql, ...$params);
-        }
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params);
 
-        $rows = $wpdb->get_results($sql, ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults($query, ARRAY_A);
         return array_map([$this, 'hydrate'], $rows ?: []);
     }
 
@@ -279,7 +283,7 @@ class DripScheduleRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT dn.*, g.resource_type, g.resource_id, g.plan_id
              FROM {$this->table} dn
              LEFT JOIN {$wpdb->prefix}fchub_membership_grants g ON dn.grant_id = g.id

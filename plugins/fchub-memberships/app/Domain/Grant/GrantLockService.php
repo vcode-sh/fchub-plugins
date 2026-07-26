@@ -108,7 +108,9 @@ final class GrantLockService
     {
         $object = $payload[$key] ?? null;
         if (!is_object($object)) {
-            throw new \InvalidArgumentException("Subscription renewal payload must expose {$key} as an object.");
+            throw new \InvalidArgumentException(
+                sprintf('Subscription renewal payload must expose %s as an object.', esc_html($key))
+            );
         }
 
         $value = $object->id ?? null;
@@ -116,7 +118,9 @@ final class GrantLockService
             return $value;
         }
         if (!is_string($value) || $value === '' || !ctype_digit($value)) {
-            throw new \InvalidArgumentException("Subscription renewal {$key} must expose a positive integer ID.");
+            throw new \InvalidArgumentException(
+                sprintf('Subscription renewal %s must expose a positive integer ID.', esc_html($key))
+            );
         }
 
         $normalised = ltrim($value, '0');
@@ -125,7 +129,9 @@ final class GrantLockService
             || strlen($normalised) > strlen($maximum)
             || (strlen($normalised) === strlen($maximum) && strcmp($normalised, $maximum) > 0)
         ) {
-            throw new \InvalidArgumentException("Subscription renewal {$key} must expose a positive integer ID.");
+            throw new \InvalidArgumentException(
+                sprintf('Subscription renewal %s must expose a positive integer ID.', esc_html($key))
+            );
         }
 
         return (int) $normalised;

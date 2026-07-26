@@ -2,6 +2,8 @@
 
 namespace FChubMemberships\Storage;
 
+use FChubMemberships\Support\Logger;
+
 defined('ABSPATH') || exit;
 
 class EntitlementEdgeRepository
@@ -30,15 +32,15 @@ class EntitlementEdgeRepository
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_entitlement_edges';
-        $this->operationsTable = $wpdb->prefix . 'fchub_membership_provider_operations';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_entitlement_edges');
+        $this->operationsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_provider_operations');
     }
 
     public function findById(int $id): ?array
     {
         global $wpdb;
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
@@ -53,7 +55,7 @@ class EntitlementEdgeRepository
     {
         global $wpdb;
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE user_id = %d
                AND provider = %s
@@ -91,7 +93,7 @@ class EntitlementEdgeRepository
         global $wpdb;
         $insert = $this->persistedFields($data);
         $insert['policy'] = wp_json_encode($insert['policy'] ?? []);
-        $created = $wpdb->insert($this->table, $insert);
+        $created = \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $insert);
         if ($created === false) {
             $existing = $this->findByIdentity($data);
             if ($existing) {
@@ -130,7 +132,7 @@ class EntitlementEdgeRepository
             'end_reason' => $reason,
             'updated_at' => $endedAt,
         ];
-        $updated = $wpdb->update(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::update(
             $this->table,
             $update,
             ['id' => (int) $existing['id'], 'lifecycle' => 'active']
@@ -167,7 +169,7 @@ class EntitlementEdgeRepository
         }
 
         global $wpdb;
-        $updated = $wpdb->update(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::update(
             $this->table,
             ['expires_at' => $newExpiry, 'updated_at' => $updatedAt],
             ['id' => $edgeId, 'lifecycle' => 'active', 'expires_at' => $currentExpiry]
@@ -198,7 +200,7 @@ class EntitlementEdgeRepository
     ): array {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE user_id = %d
                AND provider = %s
@@ -226,7 +228,7 @@ class EntitlementEdgeRepository
 
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE user_id = %d
                AND provider = %s
@@ -257,7 +259,7 @@ class EntitlementEdgeRepository
 
         global $wpdb;
         $placeholders = implode(', ', array_fill(0, count($edgeIds), '%d'));
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET access_status = %s, updated_at = %s
              WHERE lifecycle = 'active'
@@ -279,7 +281,12 @@ class EntitlementEdgeRepository
     {
         global $wpdb;
 
-        $maximum = $wpdb->get_var("SELECT COALESCE(MAX(id), 0) FROM {$this->table}");
+        $maximum = \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT COALESCE(MAX(id), 0) FROM {$this->table} WHERE 1 = %d",
+                1,
+            ),
+        );
         if ($maximum === null || $this->databaseHasError()) {
             throw new \RuntimeException('Unable to read reconciliation watermark.');
         }
@@ -302,7 +309,7 @@ class EntitlementEdgeRepository
             throw new \InvalidArgumentException('Reconciliation page criteria are invalid.');
         }
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT edge.*, resource_page.cursor_id
              FROM {$this->table} edge
              INNER JOIN (
@@ -362,7 +369,7 @@ class EntitlementEdgeRepository
         if ($userId <= 0 || $provider === '' || $resourceType === '' || $resourceId === '') {
             throw new \InvalidArgumentException('Entitlement resource identity is invalid.');
         }
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE user_id = %d
                AND provider = %s
@@ -426,7 +433,7 @@ class EntitlementEdgeRepository
         }
         $this->appendEdgeIdCriteria($context, $where, $params);
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE " . implode(' AND ', $where) . ' ORDER BY id ASC',
             ...$params
         ), ARRAY_A);
@@ -482,7 +489,7 @@ class EntitlementEdgeRepository
         }
         $this->appendEdgeIdCriteria($context, $where, $params);
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE " . implode(' AND ', $where) . ' ORDER BY id ASC',
             ...$params
         ), ARRAY_A);
@@ -510,7 +517,7 @@ class EntitlementEdgeRepository
         }
 
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE lifecycle = %s
                AND (
@@ -536,7 +543,7 @@ class EntitlementEdgeRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE lifecycle = 'active'
                AND (
@@ -567,7 +574,7 @@ class EntitlementEdgeRepository
         if ($sourceId < 0 || $sourceType === '' || !in_array($lifecycle, self::LIFECYCLES, true)) {
             throw new \InvalidArgumentException('Typed entitlement source is invalid.');
         }
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE source_type = %s
                AND source_id = %d
@@ -605,7 +612,7 @@ class EntitlementEdgeRepository
     ): bool {
         global $wpdb;
 
-        $count = $wpdb->get_var($wpdb->prepare(
+        $count = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT CASE WHEN
                 EXISTS (
                     SELECT 1 FROM {$this->table} unsafe_edge
@@ -664,19 +671,19 @@ class EntitlementEdgeRepository
     {
         global $wpdb;
 
-        if ($wpdb->query('START TRANSACTION') === false) {
+        if (\FChubMemberships\Support\CustomTableDatabase::beginTransaction() === false) {
             throw new \RuntimeException('The entitlement transaction could not be started.');
         }
 
         try {
             $result = $callback();
-            if ($wpdb->query('COMMIT') === false) {
+            if (\FChubMemberships\Support\CustomTableDatabase::commit() === false) {
                 throw new \RuntimeException('The entitlement transaction could not be committed.');
             }
 
             return $result;
         } catch (\Throwable $exception) {
-            $wpdb->query('ROLLBACK');
+            \FChubMemberships\Support\CustomTableDatabase::rollBack();
             throw $exception;
         }
     }
@@ -686,7 +693,7 @@ class EntitlementEdgeRepository
         global $wpdb;
 
         $lockName = $this->resourceLockName($resource);
-        $acquired = (int) $wpdb->get_var($wpdb->prepare(
+        $acquired = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             'SELECT GET_LOCK(%s, %d)',
             $lockName,
             10
@@ -703,16 +710,15 @@ class EntitlementEdgeRepository
             $failure = $exception;
         }
 
-        $released = (int) $wpdb->get_var($wpdb->prepare(
+        $released = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             'SELECT RELEASE_LOCK(%s)',
             $lockName
         ));
         if ($released !== 1) {
-            throw new \RuntimeException(
-                'The entitlement resource lock could not be released.',
-                0,
-                $failure
-            );
+            if ($failure) {
+                Logger::error('The entitlement resource lock could not be released.', $failure->getMessage());
+            }
+            throw new \RuntimeException('The entitlement resource lock could not be released.');
         }
         if ($failure) {
             throw $failure;

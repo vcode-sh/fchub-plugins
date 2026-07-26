@@ -32,5 +32,4 @@ final class UrlParamResolver
 
         return $code;
     }
-
 }

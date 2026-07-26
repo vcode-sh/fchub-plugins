@@ -13,54 +13,54 @@
       "description": "Przelewy24 payment gateway for FluentCart, built for the Polish market. Handles checkout, IPN callbacks, and refunds so nobody has to explain BLIK to a support ticket.",
       "status": "stable",
       "plugin_file": "fchub-p24/fchub-p24.php",
-      "requires_wp": "6.4",
-      "requires_php": "8.1",
+      "requires_wp": "7.0",
+      "requires_php": "8.3",
       "dependencies": [
         "fluentcart"
       ],
       "docs_path": "/docs/fchub-p24",
       "admin_path": "admin.php?page=fluent-cart#/settings/payment-methods",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "docs_url": "https://fchub.co/docs/fchub-p24",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.3",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-p24/v1.0.3/fchub-p24-1.0.3.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-p24/v1.0.3/fchub-p24-1.0.3.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-p24/v1.0.4",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-p24/v1.0.4/fchub-p24-1.0.4.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-p24/v1.0.4/fchub-p24-1.0.4.zip.sha256"
     },
     "fchub-fakturownia": {
       "name": "Fakturownia",
       "description": "Invoice automation with Fakturownia and KSeF 2.0 for FluentCart orders. Generates, sends, and tracks invoices automatically, including real-time submission to the tax office.",
       "status": "stable",
       "plugin_file": "fchub-fakturownia/fchub-fakturownia.php",
-      "requires_wp": "6.4",
-      "requires_php": "8.1",
+      "requires_wp": "7.0",
+      "requires_php": "8.3",
       "dependencies": [
         "fluentcart"
       ],
       "docs_path": "/docs/fchub-fakturownia",
       "admin_path": "admin.php?page=fluent-cart#/integrations/fakturownia",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "docs_url": "https://fchub.co/docs/fchub-fakturownia",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.1",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-fakturownia/v1.1.1/fchub-fakturownia-1.1.1.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-fakturownia/v1.1.1/fchub-fakturownia-1.1.1.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.2",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-fakturownia/v1.1.2/fchub-fakturownia-1.1.2.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-fakturownia/v1.1.2/fchub-fakturownia-1.1.2.zip.sha256"
     },
     "fchub-memberships": {
       "name": "Memberships",
       "description": "A complete membership system for FluentCart: plans, access rules, and drip content. Grants and revokes access automatically as subscriptions change, so nobody keeps access they stopped paying for.",
       "status": "stable",
       "plugin_file": "fchub-memberships/fchub-memberships.php",
-      "requires_wp": "6.7",
+      "requires_wp": "7.0",
       "requires_php": "8.3",
       "dependencies": [
         "fluentcart"
       ],
       "docs_path": "/docs/fchub-memberships",
       "admin_path": "admin.php?page=fchub-memberships",
-      "version": "1.4.0",
+      "version": "1.4.1",
       "docs_url": "https://fchub.co/docs/fchub-memberships",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.0",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.0/fchub-memberships-1.4.0.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.0/fchub-memberships-1.4.0.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.1",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.1/fchub-memberships-1.4.1.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.1/fchub-memberships-1.4.1.zip.sha256"
     },
     "fchub-portal-extender": {
       "name": "Portal Extender",
@@ -85,36 +85,36 @@
       "description": "Wishlists for FluentCart shoppers. Lets customers save products for later instead of abandoning their cart in despair.",
       "status": "stable",
       "plugin_file": "fchub-wishlist/fchub-wishlist.php",
-      "requires_wp": "6.7",
+      "requires_wp": "7.0",
       "requires_php": "8.3",
       "dependencies": [
         "fluentcart"
       ],
       "docs_path": "/docs/fchub-wishlist",
       "admin_path": "admin.php?page=fluent-cart#/settings/wishlist",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "docs_url": "https://fchub.co/docs/fchub-wishlist",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-wishlist/v1.0.1",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-wishlist/v1.0.1/fchub-wishlist-1.0.1.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-wishlist/v1.0.1/fchub-wishlist-1.0.1.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-wishlist/v1.0.2",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-wishlist/v1.0.2/fchub-wishlist-1.0.2.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-wishlist/v1.0.2/fchub-wishlist-1.0.2.zip.sha256"
     },
     "fchub-multi-currency": {
       "name": "Multi-Currency",
       "description": "Automatic currency conversion for FluentCart storefronts. Shows prices in the customer's local currency, so pricing complaints arrive in more languages.",
       "status": "stable",
       "plugin_file": "fchub-multi-currency/fchub-multi-currency.php",
-      "requires_wp": "6.7",
+      "requires_wp": "7.0",
       "requires_php": "8.3",
       "dependencies": [
         "fluentcart"
       ],
       "docs_path": "/docs/fchub-multi-currency",
       "admin_path": "admin.php?page=fluent-cart#/settings/multi-currency",
-      "version": "1.4.0",
+      "version": "1.4.1",
       "docs_url": "https://fchub.co/docs/fchub-multi-currency",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.0",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.0/fchub-multi-currency-1.4.0.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.0/fchub-multi-currency-1.4.0.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.1",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.1/fchub-multi-currency-1.4.1.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.1/fchub-multi-currency-1.4.1.zip.sha256"
     }
   }
 }

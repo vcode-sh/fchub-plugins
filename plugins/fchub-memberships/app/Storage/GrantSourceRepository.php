@@ -11,7 +11,7 @@ class GrantSourceRepository
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_grant_sources';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grant_sources');
     }
 
     public function addSource(int $grantId, string $sourceType, int $sourceId): bool
@@ -21,7 +21,7 @@ class GrantSourceRepository
         }
 
         global $wpdb;
-        return $wpdb->insert($this->table, [
+        return \FChubMemberships\Support\CustomTableDatabase::insert($this->table, [
             'grant_id'    => $grantId,
             'source_type' => $sourceType,
             'source_id'   => $sourceId,
@@ -32,7 +32,7 @@ class GrantSourceRepository
     public function removeSource(int $grantId, string $sourceType, int $sourceId): bool
     {
         global $wpdb;
-        return $wpdb->delete($this->table, [
+        return \FChubMemberships\Support\CustomTableDatabase::delete($this->table, [
             'grant_id'    => $grantId,
             'source_type' => $sourceType,
             'source_id'   => $sourceId,
@@ -42,7 +42,7 @@ class GrantSourceRepository
     public function getSourcesByGrant(int $grantId): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE grant_id = %d ORDER BY created_at ASC",
             $grantId
         ), ARRAY_A);
@@ -56,7 +56,7 @@ class GrantSourceRepository
     public function getGrantsBySource(int $sourceId, string $sourceType = 'order'): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE source_id = %d AND source_type = %s",
             $sourceId,
             $sourceType
@@ -68,7 +68,7 @@ class GrantSourceRepository
     public function hasSource(int $grantId, string $sourceType, int $sourceId): bool
     {
         global $wpdb;
-        return (bool) $wpdb->get_var($wpdb->prepare(
+        return (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table} WHERE grant_id = %d AND source_type = %s AND source_id = %d",
             $grantId,
             $sourceType,
@@ -82,7 +82,7 @@ class GrantSourceRepository
     public function removeAllByGrant(int $grantId): bool
     {
         global $wpdb;
-        return $wpdb->delete($this->table, ['grant_id' => $grantId]) !== false;
+        return \FChubMemberships\Support\CustomTableDatabase::delete($this->table, ['grant_id' => $grantId]) !== false;
     }
 
     /**
@@ -91,7 +91,7 @@ class GrantSourceRepository
     public function getGrantIdsBySource(int $sourceId, string $sourceType = 'order'): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT DISTINCT grant_id FROM {$this->table} WHERE source_id = %d AND source_type = %s",
             $sourceId,
             $sourceType
@@ -106,7 +106,7 @@ class GrantSourceRepository
     public function countSourcesByGrant(int $grantId): int
     {
         global $wpdb;
-        return (int) $wpdb->get_var($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table} WHERE grant_id = %d",
             $grantId
         ));
@@ -118,10 +118,12 @@ class GrantSourceRepository
     public static function createTable(): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'fchub_membership_grant_sources';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grant_sources');
         $charset = $wpdb->get_charset_collate();
 
-        if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'")) {
+        if (\FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare('SHOW TABLES LIKE %s', $table),
+        )) {
             return;
         }
 
@@ -146,23 +148,33 @@ class GrantSourceRepository
     public static function migrateFromJson(): void
     {
         global $wpdb;
-        $grantsTable = $wpdb->prefix . 'fchub_membership_grants';
-        $sourcesTable = $wpdb->prefix . 'fchub_membership_grant_sources';
+        $grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
+        $sourcesTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grant_sources');
 
         // Skip if junction table doesn't exist
-        if (!$wpdb->get_var("SHOW TABLES LIKE '{$sourcesTable}'")) {
+        if (!\FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare('SHOW TABLES LIKE %s', $sourcesTable),
+        )) {
             return;
         }
 
         // Skip if already migrated (junction table has rows)
-        $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$sourcesTable}");
+        $count = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT COUNT(*) FROM {$sourcesTable} WHERE 1 = %d",
+                1,
+            ),
+        );
         if ($count > 0) {
             return;
         }
 
-        $grants = $wpdb->get_results(
-            "SELECT id, source_type, source_id, source_ids FROM {$grantsTable}
-             WHERE source_ids IS NOT NULL AND source_ids != '[]' AND source_ids != ''",
+        $grants = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT id, source_type, source_id, source_ids FROM {$grantsTable}
+             WHERE source_ids IS NOT NULL AND source_ids != %s AND source_ids != %s",
+                '[]',
+                '',
+            ),
             ARRAY_A
         );
 
@@ -184,7 +196,7 @@ class GrantSourceRepository
                     continue;
                 }
 
-                $wpdb->insert($sourcesTable, [
+                \FChubMemberships\Support\CustomTableDatabase::insert($sourcesTable, [
                     'grant_id'    => $grantId,
                     'source_type' => $sourceType,
                     'source_id'   => $sourceId,

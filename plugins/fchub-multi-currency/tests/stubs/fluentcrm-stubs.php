@@ -62,6 +62,16 @@ if (!class_exists('FluentCrm\App\Models\FunnelSubscriber')) {
             self::$mockData = [];
         }
 
+        public static function query(): object
+        {
+            return new class {
+                public function where(string $field, $value): object
+                {
+                    return FluentCrm_App_Models_FunnelSubscriber::where($field, $value);
+                }
+            };
+        }
+
         public static function where(string $field, $value): object
         {
             $data = self::$mockData[$value] ?? null;
@@ -86,6 +96,23 @@ if (!class_exists('FluentCrm\App\Models\FunnelSubscriber')) {
     }
 
     class_alias('FluentCrm_App_Models_FunnelSubscriber', 'FluentCrm\App\Models\FunnelSubscriber');
+}
+
+// Custom contact field model stub
+if (!class_exists('FluentCrm\App\Models\CustomContactField')) {
+    // phpcs:ignore
+    class FluentCrm_App_Models_CustomContactField
+    {
+        /** @return array{fields: array<int, array<string, mixed>>} */
+        public function getGlobalFields(): array
+        {
+            return [
+                'fields' => $GLOBALS['fluentcrm_mock_custom_fields'] ?? [],
+            ];
+        }
+    }
+
+    class_alias('FluentCrm_App_Models_CustomContactField', 'FluentCrm\App\Models\CustomContactField');
 }
 
 // FluentCRM contact stub

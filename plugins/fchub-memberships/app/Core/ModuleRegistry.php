@@ -23,7 +23,7 @@ final class ModuleRegistry
         $key = $module->key();
 
         if (isset($this->modules[$key])) {
-            throw new \InvalidArgumentException(sprintf('Module "%s" is already registered.', $key));
+            throw new \InvalidArgumentException(sprintf('Module "%s" is already registered.', esc_html($key)));
         }
 
         $this->modules[$key] = $module;

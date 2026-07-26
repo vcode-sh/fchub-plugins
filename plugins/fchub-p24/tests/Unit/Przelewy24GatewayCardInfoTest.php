@@ -51,7 +51,6 @@ class Przelewy24GatewayCardInfoTest extends TestCase
 
         // Use reflection to call private method
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 987654);
 
         $this->assertSame('card-ref-xyz', $sub->getMeta('_p24_card_ref_id'));
@@ -84,7 +83,6 @@ class Przelewy24GatewayCardInfoTest extends TestCase
         $transaction->subscription_id = 42;
 
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 123);
 
         $this->assertSame('p24_sub_42', $sub->vendor_subscription_id);
@@ -113,7 +111,6 @@ class Przelewy24GatewayCardInfoTest extends TestCase
         $transaction->subscription_id = 42;
 
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 123);
 
         $schedules = array_filter($_fchub_test_as_actions, fn($a) => $a['type'] === 'schedule');
@@ -128,7 +125,6 @@ class Przelewy24GatewayCardInfoTest extends TestCase
         // No subscription_id set
 
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 123);
 
         // No subscription should have been looked up or modified
@@ -159,7 +155,6 @@ class Przelewy24GatewayCardInfoTest extends TestCase
         $transaction->subscription_id = 42;
 
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 123);
 
         // API should not have been called since refId already exists
@@ -190,7 +185,6 @@ class Przelewy24GatewayCardInfoTest extends TestCase
         $transaction->subscription_id = 42;
 
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 123);
 
         // Should not have stored any card info
@@ -220,7 +214,6 @@ class Przelewy24GatewayCardInfoTest extends TestCase
         $transaction->subscription_id = 42;
 
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 123);
 
         $this->assertNull($sub->getMeta('_p24_card_ref_id'));

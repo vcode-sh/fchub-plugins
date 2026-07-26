@@ -814,7 +814,9 @@ class EntitlementService
     {
         foreach (self::IDENTITY_FIELDS as $field) {
             if (!array_key_exists($field, $identity)) {
-                throw new \InvalidArgumentException("Entitlement identity field {$field} is required.");
+                throw new \InvalidArgumentException(
+                    sprintf('Entitlement identity field %s is required.', esc_html($field))
+                );
             }
         }
 
@@ -835,12 +837,12 @@ class EntitlementService
         }
         foreach (['plan_id', 'feed_id', 'source_id'] as $field) {
             if ($normalised[$field] < 0) {
-                throw new \InvalidArgumentException("Entitlement {$field} cannot be negative.");
+                throw new \InvalidArgumentException(sprintf('Entitlement %s cannot be negative.', esc_html($field)));
             }
         }
         foreach (['provider', 'resource_type', 'resource_id', 'source_type'] as $field) {
             if ($normalised[$field] === '') {
-                throw new \InvalidArgumentException("Entitlement {$field} cannot be empty.");
+                throw new \InvalidArgumentException(sprintf('Entitlement %s cannot be empty.', esc_html($field)));
             }
         }
         if (!in_array($normalised['feed_scope'], EntitlementEdgeRepository::FEED_SCOPES, true)) {

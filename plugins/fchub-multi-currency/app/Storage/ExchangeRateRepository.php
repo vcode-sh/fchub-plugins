@@ -17,9 +17,11 @@ final class ExchangeRateRepository
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_RATE_HISTORY;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- This authoritative fallback must see the latest persisted rate; service-level projection caching occurs above the repository.
         $row = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE base_currency = %s AND quote_currency = %s ORDER BY fetched_at DESC LIMIT 1",
+                "SELECT * FROM %i WHERE base_currency = %s AND quote_currency = %s ORDER BY fetched_at DESC LIMIT 1",
+                $table,
                 strtoupper($baseCurrency),
                 strtoupper($quoteCurrency),
             ),
@@ -41,20 +43,23 @@ final class ExchangeRateRepository
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_RATE_HISTORY;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Refresh, diagnostics, and public-rate consumers require the current persisted rate set.
         $results = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT rh.*
-                FROM {$table} rh
+                FROM %i rh
                 WHERE rh.base_currency = %s
                   AND rh.id = (
                       SELECT rh2.id
-                      FROM {$table} rh2
+                      FROM %i rh2
                       WHERE rh2.base_currency = rh.base_currency
                         AND rh2.quote_currency = rh.quote_currency
                       ORDER BY rh2.fetched_at DESC, rh2.id DESC
                       LIMIT 1
-                  )",
+                )",
+                $table,
                 strtoupper($baseCurrency),
+                $table,
             ),
             ARRAY_A,
         );
@@ -70,6 +75,7 @@ final class ExchangeRateRepository
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_RATE_HISTORY;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- $wpdb->insert is the WordPress CRUD API for the plugin-owned rate history.
         $result = $wpdb->insert($table, [
             'base_currency'  => $rate->baseCurrency,
             'quote_currency' => $rate->quoteCurrency,

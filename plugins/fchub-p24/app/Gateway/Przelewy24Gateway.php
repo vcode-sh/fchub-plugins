@@ -33,6 +33,15 @@ class Przelewy24Gateway extends AbstractPaymentGateway
         // No additional boot hooks needed - IPN is handled via FluentCart's listener
     }
 
+    public function getSettings(): Przelewy24Settings
+    {
+        if (!$this->settings instanceof Przelewy24Settings) {
+            throw new \LogicException('Invalid Przelewy24 gateway settings.');
+        }
+
+        return $this->settings;
+    }
+
     public function getEnqueueScriptSrc($hasSubscription = 'no'): array
     {
         return [
@@ -58,11 +67,11 @@ class Przelewy24Gateway extends AbstractPaymentGateway
             'route'       => 'przelewy24',
             'slug'        => 'przelewy24',
             'description' => esc_html__('Pay via Przelewy24 - online transfers, BLIK, cards and more', 'fchub-p24'),
-            'logo'        => FCHUB_P24_URL . 'assets/przelewy24-logo.svg',
-            'icon'        => FCHUB_P24_URL . 'assets/przelewy24-icon.svg',
-            'brand_color' => '#d13239',
+            'logo'        => FCHUB_P24_URL . 'assets/fchub-payment.svg',
+            'icon'        => FCHUB_P24_URL . 'assets/fchub-payment.svg',
+            'brand_color' => '#334155',
             'upcoming'    => false,
-            'status'      => $this->settings->get('is_active') === 'yes',
+            'status'      => $this->getSettings()->get('is_active') === 'yes',
         ];
     }
 
@@ -88,19 +97,24 @@ class Przelewy24Gateway extends AbstractPaymentGateway
     public function handleIPN(): void
     {
         // Validate HTTP method - P24 sends POST notifications
-        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        $requestMethod = isset($_SERVER['REQUEST_METHOD'])
+            ? sanitize_key(wp_unslash($_SERVER['REQUEST_METHOD']))
+            : '';
+        if (strtoupper($requestMethod) !== 'POST') {
             wp_send_json(['error' => 'Method not allowed'], 405);
-            return;
         }
 
-        $input = json_decode(file_get_contents('php://input'), true);
-
-        if (empty($input) || empty($input['sessionId'])) {
+        try {
+            $input = json_decode(file_get_contents('php://input'), true, 16, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
             wp_send_json(['error' => 'Invalid notification'], 400);
-            return;
         }
 
-        if (!empty($input['refundsUuid'])) {
+        if (!is_array($input) || array_is_list($input) || empty($input['sessionId'])) {
+            wp_send_json(['error' => 'Invalid notification'], 400);
+        }
+
+        if (array_key_exists('refundsUuid', $input)) {
             $this->handleRefundNotification($input);
             return;
         }
@@ -110,11 +124,24 @@ class Przelewy24Gateway extends AbstractPaymentGateway
         foreach ($requiredKeys as $key) {
             if (!isset($input[$key])) {
                 wp_send_json(['error' => 'Missing field: ' . $key], 400);
-                return;
             }
         }
 
-        $api = new Przelewy24API($this->settings);
+        if (array_diff(array_keys($input), $requiredKeys) !== []) {
+            wp_send_json(['error' => 'Unexpected notification field'], 400);
+        }
+
+        if (
+            !$this->hasValidNotificationFieldTypes(
+                $input,
+                ['merchantId', 'posId', 'amount', 'originAmount', 'orderId', 'methodId'],
+                ['sessionId', 'currency', 'statement', 'sign']
+            )
+        ) {
+            wp_send_json(['error' => 'Invalid notification fields'], 400);
+        }
+
+        $api = new Przelewy24API($this->getSettings());
 
         // Verify notification signature
         if (!$api->verifyNotificationSign($input)) {
@@ -122,7 +149,14 @@ class Przelewy24Gateway extends AbstractPaymentGateway
                 'module_name' => 'Order',
             ]);
             wp_send_json(['error' => 'Invalid signature'], 400);
-            return;
+        }
+
+        if ((int) $input['merchantId'] !== (int) $this->getSettings()->getMerchantId()) {
+            wp_send_json(['error' => 'Merchant mismatch'], 400);
+        }
+
+        if ((int) $input['posId'] !== (int) $this->getSettings()->getShopId()) {
+            wp_send_json(['error' => 'POS mismatch'], 400);
         }
 
         $sessionId = sanitize_text_field($input['sessionId']);
@@ -144,22 +178,17 @@ class Przelewy24Gateway extends AbstractPaymentGateway
 
         if (!$transaction) {
             // Check if this is a renewal IPN
-            $renewalHandled = $this->handleRenewalIPN($input, $sessionId, $orderId, $amount, $currency, $api);
-            if ($renewalHandled !== null) {
-                return;
-            }
+            $this->handleRenewalIPN($input, $sessionId, $orderId, $amount, $currency, $api);
 
             fluent_cart_error_log('P24 IPN Error', 'Transaction not found: ' . $sessionId, [
                 'module_name' => 'Order',
             ]);
             wp_send_json(['error' => 'Transaction not found'], 404);
-            return;
         }
 
         // Idempotency check - if already succeeded, return OK without re-processing
         if ($transaction->status === Status::TRANSACTION_SUCCEEDED) {
             wp_send_json(['status' => 'OK'], 200);
-            return;
         }
 
         // Verify amount matches what was originally registered
@@ -175,7 +204,14 @@ class Przelewy24Gateway extends AbstractPaymentGateway
                 'module_name' => 'Order',
             ]);
             wp_send_json(['error' => 'Amount mismatch'], 400);
-            return;
+        }
+
+        if ((int) $input['originAmount'] !== $expectedAmount) {
+            fluent_cart_error_log('P24 IPN Error', 'Origin amount did not match the registered transaction.', [
+                'module_id' => $transaction->order_id,
+                'module_name' => 'Order',
+            ]);
+            wp_send_json(['error' => 'Origin amount mismatch'], 400);
         }
 
         // Verify currency matches what was originally registered
@@ -191,7 +227,6 @@ class Przelewy24Gateway extends AbstractPaymentGateway
                 'module_name' => 'Order',
             ]);
             wp_send_json(['error' => 'Currency mismatch'], 400);
-            return;
         }
 
         // Verify the transaction with P24
@@ -203,12 +238,11 @@ class Przelewy24Gateway extends AbstractPaymentGateway
         ]);
 
         if (isset($verifyResponse['error']) || ($verifyResponse['data']['status'] ?? '') !== 'success') {
-            fluent_cart_error_log('P24 Verification Error', json_encode($verifyResponse), [
+            fluent_cart_error_log('P24 Verification Error', 'Przelewy24 transaction verification failed.', [
                 'module_id'   => $transaction->order_id,
                 'module_name' => 'Order',
             ]);
             wp_send_json(['error' => 'Verification failed'], 400);
-            return;
         }
 
         // Verification successful - update order
@@ -216,7 +250,6 @@ class Przelewy24Gateway extends AbstractPaymentGateway
 
         if (!$order) {
             wp_send_json(['error' => 'Order not found'], 404);
-            return;
         }
 
         // Store P24 orderId in vendor_charge_id (used for refunds and panel links)
@@ -240,18 +273,35 @@ class Przelewy24Gateway extends AbstractPaymentGateway
         foreach ($requiredKeys as $key) {
             if (!isset($input[$key])) {
                 wp_send_json(['error' => 'Missing field: ' . $key], 400);
-                return;
             }
         }
 
-        $api = new Przelewy24API($this->settings);
+        if (array_diff(array_keys($input), $requiredKeys) !== []) {
+            wp_send_json(['error' => 'Unexpected notification field'], 400);
+        }
+
+        if (
+            !$this->hasValidNotificationFieldTypes(
+                $input,
+                ['orderId', 'merchantId', 'amount', 'status'],
+                ['sessionId', 'refundsUuid', 'currency', 'sign']
+            )
+            || !in_array((int) $input['status'], [0, 1], true)
+        ) {
+            wp_send_json(['error' => 'Invalid notification fields'], 400);
+        }
+
+        $api = new Przelewy24API($this->getSettings());
 
         if (!$api->verifyRefundNotificationSign($input)) {
             fluent_cart_error_log('P24 Refund IPN Error', 'Invalid refund notification signature', [
                 'module_name' => 'Order',
             ]);
             wp_send_json(['error' => 'Invalid signature'], 400);
-            return;
+        }
+
+        if ((int) $input['merchantId'] !== (int) $this->getSettings()->getMerchantId()) {
+            wp_send_json(['error' => 'Merchant mismatch'], 400);
         }
 
         $sessionId = sanitize_text_field($input['sessionId']);
@@ -268,37 +318,81 @@ class Przelewy24Gateway extends AbstractPaymentGateway
 
         if (!$transaction) {
             wp_send_json(['error' => 'Transaction not found'], 404);
-            return;
         }
 
         if ($status === 0) {
+            if ((string) $input['orderId'] !== (string) $transaction->vendor_charge_id) {
+                wp_send_json(['error' => 'Order mismatch'], 400);
+            }
+
+            $refundAmount = (int) $input['amount'];
+            if ($refundAmount <= 0 || $refundAmount > (int) $transaction->total) {
+                wp_send_json(['error' => 'Refund amount mismatch'], 400);
+            }
+
+            if (strtoupper((string) $input['currency']) !== strtoupper($transaction->currency ?: 'PLN')) {
+                wp_send_json(['error' => 'Currency mismatch'], 400);
+            }
+
+            $idempotencyKey = 'fchub_p24_refund_' . md5((string) $input['refundsUuid']);
+            if (get_transient($idempotencyKey)) {
+                wp_send_json(['status' => 'OK'], 200);
+            }
+
             // Refund completed — record using FluentCart's Refund service
             Refund::createOrRecordRefund([
                 'vendor_charge_id' => sanitize_text_field($input['refundsUuid']),
                 'payment_method'   => 'przelewy24',
-                'total'            => (int) $input['amount'],
+                'total'            => $refundAmount,
             ], $transaction);
+            set_transient($idempotencyKey, true, 7 * 86400);
         }
 
         if ($status === 1) {
             // Refund was rejected by P24
-            fluent_cart_error_log('P24 Refund Rejected', json_encode($input), [
+            fluent_cart_error_log('P24 Refund Rejected', 'Przelewy24 rejected the refund notification.', [
                 'module_id'   => $transaction->order_id,
                 'module_name' => 'Order',
             ]);
         }
 
-        // Log the refund notification regardless of status
-        fluent_cart_error_log('P24 Refund Notification', json_encode([
-            'status'       => $status === 0 ? 'completed' : 'rejected',
-            'amount'       => $input['amount'],
-            'refundsUuid'  => $input['refundsUuid'],
-        ]), [
+        // Log only the bounded outcome, never the signed provider payload.
+        fluent_cart_error_log('P24 Refund Notification', sprintf(
+            'Refund %s for amount %d.',
+            $status === 0 ? 'completed' : 'rejected',
+            (int) $input['amount']
+        ), [
             'module_id'   => $transaction->order_id,
             'module_name' => 'Order',
         ]);
 
         wp_send_json(['status' => 'OK'], 200);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @param array<int, string> $integerKeys
+     * @param array<int, string> $stringKeys
+     */
+    private function hasValidNotificationFieldTypes(
+        array $input,
+        array $integerKeys,
+        array $stringKeys
+    ): bool {
+        foreach ($integerKeys as $key) {
+            $value = $input[$key] ?? null;
+            if (!is_int($value) && !(is_string($value) && ctype_digit($value))) {
+                return false;
+            }
+        }
+
+        foreach ($stringKeys as $key) {
+            if (!is_string($input[$key] ?? null) || $input[$key] === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function processRefund($transaction, $amount, $args)
@@ -317,7 +411,7 @@ class Przelewy24Gateway extends AbstractPaymentGateway
             );
         }
 
-        $api = new Przelewy24API($this->settings);
+        $api = new Przelewy24API($this->getSettings());
 
         // vendor_charge_id contains P24's orderId (set during IPN after successful payment)
         $orderId = (int) $transaction->vendor_charge_id;
@@ -495,6 +589,7 @@ class Przelewy24Gateway extends AbstractPaymentGateway
                     ['label' => __('Yes', 'fchub-p24'), 'value' => 'yes'],
                     ['label' => __('No', 'fchub-p24'), 'value' => 'no'],
                 ],
+                // phpcs:ignore Generic.Files.LineLength.TooLong -- Keep the complete translator-facing sentence intact.
                 'tips'    => __('Enable subscription/recurring billing via card-on-file. Requires a separate agreement with Przelewy24 for card recurring transactions.', 'fchub-p24'),
             ],
             'webhook_desc' => [
@@ -541,6 +636,7 @@ class Przelewy24Gateway extends AbstractPaymentGateway
             return [
                 'status'  => 'failed',
                 'message' => sprintf(
+                    // Translators: %s is the redacted Przelewy24 connection error.
                     __('Connection failed: %s', 'fchub-p24'),
                     $response['error']
                 ),
@@ -566,7 +662,7 @@ class Przelewy24Gateway extends AbstractPaymentGateway
             return $url;
         }
 
-        $baseUrl = $this->settings->getMode() === 'test'
+        $baseUrl = $this->getSettings()->getMode() === 'test'
             ? 'https://sandbox.przelewy24.pl'
             : 'https://panel.przelewy24.pl';
 
@@ -601,13 +697,13 @@ class Przelewy24Gateway extends AbstractPaymentGateway
     public function getOrderInfo(array $data)
     {
         $lang = substr(get_locale(), 0, 2) === 'pl' ? 'pl' : 'en';
-        $cacheKey = 'fchub_p24_methods_' . $lang . '_' . $this->settings->getMode();
+        $cacheKey = 'fchub_p24_methods_' . $lang . '_' . $this->getSettings()->getMode();
         $cachedMethods = get_transient($cacheKey);
 
         if ($cachedMethods !== false) {
             $rawMethods = $cachedMethods;
         } else {
-            $api = new Przelewy24API($this->settings);
+            $api = new Przelewy24API($this->getSettings());
             $response = $api->getPaymentMethods($lang);
             $rawMethods = !empty($response['data']) && is_array($response['data']) ? $response['data'] : [];
 
@@ -636,7 +732,7 @@ class Przelewy24Gateway extends AbstractPaymentGateway
             // Filter by enabled channels
             $group = $method['group'] ?? '';
             $channelKey = $groupToChannel[$group] ?? null;
-            if ($channelKey && $this->settings->get($channelKey) !== 'yes') {
+            if ($channelKey && $this->getSettings()->get($channelKey) !== 'yes') {
                 continue;
             }
 
@@ -684,16 +780,26 @@ class Przelewy24Gateway extends AbstractPaymentGateway
 
     /**
      * Handle IPN for a renewal card charge.
-     * Returns true if handled (response sent), null if not a renewal IPN.
+     * Returns only when this is not a renewal IPN; handled requests terminate via wp_send_json().
      */
-    private function handleRenewalIPN(array $input, string $sessionId, int $orderId, int $amount, string $currency, Przelewy24API $api): ?bool
-    {
+    private function handleRenewalIPN(
+        array $input,
+        string $sessionId,
+        int $orderId,
+        int $amount,
+        string $currency,
+        Przelewy24API $api
+    ): void {
         // Look for a subscription with this pending renewal session
         $subscriptions = Subscription::query()
             ->get();
 
         $targetSubscription = null;
         foreach ($subscriptions as $sub) {
+            if (!$sub instanceof Subscription) {
+                continue;
+            }
+
             if ($sub->getMeta('_p24_pending_renewal_session') === $sessionId) {
                 $targetSubscription = $sub;
                 break;
@@ -701,7 +807,7 @@ class Przelewy24Gateway extends AbstractPaymentGateway
         }
 
         if (!$targetSubscription) {
-            return null; // Not a renewal IPN
+            return;
         }
 
         // Verify amount matches recurring total
@@ -709,13 +815,23 @@ class Przelewy24Gateway extends AbstractPaymentGateway
         if ($amount !== $expectedAmount) {
             fluent_cart_error_log('P24 Renewal IPN Error', sprintf(
                 'Amount mismatch: expected %d, received %d for subscription #%d',
-                $expectedAmount, $amount, $targetSubscription->id
+                $expectedAmount,
+                $amount,
+                $targetSubscription->id
             ), [
                 'module_id'   => $targetSubscription->id,
                 'module_name' => 'Subscription',
             ]);
             wp_send_json(['error' => 'Amount mismatch'], 400);
-            return true;
+        }
+
+        $expectedCurrency = strtoupper($targetSubscription->currency ?: 'PLN');
+        if ($currency !== $expectedCurrency) {
+            fluent_cart_error_log('P24 Renewal IPN Error', 'Currency did not match the subscription.', [
+                'module_id' => $targetSubscription->id,
+                'module_name' => 'Subscription',
+            ]);
+            wp_send_json(['error' => 'Currency mismatch'], 400);
         }
 
         // Verify the transaction with P24
@@ -727,12 +843,11 @@ class Przelewy24Gateway extends AbstractPaymentGateway
         ]);
 
         if (isset($verifyResponse['error']) || ($verifyResponse['data']['status'] ?? '') !== 'success') {
-            fluent_cart_error_log('P24 Renewal Verification Error', json_encode($verifyResponse), [
+            fluent_cart_error_log('P24 Renewal Verification Error', 'Przelewy24 renewal verification failed.', [
                 'module_id'   => $targetSubscription->id,
                 'module_name' => 'Subscription',
             ]);
             wp_send_json(['error' => 'Verification failed'], 400);
-            return true;
         }
 
         // Clear the pending session marker
@@ -758,7 +873,6 @@ class Przelewy24Gateway extends AbstractPaymentGateway
                 'module_name' => 'Subscription',
             ]);
             wp_send_json(['error' => 'Failed to record renewal'], 500);
-            return true;
         }
 
         // Schedule next renewal
@@ -766,14 +880,16 @@ class Przelewy24Gateway extends AbstractPaymentGateway
 
         fluent_cart_error_log('P24 Renewal Success', sprintf(
             'Subscription #%d renewed, P24 order: %d, amount: %d %s',
-            $targetSubscription->id, $orderId, $amount, $currency
+            $targetSubscription->id,
+            $orderId,
+            $amount,
+            $currency
         ), [
             'module_id'   => $targetSubscription->id,
             'module_name' => 'Subscription',
         ]);
 
         wp_send_json(['status' => 'OK'], 200);
-        return true;
     }
 
     /**
@@ -786,8 +902,10 @@ class Przelewy24Gateway extends AbstractPaymentGateway
             return;
         }
 
-        $subscription = Subscription::find($subscriptionId);
-        if (!$subscription) {
+        $subscription = Subscription::query()
+            ->where('id', $subscriptionId)
+            ->first();
+        if (!$subscription instanceof Subscription) {
             return;
         }
 
@@ -796,11 +914,11 @@ class Przelewy24Gateway extends AbstractPaymentGateway
             return;
         }
 
-        $api = new Przelewy24API($this->settings);
+        $api = new Przelewy24API($this->getSettings());
         $cardInfo = $api->getCardInfo($p24OrderId);
 
         if (isset($cardInfo['error']) || empty($cardInfo['data'])) {
-            fluent_cart_error_log('P24 Card Info Error', json_encode($cardInfo), [
+            fluent_cart_error_log('P24 Card Info Error', 'Przelewy24 card reference retrieval failed.', [
                 'module_id'   => $subscriptionId,
                 'module_name' => 'Subscription',
             ]);

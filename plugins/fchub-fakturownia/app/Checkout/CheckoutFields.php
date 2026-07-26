@@ -55,10 +55,17 @@ class CheckoutFields
             return;
         }
 
-        $js = self::getToggleScript();
-        wp_register_script('fchub-fakturownia-checkout', '', [], FCHUB_FAKTUROWNIA_VERSION, true);
+        wp_register_script(
+            'fchub-fakturownia-checkout',
+            FCHUB_FAKTUROWNIA_URL . 'assets/checkout.js',
+            [],
+            FCHUB_FAKTUROWNIA_VERSION,
+            true
+        );
+        wp_localize_script('fchub-fakturownia-checkout', 'FCHubFakturowniaCheckout', [
+            'toggleLabel' => __('I want a company invoice', 'fchub-fakturownia'),
+        ]);
         wp_enqueue_script('fchub-fakturownia-checkout');
-        wp_add_inline_script('fchub-fakturownia-checkout', $js);
     }
 
     /**
@@ -68,79 +75,6 @@ class CheckoutFields
     {
         // Enqueue on all frontend pages - the JS itself checks for the elements
         return !is_admin();
-    }
-
-    /**
-     * JS that injects a toggle checkbox before the NIP field and handles show/hide.
-     * FluentCart's checkout Vue doesn't render checkbox fields, so we inject one via DOM.
-     */
-    private static function getToggleScript(): string
-    {
-        $toggleLabel = esc_js(__('I want a company invoice', 'fchub-fakturownia'));
-
-        return <<<JS
-(function() {
-    var TOGGLE_LABEL = '{$toggleLabel}';
-
-    function initNipToggle() {
-        var nipField = document.getElementById('billing_nip');
-        if (!nipField) return;
-
-        var wrapper = nipField.closest('.fchub-nip-field-wrapper') || nipField.parentElement;
-        if (!wrapper || wrapper.dataset.fchubNipInit) return;
-        wrapper.dataset.fchubNipInit = '1';
-
-        // Hide NIP field by default
-        wrapper.style.display = 'none';
-
-        // Inject toggle checkbox before the NIP wrapper
-        var toggleWrapper = document.createElement('div');
-        toggleWrapper.className = 'fchub-nip-toggle-wrapper';
-        toggleWrapper.style.cssText = 'padding: 4px 0;';
-
-        var label = document.createElement('label');
-        label.style.cssText = 'display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px;';
-
-        var checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'billing_wants_company_invoice';
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(TOGGLE_LABEL));
-        toggleWrapper.appendChild(label);
-
-        wrapper.parentNode.insertBefore(toggleWrapper, wrapper);
-
-        checkbox.addEventListener('change', function() {
-            wrapper.style.display = this.checked ? '' : 'none';
-            if (!this.checked) {
-                nipField.value = '';
-            }
-        });
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initNipToggle);
-    } else {
-        initNipToggle();
-    }
-
-    // Re-init on dynamic content (FluentCart renders checkout via JS)
-    var observer = new MutationObserver(function(mutations) {
-        for (var i = 0; i < mutations.length; i++) {
-            if (mutations[i].addedNodes.length) {
-                var nipField = document.getElementById('billing_nip');
-                if (nipField) {
-                    initNipToggle();
-                    observer.disconnect();
-                }
-                break;
-            }
-        }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-})();
-JS;
     }
 
     /**

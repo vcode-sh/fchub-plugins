@@ -1,0 +1,22 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+        - fchub-fakturownia.php
+    excludePaths:
+        - app/*/index.php
+    bootstrapFiles:
+        - vendor/autoload.php
+        - phpstan-bootstrap.php
+    stubFiles:
+        - phpstan-stubs.stub
+    scanFiles:
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/boot/globals.php
+    scanDirectories:
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/app
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/vendor/wpfluent
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false

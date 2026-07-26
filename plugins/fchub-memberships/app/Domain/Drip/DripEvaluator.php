@@ -145,6 +145,7 @@ class DripEvaluator
                 $label = __('Day 0 (Immediate)', 'fchub-memberships');
             } elseif ($rule['drip_type'] === 'delayed') {
                 $day = $rule['drip_delay_days'];
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 $label = sprintf(__('Day %d', 'fchub-memberships'), $day);
             } elseif ($rule['drip_type'] === 'fixed_date') {
                 $label = wp_date(get_option('date_format'), strtotime($rule['drip_date']));
@@ -177,6 +178,7 @@ class DripEvaluator
     private function getResourceLabel(string $provider, string $resourceType, string $resourceId): string
     {
         if ($resourceId === '*') {
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return sprintf(__('All %s', 'fchub-memberships'), $resourceType);
         }
 

@@ -11,7 +11,7 @@ class AuditLogRepository
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_audit_log';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_audit_log');
     }
 
     /**
@@ -21,7 +21,7 @@ class AuditLogRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE entity_type = %s AND entity_id = %d
              ORDER BY created_at DESC
@@ -41,7 +41,7 @@ class AuditLogRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE actor_id = %d AND actor_type = %s
              ORDER BY created_at DESC
@@ -61,7 +61,7 @@ class AuditLogRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              ORDER BY created_at DESC
              LIMIT %d",
@@ -82,7 +82,7 @@ class AuditLogRepository
 
         $cutoff = gmdate('Y-m-d H:i:s', strtotime("-{$retentionDays} days"));
 
-        return (int) $wpdb->query($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "DELETE FROM {$this->table} WHERE created_at < %s",
             $cutoff
         ));

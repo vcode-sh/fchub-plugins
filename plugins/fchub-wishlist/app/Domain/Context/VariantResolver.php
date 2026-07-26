@@ -37,14 +37,17 @@ class VariantResolver
         $variationsTable = $wpdb->prefix . 'fct_product_variations';
 
         // Try default_variation_id from product details, but only if the variant is still active.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- FluentCart has no query API for its variation tables, and variant availability must be read live.
         $defaultId = $wpdb->get_var($wpdb->prepare(
             "SELECT v.id
-             FROM {$detailsTable} d
-             INNER JOIN {$variationsTable} v
+             FROM %i d
+             INNER JOIN %i v
                 ON v.id = d.default_variation_id
                AND v.item_status = 'active'
              WHERE d.post_id = %d
              LIMIT 1",
+            $detailsTable,
+            $variationsTable,
             $productId
         ));
 
@@ -53,8 +56,10 @@ class VariantResolver
         }
 
         // Fallback: first active variant for this product
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- FluentCart has no query API for its variation tables, and variant availability must be read live.
         $firstVariant = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$variationsTable} WHERE post_id = %d AND item_status = 'active' ORDER BY id ASC LIMIT 1",
+            "SELECT id FROM %i WHERE post_id = %d AND item_status = 'active' ORDER BY id ASC LIMIT 1",
+            $variationsTable,
             $productId
         ));
 

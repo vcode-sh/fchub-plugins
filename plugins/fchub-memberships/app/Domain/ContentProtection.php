@@ -403,10 +403,10 @@ class ContentProtection
                 foreach ($implicitPlanIds as $pid) {
                     $p = $planRepo->find((int) $pid);
                     if ($p) {
-                        $implicitNames[] = esc_html($p['title']);
+                        $implicitNames[] = $p['title'];
                     }
                 }
-                echo implode(', ', $implicitNames);
+                echo esc_html(implode(', ', $implicitNames));
                 ?>
             </p>
         <?php endif; ?>
@@ -475,7 +475,10 @@ class ContentProtection
      */
     public function saveMetaBox(int $postId, \WP_Post $post): void
     {
-        if (!isset($_POST['_fchub_protection_nonce']) || !wp_verify_nonce($_POST['_fchub_protection_nonce'], 'fchub_memberships_protection')) {
+        $nonce = isset($_POST['_fchub_protection_nonce'])
+            ? sanitize_text_field(wp_unslash($_POST['_fchub_protection_nonce']))
+            : '';
+        if ($nonce === '' || !wp_verify_nonce($nonce, 'fchub_memberships_protection')) {
             return;
         }
 
@@ -491,10 +494,16 @@ class ContentProtection
         $isProtected = !empty($_POST['fchub_is_protected']);
 
         if ($isProtected) {
-            $planIds = isset($_POST['fchub_plan_ids']) ? array_map('intval', (array) $_POST['fchub_plan_ids']) : [];
-            $restrictionMessage = sanitize_textarea_field($_POST['fchub_restriction_message'] ?? '');
+            $planIds = isset($_POST['fchub_plan_ids'])
+                ? array_map('intval', (array) wp_unslash($_POST['fchub_plan_ids']))
+                : [];
+            $restrictionMessage = isset($_POST['fchub_restriction_message'])
+                ? sanitize_textarea_field(wp_unslash($_POST['fchub_restriction_message']))
+                : '';
 
-            $teaserMode = sanitize_text_field($_POST['fchub_teaser_mode'] ?? 'none');
+            $teaserMode = isset($_POST['fchub_teaser_mode'])
+                ? sanitize_text_field(wp_unslash($_POST['fchub_teaser_mode']))
+                : 'none';
             $allowedModes = ['none', 'excerpt', 'more_tag', 'custom', 'words'];
             if (!in_array($teaserMode, $allowedModes, true)) {
                 $teaserMode = 'none';
@@ -505,10 +514,20 @@ class ContentProtection
 
             $meta = [
                 'teaser_mode'       => $teaserMode,
-                'teaser_word_count' => absint($_POST['fchub_teaser_word_count'] ?? 50) ?: 50,
-                'custom_teaser'     => sanitize_textarea_field($_POST['fchub_custom_teaser'] ?? ''),
-                'cta_text'          => sanitize_text_field($_POST['fchub_cta_text'] ?? ''),
-                'cta_url'           => esc_url_raw($_POST['fchub_cta_url'] ?? ''),
+                'teaser_word_count' => (
+                    isset($_POST['fchub_teaser_word_count'])
+                        ? absint(wp_unslash($_POST['fchub_teaser_word_count']))
+                        : 50
+                ) ?: 50,
+                'custom_teaser'     => isset($_POST['fchub_custom_teaser'])
+                    ? sanitize_textarea_field(wp_unslash($_POST['fchub_custom_teaser']))
+                    : '',
+                'cta_text'          => isset($_POST['fchub_cta_text'])
+                    ? sanitize_text_field(wp_unslash($_POST['fchub_cta_text']))
+                    : '',
+                'cta_url'           => isset($_POST['fchub_cta_url'])
+                    ? esc_url_raw(wp_unslash($_POST['fchub_cta_url']))
+                    : '',
             ];
 
             $protectionRepo->createOrUpdate($post->post_type, (string) $postId, [
@@ -581,6 +600,7 @@ class ContentProtection
         return add_query_arg([
             'fchub_bulk_action' => $action,
             'fchub_bulk_count'  => $count,
+            'fchub_bulk_nonce'  => wp_create_nonce('fchub_memberships_bulk_notice'),
         ], $redirectTo);
     }
 
@@ -589,15 +609,23 @@ class ContentProtection
      */
     public function bulkActionAdminNotice(): void
     {
-        if (empty($_GET['fchub_bulk_action']) || !isset($_GET['fchub_bulk_count'])) {
+        $nonce = isset($_GET['fchub_bulk_nonce'])
+            ? sanitize_text_field(wp_unslash($_GET['fchub_bulk_nonce']))
+            : '';
+        if (
+            empty($_GET['fchub_bulk_action'])
+            || !isset($_GET['fchub_bulk_count'])
+            || !wp_verify_nonce($nonce, 'fchub_memberships_bulk_notice')
+        ) {
             return;
         }
 
-        $action = sanitize_text_field($_GET['fchub_bulk_action']);
+        $action = sanitize_text_field(wp_unslash($_GET['fchub_bulk_action']));
         $count = (int) $_GET['fchub_bulk_count'];
 
         if ($action === 'fchub_protect') {
             $message = sprintf(
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 _n('%d item protected.', '%d items protected.', $count, 'fchub-memberships'),
                 $count
             );
@@ -606,6 +634,7 @@ class ContentProtection
             $message .= '</a>';
         } elseif ($action === 'fchub_unprotect') {
             $message = sprintf(
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 _n('%d item unprotected.', '%d items unprotected.', $count, 'fchub-memberships'),
                 $count
             );
@@ -875,6 +904,7 @@ class ContentProtection
         return '<div class="fchub-membership-restricted fchub-restricted-drip-locked">'
             . wpautop($message)
             . '<p class="fchub-unlock-date">' . sprintf(
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 esc_html__('Available on: %s', 'fchub-memberships'),
                 esc_html($unlockDate)
             ) . '</p>'

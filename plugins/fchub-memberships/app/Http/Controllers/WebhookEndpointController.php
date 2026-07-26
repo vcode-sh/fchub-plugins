@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMemberships\Http\Controllers;
 
+use FChubMemberships\Http\MembershipMutationPermission;
 use FChubMemberships\Integration\MembershipSettingsOptionCoordinator;
 use FChubMemberships\Integration\WebhookEndpointConfig;
 use FChubMemberships\Integration\WebhookEndpointPolicy;
@@ -84,7 +85,7 @@ final class WebhookEndpointController
 
     public static function permission(\WP_REST_Request $request): bool
     {
-        return current_user_can('manage_options');
+        return current_user_can(MembershipMutationPermission::CAPABILITY);
     }
 
     public static function indexRoute(\WP_REST_Request $request): \WP_REST_Response
@@ -384,21 +385,22 @@ final class WebhookEndpointController
     private function error(string $code, int $status): \WP_REST_Response
     {
         $messages = [
-            'fchub_webhook_endpoint_invalid' => 'Enter a name and one safe HTTPS endpoint URL.',
-            'fchub_webhook_endpoint_duplicate' => 'This webhook endpoint already exists.',
+            'fchub_webhook_endpoint_invalid' => __('Enter a name and one safe HTTPS endpoint URL.', 'fchub-memberships'),
+            'fchub_webhook_endpoint_duplicate' => __('This webhook endpoint already exists.', 'fchub-memberships'),
             'fchub_webhook_endpoint_limit' => sprintf(
-                'Configure no more than %d webhook endpoints.',
+                /* translators: %d: Maximum number of webhook endpoints. */
+                __('Configure no more than %d webhook endpoints.', 'fchub-memberships'),
                 WebhookEndpointPolicy::MAX_ENDPOINTS
             ),
-            'fchub_webhook_endpoint_not_found' => 'Webhook endpoint was not found.',
-            'fchub_webhook_endpoint_secret_required' => 'Generate and save the endpoint secret first.',
-            'fchub_webhook_endpoint_test_required' => 'Pass a one-shot endpoint test before activation.',
-            'fchub_webhook_storage_unavailable' => 'Webhook storage is temporarily unavailable.',
+            'fchub_webhook_endpoint_not_found' => __('Webhook endpoint was not found.', 'fchub-memberships'),
+            'fchub_webhook_endpoint_secret_required' => __('Generate and save the endpoint secret first.', 'fchub-memberships'),
+            'fchub_webhook_endpoint_test_required' => __('Pass a one-shot endpoint test before activation.', 'fchub-memberships'),
+            'fchub_webhook_storage_unavailable' => __('Webhook storage is temporarily unavailable.', 'fchub-memberships'),
         ];
 
         return new \WP_REST_Response([
             'code' => $code,
-            'message' => __($messages[$code] ?? 'Webhook endpoint operation failed.', 'fchub-memberships'),
+            'message' => $messages[$code] ?? __('Webhook endpoint operation failed.', 'fchub-memberships'),
         ], $status);
     }
 

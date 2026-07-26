@@ -13,20 +13,20 @@ final class DripAdminQueryService
     private DripScheduleRepository $drips;
     private PlanRuleRepository $rules;
     private PlanRepository $plans;
-    private \wpdb $wpdb;
+    private \wpdb $database;
     private string $table;
 
     public function __construct(
         ?DripScheduleRepository $drips = null,
         ?PlanRuleRepository $rules = null,
         ?PlanRepository $plans = null,
-        ?\wpdb $wpdb = null
+        ?\wpdb $database = null
     ) {
         $this->drips = $drips ?? new DripScheduleRepository();
         $this->rules = $rules ?? new PlanRuleRepository();
         $this->plans = $plans ?? new PlanRepository();
-        $this->wpdb = $wpdb ?? $GLOBALS['wpdb'];
-        $this->table = $this->wpdb->prefix . 'fchub_membership_drip_notifications';
+        $this->database = $database ?? $GLOBALS['wpdb'];
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'fchub_membership_drip_notifications');
     }
 
     public function overview(): array
@@ -37,13 +37,17 @@ final class DripAdminQueryService
             $totalRules += count($this->rules->getDripRules($plan['id']));
         }
 
-        $sentToday = (int) $this->wpdb->get_var($this->wpdb->prepare(
+        $sentToday = (int) \FChubMemberships\Support\CustomTableDatabase::getVarFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT COUNT(*) FROM {$this->table} WHERE status = 'sent' AND DATE(sent_at) = %s",
             current_time('Y-m-d')
         ));
 
-        $failed = (int) $this->wpdb->get_var(
-            "SELECT COUNT(*) FROM {$this->table} WHERE status = 'failed'"
+        $failed = (int) \FChubMemberships\Support\CustomTableDatabase::getVarFrom($this->database,
+            \FChubMemberships\Support\CustomTableDatabase::prepareOn(
+                $this->database,
+                "SELECT COUNT(*) FROM {$this->table} WHERE status = %s",
+                'failed',
+            )
         );
 
         return [
@@ -56,8 +60,8 @@ final class DripAdminQueryService
 
     public function notificationsTotal(array $filters): int
     {
-        $where = ['1=1'];
-        $params = [];
+        $where = ['1=%d'];
+        $params = [1];
 
         if (!empty($filters['status'])) {
             $where[] = 'status = %s';
@@ -77,8 +81,9 @@ final class DripAdminQueryService
 
         $sql = "SELECT COUNT(*) FROM {$this->table} WHERE " . implode(' AND ', $where);
 
-        return $params
-            ? (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$params))
-            : (int) $this->wpdb->get_var($sql);
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVarFrom(
+            $this->database,
+            \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database, $sql, ...$params),
+        );
     }
 }

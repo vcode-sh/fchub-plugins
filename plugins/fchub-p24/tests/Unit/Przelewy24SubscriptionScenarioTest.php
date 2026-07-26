@@ -49,11 +49,9 @@ class Przelewy24SubscriptionScenarioTest extends TestCase
         $this->gateway = $ref->newInstanceWithoutConstructor();
 
         $prop = $ref->getProperty('settings');
-        $prop->setAccessible(true);
         $prop->setValue($this->gateway, $settings);
 
         $feat = $ref->getProperty('supportedFeatures');
-        $feat->setAccessible(true);
         $feat->setValue($this->gateway, ['payment', 'refund', 'webhook', 'subscriptions']);
     }
 
@@ -536,7 +534,6 @@ class Przelewy24SubscriptionScenarioTest extends TestCase
         $transaction->subscription_id = 42;
 
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 12345);
 
         $this->assertFalse($cardInfoCalled, 'card/info should NOT be re-fetched if refId exists');
@@ -669,7 +666,6 @@ class Przelewy24SubscriptionScenarioTest extends TestCase
         $transaction->subscription_id = 42;
 
         $method = new \ReflectionMethod($this->gateway, 'maybeStoreCardInfoAndScheduleRenewal');
-        $method->setAccessible(true);
         $method->invoke($this->gateway, $transaction, 12345);
 
         $this->assertNull($sub->getMeta('_p24_card_ref_id'), 'No card ref stored when refId missing');

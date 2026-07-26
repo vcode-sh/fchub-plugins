@@ -7,16 +7,16 @@ defined('ABSPATH') || exit;
 final class PlanProductLinkService
 {
     private PlanService $plans;
-    private \wpdb $wpdb;
+    private \wpdb $database;
     private string $metaTable;
     private string $variationsTable;
 
-    public function __construct(?PlanService $plans = null, ?\wpdb $wpdb = null)
+    public function __construct(?PlanService $plans = null, ?\wpdb $database = null)
     {
         $this->plans = $plans ?? new PlanService();
-        $this->wpdb = $wpdb ?? $GLOBALS['wpdb'];
-        $this->metaTable = $this->wpdb->prefix . 'fct_product_meta';
-        $this->variationsTable = $this->wpdb->prefix . 'fct_product_variations';
+        $this->database = $database ?? $GLOBALS['wpdb'];
+        $this->metaTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'fct_product_meta');
+        $this->variationsTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'fct_product_variations');
     }
 
     public function linkedProducts(int $planId): array
@@ -26,9 +26,9 @@ final class PlanProductLinkService
             return ['error' => __('Plan not found.', 'fchub-memberships')];
         }
 
-        $postsTable = $this->wpdb->prefix . 'posts';
+        $postsTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'posts');
 
-        $feeds = $this->wpdb->get_results($this->wpdb->prepare(
+        $feeds = \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT m.id AS feed_id, m.object_id AS product_id, m.meta_value,
                     p.post_title AS product_title
              FROM {$this->metaTable} m
@@ -64,8 +64,8 @@ final class PlanProductLinkService
         $productIds = array_filter(array_column($linked, 'product_id'));
         if (!empty($productIds)) {
             $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
-            $variations = $this->wpdb->get_results($this->wpdb->prepare(
-                "SELECT post_id, variation_title, item_price, payment_type
+            $variations = \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
+            "SELECT post_id, variation_title, item_price, payment_type
                  FROM {$this->variationsTable}
                  WHERE post_id IN ({$placeholders})
                  ORDER BY COALESCE(serial_index, 0) ASC",
@@ -105,8 +105,8 @@ final class PlanProductLinkService
             return ['error' => __('Product ID is required.', 'fchub-memberships'), 'status' => 422];
         }
 
-        $postsTable = $this->wpdb->prefix . 'posts';
-        $product = $this->wpdb->get_row($this->wpdb->prepare(
+        $postsTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'posts');
+        $product = \FChubMemberships\Support\CustomTableDatabase::getRowFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT ID as id, post_title as title FROM {$postsTable} WHERE ID = %d",
             $productId
         ), ARRAY_A);
@@ -116,7 +116,7 @@ final class PlanProductLinkService
         }
 
         // Check for existing feed linking this product to this plan
-        $existingFeeds = $this->wpdb->get_results($this->wpdb->prepare(
+        $existingFeeds = \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT id, meta_value FROM {$this->metaTable}
              WHERE object_id = %d AND object_type = 'product_integration' AND meta_key = 'memberships'",
             $productId
@@ -173,17 +173,17 @@ final class PlanProductLinkService
             }
         }
 
-        $this->wpdb->insert($this->metaTable, [
+        \FChubMemberships\Support\CustomTableDatabase::insertInto($this->database, $this->metaTable, [
             'object_id'   => $productId,
             'object_type' => 'product_integration',
-            'meta_key'    => 'memberships',
-            'meta_value'  => wp_json_encode($feedSettings),
+            'meta_key'    => 'memberships', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Required FluentCart custom-table column; insertInto prepares values and the reindex action refreshes derived integration data.
+            'meta_value'  => wp_json_encode($feedSettings), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Required FluentCart custom-table column; insertInto prepares values and the reindex action refreshes derived integration data.
         ]);
 
         do_action('fluent_cart/reindex_integration_feeds', []);
 
         return [
-            'data'    => ['feed_id' => (int) $this->wpdb->insert_id],
+            'data'    => ['feed_id' => (int) $this->database->insert_id],
             'message' => __('Product linked successfully.', 'fchub-memberships'),
             'status'  => 201,
         ];
@@ -196,7 +196,7 @@ final class PlanProductLinkService
             return ['error' => __('Plan not found.', 'fchub-memberships'), 'status' => 404];
         }
 
-        $feed = $this->wpdb->get_row($this->wpdb->prepare(
+        $feed = \FChubMemberships\Support\CustomTableDatabase::getRowFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT id, meta_value FROM {$this->metaTable}
              WHERE id = %d AND object_type = 'product_integration' AND meta_key = 'memberships'",
             $feedId
@@ -216,7 +216,7 @@ final class PlanProductLinkService
             return ['error' => __('This feed does not belong to this plan.', 'fchub-memberships'), 'status' => 422];
         }
 
-        $this->wpdb->delete($this->metaTable, ['id' => $feedId]);
+        \FChubMemberships\Support\CustomTableDatabase::deleteFrom($this->database, $this->metaTable, ['id' => $feedId]);
 
         do_action('fluent_cart/reindex_integration_feeds', []);
 
@@ -225,16 +225,22 @@ final class PlanProductLinkService
 
     public function searchProducts(string $search = ''): array
     {
-        $postsTable = $this->wpdb->prefix . 'posts';
+        $postsTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'posts');
         $search = sanitize_text_field($search);
 
-        $where = "p.post_type = 'fluent-products' AND p.post_status = 'publish'";
+        $where = 'p.post_type = %s AND p.post_status = %s';
+        $params = ['fluent-products', 'publish'];
         if ($search !== '') {
-            $where .= $this->wpdb->prepare(' AND p.post_title LIKE %s', '%' . $this->wpdb->esc_like($search) . '%');
+            $where .= ' AND p.post_title LIKE %s';
+            $params[] = '%' . $this->database->esc_like($search) . '%';
         }
 
-        $posts = $this->wpdb->get_results(
-            "SELECT p.ID as id, p.post_title as title FROM {$postsTable} p WHERE {$where} ORDER BY p.post_title ASC LIMIT 20",
+        $posts = \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database,
+            \FChubMemberships\Support\CustomTableDatabase::prepareOn(
+                $this->database,
+                "SELECT p.ID as id, p.post_title as title FROM {$postsTable} p WHERE {$where} ORDER BY p.post_title ASC LIMIT 20",
+                ...$params,
+            ),
             ARRAY_A
         );
 
@@ -244,7 +250,7 @@ final class PlanProductLinkService
 
         $postIds = array_column($posts, 'id');
         $placeholders = implode(',', array_fill(0, count($postIds), '%d'));
-        $variations = $this->wpdb->get_results($this->wpdb->prepare(
+        $variations = \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT post_id, variation_title, item_price, payment_type
              FROM {$this->variationsTable}
              WHERE post_id IN ({$placeholders})

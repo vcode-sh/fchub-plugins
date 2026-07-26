@@ -32,7 +32,22 @@ if (!isset($GLOBALS['wpdb'])) {
         public function prepare($query, ...$args)
         {
             $this->queries[] = $query;
-            return $query;
+            $index = 0;
+
+            return preg_replace_callback(
+                '/%(?:\d+\$)?([idsf])/',
+                static function (array $matches) use (&$index, $args): string {
+                    $value = $args[$index++] ?? null;
+
+                    return match ($matches[1]) {
+                        'i' => '`' . str_replace('`', '``', (string) $value) . '`',
+                        'd' => (string) (int) $value,
+                        'f' => (string) (float) $value,
+                        's' => "'" . addslashes((string) $value) . "'",
+                    };
+                },
+                $query
+            );
         }
 
         public function get_results($query, $output = 'OBJECT')
@@ -124,6 +139,25 @@ if (!function_exists('get_option')) {
     function get_option($key, $default = false)
     {
         return $GLOBALS['wp_options'][$key] ?? $default;
+    }
+}
+
+if (!function_exists('get_posts')) {
+    function get_posts($args = [])
+    {
+        $posts = array_values($GLOBALS['wp_mock_posts']);
+
+        return array_values(array_filter($posts, static function ($post) use ($args): bool {
+            if (isset($args['post_type']) && $post->post_type !== $args['post_type']) {
+                return false;
+            }
+
+            if (isset($args['post_status']) && $post->post_status !== $args['post_status']) {
+                return false;
+            }
+
+            return empty($args['s']) || stripos($post->post_title, (string) $args['s']) !== false;
+        }));
     }
 }
 

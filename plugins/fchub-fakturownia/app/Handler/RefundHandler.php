@@ -26,7 +26,7 @@ class RefundHandler
     {
         $order->addLog(
             __('Fakturownia: Partial refund detected', 'fchub-fakturownia'),
-            __('Automatic correction invoices are only supported for full refunds. Please create a partial correction invoice manually in Fakturownia.', 'fchub-fakturownia'),
+            __('Automatic corrections support full refunds only. Create a partial correction manually in Fakturownia.', 'fchub-fakturownia'),
             'warning',
             'Fakturownia'
         );
@@ -56,6 +56,7 @@ class RefundHandler
         }
 
         $reason = mb_substr(sprintf(
+            /* translators: %s: FluentCart order number. */
             __('Refund - Order #%s', 'fchub-fakturownia'),
             $order->invoice_no ?: $order->id
         ), 0, 256);
@@ -109,7 +110,8 @@ class RefundHandler
         $order->addLog(
             __('Fakturownia: Correction invoice created', 'fchub-fakturownia'),
             sprintf(
-                __('Correction %s created for invoice %s', 'fchub-fakturownia'),
+                /* translators: 1: correction number, 2: original invoice number. */
+                __('Correction %1$s created for invoice %2$s', 'fchub-fakturownia'),
                 Arr::get($result, 'number', ''),
                 $order->getMeta('_fakturownia_invoice_number')
             ),

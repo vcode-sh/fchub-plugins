@@ -195,7 +195,8 @@ final class GrantRevocationService
                 $order,
                 $title,
                 sprintf(
-                    __('Plan #%d: %d resources revoked, %d scheduled after grace, %d retained, %d failed', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Plan #%1$d: %2$d resources revoked, %3$d scheduled after grace, %4$d retained, %5$d failed', 'fchub-memberships'),
                     $planId,
                     $revoked,
                     $graceStarted,

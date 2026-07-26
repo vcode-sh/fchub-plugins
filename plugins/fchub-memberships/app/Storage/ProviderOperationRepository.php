@@ -7,6 +7,7 @@ namespace FChubMemberships\Storage;
 use FChubMemberships\Domain\ProviderOperationClaimResult;
 use FChubMemberships\Domain\ProviderOperationOutcome;
 use FChubMemberships\Support\Clock;
+use FChubMemberships\Support\Logger;
 
 defined('ABSPATH') || exit;
 
@@ -20,8 +21,8 @@ class ProviderOperationRepository
     public function __construct(private ?Clock $clock = null)
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_provider_operations';
-        $this->edgeTable = $wpdb->prefix . 'fchub_membership_entitlement_edges';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_provider_operations');
+        $this->edgeTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_entitlement_edges');
         $this->clock ??= new Clock();
     }
 
@@ -48,7 +49,7 @@ class ProviderOperationRepository
 
         $now = $this->storageNow();
         $eligibility = $eligibleAt ?? $this->clock->now();
-        $inserted = $wpdb->insert($this->table, [
+        $inserted = \FChubMemberships\Support\CustomTableDatabase::insert($this->table, [
             'edge_id' => $edgeId,
             'operation_key' => $operationKey,
             'desired_action' => $desiredAction,
@@ -84,7 +85,7 @@ class ProviderOperationRepository
             return null;
         }
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
@@ -99,7 +100,7 @@ class ProviderOperationRepository
     {
         global $wpdb;
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE operation_key = %s",
             $operationKey
         ), ARRAY_A);
@@ -122,7 +123,7 @@ class ProviderOperationRepository
             throw new \InvalidArgumentException('Provider operation resource identity is invalid.');
         }
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT operation.*
              FROM {$this->table} operation
              INNER JOIN {$this->edgeTable} edge ON edge.id = operation.edge_id
@@ -164,7 +165,7 @@ class ProviderOperationRepository
         $edgeIds = array_values(array_unique($edgeIds));
         sort($edgeIds, SORT_NUMERIC);
         $placeholders = implode(', ', array_fill(0, count($edgeIds), '%d'));
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT operation.*
              FROM {$this->table} operation
              INNER JOIN (
@@ -195,15 +196,20 @@ class ProviderOperationRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results(
-            "SELECT edge.provider,
-                    SUM(CASE WHEN operation.state IN ('pending', 'processing', 'deferred') THEN 1 ELSE 0 END)
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT edge.provider,
+                    SUM(CASE WHEN operation.state IN (%s, %s, %s) THEN 1 ELSE 0 END)
                         AS pending_operations,
-                    SUM(CASE WHEN operation.state = 'failed' THEN 1 ELSE 0 END) AS failed_operations
+                    SUM(CASE WHEN operation.state = %s THEN 1 ELSE 0 END) AS failed_operations
              FROM {$this->table} operation
              INNER JOIN {$this->edgeTable} edge ON edge.id = operation.edge_id
              GROUP BY edge.provider
              ORDER BY edge.provider ASC",
+                'pending',
+                'processing',
+                'deferred',
+                'failed',
+            ),
             ARRAY_A
         );
         if ($this->databaseHasError()) {
@@ -232,7 +238,7 @@ class ProviderOperationRepository
         if ($edgeId <= 0) {
             throw new \InvalidArgumentException('Provider operation edge ID must be greater than zero.');
         }
-        $count = $wpdb->get_var($wpdb->prepare(
+        $count = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table}
              WHERE edge_id = %d
                AND desired_action = 'grant'
@@ -253,7 +259,7 @@ class ProviderOperationRepository
         if ($id <= 0) {
             throw new \InvalidArgumentException('Provider operation ID must be greater than zero.');
         }
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET last_error_code = 'provider_operation_finalized', updated_at = %s
              WHERE id = %d
@@ -280,7 +286,7 @@ class ProviderOperationRepository
 
         $now = $this->storageNow();
         $leaseExpires = $this->clock->storage($this->clock->now()->modify("+{$leaseSeconds} seconds"));
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = 'processing', lease_owner = %s, lease_expires_at = %s,
                  updated_at = %s
@@ -331,7 +337,7 @@ class ProviderOperationRepository
         }
 
         $now = $this->storageNow();
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET attempt_count = attempt_count + 1, updated_at = %s
              WHERE id = %d
@@ -387,7 +393,7 @@ class ProviderOperationRepository
             $state = 'failed';
         }
 
-        $query = $wpdb->prepare(
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = %s, retryable = %d, next_retry_at = " . ($nextRetry === null ? 'NULL' : '%s') . ",
                  last_error_code = %s, last_error_message = %s,
@@ -408,7 +414,7 @@ class ProviderOperationRepository
             ], static fn(mixed $value): bool => $value !== null))
         );
 
-        return $wpdb->query($query) === 1;
+        return \FChubMemberships\Support\CustomTableDatabase::query($query) === 1;
     }
 
     /** @return list<int> */
@@ -418,7 +424,7 @@ class ProviderOperationRepository
 
         $limit = max(1, min(50, $limit));
         $now = $this->storageNow();
-        $ids = $wpdb->get_col($wpdb->prepare(
+        $ids = \FChubMemberships\Support\CustomTableDatabase::getCol(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT id FROM {$this->table}
              WHERE eligible_at <= %s AND (
                  state = 'pending'
@@ -445,7 +451,7 @@ class ProviderOperationRepository
             throw new \InvalidArgumentException('Provider operation ID must be greater than zero.');
         }
         $now = $this->storageNow();
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = 'pending', lease_owner = NULL, lease_expires_at = NULL, updated_at = %s
              WHERE id = %d
@@ -469,7 +475,7 @@ class ProviderOperationRepository
 
         $limit = max(1, min(50, $limit));
         $now = $this->storageNow();
-        $ids = $wpdb->get_col($wpdb->prepare(
+        $ids = \FChubMemberships\Support\CustomTableDatabase::getCol(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT id FROM {$this->table}
              WHERE state = 'deferred' AND eligible_at <= %s
              ORDER BY id ASC LIMIT {$limit}",
@@ -491,7 +497,7 @@ class ProviderOperationRepository
         }
 
         $now = $this->storageNow();
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = 'pending', updated_at = %s
              WHERE id = %d AND state = 'deferred' AND eligible_at <= %s",
@@ -531,11 +537,12 @@ class ProviderOperationRepository
         try {
             $eligibleAt = $this->clock->storage($this->clock->parseLocal($eligibleAt));
         } catch (\Throwable $exception) {
-            throw new \InvalidArgumentException('Invalid provider operation eligibility time.', 0, $exception);
+            Logger::error('Invalid provider operation eligibility time.', $exception->getMessage());
+            throw new \InvalidArgumentException('Invalid provider operation eligibility time.');
         }
 
         $limit = max(1, min(50, $limit));
-        $ids = $wpdb->get_col($wpdb->prepare(
+        $ids = \FChubMemberships\Support\CustomTableDatabase::getCol(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT operation.id
              FROM {$this->table} operation
              JOIN {$this->edgeTable} edge ON edge.id = operation.edge_id
@@ -573,7 +580,7 @@ class ProviderOperationRepository
         }
 
         $now = $this->storageNow();
-        $count = $wpdb->get_var($wpdb->prepare(
+        $count = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*)
              FROM {$this->table} older
              JOIN {$this->edgeTable} older_edge ON older_edge.id = older.edge_id
@@ -612,7 +619,7 @@ class ProviderOperationRepository
         }
 
         $now = $this->storageNow();
-        $count = $wpdb->get_var($wpdb->prepare(
+        $count = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*)
              FROM {$this->table} newer
              JOIN {$this->edgeTable} newer_edge ON newer_edge.id = newer.edge_id
@@ -643,7 +650,7 @@ class ProviderOperationRepository
 
         $limit = max(1, min(50, $limit));
         $now = $this->storageNow();
-        $result = $wpdb->query($wpdb->prepare(
+        $result = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = 'pending', updated_at = %s
              WHERE state = 'deferred' AND eligible_at <= %s

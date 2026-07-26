@@ -13,6 +13,10 @@ package-lock.json
 vite.config.js
 phpunit.xml
 phpunit.xml.dist
-*.md
+phpcs.xml
+phpstan.neon
+phpstan-bootstrap.php
+phpstan-stubs.stub
+README.md
 .DS_Store
 Thumbs.db

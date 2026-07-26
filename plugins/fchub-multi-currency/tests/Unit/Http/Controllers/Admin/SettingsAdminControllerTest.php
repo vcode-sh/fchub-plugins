@@ -84,4 +84,109 @@ final class SettingsAdminControllerTest extends TestCase
         $this->assertSame('inline', $settings['switcher_defaults']['search_mode']);
         $this->assertSame(['EUR', 'USD'], $settings['switcher_defaults']['favorite_currencies']);
     }
+
+    #[Test]
+    public function invalidProviderIsRejectedWithoutSavingOrScheduling(): void
+    {
+        $controller = new SettingsAdminController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['rate_provider' => 'surprisingly_free_money']);
+
+        $response = $controller->save($request);
+
+        self::assertSame(422, $response->get_status());
+        self::assertSame('manual', $GLOBALS['wp_options']['fchub_mc_settings']['rate_provider'] ?? 'manual');
+        self::assertFalse(wp_next_scheduled('fchub_mc_refresh_rates'));
+    }
+
+    #[Test]
+    public function keyedRemoteProvidersAreRejectedUntilTheirKeyIsSupplied(): void
+    {
+        $controller = new SettingsAdminController();
+
+        foreach (['exchange_rate_api', 'open_exchange_rates'] as $provider) {
+            $request = new \WP_REST_Request('POST', '/');
+            $request->set_json_params([
+                'rate_provider' => $provider,
+                'rate_provider_api_key' => '',
+            ]);
+
+            $response = $controller->save($request);
+
+            self::assertSame(422, $response->get_status());
+            self::assertFalse(wp_next_scheduled('fchub_mc_refresh_rates'));
+        }
+    }
+
+    #[Test]
+    public function switchingBetweenKeyedProvidersRequiresTheNewProvidersKey(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'rate_provider' => 'exchange_rate_api',
+            'rate_provider_api_key' => 'exchange-rate-api-key',
+        ]);
+        $controller = new SettingsAdminController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['rate_provider' => 'open_exchange_rates']);
+
+        $response = $controller->save($request);
+
+        self::assertSame(422, $response->get_status());
+        self::assertSame(
+            'exchange_rate_api',
+            $GLOBALS['wp_options']['fchub_mc_settings']['rate_provider'],
+        );
+        self::assertFalse(wp_next_scheduled('fchub_mc_refresh_rates'));
+    }
+
+    #[Test]
+    public function savingEcbSchedulesARecurringRefreshWithoutAnApiKey(): void
+    {
+        $controller = new SettingsAdminController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params([
+            'rate_provider' => 'ecb',
+            'rate_provider_api_key' => '',
+        ]);
+
+        $response = $controller->save($request);
+
+        self::assertSame(200, $response->get_status());
+        self::assertIsInt(wp_next_scheduled('fchub_mc_refresh_rates'));
+        self::assertSame(
+            'fchub_mc_rate_interval',
+            $GLOBALS['wp_scheduled_events']['fchub_mc_refresh_rates']['recurrence'] ?? null,
+        );
+    }
+
+    #[Test]
+    public function savingAKeyedRemoteProviderSchedulesOneRecurringRefresh(): void
+    {
+        $controller = new SettingsAdminController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params([
+            'rate_provider' => 'exchange_rate_api',
+            'rate_provider_api_key' => 'super-secret-key',
+        ]);
+
+        $response = $controller->save($request);
+        $controller->save($request);
+
+        self::assertSame(200, $response->get_status());
+        self::assertCount(1, $GLOBALS['wp_scheduled_events']);
+    }
+
+    #[Test]
+    public function switchingToManualClearsTheRecurringRefresh(): void
+    {
+        wp_schedule_event(time(), 'fchub_mc_rate_interval', 'fchub_mc_refresh_rates');
+        $controller = new SettingsAdminController();
+        $request = new \WP_REST_Request('POST', '/');
+        $request->set_json_params(['rate_provider' => 'manual']);
+
+        $response = $controller->save($request);
+
+        self::assertSame(200, $response->get_status());
+        self::assertFalse(wp_next_scheduled('fchub_mc_refresh_rates'));
+    }
 }

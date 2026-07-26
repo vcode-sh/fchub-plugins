@@ -27,7 +27,7 @@ final class WebhookEndpointConfig
 
         $settings['webhook_endpoints'] = array_map(
             static function (string $url) use ($secret, $status): array {
-                $host = (string) (parse_url($url, PHP_URL_HOST) ?: 'Webhook endpoint');
+                $host = (string) (wp_parse_url($url, PHP_URL_HOST) ?: 'Webhook endpoint');
 
                 return [
                     'id' => 'legacy_' . substr(hash('sha256', $url), 0, 24),

@@ -1,31 +1,28 @@
 <?php
 
 /**
- * Plugin Name: FCHub - Wishlist
- * Plugin URI: https://fchub.co
+ * Plugin Name: FCHub Wishlist
+ * Plugin URI: https://fchub.co/docs/fchub-wishlist
  * Description: Wishlist system for FluentCart with guest support, FluentCRM integration, and customer portal
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: fchub-wishlist
- * Requires at least: 6.7
- * Tested up to:    6.7
+ * Requires at least: 7.0
+ * Tested up to: 7.0
  * Requires PHP: 8.3
- * Update URI: https://fchub.co/fchub-wishlist
+ * Requires Plugins: fluent-cart
  */
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_WISHLIST_VERSION', '1.0.1');
+define('FCHUB_WISHLIST_VERSION', '1.0.2');
 define('FCHUB_WISHLIST_FILE', __FILE__);
 define('FCHUB_WISHLIST_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_WISHLIST_URL', plugin_dir_url(__FILE__));
 define('FCHUB_WISHLIST_DB_VERSION', '1.0.1');
-
-require_once __DIR__ . '/lib/GitHubUpdater.php';
-FCHub_GitHub_Updater::register('fchub-wishlist', plugin_basename(__FILE__), FCHUB_WISHLIST_VERSION);
 
 // Autoloader
 spl_autoload_register(function ($class) {
@@ -109,68 +106,61 @@ add_action('init', function () {
     }
 
     FChubWishlist\Bootstrap\Plugin::boot();
+
+    /**
+     * Register FluentCRM automation triggers, actions, and filters.
+     */
+    add_action('init', function () {
+        if (defined('FLUENTCRM')) {
+            FChubWishlist\FluentCRM\WishlistAutomation::boot();
+        }
+    }, 30);
+
+    /**
+     * Register admin menu page.
+     */
+    add_action('admin_menu', function () {
+        FChubWishlist\Support\AdminMenu::register();
+    }, 20);
+
+    /**
+     * Cron: delete guest wishlists older than 30 days.
+     */
+    add_action(FChubWishlist\Support\Constants::CRON_CLEANUP_GUESTS, function () {
+        FChubWishlist\Domain\GuestSession::cleanupExpired();
+    });
+
+    /**
+     * Cron: remove items for deleted/trashed products.
+     */
+    add_action(FChubWishlist\Support\Constants::CRON_CLEANUP_ORPHANS, function () {
+        (new FChubWishlist\Domain\Actions\CleanupOrphansAction())->execute();
+    });
+
+    /**
+     * Cron: send wishlist reminder emails.
+     */
+    add_action(FChubWishlist\Support\Constants::CRON_REMINDER, function () {
+        (new FChubWishlist\Email\WishlistReminderEmail())->sendPendingReminders();
+    });
+
+    /**
+     * Async email dispatch via Action Scheduler.
+     */
+    add_action(
+        'fchub_wishlist_send_email',
+        function (string $to, string $subject, string $body, array $headers) {
+            $sent = wp_mail($to, $subject, $body, $headers);
+            if (!$sent) {
+                FChubWishlist\Support\Logger::error('Wishlist email send failed', [
+                    'to' => $to,
+                ]);
+            }
+        },
+        10,
+        4
+    );
 }, 3);
-
-/**
- * Register FluentCRM automation triggers, actions, and filters.
- */
-add_action('init', function () {
-    if (defined('FLUENTCART_VERSION') && defined('FLUENTCRM')) {
-        FChubWishlist\FluentCRM\WishlistAutomation::boot();
-    }
-}, 30);
-
-/**
- * Register admin menu page.
- */
-add_action('admin_menu', function () {
-    if (!defined('FLUENTCART_VERSION')) {
-        return;
-    }
-    FChubWishlist\Support\AdminMenu::register();
-}, 20);
-
-/**
- * Cron: delete guest wishlists older than 30 days.
- */
-add_action($fchubWishlistCleanupGuestsHook, function () {
-    if (!defined('FLUENTCART_VERSION')) {
-        return;
-    }
-    FChubWishlist\Domain\GuestSession::cleanupExpired();
-});
-
-/**
- * Cron: remove items for deleted/trashed products.
- */
-add_action($fchubWishlistCleanupOrphansHook, function () {
-    if (!defined('FLUENTCART_VERSION')) {
-        return;
-    }
-    (new FChubWishlist\Domain\Actions\CleanupOrphansAction())->execute();
-});
-
-/**
- * Cron: send wishlist reminder emails.
- */
-add_action($fchubWishlistReminderHook, function () {
-    if (!defined('FLUENTCART_VERSION')) {
-        return;
-    }
-    (new FChubWishlist\Email\WishlistReminderEmail())->sendPendingReminders();
-});
-
-/**
- * Async email dispatch via Action Scheduler.
- */
-add_action('fchub_wishlist_send_email', function (string $to, string $subject, string $body, array $headers) {
-    $sent = wp_mail($to, $subject, $body, $headers);
-    if (!$sent) {
-        FChubWishlist\Support\Logger::error('Wishlist email send failed', [
-            'to' => $to,
-        ]);
-    }
-}, 10, 4);
 
 /**
  * Admin notice when FluentCart is missing.

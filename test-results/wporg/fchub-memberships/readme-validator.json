@@ -1,0 +1,12 @@
+{
+  "plugin": "fchub-memberships",
+  "validator": "https://wordpress.org/plugins/developers/readme-validator/",
+  "checkedAt": "2026-07-26T21:18:43.190Z",
+  "errors": [],
+  "warnings": [],
+  "notes": [
+    "No == Frequently Asked Questions == section was found",
+    "No == Upgrade Notice == section was found",
+    "No donate link was found"
+  ]
+}

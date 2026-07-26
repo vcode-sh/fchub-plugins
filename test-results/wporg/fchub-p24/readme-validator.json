@@ -1,0 +1,11 @@
+{
+  "plugin": "fchub-p24",
+  "validator": "https://wordpress.org/plugins/developers/readme-validator/",
+  "checkedAt": "2026-07-26T21:19:21.281Z",
+  "errors": [],
+  "warnings": [],
+  "notes": [
+    "No == Upgrade Notice == section was found",
+    "No donate link was found"
+  ]
+}

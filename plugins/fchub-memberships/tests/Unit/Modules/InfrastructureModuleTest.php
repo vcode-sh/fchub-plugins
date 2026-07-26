@@ -154,9 +154,24 @@ final class InfrastructureModuleTest extends PluginTestCase
             {
                 $this->calls[] = [$now, $limit];
                 return [
-                    ['id' => 10, 'status' => 'pending', 'attempt_count' => 0],
-                    ['id' => 11, 'status' => 'retrying', 'attempt_count' => 3],
-                    ['id' => 12, 'status' => 'processing', 'attempt_count' => 4],
+                    [
+                        'id' => 10,
+                        'destination_url' => 'https://one.example/webhook',
+                        'status' => 'pending',
+                        'attempt_count' => 0,
+                    ],
+                    [
+                        'id' => 11,
+                        'destination_url' => 'https://two.example/webhook',
+                        'status' => 'retrying',
+                        'attempt_count' => 3,
+                    ],
+                    [
+                        'id' => 12,
+                        'destination_url' => 'https://three.example/webhook',
+                        'status' => 'processing',
+                        'attempt_count' => 4,
+                    ],
                 ];
             }
             public function purge(string $successCutoff, string $failureCutoff): int { return 0; }
@@ -172,6 +187,22 @@ final class InfrastructureModuleTest extends PluginTestCase
             new \DateTimeImmutable('2026-07-23T12:00:00+00:00'),
             new \DateTimeZone('UTC')
         );
+        $GLOBALS['_fchub_test_options']['fchub_memberships_settings'] = [
+            'webhook_endpoints' => array_map(
+                static fn(string $url, int $index): array => [
+                    'id' => 'endpoint-' . $index,
+                    'url' => $url,
+                    'secret' => 'secret-' . $index,
+                    'status' => 'active',
+                ],
+                [
+                    'https://one.example/webhook',
+                    'https://two.example/webhook',
+                    'https://three.example/webhook',
+                ],
+                [1, 2, 3],
+            ),
+        ];
         $module = new InfrastructureModule(null, null, null, null, null, null, $deliveries, null, $queue, $clock);
 
         $module->reconcileWebhookDeliveries();

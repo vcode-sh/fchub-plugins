@@ -75,13 +75,13 @@ class AccessExpiringEmail
         $settings   = get_option('fchub_memberships_settings', []);
         $noticeDays = (int) ($settings['expiry_warning_days'] ?? $settings['expiry_notice_days'] ?? 7);
 
-        $table   = $wpdb->prefix . 'fchub_membership_grants';
+        $table   = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
         $nowValue = $this->clock->now();
         $cutoff = $this->clock->storage($this->clock->plusDays($noticeDays, $nowValue));
         $now = $this->clock->storage($nowValue);
 
         // Find active grants expiring within notice period, not yet notified
-        $grants = $wpdb->get_results($wpdb->prepare(
+        $grants = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT g.id, g.user_id, g.plan_id, g.expires_at, g.meta
              FROM {$table} g
              WHERE g.status = 'active'
@@ -99,7 +99,7 @@ class AccessExpiringEmail
         }
 
         $emailEnabled = $this->isEnabled();
-        $plansTable = $wpdb->prefix . 'fchub_membership_plans';
+        $plansTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
 
         foreach ($grants as $grant) {
             // Check if already notified
@@ -108,7 +108,7 @@ class AccessExpiringEmail
                 continue;
             }
 
-            $plan = $wpdb->get_row($wpdb->prepare(
+            $plan = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT title, slug FROM {$plansTable} WHERE id = %d",
                 (int) $grant->plan_id
             ));
@@ -145,7 +145,7 @@ class AccessExpiringEmail
 
             // Mark as notified
             $meta['expiry_notified'] = $now;
-            $wpdb->update(
+            \FChubMemberships\Support\CustomTableDatabase::update(
                 $table,
                 ['meta' => wp_json_encode($meta)],
                 ['id' => $grant->id],
@@ -164,8 +164,8 @@ class AccessExpiringEmail
     {
         global $wpdb;
 
-        $rulesTable = $wpdb->prefix . 'fchub_membership_plan_rules';
-        $rules = $wpdb->get_results($wpdb->prepare(
+        $rulesTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plan_rules');
+        $rules = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT resource_type, resource_id FROM {$rulesTable} WHERE plan_id = %d",
             $planId
         ));
@@ -289,33 +289,40 @@ HTML;
     {
         $siteName = esc_html(get_bloginfo('name'));
 
-        return <<<HTML
+        return strtr(
+            <<<'HTML'
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{$title}</title>
+<title>{title}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f3f4f6;">
 <tr><td align="center" style="padding:40px 20px;">
 <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
 <tr><td style="padding:32px 40px;background-color:#2563eb;text-align:center;">
-<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">{$siteName}</h1>
+<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">{site_name}</h1>
 </td></tr>
 <tr><td style="padding:32px 40px;color:#374151;font-size:15px;line-height:1.6;">
-{$body}
+{body}
 </td></tr>
 <tr><td style="padding:20px 40px;background-color:#f9fafb;text-align:center;font-size:12px;color:#9ca3af;">
-&copy; {$siteName}. All rights reserved.
+&copy; {site_name}. All rights reserved.
 </td></tr>
 </table>
 </td></tr>
 </table>
 </body>
 </html>
-HTML;
+HTML,
+            [
+                '{title}' => $title,
+                '{site_name}' => $siteName,
+                '{body}' => $body,
+            ]
+        );
     }
 
     private function dispatch(string $to, string $subject, string $body): void

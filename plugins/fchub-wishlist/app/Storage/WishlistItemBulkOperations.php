@@ -16,8 +16,10 @@ final class WishlistItemBulkOperations
     {
         global $wpdb;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Limit enforcement must observe the live item count before a mutation.
         return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->itemsTable} WHERE wishlist_id = %d",
+            "SELECT COUNT(*) FROM %i WHERE wishlist_id = %d",
+            $this->itemsTable,
             $wishlistId
         ));
     }
@@ -31,13 +33,14 @@ final class WishlistItemBulkOperations
         }
 
         $placeholders = implode(',', array_fill(0, count($itemIds), '%d'));
+        $params = array_merge([$this->itemsTable], array_map('intval', $itemIds));
 
-        // phpcs:disable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- dynamic placeholder count
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no bulk-delete API; no item cache is retained.
         return (int) $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$this->itemsTable} WHERE id IN ({$placeholders})",
-            ...array_map('intval', $itemIds)
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- WordPress has no array placeholder; every generated %d is prepared.
+            "DELETE FROM %i WHERE id IN ({$placeholders})",
+            ...$params
         ));
-        // phpcs:enable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
     }
 
     public function deleteByWishlistIds(array $wishlistIds): int
@@ -49,13 +52,13 @@ final class WishlistItemBulkOperations
         }
 
         $placeholders = implode(',', array_fill(0, count($wishlistIds), '%d'));
+        $params = array_merge([$this->itemsTable], array_map('intval', $wishlistIds));
 
-        // phpcs:disable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- dynamic placeholder count
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no bulk-delete API; no item cache is retained.
         return (int) $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$this->itemsTable} WHERE wishlist_id IN ({$placeholders})",
-            ...array_map('intval', $wishlistIds)
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- WordPress has no array placeholder; every generated %d is prepared.
+            "DELETE FROM %i WHERE wishlist_id IN ({$placeholders})",
+            ...$params
         ));
-        // phpcs:enable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
     }
 }
-

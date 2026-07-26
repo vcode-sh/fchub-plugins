@@ -26,7 +26,6 @@ class Przelewy24GatewayIPNValidationTest extends TestCase
         $ref = new \ReflectionClass(Przelewy24Gateway::class);
         $this->gateway = $ref->newInstanceWithoutConstructor();
         $prop = $ref->getProperty('settings');
-        $prop->setAccessible(true);
         $prop->setValue($this->gateway, $settings);
     }
 
@@ -100,6 +99,131 @@ class Przelewy24GatewayIPNValidationTest extends TestCase
         }
     }
 
+    public function testIPNRejectsUnexpectedFields(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $input = $this->validInput();
+        $input['unexpected'] = 'value';
+        $this->setPhpInput(json_encode($input));
+
+        try {
+            $this->gateway->handleIPN();
+            $this->fail('Expected WpSendJsonException');
+        } catch (WpSendJsonException $e) {
+            $this->assertSame(400, $e->statusCode);
+            $this->assertSame('Unexpected notification field', $e->data['error']);
+        }
+    }
+
+    public function testIPNRejectsSignedMerchantMismatch(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $input = $this->validInput(['merchantId' => 123456]);
+        $this->setPhpInput(json_encode($input));
+
+        try {
+            $this->gateway->handleIPN();
+            $this->fail('Expected WpSendJsonException');
+        } catch (WpSendJsonException $e) {
+            $this->assertSame(400, $e->statusCode);
+            $this->assertSame('Merchant mismatch', $e->data['error']);
+        }
+    }
+
+    public function testIPNRejectsSignedPosMismatch(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $input = $this->validInput(['posId' => 123456]);
+        $this->setPhpInput(json_encode($input));
+
+        try {
+            $this->gateway->handleIPN();
+            $this->fail('Expected WpSendJsonException');
+        } catch (WpSendJsonException $e) {
+            $this->assertSame(400, $e->statusCode);
+            $this->assertSame('POS mismatch', $e->data['error']);
+        }
+    }
+
+    public function testIPNRejectsMalformedFieldTypes(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $input = $this->validInput();
+        $input['amount'] = ['5000'];
+        $this->setPhpInput(json_encode($input));
+
+        $response = null;
+        try {
+            $this->gateway->handleIPN();
+            $this->fail('Expected WpSendJsonException');
+        } catch (WpSendJsonException $e) {
+            $response = $e;
+        }
+
+        stream_wrapper_restore('php');
+        $this->phpInputOverridden = false;
+        $this->assertInstanceOf(WpSendJsonException::class, $response);
+        $this->assertSame(400, $response->statusCode);
+        $this->assertSame('Invalid notification fields', $response->data['error']);
+    }
+
+    public function testIPNRejectsOriginAmountMismatch(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $transaction = new \FluentCart_OrderTransaction();
+        $transaction->uuid = 'test-uuid-12345';
+        $transaction->total = 5000;
+        $transaction->currency = 'PLN';
+        $transaction->status = 'pending';
+        \FluentCart_OrderTransaction::$mockResult = $transaction;
+
+        $this->setPhpInput(json_encode($this->validInput(['originAmount' => 4999])));
+
+        $response = null;
+        try {
+            $this->gateway->handleIPN();
+            $this->fail('Expected WpSendJsonException');
+        } catch (WpSendJsonException $e) {
+            $response = $e;
+        }
+
+        stream_wrapper_restore('php');
+        $this->phpInputOverridden = false;
+        $this->assertInstanceOf(WpSendJsonException::class, $response);
+        $this->assertSame(400, $response->statusCode);
+        $this->assertSame('Origin amount mismatch', $response->data['error']);
+    }
+
+    private function validInput(array $overrides = []): array
+    {
+        $input = array_merge([
+            'merchantId' => 383989,
+            'posId' => 383989,
+            'sessionId' => 'test-uuid-12345',
+            'amount' => 5000,
+            'originAmount' => 5000,
+            'currency' => 'PLN',
+            'orderId' => 987654321,
+            'methodId' => 154,
+            'statement' => 'Payment test',
+        ], $overrides);
+
+        $input['sign'] = hash('sha384', json_encode([
+            'merchantId' => (int) $input['merchantId'],
+            'posId' => (int) $input['posId'],
+            'sessionId' => $input['sessionId'],
+            'amount' => (int) $input['amount'],
+            'originAmount' => (int) $input['originAmount'],
+            'currency' => $input['currency'],
+            'orderId' => (int) $input['orderId'],
+            'methodId' => (int) $input['methodId'],
+            'statement' => $input['statement'],
+            'crc' => '679175ea875c2776',
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        return $input;
+    }
+
     private function setPhpInput(string $data): void
     {
         stream_wrapper_unregister('php');
@@ -115,5 +239,6 @@ class Przelewy24GatewayIPNValidationTest extends TestCase
         }
         $this->phpInputOverridden = false;
         unset($_SERVER['REQUEST_METHOD']);
+        \FluentCart_OrderTransaction::$mockResult = null;
     }
 }

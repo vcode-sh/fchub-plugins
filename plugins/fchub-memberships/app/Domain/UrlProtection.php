@@ -281,7 +281,9 @@ class UrlProtection
      */
     private function getCurrentUrl(): string
     {
-        $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+        $requestUri = isset($_SERVER['REQUEST_URI'])
+            ? sanitize_url(wp_unslash($_SERVER['REQUEST_URI']))
+            : '/';
         return home_url($requestUri);
     }
 

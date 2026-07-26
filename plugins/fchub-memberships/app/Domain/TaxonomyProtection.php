@@ -210,7 +210,10 @@ class TaxonomyProtection
      */
     public function saveTermProtection(int $termId, int $ttId): void
     {
-        if (!isset($_POST['_fchub_protection_nonce']) || !wp_verify_nonce($_POST['_fchub_protection_nonce'], 'fchub_memberships_protection')) {
+        $nonce = isset($_POST['_fchub_protection_nonce'])
+            ? sanitize_text_field(wp_unslash($_POST['_fchub_protection_nonce']))
+            : '';
+        if ($nonce === '' || !wp_verify_nonce($nonce, 'fchub_memberships_protection')) {
             return;
         }
 
@@ -227,9 +230,13 @@ class TaxonomyProtection
         $isProtected = !empty($_POST['fchub_is_protected']);
 
         if ($isProtected) {
-            $planIds = isset($_POST['fchub_plan_ids']) ? array_map('intval', (array) $_POST['fchub_plan_ids']) : [];
+            $planIds = isset($_POST['fchub_plan_ids'])
+                ? array_map('intval', (array) wp_unslash($_POST['fchub_plan_ids']))
+                : [];
 
-            $inheritanceMode = sanitize_text_field($_POST['fchub_inheritance_mode'] ?? 'none');
+            $inheritanceMode = isset($_POST['fchub_inheritance_mode'])
+                ? sanitize_text_field(wp_unslash($_POST['fchub_inheritance_mode']))
+                : 'none';
             if (!in_array($inheritanceMode, ['none', 'all_posts'], true)) {
                 $inheritanceMode = 'none';
             }

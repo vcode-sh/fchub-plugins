@@ -1,0 +1,38 @@
+FCHub Memberships third-party licence inventory
+================================================
+
+The distributed JavaScript and font assets include the following direct
+dependencies. Exact JavaScript versions are taken from package-lock.json.
+Transitive dependency notices remain in their upstream packages and source
+repositories.
+
+Vue 3.5.30
+Copyright (c) 2018-present Yuxi (Evan) You and Vue contributors
+Licence: MIT
+Source: https://github.com/vuejs/core
+
+Element Plus 2.13.5
+Copyright (c) 2020-present Element Plus contributors
+Licence: MIT
+Source: https://github.com/element-plus/element-plus
+
+TipTap 3.28.0
+Copyright (c) ueberdosis GmbH and TipTap contributors
+Licence: MIT
+Source: https://github.com/ueberdosis/tiptap
+
+Chart.js 4.5.1
+Copyright (c) 2014-2025 Chart.js contributors
+Licence: MIT
+Source: https://github.com/chartjs/Chart.js
+
+Lucide Vue 1.25.0
+Copyright (c) 2022 Lucide contributors
+Licence: ISC
+Source: https://github.com/lucide-icons/lucide
+
+Inter
+Copyright (c) 2016 The Inter Project Authors
+Licence: SIL Open Font License 1.1
+Source: https://github.com/rsms/inter
+Full licence: licenses/Inter-OFL.txt

@@ -31,7 +31,6 @@ abstract class PluginTestCase extends TestCase
     {
         $ref = new \ReflectionClass(\FChubFakturownia\Integration\FakturowniaSettings::class);
         $prop = $ref->getProperty('cachedSettings');
-        $prop->setAccessible(true);
         $prop->setValue(null, null);
     }
 

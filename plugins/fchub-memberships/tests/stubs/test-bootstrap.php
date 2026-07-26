@@ -275,7 +275,7 @@ if (!class_exists('wpdb')) {
             return [];
         }
 
-        public function query(string $query): int|false
+        public function query(string $query): int|bool
         {
             $GLOBALS['_fchub_test_queries'][] = ['query', $query];
 
@@ -326,7 +326,7 @@ if (!class_exists('wpdb')) {
                 return $query;
             }
 
-            $normalized = str_replace(['%d', '%f', '%s'], ['%u', '%F', "'%s'"], $query);
+            $normalized = str_replace(['%d', '%f', '%s', '%i'], ['%u', '%F', "'%s'", '`%s`'], $query);
             return vsprintf($normalized, array_map(static function (mixed $value): mixed {
                 if (is_bool($value)) {
                     return $value ? 1 : 0;
@@ -1143,6 +1143,28 @@ if (!function_exists('get_post_type')) {
     }
 }
 
+if (!function_exists('get_objects_in_term')) {
+    function get_objects_in_term(int|array $termIds, string|array $taxonomies, array $args = []): array|\WP_Error
+    {
+        $wantedTermIds = array_map('intval', (array) $termIds);
+        $wantedTaxonomies = array_map('strval', (array) $taxonomies);
+        $objectIds = [];
+
+        foreach ($GLOBALS['_fchub_test_post_terms'] ?? [] as $objectId => $termsByTaxonomy) {
+            foreach ($wantedTaxonomies as $taxonomy) {
+                foreach ($termsByTaxonomy[$taxonomy] ?? [] as $term) {
+                    if (in_array((int) ($term->term_id ?? 0), $wantedTermIds, true)) {
+                        $objectIds[] = (int) $objectId;
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($objectIds));
+    }
+}
+
 if (!function_exists('get_posts')) {
     function get_posts(array $args = []): array
     {
@@ -1155,6 +1177,14 @@ if (!function_exists('get_posts')) {
             $posts = array_values(array_filter($posts, static function (object $post) use ($search): bool {
                 return stripos((string) ($post->post_title ?? ''), $search) !== false;
             }));
+        }
+
+        if (!empty($args['post__in'])) {
+            $includedIds = array_map('intval', (array) $args['post__in']);
+            $posts = array_values(array_filter(
+                $posts,
+                static fn (object $post): bool => in_array((int) ($post->ID ?? 0), $includedIds, true),
+            ));
         }
 
         if (!empty($args['tax_query'][0]['taxonomy']) && array_key_exists('terms', $args['tax_query'][0])) {
@@ -1396,7 +1426,28 @@ if (!function_exists('wp_nonce_field')) {
 if (!function_exists('wp_verify_nonce')) {
     function wp_verify_nonce(string $nonce, string|int $action = -1): bool
     {
-        return $nonce === 'nonce';
+        return in_array($nonce, ['nonce', 'test-nonce'], true);
+    }
+}
+
+if (!function_exists('wp_unslash')) {
+    function wp_unslash(mixed $value): mixed
+    {
+        return is_array($value) ? array_map('wp_unslash', $value) : stripslashes((string) $value);
+    }
+}
+
+if (!function_exists('wp_parse_url')) {
+    function wp_parse_url(string $url, int $component = -1): array|string|int|null|false
+    {
+        return parse_url($url, $component);
+    }
+}
+
+if (!function_exists('sanitize_url')) {
+    function sanitize_url(string $url): string
+    {
+        return esc_url_raw($url);
     }
 }
 

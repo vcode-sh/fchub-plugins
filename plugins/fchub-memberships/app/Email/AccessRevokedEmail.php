@@ -112,33 +112,40 @@ HTML;
     {
         $siteName = esc_html(get_bloginfo('name'));
 
-        return <<<HTML
+        return strtr(
+            <<<'HTML'
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{$title}</title>
+<title>{title}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f3f4f6;">
 <tr><td align="center" style="padding:40px 20px;">
 <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
 <tr><td style="padding:32px 40px;background-color:#2563eb;text-align:center;">
-<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">{$siteName}</h1>
+<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">{site_name}</h1>
 </td></tr>
 <tr><td style="padding:32px 40px;color:#374151;font-size:15px;line-height:1.6;">
-{$body}
+{body}
 </td></tr>
 <tr><td style="padding:20px 40px;background-color:#f9fafb;text-align:center;font-size:12px;color:#9ca3af;">
-&copy; {$siteName}. All rights reserved.
+&copy; {site_name}. All rights reserved.
 </td></tr>
 </table>
 </td></tr>
 </table>
 </body>
 </html>
-HTML;
+HTML,
+            [
+                '{title}' => $title,
+                '{site_name}' => $siteName,
+                '{body}' => $body,
+            ]
+        );
     }
 
     private function dispatch(string $to, string $subject, string $body): void

@@ -27,7 +27,8 @@ if (!function_exists('fchub_mc_cleanup_blog')) {
         ];
 
         foreach ($fchub_mc_tables as $fchub_mc_table) {
-            $wpdb->query("DROP TABLE IF EXISTS {$fchub_mc_table}");
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Confirmed uninstall erasure targets only prepared identifiers for plugin-owned tables.
+            $wpdb->query($wpdb->prepare("DROP TABLE IF EXISTS %i", $fchub_mc_table));
         }
 
         // Delete options
@@ -38,7 +39,13 @@ if (!function_exists('fchub_mc_cleanup_blog')) {
 
         // Delete rate limiter transients (60-second TTL — self-expire on object-cache backends,
         // SQL cleanup only reaches wp_options-based transient storage)
-        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_fchub_mc_rl_%' OR option_name LIKE '_transient_timeout_fchub_mc_rl_%'");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- WordPress has no wildcard transient-deletion API; both escaped prefixes are plugin-owned and self-expiring.
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM %i WHERE option_name LIKE %s OR option_name LIKE %s",
+            $wpdb->options,
+            $wpdb->esc_like('_transient_fchub_mc_rl_') . '%',
+            $wpdb->esc_like('_transient_timeout_fchub_mc_rl_') . '%',
+        ));
 
         // Delete diagnostics transient
         delete_transient('fchub_mc_has_stale_rates');
@@ -50,8 +57,8 @@ if (!function_exists('fchub_mc_cleanup_blog')) {
         }
 
         // Delete user meta
-        $wpdb->query("DELETE FROM {$wpdb->usermeta} WHERE meta_key = '_fchub_mc_currency'");
-        $wpdb->query("DELETE FROM {$wpdb->usermeta} WHERE meta_key = '_fcom_preferred_currency'");
+        delete_metadata('user', 0, '_fchub_mc_currency', '', true);
+        delete_metadata('user', 0, '_fcom_preferred_currency', '', true);
 
         // Clean up scheduled hooks
         wp_clear_scheduled_hook('fchub_mc_refresh_rates');

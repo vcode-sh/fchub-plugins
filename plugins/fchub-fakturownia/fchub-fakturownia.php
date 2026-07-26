@@ -1,30 +1,27 @@
 <?php
+
 /**
- * Plugin Name: FCHub - Fakturownia
- * Plugin URI: https://fchub.co
+ * Plugin Name: FCHub Fakturownia
+ * Plugin URI: https://fchub.co/docs/fchub-fakturownia
  * Description: Fakturownia invoice integration with KSeF 2.0 support for FluentCart
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: fchub-fakturownia
- * Domain Path: /languages
- * Requires at least: 6.4
- * Requires PHP: 8.1
- * Tested up to:    6.7
- * Update URI: https://fchub.co/fchub-fakturownia
+ * Requires at least: 7.0
+ * Requires PHP: 8.3
+ * Tested up to: 7.0
+ * Requires Plugins: fluent-cart
  */
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_FAKTUROWNIA_VERSION', '1.1.1');
+define('FCHUB_FAKTUROWNIA_VERSION', '1.1.2');
 define('FCHUB_FAKTUROWNIA_FILE', __FILE__);
 define('FCHUB_FAKTUROWNIA_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_FAKTUROWNIA_URL', plugin_dir_url(__FILE__));
-
-require_once __DIR__ . '/lib/GitHubUpdater.php';
-FCHub_GitHub_Updater::register('fchub-fakturownia', plugin_basename(__FILE__), FCHUB_FAKTUROWNIA_VERSION);
 
 register_deactivation_hook(__FILE__, function () {
     wp_clear_scheduled_hook('fchub_fakturownia_check_ksef_status');
@@ -73,7 +70,7 @@ add_action('init', function () {
         $addons['fakturownia'] = [
             'title'       => __('Fakturownia', 'fchub-fakturownia'),
             'description' => __('Automatically create invoices in Fakturownia with KSeF 2.0 support when orders are paid.', 'fchub-fakturownia'),
-            'logo'        => FCHUB_FAKTUROWNIA_URL . 'assets/fakturownia.webp',
+            'logo'        => FCHUB_FAKTUROWNIA_URL . 'assets/fchub-fakturownia.svg',
             'enabled'     => FChubFakturownia\Integration\FakturowniaSettings::isConfigured(),
             'config_url'  => admin_url('admin.php?page=fluent-cart#/integrations/fakturownia'),
             'categories'  => ['core'],
@@ -161,7 +158,12 @@ add_action('fchub_fakturownia_check_ksef_status', function ($orderId, $fakturown
         $order->deleteMeta($retryKey);
         $order->addLog(
             __('Fakturownia: KSeF submission successful', 'fchub-fakturownia'),
-            sprintf(__('KSeF number (%s): %s', 'fchub-fakturownia'), $invoiceType, $govId),
+            sprintf(
+                /* translators: 1: invoice type, 2: KSeF number. */
+                __('KSeF number (%1$s): %2$s', 'fchub-fakturownia'),
+                $invoiceType,
+                $govId
+            ),
             'info',
             'Fakturownia'
         );
@@ -170,6 +172,7 @@ add_action('fchub_fakturownia_check_ksef_status', function ($orderId, $fakturown
         $errors = $invoice['gov_error_messages'] ?? [];
         $errorText = is_array($errors) ? implode('; ', $errors) : (string) $errors;
         $order->addLog(
+            /* translators: %s: invoice type. */
             sprintf(__('Fakturownia: KSeF %s submission failed', 'fchub-fakturownia'), $invoiceType),
             $errorText,
             'error',
@@ -232,7 +235,7 @@ add_action('rest_api_init', function () {
 add_action('admin_notices', function () {
     if (!defined('FLUENTCART_VERSION')) {
         echo '<div class="notice notice-error"><p>';
-        echo esc_html__('FCHub - Fakturownia requires FluentCart to be installed and activated.', 'fchub-fakturownia');
+        echo esc_html__('FCHub Fakturownia requires FluentCart to be installed and activated.', 'fchub-fakturownia');
         echo '</p></div>';
     }
 });
@@ -247,55 +250,17 @@ add_action('admin_enqueue_scripts', function ($hook) {
         return;
     }
 
-    $settingsLabel = esc_js(__('Settings', 'fchub-fakturownia'));
-
-    $js = <<<JS
-(function() {
-    var SETTINGS_LABEL = '{$settingsLabel}';
-    var observer = new MutationObserver(function() {
-        var cards = document.querySelectorAll('.fct-integration-card');
-        cards.forEach(function(card) {
-            if (card.dataset.fchubLinked) return;
-            var title = card.querySelector('.title');
-            if (title && title.textContent.indexOf('Fakturownia') !== -1) {
-                card.dataset.fchubLinked = '1';
-                card.style.cursor = 'pointer';
-
-                // Add a visible Settings button matching FluentCart's native style
-                var desc = card.querySelector('.desc');
-                if (desc) {
-                    var btnWrap = document.createElement('div');
-                    btnWrap.className = 'addon-setting-btn';
-                    btnWrap.style.cssText = 'margin-top: 8px;';
-                    var btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.textContent = SETTINGS_LABEL;
-                    btn.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; font-size: 13px; font-weight: 500; border-radius: 4px; border: 1px solid #d0d5dd; background: #fff; color: #344054; cursor: pointer; line-height: 1.5;';
-                    btn.addEventListener('mouseenter', function() { btn.style.background = '#f9fafb'; });
-                    btn.addEventListener('mouseleave', function() { btn.style.background = '#fff'; });
-                    btn.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        window.location.hash = '#/integrations/fakturownia';
-                    });
-                    btnWrap.appendChild(btn);
-                    desc.parentNode.insertBefore(btnWrap, desc.nextSibling);
-                }
-
-                card.addEventListener('click', function(e) {
-                    if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON') return;
-                    window.location.hash = '#/integrations/fakturownia';
-                });
-                observer.disconnect();
-            }
-        });
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-})();
-JS;
-
-    wp_register_script('fchub-fakturownia-admin', '', [], FCHUB_FAKTUROWNIA_VERSION, true);
+    wp_register_script(
+        'fchub-fakturownia-admin',
+        FCHUB_FAKTUROWNIA_URL . 'assets/admin.js',
+        [],
+        FCHUB_FAKTUROWNIA_VERSION,
+        true
+    );
+    wp_localize_script('fchub-fakturownia-admin', 'FCHubFakturowniaAdmin', [
+        'settingsLabel' => __('Settings', 'fchub-fakturownia'),
+    ]);
     wp_enqueue_script('fchub-fakturownia-admin');
-    wp_add_inline_script('fchub-fakturownia-admin', $js);
 });
 
 /**

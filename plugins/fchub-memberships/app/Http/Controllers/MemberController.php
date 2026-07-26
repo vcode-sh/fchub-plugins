@@ -268,7 +268,9 @@ class MemberController
             return new \WP_REST_Response([
                 'data' => $result,
                 'message' => $partial
-                    ? sprintf(__('%d resources were granted and %d failed. Access was partially granted.', 'fchub-memberships'), $succeeded, $failed)
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    ? sprintf(__('%1$d resources were granted and %2$d failed. Access was partially granted.', 'fchub-memberships'), $succeeded, $failed)
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     : sprintf(__('Access could not be granted. %d resources failed.', 'fchub-memberships'), $failed),
             ], $partial ? 207 : 502);
         }
@@ -292,12 +294,14 @@ class MemberController
                 'data' => $result,
                 'message' => $partial
                     ? sprintf(
-                        __('%d resources were revoked, %d scheduled after grace, %d retained, and %d failed. Access was partially revoked or scheduled.', 'fchub-memberships'),
+                        /* translators: Placeholder values are runtime membership details included in this message. */
+                        __('%1$d resources were revoked, %2$d scheduled after grace, %3$d retained, and %4$d failed. Access was partially revoked or scheduled.', 'fchub-memberships'),
                         $revoked,
                         $graceStarted,
                         $retained,
                         $failed
                     )
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     : sprintf(__('Access could not be revoked. %d resources failed.', 'fchub-memberships'), $failed),
             ], $partial ? 207 : 502);
         }
@@ -306,7 +310,8 @@ class MemberController
             return new \WP_REST_Response([
                 'data' => $result,
                 'message' => $revoked > 0
-                    ? sprintf(__('%d resources revoked and %d scheduled after grace.', 'fchub-memberships'), $revoked, $graceStarted)
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    ? sprintf(__('%1$d resources revoked and %2$d scheduled after grace.', 'fchub-memberships'), $revoked, $graceStarted)
                     : __('Access revocation scheduled for the end of the grace period.', 'fchub-memberships'),
             ]);
         }
@@ -336,6 +341,7 @@ class MemberController
 
             return new \WP_REST_Response([
                 'data'    => ['extended' => $extended],
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 'message' => sprintf(__('%d grants extended.', 'fchub-memberships'), $extended),
             ]);
         });
@@ -437,7 +443,9 @@ class MemberController
             $result = self::accessGrantService()->bulkGrant($userIds, $planId, ['expires_at' => $expiresAt, 'source_type' => 'manual']);
             $status = $result['failed'] > 0 ? ($result['granted'] > 0 ? 207 : 502) : 200;
             $message = $result['failed'] > 0
-                ? sprintf(__('%d memberships granted and %d failed.', 'fchub-memberships'), $result['granted'], $result['failed'])
+                /* translators: Placeholder values are runtime membership details included in this message. */
+                ? sprintf(__('%1$d memberships granted and %2$d failed.', 'fchub-memberships'), $result['granted'], $result['failed'])
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 : sprintf(__('%d memberships granted.', 'fchub-memberships'), $result['granted']);
             return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
         });
@@ -459,20 +467,24 @@ class MemberController
             $status = $result['failed'] > 0 ? ($succeeded > 0 ? 207 : 502) : 200;
             $message = match (true) {
                 $result['failed'] > 0 => sprintf(
-                    __('%d memberships revoked, %d scheduled after grace, and %d failed.', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('%1$d memberships revoked, %2$d scheduled after grace, and %3$d failed.', 'fchub-memberships'),
                     $result['revoked'],
                     $graceStarted,
                     $result['failed']
                 ),
                 $graceStarted > 0 && $result['revoked'] > 0 => sprintf(
-                    __('%d memberships revoked and %d scheduled after grace.', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('%1$d memberships revoked and %2$d scheduled after grace.', 'fchub-memberships'),
                     $result['revoked'],
                     $graceStarted
                 ),
                 $graceStarted > 0 => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('%d membership revocations scheduled after grace.', 'fchub-memberships'),
                     $graceStarted
                 ),
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 default => sprintf(__('%d memberships revoked.', 'fchub-memberships'), $result['revoked']),
             };
             return new \WP_REST_Response(['data' => $result, 'message' => $message], $status);
@@ -524,6 +536,7 @@ class MemberController
             };
             return new \WP_REST_Response([
                 'data'    => ['extended' => $extended, 'not_found' => $notFound, 'failed' => $failed, 'errors' => $errors],
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 'message' => sprintf(__('%d grants extended.', 'fchub-memberships'), $extended),
             ], $status);
         });

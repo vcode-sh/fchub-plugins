@@ -11,14 +11,14 @@ final class SubscriptionValidityLogRepository
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_validity_log';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_validity_log');
     }
 
     public function findLatestBySubscriptionId(int $subscriptionId): ?array
     {
         global $wpdb;
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE subscription_id = %d ORDER BY id DESC LIMIT 1",
             $subscriptionId
         ), ARRAY_A);
@@ -32,7 +32,7 @@ final class SubscriptionValidityLogRepository
 
         $existing = $this->findLatestBySubscriptionId($subscriptionId);
         if (!$existing) {
-            $wpdb->insert($this->table, [
+            \FChubMemberships\Support\CustomTableDatabase::insert($this->table, [
                 'subscription_id' => $subscriptionId,
                 'last_valid_at'   => current_time('mysql'),
             ]);
@@ -40,7 +40,7 @@ final class SubscriptionValidityLogRepository
             return;
         }
 
-        $wpdb->update($this->table, [
+        \FChubMemberships\Support\CustomTableDatabase::update($this->table, [
             'last_valid_at' => current_time('mysql'),
         ], ['id' => (int) $existing['id']]);
     }
@@ -58,11 +58,11 @@ final class SubscriptionValidityLogRepository
         ];
 
         if (!$existing) {
-            $wpdb->insert($this->table, $payload);
+            \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $payload);
             return;
         }
 
-        $wpdb->update($this->table, [
+        \FChubMemberships\Support\CustomTableDatabase::update($this->table, [
             'expired_at'    => current_time('mysql'),
             'dispatched_at' => current_time('mysql'),
         ], ['id' => (int) $existing['id']]);

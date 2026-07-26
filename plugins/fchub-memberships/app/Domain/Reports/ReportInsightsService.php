@@ -11,17 +11,17 @@ final class ReportInsightsService
 {
     private GrantRepository $grants;
     private PlanRepository $plans;
-    private \wpdb $wpdb;
+    private \wpdb $database;
     private string $grantsTable;
     private string $plansTable;
 
-    public function __construct(?GrantRepository $grants = null, ?PlanRepository $plans = null, ?\wpdb $wpdb = null)
+    public function __construct(?GrantRepository $grants = null, ?PlanRepository $plans = null, ?\wpdb $database = null)
     {
         $this->grants = $grants ?? new GrantRepository();
         $this->plans = $plans ?? new PlanRepository();
-        $this->wpdb = $wpdb ?? $GLOBALS['wpdb'];
-        $this->grantsTable = $this->wpdb->prefix . 'fchub_membership_grants';
-        $this->plansTable = $this->wpdb->prefix . 'fchub_membership_plans';
+        $this->database = $database ?? $GLOBALS['wpdb'];
+        $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'fchub_membership_grants');
+        $this->plansTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'fchub_membership_plans');
     }
 
     public function expiringSoon(int $days = 7, int $limit = 10): array
@@ -57,7 +57,7 @@ final class ReportInsightsService
     {
         [$fromDate, $toDate] = $this->resolveRange($from, $to);
 
-        $total = (int) $this->wpdb->get_var($this->wpdb->prepare(
+        $total = (int) \FChubMemberships\Support\CustomTableDatabase::getVarFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT COUNT(DISTINCT user_id) FROM {$this->grantsTable}
              WHERE status IN ('active', 'expired', 'revoked')
                AND created_at >= %s
@@ -65,7 +65,7 @@ final class ReportInsightsService
             $fromDate,
             $toDate
         ));
-        $renewed = (int) $this->wpdb->get_var($this->wpdb->prepare(
+        $renewed = (int) \FChubMemberships\Support\CustomTableDatabase::getVarFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT COUNT(DISTINCT user_id) FROM {$this->grantsTable}
              WHERE renewal_count > 0
                AND updated_at >= %s
@@ -77,9 +77,9 @@ final class ReportInsightsService
 
         $avgRenewalsPerMember = 0.0;
         if ($renewed > 0) {
-            $avgRenewalsPerMember = (float) $this->wpdb->get_var(
-                $this->wpdb->prepare(
-                    "SELECT AVG(renewal_count) FROM {$this->grantsTable}
+            $avgRenewalsPerMember = (float) \FChubMemberships\Support\CustomTableDatabase::getVarFrom($this->database,
+                \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
+            "SELECT AVG(renewal_count) FROM {$this->grantsTable}
                      WHERE renewal_count > 0
                        AND updated_at >= %s
                        AND updated_at <= %s",
@@ -90,7 +90,7 @@ final class ReportInsightsService
             $avgRenewalsPerMember = round($avgRenewalsPerMember, 1);
         }
 
-        $byPlan = $this->wpdb->get_results($this->wpdb->prepare(
+        $byPlan = \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT g.plan_id, p.title AS plan_title, COUNT(DISTINCT g.user_id) AS total_members,
                     SUM(CASE WHEN g.renewal_count > 0 THEN 1 ELSE 0 END) AS renewed_members,
                     AVG(g.renewal_count) AS avg_renewals
@@ -106,7 +106,7 @@ final class ReportInsightsService
             ARRAY_A
         );
 
-        $overTime = $this->wpdb->get_results($this->wpdb->prepare(
+        $overTime = \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT DATE_FORMAT(updated_at, '%%Y-%%m') AS month,
                     COUNT(*) AS total_renewals
              FROM {$this->grantsTable}
@@ -135,7 +135,7 @@ final class ReportInsightsService
     {
         [$fromDate, $toDate] = $this->resolveRange($from, $to);
 
-        $trials = $this->wpdb->get_results($this->wpdb->prepare(
+        $trials = \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT g.plan_id, p.title AS plan_title,
                     COUNT(*) AS total_trials,
                     SUM(CASE WHEN g.status = 'active' AND (g.trial_ends_at IS NULL OR g.trial_ends_at < NOW()) THEN 1 ELSE 0 END) AS converted,

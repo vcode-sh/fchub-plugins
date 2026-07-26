@@ -32,7 +32,7 @@ class AccountPage
             return;
         }
 
-        echo Shortcodes::renderMyMemberships([]);
+        echo wp_kses_post(Shortcodes::renderMyMemberships([]));
     }
 
     /**

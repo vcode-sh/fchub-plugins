@@ -5,6 +5,7 @@ node_modules/
 vendor/
 tests/
 docs/
+lib/
 .phpunit.cache/
 composer.json
 composer.lock
@@ -13,6 +14,10 @@ package-lock.json
 vite.config.js
 phpunit.xml
 phpunit.xml.dist
-*.md
+README.md
+phpcs.xml
+phpstan.neon
+phpstan-bootstrap.php
+phpstan-functions.php
 .DS_Store
 Thumbs.db

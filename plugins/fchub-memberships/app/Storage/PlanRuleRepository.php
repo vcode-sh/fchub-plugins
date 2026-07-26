@@ -17,13 +17,13 @@ class PlanRuleRepository
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_plan_rules';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plan_rules');
     }
 
     public function find(int $id): ?array
     {
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
@@ -34,7 +34,7 @@ class PlanRuleRepository
     public function getByPlanId(int $planId): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE plan_id = %d ORDER BY sort_order ASC, id ASC",
             $planId
         ), ARRAY_A);
@@ -50,7 +50,7 @@ class PlanRuleRepository
 
         global $wpdb;
         $placeholders = implode(',', array_fill(0, count($planIds), '%d'));
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE plan_id IN ({$placeholders}) ORDER BY plan_id ASC, sort_order ASC",
             ...$planIds
         ), ARRAY_A);
@@ -62,8 +62,11 @@ class PlanRuleRepository
     public function getAllForAccessResolution(): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT * FROM {$this->table} ORDER BY plan_id ASC, sort_order ASC, id ASC",
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT * FROM {$this->table} WHERE 1 = %d ORDER BY plan_id ASC, sort_order ASC, id ASC",
+                1,
+            ),
             ARRAY_A
         );
         if (!is_array($rows) || !empty($wpdb->last_error)) {
@@ -96,7 +99,7 @@ class PlanRuleRepository
             throw new \InvalidArgumentException('drip_date is required when drip_type is fixed_date');
         }
 
-        $created = $wpdb->insert($this->table, $insert);
+        $created = \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $insert);
         if ($created !== false) {
             self::invalidateAfterWrite();
         }
@@ -127,7 +130,7 @@ class PlanRuleRepository
             $update['meta'] = wp_json_encode($data['meta']);
         }
 
-        $updated = $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        $updated = \FChubMemberships\Support\CustomTableDatabase::update($this->table, $update, ['id' => $id]) !== false;
         if ($updated) {
             self::invalidateAfterWrite();
         }
@@ -137,7 +140,7 @@ class PlanRuleRepository
     public function delete(int $id): bool
     {
         global $wpdb;
-        $deleted = $wpdb->delete($this->table, ['id' => $id]) !== false;
+        $deleted = \FChubMemberships\Support\CustomTableDatabase::delete($this->table, ['id' => $id]) !== false;
         if ($deleted) {
             self::invalidateAfterWrite();
         }
@@ -147,7 +150,7 @@ class PlanRuleRepository
     public function deleteByPlanId(int $planId): int
     {
         global $wpdb;
-        $deleted = (int) $wpdb->delete($this->table, ['plan_id' => $planId]);
+        $deleted = (int) \FChubMemberships\Support\CustomTableDatabase::delete($this->table, ['plan_id' => $planId]);
         if ($deleted > 0) {
             self::invalidateAfterWrite();
         }
@@ -174,7 +177,7 @@ class PlanRuleRepository
     public function findPlansWithResource(string $provider, string $resourceType, string $resourceId): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT DISTINCT plan_id FROM {$this->table}
              WHERE provider = %s AND resource_type = %s AND (resource_id = %s OR resource_id = '*')",
             $provider,
@@ -188,7 +191,7 @@ class PlanRuleRepository
     public function getDripRules(int $planId): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE plan_id = %d AND drip_type != 'immediate' ORDER BY sort_order ASC",
             $planId
         ), ARRAY_A);
@@ -199,7 +202,7 @@ class PlanRuleRepository
     public function countByPlanId(int $planId): int
     {
         global $wpdb;
-        return (int) $wpdb->get_var($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table} WHERE plan_id = %d",
             $planId
         ));
@@ -213,7 +216,12 @@ class PlanRuleRepository
         }
 
         global $wpdb;
-        $hasRules = (bool) $wpdb->get_var("SELECT EXISTS(SELECT 1 FROM {$this->table} LIMIT 1)");
+        $hasRules = (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                "SELECT EXISTS(SELECT 1 FROM {$this->table} WHERE 1 = %d LIMIT 1)",
+                1,
+            ),
+        );
         if (!empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to determine whether membership plan rules exist.');
         }

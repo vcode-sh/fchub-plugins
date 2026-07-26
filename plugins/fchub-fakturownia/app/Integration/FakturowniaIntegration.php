@@ -24,7 +24,7 @@ class FakturowniaIntegration extends BaseIntegrationManager
         );
 
         $this->description = __('Automatically create invoices in Fakturownia with KSeF 2.0 support when orders are paid.', 'fchub-fakturownia');
-        $this->logo = FCHUB_FAKTUROWNIA_URL . 'assets/fakturownia.webp';
+        $this->logo = FCHUB_FAKTUROWNIA_URL . 'assets/fchub-fakturownia.svg';
         $this->category = 'invoicing';
         $this->scopes = ['global'];
         $this->hasGlobalMenu = true;

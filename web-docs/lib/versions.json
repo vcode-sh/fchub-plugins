@@ -13,21 +13,21 @@
       "mcpbFilename": null
     },
     "fchub-p24": {
-      "version": "1.0.3",
-      "tagName": "fchub-p24/v1.0.3",
-      "zipFilename": "fchub-p24-1.0.3.zip",
+      "version": "1.0.4",
+      "tagName": "fchub-p24/v1.0.4",
+      "zipFilename": "fchub-p24-1.0.4.zip",
       "mcpbFilename": null
     },
     "fchub-fakturownia": {
-      "version": "1.1.1",
-      "tagName": "fchub-fakturownia/v1.1.1",
-      "zipFilename": "fchub-fakturownia-1.1.1.zip",
+      "version": "1.1.2",
+      "tagName": "fchub-fakturownia/v1.1.2",
+      "zipFilename": "fchub-fakturownia-1.1.2.zip",
       "mcpbFilename": null
     },
     "fchub-memberships": {
-      "version": "1.4.0",
-      "tagName": "fchub-memberships/v1.4.0",
-      "zipFilename": "fchub-memberships-1.4.0.zip",
+      "version": "1.4.1",
+      "tagName": "fchub-memberships/v1.4.1",
+      "zipFilename": "fchub-memberships-1.4.1.zip",
       "mcpbFilename": null
     },
     "fchub-portal-extender": {
@@ -37,15 +37,15 @@
       "mcpbFilename": null
     },
     "fchub-wishlist": {
-      "version": "1.0.1",
-      "tagName": "fchub-wishlist/v1.0.1",
-      "zipFilename": "fchub-wishlist-1.0.1.zip",
+      "version": "1.0.2",
+      "tagName": "fchub-wishlist/v1.0.2",
+      "zipFilename": "fchub-wishlist-1.0.2.zip",
       "mcpbFilename": null
     },
     "fchub-multi-currency": {
-      "version": "1.4.0",
-      "tagName": "fchub-multi-currency/v1.4.0",
-      "zipFilename": "fchub-multi-currency-1.4.0.zip",
+      "version": "1.4.1",
+      "tagName": "fchub-multi-currency/v1.4.1",
+      "zipFilename": "fchub-multi-currency-1.4.1.zip",
       "mcpbFilename": null
     },
     "fchub-stream": {

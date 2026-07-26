@@ -594,15 +594,15 @@ class Migrations
             }
             $table = $prefix . $suffix;
             $tablePattern = $wpdb->esc_like($table);
-            $foundTable = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $tablePattern));
+            $foundTable = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare('SHOW TABLES LIKE %s', $tablePattern));
             if ($foundTable !== $table) {
                 $failures[] = "table:{$suffix} missing";
                 continue;
             }
             $existingTables[$suffix] = true;
 
-            $statusRows = $wpdb->get_results(
-                $wpdb->prepare('SHOW TABLE STATUS LIKE %s', $tablePattern),
+            $statusRows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+                \FChubMemberships\Support\CustomTableDatabase::prepare('SHOW TABLE STATUS LIKE %s', $tablePattern),
                 ARRAY_A
             );
             $tableStatus = null;
@@ -621,7 +621,13 @@ class Migrations
                 $failures[] = "table:{$suffix} engine expected InnoDB, got {$engine}";
             }
 
-            $columnRows = $wpdb->get_results("SHOW COLUMNS FROM {$table}", ARRAY_A);
+            $columnRows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+                \FChubMemberships\Support\CustomTableDatabase::prepare(
+                    "SHOW COLUMNS FROM {$table} WHERE Field != %s",
+                    '',
+                ),
+                ARRAY_A,
+            );
             $columns = [];
             foreach ($columnRows as $columnRow) {
                 $columns[(string) ($columnRow['Field'] ?? '')] = $columnRow;
@@ -663,7 +669,13 @@ class Migrations
                 continue;
             }
             $table = $prefix . $suffix;
-            $indexRows = $wpdb->get_results("SHOW INDEX FROM {$table}", ARRAY_A);
+            $indexRows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+                \FChubMemberships\Support\CustomTableDatabase::prepare(
+                    "SHOW INDEX FROM {$table} WHERE Key_name != %s",
+                    '',
+                ),
+                ARRAY_A,
+            );
             $indexes = [];
             foreach ($indexRows as $indexRow) {
                 $name = (string) ($indexRow['Key_name'] ?? '');
@@ -703,7 +715,7 @@ class Migrations
                 continue;
             }
             $table = $prefix . $suffix;
-            $foreignKeyRows = $wpdb->get_results($wpdb->prepare(
+            $foreignKeyRows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT rc.CONSTRAINT_NAME, kcu.COLUMN_NAME, kcu.REFERENCED_TABLE_NAME,
                         kcu.REFERENCED_COLUMN_NAME, rc.DELETE_RULE, kcu.ORDINAL_POSITION
                  FROM information_schema.REFERENTIAL_CONSTRAINTS rc
@@ -750,29 +762,44 @@ class Migrations
         }
 
         $orphanQueries = [
-            'orphan:plan_rules.plan_id references missing plans rows' =>
-                "SELECT COUNT(*) FROM {$prefix}plan_rules child
-                 LEFT JOIN {$prefix}plans parent ON parent.id = child.plan_id
-                 WHERE parent.id IS NULL",
-            'orphan:grants.plan_id references missing plans rows' =>
-                "SELECT COUNT(*) FROM {$prefix}grants child
-                 LEFT JOIN {$prefix}plans parent ON parent.id = child.plan_id
-                 WHERE child.plan_id IS NOT NULL AND parent.id IS NULL",
-            'orphan:drip_notifications.grant_id references missing grants rows' =>
-                "SELECT COUNT(*) FROM {$prefix}drip_notifications child
-                 LEFT JOIN {$prefix}grants parent ON parent.id = child.grant_id
-                 WHERE parent.id IS NULL",
-            'orphan:drip_notifications.plan_rule_id references missing plan_rules rows' =>
-                "SELECT COUNT(*) FROM {$prefix}drip_notifications child
-                 LEFT JOIN {$prefix}plan_rules parent ON parent.id = child.plan_rule_id
-                 WHERE parent.id IS NULL",
-            'orphan:provider_operations.edge_id references missing entitlement_edges rows' =>
-                "SELECT COUNT(*) FROM {$prefix}provider_operations child
-                 LEFT JOIN {$prefix}entitlement_edges parent ON parent.id = child.edge_id
-                 WHERE parent.id IS NULL",
+            'orphan:plan_rules.plan_id references missing plans rows' => [
+                'sql' => 'SELECT COUNT(*) FROM %i child
+                    LEFT JOIN %i parent ON parent.id = child.plan_id
+                    WHERE parent.id IS NULL',
+                'tables' => [$prefix . 'plan_rules', $prefix . 'plans'],
+            ],
+            'orphan:grants.plan_id references missing plans rows' => [
+                'sql' => 'SELECT COUNT(*) FROM %i child
+                    LEFT JOIN %i parent ON parent.id = child.plan_id
+                    WHERE child.plan_id IS NOT NULL AND parent.id IS NULL',
+                'tables' => [$prefix . 'grants', $prefix . 'plans'],
+            ],
+            'orphan:drip_notifications.grant_id references missing grants rows' => [
+                'sql' => 'SELECT COUNT(*) FROM %i child
+                    LEFT JOIN %i parent ON parent.id = child.grant_id
+                    WHERE parent.id IS NULL',
+                'tables' => [$prefix . 'drip_notifications', $prefix . 'grants'],
+            ],
+            'orphan:drip_notifications.plan_rule_id references missing plan_rules rows' => [
+                'sql' => 'SELECT COUNT(*) FROM %i child
+                    LEFT JOIN %i parent ON parent.id = child.plan_rule_id
+                    WHERE parent.id IS NULL',
+                'tables' => [$prefix . 'drip_notifications', $prefix . 'plan_rules'],
+            ],
+            'orphan:provider_operations.edge_id references missing entitlement_edges rows' => [
+                'sql' => 'SELECT COUNT(*) FROM %i child
+                    LEFT JOIN %i parent ON parent.id = child.edge_id
+                    WHERE parent.id IS NULL',
+                'tables' => [$prefix . 'provider_operations', $prefix . 'entitlement_edges'],
+            ],
         ];
         foreach ($orphanQueries as $failure => $query) {
-            if ((int) $wpdb->get_var($query) > 0) {
+            if ((int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+                \FChubMemberships\Support\CustomTableDatabase::prepare(
+                    $query['sql'],
+                    ...$query['tables'],
+                ),
+            ) > 0) {
                 $failures[] = $failure;
             }
         }
@@ -871,7 +898,12 @@ class Migrations
         ];
 
         foreach ($tables as $table) {
-            $wpdb->query("DROP TABLE IF EXISTS {$prefix}{$table}");
+            \FChubMemberships\Support\CustomTableDatabase::query(
+                \FChubMemberships\Support\CustomTableDatabase::prepare(
+                    'DROP TABLE IF EXISTS %i',
+                    $prefix . $table,
+                ),
+            );
         }
 
         delete_option('fchub_memberships_db_version');

@@ -35,6 +35,9 @@ abstract class TestCase extends BaseTestCase
         $GLOBALS['wp_registered_blocks'] = [];
         $GLOBALS['wp_registered_block_patterns'] = [];
         $GLOBALS['wp_registered_block_pattern_categories'] = [];
+        $GLOBALS['wp_scheduled_events'] = [];
+        $GLOBALS['wp_remote_requests'] = [];
+        $GLOBALS['fluent_cart_logs'] = [];
 
         // Reset multisite mock state
         $GLOBALS['wp_mock_is_multisite'] = false;
@@ -53,6 +56,7 @@ abstract class TestCase extends BaseTestCase
         // Reset FluentCRM mock state
         $GLOBALS['fluentcrm_mock_contact'] = null;
         $GLOBALS['fluentcrm_mock_tag_id'] = 1;
+        $GLOBALS['fluentcrm_mock_custom_fields'] = [];
         $GLOBALS['fluentcrm_custom_field_updates'] = [];
         $GLOBALS['fluentcrm_attached_tags'] = [];
 

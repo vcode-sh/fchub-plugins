@@ -1,0 +1,11 @@
+{
+  "plugin": "fchub-multi-currency",
+  "validator": "https://wordpress.org/plugins/developers/readme-validator/",
+  "checkedAt": "2026-07-26T21:17:39.436Z",
+  "errors": [],
+  "warnings": [],
+  "notes": [
+    "No == Upgrade Notice == section was found",
+    "No donate link was found"
+  ]
+}

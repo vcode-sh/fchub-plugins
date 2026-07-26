@@ -44,6 +44,7 @@ export default defineConfig({
   },
   base: './',
   build: {
+    assetsInlineLimit: 0,
     manifest: true,
     outDir: 'assets/dist',
     emptyOutDir: true,

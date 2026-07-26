@@ -27,7 +27,7 @@ final class WishlistShortcode
         $service = WishlistService::make();
         $wishlist = $service->resolveWishlist();
 
-        $page = max(1, absint($_GET['wishlist_page'] ?? 1));
+        $page = max(1, absint(filter_input(INPUT_GET, 'wishlist_page', FILTER_VALIDATE_INT) ?: 1));
         $perPage = min(100, max(1, (int) apply_filters('fchub_wishlist/shortcode_items_per_page', 20)));
 
         $items = [];

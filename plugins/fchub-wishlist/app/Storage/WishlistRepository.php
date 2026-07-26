@@ -21,8 +21,10 @@ class WishlistRepository
     public function find(int $id): ?array
     {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Wishlist ownership and counts are live, mutation-heavy access-control state.
         $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->table} WHERE id = %d",
+            "SELECT * FROM %i WHERE id = %d",
+            $this->table,
             $id
         ), ARRAY_A);
 
@@ -32,8 +34,10 @@ class WishlistRepository
     public function findByUserId(int $userId): ?array
     {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Wishlist ownership is live access-control state and must not be stale during resolution.
         $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->table} WHERE user_id = %d",
+            "SELECT * FROM %i WHERE user_id = %d",
+            $this->table,
             $userId
         ), ARRAY_A);
 
@@ -43,8 +47,10 @@ class WishlistRepository
     public function findBySessionHash(string $hash): ?array
     {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Guest ownership can transfer during login and must be resolved from live state.
         $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->table} WHERE session_hash = %s AND user_id IS NULL",
+            "SELECT * FROM %i WHERE session_hash = %s AND user_id IS NULL",
+            $this->table,
             $hash
         ), ARRAY_A);
 
@@ -54,8 +60,10 @@ class WishlistRepository
     public function findByCustomerId(int $customerId): ?array
     {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Customer ownership is live access-control state and must not be stale during resolution.
         $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->table} WHERE customer_id = %d",
+            "SELECT * FROM %i WHERE customer_id = %d",
+            $this->table,
             $customerId
         ), ARRAY_A);
 
@@ -77,6 +85,7 @@ class WishlistRepository
             'updated_at'   => $now,
         ];
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- $wpdb->insert is the WordPress CRUD API for this plugin-owned custom table.
         $result = $wpdb->insert($this->table, $insert);
         if ($result === false) {
             return 0;
@@ -98,20 +107,24 @@ class WishlistRepository
             }
         }
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- $wpdb->update is the WordPress CRUD API; this write has no result cache.
         return $wpdb->update($this->table, $update, ['id' => $id]) !== false;
     }
 
     public function delete(int $id): bool
     {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- $wpdb->delete is the WordPress CRUD API; this write has no result cache.
         return $wpdb->delete($this->table, ['id' => $id]) !== false;
     }
 
     public function incrementItemCount(int $id): void
     {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Atomic counters have no WordPress CRUD equivalent and no cached list rows are retained.
         $wpdb->query($wpdb->prepare(
-            "UPDATE {$this->table} SET item_count = item_count + 1, updated_at = %s WHERE id = %d",
+            "UPDATE %i SET item_count = item_count + 1, updated_at = %s WHERE id = %d",
+            $this->table,
             current_time('mysql'),
             $id
         ));
@@ -120,8 +133,10 @@ class WishlistRepository
     public function decrementItemCount(int $id): void
     {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Atomic counters have no WordPress CRUD equivalent and no cached list rows are retained.
         $wpdb->query($wpdb->prepare(
-            "UPDATE {$this->table} SET item_count = GREATEST(item_count - 1, 0), updated_at = %s WHERE id = %d",
+            "UPDATE %i SET item_count = GREATEST(item_count - 1, 0), updated_at = %s WHERE id = %d",
+            $this->table,
             current_time('mysql'),
             $id
         ));
@@ -132,11 +147,14 @@ class WishlistRepository
         global $wpdb;
         $itemsTable = $wpdb->prefix . 'fchub_wishlist_items';
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Recalculation must count live rows immediately after bulk mutations.
         $count = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$itemsTable} WHERE wishlist_id = %d",
+            "SELECT COUNT(*) FROM %i WHERE wishlist_id = %d",
+            $itemsTable,
             $id
         ));
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- $wpdb->update is the WordPress CRUD API; this write persists the fresh count directly.
         $wpdb->update(
             $this->table,
             ['item_count' => $count, 'updated_at' => current_time('mysql')],
@@ -148,6 +166,7 @@ class WishlistRepository
     {
         global $wpdb;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- $wpdb->update is the WordPress CRUD API; ownership changes are never cached.
         return $wpdb->update(
             $this->table,
             [

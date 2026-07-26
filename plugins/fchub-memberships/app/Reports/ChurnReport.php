@@ -16,8 +16,8 @@ class ChurnReport
     {
         global $wpdb;
         $this->grantRepo = new GrantRepository();
-        $this->grantsTable = $wpdb->prefix . 'fchub_membership_grants';
-        $this->statsTable = $wpdb->prefix . 'fchub_membership_stats_daily';
+        $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
+        $this->statsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_stats_daily');
     }
 
     /**
@@ -59,7 +59,7 @@ class ChurnReport
         $results = [];
 
         // Use daily stats table for historical data
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT
                 DATE_FORMAT(stat_date, '%%Y-%%m') AS month,
                 MAX(active_count) AS peak_active,
@@ -110,7 +110,7 @@ class ChurnReport
             $cohortLabel = gmdate('Y-m', strtotime($cohortStart));
 
             // Get users who first received a grant in this month
-            $cohortUserIds = $wpdb->get_col($wpdb->prepare(
+            $cohortUserIds = \FChubMemberships\Support\CustomTableDatabase::getCol(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT DISTINCT user_id FROM {$this->grantsTable}
                  WHERE created_at >= %s AND created_at <= %s
                    AND user_id NOT IN (
@@ -142,7 +142,7 @@ class ChurnReport
                 $placeholders = implode(',', array_fill(0, $cohortSize, '%d'));
                 $params = array_merge($cohortUserIds, [$checkStart, $checkEnd]);
 
-                $retainedCount = (int) $wpdb->get_var($wpdb->prepare(
+                $retainedCount = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                     "SELECT COUNT(DISTINCT user_id) FROM {$this->grantsTable}
                      WHERE user_id IN ({$placeholders})
                        AND status = 'active'

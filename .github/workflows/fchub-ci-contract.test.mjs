@@ -225,7 +225,7 @@ test('Every release publishes a SHA-256 sidecar beside its ZIP', () => {
     return found
   }
 
-  const zip = named('Build ZIP')
+  const zip = named('Locate release ZIP')
   const sidecar = named('Create checksum sidecar')
   const publish = named('Create GitHub Release')
 
@@ -243,7 +243,7 @@ test('Every release publishes a SHA-256 sidecar beside its ZIP', () => {
   assert.doesNotMatch(sidecar.body, /continue-on-error:\s*true/)
   assert.doesNotMatch(sidecar.body, bypass)
 
-  assert.ok(zip.at < sidecar.at, 'The sidecar describes the ZIP, so it comes after it')
+  assert.ok(zip.at < sidecar.at, 'The sidecar describes the located ZIP, so it comes after it')
   assert.ok(
     sidecar.at < publish.at,
     'The sidecar must exist before the release that publishes it — checksum_path is empty otherwise',

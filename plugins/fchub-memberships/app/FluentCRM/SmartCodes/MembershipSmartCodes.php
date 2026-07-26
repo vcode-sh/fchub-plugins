@@ -240,7 +240,8 @@ class MembershipSmartCodes
         $total = count($notifications);
         $sent = count(array_filter($notifications, fn($n) => $n['status'] === 'sent'));
 
-        return sprintf(__('%d of %d items unlocked', 'fchub-memberships'), $sent, $total);
+        /* translators: Placeholder values are runtime membership details included in this message. */
+        return sprintf(__('%1$d of %2$d items unlocked', 'fchub-memberships'), $sent, $total);
     }
 
     private static function parseCouponSmartCode(string $valueKey, $subscriber): string

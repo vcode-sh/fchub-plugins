@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FChubMemberships\Tests\Unit\Integration {
 
     use FChubMemberships\Http\Controllers\MemberController;
+    use FChubMemberships\Http\Controllers\ProviderReconciliationController;
     use FChubMemberships\Integration\MembershipAccessIntegration;
     use FChubMemberships\Support\Clock;
     use FChubMemberships\Tests\Unit\PluginTestCase;
@@ -102,6 +103,19 @@ namespace FChubMemberships\Tests\Unit\Integration {
             self::assertSame(200, $response->get_status());
             self::assertStringContainsString('scheduled', strtolower($response->get_data()['message']));
             self::assertStringNotContainsString('access revoked', strtolower($response->get_data()['message']));
+        }
+
+        public function test_provider_reconciliation_checks_the_memberships_capability_before_running(): void
+        {
+            $GLOBALS['_fchub_test_current_user_can'] = false;
+
+            self::assertFalse(ProviderReconciliationController::permission(new \WP_REST_Request()));
+            self::assertContains(
+                'manage_fchub_memberships',
+                $GLOBALS['_fchub_test_current_user_can_checks'],
+            );
+            self::assertSame([], $GLOBALS['_fchub_test_safe_remote_posts'] ?? []);
+            self::assertSame([], $GLOBALS['_fchub_test_remote_posts'] ?? []);
         }
 
         public function test_integration_logs_failed_and_partial_grants_without_success_copy(): void

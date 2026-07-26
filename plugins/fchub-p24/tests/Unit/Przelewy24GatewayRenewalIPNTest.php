@@ -38,7 +38,6 @@ class Przelewy24GatewayRenewalIPNTest extends TestCase
         $ref = new \ReflectionClass(Przelewy24Gateway::class);
         $this->gateway = $ref->newInstanceWithoutConstructor();
         $prop = $ref->getProperty('settings');
-        $prop->setAccessible(true);
         $prop->setValue($this->gateway, $settings);
     }
 
@@ -114,6 +113,27 @@ class Przelewy24GatewayRenewalIPNTest extends TestCase
             $this->assertSame(400, $e->statusCode);
             $this->assertSame('Amount mismatch', $e->data['error']);
         }
+    }
+
+    public function testRenewalIPNCurrencyMismatchRejects(): void
+    {
+        $sessionId = 'renewal-session-currency-mismatch';
+        $sub = $this->createSubscriptionWithPendingSession(42, $sessionId, 5000);
+        \FluentCart\App\Models\Subscription::$mockResults = [$sub];
+
+        $response = null;
+        try {
+            $this->simulateIPN($this->buildNotification($sessionId, 555, 5000, 'EUR'));
+            $this->fail('Expected WpSendJsonException');
+        } catch (WpSendJsonException $e) {
+            $response = $e;
+        }
+
+        stream_wrapper_restore('php');
+        $this->phpInputOverridden = false;
+        $this->assertInstanceOf(WpSendJsonException::class, $response);
+        $this->assertSame(400, $response->statusCode);
+        $this->assertSame('Currency mismatch', $response->data['error']);
     }
 
     public function testRenewalIPNVerificationFailureRejects(): void
@@ -199,7 +219,7 @@ class Przelewy24GatewayRenewalIPNTest extends TestCase
         return $sub;
     }
 
-    private function buildNotification(string $sessionId, int $orderId, int $amount): array
+    private function buildNotification(string $sessionId, int $orderId, int $amount, string $currency = 'PLN'): array
     {
         $data = [
             'merchantId'   => 383989,
@@ -207,7 +227,7 @@ class Przelewy24GatewayRenewalIPNTest extends TestCase
             'sessionId'    => $sessionId,
             'amount'       => $amount,
             'originAmount' => $amount,
-            'currency'     => 'PLN',
+            'currency'     => $currency,
             'orderId'      => $orderId,
             'methodId'     => 154,
             'statement'    => 'Renewal payment',

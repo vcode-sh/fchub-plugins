@@ -1,0 +1,25 @@
+{
+  "owner": "Vibe Code",
+  "status": "approved",
+  "approvedAt": "2026-07-26T20:44:28Z",
+  "method": "deterministic composition",
+  "generator": "scripts/wporg/generate-directory-assets.mjs",
+  "sourceAssets": [
+    {
+      "path": "web-docs/public/fchub-mobile-logo.webp",
+      "role": "FCHub brand mark",
+      "sha256": "def79f92d91888586aac16cf8aa1a86741500c1a5349645fc2a119febd7ab59e"
+    },
+    {
+      "path": "web-docs/public/vcode/v-logo-dark.webp",
+      "role": "Vibe Code author wordmark",
+      "sha256": "ecb8375112e4cf87534ef1aa03b407d349afc3598f395e5e7f54569551a39e6b"
+    }
+  ],
+  "thirdPartyLogos": false,
+  "thirdPartyNames": [
+    "Przelewy24",
+    "Fakturownia"
+  ],
+  "notes": "Owner-approved WordPress.org artwork generated deterministically from the original FCHub and Vibe Code brand files. Product glyphs are original geometric line work; no third-party logos are present."
+}

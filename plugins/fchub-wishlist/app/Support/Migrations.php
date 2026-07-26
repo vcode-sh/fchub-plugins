@@ -33,7 +33,8 @@ class Migrations
         ];
 
         foreach ($tables as $table) {
-            $wpdb->query("DROP TABLE IF EXISTS {$table}");
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- This explicit opt-in erasure targets only plugin-owned tables and has no schema API equivalent.
+            $wpdb->query($wpdb->prepare("DROP TABLE IF EXISTS %i", $table));
         }
 
         delete_option(Constants::OPTION_DB_VERSION);

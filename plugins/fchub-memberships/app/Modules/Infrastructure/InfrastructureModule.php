@@ -9,6 +9,7 @@ use FChubMemberships\Domain\Lifecycle\MembershipLifecycleCoordinator;
 use FChubMemberships\Http\Controllers\SettingsController;
 use FChubMemberships\Integration\FluentCrmSync;
 use FChubMemberships\Integration\WebhookDeliveryWorker;
+use FChubMemberships\Integration\WebhookEndpointConfig;
 use FChubMemberships\Integration\WebhookQueue;
 use FChubMemberships\Storage\DripScheduleRepository;
 use FChubMemberships\Storage\MutationRequestRepository;
@@ -210,6 +211,10 @@ final class InfrastructureModule implements ModuleInterface
     public function reconcileWebhookDeliveries(): void
     {
         $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
+        $activeDestinations = array_fill_keys(
+            array_column(WebhookEndpointConfig::active(SettingsController::getSettings()), 'url'),
+            true
+        );
         try {
             $deliveries = $this->webhookDeliveryRepository->retryableDue($this->clock->storage($now), 100);
         } catch (\Throwable) {
@@ -221,6 +226,18 @@ final class InfrastructureModule implements ModuleInterface
         }
 
         foreach ($deliveries as $delivery) {
+            if (!isset($activeDestinations[(string) ($delivery['destination_url'] ?? '')])) {
+                try {
+                    $this->webhookDeliveryRepository->cancel((int) ($delivery['id'] ?? 0));
+                } catch (\Throwable) {
+                    Logger::error(
+                        'Webhook reconciliation cancellation failed',
+                        'The inactive delivery remains blocked from scheduling and will be checked again later.'
+                    );
+                }
+                continue;
+            }
+
             $attempt = (int) ($delivery['attempt_count'] ?? 0);
             if (($delivery['status'] ?? '') !== 'processing') {
                 $attempt++;
@@ -290,8 +307,8 @@ final class InfrastructureModule implements ModuleInterface
 
         global $wpdb;
         foreach (['webhook_events', 'webhook_deliveries'] as $suffix) {
-            $table = $wpdb->prefix . 'fchub_membership_' . $suffix;
-            $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)));
+            $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_' . $suffix);
+            $found = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)));
             if ($found !== $table) {
                 return false;
             }

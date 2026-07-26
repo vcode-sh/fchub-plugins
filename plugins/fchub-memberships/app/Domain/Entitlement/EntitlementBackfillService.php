@@ -440,9 +440,9 @@ final class EntitlementBackfillService
     {
         global $wpdb;
 
-        $productTable = $wpdb->prefix . 'fct_product_meta';
-        $globalTable = $wpdb->prefix . 'fct_meta';
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $productTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_product_meta');
+        $globalTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_meta');
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT 'product' AS scope, meta_value
              FROM {$productTable}
              WHERE id = %d AND object_type = 'product_integration' AND meta_key = 'memberships'

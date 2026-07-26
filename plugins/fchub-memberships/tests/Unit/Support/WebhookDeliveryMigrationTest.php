@@ -91,7 +91,7 @@ final class WebhookDeliveryMigrationTest extends PluginTestCase
 
         Migrations::dropAll();
         $drops = array_values(array_map(
-            static fn(array $entry): string => $entry[1],
+            static fn(array $entry): string => str_replace('`', '', $entry[1]),
             array_filter(
                 $GLOBALS['_fchub_test_queries'],
                 static fn(array $entry): bool => $entry[0] === 'query' && str_contains($entry[1], 'DROP TABLE')

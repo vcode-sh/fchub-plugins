@@ -11,12 +11,8 @@ smoke/
 test-results/
 composer.json
 composer.lock
-package.json
-package-lock.json
-vite.config.js
 phpunit.xml
 phpunit.xml.dist
 *.md
 .DS_Store
 Thumbs.db
-resources/

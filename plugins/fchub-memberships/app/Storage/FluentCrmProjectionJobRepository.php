@@ -33,7 +33,7 @@ class FluentCrmProjectionJobRepository
     {
         global $wpdb;
 
-        $this->table = $wpdb->prefix . 'fchub_membership_crm_projection_jobs';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_crm_projection_jobs');
         $this->clock ??= new Clock();
     }
 
@@ -47,7 +47,7 @@ class FluentCrmProjectionJobRepository
         }
 
         $now = $this->storageNow();
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "INSERT INTO {$this->table}
                 (user_id, status, request_version, attempt_count, created_at, updated_at)
              VALUES (%d, 'pending', 1, 0, %s, %s)
@@ -87,7 +87,7 @@ class FluentCrmProjectionJobRepository
             return null;
         }
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE user_id = %d",
             $userId
         ), ARRAY_A);
@@ -115,7 +115,7 @@ class FluentCrmProjectionJobRepository
             $this->clock->now()->modify("+{$leaseSeconds} seconds")
         );
         $previousAttempt = $attempt - 1;
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET status = 'processing', lease_owner = %s, lease_expires_at = %s,
                  attempt_count = %d, last_attempt_at = %s, updated_at = %s
@@ -165,7 +165,7 @@ class FluentCrmProjectionJobRepository
 
         $this->assertWorkerIdentity($userId, $requestVersion, $attempt, $owner, 300);
         $now = $this->storageNow();
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET status = 'succeeded', lease_owner = NULL, lease_expires_at = NULL,
                  next_retry_at = NULL, last_error_code = NULL,
@@ -230,7 +230,7 @@ class FluentCrmProjectionJobRepository
             $owner,
             $now
         );
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET status = %s, lease_owner = NULL, lease_expires_at = NULL,
                  last_error_code = %s, next_retry_at = {$nextRetrySql}, updated_at = %s
@@ -259,7 +259,7 @@ class FluentCrmProjectionJobRepository
 
         $limit = max(1, min(50, $limit));
         $now = $this->storageNow();
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE (
                     status = 'pending'
@@ -292,12 +292,16 @@ class FluentCrmProjectionJobRepository
     {
         global $wpdb;
 
-        $row = $wpdb->get_row(
-            "SELECT
-                SUM(status IN ('pending', 'processing')) AS pending,
-                SUM(status = 'failed') AS failed,
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT
+                SUM(status IN (%s, %s)) AS pending,
+                SUM(status = %s) AS failed,
                 MAX(last_success_at) AS last_success_at
              FROM {$this->table}",
+                'pending',
+                'processing',
+                'failed',
+            ),
             ARRAY_A
         );
         if ($this->databaseHasError()) {

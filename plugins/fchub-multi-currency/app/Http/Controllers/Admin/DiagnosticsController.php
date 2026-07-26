@@ -43,16 +43,25 @@ final class DiagnosticsController
 
             $fluentcrmFieldsStatus = [];
 
-            foreach ($fieldSlugs as $key => $slug) {
+            if (class_exists(\FluentCrm\App\Models\CustomContactField::class)) {
                 try {
-                    if (class_exists(\FluentCrm\App\Models\CustomContactField::class)) {
-                        $fluentcrmFieldsStatus[$key] = \FluentCrm\App\Models\CustomContactField::where('slug', $slug)->exists();
-                    } else {
-                        $fluentcrmFieldsStatus[$key] = null;
+                    $globalFields = (new \FluentCrm\App\Models\CustomContactField())->getGlobalFields();
+                    $availableSlugs = [];
+
+                    foreach ($globalFields['fields'] ?? [] as $field) {
+                        if (is_array($field) && isset($field['slug'])) {
+                            $availableSlugs[] = (string) $field['slug'];
+                        }
+                    }
+
+                    foreach ($fieldSlugs as $key => $slug) {
+                        $fluentcrmFieldsStatus[$key] = in_array($slug, $availableSlugs, true);
                     }
                 } catch (\Throwable $e) {
-                    $fluentcrmFieldsStatus[$key] = null;
+                    $fluentcrmFieldsStatus = array_fill_keys(array_keys($fieldSlugs), null);
                 }
+            } else {
+                $fluentcrmFieldsStatus = array_fill_keys(array_keys($fieldSlugs), null);
             }
         }
 

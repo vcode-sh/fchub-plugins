@@ -11,10 +11,14 @@ defined('ABSPATH') || exit;
 final class EcbProvider implements ProviderContract
 {
     private const ECB_URL = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
+    private const MAX_RESPONSE_BYTES = 1_048_576;
 
     public function fetchRates(string $baseCurrency): array
     {
-        $response = wp_remote_get(self::ECB_URL, ['timeout' => 15]);
+        $response = wp_remote_get(self::ECB_URL, [
+            'timeout' => 15,
+            'limit_response_size' => self::MAX_RESPONSE_BYTES,
+        ]);
 
         if (is_wp_error($response)) {
             Logger::error('ECB request failed', [
@@ -23,7 +27,23 @@ final class EcbProvider implements ProviderContract
             return [];
         }
 
-        $xml = simplexml_load_string(wp_remote_retrieve_body($response));
+        $responseBody = wp_remote_retrieve_body($response);
+        if (
+            wp_remote_retrieve_response_code($response) !== 200
+            || strlen($responseBody) > self::MAX_RESPONSE_BYTES
+        ) {
+            Logger::error('ECB returned an invalid HTTP response');
+            return [];
+        }
+
+        $previousLibxmlErrorMode = libxml_use_internal_errors(true);
+        $xml = simplexml_load_string(
+            $responseBody,
+            \SimpleXMLElement::class,
+            LIBXML_NONET | LIBXML_NOCDATA,
+        );
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousLibxmlErrorMode);
 
         if ($xml === false) {
             Logger::error('ECB XML parse failed');

@@ -169,9 +169,12 @@ class SpecialPageProtection
 
             $loginLink = '';
             if (!$userId) {
+                $requestUri = isset($_SERVER['REQUEST_URI'])
+                    ? sanitize_url(wp_unslash($_SERVER['REQUEST_URI']))
+                    : '/';
                 $loginLink = sprintf(
                     '<p class="fchub-login-link"><a href="%s">%s</a></p>',
-                    esc_url(wp_login_url(home_url($_SERVER['REQUEST_URI'] ?? '/'))),
+                    esc_url(wp_login_url(home_url($requestUri))),
                     esc_html__('Log in', 'fchub-memberships')
                 );
             }
@@ -179,10 +182,10 @@ class SpecialPageProtection
             wp_enqueue_style('fchub-memberships-frontend', FCHUB_MEMBERSHIPS_URL . 'assets/css/frontend.css', [], FCHUB_MEMBERSHIPS_VERSION);
 
             wp_die(
-                '<div class="fchub-membership-restricted fchub-restricted-special-page">'
+                wp_kses_post('<div class="fchub-membership-restricted fchub-restricted-special-page">'
                     . wp_kses_post(wpautop($message))
                     . $loginLink
-                    . '</div>',
+                    . '</div>'),
                 esc_html__('Access Restricted', 'fchub-memberships'),
                 ['response' => 403, 'back_link' => true]
             );

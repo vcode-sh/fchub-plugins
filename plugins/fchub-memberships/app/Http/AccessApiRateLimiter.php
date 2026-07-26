@@ -50,7 +50,7 @@ final class AccessApiRateLimiter
     {
         global $wpdb;
 
-        return (int) $wpdb->get_var($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             'SELECT GET_LOCK(%s, %d)',
             $lockName,
             self::LOCK_TIMEOUT_SECONDS
@@ -61,7 +61,7 @@ final class AccessApiRateLimiter
     {
         global $wpdb;
 
-        return (int) $wpdb->get_var($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             'SELECT RELEASE_LOCK(%s)',
             $lockName
         )) === 1;

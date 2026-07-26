@@ -295,6 +295,7 @@ final class NotificationTemplateRenderer
             default => "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
         };
         $footer = $theme['footer_html'] ?: esc_html(
+            /* translators: Placeholder values are runtime membership details included in this message. */
             $theme['footer_text'] ?: sprintf(__('Sent by %s', 'fchub-memberships'), get_bloginfo('name'))
         );
         $headerText = esc_html($theme['header_text'] ?: get_bloginfo('name'));

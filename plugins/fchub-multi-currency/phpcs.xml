@@ -34,7 +34,7 @@
     <rule ref="WordPress.Security.EscapeOutput"/>
     <rule ref="WordPress.Security.ValidatedSanitizedInput"/>
     <rule ref="WordPress.Security.NonceVerification"/>
-    <config name="minimum_supported_wp_version" value="6.7"/>
+    <config name="minimum_supported_wp_version" value="7.0"/>
     <rule ref="WordPress.WP.I18n">
         <properties>
             <property name="text_domain" type="array">

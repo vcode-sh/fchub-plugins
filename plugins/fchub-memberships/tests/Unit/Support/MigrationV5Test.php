@@ -372,7 +372,10 @@ final class MigrationV5Test extends PluginTestCase
             $GLOBALS['_fchub_test_queries'],
             static fn(array $query): bool => $query[0] === 'query' && str_starts_with($query[1], 'DROP TABLE')
         ));
-        $tables = array_map(static fn(array $query): string => $query[1], $drops);
+        $tables = array_map(
+            static fn(array $query): string => str_replace('`', '', $query[1]),
+            $drops,
+        );
         $operationPosition = array_search(
             'DROP TABLE IF EXISTS wp_fchub_membership_provider_operations',
             $tables,
@@ -406,7 +409,8 @@ final class MigrationV5Test extends PluginTestCase
             $orphanOperations,
             $providerOperationsTableExists
         ): string|int|null {
-            if (str_contains($query, 'provider_operations child') && str_contains($query, 'LEFT JOIN')) {
+            $normalised = str_replace('`', '', $query);
+            if (str_contains($normalised, 'provider_operations child') && str_contains($normalised, 'LEFT JOIN')) {
                 return $orphanOperations;
             }
             if (!str_contains($query, 'SHOW TABLES LIKE')) {

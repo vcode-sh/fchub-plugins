@@ -85,10 +85,12 @@ final class MigrationV5
             return [];
         }
 
-        $orphanOperations = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$operationsTable} child
+        $orphanOperations = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT COUNT(*) FROM {$operationsTable} child
              LEFT JOIN {$edgesTable} parent ON parent.id = child.edge_id
-             WHERE parent.id IS NULL"
+             WHERE parent.id IS NULL AND %d = 1",
+                1,
+            )
         );
         if ($orphanOperations > 0) {
             return ['provider_operations: orphan edge_id rows prevent foreign key'];
@@ -100,11 +102,14 @@ final class MigrationV5
             $previousSuppression = (bool) $wpdb->suppress_errors(true);
         }
         try {
-            $added = $wpdb->query(
-                "ALTER TABLE {$operationsTable}
+            $added = \FChubMemberships\Support\CustomTableDatabase::query(
+                \FChubMemberships\Support\CustomTableDatabase::prepare("ALTER TABLE %i
                  ADD CONSTRAINT fk_provider_operations_edge
-                 FOREIGN KEY (edge_id) REFERENCES {$edgesTable}(id)
-                 ON DELETE RESTRICT"
+                 FOREIGN KEY (edge_id) REFERENCES %i(id)
+                 ON DELETE RESTRICT",
+                    $operationsTable,
+                    $edgesTable,
+                )
             );
         } finally {
             if ($canSuppressErrors) {
@@ -123,14 +128,14 @@ final class MigrationV5
         global $wpdb;
 
         $pattern = $wpdb->esc_like($table);
-        return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $pattern)) === $table;
+        return \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare('SHOW TABLES LIKE %s', $pattern)) === $table;
     }
 
     private static function foreignKeyExists(string $table, string $constraint): bool
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT rc.CONSTRAINT_NAME
              FROM information_schema.REFERENTIAL_CONSTRAINTS rc
              WHERE rc.CONSTRAINT_SCHEMA = %s

@@ -26,12 +26,13 @@ class Przelewy24GatewayRefundNotificationTest extends TestCase
         $ref = new \ReflectionClass(Przelewy24Gateway::class);
         $this->gateway = $ref->newInstanceWithoutConstructor();
         $prop = $ref->getProperty('settings');
-        $prop->setAccessible(true);
         $prop->setValue($this->gateway, $settings);
 
         // Reset global test state
         global $_fchub_test_refund_calls;
         $_fchub_test_refund_calls = [];
+        global $_wp_transients;
+        $_wp_transients = [];
         \FluentCart_OrderTransaction::$mockResult = null;
         \FluentCart_Order::$mockResults = [];
     }
@@ -82,7 +83,6 @@ class Przelewy24GatewayRefundNotificationTest extends TestCase
         ];
 
         $method = new \ReflectionMethod(Przelewy24Gateway::class, 'handleRefundNotification');
-        $method->setAccessible(true);
 
         try {
             $method->invoke($this->gateway, $input);
@@ -123,6 +123,8 @@ class Przelewy24GatewayRefundNotificationTest extends TestCase
         $mockTx->order_id = 100;
         $mockTx->status = 'succeeded';
         $mockTx->total = 5000;
+        $mockTx->currency = 'PLN';
+        $mockTx->vendor_charge_id = '987654321';
         \FluentCart_OrderTransaction::$mockResult = $mockTx;
 
         $input = $this->buildRefundInput(0);
@@ -192,6 +194,53 @@ class Przelewy24GatewayRefundNotificationTest extends TestCase
         }
     }
 
+    public function testRefundRejectsOrderRelationshipMismatch(): void
+    {
+        $transaction = $this->mockTransaction();
+        $transaction->vendor_charge_id = '123';
+        $this->assertRefundRejected($this->buildRefundInput(0), 'Order mismatch');
+    }
+
+    public function testRefundRejectsAmountAboveOriginalPayment(): void
+    {
+        $this->mockTransaction();
+        $input = $this->buildRefundInput(0);
+        $input['amount'] = 5001;
+        $input = $this->signRefundInput($input);
+
+        $this->assertRefundRejected($input, 'Refund amount mismatch');
+    }
+
+    public function testDuplicateRefundNotificationIsRecordedOnce(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        global $_fchub_test_refund_calls;
+        $this->mockTransaction();
+        $input = $this->buildRefundInput(0);
+
+        foreach ([1, 2] as $attempt) {
+            $this->setPhpInput(json_encode($input));
+            try {
+                $this->gateway->handleIPN();
+                $this->fail('Expected WpSendJsonException');
+            } catch (WpSendJsonException $e) {
+                $this->assertSame(200, $e->statusCode, 'Attempt ' . $attempt);
+            }
+            stream_wrapper_restore('php');
+            $this->phpInputOverridden = false;
+        }
+
+        $this->assertCount(1, $_fchub_test_refund_calls);
+    }
+
+    public function testRefundRejectsMalformedFieldTypes(): void
+    {
+        $input = $this->buildRefundInput(0);
+        $input['status'] = ['completed'];
+
+        $this->assertRefundRejected($input, 'Invalid notification fields');
+    }
+
     /**
      * Build a valid refund notification input with correct sign
      */
@@ -207,6 +256,11 @@ class Przelewy24GatewayRefundNotificationTest extends TestCase
             'status'       => $status,
         ];
 
+        return $this->signRefundInput($data);
+    }
+
+    private function signRefundInput(array $data): array
+    {
         $signData = json_encode([
             'orderId'      => (int) $data['orderId'],
             'sessionId'    => $data['sessionId'],
@@ -221,6 +275,41 @@ class Przelewy24GatewayRefundNotificationTest extends TestCase
         $data['sign'] = hash('sha384', $signData);
 
         return $data;
+    }
+
+    private function mockTransaction(): \FluentCart_OrderTransaction
+    {
+        $transaction = new \FluentCart_OrderTransaction();
+        $transaction->uuid = 'test-uuid-12345';
+        $transaction->id = 42;
+        $transaction->order_id = 100;
+        $transaction->status = 'succeeded';
+        $transaction->total = 5000;
+        $transaction->currency = 'PLN';
+        $transaction->vendor_charge_id = '987654321';
+        \FluentCart_OrderTransaction::$mockResult = $transaction;
+
+        return $transaction;
+    }
+
+    private function assertRefundRejected(array $input, string $message): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $this->setPhpInput(json_encode($input));
+
+        $response = null;
+        try {
+            $this->gateway->handleIPN();
+            $this->fail('Expected WpSendJsonException');
+        } catch (WpSendJsonException $e) {
+            $response = $e;
+        }
+
+        stream_wrapper_restore('php');
+        $this->phpInputOverridden = false;
+        $this->assertInstanceOf(WpSendJsonException::class, $response);
+        $this->assertSame(400, $response->statusCode);
+        $this->assertSame($message, $response->data['error']);
     }
 
     private function setPhpInput(string $data): void

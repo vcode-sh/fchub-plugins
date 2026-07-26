@@ -4,6 +4,10 @@
  * PHPUnit bootstrap - mocks WordPress functions for standalone unit testing
  */
 
+if (!defined('ABSPATH')) {
+    define('ABSPATH', dirname(__DIR__) . '/');
+}
+
 // Autoload
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -47,6 +51,12 @@ if (!function_exists('esc_url')) {
 if (!function_exists('wp_kses')) {
     function wp_kses($string, $allowed_html) {
         return $string;
+    }
+}
+
+if (!function_exists('wp_strip_all_tags')) {
+    function wp_strip_all_tags($text) {
+        return strip_tags((string) $text);
     }
 }
 
@@ -189,6 +199,30 @@ if (!function_exists('wp_parse_args')) {
     }
 }
 
+if (!function_exists('wp_parse_url')) {
+    function wp_parse_url($url, $component = -1) {
+        return parse_url($url, $component);
+    }
+}
+
+if (!function_exists('wp_unslash')) {
+    function wp_unslash($value) {
+        return stripslashes_deep($value);
+    }
+}
+
+if (!function_exists('stripslashes_deep')) {
+    function stripslashes_deep($value) {
+        return is_array($value) ? array_map('stripslashes_deep', $value) : stripslashes((string) $value);
+    }
+}
+
+if (!function_exists('sanitize_key')) {
+    function sanitize_key($key) {
+        return preg_replace('/[^a-z0-9_\\-]/', '', strtolower((string) $key));
+    }
+}
+
 // Mock FluentCart classes needed by Przelewy24Settings
 if (!class_exists('FluentCart\\Api\\StoreSettings')) {
     // phpcs:ignore
@@ -207,7 +241,12 @@ if (!class_exists('FluentCart\\App\\Modules\\PaymentMethods\\Core\\BaseGatewaySe
         public $methodHandler;
 
         public function __construct() {
-            $this->settings = wp_parse_args([], static::getDefaults());
+            $this->settings = wp_parse_args([
+                'test_merchant_id' => '383989',
+                'test_shop_id' => '383989',
+                'test_crc_key' => 'test-crc-key',
+                'test_api_key' => 'test-api-key',
+            ], static::getDefaults());
         }
 
         abstract public function get($key = '');

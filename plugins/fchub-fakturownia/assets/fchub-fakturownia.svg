@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">FCHub invoice glyph</title>
+  <rect width="240" height="240" rx="52" fill="#14213d"/>
+  <path d="M72 44h68l28 28v124H72z" fill="#fff"/>
+  <path d="M140 44v28h28z" fill="#c7f9e9"/>
+  <path d="M96 104h48M96 128h48M96 152h30" fill="none" stroke="#14213d" stroke-linecap="round" stroke-width="10"/>
+  <circle cx="154" cy="166" r="28" fill="#18a978"/>
+  <path d="m141 166 9 9 18-20" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+</svg>

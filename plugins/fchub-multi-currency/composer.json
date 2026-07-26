@@ -1,6 +1,7 @@
 {
     "name": "fchub/multi-currency",
     "description": "FCHub Multi-Currency - Display-layer multi-currency for FluentCart",
+    "license": "GPL-2.0-or-later",
     "type": "wordpress-plugin",
     "require": {
         "php": ">=8.3"

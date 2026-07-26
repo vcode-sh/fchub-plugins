@@ -35,7 +35,6 @@ class Przelewy24BugTest extends TestCase
         $ref = new \ReflectionClass(Przelewy24Gateway::class);
         $this->gateway = $ref->newInstanceWithoutConstructor();
         $prop = $ref->getProperty('settings');
-        $prop->setAccessible(true);
         $prop->setValue($this->gateway, $this->settings);
 
         // Reset global mocks

@@ -1,0 +1,10 @@
+{
+  "plugin": "fchub-fakturownia",
+  "validator": "https://wordpress.org/plugins/developers/readme-validator/",
+  "checkedAt": "2026-07-26T21:19:19.863Z",
+  "errors": [],
+  "warnings": [],
+  "notes": [
+    "No donate link was found"
+  ]
+}

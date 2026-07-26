@@ -30,24 +30,27 @@ class MigrationV3
 
         global $wpdb;
 
-        $grantsTable = $wpdb->prefix . 'fchub_membership_grants';
-        $subscriptionsTable = $wpdb->prefix . 'fct_subscriptions';
+        $grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
+        $subscriptionsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_subscriptions');
 
         // Check if FluentCart subscriptions table exists
-        $tableExists = $wpdb->get_var(
-            $wpdb->prepare("SHOW TABLES LIKE %s", $subscriptionsTable)
+        $tableExists = \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SHOW TABLES LIKE %s", $subscriptionsTable)
         );
         if (!$tableExists) {
             return;
         }
 
         // Find grants with source_type='order' where the order has a subscription
-        $grants = $wpdb->get_results(
-            "SELECT g.id, g.source_id AS order_id, g.source_ids, s.id AS subscription_id
+        $grants = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT g.id, g.source_id AS order_id, g.source_ids, s.id AS subscription_id
              FROM {$grantsTable} g
              INNER JOIN {$subscriptionsTable} s ON s.parent_order_id = g.source_id
-             WHERE g.source_type = 'order'
-               AND g.source_id > 0",
+             WHERE g.source_type = %s
+               AND g.source_id > %d",
+                'order',
+                0,
+            ),
             ARRAY_A
         );
 
@@ -70,7 +73,7 @@ class MigrationV3
                 $sourceIds[] = $subscriptionId;
             }
 
-            $wpdb->update(
+            \FChubMemberships\Support\CustomTableDatabase::update(
                 $grantsTable,
                 [
                     'source_type' => 'subscription',
@@ -137,12 +140,18 @@ class MigrationV3
             }
 
             $suppress = $wpdb->suppress_errors(true);
-            $wpdb->query(
-                "ALTER TABLE {$fk['table']}
-                 ADD CONSTRAINT {$fk['name']}
-                 FOREIGN KEY ({$fk['column']})
-                 REFERENCES {$fk['ref_table']}({$fk['ref_column']})
-                 ON DELETE {$fk['on_delete']}"
+            \FChubMemberships\Support\CustomTableDatabase::query(
+                \FChubMemberships\Support\CustomTableDatabase::prepare("ALTER TABLE %i
+                 ADD CONSTRAINT %i
+                 FOREIGN KEY (%i)
+                 REFERENCES %i(%i)
+                 ON DELETE {$fk['on_delete']}",
+                    $fk['table'],
+                    $fk['name'],
+                    $fk['column'],
+                    $fk['ref_table'],
+                    $fk['ref_column'],
+                )
             );
             $wpdb->suppress_errors($suppress);
         }
@@ -163,7 +172,7 @@ class MigrationV3
     private static function addPlanScheduleColumns(): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'fchub_membership_plans';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
 
         $columns = [
             'scheduled_status' => "VARCHAR(20) DEFAULT NULL AFTER meta",
@@ -171,12 +180,18 @@ class MigrationV3
         ];
 
         foreach ($columns as $column => $definition) {
-            $exists = $wpdb->get_results($wpdb->prepare(
+            $exists = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SHOW COLUMNS FROM {$table} LIKE %s",
                 $column
             ));
             if (empty($exists)) {
-                $wpdb->query("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
+                \FChubMemberships\Support\CustomTableDatabase::query(
+                    \FChubMemberships\Support\CustomTableDatabase::prepare(
+                        "ALTER TABLE %i ADD COLUMN %i {$definition}",
+                        $table,
+                        $column,
+                    ),
+                );
             }
         }
     }
@@ -215,8 +230,12 @@ class MigrationV3
             }
 
             $suppress = $wpdb->suppress_errors(true);
-            $wpdb->query(
-                "ALTER TABLE {$idx['table']} ADD INDEX {$idx['name']} ({$idx['cols']})"
+            \FChubMemberships\Support\CustomTableDatabase::query(
+                \FChubMemberships\Support\CustomTableDatabase::prepare(
+                    "ALTER TABLE %i ADD INDEX %i ({$idx['cols']})",
+                    $idx['table'],
+                    $idx['name'],
+                )
             );
             $wpdb->suppress_errors($suppress);
         }
@@ -226,7 +245,7 @@ class MigrationV3
     {
         global $wpdb;
 
-        return (bool) $wpdb->get_var($wpdb->prepare(
+        return (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
              WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND CONSTRAINT_NAME = %s",
             $wpdb->dbname,
@@ -240,7 +259,7 @@ class MigrationV3
         global $wpdb;
 
         $suppress = $wpdb->suppress_errors(true);
-        $result = $wpdb->get_results($wpdb->prepare(
+        $result = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SHOW INDEX FROM {$table} WHERE Key_name = %s",
             $name
         ));

@@ -20,8 +20,8 @@ final class WebhookDeliveryRepository
     {
         global $wpdb;
 
-        $this->table = $wpdb->prefix . 'fchub_membership_webhook_deliveries';
-        $this->eventTable = $wpdb->prefix . 'fchub_membership_webhook_events';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_webhook_deliveries');
+        $this->eventTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_webhook_events');
         $this->clock = $clock ?? new Clock(null, new \DateTimeZone('UTC'));
     }
 
@@ -32,7 +32,7 @@ final class WebhookDeliveryRepository
 
         global $wpdb;
 
-        $persistedEventId = $wpdb->get_var($wpdb->prepare(
+        $persistedEventId = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT event_id FROM {$this->eventTable} WHERE event_id = %s",
             $eventId
         ));
@@ -88,7 +88,7 @@ final class WebhookDeliveryRepository
 
         global $wpdb;
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $deliveryId
         ), ARRAY_A);
@@ -110,7 +110,7 @@ final class WebhookDeliveryRepository
 
         global $wpdb;
 
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET attempt_count = CASE
                     WHEN status = 'processing' THEN attempt_count
@@ -236,7 +236,7 @@ final class WebhookDeliveryRepository
 
         global $wpdb;
 
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET status = 'cancelled',
                  lease_owner = NULL, lease_expires_at = NULL, next_attempt_at = NULL,
@@ -283,24 +283,33 @@ final class WebhookDeliveryRepository
             throw new \InvalidArgumentException('Invalid webhook delivery status filter.');
         }
         if ($status !== '') {
-            $conditions[] = $wpdb->prepare('delivery.status = %s', $status);
+            $conditions[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
+                'delivery.status = %s',
+                $status,
+            )->sql();
         }
         $eventType = trim((string) ($filters['event_type'] ?? ''));
         if ($eventType !== '') {
             if (strlen($eventType) > 64) {
                 throw new \InvalidArgumentException('Invalid webhook event type filter.');
             }
-            $conditions[] = $wpdb->prepare('event.event_type = %s', $eventType);
+            $conditions[] = \FChubMemberships\Support\CustomTableDatabase::prepare(
+                'event.event_type = %s',
+                $eventType,
+            )->sql();
         }
 
         $where = $conditions === [] ? '' : ' WHERE ' . implode(' AND ', $conditions);
-        $rows = $wpdb->get_results(
-            "SELECT delivery.*, event.event_type, event.schema_version, event.occurred_at
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT delivery.*, event.event_type, event.schema_version, event.occurred_at
              FROM {$this->table} delivery
              INNER JOIN {$this->eventTable} event ON event.event_id = delivery.event_id
              {$where}
              ORDER BY delivery.created_at DESC, delivery.id DESC
-             LIMIT {$perPage} OFFSET {$offset}",
+             LIMIT %d OFFSET %d",
+                $perPage,
+                $offset,
+            ),
             ARRAY_A
         );
         if ($wpdb->last_error !== '') {
@@ -315,15 +324,22 @@ final class WebhookDeliveryRepository
     {
         global $wpdb;
 
-        $row = $wpdb->get_row(
-            "SELECT
-                SUM(status = 'pending') pending,
-                SUM(status = 'processing') processing,
-                SUM(status = 'retrying') retrying,
-                SUM(status = 'succeeded') succeeded,
-                SUM(status = 'failed') failed,
-                MAX(CASE WHEN status = 'succeeded' THEN delivered_at END) last_success_at
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT
+                SUM(status = %s) pending,
+                SUM(status = %s) processing,
+                SUM(status = %s) retrying,
+                SUM(status = %s) succeeded,
+                SUM(status = %s) failed,
+                MAX(CASE WHEN status = %s THEN delivered_at END) last_success_at
              FROM {$this->table}",
+                'pending',
+                'processing',
+                'retrying',
+                'succeeded',
+                'failed',
+                'succeeded',
+            ),
             ARRAY_A
         );
         if ($wpdb->last_error !== '') {
@@ -348,7 +364,7 @@ final class WebhookDeliveryRepository
 
         global $wpdb;
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE (
                     status IN ('pending', 'retrying')
@@ -377,7 +393,7 @@ final class WebhookDeliveryRepository
 
         global $wpdb;
 
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET status = 'pending', attempt_count = 0,
                  lease_owner = NULL, lease_expires_at = NULL,
@@ -402,7 +418,7 @@ final class WebhookDeliveryRepository
 
         global $wpdb;
 
-        $deleted = $wpdb->query($wpdb->prepare(
+        $deleted = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "DELETE FROM {$this->table}
              WHERE (status = 'succeeded' AND delivered_at IS NOT NULL AND delivered_at < %s)
                 OR (status = 'failed' AND updated_at < %s)",
@@ -423,7 +439,7 @@ final class WebhookDeliveryRepository
 
         $previousSuppression = $wpdb->suppress_errors(true);
         try {
-            return $wpdb->insert($this->table, $record) !== false;
+            return \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $record) !== false;
         } finally {
             $wpdb->suppress_errors($previousSuppression);
         }
@@ -434,7 +450,7 @@ final class WebhookDeliveryRepository
     {
         global $wpdb;
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table}
              WHERE event_id = %s AND destination_hash = %s",
             $eventId,
@@ -467,10 +483,16 @@ final class WebhookDeliveryRepository
         global $wpdb;
 
         $codeSql = $code === null ? 'NULL' : (string) max(0, min(65535, $code));
-        $nextSql = $nextAt === null ? 'NULL' : $wpdb->prepare('%s', $nextAt);
-        $deliveredSql = $deliveredAt === null ? 'NULL' : $wpdb->prepare('%s', $deliveredAt);
-        $errorSql = $error === null ? 'NULL' : $wpdb->prepare('%s', $error);
-        $updated = $wpdb->query($wpdb->prepare(
+        $nextSql = $nextAt === null
+            ? 'NULL'
+            : \FChubMemberships\Support\CustomTableDatabase::prepare('%s', $nextAt)->sql();
+        $deliveredSql = $deliveredAt === null
+            ? 'NULL'
+            : \FChubMemberships\Support\CustomTableDatabase::prepare('%s', $deliveredAt)->sql();
+        $errorSql = $error === null
+            ? 'NULL'
+            : \FChubMemberships\Support\CustomTableDatabase::prepare('%s', $error)->sql();
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET status = %s,
                  response_code = {$codeSql},

@@ -10,6 +10,8 @@ defined('ABSPATH') || exit;
 
 final class OpenExchangeRatesProvider implements ProviderContract
 {
+    private const MAX_RESPONSE_BYTES = 1_048_576;
+
     public function __construct(
         private string $appId,
     ) {
@@ -23,7 +25,10 @@ final class OpenExchangeRatesProvider implements ProviderContract
             strtoupper($baseCurrency),
         );
 
-        $response = wp_remote_get($url, ['timeout' => 15]);
+        $response = wp_remote_get($url, [
+            'timeout' => 15,
+            'limit_response_size' => self::MAX_RESPONSE_BYTES,
+        ]);
 
         if (is_wp_error($response)) {
             Logger::error('OpenExchangeRates request failed', [
@@ -32,12 +37,19 @@ final class OpenExchangeRatesProvider implements ProviderContract
             return [];
         }
 
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $responseBody = wp_remote_retrieve_body($response);
+        if (
+            wp_remote_retrieve_response_code($response) !== 200
+            || strlen($responseBody) > self::MAX_RESPONSE_BYTES
+        ) {
+            Logger::error('Open Exchange Rates returned an invalid HTTP response');
+            return [];
+        }
 
-        if (!is_array($body) || !isset($body['rates'])) {
-            Logger::error('OpenExchangeRates invalid response', [
-                'body' => $body,
-            ]);
+        $body = json_decode($responseBody, true);
+
+        if (!is_array($body) || !is_array($body['rates'] ?? null)) {
+            Logger::error('Open Exchange Rates returned an invalid response');
             return [];
         }
 
@@ -47,11 +59,30 @@ final class OpenExchangeRatesProvider implements ProviderContract
             $rates[strtoupper($code)] = (string) $rate;
         }
 
+        if (!self::hasPositiveBaseRate($rates, $baseCurrency)) {
+            Logger::error('Open Exchange Rates response omitted a valid base rate', [
+                'base_currency' => strtoupper($baseCurrency),
+            ]);
+            return [];
+        }
+
         return $rates;
     }
 
     public function name(): string
     {
         return 'open_exchange_rates';
+    }
+
+    /**
+     * @param array<string, string> $rates
+     */
+    private static function hasPositiveBaseRate(array $rates, string $baseCurrency): bool
+    {
+        $baseRate = $rates[strtoupper($baseCurrency)] ?? null;
+
+        return $baseRate !== null
+            && is_numeric($baseRate)
+            && (float) $baseRate > 0.0;
     }
 }

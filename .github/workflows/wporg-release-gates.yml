@@ -1,0 +1,281 @@
+name: WordPress.org Release Gates
+
+on:
+  workflow_call:
+    inputs:
+      tagged_slug:
+        description: WordPress.org plugin selected by the caller tag
+        required: true
+        type: string
+      tagged_version:
+        description: Version selected by the caller tag
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate WordPress.org gate input
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout caller tag SHA
+        uses: actions/checkout@v4
+
+      - name: Validate target and version
+        env:
+          TAGGED_SLUG: ${{ inputs.tagged_slug }}
+          TAGGED_VERSION: ${{ inputs.tagged_version }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const manifest = JSON.parse(fs.readFileSync("wporg/plugins.json", "utf8"));
+          const versions = JSON.parse(fs.readFileSync("web-docs/lib/versions.json", "utf8"));
+          const slug = process.env.TAGGED_SLUG;
+          const version = process.env.TAGGED_VERSION;
+
+          if (!Object.hasOwn(manifest.plugins, slug)) {
+            throw new Error(`Unsupported WordPress.org release target: ${slug}`);
+          }
+          if (versions.plugins[slug]?.version !== version) {
+            throw new Error(
+              `WordPress.org release version mismatch for ${slug}: expected ${versions.plugins[slug]?.version}, received ${version}`,
+            );
+          }
+          NODE
+
+  source:
+    name: Source gates (${{ matrix.plugin }}, PHP ${{ matrix.php_version }})
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin:
+          - fchub-fakturownia
+          - fchub-memberships
+          - fchub-multi-currency
+          - fchub-p24
+          - fchub-wishlist
+        php_version:
+          - '8.4'
+          - '8.5'
+    steps:
+      - name: Checkout caller tag SHA
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php_version }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Validate Composer metadata
+        working-directory: plugins/${{ matrix.plugin }}
+        run: composer validate --strict --no-interaction
+
+      - name: Install Composer dependencies
+        working-directory: plugins/${{ matrix.plugin }}
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit Composer dependencies
+        working-directory: plugins/${{ matrix.plugin }}
+        run: composer audit --locked --no-interaction
+
+      - name: Run applicable PHP gates
+        run: bash scripts/wporg/run-source-gates.sh "${{ matrix.plugin }}" "${{ matrix.php_version }}"
+
+  memberships-frontend:
+    name: Memberships frontend gates
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout caller tag SHA
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: plugins/fchub-memberships/package-lock.json
+
+      - name: Install npm dependencies
+        working-directory: plugins/fchub-memberships
+        run: npm ci
+
+      - name: Audit npm dependencies
+        working-directory: plugins/fchub-memberships
+        run: npm audit --audit-level=high
+
+      - name: Run Vitest
+        working-directory: plugins/fchub-memberships
+        run: npm test
+
+      - name: Install Chromium
+        working-directory: plugins/fchub-memberships
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright
+        working-directory: plugins/fchub-memberships
+        run: npm run test:smoke
+
+      - name: Build production assets
+        working-directory: plugins/fchub-memberships
+        run: |
+          npm run build
+          if [ ! -d assets/dist ] || [ -z "$(find assets/dist -type f -print -quit)" ]; then
+            echo "::error::Memberships production assets are missing."
+            exit 1
+          fi
+
+  package:
+    name: Package gates (${{ matrix.plugin }})
+    needs: [source, memberships-frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin:
+          - fchub-fakturownia
+          - fchub-memberships
+          - fchub-multi-currency
+          - fchub-p24
+          - fchub-wishlist
+    steps:
+      - name: Checkout caller tag SHA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build and inspect archive
+        env:
+          PLUGIN_SLUG: ${{ matrix.plugin }}
+        run: |
+          bash build.sh "${{ matrix.plugin }}"
+          VERSION=$(node -e 'const v=require("./web-docs/lib/versions.json"); process.stdout.write(v.plugins[process.env.PLUGIN_SLUG].version)')
+          ZIP_PATH="${GITHUB_WORKSPACE}/dist/${PLUGIN_SLUG}-${VERSION}.zip"
+
+          node scripts/wporg/check-package.mjs "$ZIP_PATH" "$PLUGIN_SLUG" \
+            > "${GITHUB_WORKSPACE}/dist/${PLUGIN_SLUG}-${VERSION}.inspection.json"
+
+      - name: Fetch pinned genuine previous release
+        env:
+          PLUGIN_SLUG: ${{ matrix.plugin }}
+        run: |
+          node scripts/wporg/fetch-previous-release.mjs \
+            "$PLUGIN_SLUG" \
+            "${GITHUB_WORKSPACE}/dist/previous"
+
+      - name: Validate WordPress.org readme
+        run: |
+          node scripts/wporg/run-readme-validator.mjs \
+            "plugins/${{ matrix.plugin }}/readme.txt" \
+            "${{ matrix.plugin }}"
+
+      - name: Upload validated package
+        uses: actions/upload-artifact@v4
+        with:
+          name: wporg-package-${{ matrix.plugin }}
+          path: |
+            dist/${{ matrix.plugin }}-*.zip
+            dist/${{ matrix.plugin }}-*.inspection.json
+            dist/previous/${{ matrix.plugin }}-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload rejected package evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wporg-package-${{ matrix.plugin }}-failure
+          path: |
+            dist/${{ matrix.plugin }}-*.zip
+            dist/${{ matrix.plugin }}-*.inspection.json
+            test-results/wporg/${{ matrix.plugin }}/readme-validator.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  runtime:
+    name: Runtime (${{ matrix.plugin }}, PHP ${{ matrix.php_version }})
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin:
+          - fchub-fakturownia
+          - fchub-memberships
+          - fchub-multi-currency
+          - fchub-p24
+          - fchub-wishlist
+        php_version:
+          - '8.3'
+          - '8.4'
+          - '8.5'
+    steps:
+      - name: Checkout caller tag SHA
+        uses: actions/checkout@v4
+
+      - name: Download validated package
+        uses: actions/download-artifact@v4
+        with:
+          name: wporg-package-${{ matrix.plugin }}
+          path: dist
+
+      - name: Locate validated package
+        id: package
+        env:
+          PLUGIN_SLUG: ${{ matrix.plugin }}
+        run: |
+          ZIP_PATH=$(find "${GITHUB_WORKSPACE}/dist" -maxdepth 1 -type f -name "${PLUGIN_SLUG}-*.zip" -print -quit)
+          if [ -z "$ZIP_PATH" ] || [ ! -f "$ZIP_PATH" ]; then
+            echo "::error::Validated package is missing for ${PLUGIN_SLUG}."
+            exit 1
+          fi
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+
+          PREVIOUS_ZIP_PATH=$(find "${GITHUB_WORKSPACE}/dist/previous" -maxdepth 1 -type f -name "${PLUGIN_SLUG}-*.zip" -print -quit)
+          if [ -z "$PREVIOUS_ZIP_PATH" ] || [ ! -f "$PREVIOUS_ZIP_PATH" ]; then
+            echo "::error::Pinned previous release is missing for ${PLUGIN_SLUG}."
+            exit 1
+          fi
+          echo "previous_zip_path=$PREVIOUS_ZIP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Run WordPress 7.0.2 lifecycle
+        run: |
+          bash scripts/wporg/run-lifecycle.sh \
+            "${{ steps.package.outputs.zip_path }}" \
+            "${{ matrix.plugin }}" \
+            "wordpress:7.0.2-php${{ matrix.php_version }}-apache" \
+            "wordpress:cli-php${{ matrix.php_version }}" \
+            "${{ steps.package.outputs.previous_zip_path }}"
+
+      - name: Run Plugin Check 2.0.0 in new-plugin mode
+        if: matrix.php_version == '8.5'
+        run: |
+          bash scripts/wporg/run-plugin-check.sh \
+            "${{ steps.package.outputs.zip_path }}" \
+            "${{ matrix.plugin }}" \
+            "wordpress:7.0.2-php${{ matrix.php_version }}-apache" \
+            "wordpress:cli-php${{ matrix.php_version }}"
+
+      - name: Upload disposable gate evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wporg-runtime-${{ matrix.plugin }}-php${{ matrix.php_version }}-failure
+          path: test-results/wporg/${{ matrix.plugin }}/
+          if-no-files-found: warn
+          retention-days: 7

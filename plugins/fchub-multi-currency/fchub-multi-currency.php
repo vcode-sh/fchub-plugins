@@ -1,34 +1,30 @@
 <?php
 
 /**
- * Plugin Name: FCHub - Multi-Currency
- * Plugin URI: https://fchub.co
+ * Plugin Name: FCHub Multi-Currency
+ * Plugin URI: https://fchub.co/docs/fchub-multi-currency
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.4.0
+ * Version: 1.4.1
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: fchub-multi-currency
- * Domain Path: /languages
- * Requires at least: 6.7
- * Tested up to:    6.7
+ * Requires at least: 7.0
+ * Tested up to: 7.0
  * Requires PHP: 8.3
- * Update URI: https://fchub.co/fchub-multi-currency
+ * Requires Plugins: fluent-cart
  */
 
 declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.4.0');
+define('FCHUB_MC_VERSION', '1.4.1');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));
 define('FCHUB_MC_DB_VERSION', '1.0.0');
-
-require_once __DIR__ . '/lib/GitHubUpdater.php';
-FCHub_GitHub_Updater::register('fchub-multi-currency', plugin_basename(__FILE__), FCHUB_MC_VERSION);
 
 // Autoloader
 spl_autoload_register(function ($class) {
@@ -49,15 +45,15 @@ spl_autoload_register(function ($class) {
 });
 
 /**
- * Plugin activation: create database tables and schedule rate refresh cron.
+ * Plugin activation: create database tables and honour saved provider consent.
  */
 register_activation_hook(__FILE__, function () {
     FChubMultiCurrency\Support\Migrations::run();
     update_option('fchub_mc_db_version', FCHUB_MC_DB_VERSION);
 
-    if (!wp_next_scheduled('fchub_mc_refresh_rates')) {
-        wp_schedule_event(time(), 'fchub_mc_rate_interval', 'fchub_mc_refresh_rates');
-    }
+    $optionStore = new FChubMultiCurrency\Storage\OptionStore();
+    $optionStore->ensureExplicitRateProvider();
+    FChubMultiCurrency\Support\RateSchedule::sync($optionStore);
 });
 
 /**
@@ -102,10 +98,10 @@ add_action('init', function () {
         update_option('fchub_mc_db_version', FCHUB_MC_DB_VERSION);
     }
 
-    // Re-schedule cron if it went missing (WP cron cleanup, options reset, etc.)
-    if (!wp_next_scheduled('fchub_mc_refresh_rates')) {
-        wp_schedule_event(time(), 'fchub_mc_rate_interval', 'fchub_mc_refresh_rates');
-    }
+    // Restore a missing schedule only when a remote provider was explicitly saved.
+    $optionStore = new FChubMultiCurrency\Storage\OptionStore();
+    $optionStore->ensureExplicitRateProvider();
+    FChubMultiCurrency\Support\RateSchedule::sync($optionStore);
 
     FChubMultiCurrency\Bootstrap\Plugin::boot();
 }, 3);
@@ -199,7 +195,13 @@ function fchub_mc_format_price(float $basePrice): string
     $decimals = $context->displayCurrency->decimals;
 
     $rounded = match ($roundingMode) {
-        FChubMultiCurrency\Domain\Enums\RoundingMode::None     => (float) (($converted >= 0 ? floor($converted * (10 ** $decimals)) : ceil($converted * (10 ** $decimals))) / (10 ** $decimals)),
+        FChubMultiCurrency\Domain\Enums\RoundingMode::None => (float) (
+            (
+                $converted >= 0
+                    ? floor($converted * (10 ** $decimals))
+                    : ceil($converted * (10 ** $decimals))
+            ) / (10 ** $decimals)
+        ),
         FChubMultiCurrency\Domain\Enums\RoundingMode::HalfUp   => round($converted, $decimals, PHP_ROUND_HALF_UP),
         FChubMultiCurrency\Domain\Enums\RoundingMode::HalfDown => round($converted, $decimals, PHP_ROUND_HALF_DOWN),
         FChubMultiCurrency\Domain\Enums\RoundingMode::Ceil     => (float) (ceil($converted * (10 ** $decimals)) / (10 ** $decimals)),
@@ -224,13 +226,14 @@ function fchub_mc_get_order_display_currency(int $orderId): ?string
         return null;
     }
 
-    $order = \FluentCart\App\Models\Order::find($orderId);
+    /** @var \FluentCart\App\Models\Order|null $order */
+    $order = \FluentCart\App\Models\Order::query()->find($orderId);
     if (!$order) {
         return null;
     }
 
     $currency = $order->getMeta('_fchub_mc_display_currency');
-    return ($currency && $currency !== '') ? (string) $currency : null;
+    return $currency ? (string) $currency : null;
 }
 
 /**
@@ -251,7 +254,8 @@ function fchub_mc_format_order_price(float $basePrice, int $orderId): string
         return (string) $basePrice;
     }
 
-    $order = \FluentCart\App\Models\Order::find($orderId);
+    /** @var \FluentCart\App\Models\Order|null $order */
+    $order = \FluentCart\App\Models\Order::query()->find($orderId);
     if (!$order) {
         return \FluentCart\Api\CurrencySettings::getPriceHtml($basePrice);
     }

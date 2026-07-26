@@ -62,6 +62,6 @@ class PmproCsvParser implements CsvParserInterface
             return null;
         }
 
-        return date('Y-m-d', $ts);
+        return gmdate('Y-m-d', $ts);
     }
 }

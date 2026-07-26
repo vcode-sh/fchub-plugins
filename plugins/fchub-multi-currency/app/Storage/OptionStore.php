@@ -79,6 +79,19 @@ final class OptionStore
         return $settings[$key] ?? $default;
     }
 
+    public function ensureExplicitRateProvider(): void
+    {
+        $saved = get_option(Constants::OPTION_SETTINGS, []);
+        $saved = is_array($saved) ? $saved : [];
+
+        if (array_key_exists('rate_provider', $saved)) {
+            return;
+        }
+
+        $saved['rate_provider'] = 'manual';
+        update_option(Constants::OPTION_SETTINGS, $saved);
+    }
+
     /**
      * @param array<string, mixed> $values
      */

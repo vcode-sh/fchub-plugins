@@ -385,6 +385,7 @@ class MembershipAccessIntegration extends BaseIntegrationManager
         $plan = $planRepo->find($planId);
 
         if (!$plan) {
+            /* translators: Placeholder values are runtime membership details included in this message. */
             Logger::orderLog($order, __('Membership grant failed', 'fchub-memberships'), sprintf(__('Plan #%d not found.', 'fchub-memberships'), $planId), 'error');
             return EventProcessingOutcome::terminalFailure("Plan #{$planId} not found.");
         }
@@ -819,7 +820,8 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                 $order,
                 __('Membership access grant pending', 'fchub-memberships'),
                 sprintf(
-                    __('Plan "%s" for user #%d: %d resources are pending provider recovery.', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Plan "%1$s" for user #%2$d: %3$d resources are pending provider recovery.', 'fchub-memberships'),
                     $planTitle,
                     $userId,
                     $pending
@@ -837,7 +839,8 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                     ? __('Membership access partially granted', 'fchub-memberships')
                     : __('Membership access grant failed', 'fchub-memberships'),
                 sprintf(
-                    __('Plan "%s" for user #%d: %d resources applied, %d failed. %s', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Plan "%1$s" for user #%2$d: %3$d resources applied, %4$d failed. %5$s', 'fchub-memberships'),
                     $planTitle,
                     $userId,
                     $succeeded,
@@ -853,7 +856,8 @@ class MembershipAccessIntegration extends BaseIntegrationManager
             $order,
             __('Membership access granted', 'fchub-memberships'),
             sprintf(
-                __('Plan "%s" granted to user #%d (%d created, %d updated, validity: %s, source: %s #%d).', 'fchub-memberships'),
+                /* translators: Placeholder values are runtime membership details included in this message. */
+                __('Plan "%1$s" granted to user #%2$d (%3$d created, %4$d updated, validity: %5$s, source: %6$s #%7$d).', 'fchub-memberships'),
                 $planTitle,
                 $userId,
                 $created,
@@ -879,7 +883,8 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                 $order,
                 __('Membership access revocation pending', 'fchub-memberships'),
                 sprintf(
-                    __('Order #%d: %d provider revocations are pending recovery.', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Order #%1$d: %2$d provider revocations are pending recovery.', 'fchub-memberships'),
                     $orderId,
                     $pending
                 ),
@@ -897,7 +902,8 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                         : __('Membership access partially revoked', 'fchub-memberships'))
                     : __('Membership access revoke failed', 'fchub-memberships'),
                 sprintf(
-                    __('Order #%d: %d grants revoked, %d scheduled after grace, %d failed. %s', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Order #%1$d: %2$d grants revoked, %3$d scheduled after grace, %4$d failed. %5$s', 'fchub-memberships'),
                     $orderId,
                     $revoked,
                     $graceStarted,
@@ -917,13 +923,15 @@ class MembershipAccessIntegration extends BaseIntegrationManager
                     : __('Membership access revocation scheduled', 'fchub-memberships'),
                 $revoked > 0
                     ? sprintf(
-                        __('Order #%d: %d revoked, %d scheduled after grace.', 'fchub-memberships'),
+                        /* translators: Placeholder values are runtime membership details included in this message. */
+                        __('Order #%1$d: %2$d revoked, %3$d scheduled after grace.', 'fchub-memberships'),
                         $orderId,
                         $revoked,
                         $graceStarted
                     )
                     : sprintf(
-                        __('%d grant(s) scheduled for revocation after grace for order #%d.', 'fchub-memberships'),
+                        /* translators: Placeholder values are runtime membership details included in this message. */
+                        __('%1$d grant(s) scheduled for revocation after grace for order #%2$d.', 'fchub-memberships'),
                         $graceStarted,
                         $orderId
                     )
@@ -934,7 +942,8 @@ class MembershipAccessIntegration extends BaseIntegrationManager
         Logger::orderLog(
             $order,
             __('Membership access revoked', 'fchub-memberships'),
-            sprintf(__('%d grant(s) revoked for order #%d.', 'fchub-memberships'), $revoked, $orderId)
+            /* translators: Placeholder values are runtime membership details included in this message. */
+            sprintf(__('%1$d grant(s) revoked for order #%2$d.', 'fchub-memberships'), $revoked, $orderId)
         );
     }
 

@@ -6,20 +6,20 @@ defined('ABSPATH') || exit;
 
 final class TrialGrantQueryService
 {
-    private \wpdb $wpdb;
+    private \wpdb $database;
     private string $grantsTable;
     private string $plansTable;
 
-    public function __construct(?\wpdb $wpdb = null)
+    public function __construct(?\wpdb $database = null)
     {
-        $this->wpdb = $wpdb ?? $GLOBALS['wpdb'];
-        $this->grantsTable = $this->wpdb->prefix . 'fchub_membership_grants';
-        $this->plansTable = $this->wpdb->prefix . 'fchub_membership_plans';
+        $this->database = $database ?? $GLOBALS['wpdb'];
+        $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'fchub_membership_grants');
+        $this->plansTable = \FChubMemberships\Support\CustomTableDatabase::identifierOn($this->database, $this->database->prefix . 'fchub_membership_plans');
     }
 
     public function getDueTrialExpirations(string $now): array
     {
-        return $this->wpdb->get_results($this->wpdb->prepare(
+        return \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT id, user_id, plan_id, trial_ends_at, source_id, source_ids, meta
              FROM {$this->grantsTable}
              WHERE trial_ends_at IS NOT NULL
@@ -33,7 +33,7 @@ final class TrialGrantQueryService
 
     public function getTrialExpiringSoon(string $now, string $cutoff): array
     {
-        return $this->wpdb->get_results($this->wpdb->prepare(
+        return \FChubMemberships\Support\CustomTableDatabase::getResultsFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT id, user_id, plan_id, trial_ends_at, meta
              FROM {$this->grantsTable}
              WHERE trial_ends_at IS NOT NULL
@@ -49,7 +49,7 @@ final class TrialGrantQueryService
 
     public function findPlanSummary(int $planId): ?object
     {
-        $row = $this->wpdb->get_row($this->wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRowFrom($this->database, \FChubMemberships\Support\CustomTableDatabase::prepareOn($this->database,
             "SELECT title, slug FROM {$this->plansTable} WHERE id = %d",
             $planId
         ));
@@ -59,7 +59,7 @@ final class TrialGrantQueryService
 
     public function markTrialExpiryNotified(int $grantId, array $meta): void
     {
-        $this->wpdb->update(
+        \FChubMemberships\Support\CustomTableDatabase::updateIn($this->database,
             $this->grantsTable,
             ['meta' => wp_json_encode($meta)],
             ['id' => $grantId],

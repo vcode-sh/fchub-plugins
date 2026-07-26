@@ -50,6 +50,7 @@ class FluentCrmAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
             return [
                 'success' => true,
                 'message' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('FluentCRM tag applied: %s', 'fchub-memberships'),
                     $this->getResourceLabel($resourceType, $resourceId)
                 ),
@@ -69,6 +70,7 @@ class FluentCrmAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
             return [
                 'success' => true,
                 'message' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('FluentCRM list assigned: %s', 'fchub-memberships'),
                     $this->getResourceLabel($resourceType, $resourceId)
                 ),
@@ -114,6 +116,7 @@ class FluentCrmAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
             return [
                 'success' => true,
                 'message' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('FluentCRM tag removed: %s', 'fchub-memberships'),
                     $this->getResourceLabel($resourceType, $resourceId)
                 ),
@@ -133,6 +136,7 @@ class FluentCrmAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
             return [
                 'success' => true,
                 'message' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('FluentCRM list removed: %s', 'fchub-memberships'),
                     $this->getResourceLabel($resourceType, $resourceId)
                 ),
@@ -170,11 +174,13 @@ class FluentCrmAdapter implements AccessAdapterInterface, BatchResourceLabelAdap
 
         if ($resourceType === 'fluentcrm_tag') {
             $tag = FluentCrmApi('tags')->find((int) $resourceId);
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return $tag ? $tag->title : sprintf(__('Tag #%s', 'fchub-memberships'), $resourceId);
         }
 
         if ($resourceType === 'fluentcrm_list') {
             $list = FluentCrmApi('lists')->find((int) $resourceId);
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return $list ? $list->title : sprintf(__('List #%s', 'fchub-memberships'), $resourceId);
         }
 

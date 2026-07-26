@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FChubMemberships\Http\Controllers;
 
+use FChubMemberships\Http\MembershipMutationPermission;
 use FChubMemberships\Http\WebhookRestArguments;
 use FChubMemberships\Integration\MembershipSettingsOptionCoordinator;
 use FChubMemberships\Integration\WebhookDeliveryWorker;
@@ -91,7 +92,7 @@ final class WebhookController
 
     public static function permission(\WP_REST_Request $request): bool
     {
-        return current_user_can('manage_options');
+        return current_user_can(MembershipMutationPermission::CAPABILITY);
     }
 
     public static function health(\WP_REST_Request $request): \WP_REST_Response
@@ -445,17 +446,17 @@ final class WebhookController
     private function error(string $code, int $status, ?array $data = null): \WP_REST_Response
     {
         $messages = [
-            'fchub_webhook_delivery_not_found' => 'Webhook delivery was not found.',
-            'fchub_webhook_retry_not_allowed' => 'Webhook delivery cannot be retried in its current state.',
-            'fchub_webhook_cancel_not_allowed' => 'Webhook delivery cannot be stopped in its current state.',
-            'fchub_webhook_retry_schedule_failed' => 'Webhook retry could not be scheduled.',
-            'fchub_webhook_not_ready' => 'Configure safe webhook destinations and a signing secret first.',
-            'fchub_webhook_storage_unavailable' => 'Webhook storage is temporarily unavailable.',
+            'fchub_webhook_delivery_not_found' => __('Webhook delivery was not found.', 'fchub-memberships'),
+            'fchub_webhook_retry_not_allowed' => __('Webhook delivery cannot be retried in its current state.', 'fchub-memberships'),
+            'fchub_webhook_cancel_not_allowed' => __('Webhook delivery cannot be stopped in its current state.', 'fchub-memberships'),
+            'fchub_webhook_retry_schedule_failed' => __('Webhook retry could not be scheduled.', 'fchub-memberships'),
+            'fchub_webhook_not_ready' => __('Configure safe webhook destinations and a signing secret first.', 'fchub-memberships'),
+            'fchub_webhook_storage_unavailable' => __('Webhook storage is temporarily unavailable.', 'fchub-memberships'),
         ];
 
         $response = [
             'code' => $code,
-            'message' => __($messages[$code] ?? 'Webhook operation failed.', 'fchub-memberships'),
+            'message' => $messages[$code] ?? __('Webhook operation failed.', 'fchub-memberships'),
         ];
         if ($data !== null) {
             $response['data'] = $data;

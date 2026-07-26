@@ -31,7 +31,7 @@ class StatusTransitionValidator
     {
         if (!self::isValid($from, $to)) {
             throw new \InvalidArgumentException(
-                sprintf('Invalid status transition from "%s" to "%s"', $from, $to)
+                sprintf('Invalid status transition from "%s" to "%s"', esc_html($from), esc_html($to))
             );
         }
     }

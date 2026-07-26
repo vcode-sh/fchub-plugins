@@ -24,10 +24,10 @@ class ContentPopularityReport
         $this->planRepo = new PlanRepository();
         $this->ruleRepo = new PlanRuleRepository();
         $this->dripRepo = new DripScheduleRepository();
-        $this->grantsTable = $wpdb->prefix . 'fchub_membership_grants';
-        $this->rulesTable = $wpdb->prefix . 'fchub_membership_plan_rules';
-        $this->plansTable = $wpdb->prefix . 'fchub_membership_plans';
-        $this->dripTable = $wpdb->prefix . 'fchub_membership_drip_notifications';
+        $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
+        $this->rulesTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plan_rules');
+        $this->plansTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
+        $this->dripTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_drip_notifications');
     }
 
     /**
@@ -42,7 +42,7 @@ class ContentPopularityReport
         $range = $this->resolveRange($from, $to);
         $now = $range['to'];
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT
                 g.provider,
                 g.resource_type,
@@ -88,7 +88,7 @@ class ContentPopularityReport
         global $wpdb;
         $now = current_time('mysql');
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT
                 r.provider,
                 r.resource_type,
@@ -134,12 +134,14 @@ class ContentPopularityReport
         $now = current_time('mysql');
 
         // Get plans that have drip rules
-        $plansWithDrip = $wpdb->get_results(
-            "SELECT r.plan_id, p.title AS plan_title, COUNT(*) AS drip_count
+        $plansWithDrip = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT r.plan_id, p.title AS plan_title, COUNT(*) AS drip_count
              FROM {$this->rulesTable} r
              LEFT JOIN {$this->plansTable} p ON r.plan_id = p.id
-             WHERE r.drip_type != 'immediate'
+             WHERE r.drip_type != %s
              GROUP BY r.plan_id, p.title",
+                'immediate',
+            ),
             ARRAY_A
         );
 
@@ -150,7 +152,7 @@ class ContentPopularityReport
             $totalDripItems = (int) $planRow['drip_count'];
 
             // Count users who have all drip items unlocked (drip_available_at in the past or null)
-            $totalMembers = (int) $wpdb->get_var($wpdb->prepare(
+            $totalMembers = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT COUNT(DISTINCT user_id) FROM {$this->grantsTable}
                  WHERE plan_id = %d AND status = 'active'",
                 $planId
@@ -169,7 +171,7 @@ class ContentPopularityReport
             }
 
             // Members who have unlocked all drip content for this plan
-            $membersCompleted = (int) $wpdb->get_var($wpdb->prepare(
+            $membersCompleted = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT COUNT(*) FROM (
                     SELECT user_id
                     FROM {$this->grantsTable}
@@ -208,8 +210,8 @@ class ContentPopularityReport
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results(
-            "SELECT
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT
                 r.provider,
                 r.resource_type,
                 r.resource_id,
@@ -217,10 +219,12 @@ class ContentPopularityReport
                 GROUP_CONCAT(DISTINCT p.title SEPARATOR '||') AS plan_titles
              FROM {$this->rulesTable} r
              LEFT JOIN {$this->plansTable} p ON r.plan_id = p.id
-             WHERE r.resource_id != '*'
+             WHERE r.resource_id != %s
              GROUP BY r.provider, r.resource_type, r.resource_id
              HAVING plan_count > 1
              ORDER BY plan_count DESC",
+                '*',
+            ),
             ARRAY_A
         );
 

@@ -65,7 +65,7 @@ final class Constants
         'geo_enabled'                 => 'no',
         'geo_provider'                => 'ip_api',
         'geo_api_key'                 => '',
-        'rate_provider'               => 'exchange_rate_api',
+        'rate_provider'               => 'manual',
         'rate_provider_api_key'       => '',
         'rate_refresh_interval_hrs'   => 6,
         'stale_threshold_hrs'         => 24,

@@ -1,0 +1,18 @@
+{
+  "slug": "fchub-fakturownia",
+  "version": "1.1.2",
+  "sha256": "61ccf2de3c44d29ddb06ad550a899faa6106b06c9f1a13c946ee0090a89cfbdc",
+  "fileCount": 20,
+  "compressedBytes": 35388,
+  "uncompressedBytes": 98499,
+  "checks": [
+    "archive-paths",
+    "required-files",
+    "forbidden-files",
+    "text-safety",
+    "headers",
+    "readme",
+    "php-entrypoints",
+    "size"
+  ]
+}

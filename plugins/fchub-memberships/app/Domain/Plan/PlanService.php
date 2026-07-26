@@ -120,21 +120,21 @@ class PlanService
         // Cascade: delete drip notifications for this plan's rules
         $ruleIds = array_column($this->ruleRepo->getByPlanId($id), 'id');
         if (!empty($ruleIds)) {
-            $dripTable = $wpdb->prefix . 'fchub_membership_drip_notifications';
+            $dripTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_drip_notifications');
             $placeholders = implode(',', array_fill(0, count($ruleIds), '%d'));
-            $wpdb->query($wpdb->prepare(
+            \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "DELETE FROM {$dripTable} WHERE plan_rule_id IN ({$placeholders})",
                 ...$ruleIds
             ));
         }
 
         // Cascade: remove plan from protection rules' plan_ids
-        $protectionTable = $wpdb->prefix . 'fchub_membership_protection_rules';
-        $rows = $wpdb->get_results($wpdb->prepare("SELECT id, plan_ids FROM {$protectionTable} WHERE plan_ids LIKE %s", '%' . $wpdb->esc_like('"' . $id . '"') . '%'), ARRAY_A);
+        $protectionTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_protection_rules');
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare("SELECT id, plan_ids FROM {$protectionTable} WHERE plan_ids LIKE %s", '%' . $wpdb->esc_like('"' . $id . '"') . '%'), ARRAY_A);
         foreach ($rows as $row) {
             $planIds = json_decode($row['plan_ids'] ?? '[]', true) ?: [];
             $planIds = array_values(array_filter($planIds, fn($pid) => (int) $pid !== $id));
-            $wpdb->update($protectionTable, ['plan_ids' => wp_json_encode($planIds)], ['id' => $row['id']]);
+            \FChubMemberships\Support\CustomTableDatabase::update($protectionTable, ['plan_ids' => wp_json_encode($planIds)], ['id' => $row['id']]);
         }
 
         $this->ruleRepo->deleteByPlanId($id);

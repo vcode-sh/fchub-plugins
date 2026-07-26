@@ -159,8 +159,8 @@ class CheckoutUrlHelper
             return null;
         }
 
-        $metaTable = $wpdb->prefix . 'fct_product_meta';
-        $feeds = $wpdb->get_results($wpdb->prepare(
+        $metaTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_product_meta');
+        $feeds = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT object_id AS product_id, meta_value FROM {$metaTable}
              WHERE object_type = 'product_integration' AND meta_key = %s",
             'memberships'
@@ -197,8 +197,8 @@ class CheckoutUrlHelper
     {
         global $wpdb;
 
-        $detailsTable = $wpdb->prefix . 'fct_product_details';
-        $detail = $wpdb->get_row($wpdb->prepare(
+        $detailsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_product_details');
+        $detail = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT default_variation_id FROM {$detailsTable} WHERE post_id = %d",
             $productId
         ), ARRAY_A);
@@ -208,8 +208,8 @@ class CheckoutUrlHelper
         }
 
         // Fall back to the first variant
-        $variationsTable = $wpdb->prefix . 'fct_product_variations';
-        $variantId = $wpdb->get_var($wpdb->prepare(
+        $variationsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_product_variations');
+        $variantId = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT id FROM {$variationsTable} WHERE post_id = %d ORDER BY serial_index ASC LIMIT 1",
             $productId
         ));

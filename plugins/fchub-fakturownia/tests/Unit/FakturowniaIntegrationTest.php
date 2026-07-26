@@ -155,6 +155,7 @@ final class FakturowniaIntegrationTest extends PluginTestCase
 
     public function testRevokeHookTriggersRefund(): void
     {
+        $this->setSettings();
         $integration = $this->createIntegration();
         $this->mockSuccessfulApi();
 

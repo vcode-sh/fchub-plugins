@@ -15,6 +15,7 @@ final class EventLogRepository
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_EVENT_LOG;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- $wpdb->insert is the WordPress CRUD API for the plugin-owned event log.
         $wpdb->insert($table, [
             'event'      => $event,
             'user_id'    => $userId,
@@ -35,9 +36,11 @@ final class EventLogRepository
         $limit = max(1, $limit);
         $offset = max(0, $offset);
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- GDPR export pagination must read the current append-only event log.
         return $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE user_id = %d ORDER BY created_at DESC LIMIT %d OFFSET %d",
+                "SELECT * FROM %i WHERE user_id = %d ORDER BY created_at DESC LIMIT %d OFFSET %d",
+                $table,
                 $userId,
                 $limit,
                 $offset,
@@ -50,6 +53,7 @@ final class EventLogRepository
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_EVENT_LOG;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- $wpdb->delete is the WordPress CRUD API; this GDPR write has no query result cache.
         return (int) $wpdb->delete($table, ['user_id' => $userId], ['%d']);
     }
 
@@ -61,7 +65,11 @@ final class EventLogRepository
         global $wpdb;
         $table = $wpdb->prefix . Constants::TABLE_EVENT_LOG;
 
-        $rows = $wpdb->get_results("SELECT event, COUNT(*) AS total FROM {$table} GROUP BY event");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Diagnostics totals intentionally reflect the current append-only event log.
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT event, COUNT(*) AS total FROM %i GROUP BY event",
+            $table,
+        ));
         $counts = [];
 
         foreach ($rows as $row) {
@@ -84,9 +92,11 @@ final class EventLogRepository
         $table = $wpdb->prefix . Constants::TABLE_EVENT_LOG;
         $limit = max(1, $limit);
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Diagnostics rankings intentionally reflect the current append-only event log.
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT payload FROM {$table} WHERE event = %s ORDER BY created_at DESC LIMIT %d",
+                "SELECT payload FROM %i WHERE event = %s ORDER BY created_at DESC LIMIT %d",
+                $table,
                 $event,
                 200,
             ),

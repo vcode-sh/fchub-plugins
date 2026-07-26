@@ -17,7 +17,7 @@ class MutationRequestRepository
     {
         global $wpdb;
 
-        $this->table = $wpdb->prefix . 'fchub_membership_mutation_requests';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_mutation_requests');
         $this->clock = $clock ?? new Clock(null, new \DateTimeZone('UTC'));
     }
 
@@ -25,7 +25,7 @@ class MutationRequestRepository
     {
         global $wpdb;
 
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE request_key = %s",
             $key
         ), ARRAY_A);
@@ -59,7 +59,7 @@ class MutationRequestRepository
             $previousSuppression = (bool) $wpdb->suppress_errors(true);
         }
         try {
-            $inserted = $wpdb->insert($this->table, [
+            $inserted = \FChubMemberships\Support\CustomTableDatabase::insert($this->table, [
                 'request_key' => $key,
                 'fingerprint' => $fingerprint,
                 'user_id' => $userId,
@@ -87,19 +87,19 @@ class MutationRequestRepository
         $oldToken = $existing['lease_token'] ?? null;
         $oldLease = $existing['lease_expires_at'] ?? null;
         $tokenCondition = is_string($oldToken) && $oldToken !== ''
-            ? $wpdb->prepare('lease_token = %s', $oldToken)
+            ? \FChubMemberships\Support\CustomTableDatabase::prepare('lease_token = %s', $oldToken)->sql()
             : 'lease_token IS NULL';
         if ($oldLease === null || $oldLease === '') {
             $leaseCondition = 'lease_expires_at IS NULL';
         } else {
-            $leaseCondition = $wpdb->prepare(
+            $leaseCondition = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 'lease_expires_at = %s AND lease_expires_at <= %s',
                 (string) $oldLease,
                 $now
-            );
+            )->sql();
         }
 
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET lease_token = %s,
                  lease_expires_at = %s,
@@ -145,7 +145,7 @@ class MutationRequestRepository
 
         $limit = max(1, min(100, $limit));
         $cutoff = $this->clock->storage($this->clock->plusDays(-$days));
-        $deleted = $wpdb->query($wpdb->prepare(
+        $deleted = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "DELETE FROM {$this->table}
              WHERE id IN (
                 SELECT id FROM (
@@ -183,7 +183,7 @@ class MutationRequestRepository
         }
 
         $now = $this->storageNow();
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = %s,
                  response_status = %d,

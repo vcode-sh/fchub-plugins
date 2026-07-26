@@ -89,9 +89,12 @@ class Przelewy24Handler
 
         // Add selected payment method (bank, BLIK, etc.) — not applicable for subscription initial payments
         if (!$isSubscription) {
+            // FluentCart verifies the checkout request before invoking the gateway.
+            // phpcs:disable WordPress.Security.NonceVerification.Missing
             $selectedMethod = isset($_POST['fchub_p24_selected_method'])
-                ? (int) sanitize_text_field($_POST['fchub_p24_selected_method'])
+                ? (int) sanitize_text_field(wp_unslash($_POST['fchub_p24_selected_method']))
                 : 0;
+            // phpcs:enable WordPress.Security.NonceVerification.Missing
 
             if ($selectedMethod > 0) {
                 $params['method'] = $selectedMethod;
@@ -111,7 +114,7 @@ class Przelewy24Handler
         $response = $this->api->registerTransaction($params);
 
         if (isset($response['error'])) {
-            fluent_cart_error_log('P24 Registration Error', json_encode($response), [
+            fluent_cart_error_log('P24 Registration Error', 'Przelewy24 rejected the registration request.', [
                 'module_id'   => $order->id,
                 'module_name' => 'Order',
             ]);
@@ -223,6 +226,7 @@ class Przelewy24Handler
     private function buildDescription(object $order): string
     {
         $ref = $order->invoice_no ?: $order->id;
+        // Translators: %s is the FluentCart order reference.
         $desc = sprintf(__('Order #%s', 'fchub-p24'), $ref);
 
         $items = $order->order_items ?? null;
@@ -295,10 +299,14 @@ class Przelewy24Handler
 
     private function buildPsuData(): array
     {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        $ip = isset($_SERVER['REMOTE_ADDR'])
+            ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR']))
+            : '';
 
         // Use X-Forwarded-For only when REMOTE_ADDR is a known proxy/private IP
-        $forwarded = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
+        $forwarded = isset($_SERVER['HTTP_X_FORWARDED_FOR'])
+            ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_FORWARDED_FOR']))
+            : '';
         if (!empty($forwarded)) {
             // Take the rightmost IP (last proxy-appended entry, not client-controlled)
             $parts = array_map('trim', explode(',', $forwarded));
@@ -311,7 +319,9 @@ class Przelewy24Handler
 
         $psu = ['IP' => $ip];
 
-        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $ua = isset($_SERVER['HTTP_USER_AGENT'])
+            ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT']))
+            : '';
         if (!empty($ua)) {
             $psu['userAgent'] = mb_substr($ua, 0, 255);
         }

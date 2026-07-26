@@ -6,6 +6,7 @@ node_modules/
 tests/
 docs/
 .phpunit.cache/
+.phpunit.result.cache
 composer.json
 composer.lock
 phpunit.xml

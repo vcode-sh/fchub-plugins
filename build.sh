@@ -25,6 +25,14 @@ ALL_PLUGINS=(
     "cartshift|cartshift.php"
 )
 
+WORDPRESS_ORG_PLUGINS=(
+    "fchub-p24"
+    "fchub-fakturownia"
+    "fchub-memberships"
+    "fchub-wishlist"
+    "fchub-multi-currency"
+)
+
 # Discontinued, but still buildable on purpose.
 #
 # Stream's source and tooling stay in the repository — the project may return,
@@ -57,6 +65,19 @@ human_size() {
     elif (( bytes >= 1024 ));    then printf "%.1f KB" "$(echo "scale=1; $bytes/1024" | bc)"
     else printf "%d B" "$bytes"
     fi
+}
+
+is_wordpress_org_plugin() {
+    local candidate="$1"
+    local wordpress_org_slug=""
+
+    for wordpress_org_slug in "${WORDPRESS_ORG_PLUGINS[@]}"; do
+        if [ "$wordpress_org_slug" = "$candidate" ]; then
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 usage() {
@@ -306,19 +327,30 @@ fi
 # used to copy a file into every plugin directory in the repository, including
 # discontinued Stream, which nobody asked it to touch — and the lifecycle
 # harness runs exactly that command on every default run.
-info "Syncing GitHubUpdater into plugins ..."
+updater_sync_count=0
 for entry in "${PLUGINS[@]}"; do
     IFS='|' read -r sync_slug _ <<< "$entry"
+
+    if is_wordpress_org_plugin "$sync_slug"; then
+        continue
+    fi
 
     sync_dir="$PLUGINS_DIR/$sync_slug"
 
     if [ -d "$sync_dir" ]; then
         mkdir -p "$sync_dir/lib"
         cp "$ROOT_DIR/lib/GitHubUpdater.php" "$sync_dir/lib/GitHubUpdater.php"
+        updater_sync_count=$((updater_sync_count + 1))
     fi
 done
-success "GitHubUpdater synced"
-echo ""
+if [ "$updater_sync_count" -gt 0 ]; then
+    if [ "$updater_sync_count" -eq 1 ]; then
+        success "GitHubUpdater synced into 1 plugin"
+    else
+        success "GitHubUpdater synced into $updater_sync_count plugins"
+    fi
+    echo ""
+fi
 
 if [ -z "$FILTER_SLUG" ] && [ -d "$DIST_DIR" ]; then
     info "Cleaning previous dist/ ..."
@@ -460,6 +492,15 @@ for entry in "${PLUGINS[@]}"; do
     rm -f "$zip_path.sha256"
     write_checksum "$zip_path"
     success "Created $zip_name.sha256"
+
+    if is_wordpress_org_plugin "$slug"; then
+        inspection_path="$DIST_DIR/${slug}-${version}.inspection.json"
+        info "Inspecting the WordPress.org archive contract ..."
+        if ! node "$ROOT_DIR/scripts/wporg/check-package.mjs" "$zip_path" "$slug" > "$inspection_path"; then
+            error "WordPress.org package inspection failed — see $inspection_path"
+        fi
+        success "Created $(basename "$inspection_path")"
+    fi
 
     BUILT_ZIPS+=("$zip_path")
 

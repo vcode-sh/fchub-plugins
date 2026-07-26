@@ -1,4 +1,5 @@
 <?php
+
 /**
  * FCHub - Przelewy24 Uninstall
  *
@@ -7,31 +8,32 @@
 
 defined('WP_UNINSTALL_PLUGIN') || exit;
 
-// Delete gateway settings from FluentCart's fct_meta table
-global $wpdb;
-$meta_table = $wpdb->prefix . 'fct_meta';
-if ($wpdb->get_var("SHOW TABLES LIKE '{$meta_table}'") === $meta_table) {
-    $wpdb->delete($meta_table, [
-        'meta_key'    => 'fluent_cart_payment_settings_przelewy24',
-        'object_type' => 'option',
-    ]);
+// Delete gateway settings through FluentCart's data layer.
+if (class_exists(\FluentCart\App\Models\Meta::class)) {
+    \FluentCart\App\Models\Meta::query()
+        ->where('meta_key', 'fluent_cart_payment_settings_przelewy24')
+        ->where('object_type', 'option')
+        ->delete();
 }
 
-// Delete cached payment methods transients
+// Delete cached payment methods transients.
 delete_transient('fchub_p24_methods_pl_test');
 delete_transient('fchub_p24_methods_en_test');
 delete_transient('fchub_p24_methods_pl_live');
 delete_transient('fchub_p24_methods_en_live');
 
-// Clean up Action Scheduler entries
+// Clean up Action Scheduler entries.
 if (function_exists('as_unschedule_all_actions')) {
-    as_unschedule_all_actions('fchub_p24_process_renewal');
+    as_unschedule_all_actions('fchub_p24_process_renewal', [], 'fchub-p24');
 }
 
-// Clean up order meta
-$meta_table = $wpdb->prefix . 'fct_order_meta';
-if ($wpdb->get_var("SHOW TABLES LIKE '{$meta_table}'") === $meta_table) {
-    $wpdb->query(
-        "DELETE FROM `{$meta_table}` WHERE `meta_key` LIKE '_p24\_%' OR `meta_key` = 'p24_session_id'"
-    );
+// Delete plugin-owned order metadata through FluentCart's data layer.
+if (class_exists(\FluentCart\App\Models\OrderMeta::class)) {
+    \FluentCart\App\Models\OrderMeta::query()
+        ->where(function ($query) {
+            $query
+                ->where('meta_key', 'like', '_p24_%')
+                ->orWhere('meta_key', 'p24_session_id');
+        })
+        ->delete();
 }

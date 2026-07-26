@@ -3,7 +3,9 @@
     "description": "FCHub Memberships plugin development tooling",
     "license": "GPL-2.0-or-later",
     "type": "project",
-    "require": {},
+    "require": {
+        "php": ">=8.3"
+    },
     "require-dev": {
         "phpunit/phpunit": "^13.0"
     },

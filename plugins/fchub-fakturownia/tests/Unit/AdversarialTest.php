@@ -34,6 +34,65 @@ final class AdversarialTest extends PluginTestCase
         return new InvoiceHandler(new FakturowniaAPI('testfirma', 'test-token'));
     }
 
+    public function testInvalidDomainIsRejectedBeforeTransport(): void
+    {
+        $transportCalled = false;
+        $this->mockApiHandler(function () use (&$transportCalled) {
+            $transportCalled = true;
+
+            return [
+                'response' => ['code' => 200],
+                'body'     => json_encode(['id' => 1]),
+                'headers'  => [],
+            ];
+        });
+
+        $result = (new FakturowniaAPI('https://attacker.example', 'secret'))->getInvoice(1);
+
+        $this->assertFalse($transportCalled);
+        $this->assertArrayHasKey('error', $result);
+        $this->assertStringNotContainsString('secret', $result['error']);
+    }
+
+    public function testNetworkErrorsRedactSecretsUrlsAndMarkup(): void
+    {
+        $secret = 'top-secret-token';
+        $this->mockApiHandler(
+            fn () => new \WP_Error(
+                'http_error',
+                '<b>Failure</b> at https://test.fakturownia.pl/invoices.json?api_token=' . $secret
+            )
+        );
+
+        $result = (new FakturowniaAPI('test', $secret))->getInvoice(1);
+
+        $this->assertArrayHasKey('error', $result);
+        $this->assertStringNotContainsString($secret, $result['error']);
+        $this->assertStringNotContainsString('https://', $result['error']);
+        $this->assertStringNotContainsString('<b>', $result['error']);
+        $this->assertLessThanOrEqual(500, strlen($result['error']));
+    }
+
+    public function testProviderErrorsAreSanitisedAndBounded(): void
+    {
+        $secret = 'top-secret-token';
+        $providerMessage = '<script>alert(1)</script> https://example.test/?api_token='
+            . $secret . ' ' . str_repeat('failure ', 200);
+
+        $this->mockApiHandler(fn () => [
+            'response' => ['code' => 422],
+            'body'     => json_encode(['error' => $providerMessage]),
+            'headers'  => ['content-type' => 'application/json'],
+        ]);
+
+        $result = (new FakturowniaAPI('test', $secret))->createInvoice([]);
+
+        $this->assertStringNotContainsString($secret, $result['error']);
+        $this->assertStringNotContainsString('https://', $result['error']);
+        $this->assertStringNotContainsString('<script>', $result['error']);
+        $this->assertLessThanOrEqual(500, strlen($result['error']));
+    }
+
     // ──────────────────────────────────────────────────────────
     // BUG 1/2/3 combo: Everything null at once
     // ──────────────────────────────────────────────────────────

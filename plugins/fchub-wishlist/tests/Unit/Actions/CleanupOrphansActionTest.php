@@ -35,7 +35,6 @@ class CleanupOrphansActionTest extends TestCase
 
         $this->assertSame(2, $deleted);
         $this->assertQueryContains('SELECT DISTINCT wi.wishlist_id');
-        $this->assertQueryContains('COUNT(*) FROM wp_fchub_wishlist_items');
+        $this->assertQueryContains('COUNT(*) FROM `wp_fchub_wishlist_items`');
     }
 }
-

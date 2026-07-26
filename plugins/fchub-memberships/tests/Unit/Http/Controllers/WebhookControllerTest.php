@@ -10,7 +10,7 @@ use FChubMemberships\Tests\Unit\PluginTestCase;
 
 final class WebhookControllerTest extends PluginTestCase
 {
-    public function test_registers_exact_routes_with_manage_options_permission_and_frozen_arguments(): void
+    public function test_registers_exact_routes_with_memberships_permission_and_frozen_arguments(): void
     {
         WebhookController::registerRoutes();
 
@@ -34,8 +34,8 @@ final class WebhookControllerTest extends PluginTestCase
             'manage_options' => false,
             'manage_fchub_memberships' => true,
         ];
-        self::assertFalse(WebhookController::permission(new \WP_REST_Request()));
-        self::assertContains('manage_options', $GLOBALS['_fchub_test_current_user_can_checks']);
+        self::assertTrue(WebhookController::permission(new \WP_REST_Request()));
+        self::assertContains('manage_fchub_memberships', $GLOBALS['_fchub_test_current_user_can_checks']);
     }
 
     public function test_health_is_flat_redacted_and_reports_degraded_from_retry_state(): void

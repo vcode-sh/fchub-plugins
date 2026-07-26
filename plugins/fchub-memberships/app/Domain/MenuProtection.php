@@ -234,8 +234,12 @@ class MenuProtection
      */
     public function saveMenuItemFields(int $menuId, int $menuItemId): void
     {
-        if (!isset($_POST['_fchub_menu_nonce_' . $menuItemId])
-            || !wp_verify_nonce($_POST['_fchub_menu_nonce_' . $menuItemId], 'fchub_menu_protection_' . $menuItemId)
+        $nonceKey = '_fchub_menu_nonce_' . $menuItemId;
+        $nonce = isset($_POST[$nonceKey])
+            ? sanitize_text_field(wp_unslash($_POST[$nonceKey]))
+            : '';
+        if ($nonce === ''
+            || !wp_verify_nonce($nonce, 'fchub_menu_protection_' . $menuItemId)
         ) {
             return;
         }
@@ -247,7 +251,9 @@ class MenuProtection
         $isRestricted = !empty($_POST['fchub_menu_restrict'][$menuItemId]);
 
         if ($isRestricted) {
-            $visibility = sanitize_text_field($_POST['fchub_menu_visibility'][$menuItemId] ?? 'members_only');
+            $visibility = isset($_POST['fchub_menu_visibility'][$menuItemId])
+                ? sanitize_text_field(wp_unslash($_POST['fchub_menu_visibility'][$menuItemId]))
+                : 'members_only';
             $allowedVisibilities = ['members_only', 'non_members_only', 'specific_plans', 'logged_in', 'logged_out'];
             if (!in_array($visibility, $allowedVisibilities, true)) {
                 $visibility = 'members_only';
@@ -255,11 +261,15 @@ class MenuProtection
 
             $planIds = [];
             if ($visibility === 'specific_plans' && isset($_POST['fchub_menu_plans'][$menuItemId])) {
-                $planIds = array_map('intval', (array) $_POST['fchub_menu_plans'][$menuItemId]);
+                $planIds = array_map('intval', (array) wp_unslash($_POST['fchub_menu_plans'][$menuItemId]));
             }
 
-            $replacementText = sanitize_text_field($_POST['fchub_menu_replacement_text'][$menuItemId] ?? '');
-            $replacementUrl = sanitize_text_field($_POST['fchub_menu_replacement_url'][$menuItemId] ?? '');
+            $replacementText = isset($_POST['fchub_menu_replacement_text'][$menuItemId])
+                ? sanitize_text_field(wp_unslash($_POST['fchub_menu_replacement_text'][$menuItemId]))
+                : '';
+            $replacementUrl = isset($_POST['fchub_menu_replacement_url'][$menuItemId])
+                ? esc_url_raw(wp_unslash($_POST['fchub_menu_replacement_url'][$menuItemId]))
+                : '';
 
             $meta = [
                 'visibility' => $visibility,

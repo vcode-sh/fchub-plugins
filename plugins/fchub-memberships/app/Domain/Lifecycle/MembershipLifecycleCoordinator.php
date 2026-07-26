@@ -512,7 +512,7 @@ class MembershipLifecycleCoordinator
         $object = $payload[$key] ?? null;
         $id = is_object($object) ? $this->positiveId($object->id ?? null) : 0;
         if ($id <= 0) {
-            throw new \InvalidArgumentException("Lifecycle payload {$key} ID is invalid.");
+            throw new \InvalidArgumentException(sprintf('Lifecycle payload %s ID is invalid.', esc_html($key)));
         }
         return $id;
     }

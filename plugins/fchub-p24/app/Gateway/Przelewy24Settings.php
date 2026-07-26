@@ -44,7 +44,7 @@ class Przelewy24Settings extends BaseGatewaySettings
 
     public function getMode()
     {
-        return (new StoreSettings)->get('order_mode');
+        return (new StoreSettings())->get('order_mode');
     }
 
     public function get($key = '')
@@ -114,6 +114,14 @@ class Przelewy24Settings extends BaseGatewaySettings
         return defined('FCHUB_P24_LIVE_API_KEY')
             ? FCHUB_P24_LIVE_API_KEY
             : ($this->get('live_api_key') ?: '');
+    }
+
+    public function hasCompleteCredentials(): bool
+    {
+        return $this->getMerchantId() !== ''
+            && $this->getShopId() !== ''
+            && $this->getCrcKey() !== ''
+            && $this->getApiKey() !== '';
     }
 
     public function getChannel(): int

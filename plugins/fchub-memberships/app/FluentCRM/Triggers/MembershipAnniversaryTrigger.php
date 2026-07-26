@@ -180,12 +180,12 @@ class MembershipAnniversaryTrigger extends BaseTrigger
         $grantRepo = new GrantRepository();
 
         global $wpdb;
-        $table = $wpdb->prefix . 'fchub_membership_grants';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
 
         $milestones = [30, 60, 90, 180, 365, 730];
 
         foreach ($milestones as $days) {
-            $rows = $wpdb->get_results($wpdb->prepare(
+            $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT * FROM {$table}
                  WHERE status = 'active'
                    AND DATEDIFF(NOW(), created_at) = %d",

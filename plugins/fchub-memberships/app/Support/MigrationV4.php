@@ -11,7 +11,7 @@ final class MigrationV4
     {
         global $wpdb;
 
-        $table = $wpdb->prefix . 'fchub_membership_event_locks';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_event_locks');
         $columns = [
             'state' => "VARCHAR(20) NOT NULL DEFAULT 'processing' AFTER error",
             'owner_token' => 'VARCHAR(64) DEFAULT NULL AFTER state',
@@ -26,16 +26,25 @@ final class MigrationV4
 
         foreach ($columns as $column => $definition) {
             if (!self::columnExists($table, $column)) {
-                if ($wpdb->query("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}") === false) {
+                if (\FChubMemberships\Support\CustomTableDatabase::query(
+                    \FChubMemberships\Support\CustomTableDatabase::prepare(
+                        "ALTER TABLE %i ADD COLUMN %i {$definition}",
+                        $table,
+                        $column,
+                    ),
+                ) === false) {
                     return ["event_locks: failed adding V4 column {$column}"];
                 }
             }
         }
 
-        $unknownLegacyResults = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$table}
+        $unknownLegacyResults = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT COUNT(*) FROM {$table}
              WHERE updated_at IS NULL
-               AND (result IS NULL OR result NOT IN ('success', 'failed'))"
+               AND (result IS NULL OR result NOT IN (%s, %s))",
+                'success',
+                'failed',
+            )
         );
         if ($unknownLegacyResults > 0) {
             return ['event_locks: unknown legacy result values prevent safe V4 mapping'];
@@ -43,7 +52,7 @@ final class MigrationV4
 
         $clock = new Clock();
         $now = $clock->storage($clock->now());
-        $mappedSuccess = $wpdb->query($wpdb->prepare(
+        $mappedSuccess = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$table}
              SET state = 'succeeded',
                  owner_token = NULL,
@@ -64,7 +73,7 @@ final class MigrationV4
             return ['event_locks: failed mapping legacy success rows'];
         }
 
-        $mappedFailures = $wpdb->query($wpdb->prepare(
+        $mappedFailures = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$table}
              SET state = 'failed',
                  owner_token = NULL,
@@ -86,19 +95,22 @@ final class MigrationV4
             return ['event_locks: failed mapping legacy failed rows'];
         }
 
-        $unmappedLegacyResults = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$table}
+        $unmappedLegacyResults = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT COUNT(*) FROM {$table}
              WHERE updated_at IS NULL
-               AND result IN ('success', 'failed')
+               AND result IN (%s, %s)
                AND state = 'processing'
                AND owner_token IS NULL
-               AND lease_expires_at IS NULL"
+               AND lease_expires_at IS NULL",
+                'success',
+                'failed',
+            )
         );
         if ($unmappedLegacyResults > 0) {
             return ['event_locks: legacy result rows remain unmapped after V4 mapping'];
         }
 
-        $backfilledTimestamps = $wpdb->query($wpdb->prepare(
+        $backfilledTimestamps = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$table}
              SET updated_at = COALESCE(updated_at, processed_at, %s)
              WHERE updated_at IS NULL",
@@ -108,7 +120,12 @@ final class MigrationV4
             return ['event_locks: failed backfilling updated_at'];
         }
 
-        if ($wpdb->query("ALTER TABLE {$table} MODIFY COLUMN updated_at DATETIME NOT NULL") === false) {
+        if (\FChubMemberships\Support\CustomTableDatabase::query(
+            \FChubMemberships\Support\CustomTableDatabase::prepare(
+                'ALTER TABLE %i MODIFY COLUMN updated_at DATETIME NOT NULL',
+                $table,
+            ),
+        ) === false) {
             return ['event_locks: failed enforcing updated_at NOT NULL'];
         }
 
@@ -118,7 +135,13 @@ final class MigrationV4
         ];
         foreach ($indexes as $name => $columnsSql) {
             if (!self::indexExists($table, $name)) {
-                if ($wpdb->query("ALTER TABLE {$table} ADD INDEX {$name} ({$columnsSql})") === false) {
+                if (\FChubMemberships\Support\CustomTableDatabase::query(
+                    \FChubMemberships\Support\CustomTableDatabase::prepare(
+                        "ALTER TABLE %i ADD INDEX %i ({$columnsSql})",
+                        $table,
+                        $name,
+                    ),
+                ) === false) {
                     return ["event_locks: failed adding index {$name}"];
                 }
             }
@@ -131,7 +154,7 @@ final class MigrationV4
     {
         global $wpdb;
 
-        return !empty($wpdb->get_results($wpdb->prepare(
+        return !empty(\FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SHOW COLUMNS FROM {$table} LIKE %s",
             $column
         ), ARRAY_A));
@@ -141,7 +164,7 @@ final class MigrationV4
     {
         global $wpdb;
 
-        return !empty($wpdb->get_results($wpdb->prepare(
+        return !empty(\FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SHOW INDEX FROM {$table} WHERE Key_name = %s",
             $index
         ), ARRAY_A));

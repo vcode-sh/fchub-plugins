@@ -19,7 +19,7 @@ class AuditLogger
         $alternativeAction = $action === 'renewal_validity_extended'
             ? 'renewal_successor_created'
             : $action;
-        $count = $wpdb->get_var($wpdb->prepare(
+        $count = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_audit_log
              WHERE entity_type = %s
                AND entity_id = %d
@@ -50,7 +50,7 @@ class AuditLogger
     ): void {
         global $wpdb;
 
-        $inserted = $wpdb->insert($wpdb->prefix . 'fchub_membership_audit_log', [
+        $inserted = \FChubMemberships\Support\CustomTableDatabase::insert($wpdb->prefix . 'fchub_membership_audit_log', [
             'entity_type' => $entityType,
             'entity_id' => $entityId,
             'action' => $action,
@@ -79,10 +79,10 @@ class AuditLogger
     ): void {
         global $wpdb;
 
-        $table = $wpdb->prefix . 'fchub_membership_audit_log';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_audit_log');
         $now = current_time('mysql');
 
-        $wpdb->insert($table, [
+        \FChubMemberships\Support\CustomTableDatabase::insert($table, [
             'entity_type' => $entityType,
             'entity_id'   => $entityId,
             'action'      => $action,

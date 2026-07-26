@@ -68,6 +68,7 @@ class WordPressContentAdapter implements AccessAdapterInterface, BatchResourceLa
             if ($term && !is_wp_error($term)) {
                 return $term->name;
             }
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return sprintf(__('Term #%s', 'fchub-memberships'), $resourceId);
         }
 
@@ -76,6 +77,7 @@ class WordPressContentAdapter implements AccessAdapterInterface, BatchResourceLa
             return $title;
         }
 
+        /* translators: Placeholder values are runtime membership details included in this message. */
         return sprintf(__('Post #%s', 'fchub-memberships'), $resourceId);
     }
 
@@ -107,6 +109,7 @@ class WordPressContentAdapter implements AccessAdapterInterface, BatchResourceLa
             }
             foreach ($labels as $id => $label) {
                 if ($label === '') {
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     $labels[$id] = sprintf(__('Term #%s', 'fchub-memberships'), $id);
                 }
             }
@@ -136,6 +139,7 @@ class WordPressContentAdapter implements AccessAdapterInterface, BatchResourceLa
         }
         foreach ($labels as $id => $label) {
             if ($label === '') {
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 $labels[$id] = sprintf(__('Post #%s', 'fchub-memberships'), $id);
             }
         }

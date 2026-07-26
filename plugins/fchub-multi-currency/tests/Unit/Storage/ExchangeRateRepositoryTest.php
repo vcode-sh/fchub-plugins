@@ -20,6 +20,10 @@ final class ExchangeRateRepositoryTest extends TestCase
         $result = $repo->findLatest('USD', 'EUR');
 
         $this->assertNull($result);
+        $this->assertStringContainsString(
+            'FROM `wp_fchub_mc_rate_history` WHERE base_currency',
+            implode(' ', $GLOBALS['wpdb']->queries),
+        );
     }
 
     #[Test]
@@ -62,6 +66,8 @@ final class ExchangeRateRepositoryTest extends TestCase
         $result = $repo->findAllLatest('USD');
 
         $this->assertSame([], $result);
+        $queries = implode(' ', $GLOBALS['wpdb']->queries);
+        $this->assertSame(2, substr_count($queries, '`wp_fchub_mc_rate_history`'));
     }
 
     #[Test]

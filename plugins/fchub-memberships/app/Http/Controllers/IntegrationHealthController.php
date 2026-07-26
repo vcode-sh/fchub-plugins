@@ -44,9 +44,9 @@ final class IntegrationHealthController
             int $limit
         ): array {
             global $wpdb;
-            $table = $wpdb->prefix . 'fchub_membership_grants';
+            $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
 
-            return array_map('intval', $wpdb->get_col($wpdb->prepare(
+            return array_map('intval', \FChubMemberships\Support\CustomTableDatabase::getCol(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT DISTINCT user_id FROM {$table}
                  WHERE user_id > %d AND user_id <= %d
                  ORDER BY user_id ASC LIMIT %d",
@@ -57,9 +57,14 @@ final class IntegrationHealthController
         });
         $this->watermarkResolver = \Closure::fromCallable($watermarkResolver ?? static function (): int {
             global $wpdb;
-            $table = $wpdb->prefix . 'fchub_membership_grants';
+            $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
 
-            return max(0, (int) $wpdb->get_var("SELECT MAX(user_id) FROM {$table} WHERE user_id > 0"));
+            return max(0, (int) \FChubMemberships\Support\CustomTableDatabase::getVar(
+                \FChubMemberships\Support\CustomTableDatabase::prepare(
+                    "SELECT MAX(user_id) FROM {$table} WHERE user_id > %d",
+                    0,
+                ),
+            ));
         });
         if ($projectionQueue === null) {
             $sync = new FluentCrmSync();

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1 - 2026-07-26
+
+- Prepared WordPress.org identity, dependency and package metadata.
+- Replaced the remote Inter stylesheet with licensed local font subsets.
+- Removed the legacy GitHub updater.
+- Documented opt-in webhooks, authenticated REST access, privacy and build inputs.
+
 ## 1.4.0 - 2026-07-24
 
 Eighteen Memberships commits landed in 72 hours. Apparently the reasonable

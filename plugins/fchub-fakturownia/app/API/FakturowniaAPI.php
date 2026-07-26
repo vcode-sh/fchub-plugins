@@ -6,6 +6,10 @@ defined('ABSPATH') || exit;
 
 class FakturowniaAPI
 {
+    private const JSON_RESPONSE_LIMIT = 2 * MB_IN_BYTES;
+    private const PDF_RESPONSE_LIMIT = 20 * MB_IN_BYTES;
+    private const ERROR_MESSAGE_LIMIT = 500;
+
     private string $domain;
     private string $apiToken;
 
@@ -65,25 +69,50 @@ class FakturowniaAPI
      */
     public function downloadInvoicePdf(int $id): array
     {
-        $url = $this->getBaseUrl() . '/invoices/' . $id . '.pdf?api_token=' . urlencode($this->apiToken);
+        if (!$this->isAllowedDomain()) {
+            return $this->errorResponse(__('Invalid Fakturownia account domain.', 'fchub-fakturownia'));
+        }
+
+        $url = $this->getBaseUrl() . '/invoices/' . $id . '.pdf?api_token=' . rawurlencode($this->apiToken);
 
         $response = wp_remote_get($url, [
-            'timeout' => 30,
-            'headers' => ['Accept' => 'application/pdf'],
+            'timeout'             => 30,
+            'redirection'         => 0,
+            'sslverify'           => true,
+            'limit_response_size' => self::PDF_RESPONSE_LIMIT,
+            'headers'             => [
+                'Accept'     => 'application/pdf',
+                'User-Agent' => $this->userAgent(),
+            ],
         ]);
 
         if (is_wp_error($response)) {
-            return ['error' => $response->get_error_message()];
+            return $this->errorResponse($response->get_error_message());
         }
 
         $statusCode = wp_remote_retrieve_response_code($response);
-        if ($statusCode >= 400) {
-            return ['error' => sprintf('PDF download failed (HTTP %d)', $statusCode)];
+        if ($statusCode !== 200) {
+            return $this->errorResponse(sprintf('PDF download failed (HTTP %d).', $statusCode), $statusCode);
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        $contentType = strtolower(trim((string) wp_remote_retrieve_header($response, 'content-type')));
+
+        if (strlen($body) > self::PDF_RESPONSE_LIMIT) {
+            return $this->errorResponse(__('The PDF response exceeded the allowed size.', 'fchub-fakturownia'));
+        }
+
+        if (!str_starts_with($contentType, 'application/pdf')) {
+            return $this->errorResponse(__('The provider returned an invalid PDF content type.', 'fchub-fakturownia'));
+        }
+
+        if (!str_starts_with($body, '%PDF-')) {
+            return $this->errorResponse(__('The provider returned invalid PDF data.', 'fchub-fakturownia'));
         }
 
         return [
-            'body'         => wp_remote_retrieve_body($response),
-            'content_type' => wp_remote_retrieve_header($response, 'content-type') ?: 'application/pdf',
+            'body'         => $body,
+            'content_type' => 'application/pdf',
         ];
     }
 
@@ -131,7 +160,7 @@ class FakturowniaAPI
         }
 
         // API returns array of clients
-        if (is_array($result) && !empty($result) && isset($result[0])) {
+        if (!empty($result) && isset($result[0])) {
             return $result[0];
         }
 
@@ -157,17 +186,14 @@ class FakturowniaAPI
      */
     public function getBaseUrl(): string
     {
-        // Subdomain-only format (e.g. "mojafirma")
-        if (preg_match('/^[a-z0-9-]+$/i', $this->domain)) {
+        if (preg_match('/^[a-z0-9-]+$/i', $this->domain) === 1) {
             return 'https://' . $this->domain . '.fakturownia.pl';
         }
 
-        // Full domain — must end with .fakturownia.pl
-        if (preg_match('/^[a-z0-9-]+\.fakturownia\.pl$/i', $this->domain)) {
+        if (preg_match('/^[a-z0-9-]+\.fakturownia\.pl$/i', $this->domain) === 1) {
             return 'https://' . $this->domain;
         }
 
-        // Reject anything else — prevents SSRF to arbitrary hosts
         return 'https://invalid.fakturownia.pl';
     }
 
@@ -176,12 +202,20 @@ class FakturowniaAPI
      */
     private function request(string $method, string $endpoint, array $params = []): array
     {
+        if (!$this->isAllowedDomain()) {
+            return $this->errorResponse(__('Invalid Fakturownia account domain.', 'fchub-fakturownia'));
+        }
+
         $url = $this->getBaseUrl() . $endpoint;
 
         $args = [
-            'timeout' => 30,
-            'headers' => [
-                'Accept' => 'application/json',
+            'timeout'             => 30,
+            'redirection'         => 0,
+            'sslverify'           => true,
+            'limit_response_size' => self::JSON_RESPONSE_LIMIT,
+            'headers'             => [
+                'Accept'     => 'application/json',
+                'User-Agent' => $this->userAgent(),
             ],
         ];
 
@@ -190,19 +224,21 @@ class FakturowniaAPI
             $response = wp_remote_get($url, $args);
         } else {
             $args['headers']['Content-Type'] = 'application/json';
-            $args['body'] = json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $args['body'] = wp_json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $response = wp_remote_post($url, $args);
         }
 
         if (is_wp_error($response)) {
-            return [
-                'error' => $response->get_error_message(),
-                'code'  => 500,
-            ];
+            return $this->errorResponse($response->get_error_message());
         }
 
         $statusCode = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
+
+        if (strlen($body) > self::JSON_RESPONSE_LIMIT) {
+            return $this->errorResponse(__('The provider response exceeded the allowed size.', 'fchub-fakturownia'));
+        }
+
         $decoded = json_decode($body, true);
 
         if ($statusCode >= 400) {
@@ -218,10 +254,11 @@ class FakturowniaAPI
                 }
             }
 
-            return [
-                'error' => $errorMessage,
-                'code'  => $statusCode,
-            ];
+            return $this->errorResponse((string) $errorMessage, $statusCode);
+        }
+
+        if ($body !== '' && !is_array($decoded)) {
+            return $this->errorResponse(__('The provider returned an invalid JSON response.', 'fchub-fakturownia'));
         }
 
         return $decoded ?: [];
@@ -241,5 +278,33 @@ class FakturowniaAPI
         }
 
         return implode('; ', $messages);
+    }
+
+    private function isAllowedDomain(): bool
+    {
+        return preg_match('/^[a-z0-9-]+(?:\.fakturownia\.pl)?$/i', $this->domain) === 1;
+    }
+
+    private function userAgent(): string
+    {
+        return 'FCHub Fakturownia/' . FCHUB_FAKTUROWNIA_VERSION;
+    }
+
+    private function errorResponse(string $message, int $code = 500): array
+    {
+        $message = str_replace($this->apiToken, '[redacted]', $message);
+        $message = preg_replace('~https?://\S+~i', '[redacted-url]', $message) ?? $message;
+        $message = sanitize_text_field($message);
+        $message = preg_replace('/\s+/', ' ', $message) ?? $message;
+        $message = trim(substr($message, 0, self::ERROR_MESSAGE_LIMIT));
+
+        if ($message === '') {
+            $message = __('Fakturownia request failed.', 'fchub-fakturownia');
+        }
+
+        return [
+            'error' => $message,
+            'code'  => $code,
+        ];
     }
 }

@@ -53,23 +53,29 @@ class MergeGuestWishlistAction
         $itemsTable = $wpdb->prefix . 'fchub_wishlist_items';
         $listsTable = $wpdb->prefix . 'fchub_wishlist_lists';
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no transaction API; this merge is deliberately atomic and uncached.
         $transactionStarted = $wpdb->query('START TRANSACTION') !== false;
 
         try {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The row lock is required to serialise concurrent merges and cannot be served from cache.
             $wpdb->query($wpdb->prepare(
-                "SELECT id FROM {$listsTable} WHERE id IN (%d, %d) FOR UPDATE",
+                "SELECT id FROM %i WHERE id IN (%d, %d) FOR UPDATE",
+                $listsTable,
                 (int) $guestWishlist['id'],
                 (int) $userWishlist['id']
             ));
 
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no joined-delete API; this mutation runs inside the merge transaction.
             $deletedDuplicates = $wpdb->query($wpdb->prepare(
                 "DELETE guest_items
-                 FROM {$itemsTable} guest_items
-                 INNER JOIN {$itemsTable} user_items
+                 FROM %i guest_items
+                 INNER JOIN %i user_items
                     ON user_items.wishlist_id = %d
                    AND user_items.product_id = guest_items.product_id
                    AND user_items.variant_id = guest_items.variant_id
                  WHERE guest_items.wishlist_id = %d",
+                $itemsTable,
+                $itemsTable,
                 (int) $userWishlist['id'],
                 (int) $guestWishlist['id']
             ));
@@ -78,10 +84,12 @@ class MergeGuestWishlistAction
                 throw new \RuntimeException('Could not delete duplicate guest wishlist items.');
             }
 
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The bulk move is an atomic custom-table mutation with no WordPress CRUD equivalent.
             $movedCountResult = $wpdb->query($wpdb->prepare(
-                "UPDATE {$itemsTable}
+                "UPDATE %i
                  SET wishlist_id = %d
                  WHERE wishlist_id = %d",
+                $itemsTable,
                 (int) $userWishlist['id'],
                 (int) $guestWishlist['id']
             ));
@@ -99,10 +107,12 @@ class MergeGuestWishlistAction
             }
 
             if ($transactionStarted) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no transaction API; this commits the atomic merge.
                 $wpdb->query('COMMIT');
             }
         } catch (\Throwable $e) {
             if ($transactionStarted) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no transaction API; this rolls back the failed atomic merge.
                 $wpdb->query('ROLLBACK');
             }
 

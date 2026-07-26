@@ -114,8 +114,10 @@ class AddToWishlistAction extends BaseAction
         global $wpdb;
         $table = $wpdb->prefix . 'fct_product_variations';
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- FluentCart exposes no default-variation API, and funnel execution must resolve current availability.
         $variantId = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$table} WHERE post_id = %d AND item_status = 'active' ORDER BY id ASC LIMIT 1",
+            "SELECT id FROM %i WHERE post_id = %d AND item_status = 'active' ORDER BY id ASC LIMIT 1",
+            $table,
             $productId
         ));
 

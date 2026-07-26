@@ -346,21 +346,66 @@ wp_filtered() {
 
 configure_destination() {
     local url="$1"
-    printf '%s\n%s\n' "${url}" "${secret}" | wp_filtered eval '
+    local status="${2:-active}"
+    printf '%s\n%s\n%s\n' "${url}" "${secret}" "${status}" | wp_filtered eval '
         $input = file("php://stdin", FILE_IGNORE_NEW_LINES);
-        if (!is_array($input) || count($input) !== 2) {
+        if (!is_array($input)
+            || count($input) !== 3
+            || !in_array($input[2], ["active", "paused"], true)
+        ) {
             throw new RuntimeException("Invalid webhook settings input.");
         }
         $result = (new FChubMemberships\Integration\MembershipSettingsOptionCoordinator())->mutate(
             static function (array $settings) use ($input): array {
-                $settings["webhook_enabled"] = "yes";
-                $settings["webhook_urls"] = $input[0];
-                $settings["webhook_secret"] = $input[1];
+                unset($settings["webhook_enabled"], $settings["webhook_urls"], $settings["webhook_secret"]);
+                $settings["webhook_endpoints"] = [[
+                    "id" => "task8_runtime_endpoint",
+                    "name" => "Runtime smoke receiver",
+                    "url" => $input[0],
+                    "secret" => $input[1],
+                    "status" => $input[2],
+                    "requires_rotation" => false,
+                    "last_test_status" => "succeeded",
+                    "last_tested_at" => gmdate("Y-m-d H:i:s"),
+                ]];
                 return $settings;
             }
         );
         if (!$result["success"]) {
             throw new RuntimeException("Unable to install disposable webhook settings.");
+        }
+    ' >/dev/null
+}
+
+assert_dispatch_suppressed() {
+    local url="$1"
+    printf '%s\n%s\n' "${url}" "${plan_id}" | wp_filtered eval '
+        global $wpdb;
+        $input = file("php://stdin", FILE_IGNORE_NEW_LINES);
+        if (!is_array($input) || count($input) !== 2) {
+            throw new RuntimeException("Invalid suppressed webhook dispatch input.");
+        }
+        $url = $input[0];
+        $planId = (int) $input[1];
+        $before = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_webhook_deliveries
+             WHERE destination_url = %s",
+            $url
+        ));
+        (new FChubMemberships\Integration\WebhookDispatcher())->register();
+        do_action(
+            "fchub_memberships/grant_created",
+            1,
+            $planId,
+            ["source_type" => "task8_disabled_runtime_smoke", "source_id" => 0]
+        );
+        $after = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_webhook_deliveries
+             WHERE destination_url = %s",
+            $url
+        ));
+        if ($after !== $before) {
+            throw new RuntimeException("A disabled endpoint persisted a delivery.");
         }
     ' >/dev/null
 }
@@ -653,9 +698,15 @@ done
 [[ "${receiver_ready}" == 'yes' ]]
 kill -0 "${receiver_pid}"
 
+stage='paused endpoint opt-in'
+paused_url="http://host.docker.internal:${port}/${token}?responses=204"
+configure_destination "${paused_url}" paused
+assert_dispatch_suppressed "${paused_url}"
+[[ ! -s "${receiver_log}" ]]
+
 stage='success delivery'
 success_url="http://host.docker.internal:${port}/${token}?responses=204"
-configure_destination "${success_url}"
+configure_destination "${success_url}" active
 dispatch_delivery "${success_url}"
 success_delivery="${last_delivery_id}"
 run_attempt "${success_delivery}" 1
@@ -663,7 +714,7 @@ run_attempt "${success_delivery}" 1
 
 stage='retry delivery'
 retry_url="http://host.docker.internal:${port}/${token}?responses=500,204"
-configure_destination "${retry_url}"
+configure_destination "${retry_url}" active
 dispatch_delivery "${retry_url}"
 retry_delivery="${last_delivery_id}"
 run_attempt "${retry_delivery}" 1
@@ -705,7 +756,7 @@ retry_identity="$(printf '%s' "${retry_delivery}" | wp_filtered eval '
 
 stage='terminal delivery'
 failure_url="http://host.docker.internal:${port}/${token}?responses=400"
-configure_destination "${failure_url}"
+configure_destination "${failure_url}" active
 dispatch_delivery "${failure_url}"
 failure_delivery="${last_delivery_id}"
 for attempt in 1 2 3 4 5 6; do

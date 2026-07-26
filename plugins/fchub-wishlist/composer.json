@@ -2,6 +2,7 @@
     "name": "fchub/wishlist",
     "description": "FCHub Wishlist - Wishlist system for FluentCart",
     "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
     "require": {
         "php": ">=8.3"
     },

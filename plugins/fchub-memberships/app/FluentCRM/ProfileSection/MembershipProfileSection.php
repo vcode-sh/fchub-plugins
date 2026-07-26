@@ -246,7 +246,8 @@ class MembershipProfileSection
             $pct = round(($unlocked / $totalItems) * 100);
 
             $html .= '<p style="margin-bottom:4px;"><strong>' . esc_html($plan['title']) . '</strong>: '
-                . sprintf(__('%d of %d items unlocked', 'fchub-memberships'), $unlocked, $totalItems) . '</p>';
+                /* translators: Placeholder values are runtime membership details included in this message. */
+                . sprintf(__('%1$d of %2$d items unlocked', 'fchub-memberships'), $unlocked, $totalItems) . '</p>';
             $html .= '<div style="background:#e0e0e0;border-radius:4px;height:12px;max-width:300px;margin-bottom:12px;">'
                 . '<div style="background:#409EFF;border-radius:4px;height:12px;width:' . $pct . '%;"></div></div>';
         }
@@ -276,6 +277,7 @@ class MembershipProfileSection
         $color = $colors[$status] ?? '#909399';
         $label = ucfirst($status);
         if ($mixed) {
+            /* translators: Placeholder values are runtime membership details included in this message. */
             $label = sprintf(__('%s (mixed)', 'fchub-memberships'), $label);
         }
 
@@ -338,6 +340,7 @@ class MembershipProfileSection
         $maximum = $counts ? max($counts) : 0;
 
         return count($uniqueCounts) > 1
+            /* translators: Placeholder values are runtime membership details included in this message. */
             ? sprintf(__('%d (varies)', 'fchub-memberships'), $maximum)
             : $maximum;
     }

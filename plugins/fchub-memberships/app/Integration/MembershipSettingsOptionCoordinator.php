@@ -31,7 +31,7 @@ final class MembershipSettingsOptionCoordinator
             ? \Closure::fromCallable($acquire)
             : static function (): bool {
                 global $wpdb;
-                return (string) $wpdb->get_var($wpdb->prepare(
+                return (string) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                     'SELECT GET_LOCK(%s, %d)',
                     self::LOCK_NAME,
                     5
@@ -41,14 +41,14 @@ final class MembershipSettingsOptionCoordinator
             ? \Closure::fromCallable($release)
             : static function (): void {
                 global $wpdb;
-                $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', self::LOCK_NAME));
+                \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare('SELECT RELEASE_LOCK(%s)', self::LOCK_NAME));
             };
         $this->reader = $reader !== null
             ? \Closure::fromCallable($reader)
             : static function (): array {
                 global $wpdb;
 
-                $stored = $wpdb->get_var($wpdb->prepare(
+                $stored = \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                     "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
                     self::OPTION_NAME
                 ));

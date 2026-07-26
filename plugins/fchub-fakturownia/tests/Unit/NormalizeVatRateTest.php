@@ -25,7 +25,6 @@ final class NormalizeVatRateTest extends PluginTestCase
 
         $ref = new \ReflectionClass(InvoiceHandler::class);
         $this->method = $ref->getMethod('normalizeVatRate');
-        $this->method->setAccessible(true);
     }
 
     private function normalize(float $rate): int|string

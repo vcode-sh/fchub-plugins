@@ -515,8 +515,8 @@ class GrantCommand
         $limit = (int) ($assoc_args['limit'] ?? 0);
 
         // Find membership feeds linked to this product
-        $metaTable = $wpdb->prefix . 'fct_product_meta';
-        $feeds = $wpdb->get_results($wpdb->prepare(
+        $metaTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_product_meta');
+        $feeds = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT id, object_id AS product_id, meta_value AS settings
              FROM {$metaTable}
              WHERE object_id = %d AND object_type = 'product_integration' AND meta_key = 'memberships'",
@@ -529,8 +529,8 @@ class GrantCommand
 
         WP_CLI::line(sprintf('Found %d feed(s) for product #%d.', count($feeds), $productId));
 
-        $ordersTable = $wpdb->prefix . 'fct_orders';
-        $orderItemsTable = $wpdb->prefix . 'fct_order_items';
+        $ordersTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_orders');
+        $orderItemsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_order_items');
 
         $totalProcessed = 0;
         $totalCreated = 0;
@@ -568,10 +568,10 @@ class GrantCommand
             $params = [$productId];
 
             if ($limit > 0) {
-                $sql .= $wpdb->prepare(' LIMIT %d', $limit);
+                $sql .= \FChubMemberships\Support\CustomTableDatabase::prepare(' LIMIT %d', $limit)->sql();
             }
 
-            $orders = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
+            $orders = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params), ARRAY_A);
 
             $progress = Utils\make_progress_bar(
                 sprintf('Processing feed #%d (%s)', $feed['id'], $plan['title']),
@@ -752,8 +752,8 @@ class GrantCommand
             return;
         }
 
-        $metaTable = $wpdb->prefix . 'fct_product_meta';
-        $feed = $wpdb->get_row($wpdb->prepare(
+        $metaTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_product_meta');
+        $feed = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT id, object_id AS product_id, meta_value AS settings
              FROM {$metaTable}
              WHERE id = %d AND object_type = 'product_integration' AND meta_key = 'memberships'",
@@ -784,7 +784,7 @@ class GrantCommand
         }
 
         // Get all grants for this feed
-        $grants = $wpdb->get_results($wpdb->prepare(
+        $grants = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$wpdb->prefix}fchub_membership_grants WHERE feed_id = %d",
             $feedId
         ), ARRAY_A);
@@ -831,8 +831,8 @@ class GrantCommand
             WP_CLI::error(sprintf('Plan "%s" not found.', $planSlug));
         }
 
-        $metaTable = $wpdb->prefix . 'fct_product_meta';
-        $feeds = $wpdb->get_results($wpdb->prepare(
+        $metaTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_product_meta');
+        $feeds = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT id, object_id AS product_id, meta_value AS settings
              FROM {$metaTable}
              WHERE object_type = 'product_integration' AND meta_key = %s",
@@ -871,7 +871,7 @@ class GrantCommand
 
         $totalOrphaned = 0;
         foreach ($matchingFeedIds as $fid) {
-            $grants = $wpdb->get_results($wpdb->prepare(
+            $grants = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT * FROM {$wpdb->prefix}fchub_membership_grants WHERE feed_id = %d",
                 $fid
             ), ARRAY_A);
@@ -922,9 +922,9 @@ class GrantCommand
         if ($dryRun) {
             global $wpdb;
             $now = $this->clock->storage($this->clock->now());
-            $table = $wpdb->prefix . 'fchub_membership_grants';
+            $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
 
-            $count = (int) $wpdb->get_var($wpdb->prepare(
+            $count = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT COUNT(*) FROM {$table}
                  WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at <= %s",
                 $now
@@ -1027,11 +1027,11 @@ class GrantCommand
 
         $olderThan = (int) ($assoc_args['older-than'] ?? 90);
         $dryRun = Utils\get_flag_value($assoc_args, 'dry-run', false);
-        $table = $wpdb->prefix . 'fchub_membership_grants';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
 
         $cutoff = $this->clock->storage($this->clock->plusDays(-$olderThan));
 
-        $count = (int) $wpdb->get_var($wpdb->prepare(
+        $count = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$table}
              WHERE status IN ('expired', 'revoked')
                AND updated_at <= %s",
@@ -1050,7 +1050,7 @@ class GrantCommand
             return;
         }
 
-        $deleted = $wpdb->query($wpdb->prepare(
+        $deleted = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "DELETE FROM {$table}
              WHERE status IN ('expired', 'revoked')
                AND updated_at <= %s",
@@ -1326,18 +1326,13 @@ class GrantCommand
         if ($format === 'json') {
             $content = wp_json_encode($rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         } else {
-            // CSV
-            $fp = fopen($output, 'w');
-            if (!$fp) {
-                WP_CLI::error(sprintf('Cannot open file for writing: %s', $output));
-            }
+            $stream = new \SplTempFileObject();
 
             // Header
-            fputcsv($fp, array_keys($rows[0]), ',', '"', '');
+            $stream->fputcsv(array_keys($rows[0]), ',', '"', '');
 
             foreach ($rows as $row) {
-                fputcsv(
-                    $fp,
+                $stream->fputcsv(
                     array_map(
                         static fn(mixed $value): string => CsvSanitizer::sanitizeCell((string) $value),
                         $row
@@ -1348,7 +1343,14 @@ class GrantCommand
                 );
             }
 
-            fclose($fp);
+            $stream->fseek(0, SEEK_END);
+            $length = $stream->ftell();
+            $stream->rewind();
+            $content = $length > 0 ? $stream->fread($length) : '';
+            $written = file_put_contents($output, $content);
+            if ($written === false) {
+                WP_CLI::error(sprintf('Cannot write to file: %s', $output));
+            }
             WP_CLI::success(sprintf('Exported %d member(s) to %s', count($rows), $output));
             return;
         }

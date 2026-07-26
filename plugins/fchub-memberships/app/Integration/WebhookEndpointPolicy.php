@@ -51,6 +51,7 @@ final class WebhookEndpointPolicy
 
         if (count($normalised) > self::MAX_ENDPOINTS) {
             return $this->error(sprintf(
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 __('Configure no more than %d webhook destinations.', 'fchub-memberships'),
                 self::MAX_ENDPOINTS
             ));
@@ -125,7 +126,7 @@ final class WebhookEndpointPolicy
             return null;
         }
 
-        $parts = parse_url($url);
+        $parts = wp_parse_url($url);
         if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
             return null;
         }

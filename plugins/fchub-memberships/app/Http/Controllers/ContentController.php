@@ -10,6 +10,7 @@ use FChubMemberships\Storage\ProtectionRuleRepository;
 use FChubMemberships\Storage\PlanRepository;
 use FChubMemberships\Domain\AccessEvaluator;
 use FChubMemberships\Support\Constants;
+use FChubMemberships\Support\Logger;
 use FChubMemberships\Support\ResourceTypeRegistry;
 
 class ContentController
@@ -124,8 +125,7 @@ class ContentController
                 return new \WP_REST_Response([
                     'code' => 'fchub_content_search_too_broad',
                     'message' => __(
-                        'Content search exceeds 100 candidates for a provider without batch label support. '
-                            . 'Add a filter and retry.',
+                        'Content search exceeds 100 candidates for a provider without batch label support. Add a filter and retry.',
                         'fchub-memberships'
                     ),
                 ], 422);
@@ -352,6 +352,7 @@ class ContentController
         \FChubMemberships\Domain\AccessEvaluator::clearCache();
 
         return new \WP_REST_Response([
+            /* translators: Placeholder values are runtime membership details included in this message. */
             'message'   => sprintf(__('%d resources protected.', 'fchub-memberships'), $protected),
             'protected' => $protected,
         ]);
@@ -385,6 +386,7 @@ class ContentController
         \FChubMemberships\Domain\AccessEvaluator::clearCache();
 
         return new \WP_REST_Response([
+            /* translators: Placeholder values are runtime membership details included in this message. */
             'message'     => sprintf(__('%d resources unprotected.', 'fchub-memberships'), $unprotected),
             'unprotected' => $unprotected,
         ]);
@@ -575,6 +577,7 @@ class ContentController
             if ($type === 'comment') {
                 $labels = array_map(
                     static fn(string $label): string => sprintf(
+                        /* translators: Placeholder values are runtime membership details included in this message. */
                         __('Comments on: %s', 'fchub-memberships'),
                         $label
                     ),
@@ -588,11 +591,8 @@ class ContentController
             return $labels;
         } catch (\Throwable $exception) {
             if ($strictProviderLabels) {
-                throw new \UnexpectedValueException(
-                    'Unable to load provider resource labels.',
-                    0,
-                    $exception
-                );
+                Logger::error('Unable to load provider resource labels.', $exception->getMessage());
+                throw new \UnexpectedValueException('Unable to load provider resource labels.');
             }
             return [];
         }
@@ -634,6 +634,7 @@ class ContentController
                 return __('All Protected Content Comments', 'fchub-memberships');
             }
             $title = get_the_title((int) $id);
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return $title ? sprintf(__('Comments on: %s', 'fchub-memberships'), $title) : "#{$id}";
         }
 

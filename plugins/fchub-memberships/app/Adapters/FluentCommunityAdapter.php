@@ -48,6 +48,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
                 return [
                     'success' => true,
                     'message' => sprintf(
+                        /* translators: Placeholder values are runtime membership details included in this message. */
                         __('Added to space: %s', 'fchub-memberships'),
                         $this->getResourceLabel($resourceType, $resourceId)
                     ),
@@ -66,6 +67,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
                 return [
                     'success' => true,
                     'message' => sprintf(
+                        /* translators: Placeholder values are runtime membership details included in this message. */
                         __('Enrolled in course: %s', 'fchub-memberships'),
                         $this->getResourceLabel($resourceType, $resourceId)
                     ),
@@ -115,7 +117,9 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
                 'success' => true,
                 'message' => sprintf(
                     $resourceType === 'fc_space'
+                        /* translators: Placeholder values are runtime membership details included in this message. */
                         ? __('Removed from space: %s', 'fchub-memberships')
+                        /* translators: Placeholder values are runtime membership details included in this message. */
                         : __('Removed from course: %s', 'fchub-memberships'),
                     $this->getResourceLabel($resourceType, $resourceId)
                 ),
@@ -163,11 +167,13 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
 
         if ($resourceType === 'fc_space') {
             $space = $this->findSpace((int) $resourceId);
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return $space ? $space->title : sprintf(__('Space #%s', 'fchub-memberships'), $resourceId);
         }
 
         if ($resourceType === 'fc_course') {
             $course = $this->findCourse((int) $resourceId);
+            /* translators: Placeholder values are runtime membership details included in this message. */
             return $course ? $course->title : sprintf(__('Course #%s', 'fchub-memberships'), $resourceId);
         }
 
@@ -457,6 +463,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
         if (in_array($badgeSlug, $badges, true)) {
             return [
                 'success' => true,
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 'message' => sprintf(__('Badge already assigned: %s', 'fchub-memberships'), $this->badgeLabel($badgeSlug)),
             ];
         }
@@ -473,6 +480,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
 
         return [
             'success' => true,
+            /* translators: Placeholder values are runtime membership details included in this message. */
             'message' => sprintf(__('Assigned badge: %s', 'fchub-memberships'), $this->badgeLabel($badgeSlug)),
         ];
     }
@@ -503,6 +511,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
         if (!in_array($badgeSlug, $badges, true)) {
             return [
                 'success' => true,
+                /* translators: Placeholder values are runtime membership details included in this message. */
                 'message' => sprintf(__('Badge already absent: %s', 'fchub-memberships'), $this->badgeLabel($badgeSlug)),
             ];
         }
@@ -519,6 +528,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
 
         return [
             'success' => true,
+            /* translators: Placeholder values are runtime membership details included in this message. */
             'message' => sprintf(__('Removed badge: %s', 'fchub-memberships'), $this->badgeLabel($badgeSlug)),
         ];
     }
@@ -556,7 +566,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
     {
         global $wpdb;
 
-        return (int) $wpdb->get_var($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             'SELECT GET_LOCK(%s, %d)',
             $lockName,
             self::BADGE_LOCK_TIMEOUT_SECONDS
@@ -567,7 +577,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
     {
         global $wpdb;
 
-        return (int) $wpdb->get_var($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             'SELECT RELEASE_LOCK(%s)',
             $lockName
         )) === 1;
@@ -646,6 +656,7 @@ class FluentCommunityAdapter implements AccessAdapterInterface, BatchResourceLab
             return trim($definition);
         }
 
+        /* translators: Placeholder values are runtime membership details included in this message. */
         return sprintf(__('Badge %s', 'fchub-memberships'), $badgeSlug);
     }
 

@@ -41,8 +41,10 @@ class WishlistItemsQuery
     {
         global $wpdb;
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Status responses require the current wishlist item set after any toggle.
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT product_id, variant_id FROM {$this->itemsTable} WHERE wishlist_id = %d",
+            "SELECT product_id, variant_id FROM %i WHERE wishlist_id = %d",
+            $this->itemsTable,
             $wishlistId
         ), ARRAY_A);
 
@@ -66,15 +68,17 @@ class WishlistItemsQuery
 
     private function getItemsForListOwner(string $whereClause, array $params, int $page, int $perPage): array
     {
-        $fromClause = "{$this->itemsTable} i INNER JOIN {$this->listsTable} l ON i.wishlist_id = l.id";
+        $fromClause = '%i i INNER JOIN %i l ON i.wishlist_id = l.id';
+        $fromTables = [$this->itemsTable, $this->listsTable];
 
-        return $this->runItemsQuery($fromClause, $whereClause, $params, $page, $perPage, false);
+        return $this->runItemsQuery($fromClause, $fromTables, $whereClause, $params, $page, $perPage, false);
     }
 
     private function getItemsForWishlist(int $wishlistId, int $page, int $perPage): array
     {
         return $this->runItemsQuery(
-            "{$this->itemsTable} i",
+            '%i i',
+            [$this->itemsTable],
             'i.wishlist_id = %d',
             [$wishlistId],
             $page,
@@ -85,6 +89,7 @@ class WishlistItemsQuery
 
     private function runItemsQuery(
         string $fromClause,
+        array $fromTables,
         string $whereClause,
         array $whereParams,
         int $page,
@@ -93,12 +98,21 @@ class WishlistItemsQuery
     ): array {
         global $wpdb;
 
+        $countParams = array_merge($fromTables, $whereParams);
+
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Private clauses select a fixed owner mode; counts must be live.
         $total = (int) $wpdb->get_var($wpdb->prepare(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Private clauses contain only fixed SQL and %i placeholders.
             "SELECT COUNT(*) FROM {$fromClause} WHERE {$whereClause}",
-            ...$whereParams
+            ...$countParams
         ));
 
-        $queryParams = $whereParams;
+        $queryParams = array_merge(
+            $fromTables,
+            [$wpdb->posts],
+            $this->getVariantJoinTables(),
+            $whereParams
+        );
         $limitClause = '';
         if ($perPage > 0) {
             $offset = max(0, ($page - 1) * $perPage);
@@ -107,7 +121,11 @@ class WishlistItemsQuery
             $queryParams[] = $offset;
         }
 
+        $variantJoinClause = $this->getVariantJoinClause();
+
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Private clauses select a fixed owner mode; item rows must be live.
         $rows = $wpdb->get_results($wpdb->prepare(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Private clauses contain only fixed SQL and %i placeholders.
             "SELECT
                 i.*,
                 p.post_title AS product_title,
@@ -116,12 +134,12 @@ class WishlistItemsQuery
                 v.variation_title AS variant_title,
                 v.item_price AS current_price,
                 v.item_status AS variant_status,
-                v.sku AS variant_sku
-             FROM {$fromClause}
-             LEFT JOIN {$wpdb->posts} p ON i.product_id = p.ID
-             {$this->getVariantJoinClause()}
-             WHERE {$whereClause}
-             ORDER BY i.created_at DESC{$limitClause}",
+                v.sku AS variant_sku "
+            . "FROM {$fromClause} " // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Private fixed SQL.
+            . "LEFT JOIN %i p ON i.product_id = p.ID "
+            . $variantJoinClause . ' ' // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Fixed SQL.
+            . "WHERE {$whereClause} " // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Private fixed SQL.
+            . "ORDER BY i.created_at DESC{$limitClause}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Private fixed SQL.
             ...$queryParams
         ), ARRAY_A);
 
@@ -150,13 +168,13 @@ class WishlistItemsQuery
 
     private function getVariantJoinClause(): string
     {
-        return "LEFT JOIN {$this->detailsTable} pd ON pd.post_id = i.product_id
+        return "LEFT JOIN %i pd ON pd.post_id = i.product_id
              LEFT JOIN (
                  SELECT picked.post_id, MIN(picked.id) AS id
-                 FROM {$this->variationsTable} picked
+                 FROM %i picked
                  INNER JOIN (
                      SELECT post_id, MIN(serial_index) AS min_serial_index
-                     FROM {$this->variationsTable}
+                     FROM %i
                      WHERE item_status = 'active'
                      GROUP BY post_id
                  ) first_active
@@ -165,11 +183,24 @@ class WishlistItemsQuery
                  WHERE picked.item_status = 'active'
                  GROUP BY picked.post_id
              ) dv ON dv.post_id = i.product_id
-             LEFT JOIN {$this->variationsTable} v ON v.id = COALESCE(
+             LEFT JOIN %i v ON v.id = COALESCE(
                  NULLIF(i.variant_id, 0),
                  NULLIF(pd.default_variation_id, 0),
                  dv.id
              )";
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getVariantJoinTables(): array
+    {
+        return [
+            $this->detailsTable,
+            $this->variationsTable,
+            $this->variationsTable,
+            $this->variationsTable,
+        ];
     }
 
     private function hydrateWithProduct(array $row): array

@@ -63,7 +63,7 @@ final class AccessCheckRestArguments
         $hasEmail = $email !== '';
 
         if (($hasUserId && $hasEmail) || (!$hasUserId && !$hasEmail && !is_user_logged_in())) {
-            return self::error('Identify a user by exactly one of user_id or email.');
+            return self::error(__('Identify a user by exactly one of user_id or email.', 'fchub-memberships'));
         }
 
         $plan = trim((string) $request->get_param('plan'));
@@ -80,7 +80,7 @@ final class AccessCheckRestArguments
             || (!$hasPlan && !$hasCompleteResource)
             || ($hasResourceType xor $hasResourceId)
         ) {
-            return self::error('Specify exactly one selector: plan or resource_type with resource_id.');
+            return self::error(__('Specify exactly one selector: plan or resource_type with resource_id.', 'fchub-memberships'));
         }
 
         return true;
@@ -88,6 +88,6 @@ final class AccessCheckRestArguments
 
     private static function error(string $message): \WP_Error
     {
-        return new \WP_Error('fchub_invalid_access_request', __($message, 'fchub-memberships'), ['status' => 422]);
+        return new \WP_Error('fchub_invalid_access_request', $message, ['status' => 422]);
     }
 }

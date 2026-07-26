@@ -77,6 +77,7 @@ class ProtectionEditorConfig
 
                 $sources[] = [
                     'type' => 'taxonomy',
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     'label' => sprintf(__('Inherited from %s', 'fchub-memberships'), (string) $term->name),
                     'detail' => $this->planSummary($taxonomyRule['plan_ids'] ?? [], $planNames),
                     'manage_url' => get_edit_term_link((int) $term->term_id, $taxonomy),
@@ -163,6 +164,7 @@ class ProtectionEditorConfig
         }
 
         $labels = array_map(
+            /* translators: Placeholder values are runtime membership details included in this message. */
             static fn(int $planId): string => $planNames[$planId] ?? sprintf(__('Plan #%d', 'fchub-memberships'), $planId),
             array_map('intval', $planIds)
         );

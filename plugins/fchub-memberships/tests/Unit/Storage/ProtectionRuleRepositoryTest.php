@@ -154,6 +154,8 @@ final class ProtectionRuleRepositoryTest extends PluginTestCase
         self::assertSame(33, $createdId);
         self::assertSame(['55', '99'], $protectedIds);
         self::assertSame(['201'], $taxonomyInherited);
+        self::assertSame([201], $GLOBALS['_fchub_test_get_posts_args'][0]['post__in'] ?? []);
+        self::assertArrayNotHasKey('tax_query', $GLOBALS['_fchub_test_get_posts_args'][0]);
         self::assertTrue($repo->isProtected('post', '55'));
         self::assertCount(1, $updated);
         self::assertCount(1, $inserted);

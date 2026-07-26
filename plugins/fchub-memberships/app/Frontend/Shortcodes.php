@@ -136,6 +136,7 @@ class Shortcodes
                 if (!empty($plan['expires_at'])) {
                     $html .= '<span class="fchub-plan-expiry">';
                     $html .= sprintf(
+                        /* translators: Placeholder values are runtime membership details included in this message. */
                         esc_html__('Expires: %s', 'fchub-memberships'),
                         wp_date(get_option('date_format'), strtotime($plan['expires_at']))
                     );
@@ -355,6 +356,7 @@ class Shortcodes
         $html .= '</div>';
         $html .= '<div class="fchub-drip-progress-text">';
         $html .= sprintf(
+            /* translators: Placeholder values are runtime membership details included in this message. */
             esc_html__('%1$d of %2$d items unlocked (%3$d%%)', 'fchub-memberships'),
             $unlocked,
             $total,

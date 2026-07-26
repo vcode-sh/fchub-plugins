@@ -35,6 +35,7 @@ class Przelewy24API
         $shopId = (int) $this->settings->getShopId();
         $crcKey = $this->settings->getCrcKey();
 
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- P24 signs this exact JSON representation.
         $signData = json_encode([
             'sessionId'  => $params['sessionId'],
             'merchantId' => $merchantId,
@@ -62,6 +63,7 @@ class Przelewy24API
     {
         $crcKey = $this->settings->getCrcKey();
 
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- P24 signs this exact JSON representation.
         $signData = json_encode([
             'sessionId' => $params['sessionId'],
             'orderId'   => $params['orderId'],
@@ -95,10 +97,7 @@ class Przelewy24API
             $params['amount'] = $amount;
         }
         $params['currency'] = $currency;
-
-        if (!empty($params)) {
-            $endpoint .= '?' . http_build_query($params);
-        }
+        $endpoint .= '?' . http_build_query($params);
 
         return $this->request('GET', $endpoint);
     }
@@ -146,6 +145,7 @@ class Przelewy24API
     {
         $crcKey = $this->settings->getCrcKey();
 
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- P24 signs this exact JSON representation.
         $signData = json_encode([
             'orderId'     => (int) $notification['orderId'],
             'sessionId'   => $notification['sessionId'],
@@ -172,6 +172,7 @@ class Przelewy24API
     {
         $crcKey = $this->settings->getCrcKey();
 
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- P24 signs this exact JSON representation.
         $signData = json_encode([
             'merchantId'   => (int) $notification['merchantId'],
             'posId'        => (int) $notification['posId'],
@@ -200,7 +201,21 @@ class Przelewy24API
      */
     private function request(string $method, string $endpoint, array $body = []): array
     {
+        if (!$this->settings->hasCompleteCredentials()) {
+            return [
+                'error' => __('Complete Przelewy24 credentials are required.', 'fchub-p24'),
+                'code' => 400,
+            ];
+        }
+
         $url = $this->settings->getBaseUrl() . $endpoint;
+        if (!$this->isAllowedUrl($url)) {
+            return [
+                'error' => __('Invalid Przelewy24 API endpoint.', 'fchub-p24'),
+                'code' => 400,
+            ];
+        }
+
         $shopId = $this->settings->getShopId();
         $apiKey = $this->settings->getApiKey();
 
@@ -208,42 +223,105 @@ class Przelewy24API
             'method'  => $method,
             'headers' => [
                 'Content-Type'  => 'application/json',
+                // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- HTTP Basic authentication requires Base64.
                 'Authorization' => 'Basic ' . base64_encode($shopId . ':' . $apiKey),
             ],
             'timeout' => 30,
+            'redirection' => 0,
+            'sslverify' => true,
+            'limit_response_size' => 2 * 1024 * 1024,
         ];
 
         if (!empty($body)) {
-            $args['body'] = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            try {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- JSON_THROW_ON_ERROR is required here.
+                $args['body'] = json_encode(
+                    $body,
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+                );
+            } catch (\JsonException $exception) {
+                return [
+                    'error' => __('Unable to encode the Przelewy24 request.', 'fchub-p24'),
+                    'code' => 400,
+                ];
+            }
         }
 
         $response = wp_remote_request($url, $args);
 
         if (is_wp_error($response)) {
             return [
-                'error' => $response->get_error_message(),
-                'code'  => 500,
+                'error' => __('Przelewy24 request failed.', 'fchub-p24'),
+                'code' => 502,
             ];
         }
 
         $statusCode = wp_remote_retrieve_response_code($response);
         $rawBody = wp_remote_retrieve_body($response);
-        $responseBody = json_decode($rawBody, true);
+        try {
+            $responseBody = json_decode($rawBody, true, 32, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            return [
+                'error' => __('Invalid response from Przelewy24.', 'fchub-p24'),
+                'code' => $statusCode,
+            ];
+        }
+
+        if (!is_array($responseBody) || array_is_list($responseBody)) {
+            return [
+                'error' => __('Invalid response from Przelewy24.', 'fchub-p24'),
+                'code' => $statusCode,
+            ];
+        }
 
         if ($statusCode >= 400) {
             return [
-                'error' => $responseBody['error'] ?? __('Unknown error', 'fchub-p24'),
-                'code'  => $statusCode,
+                'error' => $this->redactError($responseBody['error'] ?? __('Unknown error', 'fchub-p24')),
+                'code' => $statusCode,
             ];
         }
 
-        if ($responseBody === null) {
-            return [
-                'error' => __('Invalid response from Przelewy24', 'fchub-p24'),
-                'code'  => $statusCode,
-            ];
+        return $responseBody;
+    }
+
+    private function isAllowedUrl(string $url): bool
+    {
+        $parts = wp_parse_url($url);
+        if (!is_array($parts)) {
+            return false;
         }
 
-        return $responseBody ?: [];
+        $allowedHosts = ['sandbox.przelewy24.pl', 'secure.przelewy24.pl'];
+
+        return ($parts['scheme'] ?? '') === 'https'
+            && in_array($parts['host'] ?? '', $allowedHosts, true)
+            && !isset($parts['user'])
+            && !isset($parts['pass'])
+            && !isset($parts['port']);
+    }
+
+    /**
+     * @param mixed $error
+     * @return string|array
+     */
+    private function redactError($error)
+    {
+        if (is_array($error)) {
+            $safeError = [];
+            foreach ($error as $key => $value) {
+                $safeError[$key] = $this->redactError($value);
+            }
+
+            return $safeError;
+        }
+
+        $message = sanitize_text_field(wp_strip_all_tags((string) $error));
+        foreach (array_filter([$this->settings->getApiKey(), $this->settings->getCrcKey()]) as $secret) {
+            $message = str_replace($secret, '[redacted]', $message);
+        }
+
+        $message = preg_replace('/Basic\s+[A-Za-z0-9+\/=]+/i', 'Basic [redacted]', $message);
+
+        return mb_substr((string) $message, 0, 200);
     }
 }

@@ -165,20 +165,22 @@ class CsvParser
 
     private function csvToArray(string $content, string $delimiter): array
     {
-        $stream = fopen('php://temp', 'r+');
-        fwrite($stream, $content);
-        rewind($stream);
+        $stream = new \SplTempFileObject();
+        $stream->fwrite($content);
+        $stream->rewind();
 
-        $headers = fgetcsv($stream, 0, $delimiter, '"', '\\');
+        $headers = $stream->fgetcsv($delimiter, '"', '\\');
         if ($headers === false) {
-            fclose($stream);
             return [];
         }
-        $headers = array_map('trim', $headers);
+        $headers = array_map(
+            static fn (?string $header): string => trim((string) $header),
+            $headers,
+        );
         $count = count($headers);
 
         $rows = [];
-        while (($values = fgetcsv($stream, 0, $delimiter, '"', '\\')) !== false) {
+        while (!$stream->eof() && ($values = $stream->fgetcsv($delimiter, '"', '\\')) !== false) {
             if (count($values) === 1 && ($values[0] === null || trim($values[0]) === '')) {
                 continue; // skip blank lines
             }
@@ -192,7 +194,6 @@ class CsvParser
             $rows[] = array_combine($headers, $values);
         }
 
-        fclose($stream);
         return $rows;
     }
 }

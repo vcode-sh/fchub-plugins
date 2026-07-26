@@ -30,7 +30,8 @@ final class PlanRuleValidationService
 
             if ($resourceType !== '' && !$this->registry->isValid($resourceType)) {
                 return sprintf(
-                    __('Rule #%d: invalid resource type "%s".', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Rule #%1$d: invalid resource type "%2$s".', 'fchub-memberships'),
                     $ruleNum,
                     $resourceType
                 );
@@ -47,14 +48,16 @@ final class PlanRuleValidationService
             ) {
                 if (in_array($resourceId, ['0', '*'], true)) {
                     return sprintf(
-                        __('Rule #%d: resource type "%s" does not support all resources; choose a positive resource ID.', 'fchub-memberships'),
+                        /* translators: Placeholder values are runtime membership details included in this message. */
+                        __('Rule #%1$d: resource type "%2$s" does not support all resources; choose a positive resource ID.', 'fchub-memberships'),
                         $ruleNum,
                         $resourceType
                     );
                 }
 
                 return sprintf(
-                    __('Rule #%d: resource type "%s" requires a positive resource ID.', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Rule #%1$d: resource type "%2$s" requires a positive resource ID.', 'fchub-memberships'),
                     $ruleNum,
                     $resourceType
                 );
@@ -69,14 +72,16 @@ final class PlanRuleValidationService
                 )
             ) {
                 return sprintf(
-                    __('Rule #%d: resource type "%s" requires a sanitised resource slug.', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Rule #%1$d: resource type "%2$s" requires a sanitised resource slug.', 'fchub-memberships'),
                     $ruleNum,
                     $resourceType
                 );
             }
             if ($resourceType === 'fc_badge' && !$this->isInstalledBadgeSlug($resourceId)) {
                 return sprintf(
-                    __('Rule #%d: FluentCommunity badge slug "%s" is not installed.', 'fchub-memberships'),
+                    /* translators: Placeholder values are runtime membership details included in this message. */
+                    __('Rule #%1$d: FluentCommunity badge slug "%2$s" is not installed.', 'fchub-memberships'),
                     $ruleNum,
                     $resourceId
                 );
@@ -86,6 +91,7 @@ final class PlanRuleValidationService
 
             if ($dripType === 'fixed_date' && empty($rule['drip_date'])) {
                 return sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     __('Rule #%d: drip_date is required when drip type is "Fixed Date".', 'fchub-memberships'),
                     $ruleNum
                 );
@@ -95,6 +101,7 @@ final class PlanRuleValidationService
                 $dripDate = strtotime($rule['drip_date']);
                 if ($dripDate && $dripDate < strtotime('today')) {
                     return sprintf(
+                        /* translators: Placeholder values are runtime membership details included in this message. */
                         __('Rule #%d: drip date cannot be in the past.', 'fchub-memberships'),
                         $ruleNum
                     );
@@ -105,6 +112,7 @@ final class PlanRuleValidationService
                 $delayDays = (int) ($rule['drip_delay_days'] ?? 0);
                 if ($delayDays < 1 || $delayDays > 730) {
                     return sprintf(
+                        /* translators: Placeholder values are runtime membership details included in this message. */
                         __('Rule #%d: delay days must be between 1 and 730.', 'fchub-memberships'),
                         $ruleNum
                     );

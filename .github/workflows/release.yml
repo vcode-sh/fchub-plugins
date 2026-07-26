@@ -20,16 +20,18 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  prepare:
+    name: Validate release tag
     runs-on: ubuntu-latest
-    # An FCHub tag runs the disposable-WordPress harness and a Playwright
-    # install in this job, so it can stand up containers and pull images. The
-    # default ceiling is six hours; a wedged pull should not hold a runner for
-    # most of a working day when the whole job takes minutes.
-    timeout-minutes: 60
+    outputs:
+      slug: ${{ steps.tag.outputs.slug }}
+      version: ${{ steps.tag.outputs.version }}
+      is_wporg: ${{ steps.tag.outputs.is_wporg }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Parse tag
         id: tag
@@ -39,6 +41,8 @@ jobs:
           VERSION="${TAG#*/v}"
           echo "slug=$PLUGIN_SLUG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          IS_WPORG=$(node -e 'const manifest=require("./wporg/plugins.json"); process.stdout.write(String(Object.hasOwn(manifest.plugins, process.argv[1])))' "$PLUGIN_SLUG")
+          echo "is_wporg=$IS_WPORG" >> "$GITHUB_OUTPUT"
           echo "Plugin: $PLUGIN_SLUG, Version: $VERSION"
 
       - name: Validate version in plugin header
@@ -71,73 +75,38 @@ jobs:
             exit 1
           fi
 
+  wporg-gates:
+    name: WordPress.org tag gates
+    needs: prepare
+    if: needs.prepare.outputs.is_wporg == 'true'
+    uses: ./.github/workflows/wporg-release-gates.yml
+    with:
+      tagged_slug: ${{ needs.prepare.outputs.slug }}
+      tagged_version: ${{ needs.prepare.outputs.version }}
+
+  release:
+    name: Publish release
+    needs: [prepare, wporg-gates]
+    if: >-
+      always() &&
+      needs.prepare.result == 'success' &&
+      (needs.wporg-gates.result == 'success' ||
+      needs.wporg-gates.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout validated tag SHA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Setup Node.js
-        if: steps.tag.outputs.slug == 'fchub-memberships' || steps.tag.outputs.slug == 'fchub-portal-extender' || steps.tag.outputs.slug == 'fchub-stream'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Setup PHP (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          tools: composer:v2
-          coverage: none
-
-      - name: Install Composer dependencies (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        working-directory: plugins/fchub-memberships
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Audit Composer dependencies (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        working-directory: plugins/fchub-memberships
-        run: composer audit --locked --no-interaction
-
-      - name: Run PHPUnit (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        working-directory: plugins/fchub-memberships
-        run: ./vendor/bin/phpunit
-
-      - name: Install npm dependencies (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        working-directory: plugins/fchub-memberships
-        run: npm ci
-
-      - name: Audit npm dependencies (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        working-directory: plugins/fchub-memberships
-        run: npm audit --audit-level=high
-
-      - name: Run Vitest (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        working-directory: plugins/fchub-memberships
-        run: npm run test
-
-      - name: Run Playwright (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        working-directory: plugins/fchub-memberships
-        run: |
-          npx playwright install --with-deps chromium
-          npm run test:smoke
-
-      - name: Build assets (fchub-memberships)
-        if: steps.tag.outputs.slug == 'fchub-memberships'
-        working-directory: plugins/fchub-memberships
-        run: |
-          npm run build
-
-          if [ ! -d "assets/dist" ] || [ -z "$(ls -A assets/dist)" ]; then
-            echo "::error::Build failed — assets/dist/ is empty"
-            exit 1
-          fi
-
-          echo "Build output:"
-          ls -la assets/dist/
+          node-version: '24'
 
       - name: Build assets (fchub-portal-extender)
-        if: steps.tag.outputs.slug == 'fchub-portal-extender'
+        if: needs.prepare.outputs.slug == 'fchub-portal-extender'
         working-directory: plugins/fchub-portal-extender
         run: |
           npm ci
@@ -152,7 +121,7 @@ jobs:
           ls -la assets/dist/
 
       - name: Build assets (fchub-stream)
-        if: steps.tag.outputs.slug == 'fchub-stream'
+        if: needs.prepare.outputs.slug == 'fchub-stream'
         run: |
           cd plugins/fchub-stream/admin-app
           npm ci
@@ -179,44 +148,44 @@ jobs:
           ls -la dist/
 
       - name: Sync GitHubUpdater
-        # Every product except the hub. FCHub carries a namespaced updater of its
-        # own, and the shared one would ship beside it as a second, conflicting
-        # copy of the same job.
-        if: steps.tag.outputs.slug != 'fchub'
+        # WordPress.org bridge releases must not restore the updater removed
+        # from their source. Non-directory products retain the existing feed.
+        if: needs.prepare.outputs.is_wporg != 'true'
         run: |
-          SLUG="${{ steps.tag.outputs.slug }}"
+          SLUG="${{ needs.prepare.outputs.slug }}"
           PLUGIN_DIR="plugins/${SLUG}"
           mkdir -p "${PLUGIN_DIR}/lib"
           cp lib/GitHubUpdater.php "${PLUGIN_DIR}/lib/GitHubUpdater.php"
           echo "Synced GitHubUpdater into ${SLUG}"
 
-      - name: Build ZIP
+      - name: Build non-WordPress.org ZIP
+        if: needs.prepare.outputs.is_wporg != 'true'
         run: |
-          SLUG="${{ steps.tag.outputs.slug }}"
-          VERSION="${{ steps.tag.outputs.version }}"
-          PLUGIN_DIR="plugins/${SLUG}"
+          bash build.sh "${{ needs.prepare.outputs.slug }}"
+
+      - name: Download validated WordPress.org ZIP
+        if: needs.prepare.outputs.is_wporg == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: wporg-package-${{ needs.prepare.outputs.slug }}
+          path: dist
+
+      - name: Locate release ZIP
+        run: |
+          SLUG="${{ needs.prepare.outputs.slug }}"
+          VERSION="${{ needs.prepare.outputs.version }}"
           ZIP_NAME="${SLUG}-${VERSION}.zip"
+          ZIP_PATH="${GITHUB_WORKSPACE}/dist/${ZIP_NAME}"
 
-          tmp_dir=$(mktemp -d)
-
-          # Build rsync exclude args from .distignore
-          exclude_args=()
-          if [ -f "${PLUGIN_DIR}/.distignore" ]; then
-            while IFS= read -r line || [ -n "$line" ]; do
-              [[ -z "$line" || "$line" =~ ^# ]] && continue
-              exclude_args+=(--exclude="$line")
-            done < "${PLUGIN_DIR}/.distignore"
+          if [ ! -f "$ZIP_PATH" ]; then
+            echo "::error::Validated release package not found: $ZIP_PATH"
+            exit 1
           fi
-
-          rsync -a "${exclude_args[@]}" "${PLUGIN_DIR}/" "${tmp_dir}/${SLUG}/"
-
-          (cd "$tmp_dir" && zip -qr "${GITHUB_WORKSPACE}/${ZIP_NAME}" "${SLUG}/")
-
           echo "zip_name=$ZIP_NAME" >> "$GITHUB_ENV"
-          echo "zip_path=${GITHUB_WORKSPACE}/${ZIP_NAME}" >> "$GITHUB_ENV"
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_ENV"
 
-          echo "Created: $ZIP_NAME"
-          ls -lh "${GITHUB_WORKSPACE}/${ZIP_NAME}"
+          echo "Validated: $ZIP_NAME"
+          ls -lh "$ZIP_PATH"
 
       - name: Create checksum sidecar
         # Every product, not only the hub. FCHub verifies what it downloads
@@ -238,7 +207,7 @@ jobs:
       - name: Generate release notes
         id: notes
         run: |
-          SLUG="${{ steps.tag.outputs.slug }}"
+          SLUG="${{ needs.prepare.outputs.slug }}"
 
           # Get commits since last tag for this plugin
           PREV_TAG=$(git tag -l "${SLUG}/v*" --sort=-v:refname | head -2 | tail -1)
@@ -250,7 +219,7 @@ jobs:
           fi
 
           if [ -z "$NOTES" ]; then
-            NOTES="- Release ${SLUG} v${{ steps.tag.outputs.version }}"
+            NOTES="- Release ${SLUG} v${{ needs.prepare.outputs.version }}"
           fi
 
           # Write to file to handle multiline
@@ -261,8 +230,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          SLUG="${{ steps.tag.outputs.slug }}"
-          VERSION="${{ steps.tag.outputs.version }}"
+          SLUG="${{ needs.prepare.outputs.slug }}"
+          VERSION="${{ needs.prepare.outputs.version }}"
 
           gh release create "${GITHUB_REF_NAME}" \
             "${zip_path}" \

@@ -2,12 +2,15 @@
 // If uninstall not called from WordPress, die.
 defined('WP_UNINSTALL_PLUGIN') || exit;
 
-$settings = get_option('fchub_memberships_settings', []);
-$removeData = isset($settings['uninstall_remove_data']) && $settings['uninstall_remove_data'] === 'yes';
+(static function (): void {
+    $settings = get_option('fchub_memberships_settings', []);
+    $removeData = isset($settings['uninstall_remove_data']) && $settings['uninstall_remove_data'] === 'yes';
 
-if ($removeData) {
+    if (!$removeData) {
+        return;
+    }
+
     require_once __DIR__ . '/app/Support/Migrations.php';
-
     \FChubMemberships\Support\Migrations::dropAll();
 
     $recurringHooks = [
@@ -65,4 +68,4 @@ if ($removeData) {
     if ($administrator) {
         $administrator->remove_cap('manage_fchub_memberships');
     }
-}
+})();

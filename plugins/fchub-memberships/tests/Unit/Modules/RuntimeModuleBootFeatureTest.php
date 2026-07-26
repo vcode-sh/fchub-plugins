@@ -155,7 +155,7 @@ namespace FChubMemberships\Tests\Unit\Modules {
             self::assertNotEmpty($GLOBALS['_fchub_test_dbdelta']);
             self::assertStringContainsString(
                 'ADD COLUMN owner_token',
-                serialize($GLOBALS['_fchub_test_queries'])
+                str_replace('`', '', serialize($GLOBALS['_fchub_test_queries']))
             );
             self::assertSame(FCHUB_MEMBERSHIPS_DB_VERSION, $GLOBALS['_fchub_test_options']['fchub_memberships_db_version']);
             self::assertSame([], $failures);
@@ -285,7 +285,7 @@ namespace FChubMemberships\Tests\Unit\Modules {
                 return 0;
             };
             $GLOBALS['_fchub_test_wpdb_overrides']['query'] = static function (string $query) use (&$repairComplete): int {
-                if (str_contains($query, 'ADD COLUMN owner_token')) {
+                if (str_contains(str_replace('`', '', $query), 'ADD COLUMN owner_token')) {
                     $repairComplete = true;
                     return 1;
                 }

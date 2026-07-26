@@ -26,7 +26,7 @@ class PlanRepository
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_plans';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
     }
 
     public function find(int $id): ?array
@@ -37,7 +37,7 @@ class PlanRepository
         }
 
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE id = %d",
             $id
         ), ARRAY_A);
@@ -78,7 +78,7 @@ class PlanRepository
         if ($missing !== []) {
             global $wpdb;
             $placeholders = implode(', ', array_fill(0, count($missing), '%d'));
-            $rows = $wpdb->get_results($wpdb->prepare(
+            $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT * FROM {$this->table} WHERE id IN ({$placeholders})",
                 ...$missing
             ), ARRAY_A);
@@ -114,7 +114,7 @@ class PlanRepository
         }
 
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE slug = %s",
             $slug
         ), ARRAY_A);
@@ -135,8 +135,8 @@ class PlanRepository
     {
         global $wpdb;
 
-        $where = ['1=1'];
-        $params = [];
+        $where = ['1=%d'];
+        $params = [1];
 
         if (!empty($filters['status'])) {
             $where[] = 'status = %s';
@@ -161,14 +161,12 @@ class PlanRepository
             $page = max(1, (int) ($filters['page'] ?? 1));
             $perPage = (int) $filters['per_page'];
             $offset = ($page - 1) * $perPage;
-            $sql .= $wpdb->prepare(' LIMIT %d OFFSET %d', $perPage, $offset);
+            $sql .= \FChubMemberships\Support\CustomTableDatabase::prepare(' LIMIT %d OFFSET %d', $perPage, $offset)->sql();
         }
 
-        if ($params) {
-            $sql = $wpdb->prepare($sql, ...$params);
-        }
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params);
 
-        $rows = $wpdb->get_results($sql, ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults($query, ARRAY_A);
         if (!empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to read membership plans.');
         }
@@ -183,8 +181,8 @@ class PlanRepository
     {
         global $wpdb;
 
-        $grantsTable = $wpdb->prefix . 'fchub_membership_grants';
-        $rulesTable = $wpdb->prefix . 'fchub_membership_plan_rules';
+        $grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
+        $rulesTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plan_rules');
         $now = current_time('mysql');
         $where = ['1=1'];
         $params = [$now, $now];
@@ -231,7 +229,7 @@ class PlanRepository
             $params[] = $offset;
         }
 
-        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params), ARRAY_A);
         if (!empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to read membership plans.');
         }
@@ -243,8 +241,8 @@ class PlanRepository
     {
         global $wpdb;
 
-        $where = ['1=1'];
-        $params = [];
+        $where = ['1=%d'];
+        $params = [1];
 
         if (!empty($filters['status'])) {
             $where[] = 'status = %s';
@@ -260,11 +258,9 @@ class PlanRepository
 
         $sql = "SELECT COUNT(*) FROM {$this->table} WHERE " . implode(' AND ', $where);
 
-        if ($params) {
-            $sql = $wpdb->prepare($sql, ...$params);
-        }
+        $query = \FChubMemberships\Support\CustomTableDatabase::prepare($sql, ...$params);
 
-        $count = $wpdb->get_var($sql);
+        $count = \FChubMemberships\Support\CustomTableDatabase::getVar($query);
         if (!empty($wpdb->last_error)) {
             throw new \RuntimeException('Unable to count membership plans.');
         }
@@ -296,7 +292,7 @@ class PlanRepository
             'updated_at'          => $now,
         ];
 
-        $created = $wpdb->insert($this->table, $insert);
+        $created = \FChubMemberships\Support\CustomTableDatabase::insert($this->table, $insert);
         if ($created !== false) {
             self::invalidateAfterWrite();
         }
@@ -335,7 +331,7 @@ class PlanRepository
             }
         }
 
-        $updated = $wpdb->update($this->table, $update, ['id' => $id]) !== false;
+        $updated = \FChubMemberships\Support\CustomTableDatabase::update($this->table, $update, ['id' => $id]) !== false;
         if ($updated) {
             self::invalidateAfterWrite();
         }
@@ -346,7 +342,7 @@ class PlanRepository
     public function delete(int $id): bool
     {
         global $wpdb;
-        $deleted = $wpdb->delete($this->table, ['id' => $id]) !== false;
+        $deleted = \FChubMemberships\Support\CustomTableDatabase::delete($this->table, ['id' => $id]) !== false;
         if ($deleted) {
             self::invalidateAfterWrite();
         }
@@ -367,8 +363,8 @@ class PlanRepository
     public function getMemberCount(int $planId): int
     {
         global $wpdb;
-        $grantsTable = $wpdb->prefix . 'fchub_membership_grants';
-        return (int) $wpdb->get_var($wpdb->prepare(
+        $grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(DISTINCT user_id) FROM {$grantsTable} WHERE plan_id = %d AND status = 'active'",
             $planId
         ));
@@ -377,8 +373,8 @@ class PlanRepository
     public function getRuleCount(int $planId): int
     {
         global $wpdb;
-        $rulesTable = $wpdb->prefix . 'fchub_membership_plan_rules';
-        return (int) $wpdb->get_var($wpdb->prepare(
+        $rulesTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plan_rules');
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$rulesTable} WHERE plan_id = %d",
             $planId
         ));
@@ -387,9 +383,9 @@ class PlanRepository
     public function countGrantHistory(int $planId): int
     {
         global $wpdb;
-        $grantsTable = $wpdb->prefix . 'fchub_membership_grants';
+        $grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
 
-        return (int) $wpdb->get_var($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$grantsTable} WHERE plan_id = %d",
             $planId
         ));
@@ -403,16 +399,19 @@ class PlanRepository
     public function getAdminSummary(): array
     {
         global $wpdb;
-        $rulesTable = $wpdb->prefix . 'fchub_membership_plan_rules';
-        $row = $wpdb->get_row(
-            "SELECT
+        $rulesTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plan_rules');
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT
                 COUNT(*) AS total,
-                SUM(CASE WHEN p.status = 'active' THEN 1 ELSE 0 END) AS active,
-                SUM(CASE WHEN p.status = 'active' AND NOT EXISTS (
+                SUM(CASE WHEN p.status = %s THEN 1 ELSE 0 END) AS active,
+                SUM(CASE WHEN p.status = %s AND NOT EXISTS (
                     SELECT 1 FROM {$rulesTable} r WHERE r.plan_id = p.id
                 ) THEN 1 ELSE 0 END) AS needs_content,
                 SUM(CASE WHEN p.scheduled_status IS NOT NULL AND p.scheduled_at IS NOT NULL THEN 1 ELSE 0 END) AS scheduled
              FROM {$this->table} p",
+                'active',
+                'active',
+            ),
             ARRAY_A
         ) ?: [];
 
@@ -429,14 +428,14 @@ class PlanRepository
         global $wpdb;
 
         if ($excludeId) {
-            return (bool) $wpdb->get_var($wpdb->prepare(
+            return (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
                 "SELECT COUNT(*) FROM {$this->table} WHERE slug = %s AND id != %d",
                 $slug,
                 $excludeId
             ));
         }
 
-        return (bool) $wpdb->get_var($wpdb->prepare(
+        return (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table} WHERE slug = %s",
             $slug
         ));
@@ -460,7 +459,7 @@ class PlanRepository
     {
         global $wpdb;
 
-        $updated = $wpdb->update(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::update(
             $this->table,
             [
                 'scheduled_status' => $scheduledStatus,
@@ -481,7 +480,7 @@ class PlanRepository
         global $wpdb;
 
         $now = current_time('mysql');
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE scheduled_status IS NOT NULL AND scheduled_at IS NOT NULL AND scheduled_at <= %s",
             $now
         ), ARRAY_A);

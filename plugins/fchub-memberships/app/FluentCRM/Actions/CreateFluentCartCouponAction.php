@@ -141,7 +141,8 @@ class CreateFluentCartCouponAction extends BaseAction
         // Build coupon data
         $couponData = [
             'title'      => sprintf(
-                __('Auto: %s%% off for %s', 'fchub-memberships'),
+                /* translators: Placeholder values are runtime membership details included in this message. */
+                __('Auto: %1$s%% off for %2$s', 'fchub-memberships'),
                 $couponType === 'percentage' ? $amount : $amount,
                 $subscriber->email ?: $subscriber->first_name
             ),

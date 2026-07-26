@@ -67,7 +67,7 @@ final class RefreshRatesAction
             $now = gmdate('Y-m-d H:i:s');
             $providerEnum = RateProvider::tryFrom($provider->name()) ?? RateProvider::Manual;
 
-            // Collect quote codes we're about to refresh so we can invalidate them first
+            // Track requested quote codes so an entirely invalid response is a failed refresh.
             $quoteCodes = [];
             foreach ($displayCurrencies as $currency) {
                 $code = is_array($currency) ? ($currency['code'] ?? '') : $currency;
@@ -76,8 +76,7 @@ final class RefreshRatesAction
                 }
             }
 
-            // Delete existing cache entries before writing new ones
-            $this->cache->deleteMany($baseCurrency, $quoteCodes);
+            $persistedCount = 0;
 
             foreach ($displayCurrencies as $currency) {
                 $code = is_array($currency) ? ($currency['code'] ?? '') : $currency;
@@ -119,19 +118,35 @@ final class RefreshRatesAction
                     'fetched_at'     => $now,
                 ]);
 
-                $this->repository->insert($rate);
+                if (!$this->repository->insert($rate)) {
+                    continue;
+                }
+
+                $this->cache->delete($baseCurrency, $code);
                 $this->cache->set($rate);
+                $persistedCount++;
             }
 
-            do_action('fchub_mc/rates_refreshed', $baseCurrency, count($rates));
+            if ($quoteCodes !== [] && $persistedCount === 0) {
+                Logger::error('Rate refresh contained no usable configured rates', [
+                    'provider' => $provider->name(),
+                ]);
+                EventLogger::log('rates_refresh_failed', get_current_user_id(), [
+                    'provider' => $provider->name(),
+                    'reason' => 'invalid_rates',
+                ]);
+                return false;
+            }
+
+            do_action('fchub_mc/rates_refreshed', $baseCurrency, $persistedCount);
             EventLogger::log('rates_refreshed', get_current_user_id(), [
                 'base_currency' => $baseCurrency,
                 'provider' => $provider->name(),
-                'count' => count($rates),
+                'count' => $persistedCount,
             ]);
             Logger::info('Rates refreshed successfully', [
                 'provider' => $provider->name(),
-                'count'    => count($rates),
+                'count'    => $persistedCount,
             ]);
 
             return true;
@@ -161,11 +176,17 @@ final class RefreshRatesAction
         if ($age >= $ttl) {
             // Atomic compare-and-swap: only overwrite if value hasn't changed
             global $wpdb;
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no atomic option compare-and-swap API; the successful write invalidates the option cache below.
             $updated = $wpdb->update(
                 $wpdb->options,
                 ['option_value' => (string) time()],
                 ['option_name' => $lockKey, 'option_value' => $currentLock],
             );
+
+            if ($updated > 0) {
+                wp_cache_delete($lockKey, 'options');
+            }
+
             return $updated > 0;
         }
 

@@ -6,4 +6,4 @@
 
 defined('ABSPATH') || exit;
 ?>
-<span class="fchub-wishlist-counter" data-fchub-wishlist-count aria-label="<?= esc_attr__('Wishlist items', 'fchub-wishlist') ?>"></span>
+<span class="fchub-wishlist-counter" data-fchub-wishlist-count aria-label="<?php echo esc_attr__('Wishlist items', 'fchub-wishlist'); ?>"></span>

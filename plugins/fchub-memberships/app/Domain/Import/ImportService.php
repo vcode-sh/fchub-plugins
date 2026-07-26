@@ -125,15 +125,15 @@ class ImportService
             return null;
         }
 
-        $table = $wpdb->prefix . 'fct_customers';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_customers');
 
         // Check if table exists (FluentCart may not be active)
-        if (!$wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table))) {
+        if (!\FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare("SHOW TABLES LIKE %s", $table))) {
             return null;
         }
 
         // Check existing customer by email
-        $existing = $wpdb->get_row($wpdb->prepare(
+        $existing = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT id FROM {$table} WHERE email = %s LIMIT 1",
             $email
         ), ARRAY_A);
@@ -147,7 +147,7 @@ class ImportService
         $userId = $wpUser ? $wpUser->ID : null;
 
         $now = current_time('mysql');
-        $wpdb->insert($table, [
+        \FChubMemberships\Support\CustomTableDatabase::insert($table, [
             'user_id'    => $userId,
             'email'      => $email,
             'first_name' => $member['first_name'] ?? '',

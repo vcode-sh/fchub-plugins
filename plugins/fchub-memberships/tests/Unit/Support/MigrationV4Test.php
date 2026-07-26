@@ -36,7 +36,7 @@ final class MigrationV4Test extends PluginTestCase
 
         MigrationV4::run();
 
-        $sql = strtolower(serialize($GLOBALS['_fchub_test_queries']));
+        $sql = str_replace('`', '', strtolower(serialize($GLOBALS['_fchub_test_queries'])));
         foreach ([
             'state',
             'owner_token',
@@ -141,8 +141,11 @@ final class MigrationV4Test extends PluginTestCase
 
             return [['present' => true]];
         };
-        $GLOBALS['_fchub_test_wpdb_overrides']['query'] = static fn(string $query): int|false =>
-            str_contains($query, $queryNeedle) ? false : 0;
+        $GLOBALS['_fchub_test_wpdb_overrides']['query'] = static function (string $query) use ($queryNeedle): int|false {
+            $normalised = str_replace('`', '', $query);
+
+            return str_contains($normalised, $queryNeedle) ? false : 0;
+        };
 
         $failures = MigrationV4::run();
 

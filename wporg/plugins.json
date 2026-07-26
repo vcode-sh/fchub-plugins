@@ -1,0 +1,89 @@
+{
+  "plugins": {
+    "fchub-memberships": {
+      "displayName": "FCHub Memberships",
+      "mainFile": "fchub-memberships.php",
+      "firstWpOrgVersion": "1.4.1",
+      "previousRelease": {
+        "version": "1.4.0",
+        "tag": "fchub-memberships/v1.4.0",
+        "commit": "fc4b2b1036b82414f47c6593e87de4946ae994d4",
+        "asset": "fchub-memberships-1.4.0.zip",
+        "sha256": "5b5bad44770ec39a5f9ea7f7b35018267dd0fbe1d9293b752458d46ade841802"
+      },
+      "requiresWordPress": "7.0",
+      "requiresPhp": "8.3",
+      "testedUpTo": "7.0",
+      "assetSource": "wporg/assets/fchub-memberships",
+      "requiresPlugins": ["fluent-cart"]
+    },
+    "fchub-wishlist": {
+      "displayName": "FCHub Wishlist",
+      "mainFile": "fchub-wishlist.php",
+      "firstWpOrgVersion": "1.0.2",
+      "previousRelease": {
+        "version": "1.0.1",
+        "tag": "fchub-wishlist/v1.0.1",
+        "commit": "23bf80dbd3e0168083e155d7c88116c563af76a2",
+        "asset": "fchub-wishlist-1.0.1.zip",
+        "sha256": "4a0be059a06c6c56c985b34d61cf6413295a4e58fe8ba550c4e9cd26342d7737"
+      },
+      "requiresWordPress": "7.0",
+      "requiresPhp": "8.3",
+      "testedUpTo": "7.0",
+      "assetSource": "wporg/assets/fchub-wishlist",
+      "requiresPlugins": ["fluent-cart"]
+    },
+    "fchub-multi-currency": {
+      "displayName": "FCHub Multi-Currency",
+      "mainFile": "fchub-multi-currency.php",
+      "firstWpOrgVersion": "1.4.1",
+      "previousRelease": {
+        "version": "1.4.0",
+        "tag": "fchub-multi-currency/v1.4.0",
+        "commit": "f92a5f101c719146b06982f8e83acce4393df0ff",
+        "asset": "fchub-multi-currency-1.4.0.zip",
+        "sha256": "c235fc3384eb938008e5cde468a4a242d2aeecf41a2c892f375ca160230d55a0"
+      },
+      "requiresWordPress": "7.0",
+      "requiresPhp": "8.3",
+      "testedUpTo": "7.0",
+      "assetSource": "wporg/assets/fchub-multi-currency",
+      "requiresPlugins": ["fluent-cart"]
+    },
+    "fchub-p24": {
+      "displayName": "FCHub Przelewy24",
+      "mainFile": "fchub-p24.php",
+      "firstWpOrgVersion": "1.0.4",
+      "previousRelease": {
+        "version": "1.0.3",
+        "tag": "fchub-p24/v1.0.3",
+        "commit": "23bf80dbd3e0168083e155d7c88116c563af76a2",
+        "asset": "fchub-p24-1.0.3.zip",
+        "sha256": "d39712c3b0e59776b372468e0c94b10e550b7c2f727b2f53db34debd3fb6a6b4"
+      },
+      "requiresWordPress": "7.0",
+      "requiresPhp": "8.3",
+      "testedUpTo": "7.0",
+      "assetSource": "wporg/assets/fchub-p24",
+      "requiresPlugins": ["fluent-cart"]
+    },
+    "fchub-fakturownia": {
+      "displayName": "FCHub Fakturownia",
+      "mainFile": "fchub-fakturownia.php",
+      "firstWpOrgVersion": "1.1.2",
+      "previousRelease": {
+        "version": "1.1.1",
+        "tag": "fchub-fakturownia/v1.1.1",
+        "commit": "57640fed9823dbc3405d15de322b9451c01fbd54",
+        "asset": "fchub-fakturownia-1.1.1.zip",
+        "sha256": "ecb63aea5a7662e0debca50f498584132a1e15cb2d3f8ea20b9a622c3badf793"
+      },
+      "requiresWordPress": "7.0",
+      "requiresPhp": "8.3",
+      "testedUpTo": "7.0",
+      "assetSource": "wporg/assets/fchub-fakturownia",
+      "requiresPlugins": ["fluent-cart"]
+    }
+  }
+}

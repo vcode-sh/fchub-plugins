@@ -15,7 +15,7 @@ class EventLockRepository
     public function __construct(?Clock $clock = null)
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'fchub_membership_event_locks';
+        $this->table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_event_locks');
         $this->clock = $clock ?? new Clock();
     }
 
@@ -33,7 +33,7 @@ class EventLockRepository
     public function isProcessed(string $eventHash): bool
     {
         global $wpdb;
-        return (bool) $wpdb->get_var($wpdb->prepare(
+        return (bool) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COUNT(*) FROM {$this->table} WHERE event_hash = %s AND state = 'succeeded'",
             $eventHash
         ));
@@ -70,7 +70,7 @@ class EventLockRepository
         $params[] = $leaseStorage;
         $params[] = $nowStorage;
 
-        $insertQuery = $wpdb->prepare(
+        $insertQuery = \FChubMemberships\Support\CustomTableDatabase::prepare(
             "INSERT INTO {$this->table}
              (event_hash, order_id, subscription_id, feed_id, trigger_name, processed_at,
               state, owner_token, lease_expires_at, attempt_count, retryable, next_retry_at,
@@ -85,7 +85,7 @@ class EventLockRepository
             $previousSuppression = (bool) $wpdb->suppress_errors(true);
         }
         try {
-            $inserted = $wpdb->query($insertQuery);
+            $inserted = \FChubMemberships\Support\CustomTableDatabase::query($insertQuery);
         } finally {
             if ($canSuppressErrors) {
                 $wpdb->suppress_errors($previousSuppression);
@@ -97,7 +97,7 @@ class EventLockRepository
 
         $row = $this->findByHash($eventHash);
         if ($row === null) {
-            throw new \RuntimeException("Unable to claim event lock {$eventHash}.");
+            throw new \RuntimeException(sprintf('Unable to claim event lock %s.', esc_html($eventHash)));
         }
 
         return $this->classifyClaim($row, $eventHash, $ownerToken, $now, $nowStorage, $leaseStorage, true);
@@ -110,7 +110,7 @@ class EventLockRepository
         global $wpdb;
         $now = $this->clock->now();
         $nowStorage = $this->clock->storage($now);
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = 'succeeded',
                  owner_token = NULL,
@@ -149,9 +149,13 @@ class EventLockRepository
         $now = $this->clock->now();
         $nowStorage = $this->clock->storage($now);
         $retryableValue = $retryable ? 1 : 0;
-        $nextRetry = $retryable ? $wpdb->prepare('%s', $nowStorage) : 'NULL';
-        $completedAt = $retryable ? 'NULL' : $wpdb->prepare('%s', $nowStorage);
-        $updated = $wpdb->query($wpdb->prepare(
+        $nextRetry = $retryable
+            ? \FChubMemberships\Support\CustomTableDatabase::prepare('%s', $nowStorage)->sql()
+            : 'NULL';
+        $completedAt = $retryable
+            ? 'NULL'
+            : \FChubMemberships\Support\CustomTableDatabase::prepare('%s', $nowStorage)->sql();
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = 'failed',
                  owner_token = NULL,
@@ -215,7 +219,7 @@ class EventLockRepository
         $params[] = $now;
         $params[] = $now;
 
-        $result = $wpdb->query($wpdb->prepare(
+        $result = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "INSERT IGNORE INTO {$this->table}
              (event_hash, order_id, subscription_id, feed_id, trigger_name, processed_at,
               result, error, state, owner_token, lease_expires_at, attempt_count, retryable,
@@ -236,7 +240,7 @@ class EventLockRepository
         global $wpdb;
         $now = $this->clock->storage($this->clock->now());
 
-        $wpdb->update(
+        \FChubMemberships\Support\CustomTableDatabase::update(
             $this->table,
             [
                 'state' => 'failed',
@@ -260,7 +264,7 @@ class EventLockRepository
     public function getByOrderId(int $orderId): array
     {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE order_id = %d ORDER BY processed_at DESC",
             $orderId
         ), ARRAY_A);
@@ -280,7 +284,7 @@ class EventLockRepository
         global $wpdb;
         $cutoff = $this->clock->storage($this->clock->plusDays(-$days));
 
-        return (int) $wpdb->query($wpdb->prepare(
+        return (int) \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "DELETE FROM {$this->table}
              WHERE (state = 'succeeded' OR (state = 'failed' AND retryable = 0))
                AND completed_at IS NOT NULL
@@ -293,7 +297,7 @@ class EventLockRepository
     private function findByHash(string $eventHash): ?array
     {
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = \FChubMemberships\Support\CustomTableDatabase::getRow(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT * FROM {$this->table} WHERE event_hash = %s LIMIT 1",
             $eventHash
         ), ARRAY_A);
@@ -368,25 +372,28 @@ class EventLockRepository
         $previousOwner = $row['owner_token'] ?? null;
         $ownerCondition = $previousOwner === null
             ? 'owner_token IS NULL'
-            : $wpdb->prepare('owner_token = %s', (string) $previousOwner);
+            : \FChubMemberships\Support\CustomTableDatabase::prepare(
+                'owner_token = %s',
+                (string) $previousOwner,
+            )->sql();
 
         if ($state === 'processing') {
             $previousTiming = (string) ($row['lease_expires_at'] ?? '');
-            $timingCondition = $wpdb->prepare(
+            $timingCondition = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 'lease_expires_at = %s AND lease_expires_at <= %s',
                 $previousTiming,
                 $nowStorage
-            );
+            )->sql();
         } else {
             $previousTiming = (string) ($row['next_retry_at'] ?? '');
-            $timingCondition = $wpdb->prepare(
+            $timingCondition = \FChubMemberships\Support\CustomTableDatabase::prepare(
                 'retryable = 1 AND next_retry_at = %s AND next_retry_at <= %s',
                 $previousTiming,
                 $nowStorage
-            );
+            )->sql();
         }
 
-        $updated = $wpdb->query($wpdb->prepare(
+        $updated = \FChubMemberships\Support\CustomTableDatabase::query(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "UPDATE {$this->table}
              SET state = 'processing',
                  owner_token = %s,
@@ -414,7 +421,7 @@ class EventLockRepository
             $attemptCount
         ));
         if ($updated === false) {
-            throw new \RuntimeException("Unable to reclaim event lock {$eventHash}.");
+            throw new \RuntimeException(sprintf('Unable to reclaim event lock %s.', esc_html($eventHash)));
         }
         if ($wpdb->rows_affected === 1) {
             return EventClaimResult::acquired();
@@ -422,7 +429,9 @@ class EventLockRepository
 
         $current = $this->findByHash($eventHash);
         if ($current === null) {
-            throw new \RuntimeException("Unable to classify event lock {$eventHash} after a lost race.");
+            throw new \RuntimeException(
+                sprintf('Unable to classify event lock %s after a lost race.', esc_html($eventHash))
+            );
         }
 
         return $this->classifyClaim($current, $eventHash, $ownerToken, $now, $nowStorage, $leaseStorage, false);
@@ -454,7 +463,7 @@ class EventLockRepository
             }
             $value = $context[$key];
             if (!$this->isStorageSafeInteger($value)) {
-                throw new \InvalidArgumentException("{$key} must be a non-negative integer.");
+                throw new \InvalidArgumentException(sprintf('%s must be a non-negative integer.', esc_html($key)));
             }
         }
         if (isset($context['trigger']) && !is_string($context['trigger'])) {

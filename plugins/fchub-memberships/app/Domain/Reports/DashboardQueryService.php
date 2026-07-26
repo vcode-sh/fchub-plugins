@@ -80,6 +80,7 @@ final class DashboardQueryService
                 'severity' => 'error',
                 'title' => __('Failed notifications', 'fchub-memberships'),
                 'description' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     _n(
                         '%d failed drip notification requires attention.',
                         '%d failed drip notifications require attention.',
@@ -99,6 +100,7 @@ final class DashboardQueryService
                 'severity' => 'warning',
                 'title' => __('Upcoming expirations', 'fchub-memberships'),
                 'description' => sprintf(
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     _n(
                         '%d membership expires in the next 7 days.',
                         '%d memberships expire in the next 7 days.',

@@ -371,7 +371,9 @@ final class CommunityMemberContext
             $providerResources[$key] = [
                 'id' => (int) $resourceId,
                 'title' => $resourceType === 'fc_course'
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     ? sprintf(__('Course #%d', 'fchub-memberships'), (int) $resourceId)
+                    /* translators: Placeholder values are runtime membership details included in this message. */
                     : sprintf(__('Space #%d', 'fchub-memberships'), (int) $resourceId),
                 'resource_type' => $resourceType,
                 'progress' => null,

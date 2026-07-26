@@ -11,7 +11,7 @@ final class MigrationV7
     {
         global $wpdb;
 
-        $table = $wpdb->prefix . 'fchub_membership_mutation_requests';
+        $table = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_mutation_requests');
         $charset = $wpdb->get_charset_collate();
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';

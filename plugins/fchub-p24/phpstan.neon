@@ -1,0 +1,25 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+        - fchub-p24.php
+    excludePaths:
+        - app/*/index.php
+    bootstrapFiles:
+        - vendor/autoload.php
+        - phpstan-bootstrap.php
+    scanFiles:
+        - phpstan-functions.php
+    scanDirectories:
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/app
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/api
+        - ../../../fchub-playground/wp-content/plugins/fluent-cart/vendor/wpfluent
+    universalObjectCratesClasses:
+        - FluentCart\App\Models\Order
+        - FluentCart\App\Models\OrderTransaction
+        - FluentCart\App\Models\Subscription
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false

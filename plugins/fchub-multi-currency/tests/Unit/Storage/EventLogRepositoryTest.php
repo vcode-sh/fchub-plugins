@@ -11,6 +11,17 @@ use PHPUnit\Framework\Attributes\Test;
 final class EventLogRepositoryTest extends TestCase
 {
     #[Test]
+    public function testFindByUserPreparesTheEventTableIdentifier(): void
+    {
+        (new EventLogRepository())->findByUser(42, 10, 5);
+
+        $this->assertStringContainsString(
+            'FROM `wp_fchub_mc_event_log` WHERE user_id = 42',
+            implode(' ', $GLOBALS['wpdb']->queries),
+        );
+    }
+
+    #[Test]
     public function testCountByEventBuildsAggregateMap(): void
     {
         $this->setWpdbMockResults([
@@ -22,6 +33,10 @@ final class EventLogRepositoryTest extends TestCase
 
         $this->assertSame(4, $counts['context_switched']);
         $this->assertSame(2, $counts['rates_refreshed']);
+        $this->assertStringContainsString(
+            'FROM `wp_fchub_mc_event_log` GROUP BY event',
+            implode(' ', $GLOBALS['wpdb']->queries),
+        );
     }
 
     #[Test]

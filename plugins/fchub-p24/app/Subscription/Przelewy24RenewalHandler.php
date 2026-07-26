@@ -12,9 +12,9 @@ use FluentCart\App\Services\Payments\PaymentHelper;
 
 class Przelewy24RenewalHandler
 {
-    const ACTION_HOOK = 'fchub_p24_process_renewal';
-    const MAX_RETRIES = 3;
-    const RETRY_DELAYS = [4 * HOUR_IN_SECONDS, 24 * HOUR_IN_SECONDS, 72 * HOUR_IN_SECONDS];
+    public const ACTION_HOOK = 'fchub_p24_process_renewal';
+    public const MAX_RETRIES = 3;
+    public const RETRY_DELAYS = [4 * HOUR_IN_SECONDS, 24 * HOUR_IN_SECONDS, 72 * HOUR_IN_SECONDS];
 
     /**
      * Schedule a single renewal action via Action Scheduler
@@ -41,9 +41,11 @@ class Przelewy24RenewalHandler
      */
     public static function processRenewal(int $subscriptionId): void
     {
-        $subscription = Subscription::find($subscriptionId);
+        $subscription = Subscription::query()
+            ->where('id', $subscriptionId)
+            ->first();
 
-        if (!$subscription) {
+        if (!$subscription instanceof Subscription) {
             fluent_cart_error_log('P24 Renewal Error', 'Subscription not found: ' . $subscriptionId, [
                 'module_name' => 'Subscription',
             ]);
@@ -100,7 +102,7 @@ class Przelewy24RenewalHandler
 
         if (isset($registerResponse['error'])) {
             $subscription->updateMeta('_p24_pending_renewal_session', '');
-            self::handleRenewalFailure($subscription, 'Registration failed: ' . json_encode($registerResponse['error']));
+            self::handleRenewalFailure($subscription, 'Przelewy24 registration failed');
             return;
         }
 
@@ -116,14 +118,17 @@ class Przelewy24RenewalHandler
 
         if (isset($chargeResponse['error'])) {
             $subscription->updateMeta('_p24_pending_renewal_session', '');
-            self::handleRenewalFailure($subscription, 'Card charge failed: ' . json_encode($chargeResponse['error']));
+            self::handleRenewalFailure($subscription, 'Przelewy24 card charge failed');
             return;
         }
 
         // Charge accepted (async) - IPN will confirm. Nothing more to do here.
         fluent_cart_error_log('P24 Renewal Charge Submitted', sprintf(
             'Subscription #%d, session: %s, amount: %d %s',
-            $subscriptionId, $sessionId, $amount, $currency
+            $subscriptionId,
+            $sessionId,
+            $amount,
+            $currency
         ), [
             'module_id'   => $subscriptionId,
             'module_name' => 'Subscription',
@@ -139,7 +144,10 @@ class Przelewy24RenewalHandler
 
         fluent_cart_error_log('P24 Renewal Failure', sprintf(
             'Subscription #%d (attempt %d/%d): %s',
-            $subscription->id, $retryCount + 1, self::MAX_RETRIES, $reason
+            $subscription->id,
+            $retryCount + 1,
+            self::MAX_RETRIES,
+            $reason
         ), [
             'module_id'   => $subscription->id,
             'module_name' => 'Subscription',
@@ -161,7 +169,7 @@ class Przelewy24RenewalHandler
 
         $subscription->updateMeta('_p24_retry_count', $retryCount + 1);
 
-        $delay = self::RETRY_DELAYS[$retryCount] ?? end(self::RETRY_DELAYS);
+        $delay = self::RETRY_DELAYS[$retryCount] ?? self::RETRY_DELAYS[array_key_last(self::RETRY_DELAYS)];
         self::scheduleRenewal($subscription->id, time() + $delay);
     }
 

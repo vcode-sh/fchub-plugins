@@ -34,7 +34,7 @@ final class Container
         }
 
         if (!array_key_exists($id, $this->factories)) {
-            throw new \OutOfBoundsException(sprintf('Container entry "%s" is not defined.', $id));
+            throw new \OutOfBoundsException(sprintf('Container entry "%s" is not defined.', esc_html($id)));
         }
 
         $this->instances[$id] = ($this->factories[$id])($this);

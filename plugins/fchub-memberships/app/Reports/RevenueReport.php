@@ -21,10 +21,10 @@ class RevenueReport
         global $wpdb;
         $this->grantRepo = new GrantRepository();
         $this->planRepo = new PlanRepository();
-        $this->grantsTable = $wpdb->prefix . 'fchub_membership_grants';
-        $this->plansTable = $wpdb->prefix . 'fchub_membership_plans';
-        $this->ordersTable = $wpdb->prefix . 'fct_orders';
-        $this->subscriptionsTable = $wpdb->prefix . 'fct_subscriptions';
+        $this->grantsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_grants');
+        $this->plansTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fchub_membership_plans');
+        $this->ordersTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_orders');
+        $this->subscriptionsTable = \FChubMemberships\Support\CustomTableDatabase::identifier($wpdb->prefix . 'fct_subscriptions');
     }
 
     /**
@@ -40,7 +40,7 @@ class RevenueReport
 
         $range = $this->resolveRange($period, $from, $to);
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT
                 DATE_FORMAT(g.created_at, '%%Y-%%m') AS month,
                 g.plan_id,
@@ -78,8 +78,8 @@ class RevenueReport
     {
         global $wpdb;
 
-        $mrr = $wpdb->get_var(
-            "SELECT COALESCE(SUM(
+        $mrr = \FChubMemberships\Support\CustomTableDatabase::getVar(
+            \FChubMemberships\Support\CustomTableDatabase::prepare("SELECT COALESCE(SUM(
                 CASE s.billing_interval
                     WHEN 'yearly' THEN s.recurring_amount / 12
                     WHEN 'quarterly' THEN s.recurring_amount / 3
@@ -89,7 +89,9 @@ class RevenueReport
              FROM {$this->grantsTable} g
              JOIN {$this->subscriptionsTable} s ON g.source_id = s.id AND g.source_type = 'subscription'
              WHERE g.status = 'active'
-               AND s.status = 'active'"
+               AND s.status = %s",
+                'active',
+            )
         );
 
         return (int) round((float) $mrr);
@@ -112,7 +114,7 @@ class RevenueReport
             return 0;
         }
 
-        $totalRevenue = (int) $wpdb->get_var($wpdb->prepare(
+        $totalRevenue = (int) \FChubMemberships\Support\CustomTableDatabase::getVar(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT COALESCE(SUM(o.total_amount), 0)
              FROM {$this->grantsTable} g
              JOIN {$this->ordersTable} o ON g.source_id = o.id AND g.source_type = 'order'
@@ -137,7 +139,7 @@ class RevenueReport
         global $wpdb;
         $range = $this->resolveRange('12m', $from, $to);
 
-        $rows = $wpdb->get_results($wpdb->prepare(
+        $rows = \FChubMemberships\Support\CustomTableDatabase::getResults(\FChubMemberships\Support\CustomTableDatabase::prepare(
             "SELECT
                 g.plan_id,
                 p.title AS plan_title,
