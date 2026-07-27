@@ -12,6 +12,7 @@ on:
       - 'plugins/fchub-memberships/app/Modules/Runtime/FluentCartRuntimeModule.php'
       - 'scripts/check-memberships-image-zoom.mjs'
       - 'scripts/check-memberships-route-docs.mjs'
+      - 'scripts/check-homepage-architecture.mjs'
       - 'scripts/check-fchub-docs.mjs'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
@@ -33,6 +34,7 @@ on:
       - 'plugins/fchub-memberships/app/Modules/Runtime/FluentCartRuntimeModule.php'
       - 'scripts/check-memberships-image-zoom.mjs'
       - 'scripts/check-memberships-route-docs.mjs'
+      - 'scripts/check-homepage-architecture.mjs'
       - 'scripts/check-fchub-docs.mjs'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
@@ -72,6 +74,9 @@ jobs:
 
       - name: Verify FluentCart API documentation link
         run: node --test scripts/check-fluentcart-api-link.mjs
+
+      - name: Verify homepage architecture
+        run: node --test scripts/check-homepage-architecture.mjs
 
       - name: Verify Memberships image lightboxes
         run: node --test scripts/check-memberships-image-zoom.mjs

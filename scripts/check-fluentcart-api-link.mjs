@@ -15,16 +15,18 @@ async function read(relativePath) {
 }
 
 test("FluentCart API entry points use the official developer documentation", async () => {
-  const [homeLayout, homePage] = await Promise.all([
+  const [homeLayout, homePageConfig, homeResourceLinks] = await Promise.all([
     read("web-docs/app/(home)/layout.tsx"),
-    read("web-docs/app/(home)/page.tsx"),
+    read("web-docs/app/(home)/home-page.config.ts"),
+    read("web-docs/app/(home)/home-resource-links.tsx"),
   ]);
   const escapedOfficialApiUrl = officialApiUrl.replaceAll(".", "\\.");
 
   assert.match(homeLayout, new RegExp(escapedOfficialApiUrl));
-  assert.match(homePage, new RegExp(escapedOfficialApiUrl));
+  assert.match(homePageConfig, new RegExp(escapedOfficialApiUrl));
   assert.doesNotMatch(homeLayout, new RegExp(localApiPath));
-  assert.doesNotMatch(homePage, new RegExp(localApiPath));
+  assert.doesNotMatch(homePageConfig, new RegExp(localApiPath));
+  assert.doesNotMatch(homeResourceLinks, new RegExp(localApiPath));
 
   assert.equal(
     [
@@ -46,10 +48,8 @@ test("FluentCart API entry points use the official developer documentation", asy
     "the custom desktop API navigation link must open in a new tab",
   );
   assert.match(
-    homePage,
-    new RegExp(
-      `href="${escapedOfficialApiUrl}"\\s+target="_blank"\\s+rel="noopener noreferrer"`,
-    ),
+    homeResourceLinks,
+    /href=\{FLUENTCART_API_URL\}\s+target="_blank"\s+rel="noopener noreferrer"/,
     "the homepage API card must open in a new tab",
   );
 });
