@@ -33,6 +33,75 @@ const dateRangeWithGroup = {
 		),
 }
 
+/**
+ * Turn "the licensing module is not installed" into a sentence that says so.
+ *
+ * The three license reports are registered routes on every store, but their tables only exist when
+ * the licensing module is active. Without it FluentCart answers **HTTP 200** carrying a PHP fatal,
+ * which the client can only classify as CONNECTION_ERROR — so a caller was told the store was
+ * unreachable, and handed raw SQL plus an absolute server path out of the plugin's stack trace:
+ *
+ *   Error [CONNECTION_ERROR]: Table 'wordpress.wp_fct_licenses' doesn't exist (SQL: select
+ *   count(*) ...): {"recovered":{"code":"plugin_exception","data":{"file":"/var/www/html/...
+ *
+ * Route pruning cannot catch this: the route is genuinely served, it is the storage behind it that
+ * is missing, so the REST index says yes and the query says no. Detecting it here is the only
+ * place the distinction is visible. The internals are dropped rather than forwarded — a missing
+ * table is a fact about the store's configuration, not something a caller can act on, and the file
+ * path is nobody's business.
+ */
+function licenseTool(client: FluentCartClient, config: Parameters<typeof getTool>[1]) {
+	const tool = getTool(client, config)
+	const inner = tool.handler
+
+	return {
+		...tool,
+		handler: async (input: Record<string, unknown>) => {
+			const result = await inner(input)
+			if (!result.isError) return result
+
+			const text = result.content[0]?.text ?? ''
+			if (!/wp_fct_licenses|fct_licenses/i.test(text)) return result
+
+			return {
+				content: [
+					{
+						type: 'text' as const,
+						text: 'FluentCart licensing is not active on this store, so there are no license records to report. The route exists but its tables were never created. Enable the licensing module in FluentCart if you expected data here.',
+					},
+				],
+				isError: true,
+			}
+		},
+	}
+}
+
+/**
+ * Drop the image URL each sales row carries.
+ *
+ * These reports answer "what sold"; the image belongs to a catalogue view, not a figure. On the
+ * seeded store the URLs were 34% of the top-variants payload and 43% of top-products — nearly half
+ * the tokens spent on links nobody asked for, in the two tools an agent reaches for most when
+ * asked which colour or size is selling. The contract-backed `fluentcart_report_top_products`
+ * never had the problem because its allowlist projection excludes anything it did not name.
+ */
+export function dropImageUrls(collection: string) {
+	return (data: unknown): unknown => {
+		const body = data as Record<string, unknown> | null
+		const rows = body?.[collection]
+		if (!Array.isArray(rows)) return data
+
+		return {
+			...body,
+			[collection]: rows.map((row) => {
+				if (row === null || typeof row !== 'object') return row
+				const { media, media_url, thumbnail, ...rest } = row as Record<string, unknown>
+				return rest
+			}),
+		}
+	}
+}
+
 export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 	return [
 		getTool(client, {
@@ -75,9 +144,12 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_top_sold_variants',
 			title: 'Get Top Sold Variants',
 			description:
-				"Top-selling product variants with revenue and quantity. Revenue in cents. Use per_page to control count. Best for 'top sellers by revenue'.",
+				'Units sold and revenue per product variant, ranked by units. This is the tool for "which ' +
+				'size, colour or option sells best": the variant name carries whatever distinguishes it. ' +
+				'Amounts are decimals, not cents. Use per_page to control how many rows come back.',
 			schema: z.object({ ...dateRangeWithPerPage }),
 			endpoint: '/reports/fetch-top-sold-variants',
+			transform: dropImageUrls('topSoldVariants'),
 		}),
 
 		getTool(client, {
@@ -154,7 +226,7 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/reports/future-renewals',
 		}),
 
-		getTool(client, {
+		licenseTool(client, {
 			name: 'fluentcart_report_license_summary',
 			title: 'Get License Summary',
 			description: 'License stats summary: total issued, active, expired, and revoked.',
@@ -162,7 +234,7 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/reports/license-summary',
 		}),
 
-		getTool(client, {
+		licenseTool(client, {
 			name: 'fluentcart_report_license_chart',
 			title: 'Get License Chart',
 			description: 'License issuance and activation trends over time.',
@@ -170,7 +242,7 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/reports/license-chart',
 		}),
 
-		getTool(client, {
+		licenseTool(client, {
 			name: 'fluentcart_report_license_pie_chart',
 			title: 'Get License Pie Chart',
 			description: 'License distribution by status (active, expired, revoked).',

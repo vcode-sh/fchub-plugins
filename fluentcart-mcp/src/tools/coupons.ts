@@ -50,7 +50,11 @@ export function couponTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_coupon_settings_get',
 			title: 'Get Coupon Settings',
-			description: 'Retrieve global coupon settings for the store.',
+			description:
+				'Global coupon settings. WARNING: show_on_checkout always reads null on FluentCart 1.5.5, ' +
+				'whatever the store has saved, so null here means "cannot tell" and never "off" — do not ' +
+				'report the checkout coupon field as disabled on the strength of it. The value is stored ' +
+				'correctly and the admin UI shows it; only this endpoint misreads it.',
 			schema: z.object({}),
 			endpoint: '/coupons/getSettings',
 		}),

@@ -3,6 +3,7 @@ import type { ApiCapabilities } from '../api/capabilities.js'
 import type { FluentCartClient } from '../api/client.js'
 import { TTL } from '../cache.js'
 import { getTool, type ToolDefinition } from './_factory.js'
+import { dropImageUrls } from './reports-insights.js'
 
 /** Withdrawn after 1.3.9, so these register only where the store proves it still serves them. */
 const retiredReport = (capabilities: ApiCapabilities | undefined, path: string): boolean =>
@@ -265,6 +266,7 @@ export function reportCoreTools(
 				per_page: z.number().max(50).optional().describe('Number of results (max: 50)'),
 			}),
 			endpoint: '/reports/fetch-top-sold-products',
+			transform: dropImageUrls('topSoldProducts'),
 		}),
 
 		getTool(client, {
