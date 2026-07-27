@@ -70,6 +70,9 @@ jobs:
       - name: Verify Fumadocs accordion structure
         run: node --test scripts/check-fumadocs-accordion-structure.mjs
 
+      - name: Verify FluentCart API documentation link
+        run: node --test scripts/check-fluentcart-api-link.mjs
+
       - name: Verify Memberships image lightboxes
         run: node --test scripts/check-memberships-image-zoom.mjs
 

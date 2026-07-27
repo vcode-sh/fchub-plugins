@@ -365,15 +365,17 @@ export default function HomePage() {
           </Link>
         </motion.div>
         <motion.div variants={itemVariants}>
-          <Link href="/docs/fluentcart-api" className="block group">
+          <Link
+            href="https://dev.fluentcart.com/restapi/"
+            className="block group"
+          >
             <Card className="gap-0 py-0 transition-colors hover:border-primary/30">
               <CardContent className="flex items-center gap-3 py-3">
                 <Braces className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 <div className="flex-1">
                   <CardTitle className="text-sm">REST API Reference</CardTitle>
                   <CardDescription className="text-xs">
-                    Full OpenAPI docs for the FluentCart API. Every endpoint,
-                    every parameter, zero guesswork.
+                    Official REST API documentation maintained by FluentCart.
                   </CardDescription>
                 </div>
                 <Badge variant="secondary" className="text-[10px] h-4">

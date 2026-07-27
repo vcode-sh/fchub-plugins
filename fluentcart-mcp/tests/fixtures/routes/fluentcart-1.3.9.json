@@ -11,7 +11,7 @@
   },
   "capturedAt": "2026-07-27T09:34:28.099Z",
   "evidenceKind": "docs-contract",
-  "source": "../web-docs/content/docs/fluentcart-api/openapi.yaml",
+  "source": "retired-local-docs-contract",
   "sourceSha256": "bebb6b6afd724bfc4bca59fe54e37e1dbd0c5b36bdc3b200d814a1e239abf73c",
   "operations": [
     {
