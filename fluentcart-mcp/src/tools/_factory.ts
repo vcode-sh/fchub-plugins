@@ -110,6 +110,57 @@ function annotationsFor(safety: ToolSafety): ToolAnnotations {
 	}
 }
 
+/**
+ * Filter keys every FluentCart report controller reads from a nested `params` object.
+ *
+ * Taken from `ReportHelper::sanitizeParams` (app/Services/Report/ReportHelper.php:169-189), which
+ * is the single allowlist every report route runs its input through.
+ */
+const REPORT_PARAM_KEYS: ReadonlySet<string> = new Set([
+	'startDate',
+	'endDate',
+	'compareType',
+	'compareDate',
+	'groupKey',
+	'currency',
+	'filterMode',
+	'storeMode',
+	'subscriptionType',
+	'variation_ids',
+	'orderStatus',
+	'orderTypes',
+])
+
+/**
+ * Move report filters into the `params` object the controller actually reads.
+ *
+ * Every report controller starts with `ReportHelper::processParams($request->get('params'), …)`,
+ * so a flat `?startDate=…` is simply never seen. The endpoint does not reject it — it falls back
+ * to defaults and answers HTTP 200 with zeros, an empty array, or in one case a 500. Measured on
+ * a 34-order store, flat versus nested for the same range:
+ *
+ *   /reports/revenue                  399 B, every figure 0   →  2,284 B with real totals
+ *   /reports/fetch-top-sold-products   22 B, no rows          →  2,273 B with real rows
+ *   /reports/subscription-retention   389 B, one row          →  4,429 B, full MRR series
+ *   /reports/top-products-sold        HTTP 500                →    185 B deprecation notice
+ *
+ * This is applied by route rather than declared per tool, because the failure is silent: a report
+ * added later that forgot the flag would look like an empty store rather than a bug. Only keys in
+ * the allowlist move, so paging and anything the controller reads at the top level are untouched.
+ */
+function nestReportParams(
+	endpoint: string,
+	rest: Record<string, unknown>,
+): Record<string, unknown> {
+	if (!endpoint.startsWith('/reports/')) return rest
+
+	const nested: Record<string, unknown> = {}
+	for (const [key, value] of Object.entries(rest)) {
+		nested[REPORT_PARAM_KEYS.has(key) ? `params[${key}]` : key] = value
+	}
+	return nested
+}
+
 function resolveEndpoint(
 	endpoint: string,
 	input: Record<string, unknown>,
@@ -123,7 +174,7 @@ function resolveEndpoint(
 	if (path.includes('//') || path.endsWith('/')) {
 		throw new Error(`Missing required path parameter in ${endpoint}`)
 	}
-	return { path, rest }
+	return { path, rest: nestReportParams(endpoint, rest) }
 }
 
 /**

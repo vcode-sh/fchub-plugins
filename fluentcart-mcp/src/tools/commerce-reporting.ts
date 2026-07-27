@@ -33,7 +33,7 @@ const periodShape = {
 }
 
 const SHARED_CAVEAT =
-	'Counts orders whose payment status is paid, refunded, partially_paid or partially_refunded, and includes test-mode orders, since FluentCart applies no mode filter to reports. Every result states its period, payment scope and currency. These figures are read straight from the store and reduced by an allowlist; the query semantics are established from the FluentCart controller source but have NOT been confirmed by a seeded assertion, so a total that straddles a day boundary in the store timezone is approximate. Check the warnings on each result.'
+	'Counts orders with payment status paid, refunded, partially_paid or partially_refunded, test-mode included — FluentCart applies no mode filter. Counts, money totals, date filtering and currency scoping are reconciled against the order list by a live test; day boundaries in the store timezone remain approximate. Every result states its period, scope and currency, and carries its own warnings.'
 
 export function commerceReportingTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -51,7 +51,7 @@ export function commerceReportingTools(client: FluentCartClient): ToolDefinition
 			name: 'fluentcart_report_sales_trend',
 			routes: direct('GET', '/reports/revenue'),
 			title: 'FluentCart Sales Trend',
-			description: `Sales, net revenue and order count bucketed over time for one currency. Buckets are daily unless monthly or yearly is requested, and every bucket in range is returned even when it is empty. ${SHARED_CAVEAT}`,
+			description: `Sales, net revenue and order count bucketed over time for one currency. Every bucket in range is returned, empty ones included. FluentCart widens the bucket on long ranges — daily to 91 days, monthly to a year, yearly beyond — so the result reports the granularity requested and the one actually applied, and warns when they differ. ${SHARED_CAVEAT}`,
 			schema: z.object({
 				...periodShape,
 				granularity: z

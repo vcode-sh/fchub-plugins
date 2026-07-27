@@ -127,35 +127,60 @@ const REVIEWED_CURATED_MEMBERSHIP = [
 	'fluentcart_subscription_get',
 	'fluentcart_coupon_get',
 	'fluentcart_order_transactions',
-	// Answer the recurring commercial questions.
-	'fluentcart_report_overview',
-	'fluentcart_report_revenue',
-	'fluentcart_report_top_products_sold',
-	'fluentcart_report_sales_growth',
+	// Answer the recurring commercial questions, via the three contract-backed reports.
+	'fluentcart_report_sales_summary',
+	'fluentcart_report_sales_trend',
+	'fluentcart_report_top_products',
 	// Writes, shown only when the write policy already permits them.
 	'fluentcart_coupon_create',
 	'fluentcart_coupon_update',
 ]
 
-/** Names admitted by the 2026-07-27 graduation review. Empty: no candidate had live evidence. */
-const GRADUATED_IN_THIS_REVIEW: string[] = []
+/**
+ * Names admitted by the second 2026-07-27 graduation review.
+ *
+ * The first pass admitted nothing, because two criteria — current live schema/output coverage and
+ * a recorded response size — had no evidence to check against. `tests/integration/report-semantics.test.ts`
+ * now supplies both for these three, reconciling them against the order list on a seeded store.
+ */
+const GRADUATED_IN_THIS_REVIEW: string[] = [
+	'fluentcart_report_sales_summary',
+	'fluentcart_report_sales_trend',
+	'fluentcart_report_top_products',
+]
+
+/** Raw report tools removed from curated in the same pass, and why. */
+const DEMOTED_IN_THIS_REVIEW: string[] = [
+	'fluentcart_report_overview',
+	'fluentcart_report_revenue',
+	'fluentcart_report_top_products_sold',
+	'fluentcart_report_sales_growth',
+]
 
 describe('curated graduation review (plan 06 Task 5)', () => {
 	it('holds exactly the reviewed membership, in the reviewed order', () => {
 		expect([...CURATED_TOOL_NAMES]).toEqual(REVIEWED_CURATED_MEMBERSHIP)
 	})
 
-	it('admitted nothing in this review pass', () => {
-		expect(GRADUATED_IN_THIS_REVIEW).toEqual([])
+	it('admitted exactly the three reports that gained live evidence', () => {
 		for (const name of GRADUATED_IN_THIS_REVIEW) {
 			expect(CURATED_TOOL_NAMES).toContain(name)
 		}
 	})
 
-	it('records why the review admitted nothing, so it is not re-litigated from memory', () => {
+	it('dropped the raw report tools they supersede', () => {
+		// Two of these cannot answer at all on FluentCart 1.5.5: sales-growth returns HTTP 500, and
+		// top-products-sold is deprecated since 1.4 and returns an empty list.
+		for (const name of DEMOTED_IN_THIS_REVIEW) {
+			expect(CURATED_TOOL_NAMES).not.toContain(name)
+		}
+	})
+
+	it('records the evidence for the change, so it is not re-litigated from memory', () => {
 		const source = readFileSync(new URL('../../src/tools/curated.ts', import.meta.url), 'utf8')
-		expect(source).toContain('nothing graduated')
-		expect(source).toMatch(/live/i)
+		expect(source).toMatch(/HTTP 500/)
+		expect(source).toMatch(/deprecated since FluentCart 1\.4/)
+		expect(source).toMatch(/report-semantics/)
 	})
 
 	it('carries only the two reviewed writes, and both are policy-gated', () => {

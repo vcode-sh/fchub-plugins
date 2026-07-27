@@ -84,7 +84,10 @@ if (transport === 'http') {
 		const stdioTransport = new StdioServerTransport()
 		await server.connect(stdioTransport)
 	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
+		// Nothing is connected yet, so this line is the entire failure report the user gets — in a
+		// desktop client it is the whole crash log. Say what could not be done, not just what threw.
+		const detail = error instanceof Error ? error.message : String(error)
+		console.error(`fluentcart-mcp could not start: ${detail}`)
 		process.exit(1)
 	}
 }

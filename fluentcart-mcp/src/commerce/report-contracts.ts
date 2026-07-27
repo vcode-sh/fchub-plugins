@@ -73,6 +73,13 @@ export interface AcceptedReport {
 	currency: CurrencySemantics
 	/** Allowlist of output keys. Anything absent here never reaches a caller. */
 	outputProjection: string[]
+	/**
+	 * Output key to the field the store actually sends, for reports whose response does not use
+	 * our vocabulary. Absent means the store's names and ours already agree.
+	 */
+	sourceFields?: Readonly<Record<string, string>>
+	/** Output keys computed here rather than read from the response. */
+	derivedFields?: readonly string[]
 	emptySet: string
 	evidence: ReportEvidence
 	/** Caveats a caller must see on every result. */
@@ -131,6 +138,35 @@ const REVENUE_BASE = {
 	warnings: REVENUE_WARNINGS,
 }
 
+/**
+ * FluentCart names the same figures differently in the two halves of one `/reports/revenue`
+ * response: the summary block calls gross sales `gross_sale` and tax `tax_total`, while every
+ * trend row in the same payload calls them `total_sales` and `total_tax`. Neither name is wrong,
+ * they are simply built by different code, and a caller has no way to guess which half it is
+ * holding.
+ *
+ * So the raw names stop here. Both shapes are mapped onto one vocabulary, and these two tables
+ * are the only place in the server that knows what the store calls anything. A contract test
+ * checks every value below against the captured response fixture, because the previous version of
+ * this file guessed the summary names from the trend rows and shipped four permanently-null
+ * fields — including total sales — behind a warning that made it look deliberate.
+ */
+const SUMMARY_SOURCE_FIELDS = {
+	gross_sales: 'gross_sale',
+	net_revenue: 'net_revenue',
+	tax: 'tax_total',
+	shipping: 'shipping_total',
+	refunded_amount: 'total_refunded_amount',
+	order_count: 'order_count',
+	refunded_orders: 'refunded_orders',
+} as const
+
+const TREND_SOURCE_FIELDS = {
+	gross_sales: 'total_sales',
+	net_revenue: 'net_revenue',
+	order_count: 'order_count',
+} as const
+
 const REVENUE_EVIDENCE = {
 	controllerFile: 'app/Http/Controllers/Reports/RevenueReportController.php',
 	controllerMethod: 'getRevenue',
@@ -143,22 +179,24 @@ export const REPORT_CONTRACTS: Readonly<Record<ReportName, ReportContract>> = {
 		...REVENUE_BASE,
 		name: 'sales_summary',
 		status: 'accepted',
-		outputProjection:
-			'total_sales net_revenue total_tax shipping_total total_refunds order_count refunded_orders average_order_value'.split(
-				' ',
-			),
+		outputProjection: [...Object.keys(SUMMARY_SOURCE_FIELDS), 'average_order_value'],
+		sourceFields: SUMMARY_SOURCE_FIELDS,
+		// The store sends no average. It is gross sales over order count, computed here so the
+		// caller does not have to divide two numbers whose scopes it cannot see.
+		derivedFields: ['average_order_value'],
 		emptySet: 'All summary fields return zero; the response is never structurally empty.',
 		evidence: {
 			...REVENUE_EVIDENCE,
 			notes:
-				'Single table, no joins. Amounts are divided by 100 in SQL, so the response carries decimals while the column stores minor units.',
+				'Single table, no joins. Amounts are divided by 100 in SQL, so the response carries decimals while the column stores minor units. The summary block uses different field names from the trend rows in the same response; both are mapped in this file.',
 		},
 	},
 	sales_trend: {
 		...REVENUE_BASE,
 		name: 'sales_trend',
 		status: 'accepted',
-		outputProjection: ['period', 'total_sales', 'net_revenue', 'order_count'],
+		outputProjection: ['period', ...Object.keys(TREND_SOURCE_FIELDS)],
+		sourceFields: TREND_SOURCE_FIELDS,
 		emptySet:
 			'One zero-filled row per period is always returned; getPeriodRange pre-builds the buckets.',
 		evidence: {

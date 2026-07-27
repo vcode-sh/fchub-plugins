@@ -21,17 +21,21 @@ function stubClient(body: unknown) {
 	return { client: { get } as unknown as FluentCartClient, get }
 }
 
+// The field names the store really sends in the summary block, per the captured response
+// fixture. They differ from the ones in each trend row of the very same response — see
+// report-source-fields.test.ts. Stubbing the convenient names here instead of the real ones is
+// exactly how four permanently-null fields shipped, so this object must stay in step with the
+// fixture rather than with the trend rows below.
 const SUMMARY_BODY = {
 	data: {
 		summary: {
-			total_sales: 400,
+			gross_sale: 400,
 			net_revenue: 320,
-			total_tax: 80,
+			tax_total: 80,
 			shipping_total: 0,
-			total_refunds: 0,
+			total_refunded_amount: 0,
 			order_count: 2,
 			refunded_orders: 0,
-			average_order_value: 200,
 		},
 	},
 }
@@ -80,7 +84,31 @@ describe('sales summary', () => {
 		})
 		expect(result.paymentMode).toBe('live-and-test-combined')
 		expect(result.currency).toBe('PLN')
-		expect(result.data.total_sales).toBe(400)
+		expect(result.data.gross_sales).toBe(400)
+	})
+
+	it('reads the summary field names the store sends, not the trend row names', async () => {
+		// The regression this whole mapping exists for: `gross_sale` in the summary block versus
+		// `total_sales` in a trend row of the same response. Reading the row name here yields null.
+		const { client } = stubClient(SUMMARY_BODY)
+		const result = await salesSummary(client, PERIOD)
+
+		expect(result.data.gross_sales).toBe(400)
+		expect(result.data.tax).toBe(80)
+		expect(result.data.refunded_amount).toBe(0)
+		expect(result.warnings.join(' ')).not.toMatch(/returned no value/)
+	})
+
+	it('derives the average order value the store never sends', async () => {
+		const { client } = stubClient(SUMMARY_BODY)
+		const result = await salesSummary(client, PERIOD)
+		expect(result.data.average_order_value).toBe(200)
+	})
+
+	it('leaves the average null rather than dividing by no orders', async () => {
+		const { client } = stubClient({ data: { summary: { gross_sale: 0, order_count: 0 } } })
+		const result = await salesSummary(client, PERIOD)
+		expect(result.data.average_order_value).toBeNull()
 	})
 
 	it('carries the contract warnings on every result, including an empty one', async () => {
@@ -92,10 +120,10 @@ describe('sales summary', () => {
 	})
 
 	it('reports an absent figure as null and says so, rather than as zero', async () => {
-		const { client } = stubClient({ data: { summary: { total_sales: 400 } } })
+		const { client } = stubClient({ data: { summary: { gross_sale: 400 } } })
 		const result = await salesSummary(client, PERIOD)
 
-		expect(result.data.total_sales).toBe(400)
+		expect(result.data.gross_sales).toBe(400)
 		expect(result.data.net_revenue).toBeNull()
 		expect(result.warnings.join(' ')).toContain('net_revenue')
 		expect(result.warnings.join(' ')).toMatch(/rather than zero/)
@@ -113,9 +141,9 @@ describe('sales summary', () => {
 	})
 
 	it('accepts an unwrapped body as well as a data-wrapped one', async () => {
-		const { client } = stubClient({ summary: { total_sales: 150 } })
+		const { client } = stubClient({ summary: { gross_sale: 150 } })
 		const result = await salesSummary(client, PERIOD)
-		expect(result.data.total_sales).toBe(150)
+		expect(result.data.gross_sales).toBe(150)
 	})
 
 	it('lets a permission failure travel outward instead of returning empty data', async () => {
@@ -135,11 +163,41 @@ describe('sales trend', () => {
 		},
 	}
 
-	it('omits groupKey for daily rather than relying on the store’s whitelist accident', async () => {
+	it('omits groupKey for daily, because sending the word means group-by-payment-method', async () => {
+		// FluentCart replaces any unwhitelisted groupKey with `payment_method` instead of rejecting
+		// it, so `groupKey=daily` returns revenue grouped by payment method wearing a time series'
+		// clothes. Verified live: a 364-day range answered appliedGroupKey=payment_method.
 		const { client, get } = stubClient(TREND_BODY)
 		await salesTrend(client, { ...PERIOD, granularity: 'daily' })
 
 		expect(get.mock.calls[0]?.[1]).not.toHaveProperty('params[groupKey]')
+	})
+
+	it('reports the granularity the store applied, not the one that was asked for', async () => {
+		const { client } = stubClient({
+			data: { appliedGroupKey: 'monthly', revenueReport: [{ group: '2026-07', total_sales: 1 }] },
+		})
+		const result = await salesTrend(client, { ...PERIOD, granularity: 'daily' })
+
+		expect(result.granularity).toEqual({ requested: 'daily', applied: 'monthly' })
+		expect(result.warnings.join(' ')).toMatch(/store grouped by monthly/)
+	})
+
+	it('stays quiet when the store grouped the way it was asked to', async () => {
+		const { client } = stubClient({
+			data: { appliedGroupKey: 'monthly', revenueReport: [{ group: '2026-07', total_sales: 1 }] },
+		})
+		const result = await salesTrend(client, { ...PERIOD, granularity: 'monthly' })
+
+		expect(result.granularity).toEqual({ requested: 'monthly', applied: 'monthly' })
+		expect(result.warnings.join(' ')).not.toMatch(/store grouped by/)
+	})
+
+	it('falls back to the documented range rule when the store omits appliedGroupKey', async () => {
+		const { client } = stubClient({ data: { revenueReport: [] } })
+		// 2026-07-01 to 2026-07-27 is 26 days, inside the 91-day daily band.
+		const result = await salesTrend(client, { ...PERIOD, granularity: 'daily' })
+		expect(result.granularity.applied).toBe('daily')
 	})
 
 	it('sends groupKey only for the two values the store actually whitelists', async () => {
@@ -157,7 +215,7 @@ describe('sales trend', () => {
 		expect(result.data).toHaveLength(2)
 		expect(result.data[1]).toEqual({
 			period: '2026-07-02',
-			total_sales: 0,
+			gross_sales: 0,
 			net_revenue: 0,
 			order_count: 0,
 		})

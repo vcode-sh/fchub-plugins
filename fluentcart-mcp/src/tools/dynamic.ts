@@ -5,7 +5,15 @@ import { CATEGORIES, inferCategory, searchTools } from './dynamic-search.js'
 import type { ToolRisk } from './risk.js'
 
 /** Meta-tools registered in dynamic mode: search, describe and three risk-split executors. */
-export const DYNAMIC_TOOL_COUNT = 5
+export const DYNAMIC_TOOL_NAMES: readonly string[] = Object.freeze([
+	'fluentcart_search_tools',
+	'fluentcart_describe_tools',
+	'fluentcart_execute_read_tool',
+	'fluentcart_execute_reversible_write',
+	'fluentcart_execute_guarded_write',
+])
+
+export const DYNAMIC_TOOL_COUNT = DYNAMIC_TOOL_NAMES.length
 
 const SEARCH_LIMIT_DEFAULT = 5
 const SEARCH_LIMIT_MAX = 10

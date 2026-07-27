@@ -177,20 +177,16 @@
       "description": "Search for products by name."
     },
     {
-      "name": "fluentcart_report_overview",
-      "description": "DIAGNOSTIC, not a metric. Gross/net revenue by month and quarter with growth and top countries. The controller hardcodes a 30-month UTC window and ignores any date range you pass, so this cannot answer a question about a chosen period. For revenue over a period use fluentcart_report_sales_summary."
+      "name": "fluentcart_report_sales_summary",
+      "description": "Total sales, net revenue, tax, shipping, refunds, order count and average order value for one currency over an inclusive date range. Counts orders with payment status paid, refunded, partially_paid or partially_refunded, test-mode included — FluentCart applies no mode filter. Counts, money totals, date filtering and currency scoping are reconciled against the order list by a live test; day boundaries in the store timezone remain approximate. Every result states its period, scope and currency, and carries its own warnings. Refunds are attributed to the order's creation date, so a closed period can still move when an old order is refunded."
     },
     {
-      "name": "fluentcart_report_revenue",
-      "description": "Raw revenue rows grouped by day, month or year: net revenue, shipping, tax, refunds and order counts. Amounts are decimals, not cents — the store divides by 100 in SQL. Amounts are summed across every currency unless params[currency] pins one, and test-mode orders are included. Prefer fluentcart_report_sales_summary or fluentcart_report_sales_trend, which pin a currency and state their period and payment scope."
+      "name": "fluentcart_report_sales_trend",
+      "description": "Sales, net revenue and order count bucketed over time for one currency. Every bucket in range is returned, empty ones included. FluentCart widens the bucket on long ranges — daily to 91 days, monthly to a year, yearly beyond — so the result reports the granularity requested and the one actually applied, and warns when they differ. Counts orders with payment status paid, refunded, partially_paid or partially_refunded, test-mode included — FluentCart applies no mode filter. Counts, money totals, date filtering and currency scoping are reconciled against the order list by a live test; day boundaries in the store timezone remain approximate. Every result states its period, scope and currency, and carries its own warnings."
     },
     {
-      "name": "fluentcart_report_sales_growth",
-      "description": "Sales growth metrics over time for a date range. ⚠️ UPSTREAM BUG: Crashes with missing Status class import (UB-007b)."
-    },
-    {
-      "name": "fluentcart_report_top_products_sold",
-      "description": "Top-selling products ranked by units sold (endpoint: top-products-sold). Note: Similar to report_top_sold_products which uses a different endpoint (fetch-top-sold-products) and may return a different response shape. Revenue in cents. Use per_page to control count (e.g. top 5, top 10). ⚠️ UPSTREAM BUG: Crashes with array_intersect_key() on null (UB-006)."
+      "name": "fluentcart_report_top_products",
+      "description": "The 20 best-selling products over an inclusive date range, ranked by units sold rather than revenue. Counts orders with payment status paid, refunded, partially_paid or partially_refunded, test-mode included — FluentCart applies no mode filter. Counts, money totals, date filtering and currency scoping are reconciled against the order list by a live test; day boundaries in the store timezone remain approximate. Every result states its period, scope and currency, and carries its own warnings. Product names come from the most recent matching order line, so a renamed product appears under the title it last sold as."
     },
     {
       "name": "fluentcart_search_api",
@@ -213,9 +209,9 @@
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
       "packageVersion": "2.0.0",
-      "sourceTreeDigest": "sha256:26376fc71a7e10d1cb576869aee5350b4b4ef8cc554afc164fdcd94263c81a22",
+      "sourceTreeDigest": "sha256:fe8442a04d7a5ecad625d619c027c355203a5c6fa985bc70d358c082dea10af3",
       "serializer": "mcp-tools-list-v1",
-      "advertisedToolCount": 27,
+      "advertisedToolCount": 26,
       "userConfigEnvironment": {
         "store_url": "FLUENTCART_URL",
         "username": "FLUENTCART_USERNAME",
@@ -976,10 +972,10 @@
           ]
         },
         {
-          "name": "fluentcart_report_overview",
+          "name": "fluentcart_report_sales_summary",
           "provenance": "curated",
-          "descriptionSha256": "sha256:f14548988584dfcbc1b52b56f9a98a3d254e4a915e30914adaa8706634f6f365",
-          "inputSchemaSha256": "sha256:d00a5e319612604ed5fde7af35e2f5c52cf4a2418657eb0e3934b88ee4e7dec6",
+          "descriptionSha256": "sha256:1c23ab4a7be77c6751d3abe1e4cedccdf2c412ea8e6211e3867f397f47836dcd",
+          "inputSchemaSha256": "sha256:bb436b4d2310a187a1af0663ae4843b21189ce9a776ac99673b840567e05c7cf",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -1019,10 +1015,10 @@
           ]
         },
         {
-          "name": "fluentcart_report_revenue",
+          "name": "fluentcart_report_sales_trend",
           "provenance": "curated",
-          "descriptionSha256": "sha256:8b8d731b614c0727cb30698994cd2f44c2d3d10d241b19a1582527a44d467d66",
-          "inputSchemaSha256": "sha256:7d4caf2943d1a4b6ad8edce0228ff7648b3e5ab448d4e3bac1db3042976662f1",
+          "descriptionSha256": "sha256:70a987ae5f1922098e592dee15cd07a07c6875610cb7c3c8ce04e4e9a7c516b8",
+          "inputSchemaSha256": "sha256:2c060c7a44aaaf4fbe641ee901515b05a9423035363bc50ce2dd5061cea8b396",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -1062,53 +1058,10 @@
           ]
         },
         {
-          "name": "fluentcart_report_sales_growth",
+          "name": "fluentcart_report_top_products",
           "provenance": "curated",
-          "descriptionSha256": "sha256:c2fdee3383b7c6edf4da675c3f228f479c24db645887b2a6f1f14b170ba8fc71",
-          "inputSchemaSha256": "sha256:d00a5e319612604ed5fde7af35e2f5c52cf4a2418657eb0e3934b88ee4e7dec6",
-          "exposedBy": [
-            {
-              "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-rest-disabled",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "legacy-1.3.9-runtime-rest-disabled",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            }
-          ]
-        },
-        {
-          "name": "fluentcart_report_top_products_sold",
-          "provenance": "curated",
-          "descriptionSha256": "sha256:752ea3342fdcc052641cf3b61f96166a3d30818fe88f7c457c01074daa35f6f6",
-          "inputSchemaSha256": "sha256:5bae728fbe0ab351437c811e1c80788214bd2eef334b6a7daa0c6d0c0669d662",
+          "descriptionSha256": "sha256:e204942d0ad4d4ed77aa3d6d1de08ad377fe9b94169d672d092822e31d21fbec",
+          "inputSchemaSha256": "sha256:bb436b4d2310a187a1af0663ae4843b21189ce9a776ac99673b840567e05c7cf",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",

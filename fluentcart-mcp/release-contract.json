@@ -3,7 +3,7 @@
   "serializer": "mcp-tools-list-v1",
   "tokenizer": "gpt-tokenizer@3.4.0",
   "packageVersion": "2.0.0",
-  "sourceTreeDigest": "sha256:26376fc71a7e10d1cb576869aee5350b4b4ef8cc554afc164fdcd94263c81a22",
+  "sourceTreeDigest": "sha256:fe8442a04d7a5ecad625d619c027c355203a5c6fa985bc70d358c082dea10af3",
   "sourceTreeInputs": {
     "fileCount": 112,
     "declared": [
@@ -47,8 +47,8 @@
     "note": "Exposure per write mode as the server composes it, independent of route evidence."
   },
   "curatedNames": {
-    "declared": 20,
-    "resolvable": 20,
+    "declared": 19,
+    "resolvable": 19,
     "unresolved": []
   },
   "capabilityFiltering": {
@@ -83,10 +83,10 @@
           "o200kTokens": 877
         },
         "curated": {
-          "toolCount": 18,
-          "characters": 12314,
-          "cl100kTokens": 2820,
-          "o200kTokens": 2898
+          "toolCount": 17,
+          "characters": 14302,
+          "cl100kTokens": 3278,
+          "o200kTokens": 3342
         },
         "code": {
           "toolCount": 2,
@@ -96,9 +96,9 @@
         },
         "full": {
           "toolCount": 140,
-          "characters": 86275,
-          "cl100kTokens": 19428,
-          "o200kTokens": 19897
+          "characters": 86087,
+          "cl100kTokens": 19394,
+          "o200kTokens": 19864
         }
       }
     },
@@ -121,10 +121,10 @@
           "o200kTokens": 877
         },
         "curated": {
-          "toolCount": 18,
-          "characters": 12314,
-          "cl100kTokens": 2820,
-          "o200kTokens": 2898
+          "toolCount": 17,
+          "characters": 14302,
+          "cl100kTokens": 3278,
+          "o200kTokens": 3342
         },
         "code": {
           "toolCount": 2,
@@ -134,9 +134,9 @@
         },
         "full": {
           "toolCount": 148,
-          "characters": 90393,
-          "cl100kTokens": 20343,
-          "o200kTokens": 20820
+          "characters": 90205,
+          "cl100kTokens": 20309,
+          "o200kTokens": 20787
         }
       }
     },
@@ -159,10 +159,10 @@
           "o200kTokens": 877
         },
         "curated": {
-          "toolCount": 18,
-          "characters": 12314,
-          "cl100kTokens": 2820,
-          "o200kTokens": 2898
+          "toolCount": 17,
+          "characters": 14302,
+          "cl100kTokens": 3278,
+          "o200kTokens": 3342
         },
         "code": {
           "toolCount": 2,
@@ -172,9 +172,9 @@
         },
         "full": {
           "toolCount": 158,
-          "characters": 96932,
-          "cl100kTokens": 21834,
-          "o200kTokens": 22334
+          "characters": 96744,
+          "cl100kTokens": 21800,
+          "o200kTokens": 22301
         }
       }
     },
@@ -197,10 +197,10 @@
           "o200kTokens": 877
         },
         "curated": {
-          "toolCount": 20,
-          "characters": 16153,
-          "cl100kTokens": 3652,
-          "o200kTokens": 3765
+          "toolCount": 19,
+          "characters": 18142,
+          "cl100kTokens": 4110,
+          "o200kTokens": 4209
         },
         "code": {
           "toolCount": 2,
@@ -210,9 +210,9 @@
         },
         "full": {
           "toolCount": 186,
-          "characters": 131244,
-          "cl100kTokens": 29281,
-          "o200kTokens": 29998
+          "characters": 131070,
+          "cl100kTokens": 29247,
+          "o200kTokens": 29965
         }
       }
     },
@@ -235,10 +235,10 @@
           "o200kTokens": 877
         },
         "curated": {
-          "toolCount": 20,
-          "characters": 16153,
-          "cl100kTokens": 3652,
-          "o200kTokens": 3765
+          "toolCount": 19,
+          "characters": 18142,
+          "cl100kTokens": 4110,
+          "o200kTokens": 4209
         },
         "code": {
           "toolCount": 2,
@@ -248,9 +248,9 @@
         },
         "full": {
           "toolCount": 186,
-          "characters": 131244,
-          "cl100kTokens": 29281,
-          "o200kTokens": 29998
+          "characters": 131070,
+          "cl100kTokens": 29247,
+          "o200kTokens": 29965
         }
       }
     }

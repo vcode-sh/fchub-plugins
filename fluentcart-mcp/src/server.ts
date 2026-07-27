@@ -15,7 +15,7 @@ import { canExposeTool, parseWriteMode, type WritePolicyConfig } from './securit
 import type { ToolDefinition } from './tools/_factory.js'
 import { commerceContextTools } from './tools/commerce-context.js'
 import { selectCuratedTools } from './tools/curated.js'
-import { DYNAMIC_TOOL_COUNT, registerDynamicTools } from './tools/dynamic.js'
+import { DYNAMIC_TOOL_COUNT, DYNAMIC_TOOL_NAMES, registerDynamicTools } from './tools/dynamic.js'
 import { selectEndpoint } from './tools/endpoints.js'
 import { createAllTools } from './tools/index.js'
 import { referenceDataTools } from './tools/reference-data.js'
@@ -157,18 +157,39 @@ export async function resolveServerContextAsync(): Promise<ServerContext> {
 	return resolveServerContext(capabilities)
 }
 
+/**
+ * Options every server instance is built with.
+ *
+ * `logging` has to be declared or the SDK drops log notifications on the floor: its
+ * `sendLoggingMessage` is wrapped in `if (this._capabilities.logging)` and returns silently
+ * otherwise. Without this the whole of `createLogger` was dead code — the startup line naming the
+ * mode and tool count was assembled, redacted and then discarded, and the Inspector's
+ * Notifications pane stayed empty no matter what the server did.
+ *
+ * Declaring it also makes the SDK register the `logging/setLevel` handler and filter messages
+ * below the client's chosen level, so the capability is honoured rather than merely advertised.
+ */
+const SERVER_OPTIONS = { capabilities: { logging: {} } } as const
+
 export function createServerFromContext(
 	ctx: ServerContext,
 	mode: ToolsetMode = DEFAULT_TOOLSET_MODE,
 ): McpServer {
-	const server = new McpServer({
-		name: 'fluentcart-mcp',
-		version: ctx.version,
-	})
+	const server = new McpServer(
+		{
+			name: 'fluentcart-mcp',
+			version: ctx.version,
+		},
+		SERVER_OPTIONS,
+	)
+
+	// What actually got registered, so prompts can route around whatever this mode omits.
+	const registered = new Set<string>()
 
 	// Every mode draws from the same already-filtered registry, so no mode can widen exposure.
 	if (mode === 'dynamic') {
 		registerDynamicTools(server, ctx.tools)
+		for (const name of DYNAMIC_TOOL_NAMES) registered.add(name)
 	} else {
 		if (mode === 'code') {
 			// Code mode registers exactly two meta-tools over a QuickJS sandbox, and starting that
@@ -192,23 +213,46 @@ export function createServerFromContext(
 				},
 				tool.handler,
 			)
+			registered.add(tool.name)
 		}
 	}
 
 	registerResources(server, ctx.client)
-	registerPrompts(server)
+	// Prompts name a tool only when that tool is registered here, so no mode can advertise a
+	// workflow it cannot actually run.
+	registerPrompts(server, registered)
 
-	const logger = createLogger(server)
 	const toolCount =
 		mode === 'dynamic'
 			? DYNAMIC_TOOL_COUNT
 			: mode === 'curated'
 				? selectCuratedTools(ctx.tools).length
 				: ctx.tools.length
-	logger.info(`fluentcart-mcp v${version} started — ${toolCount} tools registered (${mode} mode)`)
-	logger.debug(`config source: ${ctx.configSource}`)
+	announceStartup(
+		server,
+		`fluentcart-mcp v${version} started — ${toolCount} tools registered (${mode} mode)`,
+		ctx.configSource,
+	)
 
 	return server
+}
+
+/**
+ * Send the startup lines once a client is actually listening.
+ *
+ * These used to be sent during construction, which is before any transport is connected. That
+ * only appeared to work because the SDK was silently discarding every log notification for want
+ * of a declared `logging` capability; declaring it turned the same call into a "Not connected"
+ * throw. A log notification has no meaning before a client has initialised anyway, so the lines
+ * are emitted from the `initialized` notification instead — the point at which somebody is there
+ * to read them.
+ */
+function announceStartup(server: McpServer, summary: string, configSource: string): void {
+	server.server.oninitialized = () => {
+		const logger = createLogger(server)
+		logger.info(summary)
+		logger.debug(`config source: ${configSource}`)
+	}
 }
 
 /**
@@ -223,7 +267,7 @@ export async function createServerFromContextAsync(
 ): Promise<McpServer> {
 	if (mode !== 'code') return createServerFromContext(ctx, mode)
 
-	const server = new McpServer({ name: 'fluentcart-mcp', version: ctx.version })
+	const server = new McpServer({ name: 'fluentcart-mcp', version: ctx.version }, SERVER_OPTIONS)
 	const { registerCodeModeTools } = await import('./tools/code-mode.js')
 	const registration = await registerCodeModeTools(server, ctx.tools)
 
@@ -233,11 +277,12 @@ export async function createServerFromContextAsync(
 	}
 
 	registerResources(server, ctx.client)
-	registerPrompts(server)
+	registerPrompts(server, new Set(registration.toolNames))
 
-	const logger = createLogger(server)
-	logger.info(
+	announceStartup(
+		server,
 		`fluentcart-mcp v${version} started — ${registration.toolNames.length} tools registered (code mode)`,
+		ctx.configSource,
 	)
 
 	return server

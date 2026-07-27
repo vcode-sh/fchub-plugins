@@ -152,7 +152,15 @@ async function fetchRestRoot(rootUrl: URL): Promise<Response> {
 	}
 }
 
-function toDiscoveryFailure(error: unknown): never {
+/**
+ * Turn a transport failure into something a person can act on.
+ *
+ * Discovery runs before any transport is connected, so this message is frequently the only thing
+ * a user ever sees from the server — in Claude Desktop it is the whole of the crash log. Node
+ * renders an unreachable host as the bare string "fetch failed", which names neither the store
+ * being contacted nor anything to change, so the URL and the likely cause are added here.
+ */
+function toDiscoveryFailure(error: unknown, rootUrl: URL | string): never {
 	if (error instanceof CapabilityDiscoveryError) throw error
 	if (error instanceof FluentCartApiError) throw error
 
@@ -163,13 +171,14 @@ function toDiscoveryFailure(error: unknown): never {
 	if (isAbort) {
 		throw new FluentCartApiError(
 			'TIMEOUT',
-			`REST index request timed out after ${DISCOVERY_TIMEOUT_MS}ms`,
+			`Timed out after ${DISCOVERY_TIMEOUT_MS}ms reading the WordPress REST index at ${rootUrl}. The store is reachable but slow to answer, or a firewall is holding the connection open.`,
 		)
 	}
 
+	const detail = error instanceof Error ? error.message : String(error)
 	throw new FluentCartApiError(
 		'CONNECTION_ERROR',
-		error instanceof Error ? error.message : String(error),
+		`Could not reach the WordPress REST index at ${rootUrl} (${detail}). Check that FLUENTCART_URL points at the site root, that the site is running, and that /wp-json/ is not blocked.`,
 	)
 }
 
@@ -255,14 +264,14 @@ export async function discoverApiCapabilities(storeUrl: string): Promise<ApiCapa
 	try {
 		response = await fetchRestRoot(rootUrl)
 	} catch (error) {
-		toDiscoveryFailure(error)
+		toDiscoveryFailure(error, rootUrl)
 	}
 
 	let document: unknown
 	try {
 		document = await readRootDocument(response)
 	} catch (error) {
-		toDiscoveryFailure(error)
+		toDiscoveryFailure(error, rootUrl)
 	}
 
 	return capabilitiesFromRestIndex(document)

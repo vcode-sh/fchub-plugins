@@ -46,10 +46,12 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_top_products_sold',
 			title: 'Get Top Products Sold',
 			description:
-				'Top-selling products ranked by units sold (endpoint: top-products-sold). ' +
-				'Note: Similar to report_top_sold_products which uses a different endpoint (fetch-top-sold-products) and may return a different response shape. ' +
-				'Revenue in cents. Use per_page to control count (e.g. top 5, top 10). ' +
-				'\u26a0\ufe0f UPSTREAM BUG: Crashes with array_intersect_key() on null (UB-006).',
+				'DEPRECATED UPSTREAM, returns nothing. FluentCart has deprecated /reports/top-products-sold since 1.4; ' +
+				'on 1.5.5 it answers HTTP 200 with an empty top_products_sold list and a notice pointing at ' +
+				'/reports/fetch-top-sold-products. Verified live, not inferred. ' +
+				'Use fluentcart_report_top_products, which reads that endpoint and returns real rows with a stated ' +
+				'period, currency and payment scope. Kept only so a caller who asks for this route by name gets a ' +
+				'straight answer about why it is empty.',
 			schema: z.object({ ...dateRangeWithPerPage }),
 			endpoint: '/reports/top-products-sold',
 		}),

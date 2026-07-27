@@ -216,13 +216,39 @@ function rows(names: readonly string[], safety: ToolSafety): Array<[string, Tool
 	return names.map((name) => [name, safety])
 }
 
+/**
+ * Reversible and idempotent are not the same property, and conflating them was a real defect.
+ *
+ * Every reversible write used to be stamped `inherent`, which `ToolSafety` defines as "repeating
+ * the call cannot double-apply it" and which `_factory.ts` turns into `idempotentHint: true` on
+ * the wire. That is true of the updates — writing the same field twice lands the same row — and
+ * plainly false of the creates: FluentCart accepts no idempotency key on create, so a second POST
+ * makes a second product, customer or coupon. A client that retries on a timeout, which is
+ * exactly what `idempotentHint` invites, would silently duplicate the record.
+ *
+ * They stay `reversible-write`: each still has a verified delete, which is what governs exposure.
+ * Only the retry-safety claim changes, and `unsupported` is the honest value — there is no key to
+ * deduplicate on, so repetition cannot be made safe at this layer at all.
+ */
+function isCreate(name: string): boolean {
+	return name.endsWith('_create')
+}
+
 const REGISTRY = new Map<string, ToolSafety>([
 	...rows(POST_SHAPED_READS, READ_SAFETY),
-	...rows(REVERSIBLE_WRITES, {
+	...rows(REVERSIBLE_WRITES.filter(isCreate), {
 		risk: 'reversible-write',
-		idempotency: 'inherent',
+		idempotency: 'unsupported',
 		execution: 'rest',
 	}),
+	...rows(
+		REVERSIBLE_WRITES.filter((name) => !isCreate(name)),
+		{
+			risk: 'reversible-write',
+			idempotency: 'inherent',
+			execution: 'rest',
+		},
+	),
 	...rows(GUARDED_REAL_MONEY, {
 		risk: 'real-money',
 		idempotency: 'guard-required',

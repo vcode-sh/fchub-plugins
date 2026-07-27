@@ -38,12 +38,38 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 export class ReportRequestError extends Error {}
 
 /**
- * FluentCart sanitises `groupKey` against a whitelist that omits `daily`, so an unrecognised value
- * falls through to the daily format anyway. We send `daily` only by omission, never by name, so the
- * request never depends on that accident.
+ * `daily` is requested by omitting `groupKey`, never by sending the word.
+ *
+ * FluentCart sanitises `groupKey` against a whitelist of billing_country, shipping_country,
+ * payment_method, payment_status, default, monthly and yearly — and anything outside it is
+ * replaced with `payment_method` rather than rejected. Sending `groupKey=daily` therefore returns
+ * revenue grouped by payment method while still looking like a time series: verified live, the
+ * store answered `appliedGroupKey: payment_method` with four buckets for a 364-day range.
+ *
+ * Omitting it instead triggers ReportHelper::defineGroupKey, which picks the bucket from the range
+ * width: daily to 91 days, monthly to 365, yearly beyond. That is a real time series, so it is
+ * what we ask for — but it means a caller asking for daily over a long range gets monthly, which
+ * is why salesTrend reports the granularity the store actually applied instead of the one asked
+ * for. Evidence: app/Services/Report/ReportHelper.php lines 23-53 and 163-167.
  */
 function groupKeyFor(granularity: TrendRequest['granularity']): string | null {
 	return granularity === 'monthly' || granularity === 'yearly' ? granularity : null
+}
+
+/** Range width in whole days, matching ReportHelper::defineGroupKey's own diff. */
+function rangeDays(from: string, to: string): number {
+	const ms = Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)
+	return Number.isFinite(ms) ? Math.round(ms / 86_400_000) : 0
+}
+
+/** What the store says it grouped by, normalised to our vocabulary. */
+function appliedGranularity(body: Record<string, unknown>, from: string, to: string): string {
+	const applied = body.appliedGroupKey
+	if (applied === 'monthly' || applied === 'yearly' || applied === 'daily') return applied
+	if (typeof applied === 'string' && applied !== '') return applied
+	// Older builds omit the field; fall back to the documented range rule.
+	const days = rangeDays(from, to)
+	return days <= 91 ? 'daily' : days <= 365 ? 'monthly' : 'yearly'
 }
 
 export function assertValidRequest(request: ReportRequest): void {
@@ -101,24 +127,45 @@ function envelope<T>(
 	}
 }
 
+/**
+ * Round a reported figure to two decimals.
+ *
+ * FluentCart divides minor units by 100 in SQL, so a total that is exactly 4530.69 in the
+ * database arrives as 4530.6900000000005. Quoting that at somebody as their revenue is not a
+ * rounding error so much as a presentation failure. Two decimals is lossless for every currency
+ * the store reports in decimals, and counts are integers, which survive unchanged.
+ */
+function round2(value: number): number {
+	return Math.round(value * 100) / 100
+}
+
 /** Read a numeric field without inventing one. An absent figure stays null and is warned about. */
 function figure(source: Record<string, unknown>, key: string): number | null {
 	const value = source[key]
-	if (typeof value === 'number' && Number.isFinite(value)) return value
+	if (typeof value === 'number' && Number.isFinite(value)) return round2(value)
 	if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
-		return Number(value)
+		return round2(Number(value))
 	}
 	return null
 }
 
+/**
+ * Read each output field from whichever key the store actually sends it under.
+ *
+ * `sourceFields` maps our vocabulary onto the store's; an output key absent from that map is read
+ * under its own name. Derived fields are skipped here and filled in by the caller.
+ */
 function projectAllowlist(
 	source: Record<string, unknown>,
 	allowlist: readonly string[],
+	sourceFields: Readonly<Record<string, string>> = {},
+	derived: readonly string[] = [],
 ): { data: Record<string, number | null>; missing: string[] } {
 	const data: Record<string, number | null> = {}
 	const missing: string[] = []
 	for (const key of allowlist) {
-		const value = figure(source, key)
+		if (derived.includes(key)) continue
+		const value = figure(source, sourceFields[key] ?? key)
 		data[key] = value
 		if (value === null) missing.push(key)
 	}
@@ -148,22 +195,39 @@ export async function salesSummary(
 
 	const response = await client.get(contract.path, params(request))
 	const body = asRecord(asRecord(response.data).data ?? response.data)
-	const { data, missing } = projectAllowlist(asRecord(body.summary), contract.outputProjection)
+	const { data, missing } = projectAllowlist(
+		asRecord(body.summary),
+		contract.outputProjection,
+		contract.sourceFields,
+		contract.derivedFields,
+	)
+
+	// Averaging is only meaningful when both operands survived the projection and at least one
+	// order was counted. Anything else stays null rather than becoming a confident zero.
+	const gross = data.gross_sales ?? null
+	const count = data.order_count ?? null
+	data.average_order_value =
+		gross !== null && count !== null && count > 0 ? round2(gross / count) : null
 
 	return envelope('sales_summary', contract, request, data, missingWarning(missing))
 }
 
 export interface TrendPoint {
 	period: string
-	total_sales: number | null
+	gross_sales: number | null
 	net_revenue: number | null
 	order_count: number | null
+}
+
+export interface TrendResult extends ReportResult<TrendPoint[]> {
+	/** What was asked for, and what the store actually grouped by. Often not the same. */
+	granularity: { requested: string; applied: string }
 }
 
 export async function salesTrend(
 	client: FluentCartClient,
 	request: TrendRequest,
-): Promise<ReportResult<TrendPoint[]>> {
+): Promise<TrendResult> {
 	assertValidRequest(request)
 	const contract = contractFor('sales_trend')
 
@@ -175,6 +239,7 @@ export async function salesTrend(
 	const body = asRecord(asRecord(response.data).data ?? response.data)
 	const rows = Array.isArray(body.revenueReport) ? body.revenueReport : []
 
+	const source = contract.sourceFields ?? {}
 	const points: TrendPoint[] = rows.map((row) => {
 		const record = asRecord(row)
 		// The bucket label carries several names across group keys; take the first that is present
@@ -182,15 +247,29 @@ export async function salesTrend(
 		const label = record.period ?? record.date ?? record.group ?? record.label
 		return {
 			period: typeof label === 'string' ? label : '',
-			total_sales: figure(record, 'total_sales'),
-			net_revenue: figure(record, 'net_revenue'),
-			order_count: figure(record, 'order_count'),
+			gross_sales: figure(record, source.gross_sales ?? 'gross_sales'),
+			net_revenue: figure(record, source.net_revenue ?? 'net_revenue'),
+			order_count: figure(record, source.order_count ?? 'order_count'),
 		}
 	})
 
 	const unlabelled = points.filter((point) => point.period === '').length
 	const warnings = unlabelled > 0 ? [`${unlabelled} bucket(s) carried no period label.`] : []
-	return envelope('sales_trend', contract, request, points, warnings)
+
+	// The store widens the bucket on its own for long ranges. Saying so is the difference between
+	// a monthly series a caller can read correctly and a monthly series they believe is daily.
+	const requested = request.granularity ?? 'daily'
+	const applied = appliedGranularity(body, request.from, request.to)
+	if (applied !== requested) {
+		warnings.push(
+			`Requested ${requested} buckets but the store grouped by ${applied}: FluentCart selects the bucket from the range width (daily to 91 days, monthly to 365, yearly beyond). Narrow the range to get ${requested} buckets.`,
+		)
+	}
+
+	return {
+		...envelope('sales_trend', contract, request, points, warnings),
+		granularity: { requested, applied },
+	}
 }
 
 export interface TopProduct {

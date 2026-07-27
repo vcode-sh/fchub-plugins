@@ -13,6 +13,17 @@ const PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 const DIST_PACKAGES = join(PACKAGE_ROOT, 'dist-packages')
 const VERSION = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8')).version
 
+/**
+ * How many tools a well-formed bundle advertises, read from the generated manifest.
+ *
+ * `inspectMcpb` cross-checks the bundle's count against the release contract, so hardcoding a
+ * number here means the synthetic "good bundle" stops being well-formed the moment curated
+ * membership changes — which is a failure about this fixture, not about the inspector. Reading
+ * the real figure keeps the rejection tests below testing the thing each of them changes.
+ */
+const ADVERTISED_TOOL_COUNT = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'manifest.json'), 'utf8'))
+	._meta['sh.vcode.fluentcart-mcp'].advertisedToolCount
+
 const scratch = mkdtempSync(join(tmpdir(), 'mcpb-archive-test-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
 
@@ -109,8 +120,8 @@ function goodMcpbEntries(overrides = {}) {
 		version: VERSION,
 		description: 'Curated and capability-discovered tools for a FluentCart store.',
 		server: { entry_point: 'dist/index.js' },
-		tools: Array.from({ length: 27 }, (_, index) => ({ name: `tool_${index}` })),
-		_meta: { 'sh.vcode.fluentcart-mcp': { advertisedToolCount: 27 } },
+		tools: Array.from({ length: ADVERTISED_TOOL_COUNT }, (_, index) => ({ name: `tool_${index}` })),
+		_meta: { 'sh.vcode.fluentcart-mcp': { advertisedToolCount: ADVERTISED_TOOL_COUNT } },
 		...overrides.manifest,
 	}
 	return [
@@ -201,7 +212,10 @@ describe('MCPB archive inspection', () => {
 		const entries = goodMcpbEntries({
 			manifest: { _meta: { 'sh.vcode.fluentcart-mcp': { advertisedToolCount: 274 } } },
 		})
-		assert.match(mcpbFailures(entries), /claims 274 tools but lists 27/)
+		assert.match(
+			mcpbFailures(entries),
+			new RegExp(`claims 274 tools but lists ${ADVERTISED_TOOL_COUNT}`),
+		)
 	})
 
 	it('rejects a stale tool count in the product description', () => {
