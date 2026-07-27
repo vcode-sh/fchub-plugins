@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ToolDefinition } from '../../src/tools/_factory.js'
-import { DYNAMIC_TOOL_COUNT, registerDynamicTools } from '../../src/tools/dynamic.js'
+import {
+	DYNAMIC_TOOL_COUNT,
+	DYNAMIC_TOOL_NAMES,
+	GUARDED_EXECUTOR_TOOL_NAME,
+	registerDynamicTools,
+} from '../../src/tools/dynamic.js'
 import type { ToolRisk } from '../../src/tools/risk.js'
 
 interface Registered {
@@ -68,8 +73,12 @@ function tool(name: string, risk: ToolRisk, handler = vi.fn()): ToolDefinition {
 
 function setup(tools: ToolDefinition[]) {
 	const { registered, server } = fakeServer()
-	registerDynamicTools(server, tools)
-	return { registered, byName: new Map(registered.map((entry) => [entry.name, entry])) }
+	const reported = registerDynamicTools(server, tools)
+	return {
+		registered,
+		reported,
+		byName: new Map(registered.map((entry) => [entry.name, entry])),
+	}
 }
 
 const DEFAULT_TOOLS = [
@@ -85,16 +94,54 @@ async function callTool(entry: Registered, input: Record<string, unknown>) {
 }
 
 describe('dynamic mode registration', () => {
-	it('registers search, describe and three risk-split executors', () => {
-		const { registered } = setup(DEFAULT_TOOLS)
-		expect(registered).toHaveLength(DYNAMIC_TOOL_COUNT)
+	// This block used to assert five meta-tools unconditionally. It could not stay: every
+	// real-money entry in the risk registry ships `execution: 'none'`, so `canExposeTool` removes
+	// all of them and the guarded executor was advertised with `destructiveHint: true` at a 100%
+	// failure rate. It is now registered only when a real-money tool actually survived the filter.
+	it('registers search, describe and the two executors that can always reach something', () => {
+		const { registered, reported } = setup([
+			tool('fluentcart_product_list', 'read'),
+			tool('fluentcart_coupon_create', 'reversible-write'),
+		])
+
 		expect(registered.map((entry) => entry.name)).toEqual([
 			'fluentcart_search_tools',
 			'fluentcart_describe_tools',
 			'fluentcart_execute_read_tool',
 			'fluentcart_execute_reversible_write',
-			'fluentcart_execute_guarded_write',
 		])
+		expect(registered).toHaveLength(DYNAMIC_TOOL_COUNT)
+		expect(reported).toEqual(registered.map((entry) => entry.name))
+	})
+
+	it('withholds the guarded executor when no real-money tool survived the exposure filter', () => {
+		const { byName, reported } = setup([
+			tool('fluentcart_product_list', 'read'),
+			tool('fluentcart_coupon_create', 'reversible-write'),
+		])
+
+		expect(byName.has(GUARDED_EXECUTOR_TOOL_NAME)).toBe(false)
+		expect(reported).not.toContain(GUARDED_EXECUTOR_TOOL_NAME)
+	})
+
+	it('registers the guarded executor as soon as a real-money tool is exposed', () => {
+		const { registered, reported } = setup(DEFAULT_TOOLS)
+
+		expect(registered.map((entry) => entry.name)).toEqual([
+			...DYNAMIC_TOOL_NAMES,
+			GUARDED_EXECUTOR_TOOL_NAME,
+		])
+		expect(reported).toEqual(registered.map((entry) => entry.name))
+	})
+
+	it('reports exactly what it registered, never the constant roster', () => {
+		const readOnly = setup([tool('fluentcart_product_list', 'read')])
+		const withRefund = setup(DEFAULT_TOOLS)
+
+		for (const result of [readOnly, withRefund]) {
+			expect(result.reported).toEqual(result.registered.map((entry) => entry.name))
+		}
+		expect(withRefund.reported.length).toBe(readOnly.reported.length + 1)
 	})
 
 	it('annotates each executor according to what it can actually do', () => {
@@ -103,9 +150,7 @@ describe('dynamic mode registration', () => {
 		expect(
 			byName.get('fluentcart_execute_reversible_write')?.config.annotations?.destructiveHint,
 		).not.toBe(true)
-		expect(
-			byName.get('fluentcart_execute_guarded_write')?.config.annotations?.destructiveHint,
-		).toBe(true)
+		expect(byName.get(GUARDED_EXECUTOR_TOOL_NAME)?.config.annotations?.destructiveHint).toBe(true)
 	})
 })
 

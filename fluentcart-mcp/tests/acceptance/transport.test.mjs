@@ -68,6 +68,20 @@ function runEntrypoint(args, env) {
 	})
 }
 
+/**
+ * Build the app around a context resolved without capability discovery.
+ *
+ * `createApp` now discovers the store's real routes before building anything, which is the whole
+ * point of the fix that introduced it — but this lane deliberately points at a host that cannot
+ * resolve, so discovery would refuse before a single transport assertion ran. The transport
+ * boundaries under test here are the same either way, so the context is supplied directly.
+ */
+async function appForFixtureStore() {
+	const { createAppFromContext } = await distImport('transport', 'http.js')
+	const { resolveServerContext } = await distImport('server.js')
+	return createAppFromContext('127.0.0.1', resolveServerContext())
+}
+
 function isListening(port) {
 	return new Promise((settle) => {
 		const socket = connect({ host: '127.0.0.1', port })
@@ -87,9 +101,7 @@ before(async () => {
 	Object.assign(process.env, FIXTURE_ENV)
 	process.env.FLUENTCART_MCP_API_KEY = API_KEY
 	auth = await distImport('transport', 'auth.js')
-	const { createApp } = await distImport('transport', 'http.js')
-
-	const app = createApp('127.0.0.1')
+	const app = await appForFixtureStore()
 	await new Promise((ready) => {
 		server = app.listen(0, '127.0.0.1', () => {
 			baseUrl = `http://127.0.0.1:${server.address().port}`
@@ -265,8 +277,7 @@ describe('adversarial requests', () => {
 
 describe('shutdown', () => {
 	it('stops accepting connections once closed', async () => {
-		const { createApp } = await distImport('transport', 'http.js')
-		const app = createApp('127.0.0.1')
+		const app = await appForFixtureStore()
 		const temporary = await new Promise((ready) => {
 			const listener = app.listen(0, '127.0.0.1', () => ready(listener))
 		})

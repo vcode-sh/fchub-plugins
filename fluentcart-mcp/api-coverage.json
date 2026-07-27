@@ -8,8 +8,8 @@
 	"attribution": "Core and Pro both register into the fluent-cart/v2 namespace. The available captures are a core-only 1.3.9 docs contract and one all-active runtime index, and neither separates a core route from a Pro route, so every row is attributed to the namespace owner. Sub-attribution between fluent-cart and fluent-cart-pro is NOT evidenced.",
 	"counts": {
 		"routes": 386,
-		"exposed": 153,
-		"excluded": 233,
+		"exposed": 185,
+		"excluded": 201,
 		"deltaSince139": 61,
 		"tools": 289,
 		"declaredTools": 292,
@@ -481,18 +481,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_coupon_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /coupons"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_coupon_create",
+					"disposition": "curated"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_coupon_create"
-			]
+			"reason": "Reached by fluentcart_coupon_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/coupons-writes.ts#fluentcart_coupon_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /coupons",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/coupons-writes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -711,11 +720,16 @@
 				{
 					"publicName": "fluentcart_coupon_get",
 					"disposition": "curated"
+				},
+				{
+					"publicName": "fluentcart_coupon_update",
+					"disposition": "curated"
 				}
 			],
-			"reason": "Reached by fluentcart_coupon_get.",
+			"reason": "Reached by fluentcart_coupon_get, fluentcart_coupon_update.",
 			"risk": "read",
 			"schemaEvidence": [
+				"src/tools/coupons-writes.ts#fluentcart_coupon_update",
 				"src/tools/coupons.ts#fluentcart_coupon_get"
 			],
 			"permissionEvidence": [
@@ -723,12 +737,11 @@
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
+				"src/tools/coupons-writes.ts",
 				"src/tools/coupons.ts",
 				"src/tools/_factory.ts"
 			],
-			"suppressedTools": [
-				"fluentcart_coupon_update"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "PUT",
@@ -739,18 +752,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_coupon_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /coupons/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_coupon_update",
+					"disposition": "curated"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_coupon_update"
-			]
+			"reason": "Reached by fluentcart_coupon_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/coupons-writes.ts#fluentcart_coupon_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /coupons/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/coupons-writes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -1243,18 +1265,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_customer_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /customers"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_customer_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_customer_create"
-			]
+			"reason": "Reached by fluentcart_customer_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/customers-writes.ts#fluentcart_customer_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /customers",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/customers-writes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -1374,11 +1405,16 @@
 				{
 					"publicName": "fluentcart_customer_get",
 					"disposition": "curated"
+				},
+				{
+					"publicName": "fluentcart_customer_update",
+					"disposition": "dynamic"
 				}
 			],
-			"reason": "Reached by fluentcart_customer_get.",
+			"reason": "Reached by fluentcart_customer_get, fluentcart_customer_update.",
 			"risk": "read",
 			"schemaEvidence": [
+				"src/tools/customers-writes.ts#fluentcart_customer_update",
 				"src/tools/customers.ts#fluentcart_customer_get"
 			],
 			"permissionEvidence": [
@@ -1386,12 +1422,11 @@
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
+				"src/tools/customers-writes.ts",
 				"src/tools/customers.ts",
 				"src/tools/_factory.ts"
 			],
-			"suppressedTools": [
-				"fluentcart_customer_update"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "PUT",
@@ -1402,18 +1437,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_customer_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /customers/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_customer_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_customer_update"
-			]
+			"reason": "Reached by fluentcart_customer_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/customers-writes.ts#fluentcart_customer_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /customers/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/customers-writes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "PUT",
@@ -2836,18 +2880,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_attribute_group_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /options/attr/group"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_attribute_group_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_attribute_group_create"
-			]
+			"reason": "Reached by fluentcart_attribute_group_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/product-options.ts#fluentcart_attribute_group_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /options/attr/group",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/product-options.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -2885,12 +2938,17 @@
 				{
 					"publicName": "fluentcart_attribute_group_get",
 					"disposition": "dynamic"
+				},
+				{
+					"publicName": "fluentcart_attribute_group_update",
+					"disposition": "dynamic"
 				}
 			],
-			"reason": "Reached by fluentcart_attribute_group_get.",
+			"reason": "Reached by fluentcart_attribute_group_get, fluentcart_attribute_group_update.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/product-options.ts#fluentcart_attribute_group_get"
+				"src/tools/product-options.ts#fluentcart_attribute_group_get",
+				"src/tools/product-options.ts#fluentcart_attribute_group_update"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /options/attr/group/{param}",
@@ -2900,9 +2958,7 @@
 				"src/tools/product-options.ts",
 				"src/tools/_factory.ts"
 			],
-			"suppressedTools": [
-				"fluentcart_attribute_group_update"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "PUT",
@@ -2913,18 +2969,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_attribute_group_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /options/attr/group/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_attribute_group_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_attribute_group_update"
-			]
+			"reason": "Reached by fluentcart_attribute_group_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/product-options.ts#fluentcart_attribute_group_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /options/attr/group/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/product-options.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -2957,18 +3022,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_attribute_term_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /options/attr/group/{param}/term/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_attribute_term_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_attribute_term_update"
-			]
+			"reason": "Reached by fluentcart_attribute_term_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/product-options-terms.ts#fluentcart_attribute_term_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /options/attr/group/{param}/term/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/product-options-terms.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -3010,18 +3084,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_attribute_term_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /options/attr/group/{param}/terms"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_attribute_term_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_attribute_term_create"
-			]
+			"reason": "Reached by fluentcart_attribute_term_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/product-options-terms.ts#fluentcart_attribute_term_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /options/attr/group/{param}/terms",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/product-options-terms.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -3167,18 +3250,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_order_bump_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /order_bump"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_order_bump_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_order_bump_create"
-			]
+			"reason": "Reached by fluentcart_order_bump_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/order-bumps.ts#fluentcart_order_bump_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /order_bump",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/order-bumps.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -3242,18 +3334,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_order_bump_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /order_bump/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_order_bump_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_order_bump_update"
-			]
+			"reason": "Reached by fluentcart_order_bump_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/order-bumps.ts#fluentcart_order_bump_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /order_bump/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/order-bumps.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -4023,18 +4124,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_product_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_create"
-			]
+			"reason": "Reached by fluentcart_product_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-core.ts#fluentcart_product_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-core.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -4149,18 +4259,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_product_taxonomy_delete, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/delete-taxonomy-term/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_taxonomy_delete",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_taxonomy_delete"
-			]
+			"reason": "Reached by fluentcart_product_taxonomy_delete.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-catalog.ts#fluentcart_product_taxonomy_delete"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/delete-taxonomy-term/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-catalog.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -4171,18 +4290,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_product_update_detail, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/detail/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_update_detail",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_update_detail"
-			]
+			"reason": "Reached by fluentcart_product_update_detail.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-core.ts#fluentcart_product_update_detail"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/detail/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-core.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -4604,18 +4732,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_product_taxonomy_sync, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/sync-taxonomy-term/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_taxonomy_sync",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_taxonomy_sync"
-			]
+			"reason": "Reached by fluentcart_product_taxonomy_sync.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-catalog.ts#fluentcart_product_taxonomy_sync"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/sync-taxonomy-term/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-catalog.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -4648,18 +4785,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_product_upgrade_path_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/upgrade-path/{param}/update"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_upgrade_path_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_upgrade_path_update"
-			]
+			"reason": "Reached by fluentcart_product_upgrade_path_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-catalog.ts#fluentcart_product_upgrade_path_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/upgrade-path/{param}/update",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-catalog.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -4701,18 +4847,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_variant_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/variants"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_variant_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_variant_create"
-			]
+			"reason": "Reached by fluentcart_variant_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-variant-writes.ts#fluentcart_variant_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/variants",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-variant-writes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -4785,18 +4940,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_variant_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/variants/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_variant_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_variant_update"
-			]
+			"reason": "Reached by fluentcart_variant_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-variant-writes.ts#fluentcart_variant_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/variants/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-variant-writes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "PUT",
@@ -5136,26 +5300,37 @@
 			"routeDisposition": "exposed",
 			"toolExposures": [
 				{
+					"publicName": "fluentcart_product_inventory_update",
+					"disposition": "dynamic"
+				},
+				{
 					"publicName": "fluentcart_product_pricing_get",
+					"disposition": "dynamic"
+				},
+				{
+					"publicName": "fluentcart_variant_update",
 					"disposition": "dynamic"
 				}
 			],
-			"reason": "Reached by fluentcart_product_pricing_get.",
+			"reason": "Reached by fluentcart_product_inventory_update, fluentcart_product_pricing_get, fluentcart_variant_update.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/products-pricing.ts#fluentcart_product_pricing_get"
+				"src/tools/products-pricing-writes.ts#fluentcart_product_inventory_update",
+				"src/tools/products-pricing.ts#fluentcart_product_pricing_get",
+				"src/tools/products-variant-writes.ts#fluentcart_variant_update"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/{param}/pricing",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
+				"src/tools/products-pricing-writes.ts",
 				"src/tools/products-pricing.ts",
+				"src/tools/products-variant-writes.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": [
-				"fluentcart_product_pricing_update",
-				"fluentcart_variant_update"
+				"fluentcart_product_pricing_update"
 			]
 		},
 		{
@@ -5403,18 +5578,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_product_inventory_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /products/{param}/update-inventory/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_inventory_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_inventory_update"
-			]
+			"reason": "Reached by fluentcart_product_inventory_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-pricing-writes.ts#fluentcart_product_inventory_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /products/{param}/update-inventory/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-pricing-writes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -5447,18 +5631,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_product_manage_stock_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /products/{param}/update-manage-stock"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_manage_stock_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_manage_stock_update"
-			]
+			"reason": "Reached by fluentcart_product_manage_stock_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-pricing-writes.ts#fluentcart_product_manage_stock_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /products/{param}/update-manage-stock",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-pricing-writes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -5491,18 +5684,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_product_upgrade_path_save, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/{param}/upgrade-path"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_upgrade_path_save",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_upgrade_path_save"
-			]
+			"reason": "Reached by fluentcart_product_upgrade_path_save.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/products-catalog.ts#fluentcart_product_upgrade_path_save"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /products/{param}/upgrade-path",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-catalog.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -7171,13 +7373,18 @@
 			"routeDisposition": "exposed",
 			"toolExposures": [
 				{
+					"publicName": "fluentcart_saved_view_create",
+					"disposition": "dynamic"
+				},
+				{
 					"publicName": "fluentcart_saved_view_list",
 					"disposition": "dynamic"
 				}
 			],
-			"reason": "Reached by fluentcart_saved_view_list.",
+			"reason": "Reached by fluentcart_saved_view_create, fluentcart_saved_view_list.",
 			"risk": "read",
 			"schemaEvidence": [
+				"src/tools/saved-views.ts#fluentcart_saved_view_create",
 				"src/tools/saved-views.ts#fluentcart_saved_view_list"
 			],
 			"permissionEvidence": [
@@ -7188,9 +7395,7 @@
 				"src/tools/saved-views.ts",
 				"src/tools/_factory.ts"
 			],
-			"suppressedTools": [
-				"fluentcart_saved_view_create"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -7201,18 +7406,28 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_saved_view_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /saved-views"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_saved_view_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_saved_view_create"
-			]
+			"reason": "Reached by fluentcart_saved_view_create. Reversibility is demonstrated live: the created id is registered for removal before anything else can fail, read back independently rather than echoed from the request, then deleted and confirmed gone, with every pre-existing view unchanged.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/saved-views.ts#fluentcart_saved_view_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /saved-views",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/_factory.ts",
+				"src/tools/saved-views.ts",
+				"tests/integration/current-reversible-writes.test.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -8453,18 +8668,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_shipping_class_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /shipping/classes"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_shipping_class_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_shipping_class_create"
-			]
+			"reason": "Reached by fluentcart_shipping_class_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/shipping.ts#fluentcart_shipping_class_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /shipping/classes",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/shipping.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -8528,18 +8752,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_shipping_class_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /shipping/classes/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_shipping_class_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_shipping_class_update"
-			]
+			"reason": "Reached by fluentcart_shipping_class_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/shipping.ts#fluentcart_shipping_class_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /shipping/classes/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/shipping.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -8570,18 +8803,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_shipping_method_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /shipping/methods"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_shipping_method_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_shipping_method_create"
-			]
+			"reason": "Reached by fluentcart_shipping_method_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/shipping.ts#fluentcart_shipping_method_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /shipping/methods",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/shipping.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "PUT",
@@ -8592,18 +8834,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_shipping_method_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /shipping/methods"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_shipping_method_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_shipping_method_update"
-			]
+			"reason": "Reached by fluentcart_shipping_method_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/shipping.ts#fluentcart_shipping_method_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /shipping/methods",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/shipping.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -8786,18 +9037,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_shipping_zone_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /shipping/zones"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_shipping_zone_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_shipping_zone_create"
-			]
+			"reason": "Reached by fluentcart_shipping_zone_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/shipping.ts#fluentcart_shipping_zone_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /shipping/zones",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/shipping.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -8883,18 +9143,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_shipping_zone_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /shipping/zones/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_shipping_zone_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_shipping_zone_update"
-			]
+			"reason": "Reached by fluentcart_shipping_zone_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/shipping.ts#fluentcart_shipping_zone_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /shipping/zones/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/shipping.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -8987,14 +9256,19 @@
 					"disposition": "dynamic"
 				},
 				{
+					"publicName": "fluentcart_tax_class_create",
+					"disposition": "dynamic"
+				},
+				{
 					"publicName": "fluentcart_tax_class_list",
 					"disposition": "dynamic"
 				}
 			],
-			"reason": "Reached by fluentcart_list_reference_data, fluentcart_tax_class_list.",
+			"reason": "Reached by fluentcart_list_reference_data, fluentcart_tax_class_create, fluentcart_tax_class_list.",
 			"risk": "read",
 			"schemaEvidence": [
 				"src/tools/reference-data.ts#fluentcart_list_reference_data",
+				"src/tools/tax-classes.ts#fluentcart_tax_class_create",
 				"src/tools/tax-classes.ts#fluentcart_tax_class_list"
 			],
 			"permissionEvidence": [
@@ -9006,9 +9280,7 @@
 				"src/tools/tax-classes.ts",
 				"src/tools/_factory.ts"
 			],
-			"suppressedTools": [
-				"fluentcart_tax_class_create"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -9019,18 +9291,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_tax_class_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/classes"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_tax_class_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_tax_class_create"
-			]
+			"reason": "Reached by fluentcart_tax_class_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/tax-classes.ts#fluentcart_tax_class_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/classes",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/tax-classes.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -9121,12 +9402,17 @@
 				{
 					"publicName": "fluentcart_tax_settings_get",
 					"disposition": "dynamic"
+				},
+				{
+					"publicName": "fluentcart_tax_settings_save",
+					"disposition": "dynamic"
 				}
 			],
-			"reason": "Reached by fluentcart_tax_settings_get.",
+			"reason": "Reached by fluentcart_tax_settings_get, fluentcart_tax_settings_save.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/tax-configuration.ts#fluentcart_tax_settings_get"
+				"src/tools/tax-configuration.ts#fluentcart_tax_settings_get",
+				"src/tools/tax-configuration.ts#fluentcart_tax_settings_save"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /tax/configuration/settings",
@@ -9136,9 +9422,7 @@
 				"src/tools/tax-configuration.ts",
 				"src/tools/_factory.ts"
 			],
-			"suppressedTools": [
-				"fluentcart_tax_settings_save"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -9149,18 +9433,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_tax_settings_save, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/configuration/settings"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_tax_settings_save",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_tax_settings_save"
-			]
+			"reason": "Reached by fluentcart_tax_settings_save.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/tax-configuration.ts#fluentcart_tax_settings_save"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/configuration/settings",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/tax-configuration.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -9368,18 +9661,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_tax_rate_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/country/rate"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_tax_rate_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_tax_rate_create"
-			]
+			"reason": "Reached by fluentcart_tax_rate_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/tax.ts#fluentcart_tax_rate_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/country/rate",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/tax.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -9412,18 +9714,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_tax_rate_update, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /tax/country/rate/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_tax_rate_update",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_tax_rate_update"
-			]
+			"reason": "Reached by fluentcart_tax_rate_update.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/tax.ts#fluentcart_tax_rate_update"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#PUT /tax/country/rate/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/tax.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",
@@ -9547,18 +9858,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_tax_shipping_override_create, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/rates/country/override"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_tax_shipping_override_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_tax_shipping_override_create"
-			]
+			"reason": "Reached by fluentcart_tax_shipping_override_create.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/tax.ts#fluentcart_tax_shipping_override_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/rates/country/override",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/tax.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "DELETE",

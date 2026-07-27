@@ -1,7 +1,7 @@
 // Dynamic-mode progressive disclosure, measured against a live store.
 //
-// Dynamic mode's whole argument is that a caller pays for five meta-tools instead of a hundred and
-// fifty definitions, and then pays again, in small amounts, only for what it actually asks about.
+// Dynamic mode's whole argument is that a caller pays for a handful of meta-tools instead of a
+// hundred and fifty definitions, and then pays again, in small amounts, only for what it asks about.
 // That argument is only true if the disclosure steps stay small, so this lane measures the real
 // wire payloads of a real session rather than trusting the design.
 
@@ -23,9 +23,13 @@ const SEARCH_LIMIT_DEFAULT = 5
 const SEARCH_LIMIT_MAX = 10
 const DESCRIBE_MAX = 5
 
+/**
+ * The guarded executor used to be listed here too. It is registered only when a real-money action
+ * survives the exposure filter, and every real-money entry ships `execution: 'none'` in 2.0.0, so
+ * listing it would assert a tool that answers nothing but "not exposed" on every call.
+ */
 const DYNAMIC_NAMES = [
 	'fluentcart_describe_tools',
-	'fluentcart_execute_guarded_write',
 	'fluentcart_execute_read_tool',
 	'fluentcart_execute_reversible_write',
 	'fluentcart_search_tools',

@@ -65,6 +65,8 @@ describe('report tools nest their filters under params', () => {
 			'filterMode',
 			'storeMode',
 			'subscriptionType',
+			// Not in sanitizeParams, but read directly at ReportingController.php:167.
+			'paymentStatus',
 		]) {
 			const query = await queryFor('fluentcart_report_revenue', { [key]: 'x' })
 			expect(query[`params[${key}]`], `${key} must be nested`).toBe('x')
@@ -115,6 +117,52 @@ describe('report tools nest their filters under params', () => {
 
 			expect(query['params[startDate]'], `${tool.name} sends a flat startDate`).toBe('2026-01-01')
 			expect(query, `${tool.name} sends a flat startDate`).not.toHaveProperty('startDate')
+		}
+	})
+})
+
+describe('time-series tools offer only group keys the store honours', () => {
+	// ReportHelper::sanitizeGroupKey rewrites any unwhitelisted value to `payment_method` instead
+	// of rejecting it, so an enum that offers `daily` or `weekly` is offering a payment-method
+	// breakdown disguised as a time series. Verified live on a 364-day range: both returned the
+	// same 8 rows labelled "2026" from /reports/order-chart, where `monthly` returned 12 buckets.
+	// Finer than monthly is reached by omitting the key, not by naming it.
+	const TIME_SERIES = [
+		'fluentcart_report_order_chart',
+		'fluentcart_report_refund_chart',
+		'fluentcart_report_subscription_chart',
+		'fluentcart_report_license_chart',
+	]
+
+	it('never accepts daily or weekly by name', () => {
+		const { client } = stubClient()
+		const all = createAllTools(client, {})
+
+		for (const name of TIME_SERIES) {
+			const tool = all.find((candidate) => candidate.name === name)
+			if (!tool) continue
+			for (const rejected of ['daily', 'weekly']) {
+				expect(
+					tool.schema.safeParse({ groupKey: rejected }).success,
+					`${name} still offers groupKey="${rejected}", which the store reads as payment_method`,
+				).toBe(false)
+			}
+		}
+	})
+
+	it('still accepts the two the store whitelists', () => {
+		const { client } = stubClient()
+		const all = createAllTools(client, {})
+
+		for (const name of TIME_SERIES) {
+			const tool = all.find((candidate) => candidate.name === name)
+			if (!tool) continue
+			for (const accepted of ['monthly', 'yearly']) {
+				expect(
+					tool.schema.safeParse({ groupKey: accepted }).success,
+					`${name} should accept groupKey="${accepted}"`,
+				).toBe(true)
+			}
 		}
 	})
 })

@@ -14,19 +14,35 @@ import { loadServerModule, measureMode } from '../../scripts/measure-tool-contex
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
-/** Dynamic always registers the same five meta-tools; the policy bounds what they can reach. */
-const DYNAMIC_NAMES =
-	'search_tools describe_tools execute_read_tool execute_reversible_write execute_guarded_write'
-		.split(' ')
-		.map((suffix) => `fluentcart_${suffix}`)
+/**
+ * Dynamic registers four meta-tools; the policy bounds what they can reach.
+ *
+ * The fifth, `fluentcart_execute_guarded_write`, is registered only when a real-money action
+ * survives the exposure filter. Every real-money entry ships `execution: 'none'` in 2.0.0 — the
+ * same fact the exposure suite below asserts — so it is absent in all three write modes, and
+ * `GUARDED_EXECUTOR` is asserted absent rather than pinned present.
+ */
+const DYNAMIC_NAMES = 'search_tools describe_tools execute_read_tool execute_reversible_write'
+	.split(' ')
+	.map((suffix) => `fluentcart_${suffix}`)
+
+const GUARDED_EXECUTOR = 'fluentcart_execute_guarded_write'
 
 const CODE_NAMES = ['fluentcart_search_api', 'fluentcart_execute_code']
 
+/**
+ * Re-recorded 2026-07-27: the four raw report passthroughs became the three contract-backed
+ * reports. Two of the four could not answer at all — `/reports/sales-growth` returns HTTP 500 on
+ * FluentCart 1.5.5, and `/reports/top-products-sold` has been deprecated since 1.4 and returns an
+ * empty list — while `report_overview` and `report_revenue` returned unlabelled payloads carrying
+ * no period, currency or payment scope. The replacements state all three and are reconciled
+ * against the order list by tests/integration/report-semantics.test.ts.
+ */
 const CURATED_NAMES = (
 	'app_init dashboard_overview order_list product_list customer_list subscription_list ' +
 	'coupon_list product_search_by_name order_get product_get customer_get subscription_get ' +
-	'coupon_get order_transactions report_overview report_revenue report_top_products_sold ' +
-	'report_sales_growth coupon_create coupon_update'
+	'coupon_get order_transactions report_sales_summary report_sales_trend report_top_products ' +
+	'coupon_create coupon_update'
 )
 	.split(' ')
 	.map((suffix) => `fluentcart_${suffix}`)
@@ -202,6 +218,19 @@ describe('public names per mode', () => {
 		it(`registers the same meta-tool names in ${writeMode} mode`, () => {
 			assert.deepEqual(snapshots.get(writeMode).dynamic, DYNAMIC_NAMES)
 			assert.deepEqual(snapshots.get(writeMode).code, CODE_NAMES)
+		})
+
+		it(`does not advertise a guarded executor it cannot use in ${writeMode} mode`, () => {
+			// An executor annotated destructiveHint that refuses every call is worse than a missing
+			// one: it tells an agent the capability exists and that its own call was at fault.
+			const guardable = snapshots
+				.get(writeMode)
+				.safety.filter((tool) => tool.risk === 'real-money' && tool.execution === 'guarded-rest')
+			assert.equal(
+				snapshots.get(writeMode).dynamic.includes(GUARDED_EXECUTOR),
+				guardable.length > 0,
+				`${GUARDED_EXECUTOR} must be registered if and only if a real-money action is exposed`,
+			)
 		})
 
 		it(`lists exactly the filtered registry in full mode, ${writeMode}`, () => {

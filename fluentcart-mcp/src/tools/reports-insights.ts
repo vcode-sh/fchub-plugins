@@ -14,10 +14,23 @@ const dateRangeWithPerPage = {
 
 const dateRangeWithGroup = {
 	...dateRange,
+	// Only the two values FluentCart actually whitelists.
+	//
+	// `ReportHelper::sanitizeGroupKey` accepts billing_country, shipping_country, payment_method,
+	// payment_status, default, monthly and yearly — and rewrites anything else to `payment_method`
+	// rather than rejecting it. So `daily` and `weekly` did not produce finer buckets; they
+	// produced a payment-method breakdown wearing a time series' clothes. Verified live on a
+	// 364-day range: `daily` and `weekly` both returned the same 8 rows labelled "2026" from
+	// /reports/order-chart, where `monthly` returned 12 real month buckets.
+	//
+	// Finer than monthly is reached by OMITTING this, which triggers ReportHelper::defineGroupKey
+	// and picks from the range width: daily to 91 days, monthly to 365, yearly beyond.
 	groupKey: z
-		.enum(['daily', 'weekly', 'monthly'])
+		.enum(['monthly', 'yearly'])
 		.optional()
-		.describe('Time grouping: daily, weekly, or monthly'),
+		.describe(
+			'Time bucket. Omit for the store to pick from the range width — daily up to 91 days, then monthly, then yearly. Only monthly and yearly may be named; other values are silently reinterpreted as a payment-method breakdown',
+		),
 }
 
 export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
@@ -48,10 +61,12 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			description:
 				'DEPRECATED UPSTREAM, returns nothing. FluentCart has deprecated /reports/top-products-sold since 1.4; ' +
 				'on 1.5.5 it answers HTTP 200 with an empty top_products_sold list and a notice pointing at ' +
-				'/reports/fetch-top-sold-products. Verified live, not inferred. ' +
+				'/reports/fetch-top-sold-products. Verified live, not inferred: the list is empty because the query ' +
+				'appends HAVING total_sold with an operator and a bound this server has no way to supply, so nothing ' +
+				'can satisfy it. ' +
 				'Use fluentcart_report_top_products, which reads that endpoint and returns real rows with a stated ' +
-				'period, currency and payment scope. Kept only so a caller who asks for this route by name gets a ' +
-				'straight answer about why it is empty.',
+				'period, currency and payment scope, or fluentcart_report_top_sold_products for the same rows raw. ' +
+				'Kept only so a caller who asks for this route by name gets a straight answer about why it is empty.',
 			schema: z.object({ ...dateRangeWithPerPage }),
 			endpoint: '/reports/top-products-sold',
 		}),
@@ -166,32 +181,99 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_retention_chart',
 			title: 'Get Retention Chart',
-			description: 'Customer retention rates over time periods.',
+			description:
+				'How long subscriptions last, as a histogram rather than a time series: one count per survival band — day_7, day_15, day_30, day_90, day_180, day_365, more_than_year. ' +
+				'There is no month-by-month movement here and no MRR. For that use fluentcart_report_subscription_retention; for retention by sign-up cohort use fluentcart_report_subscription_cohorts.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/retention-chart',
 		}),
 
+		/**
+		 * The richest analytics payload FluentCart serves, and deliberately still a raw tool.
+		 *
+		 * `subscription_retention` is registered in report-contracts.ts as diagnostic-only: the
+		 * money columns cannot be scoped to a currency, because `fct_subscriptions` keeps the
+		 * currency inside a JSON `config` blob where a SUM cannot reach it. Everything else about
+		 * the report holds up, so the description states the semantics precisely instead of
+		 * shrugging, and tests/integration/report-semantics.test.ts reconciles the MRR figure
+		 * against the subscription list so the claims below are checked rather than asserted.
+		 */
 		getTool(client, {
 			name: 'fluentcart_report_subscription_retention',
-			title: 'Get Subscription Retention',
-			description: 'Subscription-specific retention analysis with cohort data.',
-			schema: z.object({ ...dateRange }),
+			title: 'Get Subscription MRR and Churn Series',
+			description:
+				'MRR and churn, one row per month: mrr, new_subscriptions, new_subscriptions_mrr, churned_subscriptions, churned_subscriptions_mrr, active_paid_subscriptions, retention_rate, retention_rate_money. ' +
+				'Amounts are decimals, not cents. Yearly, weekly and daily plans are normalised to a monthly equivalent. Caller dates are honoured. Rows count what is active at month end, so future months are projections. Excludes pending and intended; keeps cancelled and expired. ' +
+				'WARNING: money columns add every currency together. No currency column exists and a currency argument is discarded, so on a multi-currency store trust the counts and retention_rate, not the MRR. ' +
+				'mrr and active_* counts are strings; an empty month sends an empty string, not a zero.',
+			schema: z.object({
+				startDate: z
+					.string()
+					.optional()
+					.describe('First month to report, YYYY-MM-DD. Buckets step monthly from this day'),
+				endDate: z
+					.string()
+					.optional()
+					.describe(
+						'Last month to report, YYYY-MM-DD. A final month ending before the start day-of-month is dropped',
+					),
+			}),
 			endpoint: '/reports/subscription-retention',
 		}),
 
 		getTool(client, {
 			name: 'fluentcart_report_subscription_cohorts',
 			title: 'Get Subscription Cohorts',
-			description: 'Subscription cohort analysis: retention by sign-up period.',
-			schema: z.object({ ...dateRange }),
+			description:
+				'Retention by sign-up cohort, read from the pre-computed snapshot table rather than from the subscriptions themselves. ' +
+				'Returns an empty cohorts list until snapshots exist: run fluentcart_report_retention_snapshots_generate and poll fluentcart_report_retention_snapshots_status first. Both dates are required — omit either and the controller returns nothing at all. ' +
+				'For a month-by-month MRR and churn series that needs no snapshots, use fluentcart_report_subscription_retention.',
+			schema: z.object({
+				...dateRange,
+				groupBy: z
+					.enum(['month', 'year'])
+					.optional()
+					.describe('Cohort period (default: year; anything else is coerced to year)'),
+				metric: z
+					.enum(['subscribers', 'mrr'])
+					.optional()
+					.describe('Value each cohort cell reports (default: subscribers)'),
+			}),
+			// getCohortData reads groupBy and metric off `$request->get('params')` directly rather
+			// than through the report filter allowlist, so the factory does not relocate them.
+			query: (input) => {
+				const { groupBy, metric, ...rest } = input
+				return {
+					...rest,
+					...(groupBy === undefined ? {} : { 'params[groupBy]': groupBy }),
+					...(metric === undefined ? {} : { 'params[metric]': metric }),
+				}
+			},
 			endpoint: '/reports/subscription-cohorts',
 		}),
 
 		getTool(client, {
 			name: 'fluentcart_report_retention_snapshots_status',
 			title: 'Get Retention Snapshots Status',
-			description: 'Check the status of retention snapshot generation jobs.',
-			schema: z.object({}),
+			description:
+				'Status of one retention-snapshot generation job: pending, running, completed or failed, with the row counts it wrote. ' +
+				'job_id is required and comes from the job_id field that fluentcart_report_retention_snapshots_generate returns; there is no way to list jobs, so a job whose id was not kept cannot be found again. ' +
+				'Snapshots are what fluentcart_report_subscription_cohorts reads, so generate then poll here before expecting cohorts to be populated.',
+			schema: z.object({
+				job_id: z
+					.string()
+					.describe(
+						'Job identifier returned by fluentcart_report_retention_snapshots_generate (a Unix timestamp)',
+					),
+			}),
+			// RetentionSnapshotController::checkStatus reads `params.job_id`, and job_id is not one of
+			// the report filter keys the factory relocates, so it is nested here. Sent flat the
+			// endpoint answers 200 with {"success":false,"message":"Job ID required"} — a success
+			// status carrying a failure, which is why the previous empty schema looked harmless.
+			query: (input) => {
+				const { job_id: jobId, ...rest } = input
+				return jobId === undefined ? rest : { ...rest, 'params[job_id]': jobId }
+			},
 			endpoint: '/reports/retention-snapshots/status',
 		}),
 

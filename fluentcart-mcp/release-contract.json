@@ -3,7 +3,7 @@
   "serializer": "mcp-tools-list-v1",
   "tokenizer": "gpt-tokenizer@3.4.0",
   "packageVersion": "2.0.0",
-  "sourceTreeDigest": "sha256:8aab06053b724e09b425ac639b3b6da190c4fe647a229423e9a61dc7cf9aada8",
+  "sourceTreeDigest": "sha256:090572c93e776abbede7df09b8b59fcaff8cd72f67c8eca2024aee42a7fc8f36",
   "sourceTreeInputs": {
     "fileCount": 112,
     "declared": [
@@ -40,8 +40,8 @@
   "categoryCount": 20,
   "writePolicyExposure": {
     "disabled": 158,
-    "reversible": 186,
-    "guarded": 186,
+    "reversible": 190,
+    "guarded": 190,
     "realMoneyExposable": 0,
     "composedBeyondModules": 2,
     "note": "Exposure per write mode as the server composes it, independent of route evidence."
@@ -77,16 +77,16 @@
       "exposedDefinitionCount": 140,
       "modes": {
         "dynamic": {
-          "toolCount": 5,
-          "characters": 3973,
-          "cl100kTokens": 863,
-          "o200kTokens": 877
+          "toolCount": 4,
+          "characters": 3171,
+          "cl100kTokens": 688,
+          "o200kTokens": 699
         },
         "curated": {
           "toolCount": 17,
-          "characters": 14302,
-          "cl100kTokens": 3278,
-          "o200kTokens": 3342
+          "characters": 14461,
+          "cl100kTokens": 3314,
+          "o200kTokens": 3381
         },
         "code": {
           "toolCount": 2,
@@ -96,9 +96,9 @@
         },
         "full": {
           "toolCount": 140,
-          "characters": 86087,
-          "cl100kTokens": 19394,
-          "o200kTokens": 19864
+          "characters": 92314,
+          "cl100kTokens": 20706,
+          "o200kTokens": 21185
         }
       }
     },
@@ -115,16 +115,16 @@
       "exposedDefinitionCount": 148,
       "modes": {
         "dynamic": {
-          "toolCount": 5,
-          "characters": 3973,
-          "cl100kTokens": 863,
-          "o200kTokens": 877
+          "toolCount": 4,
+          "characters": 3171,
+          "cl100kTokens": 688,
+          "o200kTokens": 699
         },
         "curated": {
           "toolCount": 17,
-          "characters": 14302,
-          "cl100kTokens": 3278,
-          "o200kTokens": 3342
+          "characters": 14461,
+          "cl100kTokens": 3314,
+          "o200kTokens": 3381
         },
         "code": {
           "toolCount": 2,
@@ -134,9 +134,9 @@
         },
         "full": {
           "toolCount": 148,
-          "characters": 90205,
-          "cl100kTokens": 20309,
-          "o200kTokens": 20787
+          "characters": 96432,
+          "cl100kTokens": 21621,
+          "o200kTokens": 22108
         }
       }
     },
@@ -153,16 +153,16 @@
       "exposedDefinitionCount": 158,
       "modes": {
         "dynamic": {
-          "toolCount": 5,
-          "characters": 3973,
-          "cl100kTokens": 863,
-          "o200kTokens": 877
+          "toolCount": 4,
+          "characters": 3171,
+          "cl100kTokens": 688,
+          "o200kTokens": 699
         },
         "curated": {
           "toolCount": 17,
-          "characters": 14302,
-          "cl100kTokens": 3278,
-          "o200kTokens": 3342
+          "characters": 14461,
+          "cl100kTokens": 3314,
+          "o200kTokens": 3381
         },
         "code": {
           "toolCount": 2,
@@ -172,9 +172,9 @@
         },
         "full": {
           "toolCount": 158,
-          "characters": 96744,
-          "cl100kTokens": 21800,
-          "o200kTokens": 22301
+          "characters": 102971,
+          "cl100kTokens": 23112,
+          "o200kTokens": 23622
         }
       }
     },
@@ -188,19 +188,19 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 186,
+      "exposedDefinitionCount": 190,
       "modes": {
         "dynamic": {
-          "toolCount": 5,
-          "characters": 3973,
-          "cl100kTokens": 863,
-          "o200kTokens": 877
+          "toolCount": 4,
+          "characters": 3171,
+          "cl100kTokens": 688,
+          "o200kTokens": 699
         },
         "curated": {
           "toolCount": 19,
-          "characters": 18142,
-          "cl100kTokens": 4110,
-          "o200kTokens": 4209
+          "characters": 18301,
+          "cl100kTokens": 4146,
+          "o200kTokens": 4248
         },
         "code": {
           "toolCount": 2,
@@ -209,10 +209,10 @@
           "o200kTokens": 540
         },
         "full": {
-          "toolCount": 186,
-          "characters": 131070,
-          "cl100kTokens": 29247,
-          "o200kTokens": 29965
+          "toolCount": 190,
+          "characters": 141839,
+          "cl100kTokens": 31517,
+          "o200kTokens": 32268
         }
       }
     },
@@ -226,19 +226,19 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 186,
+      "exposedDefinitionCount": 190,
       "modes": {
         "dynamic": {
-          "toolCount": 5,
-          "characters": 3973,
-          "cl100kTokens": 863,
-          "o200kTokens": 877
+          "toolCount": 4,
+          "characters": 3171,
+          "cl100kTokens": 688,
+          "o200kTokens": 699
         },
         "curated": {
           "toolCount": 19,
-          "characters": 18142,
-          "cl100kTokens": 4110,
-          "o200kTokens": 4209
+          "characters": 18301,
+          "cl100kTokens": 4146,
+          "o200kTokens": 4248
         },
         "code": {
           "toolCount": 2,
@@ -247,10 +247,10 @@
           "o200kTokens": 540
         },
         "full": {
-          "toolCount": 186,
-          "characters": 131070,
-          "cl100kTokens": 29247,
-          "o200kTokens": 29965
+          "toolCount": 190,
+          "characters": 141839,
+          "cl100kTokens": 31517,
+          "o200kTokens": 32268
         }
       }
     }

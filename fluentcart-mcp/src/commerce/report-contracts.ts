@@ -14,6 +14,7 @@ export type ReportName =
 	| 'refund_summary'
 	| 'future_renewals'
 	| 'order_sources'
+	| 'subscription_retention'
 
 export const REPORT_NAMES: readonly ReportName[] = [
 	'sales_summary',
@@ -22,6 +23,7 @@ export const REPORT_NAMES: readonly ReportName[] = [
 	'refund_summary',
 	'future_renewals',
 	'order_sources',
+	'subscription_retention',
 ]
 
 /** Which timestamp a period filters on, whether its ends are included, and whether it can move. */
@@ -98,8 +100,19 @@ export interface DiagnosticReport {
 
 export type ReportContract = AcceptedReport | DiagnosticReport
 
-/** Routes named in planning that this runtime does not serve at all. */
-export const ABSENT_ROUTES: readonly string[] = ['/reports/get-unfulfilled-orders']
+/**
+ * Routes named in planning that this runtime does not serve at all.
+ *
+ * Both answer HTTP 404 with `rest_no_route`, which is WordPress saying the route was never
+ * registered — not FluentCart saying the report failed. Established by sweeping every report path
+ * any tool reaches on FluentCart 1.5.5 with Pro 1.5.4: 40 of the 42 answered, these two did not.
+ * `/reports/cart-report` was missing from this list until 2026-07-27, so a contract could have
+ * pointed at it and passed the completeness check.
+ */
+export const ABSENT_ROUTES: readonly string[] = [
+	'/reports/get-unfulfilled-orders',
+	'/reports/cart-report',
+]
 
 function reportsController(file: string, method: string) {
 	return { controllerFile: `app/Http/Controllers/Reports/${file}`, controllerMethod: method }
@@ -267,6 +280,46 @@ export const REPORT_CONTRACTS: Readonly<Record<ReportName, ReportContract>> = {
 		rejection:
 			'The query selects utm_term, utm_content and utm_id without grouping or aggregating them, so under default ONLY_FULL_GROUP_BY it errors and otherwise returns an arbitrary row per group. Untagged orders are also dropped, so totals cannot reconcile with revenue.',
 		evidence: reportsController('SourceReportController.php', 'index'),
+	},
+
+	/**
+	 * The best payload in the plugin, and still not a metric.
+	 *
+	 * With filters nested under `params`, `/reports/subscription-retention` returns a real monthly
+	 * MRR and churn series — mrr, new_subscriptions_mrr, churned_subscriptions,
+	 * churned_subscriptions_mrr, retention_rate, retention_rate_money, active_paid_subscriptions —
+	 * 4,429 bytes against 382 for a single month. Nothing else here comes close, and the server has
+	 * no MRR tool at all, so the temptation to promote it is considerable.
+	 *
+	 * What stops it is the same thing that stopped `future_renewals`, and it is worth stating
+	 * plainly because the two rejections must not drift apart. `fct_subscriptions` has no currency
+	 * column: the currency of a subscription lives inside the JSON `config` blob, where a SUM cannot
+	 * reach it. So every money figure in the series adds EUR to PLN. `params[currency]` is accepted,
+	 * sanitised, carried through ReportHelper::processParams into the attributes array — and then
+	 * never read by SubscriptionReportService::getRetentionData. Verified live rather than inferred:
+	 * requesting EUR and requesting PLN returned byte-identical 4,429-byte responses.
+	 *
+	 * Everything else about the report is sound, which is what makes this worth recording rather
+	 * than merely refusing. Caller dates are honoured (a 2026-03-01..2026-03-05 range returned one
+	 * March bucket; 1990 returned one 1990 bucket). Amounts are decimals, divided by 100 in SQL,
+	 * matching the revenue reports rather than the minor units `future_renewals` hands back. Yearly,
+	 * weekly and daily plans are normalised to a monthly equivalent in SQL. Pending and intended
+	 * subscriptions are excluded; cancelled and expired ones are deliberately kept, because churn
+	 * cannot be counted without them.
+	 *
+	 * The counts and the count-derived retention_rate carry no currency at all and would qualify on
+	 * their own. Admitting them would mean relaxing the rule that every accepted report pins a
+	 * currency through `params[currency]`, which is not a decision to take while writing the
+	 * contract that the rule exists to constrain.
+	 */
+	subscription_retention: {
+		name: 'subscription_retention',
+		status: 'diagnostic-only',
+		method: 'GET',
+		path: '/reports/subscription-retention',
+		rejection:
+			'Money cannot be scoped: fct_subscriptions stores currency inside the JSON config column, so the SUM cannot filter on it and mrr, new_subscriptions_mrr, churned_subscriptions_mrr and period_gross add every currency the store sells in together. params[currency] is accepted and discarded — verified live by byte-identical 4,429-byte responses for EUR and for PLN. The month buckets are also anchored to the start date day-of-month, so a range whose final month ends before that day drops that month entirely (SubscriptionReportService::getRetentionData, DatePeriod over P1M).',
+		evidence: reportsController('SubscriptionReportController.php', 'getRetentionData'),
 	},
 }
 

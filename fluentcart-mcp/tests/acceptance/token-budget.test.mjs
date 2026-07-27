@@ -30,13 +30,26 @@ const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
  *
  * Only the three gated modes are pinned. Full mode is measured and reported but never gated, and
  * every edit to any of a couple of hundred tool descriptions moves it — pinning it would turn this
- * lane into a tripwire for ordinary editing rather than a budget gate. It was 170 tools / 24,474
- * cl100k this morning and is smaller now because real-money and destructive definitions left the
- * registry; the gated modes did not move at all, which is precisely why they are measured apart.
+ * lane into a tripwire for ordinary editing rather than a budget gate.
+ *
+ * ## Re-recorded 2026-07-27, later the same day. Both moves are deliberate and cheaper.
+ *
+ * `dynamic` 5 tools / 863 cl100k → 4 / 688, about 20% off the definition payload. The guarded
+ * executor is no longer registered unconditionally: every real-money tool ships `execution: 'none'`
+ * in 2.0.0, so it could only ever answer "not exposed" while advertising `destructiveHint: true`.
+ * It returns automatically the moment a guard-wired action is exposed, and the count returns with
+ * it.
+ *
+ * `curated` 20 tools / 3,652 cl100k → 19 / 4,146. Four raw report passthroughs were replaced by the
+ * three contract-backed reports. Two of the four could not answer at all — `/reports/sales-growth`
+ * returns HTTP 500 and `/reports/top-products-sold` is deprecated and returns an empty list — and
+ * the other two handed back unlabelled payloads with no period, currency or payment scope. One
+ * fewer tool costs ~494 more tokens because the replacements carry their semantics in their
+ * descriptions; that is the trade, and it is the right way round.
  */
 const ACCEPTED = {
-	dynamic: { toolCount: 5, cl100kTokens: 863, o200kTokens: 877 },
-	curated: { toolCount: 20, cl100kTokens: 3652, o200kTokens: 3765 },
+	dynamic: { toolCount: 4, cl100kTokens: 688, o200kTokens: 699 },
+	curated: { toolCount: 19, cl100kTokens: 4146, o200kTokens: 4248 },
 	code: { toolCount: 2, cl100kTokens: 532, o200kTokens: 540 },
 }
 

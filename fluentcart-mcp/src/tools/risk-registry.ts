@@ -27,41 +27,73 @@ const POST_SHAPED_READS = [
 ]
 
 /** Create/update pairs with a verified delete (or restore) and a verified read-back. */
-const REVERSIBLE_WRITES = [
+/**
+ * Creates with a verified delete and a verified read-back.
+ *
+ * Reversible, but NOT idempotent: FluentCart accepts no idempotency key on create, so a second
+ * POST makes a second record. They are listed separately from the updates so the annotation can
+ * tell the truth — `idempotentHint` is exactly what a client consults before retrying a timed-out
+ * call, and advertising it here invited silent duplicates.
+ */
+const REVERSIBLE_CREATES = [
 	'fluentcart_attribute_group_create',
-	'fluentcart_attribute_group_update',
 	'fluentcart_attribute_term_create',
-	'fluentcart_attribute_term_update',
 	'fluentcart_coupon_create',
-	'fluentcart_coupon_update',
 	'fluentcart_customer_create',
-	'fluentcart_customer_update',
 	'fluentcart_order_bump_create',
-	'fluentcart_order_bump_update',
 	'fluentcart_product_create',
-	'fluentcart_product_update_detail',
-	'fluentcart_product_upgrade_path_save',
-	'fluentcart_product_upgrade_path_update',
 	// Saved views carry full CRUD in 1.5.5 — GET, POST, PUT and DELETE /saved-views/{id} — so a
 	// created view has both an exact read-back and a supported removal.
 	'fluentcart_saved_view_create',
+	'fluentcart_shipping_class_create',
+	'fluentcart_shipping_method_create',
+	'fluentcart_shipping_zone_create',
+	'fluentcart_tax_class_create',
+	'fluentcart_tax_rate_create',
+	'fluentcart_tax_shipping_override_create',
+	'fluentcart_variant_create',
+]
+
+/**
+ * Updates and saves with a verified read-back.
+ *
+ * Genuinely idempotent: writing the same field values twice lands the same row, so a client may
+ * safely retry one that timed out.
+ */
+const REVERSIBLE_UPDATES = [
+	'fluentcart_attribute_group_update',
+	'fluentcart_attribute_term_update',
+	'fluentcart_coupon_update',
+	'fluentcart_customer_update',
+	'fluentcart_order_bump_update',
+	'fluentcart_product_update_detail',
+	'fluentcart_product_upgrade_path_save',
+	'fluentcart_product_upgrade_path_update',
 	// Proven reversible on a live store: GET returns the complete settings blob, POST replaces it
 	// wholesale, and writing the captured blob back restored it byte-identically. The tool is
 	// read-merge-write with local enum validation, so it cannot send a partial payload or let an
 	// out-of-range value be silently coerced by the controller.
 	'fluentcart_tax_settings_save',
-	'fluentcart_shipping_class_create',
 	'fluentcart_shipping_class_update',
-	'fluentcart_shipping_method_create',
 	'fluentcart_shipping_method_update',
-	'fluentcart_shipping_zone_create',
 	'fluentcart_shipping_zone_update',
-	'fluentcart_tax_class_create',
-	'fluentcart_tax_rate_create',
 	'fluentcart_tax_rate_update',
-	'fluentcart_tax_shipping_override_create',
-	'fluentcart_variant_create',
 	'fluentcart_variant_update',
+	// ── Stock and taxonomy, promoted 2026-07-27 on a proven round trip ──
+	//
+	// All four have an exact read-back through GET /products/{id}/pricing, which carries every
+	// variant's manage_stock, total_stock, available and stock_status alongside the product's
+	// assigned categories and brands, and all four can be set back to what that read reported.
+	// Proven live on a run-owned fixture in tests/integration/product-stock-taxonomy.test.ts:
+	// captured state, changed it, restored it, and compared field by field.
+	//
+	// Neither taxonomy tool deletes a term. They change which terms a product is assigned, and the
+	// terms themselves survive for other products — which is why they are reversible where
+	// fluentcart_product_terms_add, which creates a term nothing can delete, is not.
+	'fluentcart_product_inventory_update',
+	'fluentcart_product_manage_stock_update',
+	'fluentcart_product_taxonomy_delete',
+	'fluentcart_product_taxonomy_sync',
 ]
 
 /**
@@ -113,7 +145,6 @@ const DESTRUCTIVE_WRITES = [
 	'fluentcart_product_integration_delete',
 	'fluentcart_product_shipping_class_remove',
 	'fluentcart_product_tax_class_remove',
-	'fluentcart_product_taxonomy_delete',
 	'fluentcart_product_upgrade_path_delete',
 	'fluentcart_shipping_class_delete',
 	'fluentcart_shipping_method_delete',
@@ -137,12 +168,14 @@ const DESTRUCTIVE_WRITES = [
 	'fluentcart_note_attach',
 	'fluentcart_product_bundle_save',
 	'fluentcart_product_downloadable_update',
-	'fluentcart_product_inventory_update',
-	'fluentcart_product_manage_stock_update',
 	'fluentcart_product_pricing_update',
 	'fluentcart_product_shipping_class_update',
 	'fluentcart_product_tax_class_update',
-	'fluentcart_product_taxonomy_sync',
+	// Creates vocabulary terms, and FluentCart 1.5.5 registers no route that deletes one: the only
+	// term DELETE in api.php is attr/group/{id}/term/{id}, which belongs to the attribute library,
+	// a different taxonomy. A created category therefore cannot be removed through the API, so this
+	// stays irreversible however ordinary it looks. Assigning existing terms to a product IS
+	// reversible and is handled by fluentcart_product_taxonomy_sync.
 	'fluentcart_product_terms_add',
 	'fluentcart_product_variant_option_update',
 	'fluentcart_shipping_zone_reorder',
@@ -216,39 +249,18 @@ function rows(names: readonly string[], safety: ToolSafety): Array<[string, Tool
 	return names.map((name) => [name, safety])
 }
 
-/**
- * Reversible and idempotent are not the same property, and conflating them was a real defect.
- *
- * Every reversible write used to be stamped `inherent`, which `ToolSafety` defines as "repeating
- * the call cannot double-apply it" and which `_factory.ts` turns into `idempotentHint: true` on
- * the wire. That is true of the updates — writing the same field twice lands the same row — and
- * plainly false of the creates: FluentCart accepts no idempotency key on create, so a second POST
- * makes a second product, customer or coupon. A client that retries on a timeout, which is
- * exactly what `idempotentHint` invites, would silently duplicate the record.
- *
- * They stay `reversible-write`: each still has a verified delete, which is what governs exposure.
- * Only the retry-safety claim changes, and `unsupported` is the honest value — there is no key to
- * deduplicate on, so repetition cannot be made safe at this layer at all.
- */
-function isCreate(name: string): boolean {
-	return name.endsWith('_create')
-}
-
 const REGISTRY = new Map<string, ToolSafety>([
 	...rows(POST_SHAPED_READS, READ_SAFETY),
-	...rows(REVERSIBLE_WRITES.filter(isCreate), {
+	...rows(REVERSIBLE_CREATES, {
 		risk: 'reversible-write',
 		idempotency: 'unsupported',
 		execution: 'rest',
 	}),
-	...rows(
-		REVERSIBLE_WRITES.filter((name) => !isCreate(name)),
-		{
-			risk: 'reversible-write',
-			idempotency: 'inherent',
-			execution: 'rest',
-		},
-	),
+	...rows(REVERSIBLE_UPDATES, {
+		risk: 'reversible-write',
+		idempotency: 'inherent',
+		execution: 'rest',
+	}),
 	...rows(GUARDED_REAL_MONEY, {
 		risk: 'real-money',
 		idempotency: 'guard-required',

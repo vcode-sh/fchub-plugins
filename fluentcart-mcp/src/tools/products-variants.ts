@@ -84,7 +84,11 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 						message.includes('ProductVariationResource::get()') && message.includes('null given')
 					if (!isKnownUpstreamBug) throw error
 
-					const fallback = await client.get(`/products/${productId}`)
+					// Relations are opt-in: ProductController::find eager-loads only what `with` names,
+					// so the previous fallback — a bare GET /products/{id} — read a payload that never
+					// contains variants and returned `total: 0` for a product that has them, reporting
+					// success. Verified live against a product with one variant.
+					const fallback = await client.get(`/products/${productId}`, { 'with[]': 'variants' })
 					const wrapper = fallback.data as Record<string, unknown>
 					const product = (wrapper.product ?? wrapper) as Record<string, unknown>
 					const variantsRaw = Array.isArray(product.variants) ? (product.variants as unknown[]) : []

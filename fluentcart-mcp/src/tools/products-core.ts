@@ -52,8 +52,11 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 			routes: direct('POST', '/products'),
 			title: 'Create Product',
 			description:
-				'Create a product (defaults to draft). Fulfillment type: digital or physical. ' +
-				'At least one variant must be created after the product for checkout to work.',
+				'Create a product. Defaults to a simple product in draft, which FluentCart gives a ' +
+				'starter variant priced at zero — set the price with fluentcart_variant_update, and ' +
+				'post_status to "publish" when it should be buyable. Choose simple_variations or ' +
+				'advanced_variations only when you intend to build the variants yourself; those types ' +
+				'are deliberately created empty and cannot be sold until you add one.',
 			schema: z.object({
 				post_title: z.string().describe('Product title (required)'),
 				post_status: z.string().optional().describe('Status: publish, draft (default: draft)'),
@@ -63,12 +66,30 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 					.string()
 					.optional()
 					.describe('Fulfillment type: digital, physical (default: physical)'),
+				variation_type: z
+					.enum(['simple', 'simple_variations', 'advanced_variations'])
+					.optional()
+					.describe(
+						'Product type (default: simple). Only "simple" gets a starter variant; the other two are created with no variants for you to build yourself',
+					),
 			}),
 			handler: async (client, input) => {
 				const body: Record<string, unknown> = {
 					post_title: input.post_title,
 					detail: {
 						fulfillment_type: (input.fulfillment_type as string) || 'physical',
+						// Sent explicitly, and never left to the store's default.
+						//
+						// ProductCreateRequest declares a `'simple'` fallback for this field, but
+						// Sanitizer::sanitize only runs a rule when the key is present
+						// (Sanitizer.php:459 — `if (($value = Arr::get($data, $k)) !== null)`), so an
+						// omitted key keeps no default at all. ProductController::create then reads
+						// `variation_type === 'simple'` to decide whether to make the starter variant,
+						// and skips it. Verified live: a create without this field produced a product
+						// with zero variants and `variation_type: null`; the same call with it produced
+						// one variant. A product with no variants cannot be purchased, so omitting this
+						// silently created unsellable products.
+						variation_type: (input.variation_type as string) || 'simple',
 					},
 				}
 				if (input.post_status !== undefined) body.post_status = input.post_status
@@ -82,11 +103,29 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_product_get',
 			title: 'Get Product',
-			description: 'Get full product details including pricing, media, and metadata.',
+			description:
+				'Get one product with its variants, detail, media and metadata. Prices on each variant ' +
+				'are in minor units (cents).',
 			schema: z.object({
 				product_id: z.number().describe('Product ID (WordPress post ID)'),
+				// Relations are opt-in upstream, so the tool asks for variants itself rather than
+				// exposing the choice. ProductController::find only eager-loads what `with` names
+				// (ProductController.php:65-79) and this tool never sent it, so `variants` was absent
+				// from all 20 products on the seeded store — while the description promised "full
+				// product details" and the response transform below stripped `pricing_table` from a
+				// `variants` array that was never there.
+				with: z
+					.array(z.string())
+					.optional()
+					.describe('Extra relations to load (default: variants)'),
 			}),
 			endpoint: '/products/:product_id',
+			query: (input) => {
+				const relations = (input.with as string[] | undefined) ?? ['variants']
+				// PHP reads `with[]=variants` as an array element; the key is passed verbatim.
+				const { with: _dropped, ...rest } = input
+				return { ...rest, 'with[]': relations.join(',') }
+			},
 			transform: (data: unknown) => {
 				const resp = data as Record<string, unknown>
 				const product = (resp?.product ?? resp) as Record<string, unknown>

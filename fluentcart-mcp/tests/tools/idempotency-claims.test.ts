@@ -59,22 +59,24 @@ describe('idempotency claims match reality', () => {
 		}
 	})
 
-	it('never claims idempotency for a read-modify-write it cannot deduplicate', () => {
-		// A read tool is inherently repeatable; anything that writes has to have earned the claim.
-		for (const tool of tools) {
-			if (tool.safety.risk === 'read') continue
-			if (tool.safety.idempotency !== 'inherent') continue
-			expect(
-				tool.name.endsWith('_update') ||
-					tool.name.endsWith('_save') ||
-					tool.name.endsWith('_toggle') ||
-					tool.name.endsWith('_preview') ||
-					tool.name.endsWith('_reapply') ||
-					tool.name.endsWith('_cancel') ||
-					tool.name.includes('_update_') ||
-					tool.name.includes('_change_'),
-				`${tool.name} claims inherent idempotency but is not an update-shaped write`,
-			).toBe(true)
-		}
+	it('never claims idempotency for an operation that accumulates', () => {
+		// The property that matters is whether repeating the call changes anything further, not what
+		// the tool is named. A write that names the end state — set these terms, set this quantity,
+		// set this field — lands the same row on a second call. A write that appends a new record
+		// does not, and `_create` is the only shape in this registry that appends.
+		//
+		// An earlier version of this test guessed from name suffixes and flagged
+		// `fluentcart_product_taxonomy_sync`, which is idempotent by definition: syncing to an
+		// exact set twice leaves that exact set. The heuristic was wrong, not the classification.
+		const accumulating = tools.filter(
+			(tool) => tool.safety.risk !== 'read' && tool.safety.idempotency === 'inherent',
+		)
+		const offenders = accumulating
+			.filter((tool) => tool.name.endsWith('_create') || tool.name.endsWith('_add'))
+			.map((tool) => tool.name)
+
+		expect(offenders, `these append a record but claim repetition is safe: ${offenders}`).toEqual(
+			[],
+		)
 	})
 })

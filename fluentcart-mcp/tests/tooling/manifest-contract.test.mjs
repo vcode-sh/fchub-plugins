@@ -26,9 +26,10 @@ const meta = manifest._meta[META_NAMESPACE]
  * release contract's own `curatedNames` block, and duplicating the roster would only mean editing
  * two files whenever one tool is added.
  */
+// `fluentcart_execute_guarded_write` is deliberately absent: it is registered only when a
+// real-money tool survives the exposure filter, and in 2.0.0 none does.
 const DYNAMIC_META = [
 	'fluentcart_describe_tools',
-	'fluentcart_execute_guarded_write',
 	'fluentcart_execute_read_tool',
 	'fluentcart_execute_reversible_write',
 	'fluentcart_search_tools',
@@ -184,7 +185,7 @@ describe('manifest tool inventory', () => {
 
 	it('advertises the five dynamic and two code-mode meta-tools', () => {
 		const byProvenance = (value) => meta.tools.filter((tool) => tool.provenance === value).length
-		assert.equal(byProvenance('dynamic-meta'), 5)
+		assert.equal(byProvenance('dynamic-meta'), 4)
 		assert.equal(byProvenance('code-meta'), 2)
 	})
 })

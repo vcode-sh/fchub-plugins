@@ -61,6 +61,13 @@ interface EndpointToolConfig extends BaseToolConfig {
 	/** Ordered fallbacks for a store that serves a retired route instead of the current one. */
 	routes?: ToolRouteMetadata
 	isPublic?: boolean
+	/**
+	 * Rewrite the query object before dispatch.
+	 *
+	 * For routes whose parameters are not simply the tool's inputs — a relation the caller should
+	 * not have to know to ask for, or a key shape the client cannot express from a schema field.
+	 */
+	query?: (input: Record<string, unknown>) => Record<string, unknown>
 	transform?: (data: unknown) => unknown
 	cache?: { key: string; ttlMs: number }
 	/** Cache keys to invalidate on successful write (POST/PUT/DELETE). */
@@ -113,8 +120,11 @@ function annotationsFor(safety: ToolSafety): ToolAnnotations {
 /**
  * Filter keys every FluentCart report controller reads from a nested `params` object.
  *
- * Taken from `ReportHelper::sanitizeParams` (app/Services/Report/ReportHelper.php:169-189), which
- * is the single allowlist every report route runs its input through.
+ * Mostly `ReportHelper::sanitizeParams` (app/Services/Report/ReportHelper.php:169-189), the
+ * allowlist every report route runs its input through. `paymentStatus` is the exception: it is
+ * absent from that list but read straight off the request at
+ * `ReportingController.php:167` — `$request->get('params.paymentStatus')` — so a tool that sent it
+ * flat would have it silently ignored, which is the same failure this nesting exists to prevent.
  */
 const REPORT_PARAM_KEYS: ReadonlySet<string> = new Set([
 	'startDate',
@@ -126,6 +136,7 @@ const REPORT_PARAM_KEYS: ReadonlySet<string> = new Set([
 	'filterMode',
 	'storeMode',
 	'subscriptionType',
+	'paymentStatus',
 	'variation_ids',
 	'orderStatus',
 	'orderTypes',
@@ -285,7 +296,9 @@ function createEndpointTool(
 		route: auditView(derived),
 		handler: async (input) => {
 			try {
-				const { path, rest } = resolveEndpoint(config.endpoint, input)
+				const resolved = resolveEndpoint(config.endpoint, input)
+				const path = resolved.path
+				const rest = config.query ? config.query(resolved.rest) : resolved.rest
 				const fetcher = async () => {
 					let response: { data: unknown }
 					switch (method) {

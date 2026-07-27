@@ -94,6 +94,14 @@ jobs:
       - name: Tooling contract tests
         run: npm run test:tooling
 
+      # The acceptance lane: capability matrix, guard state, transport, code sandbox, token
+      # baselines and route drift. It existed for some time without being wired into any script or
+      # job, which is exactly how its pinned baselines went stale — four of them were still
+      # describing a registry two deliberate changes out of date, and nothing said so. Like the
+      # tooling lane it loads no environment file and makes no network call.
+      - name: Acceptance contract tests
+        run: npm run test:acceptance
+
       - name: Coverage summary
         if: always()
         run: |

@@ -21,6 +21,7 @@
     "test": "vitest run --config vitest.config.ts",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:tooling": "node --test tests/tooling/*.test.mjs",
+    "test:acceptance": "node --test tests/acceptance/*.test.mjs",
     "test:integration:local": "node scripts/run-live-tests.mjs",
     "test:watch": "vitest --config vitest.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",

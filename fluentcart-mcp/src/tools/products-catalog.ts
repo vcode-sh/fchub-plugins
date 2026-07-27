@@ -163,27 +163,38 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 
 		postTool(client, {
 			name: 'fluentcart_product_taxonomy_sync',
-			title: 'Sync Taxonomy Terms',
+			title: 'Set Product Categories or Brands',
 			description:
-				'Sync taxonomy terms for a product (replaces all existing terms for that taxonomy).',
+				'Set which categories or brands a product belongs to. This REPLACES the whole set for ' +
+				'that taxonomy — terms you leave out are unassigned — so read the current ones with ' +
+				'fluentcart_product_get first and send the full list you want. An empty list removes ' +
+				'every term of that taxonomy from the product. Only the assignment changes; the ' +
+				'categories themselves are untouched and still exist for other products.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				terms: z.array(z.number()).describe('Term IDs to sync'),
-				taxonomy: z.string().describe('Taxonomy: product-categories or product-brands'),
+				terms: z
+					.array(z.number())
+					.describe('The complete set of term IDs the product should have. Empty removes all'),
+				taxonomy: z
+					.enum(['product-categories', 'product-brands'])
+					.describe('Which taxonomy to set'),
 			}),
 			endpoint: '/products/sync-taxonomy-term/:product_id',
 		}),
 
 		postTool(client, {
 			name: 'fluentcart_product_taxonomy_delete',
-			title: 'Delete Taxonomy Term',
+			title: 'Remove One Category or Brand From a Product',
 			description:
-				'Remove a single taxonomy term from a product. ' +
-				'Call multiple times to remove several terms.',
+				'Unassign a single category or brand from a product, leaving its other terms in place. ' +
+				'Call it once per term. The term itself is not deleted and remains available to other ' +
+				'products; to put it back, use fluentcart_product_taxonomy_sync with the full set.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				term: z.number().describe('Term ID to remove'),
-				taxonomy: z.string().describe('Taxonomy: product-categories or product-brands'),
+				term: z.number().describe('Term ID to unassign from this product'),
+				taxonomy: z
+					.enum(['product-categories', 'product-brands'])
+					.describe('Which taxonomy the term belongs to'),
 			}),
 			endpoint: '/products/delete-taxonomy-term/:product_id',
 		}),

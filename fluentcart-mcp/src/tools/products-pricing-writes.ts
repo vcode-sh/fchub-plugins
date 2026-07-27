@@ -257,24 +257,89 @@ export function productPricingWriteTools(client: FluentCartClient): ToolDefiniti
 		putTool(client, {
 			name: 'fluentcart_product_manage_stock_update',
 			title: 'Update Stock Management',
-			description: 'Enable or disable stock management for a product.',
+			description:
+				'Turn stock tracking on or off for a product. Applies to every variant of that product ' +
+				'and to the product record, not to one variant. Turning it OFF also forces every variant ' +
+				'to in-stock, so a variant that was out-of-stock does not come back out-of-stock when it ' +
+				'is turned on again — set the quantities afterwards with fluentcart_product_inventory_update.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
-				manage_stock: z.string().describe('Enable stock management: 1 or 0'),
+				manage_stock: z
+					.enum(['0', '1'])
+					.describe('"1" to track stock for this product, "0" to stop tracking it'),
 			}),
 			endpoint: '/products/:product_id/update-manage-stock',
 		}),
 
-		putTool(client, {
+		createTool(client, {
 			name: 'fluentcart_product_inventory_update',
+			routes: composite(
+				op('GET', '/products/{param}/pricing'),
+				op('PUT', '/products/{param}/update-inventory/{param}'),
+			),
 			title: 'Update Product Inventory',
-			description: 'Update inventory quantity for a specific product variant.',
+			description:
+				'Set the stock quantities for one variant. Reads the variant first and keeps whichever ' +
+				'figure you leave out, so setting one does not clear the other. Turns stock tracking on ' +
+				'for the whole product as a side effect, which is how FluentCart implements this route. ' +
+				'available is what checkout decrements; a variant with available 0 is marked out-of-stock.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 				variant_id: z.number().describe('Variant ID'),
-				total_stock: z.number().optional().describe('Total stock quantity'),
+				total_stock: z
+					.number()
+					.optional()
+					.describe('Total units ever stocked. Left unchanged when omitted'),
+				available: z
+					.number()
+					.optional()
+					.describe(
+						'Units available to sell. Left unchanged when omitted. Reaching 0 marks the variant out-of-stock',
+					),
 			}),
-			endpoint: '/products/:product_id/update-inventory/:variant_id',
+			handler: async (apiClient, input) => {
+				const productId = input.product_id as number
+				const variantId = input.variant_id as number
+
+				// Read-merge-write, because the route is a replace and reads `available` directly.
+				//
+				// FluentCart's updateInventory does `intval($request->get('available'))`, so a payload
+				// that omits it sends 0 and the variant is stamped out-of-stock. The previous schema
+				// exposed only `total_stock`, which made that the ONLY thing this tool could do:
+				// verified live, `{total_stock: 9}` produced `available 0, stock_status out-of-stock`
+				// on a variant that had stock. Merging against the current row removes the trap.
+				const current = await apiClient.get(`/products/${productId}/pricing`)
+				const wrapper = current.data as Record<string, unknown>
+				const product = (wrapper.product ?? wrapper) as Record<string, unknown>
+				const variants = (product.variants ?? []) as Record<string, unknown>[]
+				const existing = variants.find((variant) => variant.id === variantId)
+
+				if (!existing) {
+					throw new Error(
+						`Variant ${variantId} was not found on product ${productId}. Check the id with fluentcart_variant_list before setting stock.`,
+					)
+				}
+
+				const numberOf = (value: unknown, fallback: number): number => {
+					if (typeof value === 'number' && Number.isFinite(value)) return value
+					if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
+						return Number(value)
+					}
+					return fallback
+				}
+
+				const body = {
+					total_stock:
+						(input.total_stock as number | undefined) ?? numberOf(existing.total_stock, 0),
+					available: (input.available as number | undefined) ?? numberOf(existing.available, 0),
+				}
+
+				const response = await apiClient.put(
+					`/products/${productId}/update-inventory/${variantId}`,
+					body,
+				)
+				return response.data
+			},
 		}),
 	]
 }

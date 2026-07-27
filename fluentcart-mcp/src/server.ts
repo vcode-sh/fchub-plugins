@@ -15,7 +15,7 @@ import { canExposeTool, parseWriteMode, type WritePolicyConfig } from './securit
 import type { ToolDefinition } from './tools/_factory.js'
 import { commerceContextTools } from './tools/commerce-context.js'
 import { selectCuratedTools } from './tools/curated.js'
-import { DYNAMIC_TOOL_COUNT, DYNAMIC_TOOL_NAMES, registerDynamicTools } from './tools/dynamic.js'
+import { registerDynamicTools } from './tools/dynamic.js'
 import { selectEndpoint } from './tools/endpoints.js'
 import { createAllTools } from './tools/index.js'
 import { referenceDataTools } from './tools/reference-data.js'
@@ -158,6 +158,21 @@ export async function resolveServerContextAsync(): Promise<ServerContext> {
 }
 
 /**
+ * What a client is told about this server before it lists a single tool.
+ *
+ * The SDK returns this in the initialize result and clients prepend it to a model's context on
+ * every session, so it is kept to the handful of things a caller demonstrably gets wrong without
+ * being told and no longer. Every claim is enforced somewhere in this repository: exposure by
+ * `canExposeTool`, the report parameters by `assertValidRequest`, the warnings by the report
+ * envelope, and the unit split by the entity projections and the report contracts.
+ */
+const SERVER_INSTRUCTIONS = [
+	'FluentCart store administration over the WordPress REST API.',
+	'Write tools are absent, not disabled, unless FLUENTCART_WRITE_MODE is set — a missing tool is policy, so do not retry it. In dynamic mode: search, describe, then the executor named for that tool risk.',
+	'Sales reports require from, to, currency and timezone, and every result carries a warnings array — read it before quoting a figure. Money units differ: entity records use integer minor units beside an ISO currency, sales reports use decimals, raw report tools state their own. Never sum across currencies.',
+].join('\n\n')
+
+/**
  * Options every server instance is built with.
  *
  * `logging` has to be declared or the SDK drops log notifications on the floor: its
@@ -168,8 +183,18 @@ export async function resolveServerContextAsync(): Promise<ServerContext> {
  *
  * Declaring it also makes the SDK register the `logging/setLevel` handler and filter messages
  * below the client's chosen level, so the capability is honoured rather than merely advertised.
+ *
+ * `tools.listChanged`, `resources.listChanged` and `prompts.listChanged` are conspicuously absent
+ * and still arrive at the client as `true`: McpServer registers them itself on the first
+ * `registerTool`/`registerResource`/`registerPrompt`, and `mergeCapabilities` applies its addition
+ * over whatever was declared here, so a `false` written here is overwritten before any client can
+ * read it. This registry is frozen at construction, so no list ever changes and no notification is
+ * owed — see tests/server-protocol-surface.test.ts, which pins both halves of that statement.
  */
-const SERVER_OPTIONS = { capabilities: { logging: {} } } as const
+const SERVER_OPTIONS = {
+	capabilities: { logging: {} },
+	instructions: SERVER_INSTRUCTIONS,
+} as const
 
 export function createServerFromContext(
 	ctx: ServerContext,
@@ -188,8 +213,9 @@ export function createServerFromContext(
 
 	// Every mode draws from the same already-filtered registry, so no mode can widen exposure.
 	if (mode === 'dynamic') {
-		registerDynamicTools(server, ctx.tools)
-		for (const name of DYNAMIC_TOOL_NAMES) registered.add(name)
+		// The roster comes back from the registration itself: the guarded executor is conditional,
+		// so a constant would let prompts route to a tool this server never registered.
+		for (const name of registerDynamicTools(server, ctx.tools)) registered.add(name)
 	} else {
 		if (mode === 'code') {
 			// Code mode registers exactly two meta-tools over a QuickJS sandbox, and starting that
@@ -222,15 +248,11 @@ export function createServerFromContext(
 	// workflow it cannot actually run.
 	registerPrompts(server, registered)
 
-	const toolCount =
-		mode === 'dynamic'
-			? DYNAMIC_TOOL_COUNT
-			: mode === 'curated'
-				? selectCuratedTools(ctx.tools).length
-				: ctx.tools.length
+	// Counted from what was registered rather than recomputed per mode, so the line cannot claim a
+	// tool the client will not see.
 	announceStartup(
 		server,
-		`fluentcart-mcp v${version} started — ${toolCount} tools registered (${mode} mode)`,
+		`fluentcart-mcp v${version} started — ${registered.size} tools registered (${mode} mode)`,
 		ctx.configSource,
 	)
 

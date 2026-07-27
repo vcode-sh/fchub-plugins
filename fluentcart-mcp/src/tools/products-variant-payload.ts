@@ -19,6 +19,24 @@ export const DEFAULT_OTHER_INFO = {
 	setup_fee_per_item: 'no',
 } as const
 
+/**
+ * Pull the media array out of whatever shape the read handed back.
+ *
+ * The two sides of this round trip disagree. `POST /products/variants/{id}` wants
+ * `media: [{id, url, title}]`, but `GET /products/{id}/pricing` returns the meta row that holds
+ * it — `{id, object_id, meta_value: [{id, url, title}]}` — so the array is one level down. Handing
+ * the wrapper back verbatim is worse than sending nothing: `setImage` writes it as the new value
+ * and the thumbnail is corrupted rather than merely dropped. Verified live on a run-owned variant.
+ */
+function extractMedia(media: unknown): unknown[] | null {
+	if (Array.isArray(media)) return media.length > 0 ? media : null
+	if (media !== null && typeof media === 'object') {
+		const inner = (media as Record<string, unknown>).meta_value
+		if (Array.isArray(inner) && inner.length > 0) return inner
+	}
+	return null
+}
+
 export function buildVariantFromExisting(
 	existing: Record<string, unknown> | undefined,
 	productId: number,
@@ -52,6 +70,38 @@ export function buildVariantFromExisting(
 		committed: existing?.committed ?? 0,
 		on_hold: existing?.on_hold ?? 0,
 		other_info: existingOtherInfo,
+
+		...preservedFields(existing),
+	}
+}
+
+/**
+ * Fields carried through purely so they survive the round trip.
+ *
+ * ProductVariationResource::update rebuilds the entire row from the payload with
+ * `Arr::get($variant, X, default)` — it is a replace, not a merge — so any key missing here is
+ * written back as a default rather than left alone. Verified live on a fresh fixture: a single
+ * price edit turned serial_index 1 into null, manage_stock "0" into null and downloadable "false"
+ * into null, and the same code path deletes the variant's thumbnail when `media` is empty
+ * (ProductVariationResource.php:336-341). Editing a price should not silently reorder the variant,
+ * drop its cost, or remove its image.
+ */
+function preservedFields(existing: Record<string, unknown> | undefined): Record<string, unknown> {
+	// `item_cost` is stored in minor units like every other money column on the row, and the
+	// controller runs it back through Helper::toCent, so it has to be handed back in whole units.
+	const cost = typeof existing?.item_cost === 'number' ? existing.item_cost / 100 : 0
+	const media = extractMedia(existing?.media)
+
+	return {
+		serial_index: existing?.serial_index ?? null,
+		manage_stock: existing?.manage_stock ?? 0,
+		shipping_class: existing?.shipping_class ?? null,
+		item_cost: cost,
+		manage_cost: existing?.manage_cost ?? 'false',
+		downloadable: existing?.downloadable ?? 'false',
+		// Omitted entirely when there is no image, because an empty `media` is the signal
+		// ProductVariationResource::update uses to delete the thumbnail.
+		...(media ? { media } : {}),
 	}
 }
 

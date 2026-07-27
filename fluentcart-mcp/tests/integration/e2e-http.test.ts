@@ -19,7 +19,7 @@ describe('E2E: MCP Protocol over HTTP', () => {
 	beforeAll(async () => {
 		process.env.FLUENTCART_MCP_API_KEY = ''
 
-		const app = createApp('127.0.0.1', 'full')
+		const app = await createApp('127.0.0.1', 'full')
 
 		await new Promise<void>((resolve) => {
 			server = app.listen(0, '127.0.0.1', () => {
@@ -191,7 +191,7 @@ describe('E2E: Bearer Auth Enforcement', () => {
 	beforeAll(async () => {
 		process.env.FLUENTCART_MCP_API_KEY = TEST_API_KEY
 
-		const app = createApp('127.0.0.1')
+		const app = await createApp('127.0.0.1')
 
 		await new Promise<void>((resolve) => {
 			server = app.listen(0, '127.0.0.1', () => {
@@ -292,7 +292,7 @@ describe('E2E: Health and Edge Cases', () => {
 	beforeAll(async () => {
 		process.env.FLUENTCART_MCP_API_KEY = ''
 
-		const app = createApp('127.0.0.1')
+		const app = await createApp('127.0.0.1')
 
 		await new Promise<void>((resolve) => {
 			server = app.listen(0, '127.0.0.1', () => {
@@ -350,7 +350,7 @@ describe('E2E: dynamic default mode', () => {
 	beforeAll(async () => {
 		process.env.FLUENTCART_MCP_API_KEY = ''
 		// No mode argument: this is exactly what an operator gets out of the box.
-		const app = createApp('127.0.0.1')
+		const app = await createApp('127.0.0.1')
 
 		await new Promise<void>((resolve) => {
 			server = app.listen(0, '127.0.0.1', () => {
@@ -374,11 +374,13 @@ describe('E2E: dynamic default mode', () => {
 		server?.close()
 	})
 
-	it('exposes exactly the five meta-tools by default', async () => {
+	it('exposes exactly the meta-tools it can honour by default', async () => {
+		// Was pinned at five. The guarded executor is registered only when a real-money action
+		// survives the exposure filter, and none does while every one of them ships
+		// `execution: 'none'`, so advertising it here would assert a permanently failing tool.
 		const result = await mcpClient.listTools()
 		expect(result.tools.map((t) => t.name).sort()).toEqual([
 			'fluentcart_describe_tools',
-			'fluentcart_execute_guarded_write',
 			'fluentcart_execute_read_tool',
 			'fluentcart_execute_reversible_write',
 			'fluentcart_search_tools',

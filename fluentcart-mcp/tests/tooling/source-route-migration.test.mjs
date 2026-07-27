@@ -57,6 +57,19 @@ function toolBlocks(source) {
 		let i = match.index + match[0].length - 1
 		for (; i < source.length; i += 1) {
 			const ch = source[i]
+			// Comments are skipped whole. Without this an apostrophe in ordinary prose — "the
+			// store's default" — opens a string scan that runs to the next quote character
+			// anywhere in the file, swallowing braces and running one tool's block into the next.
+			if (ch === '/' && source[i + 1] === '/') {
+				while (i < source.length && source[i] !== '\n') i += 1
+				continue
+			}
+			if (ch === '/' && source[i + 1] === '*') {
+				i += 2
+				while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i += 1
+				i += 1
+				continue
+			}
 			if (ch === '{') depth += 1
 			else if (ch === '}') {
 				depth -= 1

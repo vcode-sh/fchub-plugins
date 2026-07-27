@@ -4,16 +4,33 @@ import type { ToolDefinition } from './_factory.js'
 import { CATEGORIES, inferCategory, searchTools } from './dynamic-search.js'
 import type { ToolRisk } from './risk.js'
 
-/** Meta-tools registered in dynamic mode: search, describe and three risk-split executors. */
+/**
+ * Meta-tools dynamic mode registers unconditionally: search, describe and two executors.
+ *
+ * The guarded executor is absent from this list on purpose — see `GUARDED_EXECUTOR_TOOL_NAME`.
+ * Callers that need the real roster should use the names `registerDynamicTools` returns, which
+ * describe what was actually registered for a given registry.
+ */
 export const DYNAMIC_TOOL_NAMES: readonly string[] = Object.freeze([
 	'fluentcart_search_tools',
 	'fluentcart_describe_tools',
 	'fluentcart_execute_read_tool',
 	'fluentcart_execute_reversible_write',
-	'fluentcart_execute_guarded_write',
 ])
 
 export const DYNAMIC_TOOL_COUNT = DYNAMIC_TOOL_NAMES.length
+
+/**
+ * The fifth meta-tool, registered only when a real-money action survived the exposure filter.
+ *
+ * Registering it unconditionally advertised a `destructiveHint: true` tool with a 100% failure
+ * rate: every real-money entry in the risk registry ships `execution: 'none'`, so `canExposeTool`
+ * removes them all and the executor could only ever answer "not exposed". A tool that cannot
+ * succeed is worse than a missing one — it tells an agent the capability exists and that its own
+ * call was somehow wrong. Absence is the honest answer, and it becomes present again the moment a
+ * guard-wired refund is exposed, with no further change here.
+ */
+export const GUARDED_EXECUTOR_TOOL_NAME = 'fluentcart_execute_guarded_write'
 
 const SEARCH_LIMIT_DEFAULT = 5
 const SEARCH_LIMIT_MAX = 10
@@ -40,7 +57,15 @@ function errorResult(message: string) {
 	return { content: [{ type: 'text' as const, text: message }], isError: true }
 }
 
-export function registerDynamicTools(server: McpServer, tools: ToolDefinition[]): void {
+/**
+ * Register the dynamic meta-tools and report which ones were actually registered.
+ *
+ * The return value is the roster, not `DYNAMIC_TOOL_NAMES`: the guarded executor is conditional,
+ * so a caller that counted the constant would announce a tool the client cannot see.
+ *
+ * @returns the registered tool names, in registration order.
+ */
+export function registerDynamicTools(server: McpServer, tools: ToolDefinition[]): string[] {
 	const toolMap = new Map(tools.map((tool) => [tool.name, tool]))
 
 	server.registerTool(
@@ -111,9 +136,23 @@ export function registerDynamicTools(server: McpServer, tools: ToolDefinition[])
 		},
 	)
 
-	registerExecutor(server, toolMap, 'read')
-	registerExecutor(server, toolMap, 'reversible')
-	registerExecutor(server, toolMap, 'guarded')
+	const registered = [
+		'fluentcart_search_tools',
+		'fluentcart_describe_tools',
+		registerExecutor(server, toolMap, 'read'),
+		registerExecutor(server, toolMap, 'reversible'),
+	]
+
+	// The registry handed in here is already filtered by `canExposeTool`, which rejects anything
+	// with `execution: 'none'`. A real-money entry surviving that filter therefore means a
+	// guard-wired action is genuinely callable, which is exactly when the executor earns its place.
+	// The risk class alone is the test; the executor keeps its own `execution` check as defence in
+	// depth for callers that hand it an unfiltered registry.
+	if (tools.some((tool) => tool.safety.risk === 'real-money')) {
+		registered.push(registerExecutor(server, toolMap, 'guarded'))
+	}
+
+	return registered
 }
 
 function executorFor(risk: ToolRisk): string | null {
@@ -145,7 +184,7 @@ const EXECUTOR_META = {
 		},
 	},
 	guarded: {
-		name: 'fluentcart_execute_guarded_write',
+		name: GUARDED_EXECUTOR_TOOL_NAME,
 		title: 'Execute a Guarded Real-Money FluentCart Action',
 		description:
 			'Execute a real-money FluentCart action through the signed-preview and durable-claim guard. Requires a fresh confirmation token and a unique idempotency key. Requires FLUENTCART_WRITE_MODE=guarded.',
@@ -153,11 +192,12 @@ const EXECUTOR_META = {
 	},
 } as const
 
+/** @returns the registered tool name, so the caller can report the roster it actually built. */
 function registerExecutor(
 	server: McpServer,
 	toolMap: Map<string, ToolDefinition>,
 	executor: 'read' | 'reversible' | 'guarded',
-): void {
+): string {
 	const meta = EXECUTOR_META[executor]
 	const permitted = EXECUTOR_RISKS[executor]
 
@@ -206,6 +246,8 @@ function registerExecutor(
 			return tool.handler(parsed.data as Record<string, unknown>)
 		},
 	)
+
+	return meta.name
 }
 
 export { inferCategory }

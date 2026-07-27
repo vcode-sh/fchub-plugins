@@ -13,18 +13,56 @@ const dateRange = {
 	endDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
 }
 
+/**
+ * `weekly` is not offered because the store cannot serve it.
+ *
+ * `ReportHelper::sanitizeGroupKey` whitelists monthly and yearly among the time buckets and
+ * rewrites everything else to `payment_method`, which `processGroup` then treats as its default
+ * and formats as `%Y-%m-%d`. So `weekly` came back as a daily series with no indication that the
+ * bucket had changed — the one failure mode a caller cannot detect from the payload.
+ */
 const dateRangeWithGroup = {
 	...dateRange,
+	// Only the two values FluentCart actually whitelists.
+	//
+	// `ReportHelper::sanitizeGroupKey` accepts billing_country, shipping_country, payment_method,
+	// payment_status, default, monthly and yearly — and rewrites anything else to `payment_method`
+	// rather than rejecting it. So `daily` and `weekly` did not produce finer buckets; they
+	// produced a payment-method breakdown wearing a time series' clothes. Verified live on a
+	// 364-day range: `daily` and `weekly` both returned the same 8 rows labelled "2026" from
+	// /reports/order-chart, where `monthly` returned 12 real month buckets.
+	//
+	// Finer than monthly is reached by OMITTING this, which triggers ReportHelper::defineGroupKey
+	// and picks from the range width: daily to 91 days, monthly to 365, yearly beyond.
 	groupKey: z
-		.enum(['daily', 'weekly', 'monthly'])
+		.enum(['monthly', 'yearly'])
 		.optional()
-		.describe('Grouping interval: daily, weekly, or monthly'),
+		.describe(
+			'Time bucket. Omit for the store to pick from the range width — daily up to 91 days, then monthly, then yearly. Only monthly and yearly may be named; other values are silently reinterpreted as a payment-method breakdown',
+		),
 }
 
 const dateRangeWithCompare = {
 	...dateRangeWithGroup,
 	compare_startDate: z.string().optional().describe('Comparison period start date (YYYY-MM-DD)'),
 	compare_endDate: z.string().optional().describe('Comparison period end date (YYYY-MM-DD)'),
+}
+
+/**
+ * The two by-group routes segment by an order column, not by time.
+ *
+ * `ReportHelper::sanitizeGroupKey` replaces anything outside its whitelist with `payment_method`
+ * rather than rejecting it, so the old `daily | weekly | monthly` enum on these two tools was
+ * wrong in every direction: `daily` and `weekly` came back grouped by payment method while still
+ * looking like a time series, and `monthly` reached the SQL builder intact and produced
+ * `Unknown column 'o.monthly'`. Verified live on 2026-07-27. Only the four order columns below
+ * are both accepted by the sanitiser and real columns on `fct_orders`.
+ */
+const orderGroupKey = {
+	groupKey: z
+		.enum(['payment_method', 'payment_status', 'billing_country', 'shipping_country'])
+		.optional()
+		.describe('Order column to segment by (default: payment_method). Not a time bucket'),
 }
 
 export function reportCoreTools(
@@ -56,9 +94,16 @@ export function reportCoreTools(
 			name: 'fluentcart_report_dashboard_stats',
 			title: 'Get Report Dashboard Stats',
 			description:
-				'Dashboard stats: total orders, paid orders, paid items, and paid amounts with comparison. Values in cents. ' +
-				"Use for 'how many orders today/this week/this month' questions.",
-			schema: z.object({ ...dateRange }),
+				'Order counters for a date range: all orders, paid orders, paid order items and paid order value. Amounts are cents — the payload says so with is_cents. ' +
+				'The only counter tool that honours both a date range and a currency: pass currency to pin one, otherwise the store answers for its own base currency rather than for every currency combined. ' +
+				"Omit both dates and it spans the first order to now. Use this for 'how many orders and how much did they come to' over a period; use fluentcart_report_sales_summary when you also need tax, shipping, refunds or an average.",
+			schema: z.object({
+				...dateRange,
+				currency: z
+					.string()
+					.optional()
+					.describe('ISO currency to scope the counters to, e.g. EUR. Defaults to the store base'),
+			}),
 			endpoint: '/reports/dashboard-stats',
 		}),
 
@@ -78,9 +123,10 @@ export function reportCoreTools(
 			name: 'fluentcart_report_revenue_by_group',
 			title: 'Get Revenue by Group',
 			description:
-				'DIAGNOSTIC, not a metric. Revenue segmented by product group or category. ' +
-				'This route stopped erroring on 2026-07-27, but returning 200 is not the same as having a defined meaning: its grouping, currency and payment scope are unverified. Treat the numbers as unconfirmed.',
-			schema: z.object({ ...dateRangeWithGroup }),
+				'DIAGNOSTIC, not a metric. Orders segmented by one order column — payment method, payment status or billing/shipping country — with orders, refunded orders, gross and net sale, average order gross and net, item count, shipping, tax, refunds and distinct customers per segment. ' +
+				'The wider of the two by-group tools: fluentcart_report_orders_by_group returns the first six of those columns and nothing else, from a different route. ' +
+				'Amounts are decimals, not cents. No currency filter, so segments add every currency together, which is why this stays diagnostic.',
+			schema: z.object({ ...dateRange, ...orderGroupKey }),
 			endpoint: '/reports/revenue-by-group',
 		}),
 
@@ -125,12 +171,9 @@ export function reportCoreTools(
 			name: 'fluentcart_report_orders_by_group',
 			title: 'Get Orders by Group',
 			description:
-				'DIAGNOSTIC, not a metric. Order data grouped by dimension such as payment method or product type. ' +
-				'This route stopped erroring on 2026-07-27; its grouping and payment scope remain unverified, so treat the numbers as unconfirmed.',
-			schema: z.object({
-				...dateRange,
-				groupKey: z.string().optional().describe('Grouping dimension key'),
-			}),
+				'DIAGNOSTIC, not a metric. Orders segmented by one order column, returning order count, gross and net sale and the two averages per segment — a strict subset of what fluentcart_report_revenue_by_group returns for the same segments and the same range, from a different route. Reach for that one unless you specifically want the smaller payload. ' +
+				'Amounts are decimals, not cents, and every currency is added together.',
+			schema: z.object({ ...dateRange, ...orderGroupKey }),
 			endpoint: '/reports/fetch-order-by-group',
 		}),
 
@@ -138,13 +181,17 @@ export function reportCoreTools(
 			name: 'fluentcart_report_quick_order_stats',
 			title: 'Get Quick Order Stats',
 			description:
-				"DIAGNOSTIC, not a metric. Quick order statistics for a lookback period. Use day_range '1' for today, '7' for this week, '30' for this month. " +
-				'This route stopped erroring on 2026-07-27; how it bounds its lookback and which currencies it combines are unverified, so treat the numbers as unconfirmed.',
+				'DIAGNOSTIC, not a metric. Order counters for a rolling lookback, echoing the window it used as from_date and to_date. ' +
+				'day_range is fed straight to strtotime, so it needs a relative expression such as "-7 days" or "-30 days", or the literals "this_month" or "all_time". A bare number is not a day count: "7" fails to parse and the window silently starts at 1970-01-01, which looks like an all-time total. ' +
+				'Only total_orders is trustworthy — paid_orders, paid items and paid value came back 0, 0 and null on a store where fluentcart_report_dashboard_stats reported 14 paid orders worth 447,599 cents over the same span. There is no currency filter, so counts span every currency. ' +
+				'Prefer fluentcart_report_dashboard_stats, which takes explicit dates and a currency.',
 			schema: z.object({
 				day_range: z
 					.string()
 					.optional()
-					.describe('Number of days to look back (e.g. "7", "30", "90")'),
+					.describe(
+						'Lookback as a strtotime expression, e.g. "-7 days", "-30 days", or "this_month" / "all_time". Never a bare number',
+					),
 			}),
 			endpoint: '/reports/quick-order-stats',
 		}),
@@ -184,8 +231,11 @@ export function reportCoreTools(
 		getTool(client, {
 			name: 'fluentcart_report_dashboard_summary',
 			title: 'Get Dashboard Summary',
-			description: 'Dashboard summary with key metrics, trends, and period comparisons.',
-			schema: z.object({ ...dateRange }),
+			description:
+				'Catalogue counters only, despite the name: total products, draft products, active coupons and expired coupons. ' +
+				'No orders, no revenue, no trends and no comparisons — the controller takes no arguments at all, so there is nothing to filter by. ' +
+				'For order counters use fluentcart_report_dashboard_stats.',
+			schema: z.object({}),
 			endpoint: '/reports/get-dashboard-summary',
 		}),
 
@@ -193,9 +243,13 @@ export function reportCoreTools(
 			name: 'fluentcart_report_summary',
 			title: 'Get Report Summary',
 			description:
-				'Report overview with aggregated metrics across all categories. ' +
-				"\u26a0\ufe0f UPSTREAM BUG: Crashes with 'Unknown column discount_total' (UB-004).",
-			schema: z.object({ ...dateRange }),
+				'DIAGNOSTIC, not a metric. Store-lifetime totals \u2014 sales, net sales, discounts, shipping tax, average order value, order count \u2014 plus a breakdown by payment method. ' +
+				'Any date range you pass is discarded: the controller reads only created_at, status and payment_status out of params, and startDate/endDate are not among them, so a five-day window and a twenty-year window return byte-identical payloads. ' +
+				'Amounts are minor units as strings, unlike the neighbouring revenue reports which return decimals, and every currency is added together. ' +
+				'Deprecated upstream since FluentCart 1.4 in favour of /reports/overview. For revenue over a chosen period use fluentcart_report_sales_summary.',
+			// No date arguments: offering a filter the controller never reads invites a caller to
+			// believe a total is scoped when it is the whole store's lifetime.
+			schema: z.object({}),
 			endpoint: '/reports/report-overview',
 		}),
 
@@ -203,10 +257,9 @@ export function reportCoreTools(
 			name: 'fluentcart_report_top_sold_products',
 			title: 'Get Top Sold Products',
 			description:
-				'Top products by units sold with revenue data (endpoint: fetch-top-sold-products). ' +
-				'Note: Similar to report_top_products_sold which uses a different endpoint (top-products-sold) and may return a different response shape. ' +
-				'Values in cents. ' +
-				'\u26a0\ufe0f UPSTREAM BUG: Crashes with array_intersect_key() on null (UB-006).',
+				'Raw top-selling products from /reports/fetch-top-sold-products: product id, name, units sold, revenue and image URL, ranked by units descending and capped at 20 rows by the controller. ' +
+				'Amounts are decimals, not cents \u2014 the query divides by 100 in SQL. ' +
+				'Three tools read a top-products route and only this one and its contract-backed sibling return anything: prefer fluentcart_report_top_products, which calls this same endpoint but pins a currency and states its period and payment scope; fluentcart_report_top_products_sold reads the deprecated route and is always empty.',
 			schema: z.object({
 				...dateRange,
 				per_page: z.number().max(50).optional().describe('Number of results (max: 50)'),
@@ -227,7 +280,7 @@ export function reportCoreTools(
 						name: 'fluentcart_report_cart',
 						title: 'Get Cart Report',
 						description:
-							'Cart analytics: abandonment, conversion funnel, cart value. Withdrawn after 1.3.9.',
+							'Cart analytics: abandonment, conversion funnel, cart value. Withdrawn after 1.3.9 — FluentCart 1.5.5 answers 404 rest_no_route, so this registers only on a store that still serves the route.',
 						schema: z.object({ ...dateRange }),
 						endpoint: '/reports/cart-report',
 					}),

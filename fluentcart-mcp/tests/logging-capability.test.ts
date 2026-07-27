@@ -102,13 +102,19 @@ describe('logging capability', () => {
 		}
 	}, 30_000)
 
-	it('names the mode and a tool count the caller can sanity-check', async () => {
+	it('names the mode and a tool count that matches what it lists', async () => {
 		const session = await connect('dynamic')
 		try {
 			const info = session.messages.find((message) => message.level === 'info')
 			expect(info?.data).toMatch(/dynamic mode/)
-			// Dynamic registers exactly the five meta-tools.
-			expect(info?.data).toMatch(/\b5 tools registered\b/)
+
+			// This used to be pinned at five. The guarded executor is now registered only when a
+			// real-money action survives the exposure filter, and none does in this release, so a
+			// fixed number would have the startup line announce a tool the client cannot see. The
+			// count is checked against the real listing instead, which cannot drift from it.
+			const names = (await session.client.listTools()).tools.map((tool) => tool.name)
+			expect(info?.data).toMatch(new RegExp(`\\b${names.length} tools registered\\b`))
+			expect(names).not.toContain('fluentcart_execute_guarded_write')
 		} finally {
 			await session.close()
 		}

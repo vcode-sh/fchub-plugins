@@ -31,8 +31,14 @@ const MANDATORY_PROFILES = [
 /**
  * Meta-tool counts the exposure design fixes; neither varies with the registry. Nothing
  * registry-sized is pinned here — its gate is `build-release-contract.mjs --check`.
+ *
+ * Dynamic is four, not five: the guarded executor is registered only when a real-money tool
+ * actually survives the exposure filter. Every real-money entry ships `execution: 'none'` in
+ * 2.0.0, so none does, and advertising a `destructiveHint: true` executor that could only ever
+ * answer "not exposed" told an agent the capability existed and that its own call was wrong.
+ * It reappears with no change here the moment a guard-wired action is exposed.
  */
-const FIXED_MODE_TOOL_COUNTS = { dynamic: 5, code: 2 }
+const FIXED_MODE_TOOL_COUNTS = { dynamic: 4, code: 2 }
 
 /** A profile is measurable only when every fixture it declares is actually on disk. */
 function fixturesPresent(profile) {
