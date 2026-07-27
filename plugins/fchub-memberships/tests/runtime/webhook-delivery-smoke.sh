@@ -4,7 +4,7 @@ set -euo pipefail
 
 plugin_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 repository_root="$(cd "${plugin_root}/../.." && pwd)"
-playground_dir="${FCHUB_PLAYGROUND_DIR:-${repository_root}/../fchub-playground}"
+playground_dir="$(cd "${FCHUB_PLAYGROUND_DIR:-${repository_root}/../fchub-playground}" && pwd -P)"
 receiver="${plugin_root}/tests/runtime/webhook-receiver.php"
 
 cd "${playground_dir}"
@@ -15,18 +15,72 @@ secret="$(openssl rand -hex 32)"
 receiver_log=''
 receiver_output=''
 filter_path="/tmp/${prefix}-safe-http.php"
+queue_guard_path="/var/www/html/wp-content/mu-plugins/${prefix}-queue-guard.php"
 receiver_pid=''
 settings_snapshot=''
 baseline=''
 cleanup_finished='no'
 stage='preflight'
 port=''
+receiver_host='8.8.8.8'
 plan_id=''
 last_delivery_id=''
 last_action_id=''
+runtime_lock_timeout="${FCHUB_WEBHOOK_SMOKE_LOCK_TIMEOUT:-180}"
+runtime_lock_key="$(printf '%s' "${playground_dir}" | cksum | awk '{print $1}')"
+runtime_lock_root="${TMPDIR:-/tmp}/fchub-memberships-runtime-locks"
+runtime_lock_dir="${runtime_lock_root}/webhook-delivery-${runtime_lock_key}.lock"
+runtime_lock_owned='no'
 declare -a action_ids=()
 declare -a delivery_ids=()
 declare -a event_ids=()
+
+acquire_runtime_lock() {
+    local waited=0
+    local holder=''
+
+    case "${runtime_lock_timeout}" in
+        ''|*[!0-9]*|0)
+            printf 'FCHUB_WEBHOOK_SMOKE_LOCK_TIMEOUT must be a positive integer.\n' >&2
+            return 2
+            ;;
+    esac
+
+    mkdir -p "${runtime_lock_root}"
+    until mkdir "${runtime_lock_dir}" 2>/dev/null; do
+        holder="$(cat "${runtime_lock_dir}/pid" 2>/dev/null || true)"
+        if [[ "${waited}" -eq 0 ]]; then
+            printf 'Another webhook delivery smoke owns %s (process %s); waiting.\n' \
+                "${runtime_lock_dir}" "${holder:-unknown}" >&2
+        fi
+        if [[ "${waited}" -ge "${runtime_lock_timeout}" ]]; then
+            printf 'Timed out after %ss waiting for webhook smoke lock %s (process %s).\n' \
+                "${runtime_lock_timeout}" "${runtime_lock_dir}" "${holder:-unknown}" >&2
+            return 1
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    printf '%s\n' "$$" >"${runtime_lock_dir}/pid"
+    runtime_lock_owned='yes'
+}
+
+release_runtime_lock() {
+    local holder=''
+
+    [[ "${runtime_lock_owned}" == 'yes' ]] || return 0
+    holder="$(cat "${runtime_lock_dir}/pid" 2>/dev/null || true)"
+    if [[ "${holder}" != "$$" ]]; then
+        printf 'Refusing to release webhook smoke lock owned by process %s.\n' \
+            "${holder:-unknown}" >&2
+        return 1
+    fi
+
+    rm -f "${runtime_lock_dir}/pid"
+    rmdir "${runtime_lock_dir}"
+    runtime_lock_owned='no'
+}
 
 snapshot_settings() {
     docker compose exec -T wpcli wp eval '
@@ -109,6 +163,34 @@ remove_filter() {
     ' "${filter_path}" >/dev/null 2>&1
 }
 
+install_queue_guard() {
+    docker compose exec -T --user 0 wpcli php -r '
+        $path = $argv[1];
+        $directory = dirname($path);
+        if ((!is_dir($directory) && !mkdir($directory, 0755, true))
+            || file_put_contents(
+                $path,
+                "<?php\n"
+                . "add_filter(\"action_scheduler_allow_async_request_runner\", \"__return_false\", PHP_INT_MAX);\n"
+                . "add_filter(\"action_scheduler_queue_runner_concurrent_batches\", static fn(): int => 0, PHP_INT_MAX);\n",
+                LOCK_EX
+            ) === false
+            || !chmod($path, 0644)
+        ) {
+            exit(1);
+        }
+    ' "${queue_guard_path}"
+}
+
+remove_queue_guard() {
+    docker compose exec -T --user 0 wpcli php -r '
+        $path = $argv[1];
+        if (is_file($path) && !unlink($path)) {
+            exit(1);
+        }
+    ' "${queue_guard_path}" >/dev/null 2>&1
+}
+
 remove_local_file() {
     local path="$1"
     [[ -z "${path}" || ! -e "${path}" ]] || unlink "${path}"
@@ -134,22 +216,37 @@ delete_tracked_data() {
             ));
 
             foreach ($deliveryIds as $deliveryId) {
-                $like = $wpdb->esc_like("fchub-memberships-webhooks-{$deliveryId}-a") . "%";
-                $owned = $wpdb->get_col($wpdb->prepare(
-                    "SELECT actions.action_id
-                     FROM {$wpdb->actionscheduler_actions} actions
-                     INNER JOIN {$wpdb->actionscheduler_groups} groups ON groups.group_id = actions.group_id
-                     WHERE actions.hook = %s AND groups.slug LIKE %s",
-                    "fchub_memberships_deliver_webhook",
-                    $like
-                ));
-                $actionIds = array_merge($actionIds, array_map("absint", $owned));
+                $scheduled = as_get_scheduled_actions([
+                    "hook" => "fchub_memberships_deliver_webhook",
+                    "args" => [$deliveryId],
+                    "orderby" => "date",
+                    "order" => "ASC",
+                    "per_page" => -1,
+                ], "ids");
+                if (is_array($scheduled)) {
+                    $actionIds = array_merge($actionIds, array_map("absint", $scheduled));
+                }
             }
             $actionIds = array_values(array_unique(array_filter($actionIds)));
 
+            $store = ActionScheduler::store();
+            $actionExists = static function (int $actionId) use ($store): bool {
+                try {
+                    return $store->get_status($actionId) !== "";
+                } catch (Throwable) {
+                    return false;
+                }
+            };
             foreach ($actionIds as $actionId) {
-                $wpdb->delete($wpdb->actionscheduler_logs, ["action_id" => $actionId], ["%d"]);
-                $wpdb->delete($wpdb->actionscheduler_actions, ["action_id" => $actionId], ["%d"]);
+                try {
+                    if ($actionExists($actionId)) {
+                        $store->delete_action($actionId);
+                    }
+                } catch (Throwable $exception) {
+                    if ($actionExists($actionId)) {
+                        throw $exception;
+                    }
+                }
             }
             foreach ($deliveryIds as $deliveryId) {
                 $wpdb->delete(
@@ -165,22 +262,6 @@ delete_tracked_data() {
                     ["%s"]
                 );
             }
-            foreach ($deliveryIds as $deliveryId) {
-                $like = $wpdb->esc_like("fchub-memberships-webhooks-{$deliveryId}-a") . "%";
-                $groups = $wpdb->get_col($wpdb->prepare(
-                    "SELECT group_id FROM {$wpdb->actionscheduler_groups} WHERE slug LIKE %s",
-                    $like
-                ));
-                foreach ($groups as $groupId) {
-                    $remaining = (int) $wpdb->get_var($wpdb->prepare(
-                        "SELECT COUNT(*) FROM {$wpdb->actionscheduler_actions} WHERE group_id = %d",
-                        $groupId
-                    ));
-                    if ($remaining === 0) {
-                        $wpdb->delete($wpdb->actionscheduler_groups, ["group_id" => $groupId], ["%d"]);
-                    }
-                }
-            }
         ' >/dev/null
 }
 
@@ -191,6 +272,7 @@ cleanup_runtime() {
     delete_tracked_data || cleanup_status=1
     restore_settings || cleanup_status=1
     remove_filter || cleanup_status=1
+    remove_queue_guard || cleanup_status=1
 
     if [[ -n "${receiver_pid}" ]] && kill -0 "${receiver_pid}" >/dev/null 2>&1; then
         kill "${receiver_pid}" >/dev/null 2>&1 || cleanup_status=1
@@ -211,6 +293,7 @@ exit_cleanup() {
     if [[ "${cleanup_finished}" != 'yes' ]]; then
         cleanup_runtime || exit_code=1
     fi
+    release_runtime_lock || exit_code=1
     if [[ "${exit_code}" -ne 0 ]]; then
         printf 'Webhook delivery smoke failed at stage: %s\n' "${stage}" >&2
     fi
@@ -218,6 +301,8 @@ exit_cleanup() {
 }
 
 trap exit_cleanup EXIT
+
+acquire_runtime_lock
 
 receiver_log="$(mktemp "${TMPDIR:-/tmp}/${prefix}.jsonl.XXXXXX")"
 receiver_output="$(mktemp "${TMPDIR:-/tmp}/${prefix}.receiver.XXXXXX")"
@@ -263,76 +348,84 @@ WP_CLI::add_hook('after_wp_load', static function (): void {
             return false;
         }
         return strtolower((string) ($parts['scheme'] ?? '')) === 'http'
-            && strtolower(rtrim((string) ($parts['host'] ?? ''), '.')) === 'host.docker.internal'
+            && (string) ($parts['host'] ?? '') === '8.8.8.8'
             && (int) ($parts['port'] ?? 0) === $fchubTask8Port
             && (string) ($parts['path'] ?? '') === '/' . $fchubTask8Token
             && in_array((string) ($parts['query'] ?? ''), ['responses=204', 'responses=500,204', 'responses=400'], true);
     };
 
     add_filter(
-        'http_request_host_is_external',
-        static fn(mixed $external, mixed $host, mixed $url): mixed => $fchubTask8Matches($url) ? true : $external,
-        PHP_INT_MAX,
-        3
-    );
-    add_filter(
-        'http_allowed_safe_ports',
-        static function (mixed $ports, mixed $host, mixed $url) use ($fchubTask8Matches, $fchubTask8Port): array {
-            $ports = is_array($ports) ? $ports : [];
-            if ($fchubTask8Matches($url)) {
-                $ports[] = $fchubTask8Port;
+        'pre_http_request',
+        static function (mixed $pre, mixed $request, mixed $url) use (
+            $fchubTask8Matches,
+            $fchubTask8Port
+        ): mixed {
+            if (!$fchubTask8Matches($url)) {
+                return $pre;
             }
-            return array_values(array_unique(array_map('intval', $ports)));
+
+            if (!function_exists('curl_init')) {
+                return new WP_Error(
+                    'fchub_runtime_transport_unavailable',
+                    'The controlled webhook transport is unavailable.'
+                );
+            }
+
+            $parts = wp_parse_url($url);
+            $target = sprintf(
+                'http://host.docker.internal:%d%s?%s',
+                $fchubTask8Port,
+                (string) ($parts['path'] ?? ''),
+                (string) ($parts['query'] ?? '')
+            );
+            $headers = [];
+            foreach ((array) ($request['headers'] ?? []) as $name => $value) {
+                $headers[] = (string) $name . ': ' . (string) $value;
+            }
+
+            $handle = curl_init($target);
+            if ($handle === false) {
+                return new WP_Error(
+                    'fchub_runtime_transport_unavailable',
+                    'The controlled webhook transport could not be initialised.'
+                );
+            }
+            curl_setopt_array($handle, [
+                CURLOPT_CUSTOMREQUEST => (string) ($request['method'] ?? 'POST'),
+                CURLOPT_POSTFIELDS => (string) ($request['body'] ?? ''),
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 2,
+                CURLOPT_TIMEOUT => max(2, (int) ($request['timeout'] ?? 15)),
+                CURLOPT_PROXY => '',
+                CURLOPT_NOPROXY => '*',
+            ]);
+            $body = curl_exec($handle);
+            $code = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+            $error = curl_error($handle);
+            curl_close($handle);
+            if (!is_string($body) || $code <= 0) {
+                return new WP_Error(
+                    'fchub_runtime_transport_failed',
+                    $error !== '' ? $error : 'The controlled webhook request failed.'
+                );
+            }
+
+            return [
+                'headers' => [],
+                'body' => $body,
+                'response' => [
+                    'code' => $code,
+                    'message' => get_status_header_desc($code),
+                ],
+                'cookies' => [],
+                'filename' => null,
+            ];
         },
-        PHP_INT_MAX,
+        PHP_INT_MIN,
         3
     );
     add_filter('action_scheduler_allow_async_request_runner', '__return_false', PHP_INT_MAX);
-    add_filter(
-        'pre_as_schedule_single_action',
-        static function (
-            mixed $pre,
-            mixed $timestamp,
-            mixed $hook,
-            mixed $args,
-            mixed $group,
-            mixed $priority,
-            mixed $unique
-        ) use ($fchubTask8Matches): mixed {
-            if ($pre !== null
-                || $hook !== 'fchub_memberships_deliver_webhook'
-                || !is_array($args)
-                || count($args) !== 1
-                || !is_int($args[0] ?? null)
-                || (int) $args[0] <= 0
-                || preg_match('/^fchub-memberships-webhooks-\d+-a\d+$/', (string) $group) !== 1
-                || (int) $priority !== 10
-            ) {
-                return $pre;
-            }
-
-            global $wpdb;
-            $destination = $wpdb->get_var($wpdb->prepare(
-                "SELECT destination_url
-                 FROM {$wpdb->prefix}fchub_membership_webhook_deliveries
-                 WHERE id = %d",
-                (int) $args[0]
-            ));
-            if (!$fchubTask8Matches($destination)) {
-                return $pre;
-            }
-
-            return ActionScheduler::factory()->single_unique(
-                (string) $hook,
-                $args,
-                time() + HOUR_IN_SECONDS,
-                (string) $group,
-                (bool) $unique
-            );
-        },
-        PHP_INT_MAX,
-        7
-    );
 });
 PHP
 }
@@ -392,7 +485,6 @@ assert_dispatch_suppressed() {
              WHERE destination_url = %s",
             $url
         ));
-        (new FChubMemberships\Integration\WebhookDispatcher())->register();
         do_action(
             "fchub_memberships/grant_created",
             1,
@@ -421,19 +513,25 @@ dispatch_delivery() {
         }
         $url = $input[0];
         $planId = (int) $input[1];
-        $policy = new FChubMemberships\Integration\WebhookEndpointPolicy(
-            "local",
-            static fn(string $host): array => strtolower(rtrim($host, ".")) === "host.docker.internal"
-                ? ["8.8.8.8"]
-                : []
-        );
-        (new FChubMemberships\Integration\WebhookDispatcher(endpointPolicy: $policy))->register();
+        $before = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_webhook_deliveries
+             WHERE destination_url = %s",
+            $url
+        ));
         do_action(
             "fchub_memberships/grant_created",
             1,
             $planId,
             ["source_type" => "task8_runtime_smoke", "source_id" => 0]
         );
+        $after = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_webhook_deliveries
+             WHERE destination_url = %s",
+            $url
+        ));
+        if ($after !== $before + 1) {
+            throw new RuntimeException("Expected exactly one owned webhook delivery.");
+        }
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT id, event_id
              FROM {$wpdb->prefix}fchub_membership_webhook_deliveries
@@ -459,31 +557,33 @@ action_id_for() {
     local delivery_id="$1"
     local attempt="$2"
     printf '%s\n%s\n' "${delivery_id}" "${attempt}" | wp_filtered eval '
-        global $wpdb;
         $input = file("php://stdin", FILE_IGNORE_NEW_LINES);
         $deliveryId = absint($input[0] ?? 0);
         $attempt = absint($input[1] ?? 0);
         $group = "fchub-memberships-webhooks-{$deliveryId}-a{$attempt}";
-        $actionId = $wpdb->get_var($wpdb->prepare(
-            "SELECT actions.action_id
-             FROM {$wpdb->actionscheduler_actions} actions
-             INNER JOIN {$wpdb->actionscheduler_groups} groups ON groups.group_id = actions.group_id
-             WHERE actions.hook = %s AND groups.slug = %s AND actions.status = %s
-             ORDER BY actions.action_id DESC LIMIT 1",
-            "fchub_memberships_deliver_webhook",
-            $group,
-            "pending"
-        ));
+        $findPendingAction = static function () use ($deliveryId, $group): int {
+            $ids = as_get_scheduled_actions([
+                "hook" => "fchub_memberships_deliver_webhook",
+                "args" => [$deliveryId],
+                "group" => $group,
+                "status" => ActionScheduler_Store::STATUS_PENDING,
+                "orderby" => "date",
+                "order" => "DESC",
+                "per_page" => 1,
+            ], "ids");
+
+            return is_array($ids) ? (int) ($ids[0] ?? 0) : 0;
+        };
+        $actionId = $findPendingAction();
         if (!is_numeric($actionId) || (int) $actionId <= 0) {
-            $observed = $wpdb->get_results($wpdb->prepare(
-                "SELECT actions.action_id, actions.status, actions.scheduled_date_gmt
-                 FROM {$wpdb->actionscheduler_actions} actions
-                 INNER JOIN {$wpdb->actionscheduler_groups} groups ON groups.group_id = actions.group_id
-                 WHERE actions.hook = %s AND groups.slug = %s
-                 ORDER BY actions.action_id",
-                "fchub_memberships_deliver_webhook",
-                $group
-            ), ARRAY_A);
+            $observed = as_get_scheduled_actions([
+                "hook" => "fchub_memberships_deliver_webhook",
+                "args" => [$deliveryId],
+                "group" => $group,
+                "orderby" => "date",
+                "order" => "ASC",
+                "per_page" => -1,
+            ], "ids");
             throw new RuntimeException(
                 "Tracked webhook action was not pending: " . wp_json_encode($observed)
             );
@@ -517,19 +617,21 @@ assert_only_runnable_action() {
         $input = file("php://stdin", FILE_IGNORE_NEW_LINES);
         $actionId = absint($input[0] ?? 0);
         $group = (string) ($input[1] ?? "");
-        $ids = array_map("intval", $wpdb->get_col($wpdb->prepare(
-            "SELECT actions.action_id
-             FROM {$wpdb->actionscheduler_actions} actions
-             INNER JOIN {$wpdb->actionscheduler_groups} groups ON groups.group_id = actions.group_id
-             WHERE actions.hook = %s
-               AND groups.slug = %s
-               AND actions.status IN (%s, %s)
-             ORDER BY actions.action_id",
-            "fchub_memberships_deliver_webhook",
-            $group,
-            "pending",
-            "in-progress"
-        )));
+        $ids = [];
+        foreach ([ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING] as $status) {
+            $found = as_get_scheduled_actions([
+                "hook" => "fchub_memberships_deliver_webhook",
+                "group" => $group,
+                "status" => $status,
+                "orderby" => "date",
+                "order" => "ASC",
+                "per_page" => -1,
+            ], "ids");
+            if (is_array($found)) {
+                $ids = array_merge($ids, array_map("intval", $found));
+            }
+        }
+        sort($ids);
         if ($ids !== [$actionId]) {
             throw new RuntimeException(
                 "The tracked group does not contain exactly one runnable action ID: expected "
@@ -542,14 +644,17 @@ assert_only_runnable_action() {
 assert_action_complete() {
     local action_id="$1"
     printf '%s' "${action_id}" | wp_filtered eval '
-        global $wpdb;
         $id = absint(trim(stream_get_contents(STDIN)));
-        $status = (string) $wpdb->get_var($wpdb->prepare(
-            "SELECT status FROM {$wpdb->actionscheduler_actions} WHERE action_id = %d",
-            $id
-        ));
-        if ($status !== "complete") {
-            throw new RuntimeException("The tracked webhook action did not complete.");
+        $status = ActionScheduler::store()->get_status($id);
+        if ($status !== ActionScheduler_Store::STATUS_COMPLETE) {
+            $logs = array_map(
+                static fn(ActionScheduler_LogEntry $entry): string => $entry->get_message(),
+                ActionScheduler::logger()->get_logs($id)
+            );
+            throw new RuntimeException(
+                "The tracked webhook action did not complete: "
+                . wp_json_encode(["status" => $status, "logs" => $logs])
+            );
         }
     ' >/dev/null
 }
@@ -591,9 +696,24 @@ delivery_state() {
     '
 }
 
+receiver_record_count() {
+    wc -l <"${receiver_log}" | tr -d '[:space:]'
+}
+
 runtime_snapshot() {
     docker compose exec -T wpcli wp eval '
         global $wpdb;
+        $actionIds = as_get_scheduled_actions([
+            "hook" => "fchub_memberships_deliver_webhook",
+            "orderby" => "date",
+            "order" => "ASC",
+            "per_page" => -1,
+        ], "ids");
+        $actionIds = is_array($actionIds) ? array_map("absint", $actionIds) : [];
+        $logCount = 0;
+        foreach ($actionIds as $actionId) {
+            $logCount += count(ActionScheduler::logger()->get_logs($actionId));
+        }
         echo wp_json_encode([
             "users" => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->users}"),
             "usermeta" => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->usermeta}"),
@@ -605,20 +725,8 @@ runtime_snapshot() {
             "mutation_requests" => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_mutation_requests"),
             "events" => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_webhook_events"),
             "deliveries" => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_webhook_deliveries"),
-            "actions" => (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->actionscheduler_actions} WHERE hook = %s",
-                "fchub_memberships_deliver_webhook"
-            )),
-            "logs" => (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->actionscheduler_logs} logs
-                 INNER JOIN {$wpdb->actionscheduler_actions} actions ON actions.action_id = logs.action_id
-                 WHERE actions.hook = %s",
-                "fchub_memberships_deliver_webhook"
-            )),
-            "groups" => (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->actionscheduler_groups} WHERE slug LIKE %s",
-                "fchub-memberships-webhooks-%"
-            )),
+            "actions" => count($actionIds),
+            "logs" => $logCount,
         ]);
     '
 }
@@ -636,23 +744,17 @@ tracked_residue() {
             $eventIds = array_values(array_filter(explode(",", $input[2] ?? "")));
             $residue = 0;
             foreach ($actionIds as $id) {
-                $residue += (int) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->actionscheduler_actions} WHERE action_id = %d",
-                    $id
-                ));
-                $residue += (int) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->actionscheduler_logs} WHERE action_id = %d",
-                    $id
-                ));
+                try {
+                    $residue += ActionScheduler::store()->get_status($id) === "" ? 0 : 1;
+                } catch (Throwable) {
+                    // The action was removed from the active store.
+                }
+                $residue += count(ActionScheduler::logger()->get_logs($id));
             }
             foreach ($deliveryIds as $id) {
                 $residue += (int) $wpdb->get_var($wpdb->prepare(
                     "SELECT COUNT(*) FROM {$wpdb->prefix}fchub_membership_webhook_deliveries WHERE id = %d",
                     $id
-                ));
-                $residue += (int) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->actionscheduler_groups} WHERE slug LIKE %s",
-                    $wpdb->esc_like("fchub-memberships-webhooks-{$id}-a") . "%"
                 ));
             }
             foreach ($eventIds as $id) {
@@ -665,14 +767,19 @@ tracked_residue() {
         '
 }
 
-port="$(php -r '
-    $socket = stream_socket_server("tcp://127.0.0.1:0", $errorCode, $errorMessage);
-    if (!is_resource($socket)) exit(1);
-    $address = stream_socket_get_name($socket, false);
+port='8080'
+php -r '
+    $socket = @stream_socket_server(
+        "tcp://127.0.0.1:" . $argv[1],
+        $errorCode,
+        $errorMessage
+    );
+    if (!is_resource($socket)) {
+        fwrite(STDERR, "Webhook smoke receiver port {$argv[1]} is unavailable.\n");
+        exit(1);
+    }
     fclose($socket);
-    echo (int) substr(strrchr((string) $address, ":"), 1);
-')"
-[[ "${port}" =~ ^[1-9][0-9]*$ ]]
+' "${port}"
 
 settings_snapshot="$(snapshot_settings)"
 baseline="$(runtime_snapshot)"
@@ -681,6 +788,7 @@ plan_id="$(docker compose exec -T wpcli wp db query \
     --skip-column-names | tr -d '[:space:]')"
 [[ "${plan_id}" =~ ^[1-9][0-9]*$ ]]
 
+install_queue_guard
 install_filter
 chmod 600 "${receiver_log}" "${receiver_output}"
 FCHUB_WEBHOOK_RECEIVER_SECRET="${secret}" \
@@ -699,21 +807,22 @@ done
 kill -0 "${receiver_pid}"
 
 stage='paused endpoint opt-in'
-paused_url="http://host.docker.internal:${port}/${token}?responses=204"
+paused_url="http://${receiver_host}:${port}/${token}?responses=204"
 configure_destination "${paused_url}" paused
 assert_dispatch_suppressed "${paused_url}"
 [[ ! -s "${receiver_log}" ]]
 
 stage='success delivery'
-success_url="http://host.docker.internal:${port}/${token}?responses=204"
+success_url="http://${receiver_host}:${port}/${token}?responses=204"
 configure_destination "${success_url}" active
 dispatch_delivery "${success_url}"
 success_delivery="${last_delivery_id}"
 run_attempt "${success_delivery}" 1
 [[ "$(delivery_state "${success_delivery}")" == 'succeeded|1|204|0|' ]]
+[[ "$(receiver_record_count)" == '1' ]]
 
 stage='retry delivery'
-retry_url="http://host.docker.internal:${port}/${token}?responses=500,204"
+retry_url="http://${receiver_host}:${port}/${token}?responses=500,204"
 configure_destination "${retry_url}" active
 dispatch_delivery "${retry_url}"
 retry_delivery="${last_delivery_id}"
@@ -721,6 +830,7 @@ run_attempt "${retry_delivery}" 1
 [[ "$(delivery_state "${retry_delivery}")" == 'retrying|1|500|0|webhook_http_500' ]]
 run_attempt "${retry_delivery}" 2
 [[ "$(delivery_state "${retry_delivery}")" == 'succeeded|2|204|0|' ]]
+[[ "$(receiver_record_count)" == '3' ]]
 
 previous_retry_action="${last_action_id}"
 [[ "${previous_retry_action}" =~ ^[1-9][0-9]*$ ]]
@@ -755,7 +865,7 @@ retry_identity="$(printf '%s' "${retry_delivery}" | wp_filtered eval '
 [[ "${retry_identity}" == '1|succeeded|2' ]]
 
 stage='terminal delivery'
-failure_url="http://host.docker.internal:${port}/${token}?responses=400"
+failure_url="http://${receiver_host}:${port}/${token}?responses=400"
 configure_destination "${failure_url}" active
 dispatch_delivery "${failure_url}"
 failure_delivery="${last_delivery_id}"
@@ -765,6 +875,7 @@ for attempt in 1 2 3 4 5 6; do
 done
 run_attempt "${failure_delivery}" 7
 [[ "$(delivery_state "${failure_delivery}")" == 'failed|7|400|2048|webhook_http_400' ]]
+[[ "$(receiver_record_count)" == '10' ]]
 
 terminal_history="$(printf '%s' "${failure_delivery}" | wp_filtered eval '
     $id = absint(trim(stream_get_contents(STDIN)));
@@ -819,21 +930,16 @@ printf '%s\n%s\n%s\n' \
         $ids = array_values(array_filter(array_map("absint", explode(",", (string) ($input[1] ?? "")))));
         $deliveryIds = array_values(array_filter(array_map("absint", explode(",", (string) ($input[2] ?? "")))));
         foreach ($ids as $id) {
-            $args = (string) $wpdb->get_var($wpdb->prepare(
-                "SELECT args FROM {$wpdb->actionscheduler_actions} WHERE action_id = %d",
-                $id
+            $action = ActionScheduler::store()->fetch_action($id);
+            $values = array_values($action->get_args());
+            $logs = implode(" ", array_map(
+                static fn(ActionScheduler_LogEntry $entry): string => $entry->get_message(),
+                ActionScheduler::logger()->get_logs($id)
             ));
-            $logs = (string) $wpdb->get_var($wpdb->prepare(
-                "SELECT GROUP_CONCAT(message)
-                 FROM {$wpdb->actionscheduler_logs} WHERE action_id = %d",
-                $id
-            ));
-            $decoded = json_decode($args, true);
-            $values = is_array($decoded) ? array_values($decoded) : [];
             if (count($values) !== 1 || !is_int($values[0]) || !in_array($values[0], $deliveryIds, true)) {
                 throw new RuntimeException("Webhook action arguments are not the exact tracked delivery ID.");
             }
-            if ($secret !== "" && (str_contains($args, $secret) || str_contains($logs, $secret))) {
+            if ($secret !== "" && (str_contains(wp_json_encode($values), $secret) || str_contains($logs, $secret))) {
                 throw new RuntimeException("Webhook secret entered scheduler storage.");
             }
         }
@@ -858,6 +964,8 @@ printf '%s\n%s\n%s\n' \
     ' >/dev/null
 
 stage='receiver audit'
+[[ "$(receiver_record_count)" == '10' ]]
+kill -0 "${receiver_pid}"
 printf '%s' "${secret}" | php -r '
     $fail = static function (string $reason): never {
         fwrite(STDERR, "Receiver audit failed: {$reason}\n");
@@ -957,17 +1065,21 @@ php -r 'echo base64_encode((string) file_get_contents($argv[1]));' "${receiver_l
     ' >/dev/null
 
 stage='cleanup'
-cleanup_runtime
+cleanup_runtime || exit 1
 stage='cleanup verification'
-[[ "$(snapshot_settings)" == "${settings_snapshot}" ]]
-[[ "$(runtime_snapshot)" == "${baseline}" ]]
-[[ "$(tracked_residue)" == '0' ]]
-[[ ! -e "${receiver_log}" ]]
-[[ ! -e "${receiver_output}" ]]
+[[ "$(snapshot_settings)" == "${settings_snapshot}" ]] || exit 1
+[[ "$(runtime_snapshot)" == "${baseline}" ]] || exit 1
+[[ "$(tracked_residue)" == '0' ]] || exit 1
+[[ ! -e "${receiver_log}" ]] || exit 1
+[[ ! -e "${receiver_output}" ]] || exit 1
 if docker compose exec -T wpcli php -r 'exit(is_file($argv[1]) ? 0 : 1);' "${filter_path}" >/dev/null 2>&1; then
     exit 1
 fi
+if docker compose exec -T --user 0 wpcli php -r 'exit(is_file($argv[1]) ? 0 : 1);' "${queue_guard_path}" >/dev/null 2>&1; then
+    exit 1
+fi
 cleanup_finished='yes'
+release_runtime_lock
 trap - EXIT
 
 printf 'Webhook delivery smoke passed; settings, actions, rows, receiver, and temporary files were restored.\n'

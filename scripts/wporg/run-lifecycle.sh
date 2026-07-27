@@ -53,6 +53,8 @@ case "$wordpress_image|$wpcli_image" in
     ;;
 esac
 
+fixture_slug="$(bash "$here/lifecycle-fixtures.sh" "$slug")"
+
 project="$(project_name "$slug")"
 case "$project" in
   wporg-lifecycle-"$slug"-*) ;;
@@ -71,12 +73,40 @@ case "$fixture_dir" in
     ;;
 esac
 
+cleanup_fixture_before_runtime() {
+  local status=$?
+  trap - EXIT INT TERM
+  case "$fixture_dir" in
+    */wporg-lifecycle-*) rm -rf "$fixture_dir" ;;
+    *)
+      printf 'Refusing to remove unsafe temporary path %s\n' "$fixture_dir" >&2
+      status=1
+      ;;
+  esac
+  exit "$status"
+}
+trap cleanup_fixture_before_runtime EXIT INT TERM
+
 chmod 0755 "$fixture_dir"
 cp "$zip_path" "$fixture_dir/candidate.zip"
 chmod 0644 "$fixture_dir/candidate.zip"
 if [ -n "$previous_zip_path" ]; then
   cp "$previous_zip_path" "$fixture_dir/previous.zip"
   chmod 0644 "$fixture_dir/previous.zip"
+fi
+if [ -n "$fixture_slug" ]; then
+  fixture_source="$here/lifecycle-fixtures/$fixture_slug"
+  if [ ! -f "$fixture_source/before-update.php" ] || [ ! -f "$fixture_source/after-update.php" ]; then
+    printf 'Lifecycle fixtures are incomplete for %s.\n' "$fixture_slug" >&2
+    exit 2
+  fi
+  cp "$fixture_source/before-update.php" "$fixture_dir/lifecycle-before-update.php"
+  cp "$fixture_source/after-update.php" "$fixture_dir/lifecycle-after-update.php"
+  cp "$here/lifecycle-admin-context.php" "$fixture_dir/lifecycle-admin-context.php"
+  chmod 0644 \
+    "$fixture_dir/lifecycle-before-update.php" \
+    "$fixture_dir/lifecycle-after-update.php" \
+    "$fixture_dir/lifecycle-admin-context.php"
 fi
 
 export WPORG_FIXTURE_DIR="$fixture_dir"
@@ -95,8 +125,147 @@ dc() {
   docker compose --progress quiet -p "$project" -f "$compose_file" "$@"
 }
 
+# shellcheck source=scripts/wporg/runtime-readiness.sh
+source "$here/runtime-readiness.sh"
+
 wp() {
   dc run --rm --no-deps -T wpcli wp "$@"
+}
+
+wp_admin() {
+  dc run --rm --no-deps -T wpcli wp \
+    --require=/wporg-fixture/lifecycle-admin-context.php "$@"
+}
+
+install_http_observer() {
+  wp option update wporg_lifecycle_observed_slug "$slug" >>"$runtime_log" 2>&1
+  wp option update wporg_lifecycle_http_attempts 0 >>"$runtime_log" 2>&1
+  dc exec -T wordpress mkdir -p /var/www/html/wp-content/mu-plugins >>"$runtime_log" 2>&1
+  dc cp \
+    "$here/lifecycle-http-observer.php" \
+    wordpress:/var/www/html/wp-content/mu-plugins/wporg-lifecycle-http-observer.php \
+    >>"$runtime_log" 2>&1
+}
+
+assert_no_plugin_http() {
+  local phase="$1"
+  local attempts
+  attempts="$(wp option get wporg_lifecycle_http_attempts | tr -d '\r')"
+  if [ "$attempts" != '0' ]; then
+    printf '%s made %s plugin-originated HTTP request(s) during %s.\n' \
+      "$slug" "$attempts" "$phase" >&2
+    exit 1
+  fi
+}
+
+probe_fixture_runtime() {
+  [ -n "$fixture_slug" ] || return 0
+
+  if wp plugin deactivate fluent-cart >>"$runtime_log" 2>&1; then
+    target_status="$(wp plugin get "$slug" --field=status | tr -d '\r')"
+    if [ "$target_status" != 'active' ]; then
+      printf '%s was not active after FluentCart dependency loss.\n' "$slug" >&2
+      exit 1
+    fi
+    wp_admin eval '
+$slug = (string) get_option("wporg_lifecycle_observed_slug", "");
+if (defined("FLUENTCART_VERSION")) {
+    throw new RuntimeException("FluentCart remained loaded after real deactivation.");
+}
+$loaded = $slug === "fchub-memberships"
+    ? defined("FCHUB_MEMBERSHIPS_VERSION")
+    : defined("FCHUB_MC_VERSION");
+if (!$loaded) {
+    throw new RuntimeException("The active target did not tolerate dependency loss.");
+}
+do_action("admin_init");
+do_action("admin_menu");
+' >>"$runtime_log" 2>&1
+    wp plugin activate fluent-cart >>"$runtime_log" 2>&1
+    printf 'Active dependency-loss tolerance passed for %s.\n' "$slug" \
+      | tee -a "$runtime_log"
+  else
+    dependency_status="$(wp plugin get fluent-cart --field=status | tr -d '\r')"
+    target_status="$(wp plugin get "$slug" --field=status | tr -d '\r')"
+    if [ "$dependency_status" != 'active' ] || [ "$target_status" != 'active' ]; then
+      printf 'The dependency guard left %s or FluentCart inactive.\n' "$slug" >&2
+      exit 1
+    fi
+    printf 'WordPress dependency guard prevented active FluentCart loss for %s.\n' "$slug" \
+      | tee -a "$runtime_log"
+  fi
+
+  wp plugin deactivate "$slug" >>"$runtime_log" 2>&1
+  wp plugin deactivate fluent-cart >>"$runtime_log" 2>&1
+
+  dependency_status="$(wp plugin get fluent-cart --field=status | tr -d '\r')"
+  target_status="$(wp plugin get "$slug" --field=status | tr -d '\r')"
+  if [ "$dependency_status" != 'inactive' ] || [ "$target_status" != 'inactive' ]; then
+    printf 'The dependency transition did not leave %s and FluentCart inactive.\n' "$slug" >&2
+    exit 1
+  fi
+
+  if wp plugin activate "$slug" >>"$runtime_log" 2>&1; then
+    printf 'The target plugin activated while FluentCart was inactive.\n' >&2
+    exit 1
+  fi
+
+  wp plugin activate fluent-cart >>"$runtime_log" 2>&1
+  wp plugin activate "$slug" >>"$runtime_log" 2>&1
+
+  wp_admin eval '
+$slug = (string) get_option("wporg_lifecycle_observed_slug", "");
+if (!defined("FLUENTCART_VERSION")) {
+    throw new RuntimeException("FluentCart did not load after reactivation.");
+}
+$addons = apply_filters("fluent_cart/integration/addons", []);
+$expectedAddon = $slug === "fchub-memberships" ? "memberships" : $slug;
+if (!is_array($addons) || !array_key_exists($expectedAddon, $addons)) {
+    throw new RuntimeException("The FluentCart integration did not recover.");
+}
+do_action("admin_init");
+do_action("admin_menu");
+if ($slug === "fchub-memberships") {
+    global $menu, $submenu;
+    $menuSlugs = array_map(
+        static fn(array $item): string => (string) ($item[2] ?? ""),
+        is_array($menu) ? $menu : []
+    );
+    if (!in_array("fchub-memberships", $menuSlugs, true)
+        || count($submenu["fchub-memberships"] ?? []) !== 7
+    ) {
+        throw new RuntimeException("The Memberships admin SPA route was not registered.");
+    }
+
+    ob_start();
+    \FChubMemberships\Support\AdminMenu::render();
+    $markup = (string) ob_get_clean();
+    if (!str_contains($markup, "fchub-memberships-app")
+        || !wp_script_is("fchub-memberships-admin", "enqueued")
+    ) {
+        throw new RuntimeException("The Memberships admin SPA shell or script was not enqueued.");
+    }
+
+    $manifestPath = FCHUB_MEMBERSHIPS_PATH . "assets/dist/.vite/manifest.json";
+    $manifest = is_readable($manifestPath)
+        ? json_decode((string) file_get_contents($manifestPath), true)
+        : null;
+    $entry = is_array($manifest) ? ($manifest["resources/admin/main.js"] ?? null) : null;
+    $entryFile = is_array($entry) ? (string) ($entry["file"] ?? "") : "";
+    if ($entryFile === "" || !is_file(FCHUB_MEMBERSHIPS_PATH . "assets/dist/" . $entryFile)) {
+        throw new RuntimeException("The Memberships admin SPA entry asset is missing.");
+    }
+}
+if ($slug === "fchub-multi-currency") {
+    do_action("fchub_mc_refresh_rates");
+} elseif ($slug === "fchub-memberships") {
+    do_action("fchub_memberships_validity_check");
+}
+' >>"$runtime_log" 2>&1
+
+  assert_no_plugin_http 'activation, admin, cron, and dependency recovery'
+  printf 'Runtime dependency and no-HTTP probes passed for %s.\n' "$slug" \
+    | tee -a "$runtime_log"
 }
 
 archive_version() {
@@ -153,6 +322,7 @@ trap cleanup EXIT INT TERM
 } >> "$runtime_log"
 
 dc up -d db wordpress >>"$runtime_log" 2>&1
+wait_for_wordpress_filesystem "$runtime_log"
 wp core install \
   --url=http://wordpress \
   --title='WordPress.org lifecycle' \
@@ -160,6 +330,8 @@ wp core install \
   --admin_password=lifecycle \
   --admin_email=lifecycle@example.test \
   --skip-email >>"$runtime_log" 2>&1
+
+install_http_observer
 
 wp plugin install /wporg-fixture/candidate.zip >>"$runtime_log" 2>&1
 
@@ -193,6 +365,8 @@ if [ "$active_status" != 'active' ]; then
   exit 1
 fi
 
+probe_fixture_runtime
+
 wp plugin deactivate "$slug" >>"$runtime_log" 2>&1
 wp plugin uninstall "$slug" >>"$runtime_log" 2>&1
 
@@ -219,6 +393,10 @@ if [ -n "$previous_zip_path" ]; then
     exit 1
   fi
 
+  if [ -n "$fixture_slug" ]; then
+    wp eval-file /wporg-fixture/lifecycle-before-update.php >>"$runtime_log" 2>&1
+  fi
+
   wp plugin install /wporg-fixture/candidate.zip --force >>"$runtime_log" 2>&1
   updated_version="$(wp plugin get "$slug" --field=version | tr -d '\r')"
   if [ "$updated_version" != "$expected_version" ]; then
@@ -232,6 +410,12 @@ if [ -n "$previous_zip_path" ]; then
     printf '%s was not active after updating from %s to %s.\n' \
       "$slug" "$previous_version" "$expected_version" >&2
     exit 1
+  fi
+
+  if [ -n "$fixture_slug" ]; then
+    wp eval-file /wporg-fixture/lifecycle-after-update.php >>"$runtime_log" 2>&1
+    probe_fixture_runtime
+    printf 'Migration preservation passed for %s.\n' "$slug" | tee -a "$runtime_log"
   fi
 
   wp plugin deactivate "$slug" >>"$runtime_log" 2>&1

@@ -1,0 +1,18 @@
+{
+  "slug": "fchub-memberships",
+  "version": "1.4.1",
+  "sha256": "b276dcb8b7d0b7617cd1e1a87a27bf48d95fe704e3820cd9544a8644f6555437",
+  "fileCount": 494,
+  "compressedBytes": 1479488,
+  "uncompressedBytes": 5013526,
+  "checks": [
+    "archive-paths",
+    "required-files",
+    "forbidden-files",
+    "text-safety",
+    "headers",
+    "readme",
+    "php-entrypoints",
+    "size"
+  ]
+}

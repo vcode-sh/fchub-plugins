@@ -60,6 +60,11 @@ export default defineConfig({
     setupFiles: ['tests/admin/setup.js'],
     globals: true,
     css: true,
+    server: {
+      deps: {
+        inline: ['element-plus'],
+      },
+    },
     include: ['tests/admin/**/*.test.js'],
     exclude: ['tests/admin-smoke/**'],
   },

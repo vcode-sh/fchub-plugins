@@ -316,7 +316,18 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, Search, Upload, Download, Plus } from '@element-plus/icons-vue'
+import {
+  ArrowDown,
+  CircleCheck,
+  CopyDocument,
+  Delete,
+  Download,
+  Edit,
+  FolderOpened,
+  Plus,
+  Search,
+  Upload,
+} from '@element-plus/icons-vue'
 import { plans } from '@/api/index.js'
 import { formatWpDate } from '@/utils/wpDate.js'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
