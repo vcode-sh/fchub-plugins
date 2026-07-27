@@ -1,7 +1,7 @@
 {
   "name": "fluentcart-mcp",
-  "version": "1.1.0",
-  "description": "MCP server for the FluentCart REST API — AI-agent-friendly tools for managing orders, products, customers, subscriptions, and more.",
+  "version": "2.0.0",
+  "description": "MCP server for the FluentCart REST API \u2014 AI-agent-friendly tools for managing orders, products, customers, subscriptions, and more.",
   "type": "module",
   "exports": {
     ".": {
@@ -28,8 +28,17 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
+    "build:contract": "node scripts/build-release-contract.mjs",
+    "build:manifest": "node scripts/build-manifest.mjs",
+    "check:contract": "node scripts/build-release-contract.mjs --check",
+    "check:manifest": "node scripts/build-manifest.mjs --check",
+    "capture:read-contracts": "node scripts/capture-read-contracts.mjs",
+    "check:routes": "node scripts/check-tool-routes.mjs",
+    "measure:context": "node scripts/measure-tool-context.mjs",
+    "check:compatibility": "node scripts/check-tool-routes.mjs --compatibility",
     "prepublishOnly": "npm run build",
-    "pack:mcpb": "npm run build && npm prune --production && mcpb pack . fluentcart-mcp.mcpb"
+    "pack:mcpb": "node scripts/build-mcpb.mjs",
+    "pack:release": "node scripts/build-release-artifacts.mjs"
   },
   "keywords": [
     "mcp",
@@ -55,7 +64,7 @@
     "url": "https://github.com/vcode-sh/fchub-plugins/issues"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "publishConfig": {
     "access": "public"

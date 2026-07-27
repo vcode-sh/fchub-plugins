@@ -56,12 +56,15 @@ describe('risk registry completeness', () => {
 		}
 	})
 
-	it('keeps refund and cancellation unavailable while the guard is unimplemented', () => {
-		// The Plan 02 done contract allows exactly two outcomes for these actions: our audited
-		// guard, or unavailable. The guard modules do not exist yet, and the handlers currently
-		// bound to these names are the raw REST calls, so unavailable is the only honest answer.
+	it('ships refund and cancellation unavailable pending acceptance evidence', () => {
+		// Classified real-money and guard-required so the classification survives, but execution
+		// is 'none' for 2.0.0: the guard is built and unit-tested yet never acceptance-proven,
+		// because no run-owned refundable order can be created and then removed on this store.
 		for (const name of ['fluentcart_order_refund', 'fluentcart_subscription_cancel']) {
-			expect(resolveToolSafety(name, false).execution).toBe('none')
+			const safety = resolveToolSafety(name, false)
+			expect(safety.risk).toBe('real-money')
+			expect(safety.idempotency).toBe('guard-required')
+			expect(safety.execution).toBe('none')
 		}
 	})
 

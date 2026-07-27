@@ -1,15 +1,17 @@
 ---
 title: Tool Reference
-description: Every tool in FluentCart MCP, listed by module. 274 tools covering orders, products, customers, subscriptions, shipping, tax, reports, and more.
+description: Every tool definition in FluentCart MCP, listed by module — orders, products, customers, subscriptions, shipping, tax, reports, and more.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-The complete inventory. Every tool, every module, every HTTP method. 274 tools organised into 27 modules so the AI (and you) can find what it needs.
+The inventory of tool definitions shipped in this release, by module, with the HTTP method behind each one.
 
-You'll never need to call these yourself — the AI picks the right tool based on what you ask. But if you want to know exactly what's possible, or you want to verify that a specific capability exists before asking for it, this is your reference.
+How many of them your AI can actually see is a different question, and the honest answer is: it depends. Two filters run before anything is registered — your write mode decides which risk classes may exist, and your store's discovered routes remove every tool it cannot serve. Your WordPress user's permissions then decide which of the survivors succeed. No fixed number can describe that, so this page doesn't print one — `release-contract.json` in the repository carries the measured figures for each configuration at a known revision, which is the only place a count means anything.
+
+You'll never call these yourself — the AI picks the right tool from what you ask. This page is for confirming that something you want to do is possible before you ask for it.
 
 Every tool follows the naming pattern `fluentcart_{resource}_{action}`.
 
@@ -17,22 +19,71 @@ Every tool follows the naming pattern `fluentcart_{resource}_{action}`.
 This page is a lookup table, not homework. The AI already knows all of this. You're here out of curiosity or because you want to confirm something specific.
 </Callout>
 
-## Dynamic Mode
+## Exposure Comes First
 
-Don't fancy loading 274 tool definitions into your LLM context? Fair enough. Start the server with `--mode dynamic` and you get 3 meta-tools instead:
+Before any mode registers anything, the write policy decides what may exist:
+
+| `FLUENTCART_WRITE_MODE` | What's in the registry |
+|---|---|
+| `disabled` *(the default)* | Read-only tools |
+| `reversible` | Reads plus writes you can undo |
+| `guarded` | The same set as `reversible` in 2.0.0. It is the mode the money tools will return to; today it adds nothing |
+
+`reversible` is the read set plus the writes that can be undone — creates and updates, nothing more. Deletion, bulk operations, order status changes, marking an order paid and dispute handling are exposed in no mode at all, because FluentCart offers no supported way to reverse them.
+
+`guarded` exists and is accepted, but in 2.0.0 it exposes exactly what `reversible` does. The two tools it was built for are unavailable in this release — the reasoning is in [the deployment guide](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0), and the short version is that the guard is finished but could not be acceptance-proven against a store that has no way to clean up a test refund.
+
+Then your store gets a say. The routes discovered at startup prune what's left: a tool needs its endpoint served to be registered, and a tool that calls several endpoints needs all of them. Anything your FluentCart build doesn't offer is not registered at all.
+
+Both filters are exposure, not permission-checking at call time. A tool that fails either is missing from every registry: it cannot be listed, searched, described, or invoked by name. Every mode below draws from the same filtered set, so no choice of mode can widen what the write mode and your store's routes allow.
+
+## Modes
+
+`--mode` changes how those definitions are presented to the model, and what that presentation costs in context.
+
+### Dynamic *(the default)*
+
+Five meta-tools. The AI searches, reads a schema, then executes — instead of holding the whole catalogue in context.
 
 | Tool | What It Does |
 |------|-------------|
-| `fluentcart_search_tools` | Search tools by keyword and optional category. Returns names, titles, descriptions. |
-| `fluentcart_describe_tools` | Get full input schemas and annotations for specific tools (max 10 per request). |
-| `fluentcart_execute_tool` | Execute any tool by name with provided input. |
-
-The AI discovers tools on demand instead of loading all 274 upfront. Same tools, same results — just lazily loaded.
+| `fluentcart_search_tools` | Search by keyword and optional category. Returns names, titles, descriptions. |
+| `fluentcart_describe_tools` | Full input schemas and annotations for named tools, five per request. |
+| `fluentcart_execute_read_tool` | Execute a read-only tool by name. |
+| `fluentcart_execute_reversible_write` | Execute a reversible write. Present only when the write mode allows one. |
+| `fluentcart_execute_guarded_write` | Reserved for guarded actions. No tool is routed through it in 2.0.0. |
 
 Categories for filtering: `product`, `order`, `customer`, `coupon`, `report`, `subscription`, `integration`, `setting`, `shipping`, `tax`, `email`, `role`, `file`, `label`, `activity`, `note`, `dashboard`, `application`, `public`, `misc`.
 
+### Curated
+
+A shortlist of the tools most workflows actually reach for, registered up front. No search step, a fraction of the definitions.
+
+### Code
+
+Two tools — `fluentcart_search_api` and `fluentcart_execute_code` — over a QuickJS WebAssembly sandbox. The AI writes a small script that queries the API and returns a result, which beats twelve round trips when it needs to correlate things. The sandbox is read-only by construction: it has no route to a write tool, whatever your write mode says.
+
+### Full
+
+Every exposed definition registered at connection time. Fastest per call, most expensive in context, and the only mode where the exposed count is also the number of definitions your model must hold.
+
+### What each one costs
+
+Each mode has a definition-token budget the build enforces. Not a target anyone aims at — a ceiling that fails the build when crossed, which is what stops the tool list quietly bloating release by release:
+
+| Mode | Budget |
+|---|---|
+| `dynamic` | 1,500 tokens |
+| `code` | 1,200 tokens |
+| `curated` | 12,000 tokens |
+| `full` | measured and reported, never gated |
+
+Dynamic and code are fixed costs by design: their payload is a handful of meta-tools, so it doesn't grow when your catalogue does. Curated grows slowly. Full grows with everything your write mode exposes, which is the entire argument for the other three.
+
+The actual figures for a given revision come from `node scripts/measure-tool-context.mjs` in the package, serialised with `mcp-tools-list-v1` and counted with `gpt-tokenizer@3.4.0`, and are recorded per profile in `release-contract.json`. They are not reproduced here: a measurement copied into a documentation page is wrong by the next release and nothing tells you.
+
 <Callout type="info" title="Trade-off">
-Dynamic mode adds 2-3 extra tool calls per workflow (search, describe, then execute). If latency matters more than token budget, stick with the default static mode.
+Dynamic mode spends 2-3 extra tool calls per workflow: search, describe, execute. If round-trip latency hurts you more than context does, `full` is there and it is a legitimate choice.
 </Callout>
 
 ## Tool Annotations
@@ -49,7 +100,19 @@ Every tool is tagged with metadata so the AI knows what it's dealing with:
 <Separator className="my-8" />
 
 <Accordions type="multiple">
-<Accordion title="Orders — Core (15 tools)">
+<Accordion title="Orientation & Search">
+
+Start here. These answer "what am I connected to and what can I ask" without a fishing expedition through the rest of the list.
+
+| Tool | Method | What It Does |
+|------|--------|--------------|
+| `fluentcart_get_store_context` | GET | Store origin, name, currency, timezone, component versions, exposed capabilities and the current write mode. Unset values come back as null with a warning rather than a guess |
+| `fluentcart_get_search_capabilities` | GET | Which filters this store has actually been proven to accept, per entity |
+| `fluentcart_search_commerce` | GET | Search orders, products, customers or subscriptions. Rejects a filter the store hasn't proven, rather than sending it and getting a full unfiltered page back that looks like a narrow result |
+| `fluentcart_list_reference_data` | GET | Resolve the identifiers other tools expect — payment methods, tax classes, shipping zones, countries, labels, categories — instead of guessing a slug |
+
+</Accordion>
+<Accordion title="Orders — Core">
 
 The bread and butter. Every support interaction starts with orders.
 
@@ -61,7 +124,7 @@ The bread and butter. Every support interaction starts with orders.
 | `fluentcart_order_update` | PUT | Update order fields (status, notes, custom fields) |
 | `fluentcart_order_delete` | DELETE | Delete an order permanently |
 | `fluentcart_order_mark_paid` | POST | Mark an order as paid (manual payment confirmation) |
-| `fluentcart_order_refund` | POST | Process a refund on an order |
+| `fluentcart_order_refund` | POST | **Not available in 2.0.0** — absent from every write mode |
 | `fluentcart_order_change_customer` | POST | Reassign an order to a different customer |
 | `fluentcart_order_create_and_change_customer` | POST | Create a new customer and assign an order to them in one go |
 | `fluentcart_order_create_custom` | POST | Create a custom order with manual line items |
@@ -72,7 +135,7 @@ The bread and butter. Every support interaction starts with orders.
 | `fluentcart_order_generate_licenses` | POST | Generate missing licence keys for an order |
 
 </Accordion>
-<Accordion title="Orders — Transactions (8 tools)">
+<Accordion title="Orders — Transactions">
 
 Transaction-level stuff. Payments, disputes, shipping calculations.
 
@@ -88,7 +151,7 @@ Transaction-level stuff. Payments, disputes, shipping calculations.
 | `fluentcart_order_customer_orders` | GET | Get orders for a specific customer |
 
 </Accordion>
-<Accordion title="Products — Core (16 tools)">
+<Accordion title="Products — Core">
 
 Product CRUD, search, and bulk operations.
 
@@ -112,7 +175,7 @@ Product CRUD, search, and bulk operations.
 | `fluentcart_product_variant_option_update` | POST | Configure attribute combinations for advanced_variations products |
 
 </Accordion>
-<Accordion title="Products — Pricing (12 tools)">
+<Accordion title="Products — Pricing">
 
 Pricing, bundles, tax classes, shipping classes, stock management.
 
@@ -132,7 +195,7 @@ Pricing, bundles, tax classes, shipping classes, stock management.
 | `fluentcart_product_inventory_update` | PUT | Update stock levels |
 
 </Accordion>
-<Accordion title="Products — Variants (9 tools)">
+<Accordion title="Products — Variants">
 
 Variation management for variable products.
 
@@ -149,7 +212,7 @@ Variation management for variable products.
 | `fluentcart_variant_upgrade_paths` | GET | Get upgrade paths for a variant |
 
 </Accordion>
-<Accordion title="Products — Catalogue (18 tools)">
+<Accordion title="Products — Catalogue">
 
 Downloads, upgrade paths, taxonomies, product-level integrations.
 
@@ -175,7 +238,7 @@ Downloads, upgrade paths, taxonomies, product-level integrations.
 | `fluentcart_product_integration_feed_status` | POST | Toggle product integration feed status |
 
 </Accordion>
-<Accordion title="Customers (19 tools)">
+<Accordion title="Customers">
 
 Profiles, addresses, stats, user linking.
 
@@ -190,9 +253,7 @@ Profiles, addresses, stats, user linking.
 | `fluentcart_customer_recalculate_ltv` | POST | Recalculate lifetime value |
 | `fluentcart_customer_orders_simple` | GET | Get a simplified list of customer orders |
 | `fluentcart_customer_addresses` | GET | List customer addresses |
-| `fluentcart_customer_address_select` | GET | Get address dropdown data |
 | `fluentcart_customer_address_create` | POST | Create a new address |
-| `fluentcart_customer_address_add` | POST | Add a new address for a customer |
 | `fluentcart_customer_address_update` | PUT | Update an address |
 | `fluentcart_customer_address_delete` | DELETE | Delete an address |
 | `fluentcart_customer_address_make_primary` | POST | Set an address as primary |
@@ -202,24 +263,23 @@ Profiles, addresses, stats, user linking.
 | `fluentcart_customer_bulk_action` | POST | Bulk customer operations |
 
 </Accordion>
-<Accordion title="Subscriptions (7 tools)">
+<Accordion title="Subscriptions">
 
-The full subscription lifecycle. List, inspect, pause, resume, cancel, reactivate.
+Read-only in this release. You can inspect a billing relationship; you cannot change one.
 
 | Tool | Method | What It Does |
 |------|--------|--------------|
 | `fluentcart_subscription_list` | GET | List subscriptions with filtering |
 | `fluentcart_subscription_get` | GET | Get subscription by ID |
 | `fluentcart_subscription_fetch` | GET | Fetch subscription with gateway sync |
-| `fluentcart_subscription_cancel` | POST | Cancel a subscription |
-| `fluentcart_subscription_pause` | POST | Pause a subscription |
-| `fluentcart_subscription_resume` | POST | Resume a paused subscription |
-| `fluentcart_subscription_reactivate` | POST | Reactivate an expired/cancelled subscription |
+| `fluentcart_subscription_cancel` | POST | **Not available in 2.0.0** — absent from every write mode |
+
+Pausing, resuming and reactivating are not exposed as tools. The FluentCart admin still does all three.
 
 **Statuses:** `active`, `trialing`, `paused`, `failing`, `past_due`, `expiring`, `canceled`, `expired`, `completed`
 
 </Accordion>
-<Accordion title="Coupons (12 tools)">
+<Accordion title="Coupons">
 
 Creation, application, and eligibility checks.
 
@@ -239,7 +299,7 @@ Creation, application, and eligibility checks.
 | `fluentcart_coupon_settings_save` | POST | Update coupon system settings |
 
 </Accordion>
-<Accordion title="Reports — Core (24 tools)">
+<Accordion title="Reports — Core">
 
 Revenue, sales, orders, and dashboard metrics.
 
@@ -271,7 +331,7 @@ Revenue, sales, orders, and dashboard metrics.
 | `fluentcart_report_weeks_between_refund` | GET | Time between purchase and refund |
 
 </Accordion>
-<Accordion title="Reports — Insights (21 tools)">
+<Accordion title="Reports — Insights">
 
 Product performance, customer behaviour, subscription trends, refund analysis, retention cohorts, and licence tracking.
 
@@ -300,7 +360,7 @@ Product performance, customer behaviour, subscription trends, refund analysis, r
 | `fluentcart_report_sources` | GET | Traffic and attribution sources |
 
 </Accordion>
-<Accordion title="Order Bumps (5 tools)">
+<Accordion title="Order Bumps">
 
 Post-purchase upsell offers.
 
@@ -313,7 +373,7 @@ Post-purchase upsell offers.
 | `fluentcart_order_bump_delete` | DELETE | Delete an order bump |
 
 </Accordion>
-<Accordion title="Product Options (10 tools)">
+<Accordion title="Product Options">
 
 Attribute groups and terms — the building blocks of product variations.
 
@@ -331,7 +391,7 @@ Attribute groups and terms — the building blocks of product variations.
 | `fluentcart_attribute_term_reorder` | PUT | Reorder terms |
 
 </Accordion>
-<Accordion title="Integrations (12 tools)">
+<Accordion title="Integrations">
 
 Third-party addon and feed management.
 
@@ -351,7 +411,7 @@ Third-party addon and feed management.
 | `fluentcart_integration_install_plugin` | POST | Install an integration plugin |
 
 </Accordion>
-<Accordion title="Shipping (15 tools)">
+<Accordion title="Shipping">
 
 Zones, methods, and classes. The holy trinity of "why does this parcel cost that much."
 
@@ -374,7 +434,7 @@ Zones, methods, and classes. The holy trinity of "why does this parcel cost that
 | `fluentcart_shipping_class_delete` | DELETE | Delete a shipping class |
 
 </Accordion>
-<Accordion title="Tax (22 tools)">
+<Accordion title="Tax">
 
 Classes, rates, EU VAT, and tax records. Everything your accountant wishes you'd sorted out months ago.
 
@@ -404,7 +464,7 @@ Classes, rates, EU VAT, and tax records. Everything your accountant wishes you'd
 | `fluentcart_tax_records_mark_filed` | POST | Mark tax records as filed |
 
 </Accordion>
-<Accordion title="Email Notifications (8 tools)">
+<Accordion title="Email Notifications">
 
 Templates and settings for every transactional email. Customise them, preview them, toggle them off when you've had enough.
 
@@ -420,7 +480,7 @@ Templates and settings for every transactional email. Customise them, preview th
 | `fluentcart_email_settings_save` | POST | Save global email settings |
 
 </Accordion>
-<Accordion title="Roles & Permissions (7 tools)">
+<Accordion title="Roles & Permissions">
 
 Access control. Decide who gets to touch what — and who absolutely shouldn't.
 
@@ -435,7 +495,7 @@ Access control. Decide who gets to touch what — and who absolutely shouldn't.
 | `fluentcart_role_user_list` | GET | List all users with their roles |
 
 </Accordion>
-<Accordion title="Files (4 tools)">
+<Accordion title="Files">
 
 Upload, list, and delete files. Riveting stuff.
 
@@ -447,7 +507,7 @@ Upload, list, and delete files. Riveting stuff.
 | `fluentcart_file_delete` | DELETE | Delete a file |
 
 </Accordion>
-<Accordion title="Settings (14 tools)">
+<Accordion title="Settings">
 
 Store config, payment methods, modules, permissions, and print templates.
 
@@ -469,7 +529,7 @@ Store config, payment methods, modules, permissions, and print templates.
 | `fluentcart_settings_print_templates_save` | PUT | Update print templates |
 
 </Accordion>
-<Accordion title="Labels (3 tools)">
+<Accordion title="Labels">
 
 Order tagging and organisation.
 
@@ -480,7 +540,7 @@ Order tagging and organisation.
 | `fluentcart_label_update_selections` | PUT | Update label assignments on orders |
 
 </Accordion>
-<Accordion title="Activity (3 tools)">
+<Accordion title="Activity">
 
 Audit trail.
 
@@ -491,7 +551,7 @@ Audit trail.
 | `fluentcart_activity_mark_read` | POST | Mark as read |
 
 </Accordion>
-<Accordion title="Notes (1 tool)">
+<Accordion title="Notes">
 
 Exactly what it sounds like.
 
@@ -500,7 +560,7 @@ Exactly what it sounds like.
 | `fluentcart_note_attach` | POST | Add a note to an order |
 
 </Accordion>
-<Accordion title="Dashboard (2 tools)">
+<Accordion title="Dashboard">
 
 Store overview.
 
@@ -510,7 +570,7 @@ Store overview.
 | `fluentcart_dashboard_overview` | GET | Get dashboard overview stats |
 
 </Accordion>
-<Accordion title="Application (4 tools)">
+<Accordion title="Application">
 
 App init and widgets.
 
@@ -522,7 +582,7 @@ App init and widgets.
 | `fluentcart_app_get_widgets` | GET | Get dashboard widget data |
 
 </Accordion>
-<Accordion title="Public (4 tools)">
+<Accordion title="Public">
 
 Unauthenticated endpoints. For storefronts and bots.
 
@@ -534,7 +594,7 @@ Unauthenticated endpoints. For storefronts and bots.
 | `fluentcart_public_user_login` | POST | Customer login |
 
 </Accordion>
-<Accordion title="Miscellaneous (4 tools)">
+<Accordion title="Miscellaneous">
 
 Lookup data that other tools depend on.
 
@@ -550,38 +610,11 @@ Lookup data that other tools depend on.
 
 <Separator className="my-8" />
 
-## The Numbers
+## Responses
 
-| Module | Tools | Type |
-|--------|-------|------|
-| Orders (Core + Transactions) | 23 | CRUD + workflows |
-| Products (Core + Pricing + Variants + Catalogue) | 55 | Full catalogue management |
-| Customers | 19 | Profiles, addresses, stats |
-| Subscriptions | 7 | Lifecycle management |
-| Coupons | 12 | Discounts and promotions |
-| Reports (Core + Insights) | 45 | Analytics and metrics |
-| Shipping | 15 | Zones, methods, classes |
-| Tax | 22 | Rates, EU VAT, records |
-| Email Notifications | 8 | Templates and settings |
-| Order Bumps | 5 | Upsell offers |
-| Product Options | 10 | Attributes and terms |
-| Integrations | 12 | Third-party addons |
-| Settings | 14 | Store configuration |
-| Roles & Permissions | 7 | Access control |
-| Labels | 3 | Order tags |
-| Activity | 3 | Audit log |
-| Notes | 1 | Order annotations |
-| Dashboard | 2 | Overview stats |
-| Application | 4 | App info |
-| Files | 4 | File management |
-| Public | 4 | Public-facing |
-| Miscellaneous | 4 | Utilities |
-| **Total (static mode)** | **274** | |
-| **Total (dynamic mode)** | **3** | Meta-tools that proxy to all 274 |
+Key endpoints feature **response transforms** — `order_get`, `product_get`, `customer_get` and all list endpoints strip HTML blobs, embedded objects, and serialised metadata before returning. Less noise, fewer tokens, same useful data.
 
-Key endpoints also feature **response transforms** — `order_get`, `product_get`, `customer_get` and all list endpoints strip HTML blobs, embedded objects, and serialised metadata before returning. Less noise, fewer tokens, same useful data.
-
-Response transforms and in-memory caching keep token usage tight. Static reference data is cached with TTL, and heavy list responses are trimmed before they reach the AI.
+When a response is too big to be useful even after trimming, the call fails with `RESPONSE_TOO_LARGE` and names the ways to narrow it — a page size, a date range, fewer fields. Earlier versions returned a quietly truncated payload with a `_truncated` marker, which looked like data and read like a lie. An error you can act on beats a half-answer you can't detect.
 
 <Separator className="my-8" />
 
@@ -596,7 +629,7 @@ Four read-only resources for reference data. These are browsable context the AI 
 | `fluentcart://store/payment-methods` | Configured payment methods |
 | `fluentcart://store/filter-options` | Available filter options for orders, products, customers |
 
-Resources are application-controlled — the client decides when to read them. Static data is cached in-memory, so repeated reads don't hit the API.
+Resources are application-controlled — the client decides when to read them. Each read goes to your store: the resource layer holds no cache of its own, so treat a resource read as an API call, not a free lookup.
 
 <Separator className="my-8" />
 
@@ -618,13 +651,18 @@ Not all MCP clients support prompts yet. Claude Desktop and Claude Code do. If y
 
 ## Response Caching
 
-Static reference data is cached in-memory so the AI doesn't re-fetch the same 250-country list every time it needs to validate an address:
+A handful of read tools opt into a TTL cache so the AI doesn't re-fetch the same 250-country list every time it validates an address. It is opt-in per tool, not a blanket policy:
 
-| Endpoint | Cache TTL |
-|----------|-----------|
-| Countries list | 1 hour |
-| Filter options | 10 minutes |
-| App init (store config) | 10 minutes |
-| Report metadata | 10 minutes |
+| Tool | TTL |
+|------|-----|
+| `fluentcart_misc_countries` | 1 hour |
+| `fluentcart_shipping_zone_states` | 1 hour |
+| `fluentcart_email_shortcodes` | 1 hour |
+| `fluentcart_tax_eu_rates` | 1 hour |
+| `fluentcart_app_init` | 10 minutes |
+| `fluentcart_misc_filter_options` | 10 minutes |
+| `fluentcart_report_meta` | 10 minutes |
+| `fluentcart_shipping_zone_list`, `fluentcart_shipping_class_list` | 10 minutes |
+| `fluentcart_role_list`, `fluentcart_tax_class_list`, `fluentcart_tax_settings_get` | 10 minutes |
 
-The cache lives in the server process. Restart the server to clear it. No external dependencies, no Redis, no drama.
+Everything else goes to your store every time. The store of values lives in the server process and dies with it — no Redis, no external dependency, and nothing shared between processes, so an HTTP deployment behind several replicas gets whatever each replica happens to have seen. Resource reads do not use it at all.

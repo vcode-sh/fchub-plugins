@@ -1,44 +1,13 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { FluentCartApiError } from '../api/errors.js'
-import {
-	createTool,
-	deleteTool,
-	getTool,
-	postTool,
-	putTool,
-	type ToolDefinition,
-} from './_factory.js'
-
-async function executeStatusOperations(
-	c: FluentCartClient,
-	orderId: number,
-	operations: { key: string; body: Record<string, unknown> }[],
-): Promise<Array<Record<string, unknown>>> {
-	const results: Array<Record<string, unknown>> = []
-	for (const op of operations) {
-		try {
-			const resp = await c.put(`/orders/${orderId}/statuses`, op.body)
-			results.push({ field: op.key, ok: true, data: resp.data })
-		} catch (error) {
-			if (error instanceof FluentCartApiError) {
-				results.push({
-					field: op.key,
-					ok: false,
-					error: { code: error.code, message: error.message, detail: error.detail },
-				})
-				continue
-			}
-			throw error
-		}
-	}
-	return results
-}
+import { createTool, deleteTool, getTool, type ToolDefinition } from './_factory.js'
+import { composite, direct, op } from './endpoints.js'
 
 export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
 		createTool(client, {
 			name: 'fluentcart_order_list',
+			routes: direct('GET', '/orders'),
 			title: 'List Orders',
 			description:
 				'List orders with customer names. Filter by date range, status tab, or search. ' +
@@ -122,6 +91,7 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_order_create',
+			routes: direct('POST', '/orders'),
 			title: 'Create Order',
 			description:
 				'Create a new order. Backend requires `order_items` array with product/variant details. ' +
@@ -200,6 +170,7 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_order_update',
+			routes: composite(op('GET', '/orders/{param}'), op('POST', '/orders/{param}')),
 			title: 'Update Order',
 			description:
 				'Update an existing order using fetch-merge pattern. Fetches current state, merges your changes, ' +
@@ -248,291 +219,6 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 				order_id: z.number().describe('Order ID'),
 			}),
 			endpoint: '/orders/:order_id',
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_order_mark_paid',
-			title: 'Mark Order as Paid',
-			description:
-				'Mark an order as paid manually. Maps `note` to backend field `mark_paid_note`. ' +
-				'Side effect: triggers order paid hooks and integration feeds.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-				payment_method: z.string().optional().describe('Payment method used'),
-				transaction_id: z.string().optional().describe('External transaction ID'),
-				note: z.string().optional().describe('Payment note (mapped to mark_paid_note)'),
-			}),
-			handler: async (c, input) => {
-				const orderId = input.order_id as number
-				const body: Record<string, unknown> = {}
-				if (input.payment_method) body.payment_method = input.payment_method
-				if (input.transaction_id) body.transaction_id = input.transaction_id
-				if (input.note) body.mark_paid_note = input.note
-
-				const resp = await c.post(`/orders/${orderId}/mark-as-paid`, body)
-				return resp.data
-			},
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_order_refund',
-			title: 'Refund Order',
-			description:
-				'Process a refund for an order. Wraps input into backend-required `refund_info` structure. ' +
-				'If transaction_id is omitted, automatically finds the first successful charge transaction.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-				amount: z.number().describe('Refund amount'),
-				transaction_id: z
-					.number()
-					.optional()
-					.describe('Transaction ID to refund (auto-detected if omitted)'),
-				reason: z.string().optional().describe('Reason for the refund'),
-				refund_method: z.string().optional().describe('Refund method to use'),
-			}),
-			handler: async (c, input) => {
-				const orderId = input.order_id as number
-				let transactionId = input.transaction_id as number | undefined
-
-				// Auto-detect transaction if not provided
-				if (!transactionId) {
-					const orderResp = await c.get(`/orders/${orderId}`)
-					const orderWrapper = orderResp.data as Record<string, unknown>
-					const orderData = (orderWrapper.order ?? orderWrapper) as Record<string, unknown>
-					const transactions = (orderData.transactions ?? []) as Record<string, unknown>[]
-					const chargeTx = transactions.find(
-						(tx) => tx.transaction_type === 'charge' && tx.status === 'succeeded',
-					)
-					if (chargeTx) {
-						transactionId = chargeTx.id as number
-					}
-				}
-
-				const refundInfo: Record<string, unknown> = {
-					amount: input.amount,
-				}
-				if (transactionId) refundInfo.transaction_id = transactionId
-				if (input.reason) refundInfo.reason = input.reason
-				if (input.refund_method) refundInfo.refund_method = input.refund_method
-
-				const resp = await c.post(`/orders/${orderId}/refund`, { refund_info: refundInfo })
-				return resp.data
-			},
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_order_update_statuses',
-			title: 'Update Order Statuses',
-			description:
-				'Update payment, shipping, and order statuses independently using backend action+statuses payload mapping. ' +
-				'Payment: pending, paid, partially_refunded, refunded, failed. ' +
-				'Shipping: pending, shipped, delivered, returned, unshipped.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-				payment_status: z.string().optional().describe('Payment status'),
-				shipping_status: z.string().optional().describe('Shipping status'),
-				order_status: z.string().optional().describe('Order status'),
-			}),
-			handler: async (c, input) => {
-				const orderId = input.order_id as number
-				const currentResp = await c.get(`/orders/${orderId}`)
-				const currentWrapper = currentResp.data as Record<string, unknown>
-				const currentOrder = (currentWrapper.order ?? currentWrapper) as Record<string, unknown>
-
-				const statusFields = [
-					{
-						key: 'order_status',
-						action: 'change_order_status',
-						current:
-							(currentOrder.status as string | undefined) ??
-							(currentOrder.order_status as string | undefined),
-					},
-					{
-						key: 'shipping_status',
-						action: 'change_shipping_status',
-						current: currentOrder.shipping_status as string | undefined,
-					},
-					{
-						key: 'payment_status',
-						action: 'change_payment_status',
-						current: currentOrder.payment_status as string | undefined,
-					},
-				] as const
-
-				const operations = statusFields
-					.filter(
-						(f) => input[f.key] !== undefined && String(input[f.key]) !== String(f.current ?? ''),
-					)
-					.map((f) => ({
-						key: f.key,
-						body: { action: f.action, statuses: { [f.key]: input[f.key] } },
-					}))
-
-				if (!operations.length) {
-					return { message: 'No status changes required', order_id: orderId, results: [] }
-				}
-
-				const results = await executeStatusOperations(c, orderId, operations)
-				const successCount = results.filter((r) => r.ok === true).length
-				if (successCount === 0) {
-					throw new FluentCartApiError(
-						'SERVER_ERROR',
-						'Server error: Failed to update requested status fields',
-						500,
-						{ results },
-					)
-				}
-
-				return {
-					message:
-						successCount === results.length
-							? 'Statuses updated successfully'
-							: 'Statuses updated partially',
-					order_id: orderId,
-					results,
-				}
-			},
-		}),
-
-		putTool(client, {
-			name: 'fluentcart_order_sync_statuses',
-			title: 'Sync Order Statuses',
-			description:
-				'Synchronise order statuses with the payment gateway. May fail with timezone errors on certain orders (data-dependent upstream issue).',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-			}),
-			endpoint: '/orders/:order_id/sync-statuses',
-		}),
-
-		postTool(client, {
-			name: 'fluentcart_order_change_customer',
-			title: 'Change Order Customer',
-			description: 'Change the customer associated with an order.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-				customer_id: z.number().describe('New customer ID'),
-			}),
-			endpoint: '/orders/:order_id/change-customer',
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_order_create_and_change_customer',
-			title: 'Create and Change Customer',
-			description:
-				'Create a new customer and associate them with the order. Backend requires `full_name`; ' +
-				'this tool auto-composes it from first_name/last_name if needed.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-				email: z.string().describe('New customer email'),
-				full_name: z.string().optional().describe('Full name (required by backend)'),
-				first_name: z.string().optional().describe('First name'),
-				last_name: z.string().optional().describe('Last name'),
-			}),
-			handler: async (c, input) => {
-				const orderId = input.order_id as number
-				const firstName = (input.first_name as string | undefined)?.trim() ?? ''
-				const lastName = (input.last_name as string | undefined)?.trim() ?? ''
-				const fullName =
-					((input.full_name as string | undefined)?.trim() ?? '') ||
-					`${firstName} ${lastName}`.trim()
-
-				if (!fullName) {
-					throw new FluentCartApiError(
-						'VALIDATION_ERROR',
-						'Validation error: full_name is required (or provide first_name + last_name)',
-						422,
-					)
-				}
-
-				const body: Record<string, unknown> = {
-					email: input.email,
-					full_name: fullName,
-				}
-				if (firstName) body.first_name = firstName
-				if (lastName) body.last_name = lastName
-
-				const resp = await c.post(`/orders/${orderId}/create-and-change-customer`, body)
-				return resp.data
-			},
-		}),
-
-		postTool(client, {
-			name: 'fluentcart_order_update_address_id',
-			title: 'Update Order Address ID',
-			description: 'Update the address ID associated with an order.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-				address_id: z.number().optional().describe('Address ID'),
-				address_type: z.string().optional().describe('Address type: billing, shipping'),
-			}),
-			endpoint: '/orders/:order_id/update-address-id',
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_order_update_address',
-			title: 'Update Order Address',
-			description:
-				'Update a billing or shipping address on an order. Re-injects IDs into the request body as required by the backend.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-				address_id: z.number().describe('Address ID'),
-				first_name: z.string().optional().describe('First name'),
-				last_name: z.string().optional().describe('Last name'),
-				address_1: z.string().optional().describe('Address line 1'),
-				address_2: z.string().optional().describe('Address line 2'),
-				city: z.string().optional().describe('City'),
-				state: z.string().optional().describe('State/province'),
-				postcode: z.string().optional().describe('Postal code'),
-				country: z.string().optional().describe('ISO 3166-1 alpha-2 country code'),
-			}),
-			handler: async (c, input) => {
-				const orderId = input.order_id as number
-				const addressId = input.address_id as number
-
-				// Re-inject IDs into body (backend expects them in body, not just path)
-				const body: Record<string, unknown> = { ...input }
-
-				const resp = await c.put(`/orders/${orderId}/address/${addressId}`, body)
-				return resp.data
-			},
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_order_create_custom',
-			title: 'Create Custom Order Line',
-			description:
-				'Add a custom (non-catalog) line item to an existing order. ' +
-				'Requires item name, price, and quantity.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-				item_name: z.string().describe('Custom item name'),
-				item_price: z.number().describe('Item price in currency units'),
-				quantity: z.number().optional().describe('Quantity (default: 1)'),
-				item_description: z.string().optional().describe('Item description'),
-			}),
-			handler: async (c, input) => {
-				const orderId = input.order_id as number
-				const product: Record<string, unknown> = {
-					item_name: input.item_name,
-					item_price: input.item_price,
-					quantity: input.quantity ?? 1,
-				}
-				if (input.item_description) product.item_description = input.item_description
-
-				const resp = await c.post(`/orders/${orderId}/create-custom`, { product })
-				return resp.data
-			},
-		}),
-
-		postTool(client, {
-			name: 'fluentcart_order_generate_licenses',
-			title: 'Generate Missing Licenses',
-			description: 'Generate any missing licenses for digital products in an order.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID'),
-			}),
-			endpoint: '/orders/:order_id/generate-missing-licenses',
 		}),
 	]
 }

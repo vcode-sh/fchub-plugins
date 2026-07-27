@@ -1,334 +1,284 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ToolDefinition } from '../../src/tools/_factory.js'
-import { registerDynamicTools } from '../../src/tools/dynamic.js'
+import { DYNAMIC_TOOL_COUNT, registerDynamicTools } from '../../src/tools/dynamic.js'
+import type { ToolRisk } from '../../src/tools/risk.js'
 
-function makeTool(overrides: Partial<ToolDefinition> = {}): ToolDefinition {
+interface Registered {
+	name: string
+	config: {
+		title: string
+		description: string
+		inputSchema: z.ZodObject<z.ZodRawShape>
+		annotations?: Record<string, unknown>
+	}
+	handler: (input: Record<string, unknown>) => Promise<{
+		content: Array<{ type: string; text: string }>
+		isError?: boolean
+	}>
+}
+
+function fakeServer() {
+	const registered: Registered[] = []
 	return {
-		name: overrides.name ?? 'fluentcart_test_tool',
-		title: overrides.title ?? 'Test Tool',
-		description: overrides.description ?? 'A test tool for testing',
-		schema: overrides.schema ?? z.object({ id: z.number() }),
-		annotations: overrides.annotations ?? { openWorldHint: true },
-		handler:
-			overrides.handler ??
-			vi.fn().mockResolvedValue({
-				content: [{ type: 'text' as const, text: '{"ok":true}' }],
-			}),
+		registered,
+		server: {
+			registerTool: (
+				name: string,
+				config: Registered['config'],
+				handler: Registered['handler'],
+			) => {
+				registered.push({ name, config, handler })
+			},
+		} as never,
 	}
 }
 
-function createMockServer() {
-	const registered = new Map<string, { meta: unknown; handler: (...args: never[]) => unknown }>()
+const SAFETY: Record<ToolRisk, ToolDefinition['safety']> = {
+	read: { risk: 'read', idempotency: 'inherent', execution: 'rest' },
+	'reversible-write': { risk: 'reversible-write', idempotency: 'inherent', execution: 'rest' },
+	'real-money': { risk: 'real-money', idempotency: 'guard-required', execution: 'guarded-rest' },
+	'destructive-write': { risk: 'destructive-write', idempotency: 'unsupported', execution: 'none' },
+	'external-side-effect': {
+		risk: 'external-side-effect',
+		idempotency: 'unsupported',
+		execution: 'none',
+	},
+	'control-plane': { risk: 'control-plane', idempotency: 'unsupported', execution: 'none' },
+	'credential-bearing': {
+		risk: 'credential-bearing',
+		idempotency: 'unsupported',
+		execution: 'none',
+	},
+	infrastructure: { risk: 'infrastructure', idempotency: 'unsupported', execution: 'none' },
+	'unreviewed-write': { risk: 'unreviewed-write', idempotency: 'unsupported', execution: 'none' },
+}
+
+function tool(name: string, risk: ToolRisk, handler = vi.fn()): ToolDefinition {
 	return {
-		registerTool: vi.fn((name: string, meta: unknown, handler: (...args: never[]) => unknown) => {
-			registered.set(name, { meta, handler })
-		}),
-		_registered: registered,
+		name,
+		title: name.replace(/_/g, ' '),
+		description: `Does ${name}. Returns a payload.`,
+		schema: z.object({ id: z.number().describe('Record id') }),
+		annotations: { readOnlyHint: risk === 'read', openWorldHint: true },
+		safety: SAFETY[risk],
+		handler: handler as unknown as ToolDefinition['handler'],
 	}
 }
 
-type MockServer = ReturnType<typeof createMockServer>
-
-async function callTool(server: MockServer, name: string, input: unknown) {
-	const entry = server._registered.get(name)
-	if (!entry) throw new Error(`Tool ${name} not registered`)
-	return entry.handler(input)
+function setup(tools: ToolDefinition[]) {
+	const { registered, server } = fakeServer()
+	registerDynamicTools(server, tools)
+	return { registered, byName: new Map(registered.map((entry) => [entry.name, entry])) }
 }
 
-describe('registerDynamicTools', () => {
-	it('registers exactly 3 meta-tools on the server', () => {
-		const server = createMockServer()
-		registerDynamicTools(server as never, [])
+const DEFAULT_TOOLS = [
+	tool('fluentcart_product_list', 'read'),
+	tool('fluentcart_order_list', 'read'),
+	tool('fluentcart_coupon_create', 'reversible-write'),
+	tool('fluentcart_order_refund', 'real-money'),
+]
 
-		expect(server.registerTool).toHaveBeenCalledTimes(3)
+async function callTool(entry: Registered, input: Record<string, unknown>) {
+	const result = await entry.handler(input)
+	return { raw: result, json: JSON.parse(result.content[0]?.text ?? 'null') }
+}
 
-		const names = server.registerTool.mock.calls.map((c) => c[0])
-		expect(names).toContain('fluentcart_search_tools')
-		expect(names).toContain('fluentcart_describe_tools')
-		expect(names).toContain('fluentcart_execute_tool')
+describe('dynamic mode registration', () => {
+	it('registers search, describe and three risk-split executors', () => {
+		const { registered } = setup(DEFAULT_TOOLS)
+		expect(registered).toHaveLength(DYNAMIC_TOOL_COUNT)
+		expect(registered.map((entry) => entry.name)).toEqual([
+			'fluentcart_search_tools',
+			'fluentcart_describe_tools',
+			'fluentcart_execute_read_tool',
+			'fluentcart_execute_reversible_write',
+			'fluentcart_execute_guarded_write',
+		])
+	})
+
+	it('annotates each executor according to what it can actually do', () => {
+		const { byName } = setup(DEFAULT_TOOLS)
+		expect(byName.get('fluentcart_execute_read_tool')?.config.annotations?.readOnlyHint).toBe(true)
+		expect(
+			byName.get('fluentcart_execute_reversible_write')?.config.annotations?.destructiveHint,
+		).not.toBe(true)
+		expect(
+			byName.get('fluentcart_execute_guarded_write')?.config.annotations?.destructiveHint,
+		).toBe(true)
 	})
 })
 
 describe('fluentcart_search_tools', () => {
-	const tools: ToolDefinition[] = [
-		makeTool({
-			name: 'fluentcart_product_list',
-			title: 'List Products',
-			description: 'List all products in the store',
-		}),
-		makeTool({
-			name: 'fluentcart_product_get',
-			title: 'Get Product',
-			description: 'Get a single product by ID',
-		}),
-		makeTool({
-			name: 'fluentcart_order_list',
-			title: 'List Orders',
-			description: 'List all orders',
-		}),
-		makeTool({
-			name: 'fluentcart_order_get',
-			title: 'Get Order',
-			description: 'Get a single order by ID',
-		}),
-		makeTool({
-			name: 'fluentcart_coupon_create',
-			title: 'Create Coupon',
-			description: 'Create a new coupon code',
-		}),
-		makeTool({
-			name: 'fluentcart_customer_list',
-			title: 'List Customers',
-			description: 'List all customers',
-		}),
-	]
+	it('returns at most five matches by default', async () => {
+		const many = Array.from({ length: 12 }, (_, i) => tool(`fluentcart_product_${i}`, 'read'))
+		const { byName } = setup(many)
+		const { json } = await callTool(byName.get('fluentcart_search_tools')!, { query: 'product' })
 
-	function setup() {
-		const server = createMockServer()
-		registerDynamicTools(server as never, tools)
-		return server
-	}
-
-	it('returns product tools when searching for "product"', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_search_tools', { query: 'product' })
-
-		const data = JSON.parse(result.content[0].text)
-		expect(data.matches).toBeGreaterThanOrEqual(2)
-
-		const names = data.tools.map((t: { name: string }) => t.name)
-		expect(names).toContain('fluentcart_product_list')
-		expect(names).toContain('fluentcart_product_get')
+		expect(json.tools).toHaveLength(5)
 	})
 
-	it('returns coupon tools when searching for "coupon"', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_search_tools', { query: 'coupon' })
+	it('accepts a limit up to ten and rejects anything outside that', () => {
+		const { byName } = setup(DEFAULT_TOOLS)
+		const schema = byName.get('fluentcart_search_tools')!.config.inputSchema
 
-		const data = JSON.parse(result.content[0].text)
-		expect(data.matches).toBeGreaterThanOrEqual(1)
-
-		const names = data.tools.map((t: { name: string }) => t.name)
-		expect(names).toContain('fluentcart_coupon_create')
+		expect(schema.safeParse({ query: 'x', limit: 10 }).success).toBe(true)
+		expect(schema.safeParse({ query: 'x', limit: 11 }).success).toBe(false)
+		expect(schema.safeParse({ query: 'x', limit: 0 }).success).toBe(false)
+		expect(schema.safeParse({ query: 'x', limit: 2.5 }).success).toBe(false)
 	})
 
-	it('includes total_available count in response', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_search_tools', { query: 'list' })
+	it('reports risk, execution and idempotency on every row', async () => {
+		const { byName } = setup(DEFAULT_TOOLS)
+		const { json } = await callTool(byName.get('fluentcart_search_tools')!, { query: 'refund' })
 
-		const data = JSON.parse(result.content[0].text)
-		expect(data.total_available).toBe(tools.length)
-	})
-
-	it('filters by category when specified', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_search_tools', {
-			query: 'list',
-			category: 'order',
+		const row = json.tools.find((r: { name: string }) => r.name === 'fluentcart_order_refund')
+		expect(row).toMatchObject({
+			risk: 'real-money',
+			execution: 'guarded-rest',
+			idempotency: 'guard-required',
 		})
-
-		const data = JSON.parse(result.content[0].text)
-		const names = data.tools.map((t: { name: string }) => t.name)
-		expect(names).toContain('fluentcart_order_list')
-		expect(names).not.toContain('fluentcart_product_list')
-		expect(names).not.toContain('fluentcart_customer_list')
 	})
 
-	it('returns empty results for non-matching query', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_search_tools', { query: 'zzzznonexistent' })
+	it('sorts by score then name so ordering is stable', async () => {
+		const { byName } = setup([
+			tool('fluentcart_order_zebra', 'read'),
+			tool('fluentcart_order_alpha', 'read'),
+		])
+		const { json } = await callTool(byName.get('fluentcart_search_tools')!, { query: 'order' })
 
-		const data = JSON.parse(result.content[0].text)
-		expect(data.matches).toBe(0)
-		expect(data.tools).toEqual([])
-	})
-
-	it('includes category in each result', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_search_tools', { query: 'product' })
-
-		const data = JSON.parse(result.content[0].text)
-		for (const tool of data.tools) {
-			expect(tool).toHaveProperty('category')
-		}
-	})
-
-	it('returns at most 20 results', async () => {
-		const manyTools = Array.from({ length: 30 }, (_, i) =>
-			makeTool({
-				name: `fluentcart_item_tool_${i}`,
-				title: `Item ${i}`,
-				description: `Item tool ${i}`,
-			}),
-		)
-		const server = createMockServer()
-		registerDynamicTools(server as never, manyTools)
-
-		const result = await callTool(server, 'fluentcart_search_tools', { query: 'item' })
-		const data = JSON.parse(result.content[0].text)
-		expect(data.tools.length).toBeLessThanOrEqual(20)
+		expect(json.tools.map((r: { name: string }) => r.name)).toEqual([
+			'fluentcart_order_alpha',
+			'fluentcart_order_zebra',
+		])
 	})
 })
 
 describe('fluentcart_describe_tools', () => {
-	const tools: ToolDefinition[] = [
-		makeTool({
-			name: 'fluentcart_product_get',
-			title: 'Get Product',
-			description: 'Get a single product by ID',
-			schema: z.object({ product_id: z.number().describe('Product ID') }),
-			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
-		}),
-		makeTool({
-			name: 'fluentcart_order_delete',
-			title: 'Delete Order',
-			description: 'Delete an order by ID',
-			schema: z.object({ order_id: z.number() }),
-			annotations: { destructiveHint: true, openWorldHint: true },
-		}),
-	]
+	it('accepts at most five names per call', () => {
+		const { byName } = setup(DEFAULT_TOOLS)
+		const schema = byName.get('fluentcart_describe_tools')!.config.inputSchema
 
-	function setup() {
-		const server = createMockServer()
-		registerDynamicTools(server as never, tools)
-		return server
-	}
-
-	it('returns JSON schema for known tool names', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_describe_tools', {
-			tools: ['fluentcart_product_get'],
-		})
-
-		const data = JSON.parse(result.content[0].text)
-		expect(data).toHaveLength(1)
-		expect(data[0].name).toBe('fluentcart_product_get')
-		expect(data[0].inputSchema).toBeDefined()
-		expect(data[0].inputSchema.type).toBe('object')
-		expect(data[0].inputSchema.properties).toHaveProperty('product_id')
+		expect(schema.safeParse({ tools: ['a', 'b', 'c', 'd', 'e'] }).success).toBe(true)
+		expect(schema.safeParse({ tools: ['a', 'b', 'c', 'd', 'e', 'f'] }).success).toBe(false)
+		expect(schema.safeParse({ tools: [] }).success).toBe(false)
 	})
 
-	it('returns annotations for described tools', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_describe_tools', {
-			tools: ['fluentcart_product_get'],
+	it('names the executor a caller must use for each tool', async () => {
+		const { byName } = setup(DEFAULT_TOOLS)
+		const { json } = await callTool(byName.get('fluentcart_describe_tools')!, {
+			tools: ['fluentcart_order_refund', 'fluentcart_product_list'],
 		})
 
-		const data = JSON.parse(result.content[0].text)
-		expect(data[0].annotations).toEqual({
-			readOnlyHint: true,
-			idempotentHint: true,
-			openWorldHint: true,
+		expect(json[0]).toMatchObject({
+			risk: 'real-money',
+			executor: 'fluentcart_execute_guarded_write',
 		})
+		expect(json[1]).toMatchObject({ risk: 'read', executor: 'fluentcart_execute_read_tool' })
 	})
 
-	it('returns error object for unknown tool names', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_describe_tools', {
-			tools: ['fluentcart_nonexistent_tool'],
-		})
-
-		const data = JSON.parse(result.content[0].text)
-		expect(data).toHaveLength(1)
-		expect(data[0].error).toBe('Tool not found')
-	})
-
-	it('handles mix of known and unknown tool names', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_describe_tools', {
-			tools: ['fluentcart_product_get', 'fluentcart_fake_tool', 'fluentcart_order_delete'],
-		})
-
-		const data = JSON.parse(result.content[0].text)
-		expect(data).toHaveLength(3)
-		expect(data[0].name).toBe('fluentcart_product_get')
-		expect(data[0].inputSchema).toBeDefined()
-		expect(data[1].error).toBe('Tool not found')
-		expect(data[2].name).toBe('fluentcart_order_delete')
-		expect(data[2].inputSchema).toBeDefined()
-	})
-
-	it('returns title and description for each tool', async () => {
-		const server = setup()
-		const result = await callTool(server, 'fluentcart_describe_tools', {
-			tools: ['fluentcart_product_get'],
-		})
-
-		const data = JSON.parse(result.content[0].text)
-		expect(data[0].title).toBe('Get Product')
-		expect(data[0].description).toBe('Get a single product by ID')
+	it('reports an unknown name without inventing a schema', async () => {
+		const { byName } = setup(DEFAULT_TOOLS)
+		const { json } = await callTool(byName.get('fluentcart_describe_tools')!, { tools: ['nope'] })
+		expect(json[0].error).toMatch(/not available|not found/i)
 	})
 })
 
-describe('fluentcart_execute_tool', () => {
-	it('dispatches to the correct tool handler', async () => {
-		const handler = vi.fn().mockResolvedValue({
-			content: [{ type: 'text' as const, text: '{"product_id":42}' }],
-		})
-		const tools = [
-			makeTool({ name: 'fluentcart_product_get', schema: z.object({ id: z.number() }), handler }),
-		]
-		const server = createMockServer()
-		registerDynamicTools(server as never, tools)
+describe('risk-split execution', () => {
+	it('executes a read through the read executor', async () => {
+		const handler = vi.fn(async () => ({
+			content: [{ type: 'text' as const, text: '{"ok":true}' }],
+		}))
+		const { byName } = setup([tool('fluentcart_product_list', 'read', handler)])
 
-		const result = await callTool(server, 'fluentcart_execute_tool', {
-			tool_name: 'fluentcart_product_get',
-			input: { id: 42 },
+		const result = await byName.get('fluentcart_execute_read_tool')!.handler({
+			tool_name: 'fluentcart_product_list',
+			input: { id: 1 },
 		})
 
-		expect(handler).toHaveBeenCalledWith({ id: 42 })
-		expect(result.content[0].text).toBe('{"product_id":42}')
+		expect(result.isError).toBeFalsy()
+		expect(handler).toHaveBeenCalledWith({ id: 1 })
 	})
 
-	it('returns error for unknown tool names', async () => {
-		const server = createMockServer()
-		registerDynamicTools(server as never, [])
+	it('refuses a real-money tool on the read executor and names the right one', async () => {
+		const handler = vi.fn()
+		const { byName } = setup([tool('fluentcart_order_refund', 'real-money', handler)])
 
-		const result = await callTool(server, 'fluentcart_execute_tool', {
-			tool_name: 'fluentcart_nonexistent',
+		const result = await byName.get('fluentcart_execute_read_tool')!.handler({
+			tool_name: 'fluentcart_order_refund',
+			input: { id: 1 },
+		})
+
+		expect(result.isError).toBe(true)
+		expect(result.content[0]?.text).toMatch(/wrong executor/)
+		expect(result.content[0]?.text).toMatch(/fluentcart_execute_guarded_write/)
+		expect(handler).not.toHaveBeenCalled()
+	})
+
+	it('refuses a reversible write on the read executor', async () => {
+		const handler = vi.fn()
+		const { byName } = setup([tool('fluentcart_coupon_create', 'reversible-write', handler)])
+
+		const result = await byName.get('fluentcart_execute_read_tool')!.handler({
+			tool_name: 'fluentcart_coupon_create',
+			input: { id: 1 },
+		})
+
+		expect(result.isError).toBe(true)
+		expect(handler).not.toHaveBeenCalled()
+	})
+
+	it('refuses a real-money tool on the reversible executor', async () => {
+		const handler = vi.fn()
+		const { byName } = setup([tool('fluentcart_order_refund', 'real-money', handler)])
+
+		const result = await byName.get('fluentcart_execute_reversible_write')!.handler({
+			tool_name: 'fluentcart_order_refund',
+			input: { id: 1 },
+		})
+
+		expect(result.isError).toBe(true)
+		expect(handler).not.toHaveBeenCalled()
+	})
+
+	it('refuses a tool that is not exposed at all', async () => {
+		const { byName } = setup(DEFAULT_TOOLS)
+		const result = await byName.get('fluentcart_execute_read_tool')!.handler({
+			tool_name: 'fluentcart_order_delete',
 			input: {},
 		})
 
 		expect(result.isError).toBe(true)
-		expect(result.content[0].text).toContain('not found')
+		expect(result.content[0]?.text).toMatch(/not exposed/)
 	})
 
-	it('returns validation error for invalid input', async () => {
-		const tools = [
-			makeTool({
-				name: 'fluentcart_product_get',
-				schema: z.object({ id: z.number() }),
-			}),
-		]
-		const server = createMockServer()
-		registerDynamicTools(server as never, tools)
+	it('refuses a tool whose execution is none even on the matching executor', async () => {
+		const handler = vi.fn()
+		const unavailable = tool('fluentcart_order_refund', 'real-money', handler)
+		unavailable.safety = { risk: 'real-money', idempotency: 'guard-required', execution: 'none' }
+		const { byName } = setup([unavailable])
 
-		const result = await callTool(server, 'fluentcart_execute_tool', {
-			tool_name: 'fluentcart_product_get',
+		const result = await byName.get('fluentcart_execute_guarded_write')!.handler({
+			tool_name: 'fluentcart_order_refund',
+			input: { id: 1 },
+		})
+
+		expect(result.isError).toBe(true)
+		expect(result.content[0]?.text).toMatch(/not executable/)
+		expect(handler).not.toHaveBeenCalled()
+	})
+
+	it('revalidates input immediately before dispatch', async () => {
+		const handler = vi.fn()
+		const { byName } = setup([tool('fluentcart_product_list', 'read', handler)])
+
+		const result = await byName.get('fluentcart_execute_read_tool')!.handler({
+			tool_name: 'fluentcart_product_list',
 			input: { id: 'not-a-number' },
 		})
 
 		expect(result.isError).toBe(true)
-		expect(result.content[0].text).toContain('Validation error')
-	})
-
-	it('accepts empty input object for tools with no required params', async () => {
-		const handler = vi.fn().mockResolvedValue({
-			content: [{ type: 'text' as const, text: '{}' }],
-		})
-		const tools = [
-			makeTool({ name: 'fluentcart_dashboard_overview', schema: z.object({}), handler }),
-		]
-		const server = createMockServer()
-		registerDynamicTools(server as never, tools)
-
-		const result = await callTool(server, 'fluentcart_execute_tool', {
-			tool_name: 'fluentcart_dashboard_overview',
-			input: {},
-		})
-
-		expect(handler).toHaveBeenCalledWith({})
-		expect(result.isError).toBeUndefined()
+		expect(result.content[0]?.text).toMatch(/Validation error/)
+		expect(handler).not.toHaveBeenCalled()
 	})
 })

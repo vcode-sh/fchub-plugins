@@ -15,6 +15,14 @@ on:
       - 'scripts/check-fchub-docs.mjs'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
+      - 'fluentcart-mcp/package.json'
+      - 'fluentcart-mcp/release-contract.json'
+      - 'fluentcart-mcp/manifest.json'
+      - 'fluentcart-mcp/api-coverage.json'
+      - 'fluentcart-mcp/README.md'
+      - 'fluentcart-mcp/Dockerfile'
+      - 'fluentcart-mcp/docker-mcp-registry/**'
+      - 'scripts/check-mcp-docs.mjs'
       - '.github/workflows/docs-ci.yml'
   pull_request:
     branches: [main]
@@ -28,6 +36,14 @@ on:
       - 'scripts/check-fchub-docs.mjs'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
+      - 'fluentcart-mcp/package.json'
+      - 'fluentcart-mcp/release-contract.json'
+      - 'fluentcart-mcp/manifest.json'
+      - 'fluentcart-mcp/api-coverage.json'
+      - 'fluentcart-mcp/README.md'
+      - 'fluentcart-mcp/Dockerfile'
+      - 'fluentcart-mcp/docker-mcp-registry/**'
+      - 'scripts/check-mcp-docs.mjs'
       - '.github/workflows/docs-ci.yml'
 
 concurrency:
@@ -69,6 +85,11 @@ jobs:
 
       - name: Verify tool counts match source
         run: node scripts/count-mcp-tools.mjs --check
+
+      # Current-facing MCP pages must not claim behaviour the code no longer has. Ground truth
+      # is release-contract.json, so this cannot drift from the measurement that produced it.
+      - name: Verify MCP documentation claims
+        run: node scripts/check-mcp-docs.mjs
 
       - name: Check for hardcoded release URLs
         run: |

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
+import { direct } from './endpoints.js'
 
 export function labelTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -14,6 +15,7 @@ export function labelTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_label_create',
+			routes: direct('POST', '/labels'),
 			title: 'Create Label',
 			description:
 				'Create a new label for tagging orders, customers, etc. ' +

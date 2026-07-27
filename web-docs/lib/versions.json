@@ -1,8 +1,8 @@
 {
   "plugins": {
     "fluentcart-mcp": {
-      "version": "1.1.0",
-      "tagName": "fluentcart-mcp/v1.1.0",
+      "version": "2.0.0",
+      "tagName": "fluentcart-mcp/v2.0.0",
       "zipFilename": null,
       "mcpbFilename": "fluentcart-mcp.mcpb"
     },
@@ -62,7 +62,9 @@
     }
   },
   "mcp": {
-    "toolCount": 274,
-    "moduleCount": 23
+    "source": "fluentcart-mcp/release-contract.json",
+    "toolCount": 276,
+    "moduleCount": 20,
+    "note": "Source tool definitions and categories from the generated release contract. NOT the number a store exposes: that depends on FLUENTCART_WRITE_MODE, discovered routes and user permissions. Do not present either figure as a product claim."
   }
 }

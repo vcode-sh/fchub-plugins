@@ -94,25 +94,9 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			},
 		}),
 
-		putTool(client, {
-			name: 'fluentcart_subscription_cancel',
-			title: 'Cancel Subscription',
-			description:
-				'Cancel a subscription. Can cancel immediately or at end of billing period. May trigger refund.',
-			schema: z.object({
-				order_id: z.number().describe('Order ID that owns the subscription'),
-				subscription_id: z.number().describe('Subscription ID to cancel'),
-				cancel_reason: z
-					.string()
-					.optional()
-					.describe('Cancellation reason — strongly recommended for audit trail'),
-				cancel_immediately: z
-					.boolean()
-					.optional()
-					.describe('Cancel immediately (true) or at end of billing period (false)'),
-			}),
-			endpoint: '/orders/:order_id/subscriptions/:subscription_id/cancel',
-		}),
+		// fluentcart_subscription_cancel lives in subscriptions-cancellation.ts. It acts on the
+		// gateway immediately and irreversibly, so it needs a signed preview, a state fingerprint
+		// and a durable idempotency claim rather than a bare endpoint mapping.
 
 		putTool(client, {
 			name: 'fluentcart_subscription_fetch',

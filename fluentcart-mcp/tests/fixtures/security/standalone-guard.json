@@ -1,0 +1,68 @@
+{
+  "contract": "fluentcart-mcp/standalone-guard",
+  "contract_version": 1,
+  "description": "Standalone guarded execution contract. Generated from tested constants and input schemas; contains no secret, token, key or state-directory path.",
+  "confirmation_token": {
+    "version": 1,
+    "ttl_seconds": 300,
+    "algorithm": "HMAC-SHA256",
+    "encoding": "base64url-unpadded",
+    "min_secret_bytes": 32,
+    "claims": [
+      "version",
+      "tool",
+      "entity",
+      "stateFingerprint",
+      "operationDigest",
+      "issuedAt",
+      "expiresAt",
+      "nonce"
+    ]
+  },
+  "ledger": {
+    "record_version": 1,
+    "inspection_kinds": ["ambiguous", "conflict", "none", "replay"],
+    "lock_kinds": ["ambiguous", "in-progress", "locked"],
+    "claim_states": ["completed", "pending"],
+    "release_outcomes": ["completed", "not-started"],
+    "completed_retention_days": 30,
+    "automatic_retry": false,
+    "single_replica_only": true
+  },
+  "failure_codes": [
+    "CONFIRMATION_INVALID",
+    "ENTITY_BUSY",
+    "GUARD_UNAVAILABLE",
+    "IDEMPOTENCY_AMBIGUOUS",
+    "IDEMPOTENCY_CONFLICT",
+    "INVALID_REQUEST",
+    "LIVE_ACTION_BLOCKED",
+    "STATE_CHANGED"
+  ],
+  "environment": {
+    "required": ["FLUENTCART_GUARD_SECRET", "FLUENTCART_GUARD_STATE_DIR"],
+    "live_execution_opt_in": {
+      "name": "FLUENTCART_ALLOW_LIVE_GATEWAY_ACTIONS",
+      "accepted_value": "yes",
+      "default_enabled": false
+    }
+  },
+  "guarded_tools": [
+    {
+      "name": "fluentcart_order_refund",
+      "entity": "order",
+      "route": { "method": "POST", "path": "/orders/{order_id}/refund" },
+      "input_schema_fingerprint": "sha256:3b31e00c4b5c98f132dfef524530a361f9270bf8342e4c1935be7b2dc3fff619"
+    },
+    {
+      "name": "fluentcart_subscription_cancel",
+      "entity": "subscription",
+      "route": {
+        "method": "PUT",
+        "path": "/orders/{order_id}/subscriptions/{subscription_id}/cancel"
+      },
+      "input_schema_fingerprint": "sha256:4764a4faf001d8e81e803ea500cb79d8d960d6e35650bc32f0291115602a327d"
+    }
+  ],
+  "fingerprint_basis": "sha256 over canonical JSON of field name, type and optionality"
+}

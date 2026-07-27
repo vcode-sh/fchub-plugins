@@ -104,7 +104,9 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_refund_chart',
 			title: 'Get Refund Chart',
-			description: 'Refund data over time for charting: amounts and counts. Amounts in cents.',
+			description:
+				'DIAGNOSTIC, not a metric. Refund amounts and counts over time. ' +
+				'The date range filters when the ORDER was created, not when the refund happened, so "refunds in July" really means "refunds against orders created in July, whenever they occurred". The refund rate moves in periods where nothing was refunded. Amounts are decimals, not cents.',
 			schema: z.object({ ...dateRangeWithGroup }),
 			endpoint: '/reports/refund-chart',
 		}),
@@ -128,7 +130,9 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_future_renewals',
 			title: 'Get Future Renewals',
-			description: 'Upcoming subscription renewal dates and expected revenue. Values in cents.',
+			description:
+				'DIAGNOSTIC, not a metric. Upcoming subscription renewals and projected revenue. ' +
+				'Any date range you pass is ignored: the window is hardcoded to today plus one quarter. Amounts here really are minor units, unlike every neighbouring report, which returns decimals. Subscriptions carry neither a currency nor a mode column, so projections sum across currencies and always include test-mode subscriptions.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/future-renewals',
 		}),
@@ -201,7 +205,9 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_sources',
 			title: 'Get Report Sources',
-			description: 'Traffic and attribution sources for orders.',
+			description:
+				'DIAGNOSTIC, not a metric. UTM attribution sources for orders. ' +
+				'The query selects utm_term, utm_content and utm_id without grouping or aggregating them, so under MySQL default settings it errors outright and otherwise returns an arbitrary row per group. Orders with no UTM source are dropped entirely, so these totals never reconcile with revenue.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/sources',
 		}),

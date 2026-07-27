@@ -1,7 +1,12 @@
 import { z } from 'zod'
+import type { ApiCapabilities } from '../api/capabilities.js'
 import type { FluentCartClient } from '../api/client.js'
 import { TTL } from '../cache.js'
 import { getTool, type ToolDefinition } from './_factory.js'
+
+/** Withdrawn after 1.3.9, so these register only where the store proves it still serves them. */
+const retiredReport = (capabilities: ApiCapabilities | undefined, path: string): boolean =>
+	capabilities?.has('GET', path) === true
 
 const dateRange = {
 	startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
@@ -22,14 +27,18 @@ const dateRangeWithCompare = {
 	compare_endDate: z.string().optional().describe('Comparison period end date (YYYY-MM-DD)'),
 }
 
-export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
+export function reportCoreTools(
+	client: FluentCartClient,
+	capabilities?: ApiCapabilities,
+): ToolDefinition[] {
 	return [
 		getTool(client, {
 			name: 'fluentcart_report_overview',
 			title: 'Get Reports Overview',
 			description:
-				'Financial overview: gross/net revenue by month/quarter with YoY growth and top countries. Values in cents. ' +
-				"Best for 'what's my revenue this month/quarter/year' questions.",
+				'DIAGNOSTIC, not a metric. Gross/net revenue by month and quarter with growth and top countries. ' +
+				'The controller hardcodes a 30-month UTC window and ignores any date range you pass, so this cannot answer a question about a chosen period. ' +
+				'For revenue over a period use fluentcart_report_sales_summary.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/overview',
 		}),
@@ -57,7 +66,10 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_revenue',
 			title: 'Get Revenue Report',
 			description:
-				'Revenue grouped by day/week/month: net revenue, shipping, tax, refunds, order counts with comparison. Values in cents.',
+				'Raw revenue rows grouped by day, month or year: net revenue, shipping, tax, refunds and order counts. ' +
+				'Amounts are decimals, not cents — the store divides by 100 in SQL. ' +
+				'Amounts are summed across every currency unless params[currency] pins one, and test-mode orders are included. ' +
+				'Prefer fluentcart_report_sales_summary or fluentcart_report_sales_trend, which pin a currency and state their period and payment scope.',
 			schema: z.object({ ...dateRangeWithCompare }),
 			endpoint: '/reports/revenue',
 		}),
@@ -66,8 +78,8 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_revenue_by_group',
 			title: 'Get Revenue by Group',
 			description:
-				'Revenue segmented by product group or category. Values in cents. ' +
-				'\u26a0\ufe0f UPSTREAM BUG: This endpoint crashes with SQL syntax errors for all groupKey values (UB-007a).',
+				'DIAGNOSTIC, not a metric. Revenue segmented by product group or category. ' +
+				'This route stopped erroring on 2026-07-27, but returning 200 is not the same as having a defined meaning: its grouping, currency and payment scope are unverified. Treat the numbers as unconfirmed.',
 			schema: z.object({ ...dateRangeWithGroup }),
 			endpoint: '/reports/revenue-by-group',
 		}),
@@ -75,7 +87,9 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_sales',
 			title: 'Get Sales Report',
-			description: 'Comprehensive sales report for a date range.',
+			description:
+				'DIAGNOSTIC, not a metric. Sales figures for a date range. ' +
+				'The query inner-joins a subquery that filters fct_order_items.created_at as well as the order date, so an order whose line items fall outside the window loses its revenue entirely rather than just its item count. Two different columns govern one number. Use fluentcart_report_sales_summary instead.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/sales-report',
 		}),
@@ -111,8 +125,8 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_orders_by_group',
 			title: 'Get Orders by Group',
 			description:
-				'Order data grouped by dimension (e.g. payment method, product type). ' +
-				'\u26a0\ufe0f UPSTREAM BUG: This endpoint crashes with SQL syntax errors regardless of groupKey value (UB-007a).',
+				'DIAGNOSTIC, not a metric. Order data grouped by dimension such as payment method or product type. ' +
+				'This route stopped erroring on 2026-07-27; its grouping and payment scope remain unverified, so treat the numbers as unconfirmed.',
 			schema: z.object({
 				...dateRange,
 				groupKey: z.string().optional().describe('Grouping dimension key'),
@@ -124,8 +138,8 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_quick_order_stats',
 			title: 'Get Quick Order Stats',
 			description:
-				"Quick order statistics for a given lookback period. Use day_range '1' for today, '7' for this week, '30' for this month. " +
-				'\u26a0\ufe0f UPSTREAM BUG: Crashes with missing Status class import (UB-007b).',
+				"DIAGNOSTIC, not a metric. Quick order statistics for a lookback period. Use day_range '1' for today, '7' for this week, '30' for this month. " +
+				'This route stopped erroring on 2026-07-27; how it bounds its lookback and which currencies it combines are unverified, so treat the numbers as unconfirmed.',
 			schema: z.object({
 				day_range: z
 					.string()
@@ -143,17 +157,21 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({}),
 			endpoint: '/reports/get-recent-orders',
 		}),
-
-		getTool(client, {
-			name: 'fluentcart_report_unfulfilled_orders',
-			title: 'Get Unfulfilled Orders',
-			description: 'Orders not yet fulfilled or shipped. Supports pagination.',
-			schema: z.object({
-				page: z.number().optional().describe('Page number (default: 1)'),
-				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
-			}),
-			endpoint: '/reports/get-unfulfilled-orders',
-		}),
+		...(retiredReport(capabilities, '/reports/get-unfulfilled-orders')
+			? [
+					getTool(client, {
+						name: 'fluentcart_report_unfulfilled_orders',
+						title: 'Get Unfulfilled Orders',
+						description:
+							'Orders not yet fulfilled or shipped. Supports pagination. Withdrawn after 1.3.9.',
+						schema: z.object({
+							page: z.number().optional().describe('Page number (default: 1)'),
+							per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
+						}),
+						endpoint: '/reports/get-unfulfilled-orders',
+					}),
+				]
+			: []),
 
 		getTool(client, {
 			name: 'fluentcart_report_recent_activities',
@@ -203,14 +221,18 @@ export function reportCoreTools(client: FluentCartClient): ToolDefinition[] {
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/country-heat-map',
 		}),
-
-		getTool(client, {
-			name: 'fluentcart_report_cart',
-			title: 'Get Cart Report',
-			description: 'Cart analytics: abandonment rate, conversion funnel, and cart value metrics.',
-			schema: z.object({ ...dateRange }),
-			endpoint: '/reports/cart-report',
-		}),
+		...(retiredReport(capabilities, '/reports/cart-report')
+			? [
+					getTool(client, {
+						name: 'fluentcart_report_cart',
+						title: 'Get Cart Report',
+						description:
+							'Cart analytics: abandonment, conversion funnel, cart value. Withdrawn after 1.3.9.',
+						schema: z.object({ ...dateRange }),
+						endpoint: '/reports/cart-report',
+					}),
+				]
+			: []),
 
 		getTool(client, {
 			name: 'fluentcart_report_order_value_distribution',

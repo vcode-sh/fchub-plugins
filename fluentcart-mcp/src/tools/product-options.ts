@@ -1,12 +1,11 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { FluentCartApiError } from '../api/errors.js'
 import { createTool, deleteTool, getTool, postTool, type ToolDefinition } from './_factory.js'
+import { composite, op } from './endpoints.js'
 
+/** Attribute groups (Size, Colour, Material). Terms live in product-options-terms.ts. */
 export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 	return [
-		// ── Attribute Groups ─────────────────────────────────────────────
-
 		getTool(client, {
 			name: 'fluentcart_attribute_group_list',
 			title: 'List Attribute Groups',
@@ -39,6 +38,10 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_attribute_group_update',
+			routes: composite(
+				op('GET', '/options/attr/group/{param}'),
+				op('PUT', '/options/attr/group/{param}'),
+			),
 			title: 'Update Attribute Group',
 			description: 'Update an attribute group title or slug.',
 			schema: z.object({
@@ -74,91 +77,5 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		}),
 
 		// ── Attribute Terms ──────────────────────────────────────────────
-
-		getTool(client, {
-			name: 'fluentcart_attribute_term_list',
-			title: 'List Attribute Terms',
-			description: 'Get all terms for an attribute group (e.g. Small, Medium, Large under Size).',
-			schema: z.object({
-				group_id: z.number().describe('Parent attribute group ID'),
-			}),
-			endpoint: '/options/attr/group/:group_id/terms',
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_attribute_term_create',
-			title: 'Create Attribute Term',
-			description:
-				'Create a term within an attribute group (e.g. add "Red" to Color). ' +
-				'Note: slug is required. Known FluentCart bug (<=1.3.9): term creation via API ' +
-				'fails with "Information mismatch" because the server validates against the wrong ' +
-				'database table. If this happens, terms must be created via the admin UI at ' +
-				'/wp-admin/ > FluentCart > Settings > Product Options.',
-			schema: z.object({
-				group_id: z.number().describe('Parent attribute group ID'),
-				title: z.string().describe('Term display name (e.g. "Red", "Large")'),
-				slug: z.string().describe('URL-friendly identifier (required, e.g. "red", "large")'),
-			}),
-			handler: async (client, input) => {
-				const groupId = input.group_id as number
-				const body = { title: input.title, slug: input.slug }
-				try {
-					const resp = await client.post(`/options/attr/group/${groupId}/term`, body)
-					return resp.data
-				} catch (error) {
-					if (
-						error instanceof FluentCartApiError &&
-						error.message.includes('Information mismatch')
-					) {
-						throw new FluentCartApiError(
-							'SERVER_ERROR',
-							`FluentCart bug: attribute term creation fails via API due to a validation ` +
-								`defect in AttrTermResource::create() (queries fct_atts_terms instead of ` +
-								`fct_atts_groups to validate the group). This affects FluentCart <=1.3.9. ` +
-								`Workaround: create terms manually via the admin UI at ` +
-								`FluentCart > Settings > Product Options, or ask the FluentCart team to fix ` +
-								`AttrTermResource.php line 105.`,
-						)
-					}
-					throw error
-				}
-			},
-		}),
-
-		postTool(client, {
-			name: 'fluentcart_attribute_term_update',
-			title: 'Update Attribute Term',
-			description: 'Update an attribute term title or slug.',
-			schema: z.object({
-				group_id: z.number().describe('Parent attribute group ID'),
-				term_id: z.number().describe('Attribute term ID'),
-				title: z.string().optional().describe('Term display name'),
-				slug: z.string().optional().describe('URL-friendly identifier'),
-			}),
-			endpoint: '/options/attr/group/:group_id/term/:term_id',
-		}),
-
-		deleteTool(client, {
-			name: 'fluentcart_attribute_term_delete',
-			title: 'Delete Attribute Term',
-			description: 'Delete an attribute term. Cannot be undone.',
-			schema: z.object({
-				group_id: z.number().describe('Parent attribute group ID'),
-				term_id: z.number().describe('Attribute term ID'),
-			}),
-			endpoint: '/options/attr/group/:group_id/term/:term_id',
-		}),
-
-		postTool(client, {
-			name: 'fluentcart_attribute_term_reorder',
-			title: 'Update Term Sort Order',
-			description: 'Update sort order of an attribute term. Lower numbers appear first.',
-			schema: z.object({
-				group_id: z.number().describe('Parent attribute group ID'),
-				term_id: z.number().describe('Attribute term ID'),
-				serial: z.number().describe('New sort order position (lower = first)'),
-			}),
-			endpoint: '/options/attr/group/:group_id/term/:term_id/serial',
-		}),
 	]
 }

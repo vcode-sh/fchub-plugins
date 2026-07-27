@@ -237,6 +237,12 @@ const SCENARIO_COVERED_TOOLS = [
 const WITHDRAWN_TOOLS: Record<string, string> = {
 	fluentcart_customer_address_select:
 		'Never existed in the direct registry. The scenario invoked a name the server does not register; the underlying route is GET /customers/{id}/update-address-select.',
+	fluentcart_report_cart:
+		'FluentCart 1.5.5 does not register the cart report route. Plan 03 Task 4 omits it rather than shipping a tool that 404s; no replacement analytics were invented.',
+	fluentcart_report_unfulfilled_orders:
+		'/reports/get-unfulfilled-orders is absent from the 1.5.5 registry and returns 404. Plan 03 Task 4 omits it pending a semantically tested alternative.',
+	fluentcart_tax_class_update:
+		'The 1.5.5 registry serves only DELETE at /tax/classes/{id}. Registering an update there would advertise an edit the store cannot perform.',
 }
 
 /**

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
 import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { composite, direct, op } from './endpoints.js'
 
 export function orderTransactionTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -86,6 +87,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 
 		createTool(client, {
 			name: 'fluentcart_order_bulk_action',
+			routes: direct('POST', '/orders/do-bulk-action'),
 			title: 'Bulk Order Actions',
 			description:
 				'Perform bulk actions on multiple orders. ' +
@@ -131,6 +133,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 
 		createTool(client, {
 			name: 'fluentcart_order_calculate_shipping',
+			routes: composite(op('GET', '/orders/{param}'), op('POST', '/orders/calculate-shipping')),
 			title: 'Calculate Shipping',
 			description:
 				'Apply a shipping method to an order and calculate shipping costs. ' +
@@ -179,6 +182,7 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 
 		createTool(client, {
 			name: 'fluentcart_order_customer_orders',
+			routes: direct('GET', '/customers/{param}/orders'),
 			title: 'Get Customer Orders (Paginated)',
 			description:
 				'Get paginated orders for a specific customer. Accepts both customerId and customer_id.',

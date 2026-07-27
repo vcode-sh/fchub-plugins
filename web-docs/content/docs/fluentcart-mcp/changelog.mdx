@@ -10,6 +10,80 @@ What changed, when, and why you should care.
 
 ---
 
+## July 2026
+
+### v2.0.0
+
+[npm](https://www.npmjs.com/package/fluentcart-mcp) · [Latest release](https://github.com/vcode-sh/fchub-plugins/releases/latest)
+
+A breaking release, and unapologetically so. Version 1.x handed an AI assistant the whole store on connection and trusted everyone involved to be careful. This one starts from the opposite assumption.
+
+<Callout type="warn" title="Upgrading from 1.x will change what your AI can do">
+Writes are off unless you switch them on, the default mode presents five meta-tools instead of the entire catalogue, and refunds, cancellations, deletions and bulk actions are not exposed at all. If your workflow depended on any of that, it will stop working. Read the two sections below before upgrading, not after.
+</Callout>
+
+#### Writes are absent by default
+
+`FLUENTCART_WRITE_MODE` is new and defaults to `disabled`. Values are `disabled`, `reversible` and `guarded`.
+
+Filtering happens before registration, not at call time, which is the part that matters: a tool your policy excludes cannot be listed, searched, described or invoked by name. There is no "the model found it anyway" path, because there is nothing to find.
+
+`disabled` exposes the reads. `reversible` adds the writes that can be undone — creating and updating products, variants, coupons, customers, shipping rules, tax rules, attributes, order bumps and upgrade paths. `guarded` is accepted and, in this release, exposes exactly the same set as `reversible`.
+
+Deletion, bulk operations, order status changes, marking an order paid and dispute handling are exposed in no mode. FluentCart provides no supported way to reverse any of them, so none qualifies as a reversible write. This is narrower than 1.x, on purpose.
+
+#### Refunding and cancellation are not available
+
+`fluentcart_order_refund` and `fluentcart_subscription_cancel` ship absent from every write mode, `guarded` included. No secret, state directory or environment variable turns them on. If you are adopting this to automate refunds, it will not do that.
+
+The guard they were built for is complete and unit-tested: previews signed and pinned to the exact payload, a durable single-writer ledger that recognises a retried call instead of charging twice, replay and conflict detection, and crash handling that never silently retries an ambiguous result. What is missing is acceptance evidence — proof of the whole path against a real store — and for an action that moves customer money that distinction is the entire argument.
+
+Producing that proof needs one run to create an order, refund it, and remove the traces. FluentCart 1.5.5 forecloses every route: transactions have no DELETE endpoint, deleting an order does not cascade to them, `canPurchase()` rejects unpublished products so no draft fixture can stand in, and a run cannot create a subscription at all. Any refundable fixture leaves rows the API cannot remove.
+
+The rule was that a guarded capability either passes both acceptance lanes or ships unavailable. It could not pass, so it ships unavailable. The ceremony is built; the proof is not, so it is not switched on. `FLUENTCART_GUARD_SECRET`, `FLUENTCART_GUARD_STATE_DIR` and `FLUENTCART_ALLOW_LIVE_GATEWAY_ACTIONS` stay documented as reserved, because that is where this returns once FluentCart offers a way to remove a test-mode charge.
+
+#### Modes: `static` is gone, `dynamic` is the default
+
+What 1.x called `static` is now called `full`. The four you can choose between are `dynamic`, `curated`, `code` and `full`, and `dynamic` is what you get if you say nothing.
+
+- **`dynamic`** — five meta-tools: `fluentcart_search_tools`, `fluentcart_describe_tools`, `fluentcart_execute_read_tool`, `fluentcart_execute_reversible_write`, `fluentcart_execute_guarded_write`. The reversible executor appears only when your write mode allows a write; the guarded executor is reserved and routes nothing in this release.
+- **`code`** — two tools over a QuickJS WebAssembly sandbox, `fluentcart_search_api` and `fluentcart_execute_code`. Read-only by construction: the sandbox has no route to a write.
+- **`curated`** — a shortlist for the workflows people actually run.
+- **`full`** — everything exposed, registered up front, exactly as `static` used to behave.
+
+Each mode now has a definition-token budget the build enforces rather than merely reports: 1,500 for dynamic, 1,200 for code, 12,000 for curated. Full mode is measured every build and never gated, because gating it would be gating the thing it exists to provide. Figures for a given revision come from `node scripts/measure-tool-context.mjs`, serialised with `mcp-tools-list-v1` and counted with `gpt-tokenizer@3.4.0`, and are recorded in `release-contract.json`.
+
+#### HTTP is loopback-first
+
+The HTTP transport binds `127.0.0.1` by default. A non-loopback bind now refuses to start without `FLUENTCART_MCP_API_KEY` of at least 32 characters — the check runs before `listen()`, so a misconfigured deployment fails immediately instead of quietly serving a store-administration API to the internet.
+
+Every authentication rejection returns exactly `{"error":"Unauthorized"}` with a constant-time comparison behind it. A wrong key is indistinguishable from a missing one.
+
+The 1.x documentation warned that without a key "anyone who discovers your endpoint can query your store". That is no longer true, and the warning has been removed rather than left to look prudent.
+
+#### Oversized responses fail loudly
+
+A response too large for the budget now returns a `RESPONSE_TOO_LARGE` error naming the remedies — narrow the page size, the date range, the field list. Previously it returned a truncated payload marked `_truncated`, which is a polite way of describing data that looks complete and isn't.
+
+#### Least-privilege roles are supported
+
+The server does what the configured WordPress user can do, and nothing more. The old advice to hand over a full admin login has been corrected: a narrow FluentCart role is a supported configuration, and pairing one with the default read-only write mode is the sensible starting point.
+
+#### Support profile
+
+Verified against WordPress 7.0.2 with FluentCart 1.5.5 and FluentCart Pro 1.5.4.
+
+The route surface of an older 1.3.9 install has also been captured from a real runtime. That records which endpoints that build serves; it does not establish that these tools work against it, and support for it is not claimed until a tool-level compatibility check passes. A smaller tool list on an older store is evidence that route pruning works, not that the surviving tools have been exercised there.
+
+#### Also
+
+- Subscription pause, resume and reactivate are no longer exposed as tools.
+- The customer address dropdown helper and the duplicate address-add tool are gone.
+- MCP Resources read through to your store on every read; the resource layer holds no cache of its own, and the documentation no longer implies otherwise.
+- Published counts now come from a generated release contract instead of a number retyped across six files, which is how they drifted in the first place.
+
+---
+
 ## March 2026
 
 <include>./_changelog/2026-03.mdx</include>

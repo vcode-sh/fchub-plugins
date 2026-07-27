@@ -2,7 +2,10 @@ import type { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
 import { cached, invalidate } from '../cache.js'
+import { assertWithinEmergencyCap, ResponseTooLargeError } from '../commerce/response-budget.js'
 import { redactSensitive } from '../security/redaction.js'
+import type { ToolRouteMetadata } from './endpoint-types.js'
+import { auditView } from './endpoints.js'
 import type { ToolSafety } from './risk.js'
 import { resolveToolSafety } from './risk-registry.js'
 
@@ -25,6 +28,20 @@ export interface ToolDefinition {
 	 * which the exposure policy hides.
 	 */
 	safety: ToolSafety
+	/**
+	 * The REST operations this tool may reach, for capability filtering and CI auditing.
+	 *
+	 * Endpoint-factory tools get this for free from the method and endpoint they already
+	 * declare, so it cannot drift from what they call. Custom tools must state it: nobody can
+	 * infer the route list of a hand-written handler without running it.
+	 */
+	routes?: ToolRouteMetadata
+	/**
+	 * The same declaration in the shape scripts/check-tool-routes.mjs reads. Derived from
+	 * `routes`, never authored by hand, so the audit view and the view the server routes on
+	 * cannot disagree.
+	 */
+	route?: { routes: { method: string; path: string }[]; composite: boolean }
 	handler: (input: Record<string, unknown>) => Promise<{
 		content: { type: 'text'; text: string }[]
 		isError?: boolean
@@ -41,6 +58,8 @@ interface BaseToolConfig {
 
 interface EndpointToolConfig extends BaseToolConfig {
 	endpoint: string
+	/** Ordered fallbacks for a store that serves a retired route instead of the current one. */
+	routes?: ToolRouteMetadata
 	isPublic?: boolean
 	transform?: (data: unknown) => unknown
 	cache?: { key: string; ttlMs: number }
@@ -49,9 +68,15 @@ interface EndpointToolConfig extends BaseToolConfig {
 }
 
 interface CustomToolConfig extends BaseToolConfig {
+	/** Required in practice; the migration test names any tool that omits it. */
+	routes?: ToolRouteMetadata
 	handler: (client: FluentCartClient, input: Record<string, unknown>) => Promise<unknown>
 }
 
+/**
+ * Retained for compatibility with callers that imported it. The real limits now live in
+ * src/commerce/response-budget.ts, where they are enforced rather than approximated.
+ */
 export const MAX_RESPONSE_CHARS = 80_000
 
 /**
@@ -101,62 +126,21 @@ function resolveEndpoint(
 	return { path, rest }
 }
 
-function sliceToFit(arr: unknown[], budget: number): unknown[] {
-	const arrJson = JSON.stringify(arr)
-	const avgItemSize = arrJson.length / arr.length
-	let targetCount = Math.max(1, Math.floor(budget / avgItemSize))
-	let sliced = arr.slice(0, targetCount)
-	while (sliced.length > 1 && JSON.stringify(sliced).length > budget) {
-		targetCount = Math.max(1, Math.floor(targetCount * 0.75))
-		sliced = arr.slice(0, targetCount)
-	}
-	return sliced
-}
-
-function truncateObjectArray(
-	obj: Record<string, unknown>,
-	jsonLen: number,
-): Record<string, unknown> | null {
-	const arrayKey =
-		'data' in obj && Array.isArray(obj.data)
-			? 'data'
-			: 'items' in obj && Array.isArray(obj.items)
-				? 'items'
-				: null
-	if (!arrayKey) return null
-	const arr = obj[arrayKey] as unknown[]
-	if (arr.length === 0) return null
-	const overhead = jsonLen - JSON.stringify(arr).length
-	const sliced = sliceToFit(arr, MAX_RESPONSE_CHARS * 0.85 - overhead)
-	return {
-		...obj,
-		[arrayKey]: sliced,
-		_truncated: true,
-		_total: arr.length,
-		_showing: sliced.length,
-	}
-}
-
+/**
+ * Reject an over-budget payload instead of quietly shortening it.
+ *
+ * The previous implementation sliced arrays to roughly 85% of the cap and returned the result
+ * as a success marked `_truncated`. That had two failure modes worth remembering: a single
+ * record larger than the cap could not be shrunk at all and was returned whole (measured at
+ * 200,065 characters against an 80,000 cap, still flagged as success), and a shortened page
+ * paired with an advancing page number silently skipped the rows it had dropped.
+ *
+ * A caller cannot distinguish a truncated list from a short one, so truncation is not a
+ * kindness. Bound the request, then return the page whole or say why you cannot.
+ */
 export function truncateResponse(data: unknown): unknown {
-	const json = JSON.stringify(data)
-	if (json.length <= MAX_RESPONSE_CHARS) return data
-
-	if (Array.isArray(data) && data.length > 0) {
-		const sliced = sliceToFit(data, MAX_RESPONSE_CHARS * 0.85)
-		return { _truncated: true, _total: data.length, _showing: sliced.length, items: sliced }
-	}
-
-	if (typeof data === 'object' && data !== null) {
-		const result = truncateObjectArray(data as Record<string, unknown>, json.length)
-		if (result) return result
-	}
-
-	return {
-		_truncated: true,
-		_chars: json.length,
-		_message:
-			'Response too large. Use filters, pagination, or more specific queries to reduce size.',
-	}
+	assertWithinEmergencyCap(data, 'this request')
+	return data
 }
 
 function formatSuccess(data: unknown) {
@@ -167,6 +151,13 @@ function formatSuccess(data: unknown) {
 }
 
 function formatError(error: unknown) {
+	if (error instanceof ResponseTooLargeError) {
+		return {
+			content: [{ type: 'text' as const, text: `Error [${error.code}]: ${error.message}` }],
+			isError: true,
+		}
+	}
+
 	// Upstream error payloads routinely echo the request, so redact before the text is built.
 	if (error instanceof FluentCartApiError) {
 		let text = `Error [${error.code}]: ${redactSensitive(error.message) as string}`
@@ -198,6 +189,8 @@ export function createTool(client: FluentCartClient, config: CustomToolConfig): 
 			resolveSafety(config.name, { openWorldHint: true, ...config.annotations }),
 		),
 		safety: resolveSafety(config.name, { openWorldHint: true, ...config.annotations }),
+		routes: config.routes,
+		route: auditView(config.routes),
 		handler: async (input) => {
 			try {
 				const result = await config.handler(client, input)
@@ -223,6 +216,11 @@ function createEndpointTool(
 	method: HttpMethod,
 	config: EndpointToolConfig,
 ): ToolDefinition {
+	const derived: ToolRouteMetadata = config.routes ?? {
+		kind: 'direct',
+		variants: [{ method, path: config.endpoint }],
+	}
+
 	return {
 		name: config.name,
 		title: config.title,
@@ -232,6 +230,8 @@ function createEndpointTool(
 			resolveSafety(config.name, { ...METHOD_ANNOTATIONS[method], ...config.annotations }),
 		),
 		safety: resolveSafety(config.name, { ...METHOD_ANNOTATIONS[method], ...config.annotations }),
+		routes: derived,
+		route: auditView(derived),
 		handler: async (input) => {
 			try {
 				const { path, rest } = resolveEndpoint(config.endpoint, input)

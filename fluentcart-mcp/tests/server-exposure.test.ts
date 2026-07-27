@@ -83,10 +83,11 @@ describe('registry exposure is filtered before registration', () => {
 		expect(names.has('fluentcart_subscription_cancel')).toBe(false)
 	})
 
-	it('keeps refund and cancellation unavailable even in fully configured guarded mode', () => {
-		// The guard modules are not implemented yet, so the handlers bound to these names are
-		// still the raw REST calls. Until the signed preview and durable claim exist, a fully
-		// configured guarded mode must not conjure them into existence.
+	it('ships refund and cancellation unavailable, even in fully configured guarded mode', () => {
+		// 2.0.0 ships these unavailable. The guard is complete and unit-tested, but it was never
+		// acceptance-proven: refunding an order this run owns is impossible on FluentCart 1.5.5,
+		// because a transaction has no DELETE route and does not cascade from order deletion. A
+		// money-moving capability that cannot be proven does not get to be present.
 		process.env.FLUENTCART_WRITE_MODE = 'guarded'
 		process.env.FLUENTCART_GUARD_SECRET = 'g'.repeat(32)
 		process.env.FLUENTCART_GUARD_STATE_DIR = '/tmp/fluentcart-guard-fixture'
@@ -104,13 +105,17 @@ describe('registry exposure is filtered before registration', () => {
 		expect(exposedNames().has('fluentcart_coupon_create')).toBe(true)
 	})
 
-	it('rejects a short guard secret rather than accepting a weak one', () => {
+	it('fails startup on a weak guard secret rather than quietly dropping the guarded tools', () => {
 		process.env.FLUENTCART_WRITE_MODE = 'guarded'
 		process.env.FLUENTCART_GUARD_SECRET = 'too-short'
 		process.env.FLUENTCART_GUARD_STATE_DIR = '/tmp/fluentcart-guard-fixture'
 
+		// The policy layer already refuses to advertise the guard...
 		expect(resolveWritePolicy().guard.signingSecret).toBe(false)
-		expect(exposedNames().has('fluentcart_order_refund')).toBe(false)
+
+		// ...and startup refuses outright, with an actionable message. Silently starting without
+		// refund and cancellation would look like a missing feature rather than a bad secret.
+		expect(() => exposedNames()).toThrow(/FLUENTCART_GUARD_SECRET must be at least 32 bytes/)
 	})
 
 	it('never exposes a destructive, control-plane or credential tool in any write mode', () => {

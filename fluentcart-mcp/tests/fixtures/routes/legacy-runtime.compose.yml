@@ -1,0 +1,66 @@
+# Ephemeral stack for isolated FluentCart route captures.
+#
+# SAFETY: this file must only ever be run with an explicit `-p fcmcp-iso-*` project name, which is
+# what scripts/capture-isolated-plugin-routes.mjs does. Both volumes below are project-scoped, so
+# `docker compose -p <project> down -v` destroys only this stack. It must never be pointed at the
+# playground project, and the playground volumes fchub-playground_wordpress and fchub-playground_db
+# are never named here, mounted here, or reachable from here.
+#
+# Plugin sources are bind-mounted READ-ONLY so a capture can never write to the checked-out source.
+# Images are pinned by digest: WordPress 7.0.2 (PHP 8.3), WP-CLI, MariaDB.
+
+services:
+  db:
+    image: mariadb@sha256:b1cb255a9939d28a1856815f0de6046c20c28c21b92a9f2696bc782b247a47ee
+    environment:
+      MARIADB_ROOT_PASSWORD: isolated-capture-root
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: isolated-capture
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  wordpress:
+    # Defaults to the digest pinned by plan 03. That digest is WordPress 6.9.1 despite being
+    # recorded as 7.0.2, so FC_WP_IMAGE allows a capture to name the version it actually needs.
+    image: ${FC_WP_IMAGE:-wordpress@sha256:ffef0dca1f0fc4357bfef3856ebd1ba18f7b394378277122eaa4524ca2619d43}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: isolated-capture
+    # Bound to loopback only: a capture stack is never a network service.
+    ports:
+      - '127.0.0.1:${FC_HTTP_PORT}:80'
+    volumes:
+      - wp-data:/var/www/html
+      - ${FC_CORE_SOURCE}:/var/www/html/wp-content/plugins/fluent-cart:ro
+      - ${FC_PRO_SOURCE}:${FC_PRO_TARGET}:ro
+
+  wpcli:
+    image: wordpress@sha256:c9ecfd0ef73102cdc6666f20ccc3a0ae16c9a170160ef70bad4e9141ae856054
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: isolated-capture
+    entrypoint: ['sleep', 'infinity']
+    volumes:
+      - wp-data:/var/www/html
+      - ${FC_CORE_SOURCE}:/var/www/html/wp-content/plugins/fluent-cart:ro
+      - ${FC_PRO_SOURCE}:${FC_PRO_TARGET}:ro
+
+volumes:
+  db-data:
+  wp-data:

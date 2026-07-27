@@ -15,7 +15,16 @@ describe('workflow test lanes', () => {
 	})
 
 	it('runs the named unit lane during release validation', () => {
-		assert.match(release, /npm run test:unit/)
+		// Release does not repeat the steps: it calls mcp-ci.yml as a reusable workflow, so the
+		// tag path and the pull-request path validate through exactly one definition. Assert the
+		// delegation AND that the callee runs the lane, or a dropped step would pass unnoticed.
+		assert.match(
+			release,
+			/uses:\s*\.\/\.github\/workflows\/mcp-ci\.yml/,
+			'release must delegate validation to the CI workflow rather than duplicating it',
+		)
+		assert.match(ci, /workflow_call/, 'mcp-ci.yml must be callable as a reusable workflow')
+		assert.match(ci, /npm run test:unit/)
 	})
 
 	it('runs the Node tooling contract lane in CI', () => {
@@ -23,7 +32,8 @@ describe('workflow test lanes', () => {
 	})
 
 	it('runs the Node tooling contract lane during release validation', () => {
-		assert.match(release, /npm run test:tooling/)
+		assert.match(release, /uses:\s*\.\/\.github\/workflows\/mcp-ci\.yml/)
+		assert.match(ci, /npm run test:tooling/)
 	})
 
 	it('never hands a store application password to CI', () => {

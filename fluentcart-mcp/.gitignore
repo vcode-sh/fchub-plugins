@@ -5,3 +5,5 @@ dist/
 .DS_Store
 coverage/
 .env
+/dist-packages/
+/artifacts/acceptance/

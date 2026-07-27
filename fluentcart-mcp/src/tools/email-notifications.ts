@@ -1,9 +1,37 @@
 import { z } from 'zod'
+import type { ApiCapabilities } from '../api/capabilities.js'
 import type { FluentCartClient } from '../api/client.js'
+import { FluentCartApiError } from '../api/errors.js'
+import type { HttpMethod } from '../api/route-normalisation.js'
 import { TTL } from '../cache.js'
-import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, putTool, type ToolDefinition } from './_factory.js'
+import { direct } from './endpoints.js'
 
-export function emailNotificationTools(client: FluentCartClient): ToolDefinition[] {
+/**
+ * Template preview moved route between 1.3.9 and the current release.
+ *
+ * Ordered current-first. Without capability evidence the current route wins: it is the only one
+ * present on any supported FluentCart, and defaulting to the retired route would guarantee a 404.
+ */
+const PREVIEW_VARIANTS: readonly { method: HttpMethod; path: string }[] = [
+	{ method: 'POST', path: '/email-notification/preview-default-template' },
+	{ method: 'POST', path: '/email-notification/get-template' },
+]
+
+function selectPath(
+	capabilities: ApiCapabilities | undefined,
+	variants: readonly { method: HttpMethod; path: string }[],
+): string | null {
+	if (!capabilities) return variants[0]?.path ?? null
+	return variants.find((variant) => capabilities.has(variant.method, variant.path))?.path ?? null
+}
+
+export function emailNotificationTools(
+	client: FluentCartClient,
+	capabilities?: ApiCapabilities,
+): ToolDefinition[] {
+	const previewPath = selectPath(capabilities, PREVIEW_VARIANTS)
+
 	return [
 		getTool(client, {
 			name: 'fluentcart_email_list',
@@ -43,6 +71,7 @@ export function emailNotificationTools(client: FluentCartClient): ToolDefinition
 
 		createTool(client, {
 			name: 'fluentcart_email_toggle',
+			routes: direct('POST', '/email-notification/enable-notification/{param}'),
 			title: 'Toggle Email Notification',
 			description:
 				'Enable or disable an email notification. Use `active` (`yes`/`no`); `status` is accepted as a legacy alias.',
@@ -70,16 +99,48 @@ export function emailNotificationTools(client: FluentCartClient): ToolDefinition
 			cache: { key: 'email_shortcodes', ttlMs: TTL.LONG },
 		}),
 
-		postTool(client, {
-			name: 'fluentcart_email_template_preview',
-			title: 'Preview Email Template',
-			description: 'Preview rendered email template with sample data.',
-			schema: z.object({
-				template: z.string().optional().describe('Notification template key to preview'),
-				body: z.string().optional().describe('Custom body to render'),
-			}),
-			endpoint: '/email-notification/get-template',
-		}),
+		...(previewPath
+			? [
+					createTool(client, {
+						name: 'fluentcart_email_template_preview',
+						// The variant is already resolved above, so declare the one route this
+						// registration will call. Declaring the alternative too would claim a route the
+						// connected store does not serve.
+						routes: direct('POST', previewPath),
+						title: 'Preview Email Template',
+						description:
+							'Preview a stored email template rendered with sample order data. ' +
+							'Returns the rendered HTML. `template` is the notification template key ' +
+							'(e.g. "order.paid.admin"); read the available keys from fluentcart_email_list. ' +
+							'Rendering arbitrary HTML is not supported: the endpoint always renders the ' +
+							'stored template selected by `template`.',
+						schema: z.object({
+							template: z
+								.string()
+								.describe('Notification template key to preview (e.g. "order.paid.admin")'),
+							body: z
+								.string()
+								.optional()
+								.describe('Not supported — rejected. The endpoint renders the stored template.'),
+						}),
+						annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+						handler: async (c, input) => {
+							// Neither the 1.3.9 contract nor the current controller reads a custom body;
+							// forwarding it would render the default template and quietly ignore the caller.
+							if (input.body !== undefined) {
+								throw new FluentCartApiError(
+									'VALIDATION_ERROR',
+									'Validation error: `body` is not supported. This endpoint renders the stored ' +
+										'template named by `template`; a custom body would be silently ignored.',
+									422,
+								)
+							}
+							const response = await c.post(previewPath, { template: input.template })
+							return response.data
+						},
+					}),
+				]
+			: []),
 
 		getTool(client, {
 			name: 'fluentcart_email_settings_get',
@@ -91,6 +152,7 @@ export function emailNotificationTools(client: FluentCartClient): ToolDefinition
 
 		createTool(client, {
 			name: 'fluentcart_email_settings_save',
+			routes: direct('POST', '/email-notification/save-settings'),
 			title: 'Save Email Settings',
 			description:
 				'Save global email notification settings. Pass fields at top level: from_name, from_email, admin_email, logo_url, footer_text.',

@@ -12,7 +12,7 @@ The stdio transport works brilliantly for local AI clients — Claude Desktop, C
 
 ## Docker Image
 
-The image is on Docker Hub and GitHub Container Registry. Multi-architecture (amd64 + arm64), so it runs on basically anything with electricity.
+The image is on Docker Hub and GitHub Container Registry, built for `linux/amd64`. That covers every ordinary VPS. On an arm64 host it runs under emulation, or you build it yourself from the tab below — which takes about a minute and skips the emulation tax.
 
 <Tabs items={['Docker Hub', 'GitHub Container Registry', 'Build from source']}>
 <Tab value="Docker Hub">
@@ -23,7 +23,7 @@ docker run -d \
   -e FLUENTCART_URL=https://your-store.com \
   -e FLUENTCART_USERNAME=admin \
   -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP" \
-  -e FLUENTCART_MCP_API_KEY=your-secret-key \
+  -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
   --name fluentcart-mcp \
   vcodesh/fluentcart-mcp
 ```
@@ -37,7 +37,7 @@ docker run -d \
   -e FLUENTCART_URL=https://your-store.com \
   -e FLUENTCART_USERNAME=admin \
   -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP" \
-  -e FLUENTCART_MCP_API_KEY=your-secret-key \
+  -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
   --name fluentcart-mcp \
   ghcr.io/vcode-sh/fluentcart-mcp
 ```
@@ -56,7 +56,7 @@ docker run -d \
   -e FLUENTCART_URL=https://your-store.com \
   -e FLUENTCART_USERNAME=admin \
   -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP" \
-  -e FLUENTCART_MCP_API_KEY=your-secret-key \
+  -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
   --name fluentcart-mcp \
   fluentcart-mcp
 ```
@@ -71,13 +71,46 @@ The container exposes port `3000` and starts with `--transport http` by default.
 | Variable | Required | Description |
 |---|---|---|
 | `FLUENTCART_URL` | Yes | Full URL to your WordPress site |
-| `FLUENTCART_USERNAME` | Yes | WordPress admin username |
+| `FLUENTCART_USERNAME` | Yes | WordPress username the server authenticates as |
 | `FLUENTCART_APP_PASSWORD` | Yes | WordPress Application Password |
-| `FLUENTCART_MCP_API_KEY` | No | Bearer token for the MCP endpoint. If set, all requests to `/mcp` must include `Authorization: Bearer <key>`. If not set, the endpoint is wide open. |
+| `FLUENTCART_MCP_API_KEY` | Yes, for any bind that isn't loopback | Bearer token for `/mcp`. At least 32 characters. |
+| `FLUENTCART_WRITE_MODE` | No | `disabled` (default), `reversible`, or `guarded` |
+| `FLUENTCART_GUARD_SECRET` | No | Reserved. Signing key for preview tokens; changes nothing in 2.0.0 |
+| `FLUENTCART_GUARD_STATE_DIR` | No | Reserved. Absolute path to a writable, persistent directory; changes nothing in 2.0.0 |
+| `FLUENTCART_ALLOW_LIVE_GATEWAY_ACTIONS` | No | Reserved. Changes nothing in 2.0.0 |
+| `FLUENTCART_TIMEOUT` | No | Request timeout in milliseconds. Default 30000 |
 
-<Callout type="warn" title="Set the API key">
-Without `FLUENTCART_MCP_API_KEY`, anyone who discovers your endpoint can query your store, create orders, issue refunds — the full 274-tool experience. Thrilling for you, potentially expensive. Set the key.
+## Binding and Authentication
+
+The HTTP transport binds `127.0.0.1` by default. The Docker image overrides that with `--host 0.0.0.0`, because a container that only talks to itself is a philosophical exercise rather than a deployment.
+
+Any bind that isn't loopback requires `FLUENTCART_MCP_API_KEY` of at least 32 characters, and the check runs *before* the server listens. Miss it and you don't get an open endpoint — you get a process that exits with `Refusing to bind 0.0.0.0` and a container that restart-loops until you fix the configuration.
+
+Once a key is set, every request to `/mcp` needs `Authorization: Bearer <key>`. Every rejection — no header, malformed header, wrong key — returns the same thing:
+
+```json
+{"error":"Unauthorized"}
+```
+
+Identical body, identical status, and the comparison is constant-time. A prober cannot tell a wrong key from a missing one, or measure its way towards a right one.
+
+<Callout type="warn" title="The key protects the endpoint, not your store">
+A bearer key stops strangers reaching your MCP endpoint. It does not decide what that endpoint can do — `FLUENTCART_WRITE_MODE` does, and it defaults to `disabled`. Leave it there unless you have a reason not to. The most secure deployment is still one where nothing dangerous is exposed in the first place.
 </Callout>
+
+## Refunds and Cancellations in 2.0.0
+
+They aren't available. `fluentcart_order_refund` and `fluentcart_subscription_cancel` are absent from every write mode, including `guarded` with a valid secret and state directory. There is no configuration that turns them on, and `guarded` currently exposes exactly what `reversible` does.
+
+If you are deploying this so an agent can hand money back to customers, stop here: that is not available in this release, and no amount of configuration changes it.
+
+**Why, since the machinery is visibly in the package.** The guard is finished and unit-tested — previews signed and pinned to the exact payload, a durable single-writer ledger, replay and conflict detection, crash handling that never silently retries an ambiguous call. What is missing is acceptance evidence: a test that creates an order, refunds it, and removes it again, proving the whole path against a real store.
+
+FluentCart 1.5.5 makes that impossible to finish cleanly. Transactions have no DELETE route. Deleting an order doesn't cascade to its transactions. `canPurchase()` rejects any unpublished product, so there's no draft fixture to hide behind. And a test run cannot create a subscription at all. Every refundable fixture leaves rows the API cannot remove, which means the only available proof is one that permanently litters the store it runs against.
+
+The rule was that a guarded capability either passes both acceptance lanes or ships unavailable. It could not pass, so it ships unavailable. The ceremony is built; the proof is not, so it is not switched on.
+
+`FLUENTCART_GUARD_SECRET`, `FLUENTCART_GUARD_STATE_DIR` and `FLUENTCART_ALLOW_LIVE_GATEWAY_ACTIONS` are reserved for the release that brings this back. Setting them today changes nothing — no tool appears, no behaviour differs.
 
 ## Dokploy Setup
 
@@ -91,7 +124,7 @@ If you're running [Dokploy](https://dokploy.com) (or similar), point it at the i
 </Step>
 <Step>
 
-**Set environment variables** — add all four from the table above. `FLUENTCART_MCP_API_KEY` is optional but strongly recommended in production.
+**Set environment variables** — the three FluentCart credentials plus `FLUENTCART_MCP_API_KEY`. The key is not optional here: the container binds beyond loopback, so without it the process exits instead of starting.
 
 </Step>
 <Step>
@@ -124,7 +157,9 @@ Should return:
 {"status":"ok"}
 ```
 
-If it doesn't, something's broken. Check the container logs:
+`/health` is deliberately unauthenticated so load balancers and uptime monitors can reach it. It says nothing about your store — only that the process is alive. The bearer key guards `/mcp` and nothing else needs it.
+
+If it doesn't answer, something's broken. Check the container logs:
 
 ```bash
 docker logs fluentcart-mcp
@@ -140,14 +175,14 @@ Paste your endpoint URL into ChatGPT's MCP server configuration:
 https://mcp.your-domain.com/mcp
 ```
 
-ChatGPT will negotiate the connection via Streamable HTTP. If you've set a bearer token, you'll need to configure that in the auth settings as well.
+ChatGPT will negotiate the connection via Streamable HTTP. Put the bearer token in its auth settings too — on a public endpoint the server has one, or it wouldn't have started.
 
 ### Any HTTP-capable MCP client
 
 Same deal. Point the client at your `/mcp` endpoint. Set the bearer token if configured. The server speaks standard MCP over Streamable HTTP — no special sauce required.
 
 <Callout type="info" title="Stateless mode">
-The HTTP transport creates a fresh server instance per request. This keeps things simple and works with scale-to-zero deployments, but it means each request resolves config and registers all 274 tools. On a reasonable VPS, this adds maybe 10-20ms overhead. Not exactly a crisis.
+The HTTP transport creates a fresh server instance per request. That keeps things simple and works with scale-to-zero deployments, at the cost of resolving config and rebuilding the registry each time. On a reasonable VPS it adds maybe 10-20ms. In dynamic mode the registry it builds is five meta-tools, so the overhead is closer to a rounding error.
 </Callout>
 
 <Separator className="my-8" />
@@ -166,7 +201,7 @@ services:
       FLUENTCART_URL: https://your-store.com
       FLUENTCART_USERNAME: admin
       FLUENTCART_APP_PASSWORD: "aBcD eFgH iJkL mNoP"
-      FLUENTCART_MCP_API_KEY: your-secret-key
+      FLUENTCART_MCP_API_KEY: "a-32-character-minimum-secret-goes-here"
     restart: unless-stopped
 ```
 

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { createTool, deleteTool, getTool, postTool, type ToolDefinition } from './_factory.js'
+import { direct } from './endpoints.js'
 
 export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -48,6 +49,7 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_product_create',
+			routes: direct('POST', '/products'),
 			title: 'Create Product',
 			description:
 				'Create a product (defaults to draft). Fulfillment type: digital or physical. ' +
@@ -198,6 +200,7 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_product_fetch_by_ids',
+			routes: direct('GET', '/products/fetchProductsByIds'),
 			title: 'Fetch Products by IDs',
 			description: 'Retrieve multiple products by their IDs. Limit to 20 IDs per request.',
 			schema: z.object({

@@ -2,10 +2,10 @@ import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import type { Express } from 'express'
 import type { ToolsetMode } from '../server.js'
-import { createServerFromContext, resolveServerContext } from '../server.js'
+import { createServerFromContext, DEFAULT_TOOLSET_MODE, resolveServerContext } from '../server.js'
 import { assertSafeHttpExposure, createBearerAuth } from './auth.js'
 
-export function createApp(host: string, mode: ToolsetMode = 'static'): Express {
+export function createApp(host: string, mode: ToolsetMode = DEFAULT_TOOLSET_MODE): Express {
 	const app = createMcpExpressApp({ host })
 	const ctx = resolveServerContext()
 
@@ -52,7 +52,7 @@ export function createApp(host: string, mode: ToolsetMode = 'static'): Express {
 export async function startHttpServer(
 	port: number,
 	host: string,
-	mode: ToolsetMode = 'static',
+	mode: ToolsetMode = DEFAULT_TOOLSET_MODE,
 ): Promise<void> {
 	// Fail before a socket exists, not after the first unauthenticated request arrives.
 	assertSafeHttpExposure(host, process.env.FLUENTCART_MCP_API_KEY)

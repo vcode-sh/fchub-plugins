@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
+import { direct } from './endpoints.js'
 
 export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -17,6 +18,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_settings_save_store',
+			routes: direct('POST', '/settings/store'),
 			title: 'Save Store Settings',
 			description:
 				'Update store settings. Backend reads top-level keys directly (e.g. store_name, currency, order_mode). ' +
@@ -102,6 +104,7 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_settings_save_confirmation',
+			routes: direct('POST', '/settings/confirmation'),
 			title: 'Save Confirmation Settings',
 			description:
 				'Update order confirmation page settings and template. Pass settings at top level.',

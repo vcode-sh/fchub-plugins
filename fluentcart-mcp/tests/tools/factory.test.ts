@@ -823,41 +823,36 @@ describe('truncateResponse', () => {
 		expect(truncateResponse(data)).toBe(data)
 	})
 
-	it('truncates oversized arrays with metadata', () => {
+	it('refuses an oversized array instead of shortening it', () => {
+		// Truncating a page and still advancing the page number silently skips the dropped rows,
+		// so an over-budget response is now an error the caller can act on.
 		const bigItem = { data: 'x'.repeat(1000) }
 		const items = Array.from({ length: 200 }, (_, i) => ({ ...bigItem, id: i }))
-		const result = truncateResponse(items) as Record<string, unknown>
 
-		expect(result._truncated).toBe(true)
-		expect(result._total).toBe(200)
-		expect(typeof result._showing).toBe('number')
-		expect(result._showing as number).toBeLessThan(200)
-		expect(Array.isArray(result.items)).toBe(true)
-		expect(JSON.stringify(result).length).toBeLessThanOrEqual(MAX_RESPONSE_CHARS)
+		expect(() => truncateResponse(items)).toThrow(/RESPONSE_TOO_LARGE|over the/)
 	})
 
-	it('truncates oversized paginated response with data array', () => {
+	it('refuses an oversized paginated payload rather than reporting partial success', () => {
 		const bigItem = { data: 'x'.repeat(1000) }
 		const items = Array.from({ length: 200 }, (_, i) => ({ ...bigItem, id: i }))
 		const paginated = { data: items, current_page: 1, total: 200, per_page: 200 }
-		const result = truncateResponse(paginated) as Record<string, unknown>
 
-		expect(result._truncated).toBe(true)
-		expect(result._total).toBe(200)
-		expect(result.current_page).toBe(1)
-		expect(Array.isArray(result.data)).toBe(true)
-		expect((result.data as unknown[]).length).toBeLessThan(200)
+		expect(() => truncateResponse(paginated)).toThrow(/RESPONSE_TOO_LARGE|over the/)
 	})
 
-	it('returns truncation notice for oversized non-array objects', () => {
-		const obj: Record<string, string> = {}
-		for (let i = 0; i < 1000; i++) {
-			obj[`key_${i}`] = 'x'.repeat(200)
-		}
-		const result = truncateResponse(obj) as Record<string, unknown>
+	it('refuses a single record larger than the cap', () => {
+		// This case previously escaped every guard: it could not be sliced below one item, so it
+		// was returned whole at 200,065 characters while still flagged as a success.
+		expect(() => truncateResponse([{ blob: 'x'.repeat(200_000) }])).toThrow(
+			/RESPONSE_TOO_LARGE|over the/,
+		)
+	})
 
-		expect(result._truncated).toBe(true)
-		expect(result._message).toContain('Response too large')
+	it('names remedies the caller can actually apply', () => {
+		const obj: Record<string, string> = {}
+		for (let i = 0; i < 1000; i++) obj[`key_${i}`] = 'x'.repeat(200)
+
+		expect(() => truncateResponse(obj)).toThrow(/narrower query|fewer requested fields|page size/)
 	})
 
 	it('handles empty arrays in paginated response', () => {

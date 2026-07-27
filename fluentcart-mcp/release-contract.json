@@ -1,0 +1,258 @@
+{
+  "generatedBy": "scripts/build-release-contract.mjs",
+  "serializer": "mcp-tools-list-v1",
+  "tokenizer": "gpt-tokenizer@3.4.0",
+  "packageVersion": "2.0.0",
+  "sourceTreeDigest": "sha256:70ffacc472d731537f1af86102eed33278128826632999dcfc414db50bd693e8",
+  "sourceTreeInputs": {
+    "fileCount": 108,
+    "declared": [
+      {
+        "file": "package.json"
+      },
+      {
+        "file": "tsconfig.json"
+      },
+      {
+        "file": "scripts/measure-tool-context.mjs"
+      },
+      {
+        "file": "scripts/build-release-contract.mjs"
+      },
+      {
+        "file": "scripts/build-manifest.mjs"
+      },
+      {
+        "directory": "src",
+        "extension": ".ts"
+      },
+      {
+        "directory": "tests/fixtures/routes",
+        "extension": ".json"
+      }
+    ],
+    "excluded": [
+      "release-contract.json",
+      "manifest.json"
+    ]
+  },
+  "sourceDefinitionCount": 276,
+  "categoryCount": 20,
+  "writePolicyExposure": {
+    "disabled": 148,
+    "reversible": 174,
+    "guarded": 174,
+    "realMoneyExposable": 0,
+    "composedBeyondModules": 2,
+    "note": "Exposure per write mode as the server composes it, independent of route evidence."
+  },
+  "curatedNames": {
+    "declared": 20,
+    "resolvable": 20,
+    "unresolved": []
+  },
+  "capabilityFiltering": {
+    "appliedToToolRegistry": true,
+    "note": "Discovered routes prune the registry before registration: a direct tool needs one declared variant served, a composite needs every route it may call, and a tool with no supported route is not registered at all. Each profile row below is measured under its own fixture, so the counts differ by store."
+  },
+  "legacyRuntimeSupport": {
+    "status": "ROUTE-SURFACE-CAPTURED",
+    "evidence": "live-rest-index",
+    "routeSurfaceProven": true,
+    "runtimeFixture": "tests/fixtures/routes/fluentcart-1.3.9-runtime.json",
+    "toolCompatibilityProven": false,
+    "claimPolicy": "Documentation may state that the 1.3.9 route surface is captured, and that pruning leaves an older store a smaller tool list. It may not claim 1.3.9 runtime support until a tool-level compatibility check passes: a smaller list is evidence that pruning works, not that the surviving tools have been exercised against that build."
+  },
+  "profiles": [
+    {
+      "name": "legacy-1.3.9-runtime-rest-disabled",
+      "componentFixture": "tests/fixtures/routes/fluentcart-1.3.9-runtime.json",
+      "guardFixture": null,
+      "writeMode": "disabled",
+      "evidenceKind": "live-rest-index",
+      "replaces": null,
+      "status": "MEASURED",
+      "missingFixture": null,
+      "reason": null,
+      "exposedDefinitionCount": 140,
+      "modes": {
+        "dynamic": {
+          "toolCount": 5,
+          "characters": 3973,
+          "cl100kTokens": 863,
+          "o200kTokens": 877
+        },
+        "curated": {
+          "toolCount": 18,
+          "characters": 12314,
+          "cl100kTokens": 2820,
+          "o200kTokens": 2898
+        },
+        "code": {
+          "toolCount": 2,
+          "characters": 2427,
+          "cl100kTokens": 532,
+          "o200kTokens": 540
+        },
+        "full": {
+          "toolCount": 140,
+          "characters": 86154,
+          "cl100kTokens": 19404,
+          "o200kTokens": 19874
+        }
+      }
+    },
+    {
+      "name": "core-1.5.5-rest-disabled",
+      "componentFixture": "tests/fixtures/routes/fluentcart-1.5.5-core.json",
+      "guardFixture": null,
+      "writeMode": "disabled",
+      "evidenceKind": "live-rest-index",
+      "replaces": null,
+      "status": "MEASURED",
+      "missingFixture": null,
+      "reason": null,
+      "exposedDefinitionCount": 142,
+      "modes": {
+        "dynamic": {
+          "toolCount": 5,
+          "characters": 3973,
+          "cl100kTokens": 863,
+          "o200kTokens": 877
+        },
+        "curated": {
+          "toolCount": 18,
+          "characters": 12314,
+          "cl100kTokens": 2820,
+          "o200kTokens": 2898
+        },
+        "code": {
+          "toolCount": 2,
+          "characters": 2427,
+          "cl100kTokens": 532,
+          "o200kTokens": 540
+        },
+        "full": {
+          "toolCount": 142,
+          "characters": 87084,
+          "cl100kTokens": 19617,
+          "o200kTokens": 20089
+        }
+      }
+    },
+    {
+      "name": "core-1.5.5-pro-1.5.4-rest-disabled",
+      "componentFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json",
+      "guardFixture": null,
+      "writeMode": "disabled",
+      "evidenceKind": "live-rest-index",
+      "replaces": null,
+      "status": "MEASURED",
+      "missingFixture": null,
+      "reason": null,
+      "exposedDefinitionCount": 148,
+      "modes": {
+        "dynamic": {
+          "toolCount": 5,
+          "characters": 3973,
+          "cl100kTokens": 863,
+          "o200kTokens": 877
+        },
+        "curated": {
+          "toolCount": 18,
+          "characters": 12314,
+          "cl100kTokens": 2820,
+          "o200kTokens": 2898
+        },
+        "code": {
+          "toolCount": 2,
+          "characters": 2427,
+          "cl100kTokens": 532,
+          "o200kTokens": 540
+        },
+        "full": {
+          "toolCount": 148,
+          "characters": 90464,
+          "cl100kTokens": 20410,
+          "o200kTokens": 20897
+        }
+      }
+    },
+    {
+      "name": "core-1.5.5-pro-1.5.4-rest-reversible",
+      "componentFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json",
+      "guardFixture": null,
+      "writeMode": "reversible",
+      "evidenceKind": "live-rest-index",
+      "replaces": null,
+      "status": "MEASURED",
+      "missingFixture": null,
+      "reason": null,
+      "exposedDefinitionCount": 174,
+      "modes": {
+        "dynamic": {
+          "toolCount": 5,
+          "characters": 3973,
+          "cl100kTokens": 863,
+          "o200kTokens": 877
+        },
+        "curated": {
+          "toolCount": 20,
+          "characters": 16153,
+          "cl100kTokens": 3652,
+          "o200kTokens": 3765
+        },
+        "code": {
+          "toolCount": 2,
+          "characters": 2427,
+          "cl100kTokens": 532,
+          "o200kTokens": 540
+        },
+        "full": {
+          "toolCount": 174,
+          "characters": 121046,
+          "cl100kTokens": 27046,
+          "o200kTokens": 27747
+        }
+      }
+    },
+    {
+      "name": "core-1.5.5-pro-1.5.4-standalone-guarded",
+      "componentFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json",
+      "guardFixture": "tests/fixtures/security/standalone-guard.json",
+      "writeMode": "guarded",
+      "evidenceKind": "live-rest-index",
+      "replaces": null,
+      "status": "MEASURED",
+      "missingFixture": null,
+      "reason": null,
+      "exposedDefinitionCount": 174,
+      "modes": {
+        "dynamic": {
+          "toolCount": 5,
+          "characters": 3973,
+          "cl100kTokens": 863,
+          "o200kTokens": 877
+        },
+        "curated": {
+          "toolCount": 20,
+          "characters": 16153,
+          "cl100kTokens": 3652,
+          "o200kTokens": 3765
+        },
+        "code": {
+          "toolCount": 2,
+          "characters": 2427,
+          "cl100kTokens": 532,
+          "o200kTokens": 540
+        },
+        "full": {
+          "toolCount": 174,
+          "characters": 121046,
+          "cl100kTokens": 27046,
+          "o200kTokens": 27747
+        }
+      }
+    }
+  ]
+}

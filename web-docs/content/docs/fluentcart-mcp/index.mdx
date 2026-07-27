@@ -1,13 +1,15 @@
 ---
 title: FluentCart MCP Server
-description: Let your AI assistant manage your FluentCart store. 274 tools, plain English, open source.
+description: Connect your AI assistant to your FluentCart store. Read-only until you say otherwise, open source.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-FluentCart admin panels are fine if you enjoy clicking through seventeen screens to refund an order. For everyone else, there's this — an MCP server that lets your AI assistant manage your store. Connect it to Claude, Cursor, Copilot, ChatGPT, Codex — whatever speaks MCP — and suddenly your AI can look up orders, create products, pull revenue reports, manage subscriptions, and do basically everything you'd do in the admin panel. Except faster.
+FluentCart's admin panel is fine if you enjoy clicking through seventeen screens to find out what last week actually earned. For everyone else, there's this — an MCP server that connects your AI assistant to your store's REST API. Claude, Cursor, Copilot, ChatGPT, Codex, anything that speaks MCP.
+
+Out of the box it reads. Orders, products, customers, subscriptions, reports, settings. Changing anything is a separate decision you have to make on purpose, and the tools that touch money are hidden until you have configured the machinery that makes them safe to expose.
 
 Open source. On [npm](https://www.npmjs.com/package/fluentcart-mcp). On [GitHub](https://github.com/vcode-sh/fchub-plugins).
 
@@ -33,32 +35,32 @@ Asks three questions (WordPress URL, username, Application Password), tests the 
 
 ## What You Can Do
 
-274 tools across 27 modules. You just talk — the AI picks the right tool:
+You just talk. The AI finds the right tool and fills in the parameters:
 
 > "Show me all orders from the last 7 days"
-
-> "Create a 15% discount coupon that expires next Friday"
 
 > "Find the customer with email john@example.com and show their order history"
 
 > "What's my revenue this month compared to last month?"
 
-> "Refund order #1234 — the customer received a damaged item"
+> "Which products sold best in the last quarter, and how does that compare to the one before?"
 
-> "Set up a flat-rate shipping zone for Europe at £5.99"
+> "Show me every subscription that renews in the next fortnight"
+
+Those work on a default install. Anything that changes data — a new product, a price update, a shipping zone — needs `FLUENTCART_WRITE_MODE` set first, and the server will not pretend otherwise: a tool it hasn't exposed cannot be listed, searched, described or called by name.
 
 <Cards>
   <Card title="Orders &amp; Support">
-    Look up orders, process refunds, update statuses, handle disputes. The daily grind, automated.
+    Look orders up, follow a payment through its transactions, read the activity trail. Reading is the whole of it — order edits and status changes aren't exposed in this release.
   </Card>
   <Card title="Products &amp; Catalogue">
-    Create products, update pricing, manage variants, downloads and licences.
+    Read the catalogue, pricing, variants, downloads and licences. Editing them needs writes enabled.
   </Card>
   <Card title="Customers &amp; Subscriptions">
-    Find customers, check lifetime value, pause/resume/cancel subscriptions.
+    Profiles, addresses, lifetime value, subscription state. Creating and updating a customer needs writes enabled; ending a subscription isn't available in this release.
   </Card>
   <Card title="Reports &amp; Analytics">
-    45 report tools — revenue, sales growth, top products, customer insights. Ask questions, get answers.
+    Revenue, sales growth, top products, retention cohorts, customer insights. All read-only, all available by default.
   </Card>
   <Card title="Shipping, Tax &amp; Email">
     Shipping zones, tax rates, EU VAT, email templates, notification settings.
@@ -67,6 +69,30 @@ Asks three questions (WordPress URL, username, Application Password), tests the 
     Coupons, roles, permissions, integrations, files, print templates.
   </Card>
 </Cards>
+
+<Separator className="my-8" />
+
+## Read-Only Until You Say Otherwise
+
+`FLUENTCART_WRITE_MODE` decides what the server is even willing to show your AI. It defaults to `disabled`.
+
+| Write mode | What appears | Use it when |
+|---|---|---|
+| `disabled` *(default)* | Reads only | You want answers, not edits |
+| `reversible` | Reads plus the writes that can be undone — creating and updating products, variants, coupons, customers, shipping, tax rules, attributes and order bumps | You want the AI to do the boring admin |
+| `guarded` | The same set as `reversible` in 2.0.0 — see below | Nothing yet. It's the mode the money tools will return to |
+
+Filtering happens before registration, not at call time. A tool the policy excludes is not disabled — it is absent, and cannot be listed, searched, described or called by name.
+
+<Callout type="warn" title="Refunds and cancellations are not available in 2.0.0">
+`fluentcart_order_refund` and `fluentcart_subscription_cancel` are **not available in any write mode**, including a fully configured `guarded` one. If you are here to automate refunds, this release will not do it and you should know that before you install rather than after.
+
+The guard itself is finished — signed previews pinned to the exact payload, a durable single-writer ledger, replay and conflict detection, crash handling that never silently retries. What is missing is acceptance evidence, and for something that moves customer money that distinction is the whole argument. Proving a refund end to end needs an order created, refunded and then removed within one run, and FluentCart 1.5.5 offers no way to finish that: transactions have no DELETE route, deleting an order leaves them behind, and no draft product can stand in because unpublished products can't be purchased. Every candidate fixture leaves residue the API cannot clean up.
+
+The rule we set ourselves was that a guarded capability either passes both acceptance lanes or ships unavailable. It could not, so it does not. The ceremony is built; the proof is not, so it is not switched on.
+</Callout>
+
+Deletion, bulk operations, order status changes and marking an order paid are also absent, for the same reason in a milder form: FluentCart offers no supported way to undo them, so they are not classed as reversible.
 
 <Separator className="my-8" />
 
@@ -88,9 +114,13 @@ The MCP server connects directly to **your** WordPress site. Nothing passes thro
 
 | Requirement | Details |
 |-------------|---------|
-| **WordPress** | Version 5.6+ with [FluentCart](https://fluentcart.com) installed |
+| **WordPress** | 7.0.2 with [FluentCart](https://fluentcart.com) 1.5.5 and FluentCart Pro 1.5.4 — the combination this release is verified against |
 | **Application Password** | Generated in WordPress admin (Users → Profile) |
-| **Node.js 22+** | [Download](https://nodejs.org) — *not needed for the Claude Desktop Extension* |
+| **Node.js 24+** | [Download](https://nodejs.org) — *not needed for the Claude Desktop Extension* |
+
+Older FluentCart builds are a different question. The route surface of an older 1.3.9 install has been captured from a real runtime, so there is hard evidence of which endpoints that build serves — but evidence about a store is not the same as proof these tools work against it, and support for it isn't claimed.
+
+What does happen on any store, old or new: the server reads your REST index at startup and registers only the tools your routes can serve. An older build gets a smaller tool list rather than a full one that fails halfway through.
 
 ## Supported AI Clients
 
@@ -119,7 +149,7 @@ Anything that speaks MCP will work. The config is the same everywhere.
     What to ask and how to phrase it. Dozens of example prompts by category.
   </Card>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    All 274 tools across 27 modules. The complete inventory.
+    Every tool definition in this release, by module — and which ones your configuration actually exposes.
   </Card>
   <Card title="Troubleshooting" href="/docs/fluentcart-mcp/troubleshooting">
     Something broken? Every failure mode is covered.
@@ -137,3 +167,5 @@ Anything that speaks MCP will work. The config is the same everywhere.
     The package on npm.
   </Card>
 </Cards>
+
+Verified against FluentCart 1.5.5 with Pro 1.5.4 on WordPress 7.0.2. Older builds are covered above: the 1.3.9 route surface has been captured from a real runtime, but support for it is not claimed.

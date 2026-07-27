@@ -23,7 +23,7 @@ Replace `username` and `application_password` with your actual values. What you 
 |----------|---------------|
 | JSON with store data | Connection and auth work fine. Your issue is in the AI client config. |
 | `401 Unauthorized` | Wrong username or Application Password. |
-| `403 Forbidden` | Your user doesn't have admin permissions. |
+| `403 Forbidden` | That user lacks the FluentCart permission behind this endpoint. |
 | `404 Not Found` | FluentCart isn't installed, or the URL is wrong. |
 | Connection refused | WordPress is unreachable. Network or server issue. |
 
@@ -55,6 +55,54 @@ Replace `username` and `application_password` with your actual values. What you 
 
 5. **Didn't restart the app**
    Claude Desktop, Cursor, and VS Code don't hot-reload MCP configs. Close the app completely (not just the window — quit it) and reopen.
+
+6. **The store rejected the startup check**
+   Before serving anything, the server asks your site which FluentCart routes exist. Bad URL, bad credentials or an unreachable site and it stops there rather than connecting and failing on every call afterwards. The error lands in your client's MCP log.
+
+</Accordion>
+<Accordion title="A Tool I Expected Isn't There">
+
+**What you see**: The AI says it has no tool for creating a product, updating a status, or refunding. Search comes back empty for something the [Tool Reference](/docs/fluentcart-mcp/tools) clearly lists.
+
+**What's wrong**: It isn't hidden — it isn't registered. Exposure is decided before registration, so a tool your policy excludes cannot be listed, searched, described or called by name.
+
+**Fix**, in order of likelihood:
+
+1. **Write mode.** `FLUENTCART_WRITE_MODE` defaults to `disabled`. Creating or updating something needs `reversible`.
+2. **It isn't exposed in any mode.** Refunds, subscription cancellation, every deletion, bulk actions, order status changes, marking an order paid and dispute handling are absent from all three write modes — including `guarded`, which in 2.0.0 exposes exactly what `reversible` does. No environment variable brings them back. [Why](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0).
+3. **Your store doesn't serve that route.** Startup discovery prunes the registry: a tool whose endpoint your FluentCart build doesn't expose is never registered, and a tool that needs several routes needs all of them. A Pro-only endpoint on a core-only site is legitimately absent, and installing the missing component brings the tool back on the next restart.
+4. **It never existed.** Subscription pause, resume and reactivate are not tools. Neither is a customer address dropdown helper. Check the reference rather than the AI's optimism.
+
+The tool list is therefore a property of your store, not a fixed catalogue. Two sites on different FluentCart builds will legitimately show different tools, and the reference page lists what ships rather than what any particular store exposes.
+
+</Accordion>
+<Accordion title="Setting the Guard Variables Did Nothing">
+
+**What you see**: You set `FLUENTCART_WRITE_MODE=guarded`, generated a signing secret, mounted a state directory — and no refund or cancellation tool appeared. No error either.
+
+**That's correct.** Those two tools are absent from every write mode in 2.0.0. `guarded` is a valid setting that currently exposes exactly what `reversible` does, and `FLUENTCART_GUARD_SECRET`, `FLUENTCART_GUARD_STATE_DIR` and `FLUENTCART_ALLOW_LIVE_GATEWAY_ACTIONS` are reserved for the release that brings them back. Setting them today changes nothing at all.
+
+The guard is finished and tested; what's missing is proof it survives contact with a real store, which FluentCart 1.5.5 makes impossible to gather cleanly. The [deployment guide explains it properly](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0). If you need refunds automated, this release is not the tool for it.
+
+</Accordion>
+<Accordion title="401 From the MCP Endpoint Itself">
+
+**What you see**: `{"error":"Unauthorized"}` from your own HTTP deployment, not from WordPress.
+
+**What's wrong**: The bearer key. Every rejection returns that identical body — missing header, malformed header, wrong key, all the same. That's deliberate: a prober shouldn't be able to tell which mistake they made. It does mean you can't debug it by reading the response, so check the client config instead.
+
+Requests need `Authorization: Bearer <key>` matching `FLUENTCART_MCP_API_KEY` exactly. Watch for a trailing newline from `echo` when you set it in a shell.
+
+If the container won't start at all and the logs say `Refusing to bind`, the key is missing or under 32 characters. The server checks before it listens, so there is no window where the endpoint exists unprotected.
+
+</Accordion>
+<Accordion title="RESPONSE_TOO_LARGE">
+
+**What you see**: A tool call fails with `RESPONSE_TOO_LARGE` instead of returning data.
+
+**What's happening**: The response exceeded the budget, and the server would rather refuse than hand your model a payload that has been quietly trimmed and looks complete. The error names the ways out.
+
+**Fix**: Narrow the request. A smaller `per_page`, a tighter date range, a specific ID instead of a list. "Show me every order ever placed" is not a question with a useful answer anyway.
 
 </Accordion>
 <Accordion title="Authentication Failed (401)">
@@ -88,9 +136,11 @@ Replace `username` and `application_password` with your actual values. What you 
 
 **What you see**: "permission denied", "forbidden", HTTP 403.
 
-**What's wrong**: Your WordPress user isn't an Administrator.
+**What's wrong**: The WordPress user the server authenticates as lacks the FluentCart capability behind that particular endpoint.
 
-**Fix**: Go to **Users** in WordPress admin and check the role. FluentCart's REST API needs admin capabilities for nearly everything. Using an Editor or Subscriber account won't work. The permission requirements can't be lowered — that's FluentCart's design decision.
+**Fix**: Go to **Users** in WordPress admin and look at what that account can do. The server inherits exactly the permissions of the user in your config — no more, no less — so a narrow role is a supported choice, not a broken one. If you want the AI to read reports but never see customer records, that's a role question, and FluentCart's own roles and permissions screens are where you answer it.
+
+A 403 on one tool while everything else works is the system behaving correctly. A 403 on everything usually means the account has no FluentCart permissions at all.
 
 </Accordion>
 <Accordion title="Not Found (404)">
@@ -204,9 +254,9 @@ Some things break because of upstream FluentCart issues, not the MCP server. The
 
 **Price 100x Multiplier** — FluentCart's `Helper::toCent()` multiplies by 100 again internally. When passing prices via MCP, pass them in cents (e.g. 4999 for $49.99) — the API handles the rest. If prices look 100x too large, this is why.
 
-**Some Report Endpoints Missing** — A handful of report endpoints (`cart-report`, `order-value-distribution`, `sales-report`, `license-chart`, `license-pie-chart`) aren't registered in FluentCart 1.3.9. The tools exist in MCP for forward compatibility, but they'll return errors on older FluentCart versions. Use the alternative report tools mentioned in each tool's description.
+**Some Report Endpoints Missing** — A handful of report routes (`cart-report`, `order-value-distribution`, `sales-report`, `license-chart`, `license-pie-chart`) don't exist on older FluentCart builds. On such a store those tools are pruned at startup rather than offered and failed, so the symptom is a missing tool, not an error. This release is verified against FluentCart 1.5.5 with Pro 1.5.4 on WordPress 7.0.2. Each affected tool's description names an alternative.
 
-**Customer Address Select** — The `customer_address_select` endpoint is scoped to frontend sessions (cookie auth), not the REST API. Use `customer_addresses` to get all addresses and filter client-side.
+**Customer Address Select** — The old `customer_address_select` endpoint is scoped to frontend sessions with cookie auth, not the REST API, so the tool wrapping it has been removed rather than left in to fail politely. Use `fluentcart_customer_addresses` and filter client-side.
 
 For the full list of 14 documented upstream bugs, check the [GitHub repository](https://github.com/vcode-sh/fchub-plugins/issues).
 

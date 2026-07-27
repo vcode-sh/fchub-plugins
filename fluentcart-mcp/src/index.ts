@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createRequire } from 'node:module'
-import type { ToolsetMode } from './server.js'
+import { parseToolsetMode } from './server.js'
 
 const require = createRequire(import.meta.url)
 const { version } = require('../package.json') as { version: string }
@@ -34,7 +34,7 @@ Usage:
 
 Options:
   --transport <stdio|http>    Transport mode (default: stdio)
-  --mode <static|dynamic>     Toolset mode (default: static)
+  --mode <dynamic|curated|code|full>  Toolset mode (default: dynamic)
   --port <number>             HTTP server port (default: 3000)
   --host <address>            HTTP server bind address (default: 127.0.0.1)
 
@@ -52,7 +52,7 @@ Documentation: https://github.com/vcode-sh/fchub-plugins/tree/main/fluentcart-mc
 }
 
 const transport = getFlag('transport', 'stdio')
-const mode = getFlag('mode', 'static') as ToolsetMode
+const mode = parseToolsetMode(getFlag('mode', ''))
 
 // CLI sub-commands (setup, etc.) only when not using transport flags
 if (transport === 'stdio' && args.length > 0 && !args[0]!.startsWith('--')) {
@@ -74,9 +74,17 @@ if (transport === 'http') {
 	}
 } else {
 	const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js')
-	const { createServer } = await import('./server.js')
+	const { createServerFromContextAsync, resolveServerContextAsync } = await import('./server.js')
 
-	const server = createServer(mode)
-	const stdioTransport = new StdioServerTransport()
-	await server.connect(stdioTransport)
+	try {
+		// Discover the store's real routes before any transport is connected, so a store that
+		// cannot describe itself produces a startup error rather than a half-working session.
+		const context = await resolveServerContextAsync()
+		const server = await createServerFromContextAsync(context, mode)
+		const stdioTransport = new StdioServerTransport()
+		await server.connect(stdioTransport)
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : String(error))
+		process.exit(1)
+	}
 }

@@ -8,6 +8,7 @@ import {
 	putTool,
 	type ToolDefinition,
 } from './_factory.js'
+import { direct } from './endpoints.js'
 
 export function productCatalogTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -137,6 +138,7 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 
 		createTool(client, {
 			name: 'fluentcart_product_terms_add',
+			routes: direct('POST', '/products/add-product-terms'),
 			title: 'Create Taxonomy Terms',
 			description:
 				'Create new taxonomy terms (categories or brands). Returns created term IDs. ' +

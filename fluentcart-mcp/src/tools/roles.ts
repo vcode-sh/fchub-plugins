@@ -3,6 +3,7 @@ import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
 import { invalidate, TTL } from '../cache.js'
 import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
+import { direct } from './endpoints.js'
 
 export function roleTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -30,6 +31,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_role_create',
+			routes: direct('POST', '/roles'),
 			title: 'Create Role',
 			description:
 				'Assign a FluentCart management role to an existing WordPress user. ' +
@@ -83,6 +85,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_role_delete',
+			routes: direct('DELETE', '/roles/{param}'),
 			title: 'Delete Role',
 			description:
 				'Remove a FluentCart role assignment from a user. ' +

@@ -19,7 +19,7 @@ describe('E2E: MCP Protocol over HTTP', () => {
 	beforeAll(async () => {
 		process.env.FLUENTCART_MCP_API_KEY = ''
 
-		const app = createApp('127.0.0.1')
+		const app = createApp('127.0.0.1', 'full')
 
 		await new Promise<void>((resolve) => {
 			server = app.listen(0, '127.0.0.1', () => {
@@ -58,6 +58,8 @@ describe('E2E: MCP Protocol over HTTP', () => {
 		expect(caps!.tools).toBeDefined()
 	})
 
+	// This group runs in explicit `full` mode so it can address direct tools by name. Dynamic is
+	// the default and is covered by its own group below.
 	it('lists only read tools under the default disabled write mode', async () => {
 		const result = await mcpClient.listTools()
 		const names = result.tools.map((t) => t.name)
@@ -335,4 +337,89 @@ describe('E2E: Health and Edge Cases', () => {
 
 		expect(res.status).toBe(400)
 	})
+})
+
+// ---------------------------------------------------------------------------
+// Group 4: Dynamic is the default toolset mode
+// ---------------------------------------------------------------------------
+describe('E2E: dynamic default mode', () => {
+	let baseUrl: string
+	let server: Server
+	let mcpClient: Client
+
+	beforeAll(async () => {
+		process.env.FLUENTCART_MCP_API_KEY = ''
+		// No mode argument: this is exactly what an operator gets out of the box.
+		const app = createApp('127.0.0.1')
+
+		await new Promise<void>((resolve) => {
+			server = app.listen(0, '127.0.0.1', () => {
+				const addr = server.address()
+				if (addr && typeof addr === 'object') baseUrl = `http://127.0.0.1:${addr.port}`
+				resolve()
+			})
+		})
+
+		const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`))
+		mcpClient = new Client({ name: 'e2e-dynamic-client', version: '1.0.0' })
+		await mcpClient.connect(transport)
+	}, 30_000)
+
+	afterAll(async () => {
+		try {
+			await mcpClient?.close()
+		} catch {
+			// Already disconnected.
+		}
+		server?.close()
+	})
+
+	it('exposes exactly the five meta-tools by default', async () => {
+		const result = await mcpClient.listTools()
+		expect(result.tools.map((t) => t.name).sort()).toEqual([
+			'fluentcart_describe_tools',
+			'fluentcart_execute_guarded_write',
+			'fluentcart_execute_read_tool',
+			'fluentcart_execute_reversible_write',
+			'fluentcart_search_tools',
+		])
+	}, 30_000)
+
+	it('finds a real tool through search and reports its risk', async () => {
+		const result = await mcpClient.callTool({
+			name: 'fluentcart_search_tools',
+			arguments: { query: 'orders' },
+		})
+		const text = (result.content as Array<{ type: string; text: string }>)[0]
+		const data = JSON.parse(text.text)
+
+		expect(data.tools.length).toBeGreaterThan(0)
+		expect(data.tools.length).toBeLessThanOrEqual(5)
+		for (const row of data.tools) {
+			expect(row.risk).toBeDefined()
+			expect(row.execution).toBeDefined()
+		}
+	}, 60_000)
+
+	it('executes a read through the read executor against the live store', async () => {
+		const result = await mcpClient.callTool({
+			name: 'fluentcart_execute_read_tool',
+			arguments: { tool_name: 'fluentcart_order_list', input: { per_page: 2 } },
+		})
+
+		expect(result.isError).toBeFalsy()
+		const text = (result.content as Array<{ type: string; text: string }>)[0]
+		expect(() => JSON.parse(text.text)).not.toThrow()
+	}, 60_000)
+
+	it('refuses a hidden write by name even through the executor', async () => {
+		const result = await mcpClient.callTool({
+			name: 'fluentcart_execute_reversible_write',
+			arguments: { tool_name: 'fluentcart_order_delete', input: {} },
+		})
+
+		expect(result.isError).toBe(true)
+		const text = (result.content as Array<{ type: string; text: string }>)[0]
+		expect(text.text).toMatch(/not exposed/)
+	}, 60_000)
 })

@@ -5,10 +5,20 @@ meta:
   tags: [ecommerce, wordpress, fluentcart, orders, products, subscriptions]
 about:
   title: FluentCart
-  description: 200+ AI tools for FluentCart — orders, products, customers, subscriptions, coupons, reports.
+  # Deliberately no tool count. The exposed surface depends on the connected store's
+  # capabilities and the configured write mode, so any fixed number here would be wrong for
+  # most installations and would drift the moment the registry changes.
+  description: >-
+    Capability-discovered MCP tools for a FluentCart store — orders, products, customers,
+    subscriptions, coupons and reports. Reads are available by default; writes stay hidden
+    unless explicitly enabled.
   icon: https://fchub.co/icon.png
 source:
   project: https://github.com/vcode-sh/fchub-plugins
+# Only the architecture the release pipeline actually builds and smokes. Multi-arch images are
+# not published, so they are not advertised here.
+platforms:
+  - linux/amd64
 config:
   secrets:
     - name: fluentcart.url
@@ -20,3 +30,9 @@ config:
     - name: fluentcart.app_password
       env: FLUENTCART_APP_PASSWORD
       example: "aBcD eFgH iJkL mNoP"
+    # Required whenever the container serves HTTP, because it binds 0.0.0.0. The server refuses
+    # to start on fewer than 32 characters rather than exposing an unauthenticated endpoint on
+    # a published port.
+    - name: fluentcart.mcp_api_key
+      env: FLUENTCART_MCP_API_KEY
+      example: "a-32-character-or-longer-random-secret"

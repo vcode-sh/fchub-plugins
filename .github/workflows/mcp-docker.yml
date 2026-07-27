@@ -1,69 +1,202 @@
-# Build and push fluentcart-mcp Docker image to GHCR + Docker Hub.
+# Build, smoke and publish the fluentcart-mcp container image.
 #
-# Triggered by the same tag convention as mcp-release.yml:
-#   git tag fluentcart-mcp/v1.0.0
-#   git push origin fluentcart-mcp/v1.0.0
+# The image is built from the Docker context archive that mcp-ci.yml already inspected and
+# checksummed, never from a second checkout. Build and push are separate jobs: the built image
+# is handed over as a saved layer tar, so publication loads exactly the bytes that passed the
+# container smoke rather than building again and hoping for the same result.
+#
+# The tag path lives in mcp-release.yml, which calls this workflow. Manual dispatch runs the
+# same validation graph first, so there is no shortcut around it.
 #
 # Requires secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
 name: MCP Docker
 
 on:
-  push:
-    tags:
-      - 'fluentcart-mcp/v*'
+  workflow_call:
+    inputs:
+      publish:
+        description: 'Push the verified image to GHCR and Docker Hub.'
+        type: boolean
+        default: false
+      artifact_name:
+        description: 'Workflow artefact holding dist-packages/.'
+        type: string
+        required: true
+      source_sha:
+        description: 'Commit the context was built from.'
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to build (without v prefix)'
-        required: true
-        default: ''
+      publish:
+        description: 'Push the verified image to GHCR and Docker Hub.'
+        type: boolean
+        default: false
 
 env:
   GHCR_IMAGE: ghcr.io/vcode-sh/fluentcart-mcp
   DOCKERHUB_IMAGE: vcodesh/fluentcart-mcp
+  LOCAL_REPOSITORY: vcodesh/fluentcart-mcp
+  IMAGE_ARTIFACT: fluentcart-mcp-image
+  # Injected only at run time. The image binds 0.0.0.0, so the server refuses to start without
+  # a key of at least 32 characters; this fixture proves both the refusal and the authorised path.
+  SMOKE_API_KEY: smoke-test-key-0123456789abcdefghijklmnop
 
 jobs:
-  prepare:
-    name: Prepare
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.set-version.outputs.VERSION }}
-    steps:
-      - name: Set version from tag
-        id: set-version
-        run: |
-          if [[ "${{ github.event_name }}" == "push" && \
-                "${{ github.ref_type }}" == "tag" ]]; then
-            VERSION="${GITHUB_REF#refs/tags/fluentcart-mcp/v}"
-          else
-            VERSION="${{ github.event.inputs.version }}"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+  # Manual dispatch has no caller to validate for it, so it runs the same graph itself.
+  validate:
+    name: Validate
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/mcp-ci.yml
 
-  build-and-push:
-    name: Build & Push
-    needs: prepare
+  verify:
+    name: Build & Smoke
     runs-on: ubuntu-latest
+    needs: [validate]
+    # A skipped dependency would skip this job too, so the gate is expressed explicitly.
+    if: always() && (github.event_name != 'workflow_dispatch' || needs.validate.result == 'success')
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+    steps:
+      - name: Download validated artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name || needs.validate.outputs.artifact_name }}
+          path: dist-packages
+
+      # Only the build tooling is checked out. It verifies the context digest against
+      # SHA256SUMS.json before extracting a single byte, so the image cannot be built from
+      # anything other than the archive that was inspected.
+      - name: Checkout build tooling
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: fluentcart-mcp/scripts
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build image from the validated context
+        id: build
+        run: |
+          node fluentcart-mcp/scripts/build-validated-docker-image.mjs \
+            --context dist-packages/fluentcart-mcp-docker-context.tar.gz \
+            --checksums dist-packages/SHA256SUMS.json \
+            --source-sha "${{ inputs.source_sha || needs.validate.outputs.source_sha }}" \
+            --repository "${{ env.LOCAL_REPOSITORY }}" > build.json
+          cat build.json
+          echo "version=$(node -p "require('./build.json').version")" >> "$GITHUB_OUTPUT"
+
+      # ---- Container smoke: the image must refuse to be unsafe, then work when configured ----
+
+      - name: Refuses to start without a key
+        run: |
+          set +e
+          OUTPUT=$(docker run --rm "${LOCAL_REPOSITORY}:${VERSION}" 2>&1)
+          STATUS=$?
+          set -e
+          if [ $STATUS -eq 0 ]; then
+            echo "::error::Container started on 0.0.0.0 with no FLUENTCART_MCP_API_KEY"
+            exit 1
+          fi
+          echo "$OUTPUT" | grep -qi "FLUENTCART_MCP_API_KEY" || {
+            echo "::error::Refusal did not name the missing key. Output was: $OUTPUT"
+            exit 1
+          }
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+
+      - name: Refuses to start with a short key
+        run: |
+          set +e
+          docker run --rm -e FLUENTCART_MCP_API_KEY=too-short \
+            "${LOCAL_REPOSITORY}:${VERSION}" >/dev/null 2>&1
+          STATUS=$?
+          set -e
+          if [ $STATUS -eq 0 ]; then
+            echo "::error::Container accepted a key shorter than 32 characters"
+            exit 1
+          fi
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+
+      - name: Reachable on the published host port, unauthorised requests get 401
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          docker run -d --name fcmcp-smoke -p 127.0.0.1:3000:3000 \
+            -e FLUENTCART_MCP_API_KEY="${SMOKE_API_KEY}" \
+            "${LOCAL_REPOSITORY}:${VERSION}"
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health >/dev/null 2>&1; then break; fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "::error::Container never became reachable on the published host port"
+              docker logs fcmcp-smoke
+              exit 1
+            fi
+            sleep 1
+          done
+
+          UNAUTH=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/mcp)
+          if [ "$UNAUTH" != "401" ]; then
+            echo "::error::Unauthorised /mcp returned $UNAUTH, expected 401"
+            docker logs fcmcp-smoke
+            exit 1
+          fi
+
+          BADKEY=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer wrong-key-wrong-key-wrong-key-xx" \
+            http://127.0.0.1:3000/mcp)
+          if [ "$BADKEY" != "401" ]; then
+            echo "::error::Wrong bearer returned $BADKEY, expected 401"
+            exit 1
+          fi
+
+          AUTHED=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${SMOKE_API_KEY}" http://127.0.0.1:3000/mcp)
+          if [ "$AUTHED" = "401" ]; then
+            echo "::error::Correct bearer was rejected"
+            docker logs fcmcp-smoke
+            exit 1
+          fi
+          echo "health 200, unauthorised 401, wrong key 401, authorised $AUTHED"
+
+      - name: Stop smoke container
+        if: always()
+        run: docker rm -f fcmcp-smoke || true
+
+      # The verified image itself becomes the handoff, so publication never rebuilds.
+      - name: Save verified image
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+        run: docker save "${LOCAL_REPOSITORY}:${VERSION}" -o fluentcart-mcp-image.tar
+
+      - name: Upload verified image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_ARTIFACT }}
+          path: fluentcart-mcp-image.tar
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Push
+    runs-on: ubuntu-latest
+    needs: [verify]
+    if: inputs.publish
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Prepare Docker tags
-        id: docker_meta
-        uses: docker/metadata-action@v5
+      - name: Download verified image
+        uses: actions/download-artifact@v4
         with:
-          images: |
-            ${{ env.GHCR_IMAGE }}
-            ${{ env.DOCKERHUB_IMAGE }}
-          tags: |
-            type=raw,value=${{ needs.prepare.outputs.version }}
-            type=raw,value=latest
+          name: ${{ env.IMAGE_ARTIFACT }}
+
+      - name: Load verified image
+        run: docker load -i fluentcart-mcp-image.tar
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -78,17 +211,19 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ./fluentcart-mcp
-          file: ./fluentcart-mcp/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.docker_meta.outputs.tags }}
-          cache-from: type=local,src=/tmp/cache/buildx
-          cache-to: type=local,dest=/tmp/cache/buildx-new,mode=max
-      - name: Rotate build cache
+      # Only linux/amd64 is built, so only linux/amd64 is tagged. Claiming an architecture we
+      # never produced is a lie the user discovers at `docker run`, not at release time.
+      - name: Tag and push
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
-          rm -rf /tmp/cache/buildx
-          mv /tmp/cache/buildx-new /tmp/cache/buildx
+          SHORT_SHA="${SOURCE_SHA:0:12}"
+          for TARGET in "${GHCR_IMAGE}" "${DOCKERHUB_IMAGE}"; do
+            docker tag "${LOCAL_REPOSITORY}:${VERSION}" "${TARGET}:${VERSION}"
+            docker tag "${LOCAL_REPOSITORY}:${VERSION}" "${TARGET}:${SHORT_SHA}"
+            docker tag "${LOCAL_REPOSITORY}:${VERSION}" "${TARGET}:latest"
+            docker push "${TARGET}:${VERSION}"
+            docker push "${TARGET}:${SHORT_SHA}"
+            docker push "${TARGET}:latest"
+          done

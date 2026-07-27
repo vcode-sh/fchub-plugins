@@ -46,8 +46,8 @@ WordPress shows this password exactly once. Close the page without copying and y
 
 The URL is the root of your site — no trailing slash, no `/wp-admin/`, no `/wp-json/`. The username is your WordPress login name, not your display name.
 
-<Callout type="info" title="Use an Admin Account">
-The MCP server needs admin-level access. A limited role (Editor, Subscriber) will get 403 errors on nearly everything.
+<Callout type="info" title="Least Privilege Works Fine">
+The server inherits whatever that WordPress user can do and nothing more, so a store-manager-style role with FluentCart permissions is a perfectly sensible choice — you don't have to hand your AI the keys to the entire site. A user with no FluentCart permissions at all will collect 403s, which is the system working as designed rather than a bug. Pair a narrow role with the default read-only write mode and the blast radius is roughly zero.
 </Callout>
 
 </Step>
@@ -83,7 +83,7 @@ The extension only works with Claude Desktop. For other AI clients, use the Setu
 
 A guided terminal walkthrough. Asks three questions, tests the connection, saves the config.
 
-<Callout type="info" title="Requires Node.js 22+">
+<Callout type="info" title="Requires Node.js 24+">
 Check with `node --version`. Don't have it? Grab it from [nodejs.org](https://nodejs.org).
 </Callout>
 
@@ -134,7 +134,7 @@ Where to paste this depends on your client — see the Manual Config tab for the
 </Tab>
 <Tab value="Manual Config">
 
-Full control. You'll need **Node.js 22+** installed (`node --version` to check — grab it from [nodejs.org](https://nodejs.org) if needed).
+Full control. You'll need **Node.js 24+** installed (`node --version` to check — grab it from [nodejs.org](https://nodejs.org) if needed).
 
 Pick your AI client below:
 
@@ -297,7 +297,7 @@ docker run -d \
   -e FLUENTCART_URL=https://your-store.com \
   -e FLUENTCART_USERNAME=admin \
   -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
-  -e FLUENTCART_MCP_API_KEY=pick-a-strong-secret \
+  -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
   --name fluentcart-mcp \
   vcodesh/fluentcart-mcp
 ```
@@ -306,8 +306,8 @@ Your endpoint is at `http://localhost:3000/mcp`. Verify with `curl http://localh
 
 For remote access, put it behind a reverse proxy or Cloudflare Tunnel — the [Deployment Guide](/docs/fluentcart-mcp/deployment) covers the details.
 
-<Callout type="warn" title="Set FLUENTCART_MCP_API_KEY">
-Without it, anyone who finds your URL gets full access to your store. Set the key.
+<Callout type="warn" title="FLUENTCART_MCP_API_KEY is not optional here">
+The container binds beyond loopback, so the server checks the bearer key before it listens and exits with an error if the key is missing or shorter than 32 characters. A container that keeps restarting with `Refusing to bind 0.0.0.0` in its logs is telling you exactly this. Generate one properly — `openssl rand -hex 32` — and keep it out of your shell history.
 </Callout>
 
 </Tab>
@@ -315,6 +315,45 @@ Without it, anyone who finds your URL gets full access to your store. Set the ke
 
 </Tab>
 </Tabs>
+
+<Separator className="my-8" />
+
+## Decide What It Can See
+
+Two independent switches. Neither has to be touched to get a working read-only server, which is why none of the configs above mention them.
+
+**`--mode`** decides how the tool definitions are presented. The default is `dynamic`: five meta-tools your AI uses to search the catalogue, read the schema of whatever it found, and then execute it. Every other mode draws from the same filtered registry, so no mode can widen what is exposed.
+
+| Mode | What your AI sees |
+|---|---|
+| `dynamic` *(default)* | Five meta-tools: `fluentcart_search_tools`, `fluentcart_describe_tools`, `fluentcart_execute_read_tool`, `fluentcart_execute_reversible_write`, `fluentcart_execute_guarded_write` |
+| `curated` | A hand-picked shortlist of the tools most workflows actually need |
+| `code` | Two tools over a read-only WebAssembly sandbox: `fluentcart_search_api` and `fluentcart_execute_code` |
+| `full` | Every exposed definition registered up front |
+
+**`FLUENTCART_WRITE_MODE`** decides what is in that registry at all. It defaults to `disabled` — reads only. `reversible` adds the writes that can be undone: creating and updating products, variants, coupons, customers, shipping rules, tax rules, attributes and order bumps. `guarded` is accepted and exposes exactly the same set in 2.0.0, because the two tools it exists for are not available in this release — see [No refunds or cancellations](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0).
+
+Deletions, bulk operations, order status changes, marking an order paid and anything that moves money are not exposed in any mode. FluentCart offers no supported way to undo them, so they are not classed as reversible. See the [Tool Reference](/docs/fluentcart-mcp/tools) for the full picture.
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp", "--mode", "curated"],
+      "env": {
+        "FLUENTCART_WRITE_MODE": "reversible"
+      }
+    }
+  }
+}
+```
+
+<Callout type="info" title="It Checks Your Store First">
+At startup the server reads your site's REST index to find out which FluentCart routes exist, rather than trusting a version string. If it can't reach the site, or the store won't say what it supports, that's a startup error in your client's MCP log — not a server that connects cheerfully and then 404s on everything.
+
+That evidence then prunes the tool list: a tool with no supported route is never registered. So the tools your AI can see are the ones your store can actually serve, and two stores running different FluentCart builds legitimately offer different tool lists.
+</Callout>
 
 <Separator className="my-8" />
 
@@ -364,6 +403,6 @@ See store data? You're done. If not, head to [Troubleshooting](/docs/fluentcart-
     What to say to your AI now that it's connected. Example prompts for every category.
   </Card>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    All 274 tools across 27 modules. The complete inventory.
+    Every tool definition in this release, by module — and what each mode costs in context.
   </Card>
 </Cards>

@@ -2,10 +2,52 @@
 // credential loading, target policy and the run identity. Nothing here mutates the store.
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { FluentCartClient } from '../../src/api/client.js'
+import { FluentCartApiError } from '../../src/api/errors.js'
 import { getLiveClient } from './support/live-client.js'
 import { getLiveRun } from './support/live-run.js'
 
 getLiveRun()
+
+/**
+ * Ask the store which integrations it has rather than naming one and hoping.
+ *
+ * `AddonsController::getAddons` answers `{addons: {slug: {enabled, ...}}}`, where `enabled`
+ * reflects whether the companion plugin is actually active. Anything not in that map is an
+ * integration this store has never heard of, and asking about it proves nothing.
+ */
+async function discoverAddons(
+	client: FluentCartClient,
+): Promise<{ all: string[]; enabled: string[] }> {
+	const res = await client.get('/integration/addons')
+	const body = res.data as { addons?: Record<string, { enabled?: unknown }> } | null
+	const addons = body?.addons ?? {}
+	const all = Object.keys(addons).sort()
+	const enabled = all.filter((slug) => addons[slug]?.enabled === true)
+	return { all, enabled }
+}
+
+/**
+ * `GlobalIntegrationSettings::getGlobalSettingsData` answers 422 for any key with no registered
+ * field set, which is the correct answer for an integration that is present but has nothing to
+ * configure. Anything else — a 500, an expired credential, a permission failure — is rethrown, so
+ * a broken store can never be mistaken for an unconfigured one.
+ */
+async function integrationSettingsOutcome(
+	client: FluentCartClient,
+	settingsKey: string,
+): Promise<'configured' | 'not-configured'> {
+	try {
+		const res = await client.get('/integration/global-settings', { settings_key: settingsKey })
+		expect(res.status).toBe(200)
+		expect(res.data).toBeDefined()
+		return 'configured'
+	} catch (error) {
+		if (error instanceof FluentCartApiError && error.code === 'VALIDATION_ERROR') {
+			return 'not-configured'
+		}
+		throw error
+	}
+}
 
 describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 	let client: FluentCartClient
@@ -434,8 +476,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		// BUG: FluentCart server 500 — Class "FluentCart\App\Modules\ReportingModule\Status" not found
-		it.fails('GET /reports/report-overview — summarised report overview (SERVER BUG)', async () => {
+		it('GET /reports/report-overview — summarised report overview', async () => {
 			const res = await client.get('/reports/report-overview')
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -469,8 +510,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		// BUG: FluentCart server 500 — Class "FluentCart\App\Modules\ReportingModule\Status" not found
-		it.fails('GET /reports/revenue-by-group — revenue by group (SERVER BUG)', async () => {
+		it('GET /reports/revenue-by-group — revenue by group', async () => {
 			const res = await client.get('/reports/revenue-by-group')
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -501,15 +541,13 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		// BUG: FluentCart server 500 — Class "FluentCart\App\Modules\ReportingModule\Status" not found
-		it.fails('GET /reports/fetch-order-by-group — orders by group (SERVER BUG)', async () => {
+		it('GET /reports/fetch-order-by-group — orders by group', async () => {
 			const res = await client.get('/reports/fetch-order-by-group')
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		// BUG: FluentCart server 500 — Class "FluentCart\App\Modules\ReportingModule\Status" not found
-		it.fails('GET /reports/quick-order-stats — quick order stats (SERVER BUG)', async () => {
+		it('GET /reports/quick-order-stats — quick order stats', async () => {
 			const res = await client.get('/reports/quick-order-stats', {
 				day_range: '30',
 			})
@@ -523,10 +561,19 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /reports/get-unfulfilled-orders — unfulfilled orders', async () => {
-			const res = await client.get('/reports/get-unfulfilled-orders')
-			expect(res.status).toBe(200)
-			expect(res.data).toBeDefined()
+		/**
+		 * COMPATIBILITY: `/reports/get-unfulfilled-orders` does not exist in this runtime.
+		 *
+		 * `app/Http/Routes/reports.php` registers no such route in FluentCart 1.5.5, and the only
+		 * surviving mention of the word is a commented-out order filter. This is recorded as an
+		 * absent-route fact rather than an expected API success, so a later release that adds the
+		 * route fails here and gets reviewed instead of silently changing what we believe exists.
+		 */
+		it('GET /reports/get-unfulfilled-orders — absent from this runtime', async () => {
+			await expect(client.get('/reports/get-unfulfilled-orders')).rejects.toMatchObject({
+				code: 'NOT_FOUND',
+				status: 404,
+			})
 		})
 
 		it('GET /reports/get-dashboard-summary — dashboard summary', async () => {
@@ -806,12 +853,23 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /integration/global-settings — gets global integration settings', async () => {
-			const res = await client.get('/integration/global-settings', {
-				settings_key: 'fakturownia',
-			})
-			expect(res.status).toBe(200)
-			expect(res.data).toBeDefined()
+		/**
+		 * Capability discovery rather than a hard-coded key. The previous revision asked for
+		 * `fakturownia`, which this store does not have, and then recorded the store's entirely
+		 * correct 422 as a test failure.
+		 */
+		it('GET /integration/global-settings — only for integrations this store reports', async () => {
+			const { all, enabled } = await discoverAddons(client)
+			expect(all.length, 'addon discovery returned nothing to test against').toBeGreaterThan(0)
+
+			// No active integration means there is no settings payload to fetch. We do not invent a
+			// key to manufacture a refusal and call that coverage.
+			if (enabled.length === 0) return
+
+			for (const key of enabled) {
+				const outcome = await integrationSettingsOutcome(client, key)
+				expect(['configured', 'not-configured']).toContain(outcome)
+			}
 		})
 
 		it('GET /integration/global-feeds — gets global feeds', async () => {

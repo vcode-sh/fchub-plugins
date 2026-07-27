@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-An MCP server that gives AI assistants full access to your [FluentCart](https://fluentcart.com) store. 279 tools across 27 modules — orders, products, customers, subscriptions, coupons, reports, shipping, tax, email notifications, and more. Open source, MIT licensed.
+An MCP server that connects AI assistants to your [FluentCart](https://fluentcart.com) store — orders, products, customers, subscriptions, coupons, reports, shipping, tax, email notifications, and more. Read-only until you deliberately say otherwise. Open source, MIT licensed.
 
 Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Codex CLI, ChatGPT, and anything else that speaks [MCP](https://modelcontextprotocol.io).
 
@@ -14,7 +14,7 @@ Works with Claude Desktop, Claude Code, Cursor, VS Code + Copilot, Windsurf, Cod
 
 Download the extension — no Node.js, no JSON, no terminal:
 
-**[Download fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases/download/fluentcart-mcp/v1.0.1/fluentcart-mcp.mcpb)**
+**[Download the latest fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases?q=fluentcart-mcp&expanded=true)**
 
 Double-click the file. Claude Desktop prompts for your WordPress URL, username, and Application Password. Fill those in. Done.
 
@@ -85,7 +85,7 @@ Uses **WordPress Application Passwords** (built into WordPress 5.6+). No extra p
 3. Enter a name, click **Add New Application Password**
 4. Copy the password (WordPress shows it once)
 
-Use an **Administrator** account — FluentCart's API requires admin capabilities.
+Pick a role that carries the FluentCart REST capabilities you actually intend to use. An admin account works, but it is not the only option: the server discovers what your role can reach and exposes nothing beyond it, so a narrower account is the safer choice.
 
 ## Configuration
 
@@ -124,27 +124,43 @@ npx fluentcart-mcp setup
 | **stdio** (default) | — | Local clients: Claude Desktop, Cursor, VS Code |
 | **HTTP** | `--transport http` | Remote clients: ChatGPT, VPS deployments, Docker |
 
-HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and `--host`).
+HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and `--host`). It binds `127.0.0.1` by default. Ask it to bind anything else and it refuses to start unless `FLUENTCART_MCP_API_KEY` is set to at least 32 characters — an unauthenticated store API on a public interface is not a configuration anyone should be able to reach by accident.
 
 ## Toolset Modes
 
-| Mode | Flag | Tools | Token Cost |
-|------|------|-------|------------|
-| **static** (default) | — | All 279 tools registered upfront | ~30K tokens |
-| **dynamic** | `--mode dynamic` | 3 meta-tools (search, describe, execute) | ~1.5K tokens |
+| Mode | Flag | Tools | Definition cost |
+|------|------|-------|-----------------|
+| **dynamic** (default) | — | 5 meta-tools: search, describe, and one executor per risk class | 863 tokens |
+| **curated** | `--mode curated` | 18–20 reviewed everyday tools | 2,820–3,652 tokens |
+| **code** | `--mode code` | 2 tools: search the API, run read-only JavaScript in a WASM sandbox | 532 tokens |
+| **full** | `--mode full` | 148–174 tools, whatever the policy permits | 20,410–27,046 tokens |
 
-Dynamic mode gives the AI 3 tools to discover and execute any of the 279 tools on demand. Same capabilities, ~96% fewer tokens in context.
+Ranges span the default read-only policy and reversible write mode. Counts are measured from the built server's `tools/list` response with serializer `mcp-tools-list-v1` and tokenizer `gpt-tokenizer@3.4.0`; see `release-contract.json` for the full matrix.
+
+Dynamic mode is the default because it keeps the definition payload small no matter how large the store API grows: the AI searches for what it needs and executes it, rather than loading everything upfront.
+
+## Write Modes
+
+Writes are absent, not merely disabled. Under the default `FLUENTCART_WRITE_MODE=disabled` a write tool cannot be listed, searched, described or called by name — 148 of the source tree's 276 definitions are exposed.
+
+| `FLUENTCART_WRITE_MODE` | What it adds |
+|-------------------------|--------------|
+| `disabled` (default) | Reads only |
+| `reversible` | Writes with a verified read-back and a supported undo |
+| `guarded` | Same tools as `reversible` today. `FLUENTCART_GUARD_SECRET` and `FLUENTCART_GUARD_STATE_DIR` are reserved for the real-money guard and change nothing yet |
+
+`fluentcart_order_refund` and `fluentcart_subscription_cancel` are classified `execution: none` in 2.0.0, so **no write mode exposes them** — not even a fully configured `guarded`. They need the signed-preview and durable-idempotency guard to be provable first, and until that lands they stay hidden rather than shipping a refund nobody can stop replaying.
 
 ## What's Inside
 
-279 tools across 27 modules:
+Tools are grouped into 27 modules. The source tree carries 276 definitions; how many you see depends on your write mode and on what your store and role actually support.
 
 | Module | Tools | What It Covers |
 |--------|-------|----------------|
-| **Orders** | 23 | List, create, update, refund, disputes, bulk actions |
+| **Orders** | 23 | List, create, update, disputes, bulk actions |
 | **Products** | 55 | CRUD, pricing, variants, downloads, categories |
 | **Customers** | 19 | Profiles, addresses, stats, lifetime value |
-| **Subscriptions** | 7 | List, pause, resume, cancel, reactivate |
+| **Subscriptions** | 7 | List, pause, resume, reactivate |
 | **Coupons** | 12 | Create, apply, eligibility, settings |
 | **Reports (Core)** | 24 | Revenue, sales, dashboard, order charts |
 | **Reports (Insights)** | 21 | Growth, retention, cohorts, heatmaps |
@@ -165,11 +181,11 @@ Dynamic mode gives the AI 3 tools to discover and execute any of the 279 tools o
 | **Public** | 4 | Unauthenticated product views |
 | **Miscellaneous** | 4 | Country/form lookups |
 
-Plus: **4 MCP Resources** (store config, countries, payment methods, filter options), **5 MCP Prompts** (store analysis, order investigation, customer overview, catalog summary, subscription health), and in-memory caching for static data.
+Plus **4 MCP Resources** (store config, countries, payment methods, filter options) and **5 MCP Prompts** (store analysis, order investigation, customer overview, catalog summary, subscription health).
 
 ## Example Prompts
 
-Once connected, just talk:
+Once connected, just talk. The read-only examples work out of the box; the ones that change something need `FLUENTCART_WRITE_MODE` raised first.
 
 - "Show me today's orders"
 - "What's my revenue this month?"
@@ -177,7 +193,7 @@ Once connected, just talk:
 - "Find customer john@example.com and show their order history"
 - "Pause subscription #42"
 - "Which products sold the most this week?"
-- "Refund order #1234"
+- "Show me the transactions on order #1234"
 - "Set up 23% VAT for Poland"
 - "Create a shipping zone for Europe at €5 flat rate"
 - "Show me all email notification templates"
@@ -187,7 +203,7 @@ Once connected, just talk:
 - **Node.js** >= 22.0.0 (for npx/stdio mode)
 - **Docker** (for HTTP/container mode — no Node.js needed)
 - **WordPress** >= 5.6 with [FluentCart](https://fluentcart.com) installed
-- **Administrator** WordPress account with an Application Password
+- A **WordPress account** with an Application Password and the FluentCart REST capabilities you plan to use
 
 ## Documentation
 

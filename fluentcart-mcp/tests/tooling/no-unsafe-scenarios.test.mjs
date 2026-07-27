@@ -112,6 +112,9 @@ describe('repository contract: no unsafe live entry points', () => {
 			'tests/security/',
 			'tests/tools/',
 			'tests/acceptance/',
+			// Code-mode tests name refund and cancellation only to assert the sandbox refuses
+			// them. They build in-memory fixtures and make no network call of any kind.
+			'tests/code-mode/',
 		]
 
 		const offenders = []

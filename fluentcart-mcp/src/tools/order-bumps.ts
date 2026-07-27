@@ -8,6 +8,7 @@ import {
 	putTool,
 	type ToolDefinition,
 } from './_factory.js'
+import { direct } from './endpoints.js'
 
 const discountSchema = z
 	.object({
@@ -60,6 +61,7 @@ export function orderBumpTools(client: FluentCartClient): ToolDefinition[] {
 	return [
 		createTool(client, {
 			name: 'fluentcart_order_bump_list',
+			routes: direct('GET', '/order_bump'),
 			title: 'List Order Bumps',
 			description:
 				'List order bump configurations with status and variant info. Statuses: active, draft. ' +

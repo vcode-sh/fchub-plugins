@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { invalidate, TTL } from '../cache.js'
+import { TTL } from '../cache.js'
 import {
 	createTool,
 	deleteTool,
@@ -10,8 +10,10 @@ import {
 	putTool,
 	type ToolDefinition,
 } from './_factory.js'
+import { direct } from './endpoints.js'
 
-function asNumber(value: unknown): number | null {
+/** Shared with tax-classes.ts, which needs it to dig an id out of a create response. */
+export function asNumber(value: unknown): number | null {
 	if (typeof value === 'number' && Number.isFinite(value)) return value
 	if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
 		return Number(value)
@@ -26,114 +28,8 @@ function asFlag(value: unknown): number | undefined {
 	return numeric == null ? undefined : numeric
 }
 
-function extractId(data: unknown): number | null {
-	const wrappers = ['data', 'class', 'tax_class']
-	const keys = ['class_id', 'id']
-	if (!data || typeof data !== 'object') return null
-
-	const obj = data as Record<string, unknown>
-	for (const key of keys) {
-		const maybe = asNumber(obj[key])
-		if (maybe != null) return maybe
-	}
-
-	for (const wrapper of wrappers) {
-		const nested = obj[wrapper]
-		if (!nested || typeof nested !== 'object') continue
-		const nestedObj = nested as Record<string, unknown>
-		for (const key of keys) {
-			const maybe = asNumber(nestedObj[key])
-			if (maybe != null) return maybe
-		}
-	}
-
-	return null
-}
-
 export function taxTools(client: FluentCartClient): ToolDefinition[] {
 	return [
-		// ── Tax Classes ────────────────────────────────────────
-
-		getTool(client, {
-			name: 'fluentcart_tax_class_list',
-			title: 'List Tax Classes',
-			description: 'List all tax classes configured in the store.',
-			schema: z.object({}),
-			endpoint: '/tax/classes',
-			cache: { key: 'tax_classes', ttlMs: TTL.MEDIUM },
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_tax_class_create',
-			title: 'Create Tax Class',
-			description:
-				'Create a new tax class for categorising products with different tax rates. ' +
-				'Accepts `title` (preferred) and `name` (legacy alias).',
-			schema: z.object({
-				title: z.string().optional().describe('Tax class title (required)'),
-				name: z.string().optional().describe('Legacy alias for title'),
-				description: z.string().optional().describe('Description'),
-			}),
-			handler: async (c, input) => {
-				const title = (input.title as string | undefined) || (input.name as string | undefined)
-				if (!title) {
-					throw new FluentCartApiError(
-						'VALIDATION_ERROR',
-						'Validation error: title is required',
-						422,
-					)
-				}
-
-				const body: Record<string, unknown> = { title }
-				if (input.description !== undefined) body.description = input.description
-
-				const created = await c.post('/tax/classes', body)
-				invalidate('tax_classes')
-				const directId = extractId(created.data)
-				if (directId != null) return created.data
-
-				// Some runtimes only return a success message; enrich with class_id via list lookup.
-				const list = await c.get('/tax/classes')
-				const classes = ((list.data as Record<string, unknown>).tax_classes ?? []) as Array<
-					Record<string, unknown>
-				>
-				const matched = classes.find((taxClass) => taxClass.title === title)
-				const classId = matched ? asNumber(matched.id) : null
-				if (classId == null) return created.data
-
-				return {
-					...(created.data as Record<string, unknown>),
-					class_id: classId,
-					class: matched,
-					_enriched: true,
-				}
-			},
-		}),
-
-		putTool(client, {
-			name: 'fluentcart_tax_class_update',
-			title: 'Update Tax Class',
-			description: 'Update a tax class title or description.',
-			schema: z.object({
-				class_id: z.number().describe('Tax class ID'),
-				title: z.string().optional().describe('Tax class title'),
-				description: z.string().optional().describe('Description'),
-			}),
-			endpoint: '/tax/classes/:class_id',
-			invalidates: ['tax_classes'],
-		}),
-
-		deleteTool(client, {
-			name: 'fluentcart_tax_class_delete',
-			title: 'Delete Tax Class',
-			description: 'Delete a tax class. This action cannot be undone.',
-			schema: z.object({
-				class_id: z.number().describe('Tax class ID'),
-			}),
-			endpoint: '/tax/classes/:class_id',
-			invalidates: ['tax_classes'],
-		}),
-
 		// ── Tax Rates ──────────────────────────────────────────
 
 		getTool(client, {
@@ -158,6 +54,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_tax_rate_create',
+			routes: direct('POST', '/tax/country/rate'),
 			title: 'Create Tax Rate',
 			description:
 				'Create a tax rate for a country. Rate is a percentage value (e.g. 23 for 23%). ' +
@@ -280,6 +177,7 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 
 		createTool(client, {
 			name: 'fluentcart_tax_shipping_override_create',
+			routes: direct('POST', '/tax/rates/country/override'),
 			title: 'Create Shipping Tax Override',
 			description:
 				'Add a shipping tax override to an existing tax rate. ' +
@@ -347,63 +245,6 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			}),
 			endpoint: '/tax/configuration/settings',
 			invalidates: ['tax_settings'],
-		}),
-
-		// ── EU VAT ─────────────────────────────────────────────
-
-		createTool(client, {
-			name: 'fluentcart_tax_eu_vat_save',
-			title: 'Save EU VAT Cross-Border Settings',
-			description:
-				'Save EU VAT cross-border registration settings. ' +
-				'The backend requires action="euCrossBorderSettings" (sent automatically). ' +
-				'Choose a method: "oss" (One Stop Shop — requires oss_country), ' +
-				'"home" (home country — requires home_country), or "specific" (specific countries). ' +
-				'Set reset_registration to "yes" to clear the current registration method.',
-			schema: z.object({
-				method: z.enum(['oss', 'home', 'specific']).describe('Cross-border registration type'),
-				oss_country: z
-					.string()
-					.optional()
-					.describe('ISO country code for OSS registration (required when method is "oss")'),
-				home_country: z
-					.string()
-					.optional()
-					.describe(
-						'ISO country code for home country registration (required when method is "home")',
-					),
-				reset_registration: z
-					.enum(['yes', 'no'])
-					.optional()
-					.describe('Set to "yes" to clear the current registration method'),
-			}),
-			handler: async (c, input) => {
-				const euVatSettings: Record<string, string> = {
-					method: input.method as string,
-				}
-				if (input.oss_country) euVatSettings.oss_country = input.oss_country as string
-				if (input.home_country) euVatSettings.home_country = input.home_country as string
-
-				const body: Record<string, unknown> = {
-					action: 'euCrossBorderSettings',
-					eu_vat_settings: euVatSettings,
-				}
-				if (input.reset_registration === 'yes') body.reset_registration = 'yes'
-
-				const response = await c.post('/tax/configuration/settings/eu-vat', body)
-				invalidate('tax_eu_rates')
-				invalidate('tax_settings')
-				return response.data
-			},
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_tax_eu_rates',
-			title: 'Get EU VAT Rates',
-			description: 'Get EU VAT rates for all member states.',
-			schema: z.object({}),
-			endpoint: '/tax/configuration/settings/eu-vat/rates',
-			cache: { key: 'tax_eu_rates', ttlMs: TTL.LONG },
 		}),
 
 		// ── Tax Records ────────────────────────────────────────

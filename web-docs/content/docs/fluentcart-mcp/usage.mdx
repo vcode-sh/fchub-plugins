@@ -1,6 +1,6 @@
 ---
 title: Usage & Examples
-description: How to talk to your FluentCart store through AI. 274 tools, plain English. What to ask, how to ask it, and what to expect back.
+description: How to talk to your FluentCart store through AI. Plain English, what to ask, how to ask it, and what to expect back.
 ---
 
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
@@ -10,7 +10,13 @@ import { Separator } from '@/components/ui/separator';
 
 You're connected. Now what?
 
-You just... talk. No special syntax. No commands to memorise. No tool names to remember. 274 tools with descriptions rich enough that any halfway decent AI can figure out which one to use from plain English. Describe what you want and let the AI sort it out.
+You just... talk. No special syntax. No commands to memorise. No tool names to remember. The descriptions are rich enough that any halfway decent AI can work out which tool to reach for from plain English. Describe what you want and let it sort out the rest.
+
+<Callout type="warn" title="Read what this release can't do before you plan around it">
+A default install reads and nothing else. Setting `FLUENTCART_WRITE_MODE=reversible` adds one specific family of writes: **creating and updating** products, variants, coupons, customers, shipping rules, tax rules, attribute groups and terms, order bumps and upgrade paths. [Setup covers the switch](/docs/fluentcart-mcp/setup#decide-what-it-can-see).
+
+Not exposed in any mode: refunds, subscription cancellation, deletions, bulk actions, order status changes, marking an order paid, and dispute handling. Ask for one and the AI won't find a tool, because there isn't one to find. The [reasoning is in the deployment guide](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0) and it is short: FluentCart offers no supported way to undo these, and for the money-moving ones the guard could not be acceptance-proven.
+</Callout>
 
 ## How to Talk to It
 
@@ -42,21 +48,12 @@ Organised by the things people actually ask. Pick a section, steal a prompt, adj
 - "What are the most recent 5 orders?"
 - "Show me unfulfilled orders"
 
-**Managing orders:**
-- "Mark order #1234 as paid"
-- "Refund order #1234 — customer received a damaged item"
-- "Change the shipping address on order #1234 to 123 New Street, London"
-- "Update order #1234 status to processing"
-- "Cancel order #1234"
-
 **Transactions & disputes:**
 - "Show me the transaction details for order #1234"
-- "Accept the dispute on order #1234"
 - "What shipping methods are available for this order?"
+- "Show me the activity trail for order #1234"
 
-**Bulk operations:**
-- "Delete all cancelled orders older than 90 days"
-- "Mark orders #100, #101, and #102 as completed"
+**Orders are read-only in this release.** No status changes, no address edits, no notes, no marking paid, no accepting disputes, no bulk operations, no refunds. FluentCart gives no supported way to undo any of them, so none is exposed. Investigating an order is what the AI is for here; the fixing still happens in the admin panel.
 
 </Accordion>
 <Accordion title="Products & Catalogue">
@@ -67,29 +64,24 @@ Organised by the things people actually ask. Pick a section, steal a prompt, adj
 - "Show me product #42"
 - "What are my digital products?"
 
-**Creating products:**
+**Creating and updating** *(needs `FLUENTCART_WRITE_MODE=reversible`)*:
 - "Create a new digital product called 'Starter Plan' at $29"
-- "Duplicate product #42"
-- "Create a physical product called 'T-Shirt' at $25 with inventory tracking"
-
-**Updating products:**
-- "Change the price of product #42 to $49"
-- "Update the inventory for product #42 to 150 units"
-- "Add a tax class to product #42"
+- "Create a physical product called 'T-Shirt' at $25"
+- "Update the description and title of product #42"
 
 **Variants:**
 - "List all variations for product #42"
-- "Create a new variation: Size Large, Colour Blue, price $35"
-- "Update the pricing table for variant #7"
+- "Create a new variation: Size Large, Colour Blue, price $35" *(a write)*
+- "Update the title of variant #7" *(a write)*
 
 **Downloads & licences:**
 - "Show downloadable files for product #42"
 - "Generate a download URL for file #3 on product #42"
-- "Generate missing licences for order #1234"
 
 **Categories & tags:**
 - "List all product categories"
-- "Add product #42 to the 'Premium' category"
+
+Deleting a product, duplicating one, bulk-editing the catalogue and rewriting the pricing table are not exposed — none can be undone through the API.
 
 </Accordion>
 <Accordion title="Customers">
@@ -105,15 +97,14 @@ Organised by the things people actually ask. Pick a section, steal a prompt, adj
 - "What's the lifetime value for customer #15?"
 - "Recalculate the LTV for customer #15"
 
-**Managing customers:**
+**Managing customers** *(needs `FLUENTCART_WRITE_MODE=reversible`)*:
 - "Create a new customer: Jane Smith, jane@example.com"
 - "Update customer #15's phone number to +44 7700 900000"
-- "Add a billing address for customer #15"
 
 **Addresses:**
 - "Show all addresses for customer #15"
-- "Make the address at 123 High Street the primary address for customer #15"
-- "Delete address #3 from customer #15"
+
+Adding, editing and deleting addresses, and bulk customer operations, are not exposed.
 
 </Accordion>
 <Accordion title="Subscriptions">
@@ -122,39 +113,31 @@ Organised by the things people actually ask. Pick a section, steal a prompt, adj
 - "List all active subscriptions"
 - "Show subscription #42"
 - "What subscriptions does customer #15 have?"
+- "Which subscriptions renew in the next two weeks?"
+- "Re-read subscription #42 from the payment gateway"
 
-**Managing subscriptions:**
-- "Pause subscription #42"
-- "Resume subscription #42"
-- "Cancel subscription #42"
-- "Reactivate subscription #42"
-
-<Callout type="warn" title="These Are Real Actions">
-Pausing, cancelling, or reactivating a subscription affects real billing. The AI will usually confirm before pulling the trigger, but be clear about what you want. "Cancel subscription #42" is not something you can casually undo.
-</Callout>
+Subscriptions are read-only here. Pausing, resuming and reactivating aren't exposed as tools, and ending one isn't either — see below. All four still work in the FluentCart admin.
 
 </Accordion>
 <Accordion title="Coupons & Promotions">
 
-**Creating coupons:**
+**Creating coupons** *(needs `FLUENTCART_WRITE_MODE=reversible`)*:
 - "Create a coupon code SUMMER25 for 25% off"
 - "Make a $10 fixed discount coupon that expires on December 31st"
 - "Create a coupon that only works on digital products"
+- "Change the expiry date on coupon #5"
 
-**Managing coupons:**
+**Reading coupons:**
 - "List all active coupons"
 - "Show me coupon #5"
-- "Delete the EXPIRED2024 coupon"
-
-**Applying coupons:**
-- "Apply coupon SUMMER25 to order #1234"
-- "Remove the coupon from order #1234"
 - "Check if product #42 is eligible for coupon SUMMER25"
 
 **Order bumps:**
 - "List all order bumps"
-- "Create an order bump: offer Product #42 at 20% off when buying Product #10"
-- "Delete order bump #3"
+- "Create an order bump: offer Product #42 at 20% off when buying Product #10" *(a write)*
+- "Update the discount on order bump #3" *(a write)*
+
+Deleting a coupon or a bump isn't exposed, and neither is applying a coupon to an existing order — that one changes what a customer is charged.
 
 </Accordion>
 <Accordion title="Reports & Analytics">
@@ -195,32 +178,35 @@ This is where it gets genuinely useful. Instead of staring at charts in the admi
 </Accordion>
 <Accordion title="Shipping & Fulfilment">
 
-**Zones & methods:**
+**Zones & methods** *(creating and updating needs `FLUENTCART_WRITE_MODE=reversible`)*:
 - "List all shipping zones"
+- "What shipping methods are available?"
 - "Create a shipping zone called 'Europe' with countries PL, DE, FR"
 - "Add a flat-rate shipping method at £5.99 to the Europe zone"
 - "Add a free shipping method with £50 minimum order to zone #1"
-- "Delete shipping zone #5"
-- "What shipping methods are available?"
+- "Rename zone #1 and add Italy to it"
 
 **Shipping classes:**
 - "List all shipping classes"
-- "Create a shipping class called 'Heavy Items' with £3 extra per item"
+- "Create a shipping class called 'Heavy Items' with £3 extra per item" *(a write)*
+
+Deleting a zone, method or class isn't exposed, and neither is reordering zones.
 
 </Accordion>
 <Accordion title="Tax & VAT">
 
-**Rates & classes:**
+**Rates & classes** *(creating and updating needs `FLUENTCART_WRITE_MODE=reversible`)*:
 - "List all tax classes"
 - "What's the VAT rate for Poland?"
-- "Create a 23% VAT rate for Poland"
 - "Show me EU VAT rates for all member states"
-- "Delete all tax rates for Germany"
+- "Create a 23% VAT rate for Poland"
+- "Correct the rate on tax rule #7 to 21%"
 
 **Settings & records:**
 - "What are the current tax settings?"
 - "Show me tax records for January"
-- "Mark the January tax records as filed"
+
+Deleting rates, saving global tax settings, changing the EU VAT configuration and marking records as filed are not exposed.
 
 </Accordion>
 <Accordion title="Email Notifications">
@@ -228,41 +214,40 @@ This is where it gets genuinely useful. Instead of staring at charts in the admi
 **Templates:**
 - "List all email notification templates"
 - "Show me the order confirmation email template"
-- "Update the order confirmation email subject to 'Thanks for your order!'"
-- "Disable the abandoned cart email notification"
 - "Preview the new order email template"
 
 **Settings:**
 - "What shortcodes can I use in email templates?"
-- "Update the email sender name to 'My Store'"
+
+Editing templates, toggling notifications and changing sender settings are not exposed. An email that goes out to customers is not something an undo button covers.
 
 </Accordion>
 <Accordion title="Roles & Access">
 
 - "List all roles"
 - "Who has store manager access?"
-- "Create a custom role called 'Support Agent' with order management capabilities"
 - "List all users and their roles"
+
+Creating and editing roles is not exposed. Permission changes are exactly the sort of thing you want a human clicking through deliberately.
 
 </Accordion>
 <Accordion title="Settings & Configuration">
 
-**Store settings:**
+**Store settings** *(read-only — configuration changes are not exposed)*:
 - "Show me the current store settings"
 - "What payment methods are available?"
 - "What are the current module settings?"
-- "Save the module settings to enable stock management"
-- "Reorder the payment methods — put Stripe first"
 
 **Integrations:**
 - "List all installed addons"
 - "Show the global settings for the Mailchimp integration"
 - "What integration feeds are configured?"
 
-**Product options:**
+**Product options** *(creating and updating needs `FLUENTCART_WRITE_MODE=reversible`)*:
 - "List all attribute groups"
 - "Create a new attribute group called 'Sizes'"
 - "Add terms Small, Medium, Large to the Sizes attribute group"
+- "Rename the 'Sizes' group to 'Clothing Sizes'"
 
 **Files & templates:**
 - "Show me the print templates for invoices"
@@ -276,12 +261,10 @@ This is where it gets genuinely useful. Instead of staring at charts in the admi
 - "Show me recent activity"
 - "What happened in the last 24 hours?"
 
-**Notes:**
-- "Add a note to order #1234: Customer called about delivery delay"
-
 **Labels:**
 - "List all labels"
-- "Create a label called 'VIP'"
+
+Order notes and label creation are not exposed; neither can be removed through the API once written.
 
 **Public endpoints:**
 - "Search public products for 'starter'"
@@ -330,16 +313,34 @@ The AI will investigate, call the right tools, and report back.
 
 Shipping zones and tax rates sound intimidating, but the AI handles the complexity. Just say "set up 23% VAT for Poland" or "add flat-rate shipping for Europe at €5" — the AI maps your intent to the right fields. You're not filling in a tax form, you're having a conversation.
 
+## Why Refunds Aren't Here
+
+The obvious thing to want from an AI attached to a shop is to hand back a customer's money without opening the admin panel. That is not available in this release, and the reason is worth two minutes of your time.
+
+`fluentcart_order_refund` and `fluentcart_subscription_cancel` are absent from every write mode — including `guarded` with a valid signing secret and state directory. No configuration turns them on.
+
+The guard they were built for is finished: previews signed and pinned to the exact payload, a durable ledger that recognises a retried call instead of charging twice, crash handling that refuses to guess whether a payment went through. All of it unit-tested. What is missing is acceptance evidence — a test that creates a real order, refunds it, and cleans up after itself. FluentCart 1.5.5 makes that impossible to finish: transactions have no delete route, deleting an order strands them, unpublished products can't be purchased so there's no throwaway fixture, and a test run can't create a subscription at all. Every route to a proof leaves debris in the store it ran against.
+
+So the rule applied was the boring one: a money-moving capability either passes acceptance or ships unavailable. The ceremony is built; the proof is not, so it is not switched on. It returns when FluentCart offers a way to remove a test-mode charge.
+
 ## What It Can't Do
 
-274 tools is a lot, but let's not get delusional. There are limits:
+Plenty, and deliberately so:
 
 | Can't Do | Why |
 |----------|-----|
-| **Charge credit cards** | Payments require customer interaction (redirects, card forms). The MCP server can mark orders as paid, but it can't process payments. |
-| **Send arbitrary emails** | The MCP manages email templates and notification settings, but can't compose and fire off a one-off email to a customer. That's not what the API does. |
-| **Edit checkout pages** | That's frontend work — HTML/CSS/JS. Not API territory. |
-| **Touch other WordPress data** | The MCP server only talks to FluentCart endpoints. It can't read your blog posts, other plugins, or WordPress users directly. |
+| **Change anything by default** | The default write mode is `disabled`. Reads work; nothing else is exposed until you say so. |
+| **Refund or cancel** | Not in any mode in 2.0.0. The guard is built but unproven — see above. |
+| **Delete anything** | No deletion is exposed. FluentCart offers no supported restore, so none of it qualifies as reversible. |
+| **Change order statuses or mark orders paid** | Same reasoning. Orders are read-only in this release. |
+| **Charge credit cards** | Payments need customer interaction — redirects, card forms. Taking money was never on the table. |
+| **Pause or resume subscriptions** | Those endpoints aren't exposed as tools. The FluentCart admin still does it. |
+| **Send arbitrary emails** | It reads templates and notification settings. Composing a one-off message to a customer isn't what the API offers, and editing a template that goes to customers isn't exposed either. |
+| **Edit checkout pages** | Frontend work. HTML, CSS, JavaScript. Not API territory. |
+| **Touch other WordPress data** | It talks to FluentCart endpoints only. Your blog posts, other plugins and WordPress users are none of its business. |
+| **Quietly truncate a huge response** | An oversized payload fails with `RESPONSE_TOO_LARGE` and tells you how to narrow it. Silently trimmed data that looks complete is worse than an error. |
+
+What it does do, with writes enabled, is create and update: products, variants, coupons, customers, shipping zones, methods and classes, tax classes and rates, attribute groups and terms, order bumps and upgrade paths. That is a real amount of tedious admin, and all of it can be put back by hand if the AI gets it wrong.
 
 ## A Note About Money
 
@@ -355,7 +356,7 @@ The AI usually converts these when presenting results to you. But if you see num
 
 <Cards>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    All 274 tools, listed by module. The complete inventory.
+    Every tool definition in this release, by module — and which ones your write mode exposes.
   </Card>
   <Card title="Troubleshooting" href="/docs/fluentcart-mcp/troubleshooting">
     Something not working? Every failure mode is covered. Start here.
