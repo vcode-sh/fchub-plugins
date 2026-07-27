@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as p from '@clack/prompts'
 import { testConnection } from '../api/test-connection.js'
@@ -71,7 +71,7 @@ export async function runSetup(): Promise<void> {
 	const configPath = getConfigPath()
 	const configDir = dirname(configPath)
 	if (!existsSync(configDir)) {
-		mkdirSync(configDir, { recursive: true })
+		mkdirSync(configDir, { recursive: true, mode: 0o700 })
 	}
 
 	const config = {
@@ -80,8 +80,16 @@ export async function runSetup(): Promise<void> {
 		appPassword,
 	}
 
-	writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
-	p.log.success(`Config written to ${configPath}`)
+	writeFileSync(configPath, JSON.stringify(config, null, 2), { encoding: 'utf-8', mode: 0o600 })
+
+	// The mode argument only applies when the file is created, and an inherited umask can widen
+	// a pre-existing file. Repair both explicitly so a rerun cannot leave credentials readable.
+	if (process.platform !== 'win32') {
+		chmodSync(configDir, 0o700)
+		chmodSync(configPath, 0o600)
+	}
+
+	p.log.success(`Config written to ${configPath} (0600)`)
 
 	p.outro("You're all set. Run fluentcart-mcp to start the server.")
 }

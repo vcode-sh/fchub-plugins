@@ -36,7 +36,10 @@ Options:
   --transport <stdio|http>    Transport mode (default: stdio)
   --mode <static|dynamic>     Toolset mode (default: static)
   --port <number>             HTTP server port (default: 3000)
-  --host <address>            HTTP server bind address (default: 0.0.0.0)
+  --host <address>            HTTP server bind address (default: 127.0.0.1)
+
+Binding a non-loopback address requires FLUENTCART_MCP_API_KEY (32+ characters);
+the server refuses to start otherwise.
 
 Environment variables:
   FLUENTCART_URL              WordPress site URL
@@ -60,9 +63,15 @@ if (transport === 'stdio' && args.length > 0 && !args[0]!.startsWith('--')) {
 
 if (transport === 'http') {
 	const port = Number.parseInt(getFlag('port', '3000'), 10)
-	const host = getFlag('host', '0.0.0.0')
+	const host = getFlag('host', '127.0.0.1')
 	const { startHttpServer } = await import('./transport/http.js')
-	await startHttpServer(port, host, mode)
+	try {
+		await startHttpServer(port, host, mode)
+	} catch (error) {
+		// A refused exposure is a configuration answer, not a crash. Print the reason only.
+		console.error(error instanceof Error ? error.message : String(error))
+		process.exit(1)
+	}
 } else {
 	const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js')
 	const { createServer } = await import('./server.js')

@@ -112,14 +112,41 @@ async function parseSuccessBody<T>(response: Response, method: string, path: str
 	)
 }
 
+/** Map a thrown transport failure onto the package's error type without losing the cause. */
+function toApiError(
+	error: unknown,
+	context: { method: string; path: string; timeout: number },
+): FluentCartApiError {
+	if (error instanceof FluentCartApiError) return error
+
+	if (error instanceof DOMException && error.name === 'AbortError') {
+		return new FluentCartApiError(
+			'TIMEOUT',
+			`Request timed out after ${context.timeout}ms: ${context.method} ${context.path}`,
+		)
+	}
+
+	return new FluentCartApiError(
+		'CONNECTION_ERROR',
+		error instanceof Error ? error.message : String(error),
+	)
+}
+
 export function createClient(config: ResolvedConfig) {
 	const credentials = Buffer.from(`${config.username}:${config.appPassword}`).toString('base64')
 	const timeout = config.timeout ?? DEFAULT_TIMEOUT
 
-	const headers = {
-		Authorization: `Basic ${credentials}`,
+	const commonHeaders = {
 		'Content-Type': 'application/json',
 		Accept: 'application/json',
+	}
+
+	// Two distinct header sets, never one set with a conditional deletion. A public storefront
+	// route has no business receiving a store administrator's credentials.
+	const publicHeaders = commonHeaders
+	const authenticatedHeaders = {
+		...commonHeaders,
+		Authorization: `Basic ${credentials}`,
 	}
 
 	async function request<T = unknown>(
@@ -131,8 +158,10 @@ export function createClient(config: ResolvedConfig) {
 			isPublic?: boolean
 		},
 	): Promise<ApiResponse<T>> {
-		const base = options?.isPublic ? config.publicBase : config.adminBase
+		const isPublic = options?.isPublic === true
+		const base = isPublic ? config.publicBase : config.adminBase
 		const url = buildUrl(base, path, options?.params)
+		const headers = isPublic ? publicHeaders : authenticatedHeaders
 
 		const controller = new AbortController()
 		const timer = setTimeout(() => controller.abort(), timeout)
@@ -152,19 +181,7 @@ export function createClient(config: ResolvedConfig) {
 			const data = await parseSuccessBody<T>(response, method, path)
 			return { data, status: response.status }
 		} catch (error) {
-			if (error instanceof DOMException && error.name === 'AbortError') {
-				throw new FluentCartApiError(
-					'TIMEOUT',
-					`Request timed out after ${timeout}ms: ${method} ${path}`,
-				)
-			}
-			if (error instanceof FluentCartApiError) {
-				throw error
-			}
-			throw new FluentCartApiError(
-				'CONNECTION_ERROR',
-				error instanceof Error ? error.message : String(error),
-			)
+			throw toApiError(error, { method, path, timeout })
 		} finally {
 			clearTimeout(timer)
 		}

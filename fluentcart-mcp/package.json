@@ -62,15 +62,19 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",
+    "@jitl/quickjs-wasmfile-release-asyncify": "0.32.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "express": "^5.2.1",
+    "quickjs-emscripten-core": "0.32.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "2.1.2",
     "@biomejs/biome": "^2.5.5",
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.5",
     "@vitest/coverage-v8": "^4.1.10",
+    "gpt-tokenizer": "3.4.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },

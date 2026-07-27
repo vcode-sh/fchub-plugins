@@ -3,16 +3,15 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/transport/http.js'
+import { getLiveRun } from './support/live-run.js'
 
-const hasCredentials =
-	process.env.FLUENTCART_URL &&
-	process.env.FLUENTCART_USERNAME &&
-	process.env.FLUENTCART_APP_PASSWORD
+// Entry through the approved launcher; getLiveRun() throws otherwise.
+getLiveRun()
 
 // ---------------------------------------------------------------------------
 // Group 1: MCP Protocol over HTTP (no auth)
 // ---------------------------------------------------------------------------
-describe.skipIf(!hasCredentials)('E2E: MCP Protocol over HTTP', () => {
+describe('E2E: MCP Protocol over HTTP', () => {
 	let baseUrl: string
 	let server: Server
 	let mcpClient: Client
@@ -59,15 +58,31 @@ describe.skipIf(!hasCredentials)('E2E: MCP Protocol over HTTP', () => {
 		expect(caps!.tools).toBeDefined()
 	})
 
-	it('lists 190+ tools', async () => {
+	it('lists only read tools under the default disabled write mode', async () => {
 		const result = await mcpClient.listTools()
-		expect(result.tools.length).toBeGreaterThanOrEqual(190)
-
 		const names = result.tools.map((t) => t.name)
+
 		expect(names).toContain('fluentcart_dashboard_overview')
 		expect(names).toContain('fluentcart_product_list')
 		expect(names).toContain('fluentcart_order_list')
 		expect(names).toContain('fluentcart_customer_list')
+
+		// Writes are absent by default, not merely disabled: the exposure policy filters the
+		// registry before registration, so they cannot be listed or called by name.
+		for (const write of [
+			'fluentcart_coupon_create',
+			'fluentcart_product_delete',
+			'fluentcart_order_refund',
+			'fluentcart_subscription_cancel',
+			'fluentcart_role_update',
+		]) {
+			expect(names, `${write} must not be listed by default`).not.toContain(write)
+		}
+
+		// Every listed tool must annotate itself as read-only for the same reason.
+		for (const tool of result.tools) {
+			expect(tool.annotations?.readOnlyHint, `${tool.name} should be read-only`).toBe(true)
+		}
 	}, 30_000)
 
 	it('calls dashboard_overview and gets real store data', async () => {
@@ -166,7 +181,7 @@ describe.skipIf(!hasCredentials)('E2E: MCP Protocol over HTTP', () => {
 // ---------------------------------------------------------------------------
 // Group 2: Bearer Auth Enforcement
 // ---------------------------------------------------------------------------
-describe.skipIf(!hasCredentials)('E2E: Bearer Auth Enforcement', () => {
+describe('E2E: Bearer Auth Enforcement', () => {
 	let baseUrl: string
 	let server: Server
 	const TEST_API_KEY = 'e2e-test-secret-key-12345'
@@ -238,7 +253,7 @@ describe.skipIf(!hasCredentials)('E2E: Bearer Auth Enforcement', () => {
 
 		expect(res.status).toBe(401)
 		const body = await res.json()
-		expect(body).toEqual({ error: 'Invalid API key' })
+		expect(body).toEqual({ error: 'Unauthorized' })
 	})
 
 	it('accepts request with correct token (200)', async () => {
@@ -268,7 +283,7 @@ describe.skipIf(!hasCredentials)('E2E: Bearer Auth Enforcement', () => {
 // ---------------------------------------------------------------------------
 // Group 3: Health and Edge Cases
 // ---------------------------------------------------------------------------
-describe.skipIf(!hasCredentials)('E2E: Health and Edge Cases', () => {
+describe('E2E: Health and Edge Cases', () => {
 	let baseUrl: string
 	let server: Server
 

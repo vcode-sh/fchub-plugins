@@ -313,3 +313,53 @@ describe('createClient', () => {
 		})
 	})
 })
+
+describe('credential boundary', () => {
+	function stubFetch() {
+		const calls: Array<{ url: string; init: RequestInit }> = []
+		globalThis.fetch = (async (url: string, init: RequestInit) => {
+			calls.push({ url: String(url), init })
+			return {
+				ok: true,
+				status: 200,
+				text: async () => JSON.stringify({ ok: true }),
+			} as unknown as Response
+		}) as unknown as typeof fetch
+		return calls
+	}
+
+	const config: ResolvedConfig = {
+		url: 'https://store.example.com',
+		username: 'admin',
+		appPassword: 'super secret app password',
+		adminBase: 'https://store.example.com/wp-json/fluent-cart/v2',
+		publicBase: 'https://store.example.com/wp-json/fluent-cart-public/v2',
+	}
+
+	it('sends the WordPress Basic header on authenticated requests', async () => {
+		const calls = stubFetch()
+		await createClient(config).get('/orders')
+
+		const headers = new Headers(calls[0]?.init.headers as HeadersInit)
+		expect(headers.get('authorization')).toMatch(/^Basic /)
+	})
+
+	it('omits the WordPress Basic header on public requests', async () => {
+		const calls = stubFetch()
+		await createClient(config).get('/products', undefined, true)
+
+		const headers = new Headers(calls[0]?.init.headers as HeadersInit)
+		expect(headers.get('authorization')).toBeNull()
+	})
+
+	it('never leaks the application password into a public request at all', async () => {
+		const calls = stubFetch()
+		await createClient(config).post('/checkout', { qty: 1 }, true)
+
+		const serialised = JSON.stringify(calls[0])
+		expect(serialised).not.toContain('super secret app password')
+		expect(serialised).not.toContain(
+			Buffer.from('admin:super secret app password').toString('base64'),
+		)
+	})
+})

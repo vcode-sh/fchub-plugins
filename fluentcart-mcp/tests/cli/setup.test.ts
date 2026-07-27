@@ -34,10 +34,11 @@ vi.mock('node:fs', async () => {
 		existsSync: vi.fn(() => true),
 		mkdirSync: vi.fn(),
 		writeFileSync: vi.fn(),
+		chmodSync: vi.fn(),
 	}
 })
 
-import { writeFileSync } from 'node:fs'
+import { chmodSync, writeFileSync } from 'node:fs'
 import * as p from '@clack/prompts'
 import { testConnection } from '../../src/api/test-connection.js'
 import { runSetup } from '../../src/cli/setup.js'
@@ -71,7 +72,7 @@ describe('runSetup', () => {
 		expect(mockWriteFileSync).toHaveBeenCalledWith(
 			'/tmp/fluentcart-mcp-test/config.json',
 			expect.stringContaining('"url": "https://shop.test"'),
-			'utf-8',
+			{ encoding: 'utf-8', mode: 0o600 },
 		)
 		expect(p.outro).toHaveBeenCalled()
 	})
@@ -154,5 +155,25 @@ describe('runSetup', () => {
 
 		expect(mockTestConnection).toHaveBeenCalledTimes(2)
 		expect(mockWriteFileSync).toHaveBeenCalled()
+	})
+})
+
+describe('credential file permissions', () => {
+	it('writes the config with owner-only mode and repairs directory and file modes', async () => {
+		const prompts = await import('@clack/prompts')
+		const { testConnection } = await import('../../src/api/test-connection.js')
+		vi.mocked(prompts.text).mockResolvedValueOnce('https://store.example.com')
+		vi.mocked(prompts.text).mockResolvedValueOnce('admin')
+		vi.mocked(prompts.password).mockResolvedValueOnce('app pass word')
+		vi.mocked(testConnection).mockResolvedValueOnce({ ok: true, storeName: 'Store' } as never)
+
+		const { runSetup } = await import('../../src/cli/setup.js')
+		await runSetup()
+
+		expect(vi.mocked(writeFileSync).mock.calls[0]?.[2]).toMatchObject({ mode: 0o600 })
+
+		const chmodCalls = vi.mocked(chmodSync).mock.calls
+		expect(chmodCalls).toContainEqual(['/tmp/fluentcart-mcp-test', 0o700])
+		expect(chmodCalls).toContainEqual(['/tmp/fluentcart-mcp-test/config.json', 0o600])
 	})
 })

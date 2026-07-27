@@ -29,11 +29,13 @@ const baseConfig = {
 }
 
 describe('getTool', () => {
-	it('sets readOnlyHint, idempotentHint, and openWorldHint annotations', () => {
+	it('derives read annotations from the reviewed safety row, not the verb', () => {
 		const tool = getTool(mockClient(), { ...baseConfig, endpoint: '/orders' })
+		expect(tool.safety.risk).toBe('read')
 		expect(tool.annotations).toEqual({
 			readOnlyHint: true,
 			idempotentHint: true,
+			destructiveHint: false,
 			openWorldHint: true,
 		})
 	})
@@ -46,13 +48,18 @@ describe('getTool', () => {
 		expect(tool.schema).toBe(baseConfig.schema)
 	})
 
-	it('allows annotation overrides', () => {
+	it('treats an unlisted non-read tool as an unreviewed write', () => {
+		// Declaring readOnlyHint:false no longer decides anything on its own; with no reviewed
+		// row the tool becomes unreviewed-write, which the exposure policy hides.
 		const tool = getTool(mockClient(), {
 			...baseConfig,
 			endpoint: '/orders',
 			annotations: { readOnlyHint: false },
 		})
+		expect(tool.safety.risk).toBe('unreviewed-write')
+		expect(tool.safety.execution).toBe('none')
 		expect(tool.annotations.readOnlyHint).toBe(false)
+		expect(tool.annotations.destructiveHint).toBe(true)
 		expect(tool.annotations.openWorldHint).toBe(true)
 	})
 
@@ -156,9 +163,13 @@ describe('getTool', () => {
 })
 
 describe('postTool', () => {
-	it('sets only openWorldHint annotation', () => {
+	it('marks an unlisted write as an unreviewed, non-executable write', () => {
 		const tool = postTool(mockClient(), { ...baseConfig, endpoint: '/orders' })
-		expect(tool.annotations).toEqual({ openWorldHint: true })
+		expect(tool.safety.risk).toBe('unreviewed-write')
+		expect(tool.safety.execution).toBe('none')
+		expect(tool.annotations.readOnlyHint).toBe(false)
+		expect(tool.annotations.destructiveHint).toBe(true)
+		expect(tool.annotations.openWorldHint).toBe(true)
 	})
 
 	it('calls client.post with resolved path and body', async () => {
@@ -217,12 +228,13 @@ describe('postTool', () => {
 })
 
 describe('putTool', () => {
-	it('sets idempotentHint and openWorldHint annotations', () => {
-		const tool = putTool(mockClient(), { ...baseConfig, endpoint: '/orders/:id' })
-		expect(tool.annotations).toEqual({
-			idempotentHint: true,
-			openWorldHint: true,
-		})
+	it('marks an unlisted write as an unreviewed, non-executable write', () => {
+		const tool = putTool(mockClient(), { ...baseConfig, endpoint: '/orders' })
+		expect(tool.safety.risk).toBe('unreviewed-write')
+		expect(tool.safety.execution).toBe('none')
+		expect(tool.annotations.readOnlyHint).toBe(false)
+		expect(tool.annotations.destructiveHint).toBe(true)
+		expect(tool.annotations.openWorldHint).toBe(true)
 	})
 
 	it('calls client.put with resolved path and body', async () => {
@@ -255,12 +267,13 @@ describe('putTool', () => {
 })
 
 describe('deleteTool', () => {
-	it('sets destructiveHint and openWorldHint annotations', () => {
-		const tool = deleteTool(mockClient(), { ...baseConfig, endpoint: '/orders/:id' })
-		expect(tool.annotations).toEqual({
-			destructiveHint: true,
-			openWorldHint: true,
-		})
+	it('marks an unlisted write as an unreviewed, non-executable write', () => {
+		const tool = deleteTool(mockClient(), { ...baseConfig, endpoint: '/orders' })
+		expect(tool.safety.risk).toBe('unreviewed-write')
+		expect(tool.safety.execution).toBe('none')
+		expect(tool.annotations.readOnlyHint).toBe(false)
+		expect(tool.annotations.destructiveHint).toBe(true)
+		expect(tool.annotations.openWorldHint).toBe(true)
 	})
 
 	it('calls client.delete with resolved path and remaining params', async () => {
@@ -293,23 +306,33 @@ describe('deleteTool', () => {
 })
 
 describe('createTool', () => {
-	it('sets openWorldHint annotation by default', () => {
+	it('marks an unlisted custom tool as an unreviewed write by default', () => {
 		const tool = createTool(mockClient(), {
 			...baseConfig,
 			handler: vi.fn(),
 		})
-		expect(tool.annotations).toEqual({ openWorldHint: true })
+		expect(tool.safety.risk).toBe('unreviewed-write')
+		expect(tool.safety.execution).toBe('none')
+		expect(tool.annotations).toEqual({
+			readOnlyHint: false,
+			destructiveHint: true,
+			idempotentHint: false,
+			openWorldHint: true,
+		})
 	})
 
-	it('allows annotation overrides', () => {
+	it('declares a custom read tool through its annotation and receives read semantics', () => {
 		const tool = createTool(mockClient(), {
 			...baseConfig,
 			handler: vi.fn(),
-			annotations: { destructiveHint: true },
+			annotations: { readOnlyHint: true },
 		})
+		expect(tool.safety.risk).toBe('read')
 		expect(tool.annotations).toEqual({
+			readOnlyHint: true,
+			idempotentHint: true,
+			destructiveHint: false,
 			openWorldHint: true,
-			destructiveHint: true,
 		})
 	})
 

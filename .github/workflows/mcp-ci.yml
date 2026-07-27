@@ -52,8 +52,13 @@ jobs:
 
       - run: npm ci
 
-      - name: Test with coverage
-        run: npm run test:coverage
+      # The unit lane by name. It loads no environment file and performs no network I/O, so no
+      # store credential is available to it even by accident.
+      - name: Unit tests with coverage
+        run: npm run test:unit -- --coverage
+
+      - name: Tooling contract tests
+        run: npm run test:tooling
 
       - name: Coverage summary
         if: always()

@@ -2,6 +2,9 @@ import type { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
 import { cached, invalidate } from '../cache.js'
+import { redactSensitive } from '../security/redaction.js'
+import type { ToolSafety } from './risk.js'
+import { resolveToolSafety } from './risk-registry.js'
 
 export interface ToolAnnotations {
 	readOnlyHint?: boolean
@@ -16,6 +19,12 @@ export interface ToolDefinition {
 	description: string
 	schema: z.ZodObject<z.ZodRawShape>
 	annotations: ToolAnnotations
+	/**
+	 * Reviewed business-risk metadata. Resolved from the risk registry rather than inferred
+	 * from the HTTP verb, and required: an unclassified write resolves to `unreviewed-write`,
+	 * which the exposure policy hides.
+	 */
+	safety: ToolSafety
 	handler: (input: Record<string, unknown>) => Promise<{
 		content: { type: 'text'; text: string }[]
 		isError?: boolean
@@ -44,6 +53,37 @@ interface CustomToolConfig extends BaseToolConfig {
 }
 
 export const MAX_RESPONSE_CHARS = 80_000
+
+/**
+ * Look up the reviewed safety row for a tool.
+ *
+ * The verb-derived annotation is consulted only to pick the default for an unlisted name: a
+ * read stays a read, and an unlisted write becomes `unreviewed-write` and is hidden. The verb
+ * never grants a tool more permission than the registry gave it.
+ */
+function resolveSafety(name: string, verbAnnotations: ToolAnnotations): ToolSafety {
+	return resolveToolSafety(name, verbAnnotations.readOnlyHint === true)
+}
+
+/**
+ * Annotations describe business semantics, not the HTTP verb.
+ *
+ * FluentCart serves several pure reads over POST and several irreversible edits over PUT, so
+ * deriving `readOnlyHint` from the method would mislabel both. The reviewed risk row decides.
+ */
+function annotationsFor(safety: ToolSafety): ToolAnnotations {
+	if (safety.risk === 'read') {
+		return { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: true }
+	}
+
+	const destructive = safety.risk !== 'reversible-write'
+	return {
+		readOnlyHint: false,
+		destructiveHint: destructive,
+		idempotentHint: safety.idempotency === 'inherent',
+		openWorldHint: true,
+	}
+}
 
 function resolveEndpoint(
 	endpoint: string,
@@ -127,11 +167,13 @@ function formatSuccess(data: unknown) {
 }
 
 function formatError(error: unknown) {
+	// Upstream error payloads routinely echo the request, so redact before the text is built.
 	if (error instanceof FluentCartApiError) {
-		let text = `Error [${error.code}]: ${error.message}`
+		let text = `Error [${error.code}]: ${redactSensitive(error.message) as string}`
 		if (error.detail !== undefined) {
+			const redactedDetail = redactSensitive(error.detail)
 			const detailStr =
-				typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail)
+				typeof redactedDetail === 'string' ? redactedDetail : JSON.stringify(redactedDetail)
 			text += `: ${detailStr}`
 		}
 		return {
@@ -141,7 +183,7 @@ function formatError(error: unknown) {
 	}
 	const message = error instanceof Error ? error.message : String(error)
 	return {
-		content: [{ type: 'text' as const, text: `Error: ${message}` }],
+		content: [{ type: 'text' as const, text: `Error: ${redactSensitive(message) as string}` }],
 		isError: true,
 	}
 }
@@ -152,10 +194,10 @@ export function createTool(client: FluentCartClient, config: CustomToolConfig): 
 		title: config.title,
 		description: config.description,
 		schema: config.schema,
-		annotations: {
-			openWorldHint: true,
-			...config.annotations,
-		},
+		annotations: annotationsFor(
+			resolveSafety(config.name, { openWorldHint: true, ...config.annotations }),
+		),
+		safety: resolveSafety(config.name, { openWorldHint: true, ...config.annotations }),
 		handler: async (input) => {
 			try {
 				const result = await config.handler(client, input)
@@ -186,10 +228,10 @@ function createEndpointTool(
 		title: config.title,
 		description: config.description,
 		schema: config.schema,
-		annotations: {
-			...METHOD_ANNOTATIONS[method],
-			...config.annotations,
-		},
+		annotations: annotationsFor(
+			resolveSafety(config.name, { ...METHOD_ANNOTATIONS[method], ...config.annotations }),
+		),
+		safety: resolveSafety(config.name, { ...METHOD_ANNOTATIONS[method], ...config.annotations }),
 		handler: async (input) => {
 			try {
 				const { path, rest } = resolveEndpoint(config.endpoint, input)

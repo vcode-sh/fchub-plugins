@@ -3,7 +3,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { Express } from 'express'
 import type { ToolsetMode } from '../server.js'
 import { createServerFromContext, resolveServerContext } from '../server.js'
-import { createBearerAuth } from './auth.js'
+import { assertSafeHttpExposure, createBearerAuth } from './auth.js'
 
 export function createApp(host: string, mode: ToolsetMode = 'static'): Express {
 	const app = createMcpExpressApp({ host })
@@ -54,11 +54,15 @@ export async function startHttpServer(
 	host: string,
 	mode: ToolsetMode = 'static',
 ): Promise<void> {
+	// Fail before a socket exists, not after the first unauthenticated request arrives.
+	assertSafeHttpExposure(host, process.env.FLUENTCART_MCP_API_KEY)
+
 	const app = createApp(host, mode)
 
 	return new Promise((resolve) => {
 		app.listen(port, host, () => {
-			console.log(`FluentCart MCP server listening on http://${host}:${port}/mcp`)
+			// stdout belongs to JSON-RPC; operational messages go to stderr.
+			console.error(`FluentCart MCP server listening on http://${host}:${port}/mcp`)
 			resolve()
 		})
 	})

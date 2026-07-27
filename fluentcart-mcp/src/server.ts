@@ -7,6 +7,7 @@ import { resolveApiUrls } from './config/types.js'
 import { createLogger } from './logging.js'
 import { registerPrompts } from './prompts.js'
 import { registerResources } from './resources.js'
+import { canExposeTool, parseWriteMode, type WritePolicyConfig } from './security/write-policy.js'
 import type { ToolDefinition } from './tools/_factory.js'
 import { DYNAMIC_TOOL_COUNT, registerDynamicTools } from './tools/dynamic.js'
 import { createAllTools } from './tools/index.js'
@@ -18,19 +19,42 @@ export type ToolsetMode = 'static' | 'dynamic'
 
 export interface ServerContext {
 	client: FluentCartClient
+	/** Already filtered by the exposure policy. Hidden tools are absent, not merely disabled. */
 	tools: ToolDefinition[]
 	version: string
 	configSource: string
+	writePolicy: WritePolicyConfig
+}
+
+/**
+ * Read the write-exposure policy from the environment.
+ *
+ * Guard availability is reported honestly: without a signing secret and a persistent state
+ * directory there is no way to prevent a replayed refund, so guarded tools stay hidden even
+ * when the operator asked for guarded mode.
+ */
+export function resolveWritePolicy(): WritePolicyConfig {
+	return {
+		writeMode: parseWriteMode(process.env.FLUENTCART_WRITE_MODE),
+		guard: {
+			persistentState: Boolean(process.env.FLUENTCART_GUARD_STATE_DIR),
+			signingSecret: (process.env.FLUENTCART_GUARD_SECRET ?? '').length >= 32,
+		},
+	}
 }
 
 export function resolveServerContext(): ServerContext {
 	const config = resolveConfig()
 	const resolved = resolveApiUrls(config)
 	const client = createClient(resolved)
-	const tools = createAllTools(client)
+	const writePolicy = resolveWritePolicy()
+
+	// One filtered, immutable registry shared by every exposure mode. A tool removed here
+	// cannot be listed, searched, described or called by name in any mode.
+	const tools = createAllTools(client).filter((tool) => canExposeTool(tool.safety, writePolicy))
 	const configSource = process.env.FLUENTCART_URL ? 'env' : 'file'
 
-	return { client, tools, version, configSource }
+	return { client, tools, version, configSource, writePolicy }
 }
 
 export function createServerFromContext(

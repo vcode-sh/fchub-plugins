@@ -62,11 +62,12 @@ describe('tool definitions', () => {
 			expect(readOnlyTools.length).toBeGreaterThan(0)
 		})
 
-		it.each(
-			readOnlyTools.map((t) => [t.name, t]),
-		)('%s should also have idempotentHint: true', (_name, tool) => {
-			expect(tool.annotations.idempotentHint).toBe(true)
-		})
+		it.each(readOnlyTools.map((t) => [t.name, t]))(
+			'%s should also have idempotentHint: true',
+			(_name, tool) => {
+				expect(tool.annotations.idempotentHint).toBe(true)
+			},
+		)
 	})
 
 	describe('DELETE tools (destructiveHint)', () => {
@@ -76,10 +77,11 @@ describe('tool definitions', () => {
 			expect(destructiveTools.length).toBeGreaterThan(0)
 		})
 
-		it.each(
-			destructiveTools.map((t) => [t.name, t]),
-		)('%s should not have readOnlyHint: true', (_name, tool) => {
-			expect(tool.annotations.readOnlyHint).not.toBe(true)
-		})
+		it.each(destructiveTools.map((t) => [t.name, t]))(
+			'%s should not have readOnlyHint: true',
+			(_name, tool) => {
+				expect(tool.annotations.readOnlyHint).not.toBe(true)
+			},
+		)
 	})
 })

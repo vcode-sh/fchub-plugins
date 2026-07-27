@@ -62,8 +62,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
+      # Release validation runs the deterministic lanes only; the live lane is owner-operated
+      # and never receives credentials here.
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Tooling contract tests
+        run: npm run test:tooling
 
       - name: Build
         run: npm run build
