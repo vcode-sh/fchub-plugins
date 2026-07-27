@@ -42,6 +42,14 @@ const REVERSIBLE_WRITES = [
 	'fluentcart_product_update_detail',
 	'fluentcart_product_upgrade_path_save',
 	'fluentcart_product_upgrade_path_update',
+	// Saved views carry full CRUD in 1.5.5 — GET, POST, PUT and DELETE /saved-views/{id} — so a
+	// created view has both an exact read-back and a supported removal.
+	'fluentcart_saved_view_create',
+	// Proven reversible on a live store: GET returns the complete settings blob, POST replaces it
+	// wholesale, and writing the captured blob back restored it byte-identically. The tool is
+	// read-merge-write with local enum validation, so it cannot send a partial payload or let an
+	// out-of-range value be silently coerced by the controller.
+	'fluentcart_tax_settings_save',
 	'fluentcart_shipping_class_create',
 	'fluentcart_shipping_class_update',
 	'fluentcart_shipping_method_create',
@@ -164,7 +172,6 @@ const CONTROL_PLANE_WRITES = [
 	'fluentcart_tax_config_countries_save',
 	'fluentcart_tax_country_id_save',
 	'fluentcart_tax_eu_vat_save',
-	'fluentcart_tax_settings_save',
 ]
 
 /** Touches gateway keys, provider credentials or a login session. */

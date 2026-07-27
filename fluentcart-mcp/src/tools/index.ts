@@ -23,6 +23,7 @@ import { orderCustomerTools } from './orders-customer.js'
 import { orderLifecycleTools } from './orders-lifecycle.js'
 import { orderRefundTools } from './orders-refunds.js'
 import { orderTransactionTools } from './orders-transactions.js'
+import { pdfTemplateTools } from './pdf-templates.js'
 import { productOptionTools } from './product-options.js'
 import { productOptionTermTools } from './product-options-terms.js'
 import { productCatalogTools } from './products-catalog.js'
@@ -35,12 +36,14 @@ import { publicTools } from './public.js'
 import { reportCoreTools } from './reports-core.js'
 import { reportInsightTools } from './reports-insights.js'
 import { roleTools } from './roles.js'
+import { savedViewTools } from './saved-views.js'
 import { settingsCoreTools } from './settings-core.js'
 import { shippingTools } from './shipping.js'
 import { subscriptionTools } from './subscriptions.js'
 import { subscriptionCancellationTools } from './subscriptions-cancellation.js'
 import { taxTools } from './tax.js'
 import { taxClassTools } from './tax-classes.js'
+import { taxConfigurationTools } from './tax-configuration.js'
 import { taxEuVatTools } from './tax-eu-vat.js'
 
 export function createAllTools(
@@ -56,6 +59,7 @@ export function createAllTools(
 		// Split out of tax.ts; both select their route from live capability evidence, so a store
 		// that only serves DELETE at /tax/classes/{id} never sees an update tool it cannot honour.
 		...taxClassTools(client, capabilities),
+		...taxConfigurationTools(client),
 		...taxEuVatTools(client, capabilities),
 		// Split out of customers.ts, orders-core.ts and products-pricing.ts along the read/write
 		// boundary to keep every module inside the 280-line limit. Registering them here is not
@@ -69,6 +73,9 @@ export function createAllTools(
 		...productOptionTermTools(client, capabilities),
 		...commerceSearchTools(client),
 		...commerceReportingTools(client),
+		// Plan 06 read candidates: dynamic-only on arrival, never straight into curated.
+		...savedViewTools(client),
+		...pdfTemplateTools(client),
 		...subscriptionTools(client),
 		...couponTools(client),
 		...orderCoreTools(client),

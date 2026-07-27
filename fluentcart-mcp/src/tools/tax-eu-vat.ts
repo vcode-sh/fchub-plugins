@@ -27,6 +27,16 @@ export function taxEuVatTools(
 		: (EU_RATE_VARIANTS[0]?.path ?? null)
 
 	return [
+		getTool(client, {
+			name: 'fluentcart_tax_eu_product_overrides',
+			title: 'List EU VAT Product Overrides',
+			description:
+				'List the per-product and per-shipping VAT rate overrides applied under the EU ' +
+				'cross-border rules, for products that are taxed differently from the store default.',
+			schema: z.object({}),
+			endpoint: '/tax/configuration/settings/eu-vat/product-overrides',
+		}),
+
 		createTool(client, {
 			name: 'fluentcart_tax_eu_vat_save',
 			routes: direct('POST', '/tax/configuration/settings/eu-vat'),

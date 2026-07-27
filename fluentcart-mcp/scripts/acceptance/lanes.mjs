@@ -83,8 +83,14 @@ export const LANES = {
 		],
 	},
 	transport: {
-		description: 'Startup, bearer, session and shutdown boundaries against the built server',
-		steps: [testStep('transport', ['tests/acceptance/transport.test.mjs'])],
+		description:
+			'Startup, bearer, session and shutdown boundaries against the built server, plus live principal boundaries',
+		steps: [
+			testStep('transport', ['tests/acceptance/transport.test.mjs']),
+			// Proves the server preserves an upstream refusal instead of answering it emptily. Live,
+			// because the only honest source of a 401 is a store that actually issues one.
+			liveStep('permissions', 'tests/integration/acceptance-permissions.test.ts'),
+		],
 	},
 	tokens: {
 		description: 'Built wire definition sizes and progressive-disclosure budgets',

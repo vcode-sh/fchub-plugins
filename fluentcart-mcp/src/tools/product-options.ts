@@ -15,6 +15,17 @@ export function productOptionTools(client: FluentCartClient): ToolDefinition[] {
 		}),
 
 		getTool(client, {
+			name: 'fluentcart_attribute_group_library',
+			title: 'List Attribute Group Library',
+			description:
+				'List the attribute groups available to attach to products, with a term count per ' +
+				'group and the store-wide cap. Use it to find an existing group before creating a ' +
+				'duplicate. System groups are flagged with is_system.',
+			schema: z.object({}),
+			endpoint: '/options/attr/groups/library',
+		}),
+
+		getTool(client, {
 			name: 'fluentcart_attribute_group_get',
 			title: 'Get Attribute Group',
 			description: 'Get a specific attribute group by ID, including its terms.',

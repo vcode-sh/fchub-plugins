@@ -8,6 +8,27 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 		// ── Zones ──────────────────────────────────────────────
 
 		getTool(client, {
+			name: 'fluentcart_shipping_package_list',
+			title: 'List Shipping Packages',
+			description:
+				'List the parcel presets configured for shipping rate calculation, with their ' +
+				'dimensions and weight.',
+			schema: z.object({}),
+			endpoint: '/shipping/packages',
+		}),
+
+		getTool(client, {
+			name: 'fluentcart_shipping_zone_countries',
+			title: 'List Shipping Zone Countries',
+			description:
+				'List every country a shipping zone may cover, grouped by continent, with ISO codes. ' +
+				'Use it to resolve the exact codes a zone expects instead of guessing them.',
+			schema: z.object({}),
+			endpoint: '/shipping/zone/countries',
+			cache: { key: 'shipping_zone_countries', ttlMs: TTL.LONG },
+		}),
+
+		getTool(client, {
 			name: 'fluentcart_shipping_zone_list',
 			title: 'List Shipping Zones',
 			description: 'List all shipping zones with their methods and regions.',

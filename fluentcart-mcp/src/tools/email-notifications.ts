@@ -143,6 +143,35 @@ export function emailNotificationTools(
 			: []),
 
 		getTool(client, {
+			name: 'fluentcart_email_digest_settings',
+			title: 'Get Email Digest Settings',
+			description:
+				'Read the staff digest schedule: whether digests are enabled, who receives them, ' +
+				'whether an empty period still sends, and the daily/weekly/monthly cadence with send ' +
+				'hour and day of week.',
+			schema: z.object({}),
+			endpoint: '/email-notification/digest-settings',
+		}),
+
+		createTool(client, {
+			name: 'fluentcart_email_reminder_settings',
+			title: 'Get Email Reminder Settings',
+			description:
+				'Read the customer reminder schedule: which renewal and trial-end reminders are on, ' +
+				'and how many days ahead each fires. The store returns these settings wrapped in the ' +
+				'admin form schema; only the settings are returned here, because the rest is HTML for ' +
+				'rendering the settings page and describes no store behaviour.',
+			schema: z.object({}),
+			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+			routes: direct('GET', '/email-notification/reminders'),
+			handler: async (c) => {
+				const response = await c.get('/email-notification/reminders')
+				const record = (response.data ?? {}) as Record<string, unknown>
+				return { settings: record.settings ?? null }
+			},
+		}),
+
+		getTool(client, {
 			name: 'fluentcart_email_settings_get',
 			title: 'Get Email Settings',
 			description: 'Get global email notification settings (from address, logo, etc.).',

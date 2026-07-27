@@ -77,24 +77,17 @@ const EXCLUDED_INTERNAL = {
 	'POST /customer-profile/subscriptions/{param}/initiate-early-payment': ['real-money', 'Customer-session route. Acts as the logged-in shopper and initiates an early payment against their subscription.'],
 }
 
-/** Compact reads awaiting their evidence in plan 06 Task 2. */
+/**
+ * Compact reads still awaiting a tool in plan 06 Task 2.
+ *
+ * Task 2 landed thirteen of the original seventeen; those now resolve through the normal exposed
+ * path, where their evidence is derived from the module that declares them rather than asserted
+ * here. Only the four with no tool remain, and each one stays excluded until it has one.
+ */
 const PENDING_READ_CANDIDATES = [
-	'GET /email-notification/digest-settings',
-	'GET /email-notification/reminders',
-	'GET /options/attr/groups/library',
 	'GET /products/bulk-edit-data',
-	'GET /products/get-bundle-info/{param}',
-	'GET /saved-views',
-	'GET /settings/pdf-templates/factory-default',
-	'GET /settings/pdf-templates/receipt',
-	'GET /settings/pdf-templates/receipt/{param}',
-	'GET /settings/pdf-templates/saved',
 	'GET /settings/pdf-templates/seller-details',
-	'GET /settings/pdf-templates/status',
 	'GET /shipping/classes/{param}/profile',
-	'GET /shipping/packages',
-	'GET /shipping/zone/countries',
-	'GET /tax/configuration/settings/eu-vat/product-overrides',
 	'GET /tax/product-overrides/{param}',
 ]
 
@@ -119,8 +112,7 @@ const HIGH_IMPACT = {
 	'POST /products/variants/group-bulk-update': ['destructive-write', 'Bulk variation-group change with no per-record read-back and no supported bulk undo.'],
 	'POST /products/variants/{param}/tax-exempt': ['destructive-write', 'Overwrites a variation’s tax treatment with no restore of the previous value.'],
 	'POST /products/{param}/tax-exempt': ['destructive-write', 'Overwrites a product’s tax treatment with no restore of the previous value.'],
-	'POST /saved-views': ['reversible-write', 'Reversible in principle — the runtime serves DELETE /saved-views/{param} — but restore and cleanup proof belongs to plan 06 Task 3.'],
-	'PUT /saved-views/{param}': ['reversible-write', 'Reversible in principle, but no read-back of the pre-update view has been captured; restore proof belongs to plan 06 Task 3.'],
+	'PUT /saved-views/{param}': ['reversible-write', 'Updating a saved view overwrites it in place, and no read-back of the pre-update record has been captured, so the previous state cannot be restored. No tool reaches this route; an update tool needs that read-back first.'],
 	'DELETE /saved-views/{param}': ['destructive-write', 'Removes a saved view with no supported restore.'],
 	'POST /settings/pdf-templates/create': ['reversible-write', 'Reversible in principle — the runtime serves DELETE /settings/pdf-templates/delete/{param} — but restore proof belongs to plan 06 Task 3.'],
 	'DELETE /settings/pdf-templates/delete/{param}': ['destructive-write', 'Deletes a PDF template with no supported restore.'],
@@ -232,6 +224,21 @@ const REVIEWED_ORPHAN_TOOL_ROUTES = {
 	// which has since been fixed. The tool now claims GET /products/get-bundle-info/{param}, the
 	// very route this entry named as preferred, so nothing is left unowned. The sibling
 	// POST /products/save-bundle-info/{param} is claimed by fluentcart_product_bundle_save.
+}
+
+/**
+ * Live proof that an exposed write can be undone, cited per route.
+ *
+ * A `reversible-write` claim is only worth the evidence behind it, so the row names the lane
+ * that demonstrated the undo rather than asserting reversibility in prose. The validator checks
+ * these paths exist, so deleting the proof breaks the build instead of quietly leaving a write
+ * exposed on the strength of a sentence nobody re-ran.
+ */
+const REVERSIBILITY_PROOF = {
+	'POST /saved-views': {
+		evidence: 'tests/integration/current-reversible-writes.test.ts',
+		note: 'Reversibility is demonstrated live: the created id is registered for removal before anything else can fail, read back independently rather than echoed from the request, then deleted and confirmed gone, with every pre-existing view unchanged.',
+	},
 }
 
 /**
@@ -571,6 +578,12 @@ export function buildLedger() {
 		// charges anything, and labelling that lookup "real-money" would be false: the same data is
 		// independently readable through a plain read tool. So a GET that any read tool serves is a
 		// read, and everything else takes the highest reviewed risk among its exposing tools.
+		// A write that ships on a reversibility claim carries the lane that proved it, in the
+		// response evidence rather than only in prose.
+		const proof = REVERSIBILITY_PROOF[id]
+		const evidence = evidenceFor(id, exposed)
+		if (proof) evidence.responseEvidence = [...evidence.responseEvidence, proof.evidence].sort()
+
 		const risks = exposed.map((tool) => safetyFor(tool, registry).risk)
 		const worst =
 			operation.method === 'GET' && risks.includes('read')
@@ -586,9 +599,9 @@ export function buildLedger() {
 					disposition: curated.has(tool.name) ? 'curated' : 'dynamic',
 				}))
 				.sort((a, b) => compareStrings(a.publicName, b.publicName)),
-			reason: `Reached by ${exposed.map((t) => t.name).sort(compareStrings).join(', ')}.`,
+			reason: `Reached by ${exposed.map((t) => t.name).sort(compareStrings).join(', ')}.${proof ? ` ${proof.note}` : ''}`,
 			risk: worst,
-			...evidenceFor(id, exposed),
+			...evidence,
 			suppressedTools: suppressed.map((t) => t.name).sort(),
 		}
 	})

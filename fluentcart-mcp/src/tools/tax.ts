@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { TTL } from '../cache.js'
 import {
 	createTool,
 	deleteTool,
@@ -224,27 +223,6 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 				countries: z.array(z.string()).describe('Array of ISO country codes to configure for tax'),
 			}),
 			endpoint: '/tax/configuration/countries',
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_tax_settings_get',
-			title: 'Get Tax Settings',
-			description:
-				'Get global tax settings including tax-inclusive pricing, display options, and rounding.',
-			schema: z.object({}),
-			endpoint: '/tax/configuration/settings',
-			cache: { key: 'tax_settings', ttlMs: TTL.MEDIUM },
-		}),
-
-		postTool(client, {
-			name: 'fluentcart_tax_settings_save',
-			title: 'Save Tax Settings',
-			description: 'Save global tax settings.',
-			schema: z.object({
-				settings: z.record(z.string(), z.unknown()).describe('Tax settings to save'),
-			}),
-			endpoint: '/tax/configuration/settings',
-			invalidates: ['tax_settings'],
 		}),
 
 		// ── Tax Records ────────────────────────────────────────

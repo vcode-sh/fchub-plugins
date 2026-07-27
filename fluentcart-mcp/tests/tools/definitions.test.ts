@@ -12,13 +12,13 @@ const mockClient = {
 const tools = createAllTools(mockClient)
 
 describe('tool definitions', () => {
-	// 271 source definitions: 274 before Plan 03 Task 4 withdrew three tools that FluentCart
+	// 287 source definitions after plan 06 added saved-view and PDF-template reads: 274 before Plan 03 Task 4 withdrew three tools that FluentCart
 	// 1.5.5 does not serve (report_cart, report_unfulfilled_orders, tax_class_update). Each
 	// withdrawal carries a written reason in tests/regression/scenario-coverage.test.ts.
 	it('should register the reviewed number of source definitions', () => {
 		console.log(`Total tools registered: ${tools.length}`)
-		expect(tools.length).toBeGreaterThanOrEqual(265)
-		expect(tools.length).toBeLessThanOrEqual(285)
+		expect(tools.length).toBeGreaterThanOrEqual(280)
+		expect(tools.length).toBeLessThanOrEqual(300)
 	})
 
 	it('should not contain removed tools', () => {

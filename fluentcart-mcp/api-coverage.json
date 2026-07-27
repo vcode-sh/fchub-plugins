@@ -8,11 +8,11 @@
 	"attribution": "Core and Pro both register into the fluent-cart/v2 namespace. The available captures are a core-only 1.3.9 docs contract and one all-active runtime index, and neither separates a core route from a Pro route, so every row is attributed to the namespace owner. Sub-attribution between fluent-cart and fluent-cart-pro is NOT evidenced.",
 	"counts": {
 		"routes": 386,
-		"exposed": 166,
-		"excluded": 220,
+		"exposed": 181,
+		"excluded": 205,
 		"deltaSince139": 61,
-		"tools": 278,
-		"declaredTools": 281,
+		"tools": 289,
+		"declaredTools": 292,
 		"withdrawnTools": 3,
 		"orphanToolRoutes": 4
 	},
@@ -1870,15 +1870,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /email-notification/digest-settings"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_email_digest_settings",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_email_digest_settings.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/email-notifications.ts#fluentcart_email_digest_settings"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /email-notification/digest-settings",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/email-notifications.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -2056,15 +2067,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /email-notification/reminders"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_email_reminder_settings",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_email_reminder_settings.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/email-notifications.ts#fluentcart_email_reminder_settings"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /email-notification/reminders",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/email-notifications.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -3146,15 +3168,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /options/attr/groups/library"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_attribute_group_library",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_attribute_group_library.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/product-options.ts#fluentcart_attribute_group_library"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /options/attr/groups/library",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/product-options.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -4462,18 +4495,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/get-bundle-info/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_product_bundle_info",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_product_bundle_info"
-			]
+			"reason": "Reached by fluentcart_product_bundle_info.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/products-pricing.ts#fluentcart_product_bundle_info"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/get-bundle-info/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/products-pricing.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -7286,15 +7328,31 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /saved-views"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_saved_view_create",
+					"disposition": "dynamic"
+				},
+				{
+					"publicName": "fluentcart_saved_view_list",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_saved_view_create, fluentcart_saved_view_list.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/saved-views.ts#fluentcart_saved_view_create",
+				"src/tools/saved-views.ts#fluentcart_saved_view_list"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /saved-views",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/saved-views.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -7306,15 +7364,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "High-impact operation. Reversible in principle — the runtime serves DELETE /saved-views/{param} — but restore and cleanup proof belongs to plan 06 Task 3.",
-			"risk": "reversible-write",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /saved-views"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_saved_view_create",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_saved_view_create. Reversibility is demonstrated live: the created id is registered for removal before anything else can fail, read back independently rather than echoed from the request, then deleted and confirmed gone, with every pre-existing view unchanged.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/saved-views.ts#fluentcart_saved_view_create"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /saved-views",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/_factory.ts",
+				"src/tools/saved-views.ts",
+				"tests/integration/current-reversible-writes.test.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -7348,7 +7418,7 @@
 			"contractOrigin": "current-runtime",
 			"routeDisposition": "excluded",
 			"toolExposures": [],
-			"reason": "High-impact operation. Reversible in principle, but no read-back of the pre-update view has been captured; restore proof belongs to plan 06 Task 3.",
+			"reason": "High-impact operation. Updating a saved view overwrites it in place, and no read-back of the pre-update record has been captured, so the previous state cannot be restored. No tool reaches this route; an update tool needs that read-back first.",
 			"risk": "reversible-write",
 			"schemaEvidence": [],
 			"permissionEvidence": [
@@ -8024,15 +8094,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/factory-default"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_pdf_template_list",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_pdf_template_list.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/pdf-templates.ts#fluentcart_pdf_template_list"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/factory-default",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/pdf-templates.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -8044,15 +8125,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/receipt"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_pdf_template_list",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_pdf_template_list.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/pdf-templates.ts#fluentcart_pdf_template_list"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/receipt",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/pdf-templates.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -8064,15 +8156,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/receipt/{param}"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_pdf_template_get",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_pdf_template_get.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/pdf-templates.ts#fluentcart_pdf_template_get"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/receipt/{param}",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/pdf-templates.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -8104,15 +8207,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/saved"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_pdf_template_list",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_pdf_template_list.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/pdf-templates.ts#fluentcart_pdf_template_list"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/saved",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/pdf-templates.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -8164,15 +8278,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/status"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_pdf_template_status",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_pdf_template_status.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/pdf-templates.ts#fluentcart_pdf_template_status"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /settings/pdf-templates/status",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/pdf-templates.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -8720,15 +8845,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /shipping/packages"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_shipping_package_list",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_shipping_package_list.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/shipping.ts#fluentcart_shipping_package_list"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /shipping/packages",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/shipping.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -8760,15 +8896,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /shipping/zone/countries"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_shipping_zone_countries",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_shipping_zone_countries.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/shipping.ts#fluentcart_shipping_zone_countries"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /shipping/zone/countries",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/shipping.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
@@ -9213,19 +9360,24 @@
 				{
 					"publicName": "fluentcart_tax_settings_get",
 					"disposition": "dynamic"
+				},
+				{
+					"publicName": "fluentcart_tax_settings_save",
+					"disposition": "dynamic"
 				}
 			],
-			"reason": "Reached by fluentcart_tax_settings_get.",
+			"reason": "Reached by fluentcart_tax_settings_get, fluentcart_tax_settings_save.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/tax.ts#fluentcart_tax_settings_get"
+				"src/tools/tax-configuration.ts#fluentcart_tax_settings_get",
+				"src/tools/tax-configuration.ts#fluentcart_tax_settings_save"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /tax/configuration/settings",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/tax.ts",
+				"src/tools/tax-configuration.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []
@@ -9239,18 +9391,27 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Served only by fluentcart_tax_settings_save, whose reviewed risk makes it non-executable, so no caller can reach this route.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/configuration/settings"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_tax_settings_save",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_tax_settings_save"
-			]
+			"reason": "Reached by fluentcart_tax_settings_save.",
+			"risk": "reversible-write",
+			"schemaEvidence": [
+				"src/tools/tax-configuration.ts#fluentcart_tax_settings_save"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#POST /tax/configuration/settings",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/tax-configuration.ts",
+				"src/tools/_factory.ts"
+			],
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -9334,15 +9495,26 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "current-runtime",
-			"routeDisposition": "excluded",
-			"toolExposures": [],
-			"reason": "Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.",
-			"risk": "read",
-			"schemaEvidence": [],
-			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /tax/configuration/settings/eu-vat/product-overrides"
+			"routeDisposition": "exposed",
+			"toolExposures": [
+				{
+					"publicName": "fluentcart_tax_eu_product_overrides",
+					"disposition": "dynamic"
+				}
 			],
-			"responseEvidence": [],
+			"reason": "Reached by fluentcart_tax_eu_product_overrides.",
+			"risk": "read",
+			"schemaEvidence": [
+				"src/tools/tax-eu-vat.ts#fluentcart_tax_eu_product_overrides"
+			],
+			"permissionEvidence": [
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /tax/configuration/settings/eu-vat/product-overrides",
+				"src/api/client.ts"
+			],
+			"responseEvidence": [
+				"src/tools/tax-eu-vat.ts",
+				"src/tools/_factory.ts"
+			],
 			"suppressedTools": []
 		},
 		{
