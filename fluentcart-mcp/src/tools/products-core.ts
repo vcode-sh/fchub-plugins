@@ -177,9 +177,10 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_product_update_detail',
 			title: 'Update Product Detail',
 			description:
-				'Update a product detail record (variation type). ' +
-				'Backend replaces the variation type and may delete orphan variants when switching to simple. ' +
-				'Fetch current detail first to understand current state before changing.',
+				'Change a product variation type. Switching to simple may delete orphan variants, so read ' +
+				'the current detail first. This route changes nothing else — for stock tracking use ' +
+				'fluentcart_product_manage_stock_update, and for quantities use ' +
+				'fluentcart_product_inventory_update.',
 			schema: z.object({
 				detail_id: z.number().describe('Product detail ID'),
 				variation_type: z
@@ -191,8 +192,11 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 					.optional()
 					.describe('Variant IDs to keep when switching to simple (others are deleted)'),
 				action: z.string().optional().describe('Action: change_variation_type (default)'),
-				manage_stock: z.enum(['yes', 'no']).optional().describe('Enable stock management'),
-				sold_individually: z.enum(['yes', 'no']).optional().describe('Sell individually'),
+				// `manage_stock` and `sold_individually` used to be advertised here and were silently
+				// discarded: ProductController::updateProductDetail runs getSafe over exactly
+				// variation_type, variation_ids.* and action (ProductController.php:782-786), so
+				// anything else never reaches the resource. The call answered 200 and changed nothing,
+				// which is worse than refusing. Stock tracking now has a tool that works.
 			}),
 			endpoint: '/products/detail/:detail_id',
 		}),

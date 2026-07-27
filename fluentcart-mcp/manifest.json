@@ -205,7 +205,7 @@
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
       "packageVersion": "2.0.0",
-      "sourceTreeDigest": "sha256:090572c93e776abbede7df09b8b59fcaff8cd72f67c8eca2024aee42a7fc8f36",
+      "sourceTreeDigest": "sha256:c847839cfaa836dbfa239480ae2a8755e73a7bb4b87f5c45e752a86fafa497d2",
       "serializer": "mcp-tools-list-v1",
       "advertisedToolCount": 25,
       "userConfigEnvironment": {
