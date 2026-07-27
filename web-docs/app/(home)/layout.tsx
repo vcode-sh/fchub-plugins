@@ -88,6 +88,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
             {
               text: "FluentCart API",
               url: "https://dev.fluentcart.com/restapi/",
+              external: true,
               icon: <Braces size={16} />,
             },
           ],
@@ -230,7 +231,13 @@ export default function Layout({ children }: LayoutProps<"/">) {
                     FluentCart MCP
                   </NavigationMenuLink>
                   <NavigationMenuLink
-                    render={<Link href="https://dev.fluentcart.com/restapi/" />}
+                    render={
+                      <Link
+                        href="https://dev.fluentcart.com/restapi/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      />
+                    }
                   >
                     <Braces size={16} />
                     FluentCart API
@@ -253,6 +260,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
         {
           text: "API",
           url: "https://dev.fluentcart.com/restapi/",
+          external: true,
           icon: <Braces size={18} />,
         },
         {

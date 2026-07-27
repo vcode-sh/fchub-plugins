@@ -19,11 +19,39 @@ test("FluentCart API entry points use the official developer documentation", asy
     read("web-docs/app/(home)/layout.tsx"),
     read("web-docs/app/(home)/page.tsx"),
   ]);
+  const escapedOfficialApiUrl = officialApiUrl.replaceAll(".", "\\.");
 
-  assert.match(homeLayout, new RegExp(officialApiUrl.replaceAll(".", "\\.")));
-  assert.match(homePage, new RegExp(officialApiUrl.replaceAll(".", "\\.")));
+  assert.match(homeLayout, new RegExp(escapedOfficialApiUrl));
+  assert.match(homePage, new RegExp(escapedOfficialApiUrl));
   assert.doesNotMatch(homeLayout, new RegExp(localApiPath));
   assert.doesNotMatch(homePage, new RegExp(localApiPath));
+
+  assert.equal(
+    [
+      ...homeLayout.matchAll(
+        new RegExp(
+          `url: "${escapedOfficialApiUrl}",\\s+external: true,`,
+          "g",
+        ),
+      ),
+    ].length,
+    2,
+    "both Fumadocs API navigation items must explicitly open externally",
+  );
+  assert.match(
+    homeLayout,
+    new RegExp(
+      `<Link\\s+href="${escapedOfficialApiUrl}"\\s+target="_blank"\\s+rel="noopener noreferrer"\\s*/>`,
+    ),
+    "the custom desktop API navigation link must open in a new tab",
+  );
+  assert.match(
+    homePage,
+    new RegExp(
+      `href="${escapedOfficialApiUrl}"\\s+target="_blank"\\s+rel="noopener noreferrer"`,
+    ),
+    "the homepage API card must open in a new tab",
+  );
 });
 
 test("the website does not bundle a local FluentCart API reference", async () => {
