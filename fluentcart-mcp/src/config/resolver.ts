@@ -8,6 +8,21 @@ interface ConfigFile {
 	timeout?: number
 }
 
+const MAX_TIMEOUT_MS = 300_000
+
+function validTimeout(value: unknown, label: string): number {
+	const numeric = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value
+	if (
+		typeof numeric !== 'number' ||
+		!Number.isSafeInteger(numeric) ||
+		numeric < 1 ||
+		numeric > MAX_TIMEOUT_MS
+	) {
+		throw new Error(`${label} must be a whole number from 1 to ${MAX_TIMEOUT_MS} milliseconds`)
+	}
+	return numeric
+}
+
 function fromEnv(): FluentCartConfig | undefined {
 	const url = process.env.FLUENTCART_URL
 	const username = process.env.FLUENTCART_USERNAME
@@ -19,26 +34,30 @@ function fromEnv(): FluentCartConfig | undefined {
 			url,
 			username,
 			appPassword,
-			timeout: timeout ? Number.parseInt(timeout, 10) : undefined,
+			timeout: timeout === undefined ? undefined : validTimeout(timeout, 'FLUENTCART_TIMEOUT'),
 		}
 	}
 	return undefined
 }
 
 function fromFile(): FluentCartConfig | undefined {
+	let parsed: ConfigFile
 	try {
 		const raw = readFileSync(getConfigPath(), 'utf-8')
-		const parsed = JSON.parse(raw) as ConfigFile
-		if (parsed.url && parsed.username && parsed.appPassword) {
-			return {
-				url: parsed.url,
-				username: parsed.username,
-				appPassword: parsed.appPassword,
-				timeout: parsed.timeout,
-			}
-		}
+		parsed = JSON.parse(raw) as ConfigFile
 	} catch {
 		// Config file doesn't exist or is invalid — that's fine
+		return undefined
+	}
+
+	if (parsed.url && parsed.username && parsed.appPassword) {
+		return {
+			url: parsed.url,
+			username: parsed.username,
+			appPassword: parsed.appPassword,
+			timeout:
+				parsed.timeout === undefined ? undefined : validTimeout(parsed.timeout, 'config timeout'),
+		}
 	}
 	return undefined
 }

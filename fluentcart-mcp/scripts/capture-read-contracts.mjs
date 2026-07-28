@@ -22,7 +22,7 @@ import { assertAllowedLiveTarget } from './live-target-policy.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROUTE_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
-const OUTPUT = 'tests/fixtures/rest/fluentcart-1.5.5-core-pro-1.5.4-read-contracts.json'
+const OUTPUT = 'tests/fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json'
 const REQUEST_TIMEOUT_MS = 15_000
 const PAGINATION_PROBE = 500
 const PAGINATION_PROBE_SMALL = 3

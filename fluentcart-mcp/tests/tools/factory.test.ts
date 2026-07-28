@@ -6,6 +6,7 @@ import {
 	createTool,
 	deleteTool,
 	getTool,
+	invalidateToolCache,
 	MAX_RESPONSE_CHARS,
 	postTool,
 	putTool,
@@ -480,9 +481,6 @@ describe('cache integration in endpoint tools', () => {
 	})
 
 	it('calls fetcher again after cache is cleared', async () => {
-		const { clearCache } = await import('../../src/cache.js')
-		clearCache()
-
 		const client = mockClient()
 		vi.mocked(client.get).mockResolvedValue({ data: { id: 2 }, status: 200 })
 		const tool = getTool(client, {
@@ -492,7 +490,7 @@ describe('cache integration in endpoint tools', () => {
 		})
 
 		await tool.handler({})
-		clearCache()
+		invalidateToolCache(client, 'test_filters')
 		await tool.handler({})
 
 		expect(client.get).toHaveBeenCalledTimes(2)

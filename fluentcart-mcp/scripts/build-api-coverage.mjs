@@ -19,6 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 
 export const CURRENT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
+export const CORE_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core.json'
 export const LEGACY_FIXTURE = 'tests/fixtures/routes/fluentcart-1.3.9.json'
 export const OUTPUT_FILE = 'api-coverage.json'
 
@@ -26,15 +27,8 @@ const TOOLS_DIR = 'src/tools'
 const CLIENT_MODULE = 'src/api/client.ts'
 const FACTORY_MODULE = 'src/tools/_factory.ts'
 
-/**
- * The component that owns the `fluent-cart/v2` namespace.
- *
- * Core and Pro both register into this one namespace, and the only captures available are a
- * core-only 1.3.9 docs contract and a single all-active runtime index. Nothing in that evidence
- * separates a core route from a Pro route, so the ledger attributes the namespace owner and
- * says so in `attribution` rather than guessing which plugin authored each path.
- */
-const NAMESPACE_COMPONENT = { slug: 'fluent-cart', version: '1.5.5' }
+const CORE_COMPONENT = { slug: 'fluent-cart', version: '1.5.5' }
+const PRO_COMPONENT = { slug: 'fluent-cart-pro', version: '1.5.4' }
 
 const read = (relative) => readFileSync(join(PACKAGE_ROOT, relative), 'utf8')
 const readJson = (relative) => JSON.parse(read(relative))
@@ -76,20 +70,6 @@ const EXCLUDED_INTERNAL = {
 	'POST /settings/modules/turnstile/verify': ['external-side-effect', 'Captcha verification for a browser session. Consumes a single-use human-interaction token and is meaningless outside a storefront request.'],
 	'POST /customer-profile/subscriptions/{param}/initiate-early-payment': ['real-money', 'Customer-session route. Acts as the logged-in shopper and initiates an early payment against their subscription.'],
 }
-
-/**
- * Compact reads still awaiting a tool in plan 06 Task 2.
- *
- * Task 2 landed thirteen of the original seventeen; those now resolve through the normal exposed
- * path, where their evidence is derived from the module that declares them rather than asserted
- * here. Only the four with no tool remain, and each one stays excluded until it has one.
- */
-const PENDING_READ_CANDIDATES = [
-	'GET /products/bulk-edit-data',
-	'GET /settings/pdf-templates/seller-details',
-	'GET /shipping/classes/{param}/profile',
-	'GET /tax/product-overrides/{param}',
-]
 
 /**
  * High-impact operations. Every one stays excluded unless it is a reviewed guarded action.
@@ -496,18 +476,20 @@ function safetyFor(tool, registry) {
 
 const key = (operation) => `${operation.method} ${operation.path}`
 
-function evidenceFor(route, tools) {
+function evidenceFor(route, tools, fixture = CURRENT_FIXTURE) {
 	const sources = [...new Set(tools.map((t) => t.sourceFile))].sort()
 	return {
 		schemaEvidence: tools.map((t) => `${t.sourceFile}#${t.name}`).sort(),
-		permissionEvidence: [`${CURRENT_FIXTURE}#${route}`, CLIENT_MODULE],
+		permissionEvidence: [`${fixture}#${route}`, CLIENT_MODULE],
 		responseEvidence: [...sources.map((s) => s), FACTORY_MODULE],
 	}
 }
 
 export function buildLedger() {
 	const current = readJson(CURRENT_FIXTURE)
+	const core = readJson(CORE_FIXTURE)
 	const legacy = readJson(LEGACY_FIXTURE)
+	const coreKeys = new Set(core.operations.map(key))
 	const legacyKeys = new Set(legacy.operations.map(key))
 	const registry = extractRiskRegistry()
 	const curated = new Set(extractCuratedNames())
@@ -532,11 +514,14 @@ export function buildLedger() {
 		const attached = byRoute.get(id) ?? []
 		const exposed = attached.filter((tool) => safetyFor(tool, registry).execution !== 'none')
 		const suppressed = attached.filter((tool) => safetyFor(tool, registry).execution === 'none')
+		const isCore = coreKeys.has(id)
+		const evidenceFixture = isCore ? CORE_FIXTURE : CURRENT_FIXTURE
+		const component = isCore ? CORE_COMPONENT : PRO_COMPONENT
 
 		const base = {
 			method: operation.method,
 			path: operation.path,
-			component: { ...NAMESPACE_COMPONENT, evidenceFixture: CURRENT_FIXTURE },
+			component: { ...component, evidenceFixture },
 			contractOrigin: legacyKeys.has(id) ? 'legacy-docs' : 'current-runtime',
 		}
 
@@ -547,7 +532,7 @@ export function buildLedger() {
 			reason,
 			risk,
 			schemaEvidence: [],
-			permissionEvidence: [`${CURRENT_FIXTURE}#${id}`],
+			permissionEvidence: [`${evidenceFixture}#${id}`],
 			responseEvidence: [],
 			suppressedTools: suppressed.concat(exposed).map((t) => t.name).sort(compareStrings),
 		})
@@ -557,13 +542,6 @@ export function buildLedger() {
 			const [risk, reason] = HIGH_IMPACT[id]
 			return excludedAs(risk, `High-impact operation. ${reason}`)
 		}
-		if (PENDING_READ_CANDIDATES.includes(id)) {
-			return excludedAs(
-				'read',
-				'Read candidate accepted in principle but not yet exposed: schema, pagination and response-budget evidence are owned by plan 06 Task 2.',
-			)
-		}
-
 		if (exposed.length === 0) {
 			return excludedAs(
 				'read',
@@ -581,7 +559,7 @@ export function buildLedger() {
 		// A write that ships on a reversibility claim carries the lane that proved it, in the
 		// response evidence rather than only in prose.
 		const proof = REVERSIBILITY_PROOF[id]
-		const evidence = evidenceFor(id, exposed)
+		const evidence = evidenceFor(id, exposed, evidenceFixture)
 		if (proof) evidence.responseEvidence = [...evidence.responseEvidence, proof.evidence].sort()
 
 		const risks = exposed.map((tool) => safetyFor(tool, registry).risk)
@@ -626,11 +604,13 @@ export function buildLedger() {
 	return {
 		schemaVersion: 1,
 		generator: 'scripts/build-api-coverage.mjs',
-		fixtures: { current: CURRENT_FIXTURE, legacy: LEGACY_FIXTURE },
+		fixtures: { current: CURRENT_FIXTURE, core: CORE_FIXTURE, legacy: LEGACY_FIXTURE },
 		attribution:
-			'Core and Pro both register into the fluent-cart/v2 namespace. The available captures are a core-only 1.3.9 docs contract and one all-active runtime index, and neither separates a core route from a Pro route, so every row is attributed to the namespace owner. Sub-attribution between fluent-cart and fluent-cart-pro is NOT evidenced.',
+			'Isolated captures prove 355 operations with FluentCart Core 1.5.5 alone and 386 with FluentCart Pro 1.5.4 added. The exact 31-operation set difference is attributed to Pro; the shared 355-operation set is attributed to Core.',
 		counts: {
 			routes: rows.length,
+			coreRoutes: rows.filter((r) => r.component.slug === 'fluent-cart').length,
+			proRoutes: rows.filter((r) => r.component.slug === 'fluent-cart-pro').length,
 			exposed: rows.filter((r) => r.routeDisposition === 'exposed').length,
 			excluded: rows.filter((r) => r.routeDisposition === 'excluded').length,
 			deltaSince139: rows.filter((r) => r.contractOrigin === 'current-runtime').length,
@@ -818,7 +798,6 @@ export {
 	REVIEWED_ORPHAN_TOOL_ROUTES,
 	REVIEWED_UNREGISTERED_READS,
 	TOOL_ROUTE_OVERRIDES,
-	PENDING_READ_CANDIDATES,
 	safetyFor,
 }
 

@@ -2,8 +2,15 @@ import { z } from 'zod'
 import type { ApiCapabilities } from '../api/capabilities.js'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { invalidate, TTL } from '../cache.js'
-import { createTool, deleteTool, getTool, putTool, type ToolDefinition } from './_factory.js'
+import { TTL } from '../cache.js'
+import {
+	createTool,
+	deleteTool,
+	getTool,
+	invalidateToolCache,
+	putTool,
+	type ToolDefinition,
+} from './_factory.js'
 import { composite, op } from './endpoints.js'
 import { asNumber } from './tax.js'
 
@@ -84,7 +91,7 @@ export function taxClassTools(
 				if (input.description !== undefined) body.description = input.description
 
 				const created = await c.post('/tax/classes', body)
-				invalidate('tax_classes')
+				invalidateToolCache(c, 'tax_classes')
 				const directId = extractId(created.data)
 				if (directId != null) return created.data
 

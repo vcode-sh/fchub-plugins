@@ -29,12 +29,13 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --project tsconfig.tests.json",
     "build:contract": "node scripts/build-release-contract.mjs",
     "build:manifest": "node scripts/build-manifest.mjs",
     "check:contract": "node scripts/build-release-contract.mjs --check",
     "check:manifest": "node scripts/build-manifest.mjs --check",
     "capture:read-contracts": "node scripts/capture-read-contracts.mjs",
-    "check:routes": "node scripts/check-tool-routes.mjs",
+    "check:routes": "node scripts/check-tool-routes.mjs --fixture tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json",
     "measure:context": "node scripts/measure-tool-context.mjs",
     "check:compatibility": "node scripts/check-tool-routes.mjs --compatibility",
     "prepublishOnly": "npm run build",
@@ -73,7 +74,7 @@
   "dependencies": {
     "@clack/prompts": "^1.7.0",
     "@jitl/quickjs-wasmfile-release-asyncify": "0.32.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "express": "^5.2.1",
     "quickjs-emscripten-core": "0.32.0",
     "zod": "^4.4.3"
@@ -82,7 +83,7 @@
     "@anthropic-ai/mcpb": "2.1.2",
     "@biomejs/biome": "^2.5.5",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.9.5",
+    "@types/node": "^24.13.3",
     "@vitest/coverage-v8": "^4.1.10",
     "gpt-tokenizer": "3.4.0",
     "typescript": "^5.9.3",
@@ -90,10 +91,11 @@
   },
   "overrides": {
     "hono": "4.12.32",
-    "@hono/node-server": "1.19.15",
+    "@hono/node-server": "2.0.12",
     "fast-uri": "3.1.4",
     "path-to-regexp": "8.4.2",
     "qs": "6.15.3",
+    "tmp": "0.2.7",
     "body-parser": "2.3.0",
     "express-rate-limit": "8.6.0"
   }

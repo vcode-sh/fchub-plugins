@@ -247,7 +247,7 @@ describe('accepted measurements', () => {
 })
 
 /**
- * The dynamic surface has grown from three meta-tools to five since the 2026-07-27 baseline,
+ * The widest dynamic surface has grown from three meta-tools to four since the 2026-07-27 baseline,
  * because execution was split by risk class so a read executor can never be handed a write. That
  * is a deliberate safety change, and it costs roughly twice the definition payload.
  */
@@ -266,15 +266,22 @@ describe('regression against the verified dynamic baseline', () => {
 
 		assert.ok(existsSync(CONTRACT_PATH), 'release-contract.json must record the accepted figure')
 		const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'))
-		const recorded = contract.profiles
-			.filter((profile) => profile.status === 'MEASURED')
-			.map((profile) => profile.modes.dynamic)
+		const widest = contract.profiles.find(
+			(profile) =>
+				profile.name === 'core-1.5.5-pro-1.5.4-standalone-guarded' && profile.status === 'MEASURED',
+		)
 
-		assert.ok(recorded.length > 0, 'no measured profile carries a dynamic figure')
-		for (const row of recorded) {
-			assert.equal(row.cl100kTokens, measurement.cl100kTokens, 'release contract is stale')
-			assert.equal(row.o200kTokens, measurement.o200kTokens, 'release contract is stale')
-		}
+		assert.ok(widest, 'the widest measured profile is absent from the release contract')
+		assert.equal(
+			widest.modes.dynamic.cl100kTokens,
+			measurement.cl100kTokens,
+			'release contract is stale',
+		)
+		assert.equal(
+			widest.modes.dynamic.o200kTokens,
+			measurement.o200kTokens,
+			'release contract is stale',
+		)
 	})
 
 	it('still holds the enlarged dynamic surface well inside its hard cap', () => {

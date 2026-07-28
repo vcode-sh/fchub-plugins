@@ -8,7 +8,8 @@ import * as fixture from './support/config-fixture.js'
 import { getLiveClient } from './support/live-client.js'
 import type { Scenario } from './support/scenario.js'
 
-const { buildConfigTools, count, must, ok, roleExists, SQL, storeHolds, sweep } = fixture
+const { buildConfigTools, count, ok, roleExists, SQL, storeHolds, sweep } = fixture
+const must: typeof fixture.must = fixture.must
 let tools: ToolDefinition[]
 
 beforeAll(() => {
@@ -263,12 +264,17 @@ const SCENARIOS: Scenario[] = [
 		},
 		budget: 600,
 		run: async (ctx) => {
-			const { isError, text } = await ctx.call('fluentcart_get_store_context')
-			// Not mine to fix, asserted rather than skipped: server.ts builds this with `profile: null`
-			// and loadCommerceContext refuses that, so the tool cannot succeed on any store at all.
-			must(isError, 'store context succeeds now; delete this scenario and celebrate')
-			must(/runtime profile/i.test(text), `the refusal stopped explaining: ${text.slice(0, 80)}`)
-			ctx.note('discoverable, ranked first, and always fails: server.ts passes profile: null')
+			const context = await ok(ctx, 'fluentcart_get_store_context')
+			const store = context.body.store as Record<string, unknown>
+			const runtime = context.body.runtime as Record<string, unknown>
+			must(typeof store.origin === 'string', 'store context omitted its origin')
+			must(runtime.wordpress === null, 'store context guessed a WordPress version')
+			must(runtime.fluentcartCore === null, 'store context guessed a FluentCart version')
+			must(
+				/^sha256:[0-9a-f]{64}$/.test(String(runtime.routeProfileDigest)),
+				'store context omitted its route-profile digest',
+			)
+			ctx.note('runtime versions remain null because FluentCart does not expose them')
 		},
 	},
 ]

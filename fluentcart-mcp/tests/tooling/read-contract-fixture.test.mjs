@@ -13,7 +13,7 @@ import {
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const FIXTURE_PATH = join(
 	PACKAGE_ROOT,
-	'tests/fixtures/rest/fluentcart-1.5.5-core-pro-1.5.4-read-contracts.json',
+	'tests/fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json',
 )
 
 const raw = readFileSync(FIXTURE_PATH, 'utf8')
@@ -47,6 +47,7 @@ describe('read contract fixture provenance', () => {
 	it('declares its schema version, generator and route fixture', () => {
 		assert.equal(fixture.schemaVersion, 1)
 		assert.equal(fixture.generatedBy, 'scripts/capture-read-contracts.mjs')
+		assert.equal(fixture.evidenceScope, 'all-active-compatibility')
 		assert.equal(fixture.routeFixture, 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json')
 		assert.ok(existsSync(join(PACKAGE_ROOT, fixture.routeFixture.split('/').join(sep))))
 	})

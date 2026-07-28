@@ -36,14 +36,6 @@ export async function loadCommerceContext(
 	client: FluentCartClient,
 	deps: CommerceContextDeps,
 ): Promise<CommerceContext> {
-	if (deps.profile === null) {
-		// Refuse rather than report a store whose runtime nobody established. A context that
-		// guessed its own WordPress version would be worse than no context at all.
-		throw new Error(
-			'Store context needs a verified runtime profile. Start the server through capability discovery so the component versions are proven.',
-		)
-	}
-
 	// Permission and authentication failures travel outward unchanged: an operator who cannot read
 	// `/app/init` needs to be told so, not handed a context with empty fields.
 	const response = await client.get('/app/init')
@@ -61,7 +53,8 @@ export async function loadCommerceContext(
 const DESCRIPTION = [
 	'Get compact orientation for the connected FluentCart store before doing anything else.',
 	'Returns the store origin, display name, currency and timezone; the WordPress, FluentCart core',
-	'and FluentCart Pro versions with a digest identifying the verified route profile; and the',
+	'and FluentCart Pro versions when independently verified, otherwise null without inference;',
+	'a digest identifying the verified route profile; and the',
 	'entity and report capability names this configuration actually exposes, alongside the current',
 	'write mode (disabled, reversible or guarded).',
 	'Unconfigured optional values are returned as null with a short warning rather than a guess, so',

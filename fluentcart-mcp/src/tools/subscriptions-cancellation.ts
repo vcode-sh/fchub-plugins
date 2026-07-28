@@ -247,6 +247,9 @@ export function subscriptionCancellationTools(
 				'cancellation. Cancellation is immediate — FluentCart 1.5.5 has no end-of-period option, so ' +
 				'cancel_immediately:false is rejected. Stops future renewals; issues no refund.',
 			schema: cancelSchema,
+			// The guarded protocol must return its locally signed confirmation token to the caller.
+			// Every upstream field in the preview and execution result is explicitly projected.
+			redactOutput: false,
 			handler: async (_client, input) => {
 				const parsed = parseInput(input)
 				const fields: CancelFields = {

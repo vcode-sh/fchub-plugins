@@ -5,6 +5,16 @@ function okVerifier() {
 	return vi.fn(async () => true)
 }
 
+async function capturedError(promise: Promise<unknown>): Promise<Error> {
+	try {
+		await promise
+	} catch (error) {
+		if (error instanceof Error) return error
+		throw new Error(`Expected Error, received ${String(error)}`)
+	}
+	throw new Error('Expected promise to reject')
+}
+
 describe('CleanupLedger', () => {
 	it('removes and independently verifies a tracked record', async () => {
 		const ledger = new CleanupLedger()
@@ -129,7 +139,7 @@ describe('CleanupLedger', () => {
 			verifyMissing: async () => true,
 		})
 
-		const error = await ledger.cleanup().catch((e: unknown) => e as Error)
+		const error = await capturedError(ledger.cleanup())
 
 		expect(removeFirst).toHaveBeenCalledWith(1)
 		expect(error.message).toMatch(/cleanup incomplete/)
@@ -150,7 +160,7 @@ describe('CleanupLedger', () => {
 			})
 		}
 
-		const error = await ledger.cleanup().catch((e: unknown) => e as Error)
+		const error = await capturedError(ledger.cleanup())
 		for (const id of [1, 2, 3]) {
 			expect(error.message).toContain(`coupon ${id}`)
 		}

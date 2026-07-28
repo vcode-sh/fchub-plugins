@@ -3,9 +3,9 @@
   "serializer": "mcp-tools-list-v1",
   "tokenizer": "gpt-tokenizer@3.4.0",
   "packageVersion": "2.0.0",
-  "sourceTreeDigest": "sha256:99e7a6a178d34150c21049813cabb680da46e047d89b6f8e26fe480ed1dd9093",
+  "sourceTreeDigest": "sha256:925d43bae14a02bab3ae7f916a395ea44b52253fe36e3e4326e63a948ea81f2c",
   "sourceTreeInputs": {
-    "fileCount": 120,
+    "fileCount": 123,
     "declared": [
       {
         "file": "package.json"
@@ -36,12 +36,12 @@
       "manifest.json"
     ]
   },
-  "sourceDefinitionCount": 287,
+  "sourceDefinitionCount": 291,
   "categoryCount": 20,
   "writePolicyExposure": {
-    "disabled": 158,
-    "reversible": 190,
-    "guarded": 190,
+    "disabled": 162,
+    "reversible": 194,
+    "guarded": 194,
     "realMoneyExposable": 0,
     "composedBeyondModules": 2,
     "note": "Exposure per write mode as the server composes it, independent of route evidence."
@@ -77,10 +77,10 @@
       "exposedDefinitionCount": 140,
       "modes": {
         "dynamic": {
-          "toolCount": 4,
-          "characters": 3171,
-          "cl100kTokens": 688,
-          "o200kTokens": 699
+          "toolCount": 3,
+          "characters": 2359,
+          "cl100kTokens": 512,
+          "o200kTokens": 520
         },
         "curated": {
           "toolCount": 17,
@@ -96,9 +96,9 @@
         },
         "full": {
           "toolCount": 140,
-          "characters": 114209,
-          "cl100kTokens": 25407,
-          "o200kTokens": 25904
+          "characters": 114267,
+          "cl100kTokens": 25415,
+          "o200kTokens": 25912
         }
       }
     },
@@ -112,13 +112,13 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 148,
+      "exposedDefinitionCount": 151,
       "modes": {
         "dynamic": {
-          "toolCount": 4,
-          "characters": 3171,
-          "cl100kTokens": 688,
-          "o200kTokens": 699
+          "toolCount": 3,
+          "characters": 2359,
+          "cl100kTokens": 512,
+          "o200kTokens": 520
         },
         "curated": {
           "toolCount": 17,
@@ -133,10 +133,10 @@
           "o200kTokens": 540
         },
         "full": {
-          "toolCount": 148,
-          "characters": 118327,
-          "cl100kTokens": 26322,
-          "o200kTokens": 26827
+          "toolCount": 151,
+          "characters": 120855,
+          "cl100kTokens": 26873,
+          "o200kTokens": 27385
         }
       }
     },
@@ -150,13 +150,13 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 158,
+      "exposedDefinitionCount": 162,
       "modes": {
         "dynamic": {
-          "toolCount": 4,
-          "characters": 3171,
-          "cl100kTokens": 688,
-          "o200kTokens": 699
+          "toolCount": 3,
+          "characters": 2359,
+          "cl100kTokens": 512,
+          "o200kTokens": 520
         },
         "curated": {
           "toolCount": 17,
@@ -171,10 +171,10 @@
           "o200kTokens": 540
         },
         "full": {
-          "toolCount": 158,
-          "characters": 125331,
-          "cl100kTokens": 27909,
-          "o200kTokens": 28438
+          "toolCount": 162,
+          "characters": 128436,
+          "cl100kTokens": 28581,
+          "o200kTokens": 29120
         }
       }
     },
@@ -188,11 +188,11 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 190,
+      "exposedDefinitionCount": 194,
       "modes": {
         "dynamic": {
           "toolCount": 4,
-          "characters": 3171,
+          "characters": 3172,
           "cl100kTokens": 688,
           "o200kTokens": 699
         },
@@ -209,10 +209,10 @@
           "o200kTokens": 540
         },
         "full": {
-          "toolCount": 190,
-          "characters": 164215,
-          "cl100kTokens": 36312,
-          "o200kTokens": 37081
+          "toolCount": 194,
+          "characters": 167320,
+          "cl100kTokens": 36984,
+          "o200kTokens": 37763
         }
       }
     },
@@ -226,11 +226,11 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 190,
+      "exposedDefinitionCount": 194,
       "modes": {
         "dynamic": {
           "toolCount": 4,
-          "characters": 3171,
+          "characters": 3172,
           "cl100kTokens": 688,
           "o200kTokens": 699
         },
@@ -247,10 +247,10 @@
           "o200kTokens": 540
         },
         "full": {
-          "toolCount": 190,
-          "characters": 164215,
-          "cl100kTokens": 36312,
-          "o200kTokens": 37081
+          "toolCount": 194,
+          "characters": 167320,
+          "cl100kTokens": 36984,
+          "o200kTokens": 37763
         }
       }
     }

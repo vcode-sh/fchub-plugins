@@ -80,7 +80,7 @@ git tag fchub-p24/v1.0.1
 git push origin fchub-p24/v1.0.1
 ```
 
-MCP server: `fluentcart-mcp/v1.1.0` → npm publish + GitHub Release + Docker to GHCR & Docker Hub.
+MCP server: tag `fluentcart-mcp/v<package-version>` → npm publish + GitHub Release + Docker to GHCR & Docker Hub.
 
 **Tests:**
 ```bash

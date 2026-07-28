@@ -3,6 +3,7 @@ import type { FluentCartClient } from './api/client.js'
 import type { CacheScope } from './commerce/cache.js'
 import { PrincipalScopedCache, STORE_CONTEXT_TTL_MS } from './commerce/cache.js'
 import { fetchReferenceData, type ReferenceKind } from './commerce/reference-data.js'
+import { redactSensitive } from './security/redaction.js'
 
 /** A resource backed by a raw endpoint, cached under the store-context TTL. */
 interface EndpointResource {
@@ -81,7 +82,13 @@ function perCallDeps(): ResourceDeps {
 
 function jsonContents(uri: URL, value: unknown) {
 	return {
-		contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(value) }],
+		contents: [
+			{
+				uri: uri.href,
+				mimeType: 'application/json',
+				text: JSON.stringify(redactSensitive(value)),
+			},
+		],
 	}
 }
 

@@ -15,17 +15,19 @@ import { loadServerModule, measureMode } from '../../scripts/measure-tool-contex
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 /**
- * Dynamic registers four meta-tools; the policy bounds what they can reach.
+ * Dynamic always registers discovery and the read executor. Write executors appear only when the
+ * filtered registry contains a tool they can actually execute.
  *
  * The fifth, `fluentcart_execute_guarded_write`, is registered only when a real-money action
  * survives the exposure filter. Every real-money entry ships `execution: 'none'` in 2.0.0 — the
  * same fact the exposure suite below asserts — so it is absent in all three write modes, and
  * `GUARDED_EXECUTOR` is asserted absent rather than pinned present.
  */
-const DYNAMIC_NAMES = 'search_tools describe_tools execute_read_tool execute_reversible_write'
+const DYNAMIC_BASE_NAMES = 'search_tools describe_tools execute_read_tool'
 	.split(' ')
 	.map((suffix) => `fluentcart_${suffix}`)
 
+const REVERSIBLE_EXECUTOR = 'fluentcart_execute_reversible_write'
 const GUARDED_EXECUTOR = 'fluentcart_execute_guarded_write'
 
 const CODE_NAMES = ['fluentcart_search_api', 'fluentcart_execute_code']
@@ -215,8 +217,20 @@ describe('exposure by write mode', () => {
 
 describe('public names per mode', () => {
 	for (const writeMode of WRITE_MODES) {
-		it(`registers the same meta-tool names in ${writeMode} mode`, () => {
-			assert.deepEqual(snapshots.get(writeMode).dynamic, DYNAMIC_NAMES)
+		it(`registers only usable meta-tool names in ${writeMode} mode`, () => {
+			const snapshot = snapshots.get(writeMode)
+			const expected = [...DYNAMIC_BASE_NAMES]
+			if (snapshot.safety.some((tool) => tool.risk === 'reversible-write')) {
+				expected.push(REVERSIBLE_EXECUTOR)
+			}
+			if (
+				snapshot.safety.some(
+					(tool) => tool.risk === 'real-money' && tool.execution === 'guarded-rest',
+				)
+			) {
+				expected.push(GUARDED_EXECUTOR)
+			}
+			assert.deepEqual(snapshot.dynamic, expected)
 			assert.deepEqual(snapshots.get(writeMode).code, CODE_NAMES)
 		})
 

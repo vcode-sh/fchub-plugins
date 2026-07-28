@@ -165,6 +165,21 @@ describe('credentials on the success path', () => {
 		expect(text).not.toContain('fk_live_deadbeef')
 	})
 
+	it('redacts credentials returned through a custom upstream handler', async () => {
+		stubFetch(
+			JSON.stringify({
+				name: 'order_receipt',
+				pdf_settings: { api_token: 'pdf_live_deadbeef', heading: 'Receipt' },
+			}),
+		)
+		const { text } = await resultText('fluentcart_pdf_template_get', {
+			template: 'order_receipt',
+		})
+
+		expect(text).not.toContain('pdf_live_deadbeef')
+		expect(text).toContain('[REDACTED]')
+	})
+
 	// The asymmetry itself, isolated: same secret, same route, redacted only because it failed.
 	it('redacts the same secret when the store returns it inside an error', async () => {
 		stubFetch(JSON.stringify({ message: 'bad config', secret_key: 'sk_live_51ABCDEFabcdef' }), 500)

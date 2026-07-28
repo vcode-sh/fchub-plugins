@@ -23,7 +23,7 @@ const routeFixture = JSON.parse(
 
 const readContracts = JSON.parse(
 	readFileSync(
-		join(PACKAGE_ROOT, 'tests/fixtures/rest/fluentcart-1.5.5-core-pro-1.5.4-read-contracts.json'),
+		join(PACKAGE_ROOT, 'tests/fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json'),
 		'utf8',
 	),
 ) as { profileDigest: string; profile: RuntimeProfile }
@@ -136,6 +136,23 @@ describe('core-only store without FluentCart Pro', () => {
 	it('digests differently from the core plus Pro runtime', () => {
 		const full = buildCommerceContext(input())
 		expect(context.runtime.routeProfileDigest).not.toBe(full.runtime.routeProfileDigest)
+	})
+})
+
+describe('store whose runtime versions are not exposed', () => {
+	it('returns useful capability context without inventing component versions', () => {
+		const context = buildCommerceContext(input({ profile: null }))
+
+		expect(context.runtime).toEqual({
+			wordpress: null,
+			fluentcartCore: null,
+			fluentcartPro: null,
+			routeProfileDigest: routeProfileDigest(null, routeFixture.operations),
+		})
+		expect(context.capabilities.entities).toContain('products')
+		expect(context.warnings).toContain(
+			'Runtime versions are not exposed by FluentCart; route capabilities are verified independently.',
+		)
 	})
 })
 

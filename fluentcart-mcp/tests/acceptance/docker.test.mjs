@@ -8,7 +8,10 @@ import { fileURLToPath } from 'node:url'
 
 const PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 const VERSION = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8')).version
-const IMAGE = process.env.FLUENTCART_ACCEPTANCE_IMAGE ?? `vcodesh/fluentcart-mcp:${VERSION}`
+const IMAGE = process.env.FLUENTCART_ACCEPTANCE_IMAGE ?? null
+const EXPECTED_SOURCE_SHA = process.env.FLUENTCART_ACCEPTANCE_SOURCE_SHA ?? null
+const REQUIRED = process.env.FLUENTCART_ACCEPTANCE_REQUIRED === 'yes'
+const STORE_URL = process.env.FLUENTCART_ACCEPTANCE_STORE_URL ?? 'https://fixture.invalid'
 
 /** Long enough to satisfy the 32-character floor, and obviously disposable. */
 const STRONG_KEY = `acceptance-${randomBytes(24).toString('hex')}`
@@ -16,7 +19,7 @@ const PORT = 39081
 
 const STORE_ENV = [
 	'-e',
-	'FLUENTCART_URL=https://fixture.invalid',
+	`FLUENTCART_URL=${STORE_URL}`,
 	'-e',
 	'FLUENTCART_USERNAME=fixture',
 	'-e',
@@ -45,6 +48,9 @@ function inspectImage() {
 /** Reason the whole suite cannot run, or null when it can. */
 function blockedReason() {
 	if (!dockerAvailable()) return 'docker daemon is not reachable from this environment'
+	if (!IMAGE) {
+		return 'FLUENTCART_ACCEPTANCE_IMAGE is not set; refusing to test an unrelated local image with the same version'
+	}
 	if (!imagePresent()) {
 		return `image ${IMAGE} is not built; run scripts/build-validated-docker-image.mjs first`
 	}
@@ -52,6 +58,9 @@ function blockedReason() {
 }
 
 const blocked = blockedReason()
+if (blocked && REQUIRED) {
+	throw new Error(`required Docker acceptance cannot run: ${blocked}`)
+}
 let containerId = null
 
 async function waitForPort(attempts = 40) {
@@ -74,6 +83,9 @@ before(async () => {
 		'--detach',
 		'--publish',
 		`127.0.0.1:${PORT}:3000`,
+		...(STORE_URL.includes('host.docker.internal')
+			? ['--add-host', 'host.docker.internal:host-gateway']
+			: []),
 		...STORE_ENV,
 		'-e',
 		`FLUENTCART_MCP_API_KEY=${STRONG_KEY}`,
@@ -101,11 +113,12 @@ describe('docker image contract', () => {
 		if (blocked) return t.skip(blocked)
 		const labels = inspectImage().Config.Labels ?? {}
 		assert.equal(labels['org.opencontainers.image.version'], VERSION)
-		assert.match(
-			labels['org.opencontainers.image.revision'] ?? '',
-			/^[0-9a-f]{40}$/,
-			'revision label must be the full commit SHA the context was built from',
-		)
+		const revision = labels['org.opencontainers.image.revision'] ?? ''
+		assert.match(revision, /^[0-9a-f]{40}$/, 'revision label must be a full commit SHA')
+		if (EXPECTED_SOURCE_SHA) {
+			assert.match(EXPECTED_SOURCE_SHA, /^[0-9a-f]{40}$/, 'expected source SHA is malformed')
+			assert.equal(revision, EXPECTED_SOURCE_SHA, 'image revision is not the validated source SHA')
+		}
 	})
 
 	it('bakes no credential into the image', (t) => {
@@ -187,6 +200,21 @@ describe('docker authenticated endpoint', () => {
 		const ports = docker(['port', containerId, '3000'])
 		assert.equal(ports.status, 0, ports.stderr)
 		assert.match(ports.stdout, /127\.0\.0\.1:39081/)
+	})
+
+	it('completes initialize, initialized notification, and tools/list', (t) => {
+		if (blocked) return t.skip(blocked)
+		const result = spawnSync(
+			process.execPath,
+			[
+				join(PACKAGE_ROOT, 'scripts', 'smoke-mcp-http.mjs'),
+				`http://127.0.0.1:${PORT}/mcp`,
+				STRONG_KEY,
+			],
+			{ encoding: 'utf8', timeout: 30_000 },
+		)
+		assert.equal(result.status, 0, result.stderr)
+		assert.match(result.stdout, /MCP initialize and tools\/list succeeded/)
 	})
 })
 

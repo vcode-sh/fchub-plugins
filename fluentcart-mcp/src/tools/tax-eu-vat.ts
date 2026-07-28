@@ -2,8 +2,8 @@ import { z } from 'zod'
 import type { ApiCapabilities } from '../api/capabilities.js'
 import type { FluentCartClient } from '../api/client.js'
 import type { HttpMethod } from '../api/route-normalisation.js'
-import { invalidate, TTL } from '../cache.js'
-import { createTool, getTool, type ToolDefinition } from './_factory.js'
+import { TTL } from '../cache.js'
+import { createTool, getTool, invalidateToolCache, type ToolDefinition } from './_factory.js'
 import { direct } from './endpoints.js'
 
 /**
@@ -78,8 +78,8 @@ export function taxEuVatTools(
 				if (input.reset_registration === 'yes') body.reset_registration = 'yes'
 
 				const response = await c.post('/tax/configuration/settings/eu-vat', body)
-				invalidate('tax_eu_rates')
-				invalidate('tax_settings')
+				invalidateToolCache(c, 'tax_eu_rates')
+				invalidateToolCache(c, 'tax_settings')
 				return response.data
 			},
 		}),

@@ -1,15 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { FluentCartClient } from '../../src/api/client.js'
 import type { ToolDefinition } from '../../src/tools/_factory.js'
-import { emailNotificationTools } from '../../src/tools/email-notifications.js'
+import { createAllTools } from '../../src/tools/index.js'
 import { pdfTemplateTools } from '../../src/tools/pdf-templates.js'
-import { productOptionTools } from '../../src/tools/product-options.js'
-import { savedViewTools } from '../../src/tools/saved-views.js'
-import { shippingTools } from '../../src/tools/shipping.js'
-import { taxEuVatTools } from '../../src/tools/tax-eu-vat.js'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const fixture = JSON.parse(
@@ -23,14 +19,7 @@ const SERVED = new Set(
 )
 
 const client = {} as FluentCartClient
-const all: ToolDefinition[] = [
-	...emailNotificationTools(client),
-	...pdfTemplateTools(client),
-	...productOptionTools(client),
-	...savedViewTools(client),
-	...shippingTools(client),
-	...taxEuVatTools(client),
-]
+const all: ToolDefinition[] = createAllTools(client)
 const byName = new Map(all.map((tool) => [tool.name, tool]))
 
 /** Every read accepted at the plan 06 Task 2 evidence checkpoint, with the route it claims. */
@@ -42,8 +31,18 @@ const ACCEPTED: readonly { tool: string; route: string }[] = [
 	{ tool: 'fluentcart_pdf_template_status', route: 'GET /settings/pdf-templates/status' },
 	{ tool: 'fluentcart_pdf_template_list', route: 'GET /settings/pdf-templates/receipt' },
 	{ tool: 'fluentcart_pdf_template_get', route: 'GET /settings/pdf-templates/receipt/{param}' },
+	{
+		tool: 'fluentcart_pdf_seller_details_status',
+		route: 'GET /settings/pdf-templates/seller-details',
+	},
+	{ tool: 'fluentcart_product_bulk_edit_data', route: 'GET /products/bulk-edit-data' },
 	{ tool: 'fluentcart_shipping_package_list', route: 'GET /shipping/packages' },
+	{
+		tool: 'fluentcart_shipping_class_profile',
+		route: 'GET /shipping/classes/{param}/profile',
+	},
 	{ tool: 'fluentcart_shipping_zone_countries', route: 'GET /shipping/zone/countries' },
+	{ tool: 'fluentcart_tax_product_overrides', route: 'GET /tax/product-overrides/{param}' },
 	{
 		tool: 'fluentcart_tax_eu_product_overrides',
 		route: 'GET /tax/configuration/settings/eu-vat/product-overrides',
@@ -54,11 +53,7 @@ const ACCEPTED: readonly { tool: string; route: string }[] = [
  * Rejected at the same checkpoint, with the reason. Asserted so a later executor cannot promote
  * one by taste: adding a tool for any of these fails here until the reason is answered.
  */
-const REJECTED: readonly { route: string; reason: RegExp }[] = [
-	{ route: 'GET /products/bulk-edit-data', reason: /html|compact/i },
-	{ route: 'GET /settings/pdf-templates/seller-details', reason: /bank|personal/i },
-	{ route: 'GET /shipping/classes/{param}/profile', reason: /no shipping class|evidence/i },
-]
+const REJECTED: readonly { route: string; reason: RegExp }[] = []
 
 describe('accepted reads', () => {
 	it.each(ACCEPTED)('$tool is registered', ({ tool }) => {
@@ -132,6 +127,30 @@ describe('pdf template input contract', () => {
 		const tool = byName.get('fluentcart_pdf_template_get')
 		expect(tool?.schema.safeParse({}).success).toBe(false)
 		expect(tool?.schema.safeParse({ template: 'order_receipt' }).success).toBe(true)
+	})
+
+	it('keeps a template name inside one encoded route segment', async () => {
+		const get = vi.fn().mockResolvedValue({ data: { name: 'escaped' }, status: 200 })
+		const tools = pdfTemplateTools({ get } as unknown as FluentCartClient)
+		const tool = tools.find((entry) => entry.name === 'fluentcart_pdf_template_get')
+
+		await tool?.handler({ template: '../orders?status=paid#summary' })
+
+		expect(get).toHaveBeenCalledWith(
+			'/settings/pdf-templates/receipt/..%2Forders%3Fstatus%3Dpaid%23summary',
+		)
+	})
+
+	it('rejects dot segments instead of sending them upstream', async () => {
+		const get = vi.fn()
+		const tools = pdfTemplateTools({ get } as unknown as FluentCartClient)
+		const tool = tools.find((entry) => entry.name === 'fluentcart_pdf_template_get')
+
+		const result = await tool?.handler({ template: '..' })
+
+		expect(get).not.toHaveBeenCalled()
+		expect(result?.isError).toBe(true)
+		expect(result?.content[0]?.text).toContain('single record')
 	})
 })
 

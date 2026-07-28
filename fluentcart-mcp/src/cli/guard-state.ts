@@ -203,10 +203,17 @@ export async function resolveGuardClaim(request: ResolveRequest): Promise<ClaimR
 	}
 
 	const pending = await readJsonNoFollow(join(claimDir, PENDING_FILE))
-	if (pending.kind !== 'ok' || !parsePendingRecord(pending.value)) {
+	const pendingRecord = pending.kind === 'ok' ? parsePendingRecord(pending.value) : undefined
+	if (!pendingRecord) {
 		throw new LedgerError(
 			'UNKNOWN_CLAIM',
 			'That claim has no pending record to resolve. Only an interrupted action can be resolved.',
+		)
+	}
+	if (pendingRecord.entityHash !== entityHash || pendingRecord.claimHash !== claimHash) {
+		throw new LedgerError(
+			'CLAIM_MISMATCH',
+			'The pending claim does not belong to the supplied entity and claim hashes.',
 		)
 	}
 

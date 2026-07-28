@@ -148,7 +148,10 @@ export class HostBridge {
 
 	async #dispatch(
 		operation: string,
-		handler: (input: Record<string, unknown>) => Promise<{
+		handler: (
+			input: Record<string, unknown>,
+			execution?: { signal?: AbortSignal },
+		) => Promise<{
 			content: { type: 'text'; text: string }[]
 			isError?: boolean
 		}>,
@@ -157,7 +160,10 @@ export class HostBridge {
 		this.#inFlight += 1
 		this.#onCallStart?.()
 		try {
-			const result = await Promise.race([this.#abortPromise(), handler(input)])
+			const result = await Promise.race([
+				this.#abortPromise(),
+				handler(input, { signal: this.#controller.signal }),
+			])
 
 			if (result === null) {
 				return {

@@ -27,7 +27,7 @@ export function getLiveClient(): FluentCartClient {
 }
 
 function statusOf(error: unknown): number | null {
-	return error instanceof FluentCartApiError ? error.status : null
+	return error instanceof FluentCartApiError ? (error.status ?? null) : null
 }
 
 /**
@@ -78,6 +78,16 @@ export async function verifyAttributeGroupMissing(id: string | number): Promise<
 	return body?.group == null
 }
 
+export async function verifyShippingClassMissing(id: string | number): Promise<boolean> {
+	try {
+		await getLiveClient().get(`/shipping/classes/${id}`)
+		return false
+	} catch (error) {
+		if (statusOf(error) === 404) return true
+		throw error
+	}
+}
+
 /**
  * Removal is "ensure this exact record is gone", so a record the test body already deleted is
  * not an error. Absence is confirmed with the same verifier the ledger uses afterwards, so
@@ -107,6 +117,12 @@ export async function removeCoupon(id: string | number): Promise<void> {
 export async function removeAttributeGroup(id: string | number): Promise<void> {
 	await removeIfPresent(id, verifyAttributeGroupMissing, async (target) => {
 		await getLiveClient().delete(`/options/attr/group/${target}`)
+	})
+}
+
+export async function removeShippingClass(id: string | number): Promise<void> {
+	await removeIfPresent(id, verifyShippingClassMissing, async (target) => {
+		await getLiveClient().delete(`/shipping/classes/${target}`)
 	})
 }
 

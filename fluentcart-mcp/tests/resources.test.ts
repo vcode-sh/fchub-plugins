@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import type { FluentCartClient } from '../src/api/client.js'
 import { registerResources } from '../src/resources.js'
 
+interface ResourceResult {
+	contents: Array<{ mimeType: string; text: string }>
+}
+
+type ResourceHandler = (uri: URL) => Promise<ResourceResult>
+
 function mockClient(): FluentCartClient {
 	return {
 		get: vi.fn().mockResolvedValue({ data: { mock: true }, status: 200 }),
@@ -81,13 +87,11 @@ describe('registerResources', () => {
 		const client = mockClient()
 		vi.mocked(client.get).mockResolvedValue({ data: { currency: 'USD' }, status: 200 })
 
-		const handlers = new Map<string, (...args: never[]) => unknown>()
+		const handlers = new Map<string, ResourceHandler>()
 		const server = {
-			registerResource: vi.fn(
-				(name: string, _uri: string, _meta: unknown, handler: (...args: never[]) => unknown) => {
-					handlers.set(name, handler)
-				},
-			),
+			registerResource: vi.fn((name: string, _uri: string, _meta: unknown, handler: unknown) => {
+				handlers.set(name, handler as ResourceHandler)
+			}),
 		}
 
 		registerResources(server as never, client)
@@ -101,5 +105,30 @@ describe('registerResources', () => {
 		expect(result.contents).toHaveLength(1)
 		expect(result.contents[0].mimeType).toBe('application/json')
 		expect(JSON.parse(result.contents[0].text)).toEqual({ currency: 'USD' })
+	})
+
+	it('redacts credentials in successful endpoint-resource payloads', async () => {
+		const client = mockClient()
+		vi.mocked(client.get).mockResolvedValue({
+			data: { currency: 'USD', rest_nonce: 'nonce-deadbeef', api_token: 'token-deadbeef' },
+			status: 200,
+		})
+
+		const handlers = new Map<string, ResourceHandler>()
+		const server = {
+			registerResource: vi.fn((name: string, _uri: string, _meta: unknown, handler: unknown) => {
+				handlers.set(name, handler as ResourceHandler)
+			}),
+		}
+
+		registerResources(server as never, client)
+		const result = await handlers.get('store-config')!(new URL('fluentcart://store/config'))
+		const payload = JSON.parse(result.contents[0].text)
+
+		expect(payload).toEqual({
+			currency: 'USD',
+			rest_nonce: '[REDACTED]',
+			api_token: '[REDACTED]',
+		})
 	})
 })

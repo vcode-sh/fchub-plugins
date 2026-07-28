@@ -199,9 +199,16 @@ async function parseSuccessBody<T>(response: Response, method: string, path: str
 /** Map a thrown transport failure onto the package's error type without losing the cause. */
 function toApiError(
 	error: unknown,
-	context: { method: string; path: string; timeout: number },
+	context: { method: string; path: string; timeout: number; externallyAborted: boolean },
 ): FluentCartApiError {
 	if (error instanceof FluentCartApiError) return error
+
+	if (context.externallyAborted) {
+		return new FluentCartApiError(
+			'CONNECTION_ERROR',
+			`Request cancelled: ${context.method} ${context.path}`,
+		)
+	}
 
 	if (error instanceof DOMException && error.name === 'AbortError') {
 		return new FluentCartApiError(
@@ -240,6 +247,7 @@ export function createClient(config: ResolvedConfig) {
 			body?: Record<string, unknown>
 			params?: Record<string, unknown>
 			isPublic?: boolean
+			signal?: AbortSignal
 		},
 	): Promise<ApiResponse<T>> {
 		const isPublic = options?.isPublic === true
@@ -249,6 +257,10 @@ export function createClient(config: ResolvedConfig) {
 
 		const controller = new AbortController()
 		const timer = setTimeout(() => controller.abort(), timeout)
+		const externalSignal = options?.signal
+		const abortFromCaller = () => controller.abort(externalSignal?.reason)
+		if (externalSignal?.aborted) abortFromCaller()
+		else externalSignal?.addEventListener('abort', abortFromCaller, { once: true })
 
 		try {
 			const response = await fetch(url.toString(), {
@@ -265,26 +277,40 @@ export function createClient(config: ResolvedConfig) {
 			const data = await parseSuccessBody<T>(response, method, path)
 			return { data, status: response.status }
 		} catch (error) {
-			throw toApiError(error, { method, path, timeout })
+			throw toApiError(error, {
+				method,
+				path,
+				timeout,
+				externallyAborted: externalSignal?.aborted === true,
+			})
 		} finally {
 			clearTimeout(timer)
+			externalSignal?.removeEventListener('abort', abortFromCaller)
 		}
 	}
 
 	return {
 		request,
 
-		get: <T = unknown>(path: string, params?: Record<string, unknown>, isPublic?: boolean) =>
-			request<T>('GET', path, { params, isPublic }),
+		get: <T = unknown>(
+			path: string,
+			params?: Record<string, unknown>,
+			isPublic?: boolean,
+			signal?: AbortSignal,
+		) => request<T>('GET', path, { params, isPublic, signal }),
 
-		post: <T = unknown>(path: string, body?: Record<string, unknown>, isPublic?: boolean) =>
-			request<T>('POST', path, { body, isPublic }),
+		post: <T = unknown>(
+			path: string,
+			body?: Record<string, unknown>,
+			isPublic?: boolean,
+			signal?: AbortSignal,
+		) => request<T>('POST', path, { body, isPublic, signal }),
 
-		put: <T = unknown>(path: string, body?: Record<string, unknown>) =>
-			request<T>('PUT', path, { body }),
+		put: <T = unknown>(path: string, body?: Record<string, unknown>, signal?: AbortSignal) =>
+			request<T>('PUT', path, { body, signal }),
 
-		delete: <T = unknown>(path: string, params?: Record<string, unknown>) =>
-			request<T>('DELETE', path, { params }),
+		delete: <T = unknown>(path: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
+			request<T>('DELETE', path, { params, signal }),
 	}
 }
 

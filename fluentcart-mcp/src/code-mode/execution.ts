@@ -66,8 +66,6 @@ export async function runExecution(
 
 	const bridge = new HostBridge(index, {
 		maxCalls: limits.maxApiCalls,
-		onCallStart: () => cpu.pause(),
-		onCallEnd: () => cpu.resume(),
 	})
 	const pristine = capturePristineJson(context)
 

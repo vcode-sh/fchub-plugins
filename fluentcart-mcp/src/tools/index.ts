@@ -1,7 +1,7 @@
 import type { ApiCapabilities } from '../api/capabilities.js'
 import type { FluentCartClient } from '../api/client.js'
 import type { GuardRuntime } from '../security/guard-config.js'
-import type { ToolDefinition } from './_factory.js'
+import { configureToolCache, type ToolCacheDeps, type ToolDefinition } from './_factory.js'
 import { activityTools } from './activity.js'
 import { applicationTools } from './application.js'
 import { commerceReportingTools } from './commerce-reporting.js'
@@ -26,6 +26,7 @@ import { orderTransactionTools } from './orders-transactions.js'
 import { pdfTemplateTools } from './pdf-templates.js'
 import { productOptionTools } from './product-options.js'
 import { productOptionTermTools } from './product-options-terms.js'
+import { productBulkEditTools } from './products-bulk-edit.js'
 import { productCatalogTools } from './products-catalog.js'
 import { productCoreTools } from './products-core.js'
 import { productPricingTools } from './products-pricing.js'
@@ -39,19 +40,26 @@ import { roleTools } from './roles.js'
 import { savedViewTools } from './saved-views.js'
 import { settingsCoreTools } from './settings-core.js'
 import { shippingTools } from './shipping.js'
+import { shippingProfileTools } from './shipping-profile.js'
 import { subscriptionTools } from './subscriptions.js'
 import { subscriptionCancellationTools } from './subscriptions-cancellation.js'
 import { taxTools } from './tax.js'
 import { taxClassTools } from './tax-classes.js'
 import { taxConfigurationTools } from './tax-configuration.js'
 import { taxEuVatTools } from './tax-eu-vat.js'
+import { taxProductOverrideTools } from './tax-product-overrides.js'
 
 export function createAllTools(
 	client: FluentCartClient,
-	options: { guard?: GuardRuntime | null; capabilities?: ApiCapabilities } = {},
+	options: {
+		guard?: GuardRuntime | null
+		capabilities?: ApiCapabilities
+		cache?: ToolCacheDeps
+	} = {},
 ): ToolDefinition[] {
 	const guard = options.guard ?? null
 	const { capabilities } = options
+	configureToolCache(client, options.cache)
 
 	return [
 		...orderRefundTools(client, guard),
@@ -76,6 +84,9 @@ export function createAllTools(
 		// Plan 06 read candidates: dynamic-only on arrival, never straight into curated.
 		...savedViewTools(client),
 		...pdfTemplateTools(client),
+		...productBulkEditTools(client),
+		...shippingProfileTools(client),
+		...taxProductOverrideTools(client),
 		...subscriptionTools(client),
 		...couponTools(client),
 		...orderCoreTools(client),

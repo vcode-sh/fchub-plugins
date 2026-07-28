@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { assertWithinEmergencyCap } from '../commerce/response-budget.js'
-import { createTool, type ToolDefinition } from './_factory.js'
+import { createTool, encodePathParameter, getTool, type ToolDefinition } from './_factory.js'
 import { direct } from './endpoints.js'
 
 /**
@@ -12,9 +12,8 @@ import { direct } from './endpoints.js'
  * half the response budget on `pdf_settings` blobs an agent cannot act on, so the list tools
  * project to identity and the per-template tool returns one template in full.
  *
- * `GET /settings/pdf-templates/seller-details` is deliberately absent. It returns the seller's
- * IBAN, BIC, VAT and tax identifiers and contact email and phone; that is banking and personal
- * data, and no projection of it belongs in an agent's context.
+ * The seller-details route contains banking, identity, tax and contact values. Its tool returns
+ * readiness booleans only, never those values.
  */
 const SOURCES = {
 	active: '/settings/pdf-templates/receipt',
@@ -53,6 +52,41 @@ function projectMap(payload: unknown): TemplateRow[] {
 
 export function pdfTemplateTools(client: FluentCartClient): ToolDefinition[] {
 	return [
+		getTool(client, {
+			name: 'fluentcart_pdf_seller_details_status',
+			title: 'Get PDF Seller Details Status',
+			description:
+				'Report whether the seller identity, contact, bank and tax fields needed by invoice ' +
+				'templates are configured. This deliberately returns booleans only and never exposes ' +
+				'the seller values or the private WordPress administration URL.',
+			schema: z.object({}),
+			endpoint: '/settings/pdf-templates/seller-details',
+			transform: (data) => {
+				const body = (data ?? {}) as Record<string, unknown>
+				const seller = (body.seller_details ?? {}) as Record<string, unknown>
+				const configured = (key: string) =>
+					typeof seller[key] === 'string' && seller[key].trim() !== ''
+				return {
+					e_invoice_enabled: seller.zugferd_enabled === '1' || seller.zugferd_enabled === true,
+					profile: typeof seller.zugferd_profile === 'string' ? seller.zugferd_profile : null,
+					store_country_configured: body.store_country_set === true,
+					configured: {
+						contact_name: configured('seller_contact_name'),
+						contact_email: configured('seller_contact_email'),
+						contact_phone: configured('seller_contact_phone'),
+						bank_iban: configured('seller_bank_iban'),
+						bank_bic: configured('seller_bank_bic'),
+						bank_account_name: configured('seller_bank_account_name'),
+						electronic_address: configured('seller_electronic_address'),
+						vat_id: configured('seller_vat_id'),
+						tax_id: configured('seller_tax_id'),
+						legal_name: configured('seller_legal_name'),
+						legal_registration_id: configured('seller_legal_registration_id'),
+					},
+				}
+			},
+		}),
+
 		createTool(client, {
 			name: 'fluentcart_pdf_template_status',
 			title: 'Get PDF Template Availability',
@@ -125,7 +159,12 @@ export function pdfTemplateTools(client: FluentCartClient): ToolDefinition[] {
 			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
 			routes: direct('GET', '/settings/pdf-templates/receipt/{param}'),
 			handler: async (c, input) => {
-				const response = await c.get(`/settings/pdf-templates/receipt/${input.template}`)
+				const template = encodePathParameter(
+					'/settings/pdf-templates/receipt/{param}',
+					'template',
+					input.template,
+				)
+				const response = await c.get(`/settings/pdf-templates/receipt/${template}`)
 				assertWithinEmergencyCap(response.data, 'fluentcart_pdf_template_get')
 				return response.data
 			},

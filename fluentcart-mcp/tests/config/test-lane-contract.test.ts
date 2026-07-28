@@ -21,6 +21,10 @@ describe('test lane contract', () => {
 		expect(pkg.scripts['test:unit']).toBe('vitest run --config vitest.config.ts')
 		expect(pkg.scripts['test:integration:local']).toBe('node scripts/run-live-tests.mjs')
 		expect(pkg.scripts['test:tooling']).toBe('node --test tests/tooling/*.test.mjs')
+		expect(pkg.scripts['typecheck:tests']).toBe('tsc --project tsconfig.tests.json')
+		expect(pkg.scripts['check:routes']).toBe(
+			'node scripts/check-tool-routes.mjs --fixture tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+		)
 	})
 
 	it('keeps the unit lane free of environment file loading', () => {

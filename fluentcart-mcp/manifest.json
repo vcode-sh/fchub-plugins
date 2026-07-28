@@ -205,7 +205,7 @@
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
       "packageVersion": "2.0.0",
-      "sourceTreeDigest": "sha256:99e7a6a178d34150c21049813cabb680da46e047d89b6f8e26fe480ed1dd9093",
+      "sourceTreeDigest": "sha256:925d43bae14a02bab3ae7f916a395ea44b52253fe36e3e4326e63a948ea81f2c",
       "serializer": "mcp-tools-list-v1",
       "advertisedToolCount": 25,
       "userConfigEnvironment": {
@@ -640,12 +640,6 @@
           "inputSchemaSha256": "sha256:ff4904c3b337d8209ef1c07f8d7264e4b49c4ef022d0da5153f620c9a2a667fc",
           "exposedBy": [
             {
-              "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
-              "modes": [
-                "dynamic"
-              ]
-            },
-            {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
               "modes": [
                 "dynamic"
@@ -653,18 +647,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
-              "modes": [
-                "dynamic"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-rest-disabled",
-              "modes": [
-                "dynamic"
-              ]
-            },
-            {
-              "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "dynamic"
               ]

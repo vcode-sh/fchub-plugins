@@ -1,8 +1,14 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { invalidate, TTL } from '../cache.js'
-import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
+import { TTL } from '../cache.js'
+import {
+	createTool,
+	getTool,
+	invalidateToolCache,
+	postTool,
+	type ToolDefinition,
+} from './_factory.js'
 import { direct } from './endpoints.js'
 
 export function roleTools(client: FluentCartClient): ToolDefinition[] {
@@ -62,7 +68,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 					user_id: userId,
 					role_key: roleKey,
 				})
-				invalidate('roles')
+				invalidateToolCache(c, 'roles')
 				return resp.data
 			},
 		}),
@@ -99,7 +105,7 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 				const key = input.key as string
 				const userId = input.user_id as number
 				const resp = await c.delete(`/roles/${key}`, { user_id: userId })
-				invalidate('roles')
+				invalidateToolCache(c, 'roles')
 				return resp.data
 			},
 		}),

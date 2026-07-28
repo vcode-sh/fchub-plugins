@@ -24,14 +24,13 @@ const SEARCH_LIMIT_MAX = 10
 const DESCRIBE_MAX = 5
 
 /**
- * The guarded executor used to be listed here too. It is registered only when a real-money action
- * survives the exposure filter, and every real-money entry ships `execution: 'none'` in 2.0.0, so
- * listing it would assert a tool that answers nothing but "not exposed" on every call.
+ * This lane is intentionally write-disabled. Write executors are registered only when a matching
+ * write survives the exposure filter, so listing either one here would advertise an operation the
+ * live policy refuses.
  */
 const DYNAMIC_NAMES = [
 	'fluentcart_describe_tools',
 	'fluentcart_execute_read_tool',
-	'fluentcart_execute_reversible_write',
 	'fluentcart_search_tools',
 ]
 
@@ -75,7 +74,7 @@ afterAll(async () => {
 })
 
 describe('startup surface', () => {
-	it('registers exactly the five meta-tools and nothing else', async () => {
+	it('registers exactly the three read-policy meta-tools and nothing else', async () => {
 		const listed = await client.listTools()
 		expect(listed.tools.map((tool) => tool.name).sort()).toEqual(DYNAMIC_NAMES)
 	})

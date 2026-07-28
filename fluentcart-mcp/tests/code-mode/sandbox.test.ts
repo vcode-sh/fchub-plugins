@@ -327,6 +327,22 @@ describe('compute and memory budgets', () => {
 		expectAllContextsDestroyed(sandbox)
 	}, 15_000)
 
+	it('keeps charging CPU when code starts a read but does not await it', async () => {
+		const slow: Handler = () => new Promise(() => undefined)
+		const sandbox = makeSandbox([tool('fluentcart_slow', 'read', slow)], {
+			maxCpuMs: 120,
+			maxWallClockMs: 1_500,
+		})
+
+		const started = Date.now()
+		const result = await sandbox.execute('void fluentcart.call("fluentcart_slow"); while (true) {}')
+
+		expect(result.ok).toBe(false)
+		expect(result.error?.code).toBe('CPU_BUDGET_EXCEEDED')
+		expect(Date.now() - started).toBeLessThan(1_500)
+		expectAllContextsDestroyed(sandbox)
+	}, 15_000)
+
 	it('reports a wall-clock breach when nothing ever resolves the promise', async () => {
 		const sandbox = makeSandbox(DEFAULT_TOOLS, { maxWallClockMs: 400 })
 

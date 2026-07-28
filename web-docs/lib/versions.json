@@ -63,7 +63,7 @@
   },
   "mcp": {
     "source": "fluentcart-mcp/release-contract.json",
-    "toolCount": 287,
+    "toolCount": 291,
     "moduleCount": 20,
     "note": "Source tool definitions and categories from the generated release contract. NOT the number a store exposes: that depends on FLUENTCART_WRITE_MODE, discovered routes and user permissions. Do not present either figure as a product claim."
   }

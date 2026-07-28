@@ -1,7 +1,7 @@
 # FluentCart MCP Server
 
 [![npm](https://img.shields.io/npm/v/fluentcart-mcp)](https://www.npmjs.com/package/fluentcart-mcp)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 An MCP server that connects AI assistants to your [FluentCart](https://fluentcart.com) store — orders, products, customers, subscriptions, coupons, reports, shipping, tax, email notifications, and more. Read-only until you deliberately say otherwise. Open source, MIT licensed.
@@ -65,12 +65,13 @@ Same JSON config as Claude Desktop — paste into your MCP settings file. [Full 
 For remote access, ChatGPT, or always-on deployments:
 
 ```bash
+MCP_API_KEY="$(openssl rand -hex 32)"
 docker run -d \
   -p 3000:3000 \
   -e FLUENTCART_URL=https://your-store.com \
   -e FLUENTCART_USERNAME=admin \
   -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
-  -e FLUENTCART_MCP_API_KEY=your-secret-key \
+  -e FLUENTCART_MCP_API_KEY="$MCP_API_KEY" \
   vcodesh/fluentcart-mcp
 ```
 
@@ -130,10 +131,10 @@ HTTP transport uses Streamable HTTP on port 3000 (configurable with `--port` and
 
 | Mode | Flag | Tools | Definition cost |
 |------|------|-------|-----------------|
-| **dynamic** (default) | — | 5 meta-tools: search, describe, and one executor per risk class | 863 tokens |
-| **curated** | `--mode curated` | 18–20 reviewed everyday tools | 2,820–3,652 tokens |
+| **dynamic** (default) | — | 3–4 meta-tools: search, describe, read executor, and a write executor only when exposed | 512–688 tokens |
+| **curated** | `--mode curated` | 17–19 reviewed everyday tools | 4,114–4,946 tokens |
 | **code** | `--mode code` | 2 tools: search the API, run read-only JavaScript in a WASM sandbox | 532 tokens |
-| **full** | `--mode full` | 148–174 tools, whatever the policy permits | 20,410–27,046 tokens |
+| **full** | `--mode full` | 140–194 tools across the measured compatibility profiles | 25,415–36,984 tokens |
 
 Ranges span the default read-only policy and reversible write mode. Counts are measured from the built server's `tools/list` response with serializer `mcp-tools-list-v1` and tokenizer `gpt-tokenizer@3.4.0`; see `release-contract.json` for the full matrix.
 
@@ -141,7 +142,7 @@ Dynamic mode is the default because it keeps the definition payload small no mat
 
 ## Write Modes
 
-Writes are absent, not merely disabled. Under the default `FLUENTCART_WRITE_MODE=disabled` a write tool cannot be listed, searched, described or called by name — 148 of the source tree's 276 definitions are exposed.
+Writes are absent, not merely disabled. Under the default `FLUENTCART_WRITE_MODE=disabled` a write tool cannot be listed, searched, described or called by name. The source registry contains 291 definitions; policy keeps 162 read definitions before capability discovery further prunes them to the connected store and role.
 
 | `FLUENTCART_WRITE_MODE` | What it adds |
 |-------------------------|--------------|
@@ -153,14 +154,14 @@ Writes are absent, not merely disabled. Under the default `FLUENTCART_WRITE_MODE
 
 ## What's Inside
 
-Tools are grouped into 27 modules. The source tree carries 276 definitions; how many you see depends on your write mode and on what your store and role actually support.
+Tools are grouped into 20 categories. The source tree carries 291 definitions; how many you see depends on your write mode and on what your store and role actually support. The generated `release-contract.json` is the count and context-cost authority.
 
 | Module | Tools | What It Covers |
 |--------|-------|----------------|
 | **Orders** | 23 | List, create, update, disputes, bulk actions |
 | **Products** | 55 | CRUD, pricing, variants, downloads, categories |
 | **Customers** | 19 | Profiles, addresses, stats, lifetime value |
-| **Subscriptions** | 7 | List, pause, resume, reactivate |
+| **Subscriptions** | — | List and inspect subscriptions. Pause, resume, reactivate and cancellation are not shipped actions. |
 | **Coupons** | 12 | Create, apply, eligibility, settings |
 | **Reports (Core)** | 24 | Revenue, sales, dashboard, order charts |
 | **Reports (Insights)** | 21 | Growth, retention, cohorts, heatmaps |
@@ -191,7 +192,7 @@ Once connected, just talk. The read-only examples work out of the box; the ones 
 - "What's my revenue this month?"
 - "Create a 20% off coupon that expires Friday"
 - "Find customer john@example.com and show their order history"
-- "Pause subscription #42"
+- "Show subscriptions that are currently paused"
 - "Which products sold the most this week?"
 - "Show me the transactions on order #1234"
 - "Set up 23% VAT for Poland"

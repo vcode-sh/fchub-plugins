@@ -5,6 +5,7 @@ import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
 	buildLedger,
+	CORE_FIXTURE,
 	CURRENT_FIXTURE,
 	compareRoutes,
 	extractRiskRegistry,
@@ -21,7 +22,9 @@ const readJson = (relative) => JSON.parse(readFileSync(join(PACKAGE_ROOT, relati
 
 const ledger = buildLedger()
 const fixture = readJson(CURRENT_FIXTURE)
+const coreFixture = readJson(CORE_FIXTURE)
 const key = (operation) => `${operation.method} ${operation.path}`
+const coreOperations = new Set(coreFixture.operations.map(key))
 
 /** Deep clone so a negative test can corrupt a row without poisoning the shared ledger. */
 const clone = (value) => JSON.parse(JSON.stringify(value))
@@ -39,7 +42,8 @@ describe('ledger completeness', () => {
 		}
 
 		for (const operation of fixture.operations) {
-			const id = `fluent-cart ${key(operation)}`
+			const component = coreOperations.has(key(operation)) ? 'fluent-cart' : 'fluent-cart-pro'
+			const id = `${component} ${key(operation)}`
 			assert.equal(counts.get(id), 1, `${id} must appear exactly once`)
 		}
 		assert.equal(ledger.routes.length, fixture.operations.length)
@@ -50,15 +54,22 @@ describe('ledger completeness', () => {
 		assert.equal(ledger.routes.length, 386)
 	})
 
-	it('names the fixture each row was attributed from', () => {
+	it('attributes the isolated 355-operation Core set and 31-operation Pro delta', () => {
+		assert.equal(ledger.routes.filter((row) => row.component.slug === 'fluent-cart').length, 355)
+		assert.equal(ledger.routes.filter((row) => row.component.slug === 'fluent-cart-pro').length, 31)
 		for (const row of ledger.routes) {
-			assert.equal(row.component.evidenceFixture, CURRENT_FIXTURE)
+			assert.equal(
+				row.component.evidenceFixture,
+				row.component.slug === 'fluent-cart' ? CORE_FIXTURE : CURRENT_FIXTURE,
+			)
 			assert.ok(existsSync(join(PACKAGE_ROOT, row.component.evidenceFixture)))
 		}
 	})
 
-	it('states plainly that core and Pro sub-attribution is not evidenced', () => {
-		assert.match(ledger.attribution, /NOT evidenced/)
+	it('states the isolated fixture-delta attribution', () => {
+		assert.match(ledger.attribution, /355/)
+		assert.match(ledger.attribution, /31/)
+		assert.doesNotMatch(ledger.attribution, /NOT evidenced/)
 	})
 
 	it('separates the 1.3.9 contract from the current-runtime delta', () => {

@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "scripts/capture-read-contracts.mjs",
+  "evidenceScope": "all-active-compatibility",
   "profileDigest": "sha256:228709fc7d4348534772f4a47f86dc2592dc6a6eb29d11e7e477c4e124100c9e",
   "profile": {
     "wordpress": "7.0.2",

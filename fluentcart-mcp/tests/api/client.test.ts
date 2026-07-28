@@ -213,6 +213,29 @@ describe('createClient', () => {
 			await expect(client.get('/products')).rejects.toThrow('Request timed out after 100ms')
 		})
 
+		it('aborts fetch when the caller cancels an in-flight request', async () => {
+			let fetchSignal: AbortSignal | undefined
+			mockFetch.mockImplementation(
+				(_url: string, init: RequestInit) =>
+					new Promise((_resolve, reject) => {
+						fetchSignal = init.signal ?? undefined
+						fetchSignal?.addEventListener(
+							'abort',
+							() => reject(new DOMException('The operation was aborted', 'AbortError')),
+							{ once: true },
+						)
+					}),
+			)
+			const controller = new AbortController()
+			const client = createClient(testConfig)
+
+			const pending = client.get('/products', undefined, undefined, controller.signal)
+			controller.abort(new Error('sandbox ended'))
+
+			await expect(pending).rejects.toThrow('Request cancelled')
+			expect(fetchSignal?.aborted).toBe(true)
+		})
+
 		it('500 throws FluentCartApiError with SERVER_ERROR code', async () => {
 			mockFetch.mockResolvedValue(
 				mockResponse({

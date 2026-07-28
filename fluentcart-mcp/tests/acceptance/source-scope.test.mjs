@@ -42,6 +42,17 @@ const MANDATED_DELETIONS = [
 		mandate: 'plan 07 task 2 — "Delete: fluentcart-mcp/scripts/generate-manifest-tools.ts"',
 		replacedBy: 'scripts/build-manifest.mjs',
 	},
+	{
+		path: 'fluentcart-mcp/.env.example',
+		mandate: 'plan 08 task 8 — replace the unsafe generic live-test credential template',
+		replacedBy: '.env.test.local.example',
+	},
+	{
+		path: 'fluentcart-mcp/tests/fixtures/rest/fluentcart-1.5.5-core-pro-1.5.4-read-contracts.json',
+		mandate:
+			'plan 08 task 8 — stop claiming an all-active capture is exclusive Core plus Pro evidence',
+		replacedBy: 'tests/fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json',
+	},
 ]
 
 /** Files acceptance cannot run without. Their absence is the signature of a tidied tree. */

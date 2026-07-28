@@ -4,12 +4,16 @@ import type { ApiCapabilities } from './api/capabilities.js'
 import { discoverApiCapabilities } from './api/capabilities.js'
 import type { FluentCartClient } from './api/client.js'
 import { createClient } from './api/client.js'
-import { buildCacheScope, PrincipalScopedCache } from './commerce/cache.js'
+import {
+	buildCacheScope,
+	PrincipalScopedCache,
+	routeProfileDigestFromOperations,
+} from './commerce/cache.js'
 import { resolveConfig } from './config/resolver.js'
 import { resolveApiUrls } from './config/types.js'
 import { createLogger } from './logging.js'
 import { registerPrompts } from './prompts.js'
-import { registerResources } from './resources.js'
+import { type ResourceDeps, registerResources } from './resources.js'
 import { createGuardRuntime } from './security/guard-config.js'
 import { canExposeTool, parseWriteMode, type WritePolicyConfig } from './security/write-policy.js'
 import type { ToolDefinition } from './tools/_factory.js'
@@ -48,6 +52,8 @@ export interface ServerContext {
 	writePolicy: WritePolicyConfig
 	/** Live route evidence, or null when discovery was explicitly skipped for a unit test. */
 	capabilities: ApiCapabilities | null
+	/** Shared authorised-read cache used by endpoint tools, reference tools and MCP resources. */
+	resourceDeps: ResourceDeps
 }
 
 /**
@@ -100,22 +106,29 @@ export function resolveServerContext(capabilities: ApiCapabilities | null = null
 	const resolved = resolveApiUrls(config)
 	const client = createClient(resolved)
 	const writePolicy = resolveWritePolicy()
+	const cacheScope = buildCacheScope({
+		storeUrl: resolved.url,
+		username: resolved.username,
+		routeProfile: capabilities
+			? routeProfileDigestFromOperations(capabilities.operations)
+			: 'undiscovered',
+	})
+	const resourceDeps = { cache: referenceCache, scope: cacheScope }
 
 	// One filtered, immutable registry shared by every exposure mode. A tool removed here
 	// cannot be listed, searched, described or called by name in any mode.
 	// Resolve guard state once per process; a handler must never construct it per request.
 	const guard = writePolicy.writeMode === 'guarded' ? createGuardRuntime() : null
-	const tools = createAllTools(client, { guard, capabilities: capabilities ?? undefined })
+	const tools = createAllTools(client, {
+		guard,
+		capabilities: capabilities ?? undefined,
+		cache: resourceDeps,
+	})
 		.filter((tool) => canExposeTool(tool.safety, writePolicy))
 		.filter((tool) => isRouteSupported(tool, capabilities))
 	// Reference data shares one principal-scoped cache with the MCP resources, so a list read
 	// through a resource and the same list read through the tool cannot disagree. The scope is
 	// keyed by store origin, a principal digest and the route profile — never raw credentials.
-	const cacheScope = buildCacheScope({
-		storeUrl: resolved.url,
-		username: resolved.username,
-		routeProfile: capabilities ? String(capabilities.operations.size) : 'undiscovered',
-	})
 	const referenceTools = referenceDataTools(client, {
 		cache: referenceCache,
 		scope: cacheScope,
@@ -142,6 +155,7 @@ export function resolveServerContext(capabilities: ApiCapabilities | null = null
 		configSource,
 		writePolicy,
 		capabilities,
+		resourceDeps,
 	}
 }
 
@@ -243,7 +257,7 @@ export function createServerFromContext(
 		}
 	}
 
-	registerResources(server, ctx.client)
+	registerResources(server, ctx.client, ctx.resourceDeps)
 	// Prompts name a tool only when that tool is registered here, so no mode can advertise a
 	// workflow it cannot actually run.
 	registerPrompts(server, registered)
@@ -298,7 +312,7 @@ export async function createServerFromContextAsync(
 		throw new Error(registration.reason ?? 'Code mode is unavailable on this platform.')
 	}
 
-	registerResources(server, ctx.client)
+	registerResources(server, ctx.client, ctx.resourceDeps)
 	registerPrompts(server, new Set(registration.toolNames))
 
 	announceStartup(

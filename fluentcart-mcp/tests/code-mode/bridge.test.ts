@@ -120,7 +120,7 @@ describe('schema validation at the dispatch boundary', () => {
 
 		await bridge.call('fluentcart_order_get', { id: 'o-1', extra: 'dropped' })
 
-		expect(handler).toHaveBeenCalledWith({ id: 'o-1' })
+		expect(handler).toHaveBeenCalledWith({ id: 'o-1' }, { signal: expect.any(AbortSignal) })
 	})
 
 	it('treats a missing input as an empty object', async () => {
@@ -130,7 +130,7 @@ describe('schema validation at the dispatch boundary', () => {
 		const outcome = await bridge.call('fluentcart_ping', undefined)
 
 		expect(outcome.ok).toBe(true)
-		expect(handler).toHaveBeenCalledWith({})
+		expect(handler).toHaveBeenCalledWith({}, { signal: expect.any(AbortSignal) })
 	})
 })
 
@@ -240,6 +240,34 @@ describe('termination', () => {
 		if (outcome.ok) return
 		expect(outcome.error.code).toBe('SANDBOX_TERMINATED')
 		expect(bridge.inFlight).toBe(0)
+	})
+
+	it('propagates termination to the dispatched operation signal', async () => {
+		let operationSignal: AbortSignal | undefined
+		let cancelled = false
+		const handler = ((_input: Record<string, unknown>, execution?: { signal?: AbortSignal }) =>
+			new Promise((resolve) => {
+				operationSignal = execution?.signal
+				execution?.signal?.addEventListener(
+					'abort',
+					() => {
+						cancelled = true
+						resolve({
+							content: [{ type: 'text' as const, text: '{"cancelled":true}' }],
+						})
+					},
+					{ once: true },
+				)
+			})) as Handler
+		const bridge = bridgeFor([tool('fluentcart_slow', 'read', handler)])
+
+		const pending = bridge.call('fluentcart_slow', {})
+		bridge.abort('wall-clock deadline')
+		const outcome = await pending
+
+		expect(outcome.ok).toBe(false)
+		expect(operationSignal?.aborted).toBe(true)
+		expect(cancelled).toBe(true)
 	})
 
 	it('is idempotent', () => {

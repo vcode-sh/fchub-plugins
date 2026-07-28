@@ -29,16 +29,19 @@ const MANDATORY_PROFILES = [
 ]
 
 /**
- * Meta-tool counts the exposure design fixes; neither varies with the registry. Nothing
- * registry-sized is pinned here — its gate is `build-release-contract.mjs --check`.
+ * Meta-tool counts fixed by the exposure design. Nothing registry-sized is pinned here — its
+ * gate is `build-release-contract.mjs --check`.
  *
- * Dynamic is four, not five: the guarded executor is registered only when a real-money tool
- * actually survives the exposure filter. Every real-money entry ships `execution: 'none'` in
- * 2.0.0, so none does, and advertising a `destructiveHint: true` executor that could only ever
- * answer "not exposed" told an agent the capability existed and that its own call was wrong.
- * It reappears with no change here the moment a guard-wired action is exposed.
+ * Dynamic is three under the disabled policy and four when reversible writes survive filtering.
+ * The guarded executor remains conditional on a real-money tool surviving the same filter.
+ * Advertising an executor that can only answer "not exposed" would claim a capability the
+ * connected policy does not provide.
  */
-const FIXED_MODE_TOOL_COUNTS = { dynamic: 4, code: 2 }
+function expectedMetaToolCount(profile, mode) {
+	if (mode === 'code') return 2
+	if (mode === 'dynamic') return profile.writeMode === 'disabled' ? 3 : 4
+	throw new Error(`No fixed meta-tool count for mode ${mode}`)
+}
 
 /** A profile is measurable only when every fixture it declares is actually on disk. */
 function fixturesPresent(profile) {
@@ -197,8 +200,12 @@ describe('measured profiles', () => {
 			for (const [mode, row] of Object.entries(profile.modes)) {
 				assert.deepEqual(Object.keys(row), MODE_KEYS, `${profile.name}/${mode}`)
 			}
-			for (const [mode, count] of Object.entries(FIXED_MODE_TOOL_COUNTS)) {
-				assert.equal(profile.modes[mode].toolCount, count, `${profile.name}/${mode}`)
+			for (const mode of ['dynamic', 'code']) {
+				assert.equal(
+					profile.modes[mode].toolCount,
+					expectedMetaToolCount(profile, mode),
+					`${profile.name}/${mode}`,
+				)
 			}
 		}
 	})

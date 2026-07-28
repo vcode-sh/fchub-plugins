@@ -99,9 +99,15 @@ describe('reversible exposure', () => {
 		}
 	})
 
-	it('offers no delete of any kind, which is why cleanup uses the reviewed REST path', () => {
+	it('offers only deletes whose reviewed semantics are reversible', () => {
 		const deletes = ctx.tools.filter((tool) => tool.name.endsWith('_delete'))
-		expect(deletes.map((tool) => tool.name)).toEqual([])
+		expect(deletes.map((tool) => tool.name)).toEqual(['fluentcart_product_taxonomy_delete'])
+		for (const tool of deletes) {
+			expect(tool.safety).toMatchObject({
+				risk: 'reversible-write',
+				execution: 'rest',
+			})
+		}
 	})
 })
 

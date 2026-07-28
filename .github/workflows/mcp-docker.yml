@@ -57,6 +57,7 @@ jobs:
     if: always() && (github.event_name != 'workflow_dispatch' || needs.validate.result == 'success')
     outputs:
       version: ${{ steps.build.outputs.version }}
+      source_sha: ${{ steps.build.outputs.source_sha }}
     steps:
       - name: Download validated artefacts
         uses: actions/download-artifact@v4
@@ -70,7 +71,10 @@ jobs:
       - name: Checkout build tooling
         uses: actions/checkout@v4
         with:
-          sparse-checkout: fluentcart-mcp/scripts
+          sparse-checkout: |
+            fluentcart-mcp/scripts
+            fluentcart-mcp/tests/acceptance/docker.test.mjs
+            fluentcart-mcp/package.json
           sparse-checkout-cone-mode: false
 
       - uses: actions/setup-node@v4
@@ -87,6 +91,7 @@ jobs:
             --repository "${{ env.LOCAL_REPOSITORY }}" > build.json
           cat build.json
           echo "version=$(node -p "require('./build.json').version")" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$(node -p "require('./build.json').sourceSha")" >> "$GITHUB_OUTPUT"
 
       # ---- Container smoke: the image must refuse to be unsafe, then work when configured ----
 
@@ -121,11 +126,32 @@ jobs:
         env:
           VERSION: ${{ steps.build.outputs.version }}
 
-      - name: Reachable on the published host port, unauthorised requests get 401
+      - name: Start deterministic FluentCart capability fixture
+        run: |
+          node fluentcart-mcp/scripts/serve-mcp-capability-fixture.mjs --port 39082 \
+            > capability-fixture.log 2>&1 &
+          echo "$!" > capability-fixture.pid
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:39082/wp-json/fluent-cart/v2 >/dev/null 2>&1; then break; fi
+            if [ "$attempt" -eq 20 ]; then
+              echo "::error::Capability fixture did not start"
+              cat capability-fixture.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          mkdir -p smoke-config
+          node -e "require('fs').writeFileSync('smoke-config/config.json', JSON.stringify({url:'http://host.docker.internal:39082',username:'fixture',appPassword:'fixture'}))"
+
+      - name: Reachable on the published host port and speaks MCP
         env:
           VERSION: ${{ steps.build.outputs.version }}
         run: |
-          docker run -d --name fcmcp-smoke -p 127.0.0.1:3000:3000 \
+          docker run -d --name fcmcp-smoke \
+            --add-host host.docker.internal:host-gateway \
+            -p 127.0.0.1:3000:3000 \
+            -v "${PWD}/smoke-config:/home/node/.config/fluentcart-mcp:ro" \
             -e FLUENTCART_MCP_API_KEY="${SMOKE_API_KEY}" \
             "${LOCAL_REPOSITORY}:${VERSION}"
 
@@ -154,18 +180,28 @@ jobs:
             exit 1
           fi
 
-          AUTHED=$(curl -s -o /dev/null -w '%{http_code}' \
-            -H "Authorization: Bearer ${SMOKE_API_KEY}" http://127.0.0.1:3000/mcp)
-          if [ "$AUTHED" = "401" ]; then
-            echo "::error::Correct bearer was rejected"
-            docker logs fcmcp-smoke
-            exit 1
-          fi
-          echo "health 200, unauthorised 401, wrong key 401, authorised $AUTHED"
+          node fluentcart-mcp/scripts/smoke-mcp-http.mjs \
+            http://127.0.0.1:3000/mcp "${SMOKE_API_KEY}"
 
-      - name: Stop smoke container
+      - name: Stop protocol smoke container
         if: always()
-        run: docker rm -f fcmcp-smoke || true
+        run: |
+          docker rm -f fcmcp-smoke || true
+
+      - name: Run required image acceptance against the validated revision
+        env:
+          FLUENTCART_ACCEPTANCE_REQUIRED: 'yes'
+          FLUENTCART_ACCEPTANCE_IMAGE: ${{ env.LOCAL_REPOSITORY }}:${{ steps.build.outputs.version }}
+          FLUENTCART_ACCEPTANCE_SOURCE_SHA: ${{ steps.build.outputs.source_sha }}
+          FLUENTCART_ACCEPTANCE_STORE_URL: http://host.docker.internal:39082
+        run: node --test fluentcart-mcp/tests/acceptance/docker.test.mjs
+
+      - name: Stop capability fixture
+        if: always()
+        run: |
+          if [ -f capability-fixture.pid ]; then
+            kill "$(cat capability-fixture.pid)" || true
+          fi
 
       # The verified image itself becomes the handoff, so publication never rebuilds.
       - name: Save verified image
@@ -216,7 +252,7 @@ jobs:
       - name: Tag and push
         env:
           VERSION: ${{ needs.verify.outputs.version }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ needs.verify.outputs.source_sha }}
         run: |
           SHORT_SHA="${SOURCE_SHA:0:12}"
           for TARGET in "${GHCR_IMAGE}" "${DOCKERHUB_IMAGE}"; do

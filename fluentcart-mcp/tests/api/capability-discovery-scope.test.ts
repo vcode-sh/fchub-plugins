@@ -124,6 +124,16 @@ describe('discovery fetches one namespace', () => {
 })
 
 describe('a store without FluentCart still fails closed', () => {
+	async function capturedError(promise: Promise<unknown>): Promise<Error> {
+		try {
+			await promise
+		} catch (error) {
+			if (error instanceof Error) return error
+			throw new Error(`Expected Error, received ${String(error)}`)
+		}
+		throw new Error('Expected promise to reject')
+	}
+
 	it('reports the 404 as a discovery error, never as an empty registry', async () => {
 		stubFetch(() => jsonResponse(REST_NO_ROUTE, 404))
 		const promise = discoverApiCapabilities(STORE)
@@ -135,7 +145,7 @@ describe('a store without FluentCart still fails closed', () => {
 	it('names the URL, both causes and what to check', async () => {
 		stubFetch(() => jsonResponse(REST_NO_ROUTE, 404))
 
-		const error = await discoverApiCapabilities(STORE).catch((thrown: unknown) => thrown as Error)
+		const error = await capturedError(discoverApiCapabilities(STORE))
 
 		expect(error.message).toContain('http://store.test/wp-json/fluent-cart/v2')
 		expect(error.message).toContain('FluentCart is not active')
@@ -146,7 +156,7 @@ describe('a store without FluentCart still fails closed', () => {
 	it('still names the URL on a blocked or forbidden index', async () => {
 		stubFetch(() => jsonResponse({ code: 'rest_forbidden' }, 403))
 
-		const error = await discoverApiCapabilities(STORE).catch((thrown: unknown) => thrown as Error)
+		const error = await capturedError(discoverApiCapabilities(STORE))
 
 		expect(error.message).toContain('403')
 		expect(error.message).toContain('http://store.test/wp-json/fluent-cart/v2')

@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { invalidate, TTL } from '../cache.js'
-import { createTool, getTool, type ToolDefinition } from './_factory.js'
+import { TTL } from '../cache.js'
+import { createTool, getTool, invalidateToolCache, type ToolDefinition } from './_factory.js'
 import { composite, op } from './endpoints.js'
 
 /**
@@ -193,7 +193,7 @@ export function taxConfigurationTools(client: FluentCartClient): ToolDefinition[
 				const merged = mergeSettings(before, { scalars, input, euChanges, euInput })
 
 				await c.post('/tax/configuration/settings', { settings: merged })
-				invalidate('tax_settings')
+				invalidateToolCache(c, 'tax_settings')
 
 				const after = readSettings((await c.get('/tax/configuration/settings')).data)
 				if (!after) {

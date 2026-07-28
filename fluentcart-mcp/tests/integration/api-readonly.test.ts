@@ -8,6 +8,19 @@ import { getLiveRun } from './support/live-run.js'
 
 getLiveRun()
 
+function record(value: unknown): Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: {}
+}
+
+function firstId(value: unknown): number | undefined {
+	const body = record(value)
+	const rows = Array.isArray(body.data) ? body.data : Array.isArray(value) ? value : []
+	const id = record(rows[0]).id
+	return typeof id === 'number' ? id : undefined
+}
+
 /**
  * Ask the store which integrations it has rather than naming one and hoping.
  *
@@ -79,8 +92,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 
 		beforeAll(async () => {
 			const res = await client.get('/products', { per_page: 1 })
-			const body = res.data as Record<string, unknown>
-			productId = body?.data?.[0]?.id ?? body?.[0]?.id
+			productId = firstId(res.data)
 		})
 
 		it('GET /products — lists products', async () => {
@@ -240,8 +252,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			if (!variantId) return
 			// The server requires product_id even though the schema marks it optional
 			const productRes = await client.get('/products', { per_page: 1 })
-			const body = productRes.data as Record<string, unknown>
-			const pid = body?.data?.[0]?.id ?? body?.[0]?.id
+			const pid = firstId(productRes.data)
 			if (!pid) return
 			const res = await client.get('/products/variants', { product_id: pid })
 			expect(res.status).toBe(200)
@@ -272,8 +283,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 
 		beforeAll(async () => {
 			const res = await client.get('/customers', { per_page: 1 })
-			const body = res.data as Record<string, unknown>
-			customerId = body?.data?.[0]?.id ?? body?.[0]?.id
+			customerId = firstId(res.data)
 		})
 
 		it('GET /customers — lists customers', async () => {
@@ -350,8 +360,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 
 		beforeAll(async () => {
 			const res = await client.get('/orders', { per_page: 1 })
-			const body = res.data as Record<string, unknown>
-			orderId = body?.data?.[0]?.id ?? body?.[0]?.id
+			orderId = firstId(res.data)
 		})
 
 		it('GET /orders — lists orders', async () => {
@@ -400,8 +409,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 
 		beforeAll(async () => {
 			const res = await client.get('/subscriptions', { per_page: 1 })
-			const body = res.data as Record<string, unknown>
-			subscriptionId = body?.data?.[0]?.id ?? body?.[0]?.id
+			subscriptionId = firstId(res.data)
 		})
 
 		it('GET /subscriptions — lists subscriptions', async () => {
@@ -431,8 +439,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 
 		beforeAll(async () => {
 			const res = await client.get('/coupons', { per_page: 1 })
-			const body = res.data as Record<string, unknown>
-			couponId = body?.data?.[0]?.id ?? body?.[0]?.id
+			couponId = firstId(res.data)
 		})
 
 		it('GET /coupons — lists coupons', async () => {
@@ -882,8 +889,8 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			// This endpoint requires a valid integration_name for an installed & configured integration.
 			// First, get available addons to find a valid integration_name.
 			const addonsRes = await client.get('/integration/addons')
-			const addons = addonsRes.data as Record<string, unknown>
-			const addonList = addons?.addons ?? addons?.data?.addons ?? addons
+			const addons = record(addonsRes.data)
+			const addonList = addons.addons ?? record(addons.data).addons ?? addons
 			let integrationName: string | undefined
 			if (Array.isArray(addonList)) {
 				const installed = addonList.find(
@@ -926,8 +933,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 		beforeAll(async () => {
 			try {
 				const res = await client.get('/order_bump', { per_page: 1 })
-				const body = res.data as Record<string, unknown>
-				bumpId = body?.data?.[0]?.id ?? body?.[0]?.id
+				bumpId = firstId(res.data)
 			} catch {
 				// order bumps module may not be enabled
 			}

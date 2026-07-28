@@ -1,7 +1,8 @@
 import type { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
-import { cached, invalidate } from '../cache.js'
+import type { CacheScope } from '../commerce/cache.js'
+import { PrincipalScopedCache } from '../commerce/cache.js'
 import {
 	assertToolResponseBudget,
 	assertWithinEmergencyCap,
@@ -46,10 +47,18 @@ export interface ToolDefinition {
 	 * cannot disagree.
 	 */
 	route?: { routes: { method: string; path: string }[]; composite: boolean }
-	handler: (input: Record<string, unknown>) => Promise<{
+	handler: (
+		input: Record<string, unknown>,
+		execution?: ToolExecutionContext,
+	) => Promise<{
 		content: { type: 'text'; text: string }[]
 		isError?: boolean
 	}>
+}
+
+export interface ToolExecutionContext {
+	/** Cancels upstream work when the owning execution or transport no longer needs the result. */
+	signal?: AbortSignal
 }
 
 interface BaseToolConfig {
@@ -81,7 +90,67 @@ interface EndpointToolConfig extends BaseToolConfig {
 interface CustomToolConfig extends BaseToolConfig {
 	/** Required in practice; the migration test names any tool that omits it. */
 	routes?: ToolRouteMetadata
+	/**
+	 * Successful custom-handler output is redacted by default because it may contain upstream
+	 * data. Disable only when the handler returns a locally generated protocol secret that the
+	 * caller must receive, such as a short-lived guarded-action confirmation token.
+	 */
+	redactOutput?: boolean
 	handler: (client: FluentCartClient, input: Record<string, unknown>) => Promise<unknown>
+}
+
+export interface ToolCacheDeps {
+	cache: PrincipalScopedCache
+	scope: CacheScope
+}
+
+/**
+ * Bind endpoint caches to the client context that owns their authorisation.
+ *
+ * A WeakMap prevents a module-global response cache from crossing stores or principals. Production
+ * supplies the store/principal/route scope; direct factory callers get a cache private to their
+ * client object, which is safe even when no identity metadata is available.
+ */
+const CACHE_BY_CLIENT = new WeakMap<FluentCartClient, ToolCacheDeps>()
+
+function toolCacheDeps(client: FluentCartClient): ToolCacheDeps {
+	const existing = CACHE_BY_CLIENT.get(client)
+	if (existing) return existing
+
+	const isolated = {
+		cache: new PrincipalScopedCache(),
+		scope: {
+			origin: 'client-local',
+			principal: 'client-local',
+			routeProfile: 'undiscovered',
+		},
+	}
+	CACHE_BY_CLIENT.set(client, isolated)
+	return isolated
+}
+
+export function configureToolCache(client: FluentCartClient, deps?: ToolCacheDeps): void {
+	if (deps) CACHE_BY_CLIENT.set(client, deps)
+	else toolCacheDeps(client)
+}
+
+export function invalidateToolCache(client: FluentCartClient, operation: string): number {
+	const deps = toolCacheDeps(client)
+	return deps.cache.invalidate(deps.scope, operation)
+}
+
+function clientWithSignal(
+	client: FluentCartClient,
+	signal: AbortSignal | undefined,
+): FluentCartClient {
+	if (!signal) return client
+	return {
+		request: (method, path, options = {}) => client.request(method, path, { ...options, signal }),
+		get: (path, params, isPublic) => client.get(path, params, isPublic, signal),
+		post: (path, body, isPublic) => client.post(path, body, isPublic, signal),
+		put: (path, body) => client.put(path, body, signal),
+		delete: (path, params) => client.delete(path, params, signal),
+	} as FluentCartClient
 }
 
 /**
@@ -198,7 +267,7 @@ function nestReportParams(
  * `.` and `..` are rejected outright rather than encoded: they are never a real identifier, and a
  * caller sending one has misunderstood something that should be corrected loudly.
  */
-function encodePathParameter(endpoint: string, key: string, value: unknown): string {
+export function encodePathParameter(endpoint: string, key: string, value: unknown): string {
 	const raw = String(value ?? '')
 	if (raw === '.' || raw === '..') {
 		throw new Error(
@@ -206,25 +275,6 @@ function encodePathParameter(endpoint: string, key: string, value: unknown): str
 		)
 	}
 	return encodeURIComponent(raw)
-}
-
-/**
- * A cache entry belongs to the request that produced it, not merely to the tool.
- *
- * `fluentcart_shipping_zone_states` takes an optional `country` and cached under the constant key
- * `shipping_zone_states` for an hour, so asking for US and then FR within that hour returned the
- * US states — silently, with no way for the caller to tell. Every cached tool inherits that the
- * moment it gains a parameter, which is why the fix belongs here and not in one tool.
- *
- * Keys are sorted so argument order cannot produce two entries for one request.
- */
-function cacheKeyFor(base: string, path: string, query: Record<string, unknown>): string {
-	const entries = Object.entries(query)
-		.filter(([, value]) => value !== undefined && value !== null)
-		.sort(([a], [b]) => a.localeCompare(b))
-
-	if (entries.length === 0) return `${base}:${path}`
-	return `${base}:${path}:${entries.map(([k, v]) => `${k}=${String(v)}`).join('&')}`
 }
 
 function resolveEndpoint(
@@ -407,10 +457,14 @@ export function createTool(client: FluentCartClient, config: CustomToolConfig): 
 		safety: resolveSafety(config.name, { openWorldHint: true, ...config.annotations }),
 		routes: config.routes,
 		route: auditView(config.routes),
-		handler: async (input) => {
+		handler: async (input, execution) => {
 			try {
-				const result = await config.handler(client, input)
-				return formatSuccess(result, { context: config.name, pageable: isPageable(config.schema) })
+				const result = await config.handler(clientWithSignal(client, execution?.signal), input)
+				const output = config.redactOutput === false ? result : redactSensitive(result)
+				return formatSuccess(output, {
+					context: config.name,
+					pageable: isPageable(config.schema),
+				})
 			} catch (error) {
 				return formatError(error)
 			}
@@ -427,11 +481,33 @@ const METHOD_ANNOTATIONS: Record<HttpMethod, ToolAnnotations> = {
 	DELETE: { destructiveHint: true, openWorldHint: true },
 }
 
+async function dispatchEndpointRequest(
+	client: FluentCartClient,
+	method: HttpMethod,
+	path: string,
+	payload: Record<string, unknown>,
+	isPublic: boolean | undefined,
+	signal: AbortSignal | undefined,
+): Promise<unknown> {
+	const scopedClient = clientWithSignal(client, signal)
+	switch (method) {
+		case 'GET':
+			return (await scopedClient.get(path, payload, isPublic)).data
+		case 'POST':
+			return (await scopedClient.post(path, payload, isPublic)).data
+		case 'PUT':
+			return (await scopedClient.put(path, payload)).data
+		case 'DELETE':
+			return (await scopedClient.delete(path, payload)).data
+	}
+}
+
 function createEndpointTool(
 	client: FluentCartClient,
 	method: HttpMethod,
 	config: EndpointToolConfig,
 ): ToolDefinition {
+	const cacheDeps = toolCacheDeps(client)
 	const derived: ToolRouteMetadata = config.routes ?? {
 		kind: 'direct',
 		variants: [{ method, path: config.endpoint }],
@@ -448,34 +524,36 @@ function createEndpointTool(
 		safety: resolveSafety(config.name, { ...METHOD_ANNOTATIONS[method], ...config.annotations }),
 		routes: derived,
 		route: auditView(derived),
-		handler: async (input) => {
+		handler: async (input, execution) => {
 			try {
 				const resolved = resolveEndpoint(config.endpoint, input)
 				const path = resolved.path
 				const rest = config.query ? config.query(resolved.rest) : resolved.rest
 				const fetcher = async () => {
-					let response: { data: unknown }
-					switch (method) {
-						case 'GET':
-							response = await client.get(path, rest, config.isPublic)
-							break
-						case 'POST':
-							response = await client.post(path, rest, config.isPublic)
-							break
-						case 'PUT':
-							response = await client.put(path, rest)
-							break
-						case 'DELETE':
-							response = await client.delete(path, rest)
-							break
-					}
-					return config.transform ? config.transform(response.data) : response.data
+					const response = await dispatchEndpointRequest(
+						client,
+						method,
+						path,
+						rest,
+						config.isPublic,
+						execution?.signal,
+					)
+					return config.transform ? config.transform(response) : response
 				}
-				const data = config.cache
-					? await cached(cacheKeyFor(config.cache.key, path, rest), config.cache.ttlMs, fetcher)
-					: await fetcher()
+				const data =
+					config.cache && !execution?.signal
+						? await cacheDeps.cache.getOrLoad(
+								cacheDeps.scope,
+								config.cache.key,
+								{ path, query: rest },
+								config.cache.ttlMs,
+								fetcher,
+							)
+						: await fetcher()
 				if (config.invalidates) {
-					for (const key of config.invalidates) invalidate(key)
+					for (const key of config.invalidates) {
+						cacheDeps.cache.invalidate(cacheDeps.scope, key)
+					}
 				}
 				// Redaction ran on every failure path and on logs, but never here — so a store that
 				// returned a secret in a SUCCESSFUL response handed it straight to the caller, while

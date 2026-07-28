@@ -61,6 +61,20 @@ describe('resolveConfig', () => {
 		expect(config.timeout).toBe(5000)
 	})
 
+	it.each(['0', '-1', '1.5', '5000ms', '2147483648'])(
+		'rejects invalid FLUENTCART_TIMEOUT=%s before any request is made',
+		(timeout) => {
+			process.env.FLUENTCART_URL = 'https://shop.test'
+			process.env.FLUENTCART_USERNAME = 'admin'
+			process.env.FLUENTCART_APP_PASSWORD = 'secret-pass'
+			process.env.FLUENTCART_TIMEOUT = timeout
+
+			expect(() => resolveConfig()).toThrow(
+				'FLUENTCART_TIMEOUT must be a whole number from 1 to 300000 milliseconds',
+			)
+		},
+	)
+
 	it('falls back to file config when env vars are missing', () => {
 		mockedReadFileSync.mockReturnValue(
 			JSON.stringify({
@@ -80,6 +94,24 @@ describe('resolveConfig', () => {
 			timeout: 3000,
 		})
 	})
+
+	it.each([0, -1, 1.5, 300_001, Number.NaN])(
+		'rejects invalid config file timeout=%s',
+		(timeout) => {
+			mockedReadFileSync.mockReturnValue(
+				JSON.stringify({
+					url: 'https://file-shop.test',
+					username: 'file-admin',
+					appPassword: 'file-pass',
+					timeout,
+				}),
+			)
+
+			expect(() => resolveConfig()).toThrow(
+				'config timeout must be a whole number from 1 to 300000 milliseconds',
+			)
+		},
+	)
 
 	it('throws descriptive error when neither env vars nor file exist', () => {
 		mockedReadFileSync.mockImplementation(() => {

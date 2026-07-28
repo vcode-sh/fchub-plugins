@@ -272,6 +272,9 @@ export function orderRefundTools(
 				'(e.g. 4000 = 40.00 PLN). Reusing an idempotency key replays the recorded result rather than ' +
 				'refunding again. Moves real money and cannot be undone.',
 			schema: refundSchema,
+			// The guarded protocol must return its locally signed confirmation token to the caller.
+			// Every upstream field in the preview and execution result is explicitly projected.
+			redactOutput: false,
 			handler: async (_client, input) => {
 				const parsed = parseGuardedInput(refundSchema, input)
 				const fields: RefundFields = {

@@ -21,10 +21,12 @@ import {
 	removeCoupon,
 	removeCustomer,
 	removeProduct,
+	removeShippingClass,
 	verifyAttributeGroupMissing,
 	verifyCouponMissing,
 	verifyCustomerMissing,
 	verifyProductMissing,
+	verifyShippingClassMissing,
 } from './live-client.js'
 import { getLiveRun } from './live-run.js'
 
@@ -63,6 +65,11 @@ export interface OwnedAttributeGroup {
 	id: number
 	title: string
 	slug: string
+}
+
+export interface OwnedShippingClass {
+	id: number
+	name: string
 }
 
 const contexts = new Map<string, Promise<ServerContext>>()
@@ -221,6 +228,32 @@ export async function createOwnedCoupon(ledger: CleanupLedger): Promise<OwnedCou
 	}
 	ledger.track({ type: 'coupon', id, remove: removeCoupon, verifyMissing: verifyCouponMissing })
 	return { id, code, status }
+}
+
+export async function createOwnedShippingClass(ledger: CleanupLedger): Promise<OwnedShippingClass> {
+	const run = getLiveRun()
+	const name = `${run.prefix} shipping class`
+	const res = await getLiveClient().post('/shipping/classes', {
+		name,
+		description: 'Run-owned shipping profile fixture',
+		cost: 0,
+		type: 'fixed',
+	})
+	const body = res.data as Record<string, unknown>
+	const shippingClass = (body.shipping_class ?? inner(body).shipping_class) as
+		| Record<string, unknown>
+		| undefined
+	const id = shippingClass?.id
+	if (!(typeof id === 'number' && id > 0)) {
+		throw new Error(`shipping class create returned no usable id: ${JSON.stringify(res.data)}`)
+	}
+	ledger.track({
+		type: 'shipping class',
+		id,
+		remove: removeShippingClass,
+		verifyMissing: verifyShippingClassMissing,
+	})
+	return { id, name }
 }
 
 export async function createOwnedAttributeGroup(

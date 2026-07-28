@@ -183,8 +183,11 @@ export function registerDynamicTools(server: McpServer, tools: ToolDefinition[])
 		'fluentcart_search_tools',
 		'fluentcart_describe_tools',
 		registerExecutor(server, toolMap, 'read'),
-		registerExecutor(server, toolMap, 'reversible'),
 	]
+
+	if (tools.some((tool) => tool.safety.risk === 'reversible-write')) {
+		registered.push(registerExecutor(server, toolMap, 'reversible'))
+	}
 
 	// The registry handed in here is already filtered by `canExposeTool`, which rejects anything
 	// with `execution: 'none'`. A real-money entry surviving that filter therefore means a
@@ -222,7 +225,10 @@ const EXECUTOR_META = {
 		annotations: {
 			readOnlyHint: false,
 			destructiveHint: false,
-			idempotentHint: true,
+			// The executor may dispatch non-idempotent creates. The selected tool's own metadata
+			// remains available through describe_tools, but this generic surface must not invite
+			// automatic retries that could create a duplicate record.
+			idempotentHint: false,
 			openWorldHint: true,
 		},
 	},

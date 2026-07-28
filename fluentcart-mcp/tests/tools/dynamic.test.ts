@@ -114,6 +114,17 @@ describe('dynamic mode registration', () => {
 		expect(reported).toEqual(registered.map((entry) => entry.name))
 	})
 
+	it('withholds the reversible executor when policy exposed no reversible writes', () => {
+		const { registered, reported } = setup([tool('fluentcart_product_list', 'read')])
+
+		expect(registered.map((entry) => entry.name)).toEqual([
+			'fluentcart_search_tools',
+			'fluentcart_describe_tools',
+			'fluentcart_execute_read_tool',
+		])
+		expect(reported).toEqual(registered.map((entry) => entry.name))
+	})
+
 	it('withholds the guarded executor when no real-money tool survived the exposure filter', () => {
 		const { byName, reported } = setup([
 			tool('fluentcart_product_list', 'read'),
@@ -141,7 +152,8 @@ describe('dynamic mode registration', () => {
 		for (const result of [readOnly, withRefund]) {
 			expect(result.reported).toEqual(result.registered.map((entry) => entry.name))
 		}
-		expect(withRefund.reported.length).toBe(readOnly.reported.length + 1)
+		// The wider registry adds one reversible executor and one guarded executor.
+		expect(withRefund.reported.length).toBe(readOnly.reported.length + 2)
 	})
 
 	it('annotates each executor according to what it can actually do', () => {
@@ -150,6 +162,9 @@ describe('dynamic mode registration', () => {
 		expect(
 			byName.get('fluentcart_execute_reversible_write')?.config.annotations?.destructiveHint,
 		).not.toBe(true)
+		expect(
+			byName.get('fluentcart_execute_reversible_write')?.config.annotations?.idempotentHint,
+		).toBe(false)
 		expect(byName.get(GUARDED_EXECUTOR_TOOL_NAME)?.config.annotations?.destructiveHint).toBe(true)
 	})
 })
@@ -275,7 +290,10 @@ describe('risk-split execution', () => {
 
 	it('refuses a real-money tool on the reversible executor', async () => {
 		const handler = vi.fn()
-		const { byName } = setup([tool('fluentcart_order_refund', 'real-money', handler)])
+		const { byName } = setup([
+			tool('fluentcart_coupon_create', 'reversible-write'),
+			tool('fluentcart_order_refund', 'real-money', handler),
+		])
 
 		const result = await byName.get('fluentcart_execute_reversible_write')!.handler({
 			tool_name: 'fluentcart_order_refund',

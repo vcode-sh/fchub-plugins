@@ -18,6 +18,7 @@ const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const DOCS_ROOT = join(REPO_ROOT, 'web-docs', 'content', 'docs', 'fluentcart-mcp')
 
 export const SCANNED_FILES = [
+	join(REPO_ROOT, 'README.md'),
 	join(REPO_ROOT, 'fluentcart-mcp', 'README.md'),
 	join(DOCS_ROOT, 'index.mdx'),
 	join(DOCS_ROOT, 'setup.mdx'),
@@ -126,6 +127,11 @@ export const RULES = [
 		test: (line) => /releases\/(download|tag)\/[^)\s]*v\d+\.\d+\.\d+/.test(line),
 	},
 	{
+		id: 'pinned-release-command',
+		message: 'hard-coded FluentCart MCP tag version; use the package version or a neutral placeholder',
+		test: (line) => /fluentcart-mcp\/v\d+\.\d+\.\d+/.test(line),
+	},
+	{
 		id: 'unqualified-full-access',
 		message: '"full access" without a capability or write-policy qualification',
 		test: (line) =>
@@ -189,6 +195,19 @@ export const RULES = [
 		appliesWhen: (truth) => truth.realMoneyExposable === 0,
 		test: (line) =>
 			REAL_MONEY_SUBJECT.test(line) && AVAILABILITY_VERB.test(line) && !UNAVAILABLE_MARKER.test(line),
+	},
+	{
+		id: 'unavailable-subscription-lifecycle',
+		selfNegating: true,
+		message: 'subscription pause, resume and reactivate are not shipped tool actions',
+		test: (line) =>
+			(/fluentcart_subscription_(pause|resume|reactivate)\b/i.test(line) ||
+				/"(?:pause|resume|reactivate)\b[^"]*\bsubscription\b/i.test(line) ||
+				/\|\s*list,\s*(?:pause|resume|reactivate)\b/i.test(line) ||
+				/\b(allows?|enables?|supports?|use|call)\b[^.]{0,50}\b(pause|resume|reactivate)\w*\b[^.]{0,30}\bsubscriptions?\b/i.test(
+					line,
+				)) &&
+			!UNAVAILABLE_MARKER.test(line),
 	},
 	{
 		id: 'guard-mechanics-as-usable',

@@ -16,8 +16,8 @@ export interface CommerceContext {
 		timezone: string | null
 	}
 	runtime: {
-		wordpress: string
-		fluentcartCore: string
+		wordpress: string | null
+		fluentcartCore: string | null
 		fluentcartPro: string | null
 		routeProfileDigest: string
 	}
@@ -92,22 +92,25 @@ const PRO_SLUG = 'fluent-cart-pro'
  * fixture digest taken from one runtime are comparable rather than merely similar-looking.
  */
 export function routeProfileDigest(
-	profile: RuntimeProfile,
+	profile: RuntimeProfile | null,
 	operations: readonly unknown[] | null = null,
 ): string {
-	const normalised = {
-		wordpress: profile.wordpress,
-		activeComponents: [...profile.activeComponents]
-			.map((component) => ({ slug: component.slug, version: component.version }))
-			.sort((left, right) => (left.slug < right.slug ? -1 : 1)),
-	}
+	const normalised = profile
+		? {
+				wordpress: profile.wordpress,
+				activeComponents: [...profile.activeComponents]
+					.map((component) => ({ slug: component.slug, version: component.version }))
+					.sort((left, right) => (left.slug < right.slug ? -1 : 1)),
+			}
+		: null
 	const digest = createHash('sha256')
 		.update(JSON.stringify({ profile: normalised, operations }))
 		.digest('hex')
 	return `sha256:${digest}`
 }
 
-function componentVersion(profile: RuntimeProfile, slug: string): string | null {
+function componentVersion(profile: RuntimeProfile | null, slug: string): string | null {
+	if (profile === null) return null
 	return profile.activeComponents.find((component) => component.slug === slug)?.version ?? null
 }
 
@@ -125,7 +128,7 @@ export interface ContextInput {
 	origin: string
 	/** The `shop` block of `/app/init`, read by allowlist. */
 	shop: Record<string, unknown> | null
-	profile: RuntimeProfile
+	profile: RuntimeProfile | null
 	/** Canonical operations backing the profile, when the caller has them. */
 	operations?: readonly unknown[] | null
 	/** Names already filtered by capability discovery and the write-exposure policy. */
@@ -155,7 +158,7 @@ export function buildCommerceContext(input: ContextInput): CommerceContext {
 	const warnings: string[] = []
 
 	const core = componentVersion(input.profile, CORE_SLUG)
-	if (core === null) {
+	if (input.profile !== null && core === null) {
 		throw new Error(`Runtime profile lists no ${CORE_SLUG}; it is not a FluentCart store.`)
 	}
 
@@ -170,11 +173,16 @@ export function buildCommerceContext(input: ContextInput): CommerceContext {
 		warnings.push('Store currency is not configured; monetary values have no unit.')
 	if (timezone === null)
 		warnings.push('Store timezone is not exposed; date boundaries are unverified.')
+	if (input.profile === null) {
+		warnings.push(
+			'Runtime versions are not exposed by FluentCart; route capabilities are verified independently.',
+		)
+	}
 
 	return {
 		store: { origin: input.origin, name, currency, timezone },
 		runtime: {
-			wordpress: input.profile.wordpress,
+			wordpress: input.profile?.wordpress ?? null,
 			fluentcartCore: core,
 			fluentcartPro: componentVersion(input.profile, PRO_SLUG),
 			routeProfileDigest: routeProfileDigest(input.profile, input.operations ?? null),

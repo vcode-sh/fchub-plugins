@@ -179,4 +179,24 @@ describe('cache entries belong to their request', () => {
 
 		expect(get, 'the cache must still do its job').toHaveBeenCalledTimes(1)
 	})
+
+	it('never serves one client context from another client cache', async () => {
+		const firstGet = vi.fn().mockResolvedValue({ data: { shop: { store_name: 'Alpha' } } })
+		const secondGet = vi.fn().mockResolvedValue({ data: { shop: { store_name: 'Beta' } } })
+		const first = createAllTools({ get: firstGet } as unknown as FluentCartClient).find(
+			(candidate) => candidate.name === 'fluentcart_app_init',
+		)
+		const second = createAllTools({ get: secondGet } as unknown as FluentCartClient).find(
+			(candidate) => candidate.name === 'fluentcart_app_init',
+		)
+		if (!(first && second)) throw new Error('fluentcart_app_init is not registered')
+
+		const alpha = await first.handler({})
+		const beta = await second.handler({})
+
+		expect(alpha.content[0]?.text).toContain('Alpha')
+		expect(beta.content[0]?.text).toContain('Beta')
+		expect(firstGet).toHaveBeenCalledTimes(1)
+		expect(secondGet).toHaveBeenCalledTimes(1)
+	})
 })

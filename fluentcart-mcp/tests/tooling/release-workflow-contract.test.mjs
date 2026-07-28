@@ -27,6 +27,14 @@ const release = read('mcp-release.yml')
 const docker = read('mcp-docker.yml')
 const ci = read('mcp-ci.yml')
 const docs = read('docs-ci.yml')
+const protocolSmoke = readFileSync(
+	join(REPO_ROOT, 'fluentcart-mcp', 'scripts', 'smoke-mcp-http.mjs'),
+	'utf8',
+)
+const dockerAcceptance = readFileSync(
+	join(REPO_ROOT, 'fluentcart-mcp', 'tests', 'acceptance', 'docker.test.mjs'),
+	'utf8',
+)
 
 const ALL_WORKFLOWS = readdirSync(WORKFLOWS)
 	.filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'))
@@ -124,6 +132,7 @@ describe('one validation job owns every build', () => {
 		const quality = job(ci, 'quality')
 
 		assert.match(quality, /npm run typecheck/)
+		assert.match(quality, /npm run typecheck:tests/)
 		assert.match(quality, /npm run lint/)
 		assert.match(test, /npm run test:unit/)
 		assert.match(test, /npm run test:tooling/)
@@ -267,9 +276,11 @@ describe('Docker consumes the validated context', () => {
 	})
 
 	it('tags with the validated version and the source SHA', () => {
+		const verify = job(docker, 'verify')
 		const publish = job(docker, 'publish')
+		assert.match(verify, /^\s{6}source_sha:\s*\$\{\{\s*steps\.build\.outputs\.source_sha\s*\}\}/m)
 		assert.match(publish, /needs\.verify\.outputs\.version/)
-		assert.match(publish, /SOURCE_SHA/)
+		assert.match(publish, /SOURCE_SHA:\s*\$\{\{\s*needs\.verify\.outputs\.source_sha\s*\}\}/)
 		assert.match(publish, /docker push/)
 	})
 
@@ -299,10 +310,32 @@ describe('the container smoke proves the security contract', () => {
 		assert.match(verify, /"\$UNAUTH" != "401"/)
 	})
 
-	it('proves a wrong bearer is refused and the right one is not', () => {
+	it('proves a wrong bearer is refused and the right one completes an MCP exchange', () => {
 		assert.match(verify, /BADKEY=/)
-		assert.match(verify, /AUTHED=/)
-		assert.match(verify, /Correct bearer was rejected/)
+		assert.match(verify, /smoke-mcp-http\.mjs/)
+		assert.match(protocolSmoke, /method:\s*'initialize'/)
+		assert.match(protocolSmoke, /method:\s*'notifications\/initialized'/)
+		assert.match(protocolSmoke, /method:\s*'tools\/list'/)
+		assert.match(protocolSmoke, /serverInfo/)
+		for (const name of [
+			'fluentcart_search_tools',
+			'fluentcart_describe_tools',
+			'fluentcart_execute_read_tool',
+		]) {
+			assert.match(protocolSmoke, new RegExp(name))
+		}
+	})
+
+	it('runs required image acceptance against the verified SHA', () => {
+		assert.match(verify, /node --test fluentcart-mcp\/tests\/acceptance\/docker\.test\.mjs/)
+		assert.match(verify, /FLUENTCART_ACCEPTANCE_REQUIRED:\s*'yes'/)
+		assert.match(
+			verify,
+			/FLUENTCART_ACCEPTANCE_SOURCE_SHA:\s*\$\{\{\s*steps\.build\.outputs\.source_sha\s*\}\}/,
+		)
+		assert.match(dockerAcceptance, /FLUENTCART_ACCEPTANCE_REQUIRED/)
+		assert.match(dockerAcceptance, /FLUENTCART_ACCEPTANCE_SOURCE_SHA/)
+		assert.match(dockerAcceptance, /assert\.equal\(revision,\s*EXPECTED_SOURCE_SHA/)
 	})
 
 	it('injects a key long enough to satisfy the exposure guard', () => {
