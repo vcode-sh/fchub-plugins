@@ -126,6 +126,73 @@ That does **not** mean 291 tools are dumped into the model's context like a cutl
 
 The trade-off is setup. You are operating another service and supplying the store URL plus a WordPress application password. Docker makes that manageable, but “built into the plugin” remains easier than “deploy this Node process”. Physics continues to be annoyingly consistent.
 
+## What This Looks Like on a Tuesday
+
+<ImageZoom
+  src="/fluentcart-mcp/independent-fluentcart-mcp-shop-owner-conversation.webp"
+  alt="A shop owner asking the independent FluentCart MCP what needs attention across orders, stock, customers, renewals, and reports"
+  width={1600}
+  height={900}
+  className="rounded-xl border my-6"
+/>
+
+You do not need to know what an endpoint is. You ask about the shop; the assistant works out which FluentCart data it needs.
+
+These are representative conversations backed by the documented tool paths and live merchant scenarios—not suspiciously perfect screenshots from a shop where every order total ends in `.00`.
+
+### 1. Start With the Jobs That Need Attention
+
+> **Shop owner:** “What needs my attention today?”
+
+**What the MCP does:** checks the dashboard summary, recent and unfulfilled orders, stock information, and upcoming subscription payments. In Code Mode it can combine those reads before returning the useful rows.
+
+**What you get:** one prioritised summary instead of a morning tour of WordPress tabs. The default mode is read-only, so asking a vague question cannot accidentally improve the business by deleting half of it.
+
+### 2. Investigate a Customer Problem
+
+<ImageZoom
+  src="/fluentcart-mcp/independent-fluentcart-mcp-customer-order-investigation.webp"
+  alt="The independent FluentCart MCP investigating whether a customer was charged twice by checking customer, order, and transaction records"
+  width={1600}
+  height={900}
+  className="rounded-xl border my-6"
+/>
+
+> **Shop owner:** “A customer says they were charged twice. Check what happened.”
+
+**What the MCP does:** finds the customer, reads the relevant orders and compares their transaction records.
+
+**What you get:** the evidence needed to decide what happened. It does not issue a refund; version 2.0.0 deliberately leaves money-moving actions to the official MCP or the FluentCart admin. An investigation tool should investigate. Revolutionary stuff.
+
+### 3. Hand Off the Tedious Admin
+
+<ImageZoom
+  src="/fluentcart-mcp/independent-fluentcart-mcp-create-coupon.webp"
+  alt="A shop owner asking the independent FluentCart MCP to create a SUMMER25 coupon in reversible mode"
+  width={1600}
+  height={900}
+  className="rounded-xl border my-6"
+/>
+
+> **Shop owner:** “Create coupon SUMMER25 for 25% off and make it expire on 31 August.”
+
+**What the MCP does:** resolves the coupon fields, converts the plain-English discount into FluentCart's expected values, creates the coupon, and returns the saved result.
+
+**What you get:** a finished routine task without hunting through forms. This requires [reversible write mode](/docs/fluentcart-mcp/setup#decide-what-it-can-see), which is off by default. It can also create or update products, variants, customers, shipping rules, tax rules, attributes, and order bumps. Deleting things remains a hobby for humans.
+
+<Callout type="info" title="Steal the Prompts">
+  The [usage guide](/docs/fluentcart-mcp/usage) has practical prompts for orders, products, customers, subscriptions, reports, shipping, tax, coupons, email settings, and the other parts of the shop nobody opens for pleasure.
+</Callout>
+
+<div className="flex flex-wrap gap-3 my-6 not-prose">
+  <a href="/docs/fluentcart-mcp/usage" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition-all">
+    See Example Prompts
+  </a>
+  <a href="/docs/fluentcart-mcp/setup" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border bg-background text-sm font-medium shadow-xs hover:bg-muted hover:text-foreground transition-all dark:border-input dark:bg-input/30 dark:hover:bg-input/50">
+    Install FluentCart MCP
+  </a>
+</div>
+
 ## The Token Difference Is Not Subtle
 
 <ImageZoom
@@ -154,6 +221,16 @@ The independent server's default pays roughly **29 times less initial context** 
 If latency matters more than context, curated or full mode exists. If a client has tight tool limits, or every token is being invoiced with the confidence of a London landlord, dynamic mode is the point.
 
 ## Code Mode Is the Biggest Architectural Difference
+
+<ImageZoom
+  src="/fluentcart-mcp/independent-fluentcart-mcp-code-mode-read-only-sandbox.webp"
+  alt="Independent FluentCart MCP Code Mode running several approved store reads inside a locked read-only sandbox and returning one concise answer"
+  width={1600}
+  height={900}
+  className="rounded-xl border my-6"
+/>
+
+Code Mode belongs to the independent FluentCart MCP I built. It is not a feature of FluentCart's official server.
 
 The official MCP exposes normal tools. One tool call does one prepared job.
 
