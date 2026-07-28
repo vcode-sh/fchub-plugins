@@ -71,7 +71,7 @@ describe('repository contract: no unsafe live entry points', () => {
 		for (const file of sourceFiles) {
 			const text = readFileSync(file, 'utf8')
 			// Reading the exact credential file, or any env-file loader, is launcher-only.
-			if (/\.env\.test\.local|loadEnvFile\(|parseEnv\(|loadEnv\(/.test(text)) {
+			if (/\.env\.test\.local(?!\.example)|loadEnvFile\(|parseEnv\(|loadEnv\(/.test(text)) {
 				offenders.push(rel(file))
 			}
 		}
