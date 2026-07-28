@@ -11,16 +11,46 @@ pinOrder: 0
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
 
-I built a FluentCart MCP server. Then FluentCart built a FluentCart MCP server.
+Running a shop means opening six admin screens to answer one question.
 
-Excellent. Two things with nearly the same name, connected to the same shop, both promising that you can talk to your store. Naming has once again delivered the clarity for which software is famous.
+Which orders need attention? What is running out? Who is about to renew? How much did the shop actually make? By the time you find the answers, another order has arrived and WordPress wants an update. Lovely.
 
-They are not duplicates, though. I installed both against the same FluentCart store, connected through the actual MCP protocol, ran the shop questions, inspected the source, measured the tool payloads, and tested the dangerous bits without giving anyone an accidental refund.
+MCP gives your AI assistant access to the shop, so you can ask those questions in plain English. It checks FluentCart and brings back the answer. Less clicking, fewer exports, more time for the bit where you actually run the business.
 
-The short version: the [official FluentCart MCP](https://docs.fluentcart.com/guide/settings-configuration/mcp) is a focused operator interface built into FluentCart. [FluentCart MCP](/docs/fluentcart-mcp) is a standalone, broader API workbench built for discovery, Code Mode, and deeper store administration.
+There are now two ways to do this: the [official FluentCart MCP](https://docs.fluentcart.com/guide/settings-configuration/mcp) and the independent [FluentCart MCP](/docs/fluentcart-mcp). They sound identical. They are not.
 
-Same shop. Different jobs.
+To be clear: I did not build, contribute to, or work on the official server. FluentCart MCP is an independent project—and it came first. I released the first functional version on [2 March 2026](/docs/fluentcart-mcp/changelog#v090). FluentCart announced its official MCP on [12 June 2026](https://fluentcart.com/blog/fluentcart-1-4-1/), more than three months later.
+
+The official server is simpler and built into FluentCart. The independent server goes much deeper and can handle far more of the admin work. I tested both to show where each one fits—without refunding a real customer for journalistic purposes.
+
+<Callout type="info" title="TL;DR — Which One Should You Use?">
+  Choose the **official MCP** if you want the easiest setup and safe refunds or subscription cancellations. Choose the **independent FluentCart MCP** if you want one assistant to reach much more of the shop admin, use far fewer tokens, and handle deeper multi-step analysis. You can connect both and let each do what it is good at. Software has finally invented cooperation.
+</Callout>
+
+## The Difference at a Glance
+
+<ImageZoom
+  src="/fluentcart-mcp/fluentcart-mcp-official-vs-independent-comparison.webp"
+  alt="Official FluentCart MCP and independent FluentCart MCP compared side by side around the same ecommerce store"
+  width={1600}
+  height={900}
+  className="rounded-xl border my-6"
+/>
+
+| | Official FluentCart MCP | Independent FluentCart MCP |
+|---|---|---|
+| **Best for** | Everyday shop questions and guarded operator actions | Broader administration, investigation, and automation |
+| **Setup** | Enable it in FluentCart, install an MCP adapter, add an application password | Run a separate Node.js, Docker, npm, or MCPB server and add an application password |
+| **What it covers** | 33 focused tools for orders, customers, products, subscriptions, coupons, and reports | Up to 194 available tools across products, orders, tax, shipping, settings, email, reports, integrations, and more |
+| **How it feels** | A focused assistant for common shop-owner jobs | A command centre for much more of the FluentCart back office |
+| **Refunds and cancellations** | Available with preview, confirmation, permissions, and live-payment safeguards | Deliberately unavailable in version 2.0.0 |
+| **Changing store data** | Selected customer, coupon, label, order, subscription, and refund actions | Off by default; optionally exposes changes that can be reversed |
+| **Initial tool cost** | 14,950 tokens in the tested store | 512 tokens in the default read-only mode |
+| **Code Mode** | No | Yes — combines several read operations inside a locked-down sandbox |
+| **Compatibility approach** | Built for the current FluentCart abilities exposed by the plugin | Checks the connected shop at startup and removes tools its routes cannot support |
+| **Separate service required** | No MCP server to host, but an adapter plugin is required | Yes |
 
 ## What I Actually Tested
 
@@ -32,19 +62,27 @@ This comparison uses:
 - FluentCart MCP 2.0.0
 - the same local shop data and the same WordPress administrator
 - Streamable HTTP for the official server
-- live REST integration tests plus MCP protocol tests for ours
+- live REST integration tests plus MCP protocol tests for the independent server
 
 The [official launch article](https://fluentcart.com/blog/fluentcart-ecommerce-mcp/) and [1.4.1 release post](https://fluentcart.com/blog/fluentcart-1-4-1/) variously described 28 and 30 tools, because apparently even tool counts enjoy a little character development. The current 1.5.5 runtime advertised **33 tools**, so that is the version compared here—not the launch snapshot.
 
 I tested protocol initialisation, authentication, tool discovery, product and order reads, store context, reporting, inventory, invalid parameters, and the refund preview flow. I did **not** execute a refund or cancel a real subscription. Testing safety by moving real money would be a rather avant-garde definition of safety.
 
-For our server, the current gate ran 2,837 unit tests, acceptance and route-contract checks, five measured compatibility profiles, and the live merchant-scenario suite against the store. All 93 merchant scenarios passed. The enclosing live integration command did not finish green: two HTTP assertions still expected a reversible-write executor in the default mode, while the running server correctly exposed the documented three-tool read-only default. I am reporting the gate as red until those stale expectations are repaired, because redefining “green” is how dashboards become decorative.
+For the independent server, the current gate ran 2,837 unit tests, acceptance and route-contract checks, five measured compatibility profiles, and the live merchant-scenario suite against the store. All 93 merchant scenarios passed. The enclosing live integration command did not finish green: two HTTP assertions still expected a reversible-write executor in the default mode, while the running server correctly exposed the documented three-tool read-only default. I am reporting the gate as red until those stale expectations are repaired, because redefining “green” is how dashboards become decorative.
 
 The public [proof page](/docs/fluentcart-mcp/proof) explains why “the endpoint returned 200” is not considered a personality trait, let alone evidence.
 
 ## The Official Server Lives Inside the Shop
 
 The official MCP is part of FluentCart core. It registers a curated set of WordPress Abilities, uses the shop's existing roles and permissions, and exposes them through a WordPress MCP adapter.
+
+<ImageZoom
+  src="/fluentcart-mcp/fluentcart-official-mcp-safe-shop-operations.webp"
+  alt="Official FluentCart MCP handling a focused set of safe everyday ecommerce operations"
+  width={1600}
+  height={900}
+  className="rounded-xl border my-6"
+/>
 
 That gives it a very tidy setup:
 
@@ -59,9 +97,17 @@ Its 33 tools are deliberately shop-owner-shaped. They cover orders, customers, p
 
 It is opinionated in a useful way. You ask what renews next week, which product earns the most, or what needs restocking. It returns a prepared commerce answer rather than handing the model three raw controllers and wishing it emotional resilience.
 
-## Our Server Lives Beside the Shop
+## The Independent Server Lives Beside the Shop
 
 FluentCart MCP 2.0.0 is a standalone Node.js server. It connects to FluentCart's authenticated REST API and can run through stdio, HTTP, Docker, npm, or an MCPB package.
+
+<ImageZoom
+  src="/fluentcart-mcp/independent-fluentcart-mcp-code-mode-admin-tools.webp"
+  alt="Independent FluentCart MCP connecting products, orders, customers, reports, tax, shipping, integrations, and settings through Code Mode"
+  width={1600}
+  height={900}
+  className="rounded-xl border my-6"
+/>
 
 That extra moving part buys a much wider surface.
 
@@ -82,7 +128,15 @@ The trade-off is setup. You are operating another service and supplying the stor
 
 ## The Token Difference Is Not Subtle
 
-I serialised the real `tools/list` responses and counted them with the same `gpt-tokenizer` package used by our release contract.
+<ImageZoom
+  src="/fluentcart-mcp/independent-fluentcart-mcp-token-efficiency-comparison.webp"
+  alt="Official FluentCart MCP using 14,950 tool-definition tokens compared with 512 tokens for the independent FluentCart MCP default mode"
+  width={1600}
+  height={900}
+  className="rounded-xl border my-6"
+/>
+
+I serialised the real `tools/list` responses and counted them with the same `gpt-tokenizer` package used by the project's release contract.
 
 | Surface | Advertised tools | Definition payload |
 |---|---:|---:|
@@ -95,7 +149,7 @@ I serialised the real `tools/list` responses and counted them with the same `gpt
 
 The official server pays once for 33 rich schemas. The model can call them immediately with no discovery round trip. That is perfectly reasonable for a focused toolset.
 
-Our default pays roughly **29 times less initial context** than the official server, but usually spends two or three calls on search, schema lookup, and execution. Less context, more round trips. Neither cost disappears; it merely changes outfits.
+The independent server's default pays roughly **29 times less initial context** than the official server, but usually spends two or three calls on search, schema lookup, and execution. Less context, more round trips. Neither cost disappears; it merely changes outfits.
 
 If latency matters more than context, curated or full mode exists. If a client has tight tool limits, or every token is being invoiced with the confidence of a London landlord, dynamic mode is the point.
 
@@ -103,7 +157,7 @@ If latency matters more than context, curated or full mode exists. If a client h
 
 The official MCP exposes normal tools. One tool call does one prepared job.
 
-Our Code Mode exposes two tools: search the read-only API index, then run a small JavaScript programme inside a QuickJS WebAssembly sandbox. The script can make up to ten approved read calls, join or filter the results, and return only the final answer.
+The independent server's Code Mode exposes two tools: search the read-only API index, then run a small JavaScript programme inside a QuickJS WebAssembly sandbox. The script can make up to ten approved read calls, join or filter the results, and return only the final answer.
 
 That matters when the question crosses endpoints:
 
@@ -129,7 +183,7 @@ FluentCart MCP 2.0.0 does **not** expose refunds, subscription cancellation, del
 
 Not disabled. Not hidden behind a warning the model may ignore. Absent.
 
-Our reversible mode is for changes that can be undone: creating or updating products, variants, coupons, customers, shipping rules, tax rules, attributes, and order bumps. If your workflow needs a refund, use the official server or the FluentCart admin. Version 2.0.0 is not going to cosplay as a payment gateway.
+The independent server's reversible mode is for changes that can be undone: creating or updating products, variants, coupons, customers, shipping rules, tax rules, attributes, and order bumps. If your workflow needs a refund, use the official server or the FluentCart admin. Version 2.0.0 is not going to cosplay as a payment gateway.
 
 <Callout type="info" title="The Honest Split">
   Use the official MCP for guarded operator actions around orders, customers, subscriptions, refunds, and native reports. Use FluentCart MCP when you need broader administration, API discovery, token-efficient tool selection, or read-only multi-step analysis in Code Mode.
@@ -139,11 +193,11 @@ Our reversible mode is for changes that can be undone: creating or updating prod
 
 The official server has the cleaner answer for its supported questions. Sales, trends, top products, refunds, attribution, product financials, upcoming payments, and the transaction ledger come back in purpose-built envelopes with summaries, definitions, pagination, currency handling, and date boundaries.
 
-Our server covers those merchant questions plus many more underlying FluentCart report routes. That breadth revealed why raw API coverage is not automatically useful.
+The independent server covers those merchant questions plus many more underlying FluentCart report routes. That breadth revealed why raw API coverage is not automatically useful.
 
 The live scenario suite found routes that ignore a requested range, disagree with another report, return empty figures despite existing data, or need several calls because FluentCart exposes no direct filter. The server ranks working routes above diagnostic ones, adds warnings where a number is unsafe to interpret, and refuses to add totals across currencies.
 
-The official approach is “offer fewer questions with first-class answers.” Ours is “map the larger system, test what it actually says, and label the awkward parts.” One is a polished reception desk. The other has keys to the boiler room and knows which pipe makes that noise.
+The official approach is “offer fewer questions with first-class answers.” The independent approach is “map the larger system, test what it actually says, and label the awkward parts.” One is a polished reception desk. The other has keys to the boiler room and knows which pipe makes that noise.
 
 ## So Which One Should a Shop Owner Use?
 
@@ -166,7 +220,7 @@ Use **FluentCart MCP 2.0.0** if you want:
 - stdio, HTTP, Docker, npm, and MCPB deployment choices;
 - writes limited to explicitly enabled, reversible operations.
 
-You can also connect both. Give them different server names and let each do the job it was designed for. The official server handles the guarded operator lane; ours handles deep discovery and analysis. Two MCP servers are only confusing until they stop pretending to be the same product.
+You can also connect both. Give them different server names and let each do the job it was designed for. The official server handles the guarded operator lane; the independent server handles deep discovery and analysis. Two MCP servers are only confusing until they stop pretending to be the same product.
 
 ## The Numbers
 
@@ -175,11 +229,11 @@ You can also connect both. Give them different server names and let each do the 
 - **162** read definitions before per-store capability pruning
 - **93** live merchant scenarios across customers, orders, products, stock, subscriptions, coupons, analytics, configuration, and storefront behaviour
 - **14,950** official definition tokens in the tested runtime
-- **512** default dynamic definition tokens for our read-only profile
+- **512** default dynamic definition tokens for the independent server's read-only profile
 - **532** Code Mode definition tokens
 - **2,837** unit tests passed in the audit run
 - **0** refunds executed for the sake of a blog post
 
-The official server is not the smaller version of ours. Ours is not the unofficial version of theirs.
+The official server is not a smaller version of the independent server. The independent server is not an unofficial copy of FluentCart's.
 
 One is the native control panel for the questions FluentCart has chosen to support. The other is a standalone workbench for people who want more of the store exposed, less context wasted, and enough rope to inspect the knot without being allowed to hang the payment gateway.
