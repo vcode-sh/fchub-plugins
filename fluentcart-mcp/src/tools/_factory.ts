@@ -143,6 +143,10 @@ const REPORT_PARAM_KEYS: ReadonlySet<string> = new Set([
 	'paymentStatus',
 	'variation_ids',
 	'orderStatus',
+	// The snake_case twin is a different key, not a spelling variant: `/reports/search-repeat-customer`
+	// reads `order_status`, and without the nesting it was dropped and the report could only ever
+	// answer with nobody. See fluentcart_report_repeat_customers.
+	'order_status',
 	'orderTypes',
 ])
 

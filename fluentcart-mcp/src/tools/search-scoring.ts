@@ -128,7 +128,12 @@ export function scoreTool(
 	// segment `variants` in `report_top_sold_variants`, which is exactly the tool being asked for.
 	const segments = new Set(name.split('_').map(stem))
 	const title = tool.title.toLowerCase()
-	const body = tool.description.toLowerCase()
+	// A description that points at a sibling — "use fluentcart_customer_get instead" — must not
+	// thereby compete with it. Naming the better tool is the most useful sentence a description can
+	// carry, and scoring it made every cross-reference a small act of self-harm: `order_get` names
+	// three siblings. The referenced names go before matching; a caller who types a tool name still
+	// reaches it through its own name and segments, which score far higher than prose anyway.
+	const body = tool.description.toLowerCase().replace(/fluentcart_[a-z0-9_]+/g, ' ')
 
 	let score = 0
 	let matched = 0

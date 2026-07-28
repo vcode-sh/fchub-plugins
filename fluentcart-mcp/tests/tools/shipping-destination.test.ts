@@ -110,3 +110,56 @@ describe('shipping methods can be asked about a destination', () => {
 		expect(tool.description).toMatch(/no shipping available/i)
 	})
 })
+
+// An unrecognised country code is not rejected: "ZZ" answers HTTP 200 with an empty state list,
+// exactly as Poland does — and Poland genuinely has none. So an empty `states` cannot on its own
+// tell a typo from a real answer, and a typo that reads as a valid country is how a shipping zone
+// ends up silently covering nothing.
+//
+// The payload does distinguish them, though nothing says so. A country FluentCart knows carries an
+// `address_locale` OBJECT describing its postcode and state fields; an unknown code carries an
+// empty ARRAY. Verified live across twelve codes: ZZ, QQ, XX and the empty string all gave `[]`,
+// while PL, AT, BE, DK, CZ, GB, DE and US all gave an object — including the five with no
+// subdivisions at all.
+describe('an empty state list says which kind of empty it is', () => {
+	// A distinct code per case, because this tool caches on the country and the earlier suite proved
+	// it: reusing one code here would serve the first payload to all three and pass on a lie.
+	async function statesFor(code: string, payload: Record<string, unknown>) {
+		const get = vi.fn().mockResolvedValue({ data: { data: payload }, status: 200 })
+		const tool = toolNamed(get, 'fluentcart_shipping_zone_states')
+		const result = (await tool.handler({ country_code: code } as never, {} as never)) as {
+			content: { text: string }[]
+		}
+		return JSON.parse(result.content[0]?.text ?? '{}').data as Record<string, unknown>
+	}
+
+	it('calls an unknown code unknown, rather than a country with no states', async () => {
+		const data = await statesFor('ZZ', { country_code: 'ZZ', states: [], address_locale: [] })
+
+		expect(String(data.note)).toMatch(/NOT recognised/)
+		expect(String(data.note)).toContain('fluentcart_shipping_zone_countries')
+	})
+
+	it('says a recognised country simply has none', async () => {
+		const data = await statesFor('PL', {
+			country_code: 'PL',
+			states: [],
+			address_locale: { postcode: { priority: 65 }, state: { hidden: true } },
+		})
+
+		expect(String(data.note)).toMatch(/recognised and has no subdivisions/)
+		expect(String(data.note)).not.toMatch(/NOT recognised/)
+	})
+
+	it('adds nothing when there are states to return', async () => {
+		// 'NL' rather than 'DE': the alias case above already warmed DE in this file's cache.
+		const data = await statesFor('NL', {
+			country_code: 'NL',
+			states: [{ value: 'NL-NH', name: 'North Holland' }],
+			address_locale: { state: { required: true } },
+		})
+
+		expect(data).not.toHaveProperty('note')
+		expect((data.states as unknown[]).length).toBe(1)
+	})
+})

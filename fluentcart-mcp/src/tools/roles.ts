@@ -116,9 +116,14 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_role_user_list',
 			title: 'List Role Users',
 			description:
-				'Search WordPress users who COULD be given a FluentCart role. It returns id, name and email only — no role information — and excludes anyone who already holds a WordPress administrator role. To see who currently holds which FluentCart role, use fluentcart_role_managers. Requires FluentCart Pro.',
+				'Search WordPress users who COULD be given a FluentCart role. It returns id, name and email only — no role information — and excludes anyone who already holds a WordPress administrator role. Search is mandatory in practice: with no search term the store returns a total of zero rather than the whole directory, so an empty result means nothing was asked for, not that no candidate exists. To see who currently holds which FluentCart role, use fluentcart_role_managers. Requires FluentCart Pro.',
 			schema: z.object({
-				search: z.string().optional().describe('Search users by name or email'),
+				search: z
+					.string()
+					.optional()
+					.describe(
+						'Search users by name or email. Omitting it returns zero users, not all of them.',
+					),
 				page: z.number().optional().describe('Page number'),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 			}),

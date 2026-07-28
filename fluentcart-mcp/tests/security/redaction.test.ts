@@ -109,3 +109,41 @@ describe('redactSensitive', () => {
 		expect(() => redactSensitive(deep)).not.toThrow()
 	})
 })
+
+// A fully-qualified PHP class names the internal structure; its last segment names the thing that
+// went wrong. Asking for a product that does not exist answered "No query results for model
+// [FluentCart\App\Models\Product]" — the ORM, the namespace layout and the model. Blanking the
+// whole path fixed the leak and broke the message: a bad product id, a bad customer id and a bad
+// password all read identically after it. The namespace goes, the class stays.
+describe('a PHP class path loses its namespace, not its name', () => {
+	it('keeps the final segment', () => {
+		const text = redactSensitive(
+			'No query results for model [FluentCart\\App\\Models\\Product].',
+		) as string
+
+		expect(text).toContain('[Product]')
+		expect(text).not.toContain('FluentCart')
+		expect(text).not.toContain('Models')
+	})
+
+	it('handles the double-backslash form that arrives through JSON', () => {
+		const text = redactSensitive(
+			'Uncaught FluentCart\\\\App\\\\Services\\\\TaxManager failed',
+		) as string
+
+		expect(text).not.toContain('Services')
+		// The Uncaught rule owns this line, so what matters is that no namespace survives.
+		expect(text).not.toContain('FluentCart\\')
+	})
+
+	it('leaves ordinary prose and a lone escape alone', () => {
+		// Not `C:\ok` — the Windows absolute-path rule owns that one and is right to.
+		for (const safe of [
+			'Use a\\nb as a separator',
+			'One\\Two is not a class path',
+			'A\\B has only two segments',
+		]) {
+			expect(redactSensitive(safe)).toBe(safe)
+		}
+	})
+})

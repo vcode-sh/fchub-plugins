@@ -218,6 +218,11 @@ describe('verified search against run-owned records', () => {
 })
 
 describe('reports over an isolated period', () => {
+	/** Arguments a report cannot answer without, over and above the period. */
+	const REQUIRED_BEYOND_PERIOD: Record<string, Record<string, unknown>> = {
+		fluentcart_report_repeat_customers: { order_status: 'completed' },
+	}
+
 	const reportTools = [
 		'fluentcart_report_overview',
 		'fluentcart_report_order_chart',
@@ -230,9 +235,13 @@ describe('reports over an isolated period', () => {
 		it(`${name} answers completely for a period with no trading`, async () => {
 			if (!has(name)) return
 			const tool = findTool(ctx, name)
-			// Only send the period fields this report actually declares.
+			// Only send the period fields this report actually declares, plus anything the report
+			// requires beyond a period. `report_repeat_customers` needs an order_status: FluentCart
+			// filters the underlying orders by it unconditionally, so a call without one matches
+			// nothing and answers with an empty list rather than an error. Sending a period alone
+			// would test that the tool tolerates a call that can never work.
 			const shape = tool.schema.shape as Record<string, unknown>
-			const input: Record<string, unknown> = {}
+			const input: Record<string, unknown> = { ...REQUIRED_BEYOND_PERIOD[name] }
 			for (const [key, value] of Object.entries(ISOLATED_PERIOD)) {
 				if (key in shape) input[key] = value
 			}

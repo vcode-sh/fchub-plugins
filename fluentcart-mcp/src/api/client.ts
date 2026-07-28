@@ -66,19 +66,97 @@ function previewRaw(raw: string): string | null {
 	return compact.slice(0, 220)
 }
 
+/**
+ * The human sentence in a FluentCart error, wherever it put it.
+ *
+ * `sendError` nests it: a missing subscription answers
+ * `{"data":{"message":"Subscription not found",…},"code":"fluent_cart_entity_not_found"}`, with no
+ * top-level `message`. Reading only the top level meant falling through to a 220-character preview
+ * of the raw body — which was then rendered beside the same body again as the error detail. One
+ * not-found cost 573 characters to say four words.
+ */
+function errorMessageFrom(parsed: Record<string, unknown> | undefined): string | null {
+	if (typeof parsed?.message === 'string') return parsed.message
+	const data = parsed?.data
+	if (data !== null && typeof data === 'object' && !Array.isArray(data)) {
+		const nested = (data as Record<string, unknown>).message
+		if (typeof nested === 'string') return nested
+	}
+	return null
+}
+
+/**
+ * Drop the framework's debug block from an error before it travels.
+ *
+ * `wpfluent` carries `env`, the HTTP method, the FULL request URL and the parsed route, query and
+ * body parameters — the store's own hostname and its environment name, echoed back on any 404.
+ * None of it helps a caller fix the call, and `env: "dev"` plus a request URL is not something to
+ * hand a model by default. `buttonText` and `route` are admin UI strings for a screen no caller
+ * here is looking at.
+ */
+function stripErrorPlumbing(value: unknown, message: string | null): unknown {
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) return value
+	const {
+		wpfluent: _debug,
+		buttonText: _button,
+		route: _route,
+		...rest
+	} = value as Record<string, unknown>
+
+	const kept: Record<string, unknown> = {}
+	for (const [key, nested] of Object.entries(rest)) {
+		// The detail is rendered beside the message, never instead of it, so a copy of the message is
+		// the one thing it can never usefully carry. Dropping it — and then dropping whatever that
+		// leaves empty — turns a not-found from two recitals of the same four words into a code.
+		if (message !== null && nested === message) continue
+		if (nested !== null && typeof nested === 'object' && !Array.isArray(nested)) {
+			const inner = stripErrorPlumbing(nested, message)
+			if (inner !== null && typeof inner === 'object' && Object.keys(inner).length === 0) continue
+			kept[key] = inner
+			continue
+		}
+		kept[key] = nested
+	}
+	return kept
+}
+
+/**
+ * A missing record is not a permissions problem, whatever status it arrived under.
+ *
+ * FluentCart resolves the model inside its permission callback, so an ORM
+ * `ModelNotFoundException` escapes there and WordPress reports the whole thing as HTTP 403 with
+ * `code: "Permission Callback Error"`. Asking for a product that does not exist therefore answered
+ * "Permission denied" — which an agent reads as a credentials failure, and which would send a
+ * merchant to check their application password over a mistyped id.
+ *
+ * Only this one shape is reclassified, matched on the framework's own wording before redaction
+ * touches it. A 403 that is genuinely about permissions still says so.
+ */
+function reclassify(status: number, message: string): number {
+	if (status === 403 && /no query results for model/i.test(message)) return 404
+	return status
+}
+
 async function handleErrorResponse(response: Response): Promise<never> {
 	const raw = await readResponseText(response)
 	const parsed = parseJsonLenient(raw)
 	const parsedObj =
 		parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : undefined
 	const message =
-		typeof parsedObj?.message === 'string'
-			? parsedObj.message
-			: raw.trim().startsWith('<')
-				? 'Received HTML instead of JSON'
-				: (previewRaw(raw) ?? response.statusText)
-	const detail = parsed ?? (previewRaw(raw) ? { raw_preview: previewRaw(raw) } : null)
-	throw errorFromStatus(response.status, message, detail)
+		errorMessageFrom(parsedObj) ??
+		(raw.trim().startsWith('<')
+			? 'Received HTML instead of JSON'
+			: (previewRaw(raw) ?? response.statusText))
+	const cleaned = parsed === null ? null : stripErrorPlumbing(parsed, errorMessageFrom(parsedObj))
+	const detail = cleaned ?? (previewRaw(raw) ? { raw_preview: previewRaw(raw) } : null)
+	// The CODE becomes NOT_FOUND because that is what happened; the STATUS stays 403 because that is
+	// what the wire said. Rewriting the status would trade one wrong answer for another, and anything
+	// reasoning about HTTP — retries, transport logging — would then be reasoning about a fiction.
+	const semantic = reclassify(response.status, message)
+	const error = errorFromStatus(semantic, message, detail)
+	throw semantic === response.status
+		? error
+		: new FluentCartApiError(error.code, error.message, response.status, detail)
 }
 
 async function parseSuccessBody<T>(response: Response, method: string, path: string): Promise<T> {

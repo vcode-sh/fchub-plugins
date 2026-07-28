@@ -345,9 +345,19 @@ describe('Integration: CRUD operations', () => {
 	})
 
 	describe('Error contracts', { timeout: 60_000 }, () => {
-		it('answers FORBIDDEN for an unknown product id', async () => {
+		it('calls an unknown product id NOT_FOUND, while reporting the 403 the store sent', async () => {
+			// FluentCart resolves the model inside its permission callback, so the ORM's
+			// ModelNotFoundException escapes there and WordPress answers HTTP 403 with
+			// `code: "Permission Callback Error"`. This lane used to assert only the 403, which
+			// recorded the wire faithfully and left the tool telling callers "Permission denied" for a
+			// mistyped id — a message that sends a merchant to check their application password.
+			// Both facts now hold at once: the code is semantic, the status is what arrived.
 			await expect(client.get('/products/999999')).rejects.toSatisfy(
-				(error: unknown) => error instanceof FluentCartApiError && error.status === 403,
+				(error: unknown) =>
+					error instanceof FluentCartApiError &&
+					error.code === 'NOT_FOUND' &&
+					error.status === 403 &&
+					!/permission denied/i.test(error.message),
 			)
 		})
 

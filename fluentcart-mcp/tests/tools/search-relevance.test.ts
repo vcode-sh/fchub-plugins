@@ -16,6 +16,7 @@
 // examples rather than the problem.
 import { describe, expect, it } from 'vitest'
 import { resolveServerContext } from '../../src/server.js'
+import { startingPointsFor } from '../../src/tools/dynamic.js'
 import { searchTools } from '../../src/tools/dynamic-search.js'
 
 // The registry the server actually exposes, not the raw catalogue. Ranking is only meaningful
@@ -189,6 +190,32 @@ describe('ranking rules behave as documented', () => {
 		expect(working).toBeLessThan(disowned)
 	})
 
+	it('does not let a tool compete with the sibling it recommends', () => {
+		// Naming the better tool is the most useful sentence a description can carry, and scoring it
+		// turned every cross-reference into an own goal. `order_customer_orders` explains that an
+		// unknown customer id looks identical to a real customer with no orders, and points at
+		// `customer_get`; that sentence made the ORDERS tool the top hit for "does this customer
+		// exist", above the customer tool it was recommending.
+		const customer = rankOf('does this customer exist', 'fluentcart_customer_get')
+		const orders = rankOf('does this customer exist', 'fluentcart_order_customer_orders')
+		expect(customer).toBeGreaterThanOrEqual(0)
+		expect(customer, 'the recommended tool must outrank the one recommending it').toBeLessThan(
+			orders,
+		)
+	})
+
+	it('still finds a tool when the caller types its name', () => {
+		// Stripping sibling names from the prose must not make a tool unfindable by its own name. It
+		// cannot: the name is matched separately from the description, and scores far higher than a
+		// mention in someone else's paragraph ever did. Written without the `fluentcart_` prefix
+		// because scoring strips it from the name first — the fully qualified form has never matched
+		// through prose, and asserting that it does would have been asserting a thing that was never
+		// true rather than protecting a thing that is.
+		expect(rankOf('customer_get', 'fluentcart_customer_get')).toBe(0)
+		expect(rankOf('variant_list_all', 'fluentcart_variant_list_all')).toBe(0)
+		expect(rankOf('order transactions', 'fluentcart_order_transactions')).toBe(0)
+	})
+
 	it('ranks a reference table below the store it is not about', () => {
 		// tax_config_rates reads a static file bundled in FluentCart and never queries the store. It
 		// ranked FIRST for this question until REFERENCE DATA joined the disowning prefixes — an
@@ -210,5 +237,53 @@ describe('ranking rules behave as documented', () => {
 		const rows = searchTools(tools, 'list', { category: 'coupon', limit: VISIBLE })
 		expect(rows.length).toBeGreaterThan(0)
 		for (const row of rows) expect(row.category).toBe('coupon')
+	})
+})
+
+// A question the registry cannot match by words must still leave the caller somewhere to go.
+//
+// In dynamic mode search IS the interface, so an empty result set is not a null answer — it is a
+// dead end. "the green shirt" scores zero against every name, title and description in the
+// registry, and yet `fluentcart_product_list` answers it in one call, because its search covers
+// variant names as well as titles. Returning nothing sent the agent away from a question the store
+// could answer.
+describe('a query that matches nothing still points somewhere', () => {
+	it('scores zero for a phrase describing goods rather than tools', () => {
+		// The premise. If this ever starts matching, the fallback below stops being exercised and
+		// this block needs rethinking rather than deleting.
+		expect(searchTools(tools, 'the green shirt', { limit: 5 })).toEqual([])
+	})
+
+	it('offers the entry points, centre of the shop first', () => {
+		const suggested = startingPointsFor(tools)
+
+		expect(suggested[0]).toBe('fluentcart_product_list')
+		expect(suggested).toContain('fluentcart_order_list')
+		expect(suggested).toContain('fluentcart_customer_list')
+		expect(suggested.length).toBeLessThanOrEqual(6)
+	})
+
+	it('offers only tools that can be called with no arguments', () => {
+		// Suggesting a starting point that demands an id the caller does not have would be the same
+		// dead end wearing a helpful face.
+		for (const name of startingPointsFor(tools)) {
+			const tool = tools.find((candidate) => candidate.name === name)
+			expect(tool?.schema.safeParse({}).success, `${name} needs an argument`).toBe(true)
+		}
+	})
+
+	it('does not put housekeeping ahead of commerce', () => {
+		// Sorting by name put activity_list and email_list in front of order_list and product_list,
+		// then cut the two that matter at the limit — a worse answer than none.
+		const suggested = startingPointsFor(tools)
+		const commerce = [
+			'fluentcart_product_list',
+			'fluentcart_order_list',
+			'fluentcart_customer_list',
+		]
+		for (const name of commerce) {
+			expect(suggested.indexOf(name), `${name} was pushed out`).toBeGreaterThanOrEqual(0)
+		}
+		expect(suggested.indexOf('fluentcart_activity_list')).toBe(-1)
 	})
 })

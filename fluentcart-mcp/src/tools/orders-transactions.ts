@@ -214,8 +214,14 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 			name: 'fluentcart_order_customer_orders',
 			routes: direct('GET', '/customers/{param}/orders'),
 			title: 'Get Customer Orders (Paginated)',
+			// A customer id that does not exist answers HTTP 200 with an empty page — 99 characters,
+			// byte for byte what a real customer with no orders returns. The route offers nothing to
+			// tell the two apart, so the description says so rather than the caller guessing.
 			description:
-				'Get paginated orders for a specific customer. Accepts both customerId and customer_id.',
+				'Paginated orders for one customer. Accepts customerId or customer_id. An unknown customer ' +
+				'id returns an empty page rather than an error, exactly as a real customer with no orders ' +
+				'does — to tell those apart, look the customer up with fluentcart_customer_get, which ' +
+				'is the one customer route that fails on a bad id.',
 			schema: z.object({
 				customerId: z.number().optional().describe('Customer ID'),
 				customer_id: z.number().optional().describe('Customer ID (alias for customerId)'),

@@ -17,11 +17,19 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_global_settings',
 			title: 'Get Integration Global Settings',
 			description:
-				'Get global settings for an integration by key. Field types: text, password, select, link, authenticate-button.',
+				'Get the account-level configuration of one integration — the credentials and defaults ' +
+				'that apply before any feed. Field types: text, password, select, link, ' +
+				'authenticate-button. Only providers that declare disable_global_settings false have ' +
+				'anything here; for the rest, including FluentCRM, the webhook sender and WP User, ' +
+				'this returns a validation error and the per-feed settings are what you want instead. ' +
+				'Read the provider keys and their disable_global_settings flag from ' +
+				'fluentcart_integration_get_global_feeds rather than guessing a slug.',
 			schema: z.object({
 				settings_key: z
 					.string()
-					.describe('Integration settings key (e.g. "fakturownia", "fluent-crm")'),
+					.describe(
+						'Provider key exactly as available_integrations reports it, e.g. "memberships" — not the addon slug',
+					),
 			}),
 			endpoint: '/integration/global-settings',
 		}),
@@ -32,7 +40,9 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			description:
 				'Update global settings for an integration. Use get_global_settings first to discover fields.',
 			schema: z.object({
-				settings_key: z.string().describe('Integration key (e.g. "fakturownia")'),
+				settings_key: z
+					.string()
+					.describe('Provider key as available_integrations reports it (e.g. "memberships")'),
 				settings: z
 					.record(z.string(), z.unknown())
 					.optional()
@@ -55,11 +65,13 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'Get Integration Feed Settings',
 			description:
 				'Get feed settings/template. integration_name is required by the backend. ' +
-				'Pass integration_name alone for a blank template, add integration_id to load an existing feed.',
+				'Pass integration_name alone for a blank template, add integration_id to load an existing feed. ' +
+				'The provider key is the one available_integrations uses, which is not the addon slug: ' +
+				'"fluentcrm" resolves, "fluent-crm" is reported as not found.',
 			schema: z.object({
 				integration_name: z
 					.string()
-					.describe('Integration provider name (e.g. "fluent-crm") — required'),
+					.describe('Integration provider name (e.g. "fluentcrm", "webhook") — required'),
 				integration_id: z
 					.number()
 					.optional()
@@ -74,12 +86,12 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			description:
 				'Create or update a global integration feed. Include integration_id to update, omit to create new. ' +
 				'Backend requires integration_name and integration (JSON string of feed config). ' +
-				'Use get_feed_settings first to discover the feed schema for a provider.',
+				'Use get_feed_settings first to discover both the feed schema and the exact provider key.',
 			schema: z.object({
 				integration_id: z.number().optional().describe('Feed ID (omit to create new feed)'),
 				integration_name: z
 					.string()
-					.describe('Integration provider name (e.g. "fluent-crm") — required'),
+					.describe('Integration provider name (e.g. "fluentcrm") — required'),
 				integration: z
 					.string()
 					.describe(
@@ -115,9 +127,10 @@ export function integrationTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_integration_get_feed_lists',
 			title: 'Get Feed Lists',
 			description:
-				'Get available lists for a provider (e.g. FluentCRM lists, Mailchimp audiences).',
+				'Get available lists for a provider (e.g. FluentCRM lists, Mailchimp audiences). ' +
+				'Use the available_integrations key, e.g. "fluentcrm", not the addon slug "fluent-crm".',
 			schema: z.object({
-				provider: z.string().describe('Integration provider name (e.g. "fluent-crm")'),
+				provider: z.string().describe('Integration provider name (e.g. "fluentcrm")'),
 			}),
 			endpoint: '/integration/feed/lists',
 		}),

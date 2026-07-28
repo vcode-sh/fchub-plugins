@@ -110,11 +110,11 @@
     },
     {
       "name": "fluentcart_coupon_get",
-      "description": "Get coupon details including usage stats and eligibility rules."
+      "description": "Get one coupon: use_count, start and end dates, and the conditions object that decides eligibility — included_products, included_categories, max_uses, min_purchase_amount. An unknown coupon id answers HTTP 200 with coupon:null rather than an error, so a null coupon means no such coupon, never a coupon without details."
     },
     {
       "name": "fluentcart_coupon_list",
-      "description": "List coupons with optional search. Types: percentage, fixed, free_shipping. Statuses: active, inactive."
+      "description": "List coupons with optional search. Rows carry use_count against the max_uses cap, plus start_date and end_date, so expiry and redemption limits are answerable without fetching every coupon. status is derived rather than merely stored: a coupon past its end_date reads expired. Statuses: active, inactive, expired, scheduled. Types: percentage, fixed, free_shipping. amount is a percent for percentage, minor units for fixed."
     },
     {
       "name": "fluentcart_coupon_update",
@@ -122,11 +122,11 @@
     },
     {
       "name": "fluentcart_customer_get",
-      "description": "One customer in full, including the figures a stats question is usually after: purchase_count, ltv and aov in CENTS summed across currencies, first_purchase_date and last_purchase_date, plus labels and address count."
+      "description": "One customer in full, including the figures a stats question is usually after: purchase_count, ltv (lifetime value) and aov (average order value) in CENTS summed across currencies, first_purchase_date and last_purchase_date, plus labels and address count."
     },
     {
       "name": "fluentcart_customer_list",
-      "description": "List customers with optional search and sorting. Each row carries ltv, aov, purchase_count and the first and last purchase dates. ltv and aov are CENTS, summed across every currency the customer paid in, so sort by ltv DESC for top spenders. Numbers arrive as strings."
+      "description": "Find customers by name or email, or list them sorted. Each row carries ltv (lifetime value), aov (average order value), purchase_count and the first and last purchase dates. ltv and aov are CENTS, summed across every currency the customer paid in, so sort by ltv DESC for top spenders. Numbers arrive as strings."
     },
     {
       "name": "fluentcart_dashboard_overview",
@@ -150,11 +150,11 @@
     },
     {
       "name": "fluentcart_order_get",
-      "description": "Get full order details including items, transactions, addresses, and customer data."
+      "description": "Full order details for one order: the lines bought, the transactions against it, the customer, and the billing and shipping address it is to be delivered to. This is the tool that answers where to ship an order — the address is already on the order, and no other read carries it."
     },
     {
       "name": "fluentcart_order_list",
-      "description": "List orders with customer names. Filter by date range, status tab, or search. Search matches customer name, email, and invoice number. Tabs: paid, completed, processing, refunded, subscription, renewal."
+      "description": "List orders with customer names. Filter by date range, status tab, or search. Search matches customer name, email, and invoice number. There is NO customer filter: a customer_id parameter is silently ignored and you get every order in the store back. To get one customer's orders, either search by their email, or use fluentcart_order_customer_orders, which takes a customer id properly. Tabs: paid, completed, processing, refunded, subscription, renewal."
     },
     {
       "name": "fluentcart_order_transactions",
@@ -166,15 +166,15 @@
     },
     {
       "name": "fluentcart_product_list",
-      "description": "List products with optional filtering by type, status, fulfilment, and search. Use active_view to filter by product type or status."
+      "description": "List products with optional filtering by type, status, fulfilment, and search. Its search covers variant names as well as product titles, so a colour or size a customer named finds the product it belongs to — nothing else in the registry does that. Use active_view to filter by product type or status. Includes drafts."
     },
     {
       "name": "fluentcart_product_search_by_name",
-      "description": "Find products by name, returning id, title, price range, stock and fulfilment type — enough to pick one and then fetch it with fluentcart_product_get. Omitting the term returns the first page of the catalogue rather than nothing."
+      "description": "Find products by name, returning id, title, price range, stock and fulfilment type — enough to pick one and then fetch it with fluentcart_product_get. Pass category_id to list a category instead; this is the only way to see which products are filed under a term. Matches PRODUCT TITLES ONLY — a colour or size that exists solely as a variant name finds nothing here, so use fluentcart_product_list for those. Published products only, ten to a page, so read has_more before believing a total. Omitting every argument returns the first page of the catalogue rather than nothing."
     },
     {
       "name": "fluentcart_report_sales_summary",
-      "description": "Store sales for one currency over an inclusive date range: gross_sales, net_revenue, tax, shipping, refunded_amount, refunded_orders, order_count and average_order_value — so it also gives a refund rate: refunded_orders over order_count. Counts orders with payment status paid, refunded, partially_paid or partially_refunded, test-mode included — FluentCart applies no mode filter. Counts, money totals, date filtering and currency scoping are reconciled against the order list by a live test; day boundaries in the store timezone remain approximate. Every result states its period, scope and currency, and carries its own warnings. Refunds are attributed to the order's creation date, so a closed period can still move when an old order is refunded."
+      "description": "Store sales, refunds and order totals for one currency over an inclusive date range: gross_sales, net_revenue, tax, shipping, refunded_amount, refunded_orders, order_count and average_order_value — so it also gives a refund rate: refunded_orders over order_count. Counts orders with payment status paid, refunded, partially_paid or partially_refunded, test-mode included — FluentCart applies no mode filter. Counts, money totals, date filtering and currency scoping are reconciled against the order list by a live test; day boundaries in the store timezone remain approximate. Every result states its period, scope and currency, and carries its own warnings. Refunds are attributed to the order's creation date, so a closed period can still move when an old order is refunded."
     },
     {
       "name": "fluentcart_report_sales_trend",
@@ -198,14 +198,14 @@
     },
     {
       "name": "fluentcart_subscription_list",
-      "description": "List subscriptions with optional filtering. Money fields — recurring_amount, recurring_total, signup_fee — are MINOR UNITS: 99900 with currency EUR is 999.00 EUR, not 99,900. Reading them as decimals overstates a plan by two orders of magnitude. Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed."
+      "description": "List subscriptions with optional filtering. Money fields — recurring_amount, recurring_total, signup_fee — are MINOR UNITS: 99900 with currency EUR is 999.00 EUR, not 99,900. Reading them as decimals overstates a plan by two orders of magnitude. Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed. Only nine of those are filterable with active_view; for past_due or completed pass the status as search, which matches the status column."
     }
   ],
   "_meta": {
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
       "packageVersion": "2.0.0",
-      "sourceTreeDigest": "sha256:33d48b93d3b8f139fcd843bdf10c22abbf5826c5eb9abc7046eef9e37f24ef2a",
+      "sourceTreeDigest": "sha256:87ff163573db6ddf2beb6338f5aad5e7a513e4c2ceaec0a2b44f852c4c144974",
       "serializer": "mcp-tools-list-v1",
       "advertisedToolCount": 25,
       "userConfigEnvironment": {
@@ -285,7 +285,7 @@
         {
           "name": "fluentcart_coupon_get",
           "provenance": "curated",
-          "descriptionSha256": "sha256:e62b89a862ac163066c33d319a0d8aed6f2d825243ab7c7bf8a509e422e26130",
+          "descriptionSha256": "sha256:ad30691980b54d02337cf78cd35c538bcf257f80e972d5dce22a81af151cee93",
           "inputSchemaSha256": "sha256:d5f19e225dd2ee8e3cce2fb6bd1967e9a954f6e61ae9bfd5a56ac976c804df97",
           "exposedBy": [
             {
@@ -328,7 +328,7 @@
         {
           "name": "fluentcart_coupon_list",
           "provenance": "curated",
-          "descriptionSha256": "sha256:70e34a9e96e91688567513e86acb8a7fb9cbb3477d3ee833850853e80fea9d2f",
+          "descriptionSha256": "sha256:f9406e877afc68102c3d4d9bd4cea1881dd70db2860f94e648c7d3e44364b848",
           "inputSchemaSha256": "sha256:a74561ebbd389ac4f029add264ec4f365fd259260003762513666f4d7c6a28a7",
           "exposedBy": [
             {
@@ -393,7 +393,7 @@
         {
           "name": "fluentcart_customer_get",
           "provenance": "curated",
-          "descriptionSha256": "sha256:3c8382a10174579fc01cd1f258b52426b168e7cd17a9d0abbe4f351f554ae2fc",
+          "descriptionSha256": "sha256:0edc428922e907d5f87ac18d1a54c4218d47d1e44028ae15b1a855ba10d53a3f",
           "inputSchemaSha256": "sha256:48dc085f53c10290ba76baed4586b5d28a98bd98a44cf83ef7cea2d5e0f3b455",
           "exposedBy": [
             {
@@ -436,7 +436,7 @@
         {
           "name": "fluentcart_customer_list",
           "provenance": "curated",
-          "descriptionSha256": "sha256:434c51ab264db575edbe2a4446849fa7668119f8637b58f5123e9001a45d2c17",
+          "descriptionSha256": "sha256:0ed219872a95e883128322558251a34777be20fa930dbb4d17c91e6939db1a06",
           "inputSchemaSha256": "sha256:992589fbb018a3139216847a6edf80f4a0a5440694a5abbe61eed184ac808bdf",
           "exposedBy": [
             {
@@ -674,7 +674,7 @@
         {
           "name": "fluentcart_order_get",
           "provenance": "curated",
-          "descriptionSha256": "sha256:d7183222f5afaa8c7e6cf5804330a211eb5b88afa910f6f7b110653cc612cb51",
+          "descriptionSha256": "sha256:2ef0d619745a5ef4727b89a20be4186cb67416d6a8763ec387d7cc163bc34b15",
           "inputSchemaSha256": "sha256:448e96d643317d84f8f78a354dd115b7a38b900fde9844ca3c849f15e5485186",
           "exposedBy": [
             {
@@ -717,7 +717,7 @@
         {
           "name": "fluentcart_order_list",
           "provenance": "curated",
-          "descriptionSha256": "sha256:402d3a855f4abc7a26bcb8d24f9049b70296f2212bbc6f4b214d0f375c171df6",
+          "descriptionSha256": "sha256:1fe2c10a87ad4cbb9f676b5df7cad4589a8dcc83a511ce5486f116b76fbadd97",
           "inputSchemaSha256": "sha256:f5634cbe1c4df89b9dbbd30a51069432723449abd4fd7006ec2b220120144922",
           "exposedBy": [
             {
@@ -846,8 +846,8 @@
         {
           "name": "fluentcart_product_list",
           "provenance": "curated",
-          "descriptionSha256": "sha256:403c4f6b2490785d51ba983423d062dff251ec9c9a68c7fd77100ed3b8bb53bf",
-          "inputSchemaSha256": "sha256:2e7f19645735486469fcd34a0f2a8129e6f28c38124c870288bbce4aa55a3576",
+          "descriptionSha256": "sha256:d22a1742b6c55e984c8b9af7cc45dd90a23ef9aa66e96b98c53ef3323c2f82ce",
+          "inputSchemaSha256": "sha256:90ea5b100a261c2aa037d06cc3d757cd3cb82181d9d2ae653327d49d7d6d4cac",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -889,8 +889,8 @@
         {
           "name": "fluentcart_product_search_by_name",
           "provenance": "curated",
-          "descriptionSha256": "sha256:818a48408bb5fddb7bfcb666bb323935f9feec801f586160824bfec5eb45969c",
-          "inputSchemaSha256": "sha256:223fa65ea5ccd9a4ecd494ae418bd0d1d732e684f37168af7ccade780e2c90ad",
+          "descriptionSha256": "sha256:6b25ed9072a4cec15518526d5e2a0c1c1afdb59103a42590df1e6a19a96f6803",
+          "inputSchemaSha256": "sha256:a720b638cc4a91be35268f9ab6a7448dce576b1151f61f189879cad22f71f8c2",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -932,7 +932,7 @@
         {
           "name": "fluentcart_report_sales_summary",
           "provenance": "curated",
-          "descriptionSha256": "sha256:cfe385bee137a70d76efe968129ff6e7bf870dec31b108a3768d3fcf3e82e094",
+          "descriptionSha256": "sha256:3cf3036720f86f00cc3635b86feb2ad0edf668c63b4f5db5a50126f69e0e0545",
           "inputSchemaSha256": "sha256:cc6661aa36a2c64b94026661d000ecb28085d2db913484b6a21d0a7bd5fc868d",
           "exposedBy": [
             {
@@ -1180,8 +1180,8 @@
         {
           "name": "fluentcart_subscription_list",
           "provenance": "curated",
-          "descriptionSha256": "sha256:99bcd26057a6f5b593943639ba5f6d0052d83eb1652da126950c99d4afe88ba0",
-          "inputSchemaSha256": "sha256:90c35e9b049b8f827178341e252281f78a17e042cd258c6d1a29ed758dc3e353",
+          "descriptionSha256": "sha256:524fabcea390a2f40764dfb95aca333840e37a7e1aa210e02cd94f2e121ec992",
+          "inputSchemaSha256": "sha256:ae4e33391bc1ce18706e4496fe2bda545513d615dc8684032fa7aeff5e83b528",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",

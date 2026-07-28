@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FluentCartClient } from '../../src/api/client.js'
 import { createAllTools } from '../../src/tools/index.js'
-import { projectProductSearch } from '../../src/tools/product-search-rows.js'
+import { projectProductSearch, searchProductQuery } from '../../src/tools/product-search-rows.js'
 
 /** The envelope and row exactly as the route returns them. */
 const PAGE = {
@@ -113,5 +113,58 @@ describe('a search result identifies and prices a product, and stops there', () 
 			data: [{ ID: 9, post_title: 'Flat', detail: { min_price: '100' } }],
 		}) as { data: Record<string, unknown>[] }
 		expect(projected.data[0]?.min_price).toBe('100')
+	})
+})
+
+/**
+ * The route drops `ShopResource::get`'s total and returns a bare `simplePaginate` envelope, so a
+ * caller reading a full page cannot tell the catalogue from its first tenth. That is how "the most
+ * expensive thing I sell" comes back as the most expensive thing on page one.
+ */
+describe('paging a route that will not say how much there is', () => {
+	const envelope = (rows: number, perPage: number) => ({
+		products: {
+			current_page: 1,
+			per_page: perPage,
+			data: Array.from({ length: rows }, (_, index) => ({ ID: index, post_title: `P${index}` })),
+		},
+	})
+
+	it('says there is more when the page came back full', () => {
+		const projected = projectProductSearch(envelope(10, 10)) as { products: { has_more: boolean } }
+		expect(projected.products.has_more).toBe(true)
+	})
+
+	it('says there is no more when the page came back short, empty included', () => {
+		for (const rows of [0, 6, 9]) {
+			const projected = projectProductSearch(envelope(rows, 10)) as {
+				products: { has_more: boolean }
+			}
+			expect(projected.products.has_more, `${rows} of 10 is the last page`).toBe(false)
+		}
+	})
+})
+
+/**
+ * `page`, `per_page` and a category filter were all unreachable. Proven live: `page=2` and
+ * `per_page=50` each returned page one unchanged, while `current_page=2` returned the rest.
+ */
+describe('the query spelling this endpoint actually reads', () => {
+	it('sends page as current_page and category_id as termId', () => {
+		expect(searchProductQuery({ name: 'hoodie', page: 2, category_id: 2 })).toEqual({
+			name: 'hoodie',
+			current_page: 2,
+			termId: 2,
+		})
+	})
+
+	it('sends neither key when neither was asked for', () => {
+		expect(searchProductQuery({ name: 'hoodie' })).toEqual({ name: 'hoodie' })
+		expect(searchProductQuery({})).toEqual({})
+	})
+
+	it('passes a deliberate zero through rather than dropping it as falsy', () => {
+		// `category_id: 0` is a caller mistake worth surfacing upstream, not one to silently discard.
+		expect(searchProductQuery({ category_id: 0, page: 0 })).toEqual({ termId: 0, current_page: 0 })
 	})
 })

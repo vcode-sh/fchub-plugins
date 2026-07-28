@@ -60,7 +60,27 @@ const SERVER_INTERNALS: readonly RegExp[] = [
 	/\b(?:select\s[\s\S]{0,300}?\sfrom\s|insert\s+into\s|update\s+\S+\s+set\s|delete\s+from\s)[\s\S]{0,300}/gi,
 	// Absolute filesystem paths, POSIX and Windows.
 	/(?:\/(?:var|home|usr|srv|opt|www|Users|private|tmp|etc)\/[^\s"'),\]}]+|[A-Za-z]:\\[^\s"'),\]}]+)/g,
+	// A fully-qualified PHP class, which names the internal structure and nothing a caller can act
+	// on. Asking for a product that does not exist answered "No query results for model
+	// [FluentCart\App\Models\Product]" — the ORM, the namespace layout and the model name, handed
+	// over on a 404. Three or more backslash-separated segments, so ordinary prose and a lone
+	// escape sequence are both left alone.
 ]
+
+/**
+ * A fully-qualified PHP class, reduced to the class itself.
+ *
+ * Asking for a product that does not exist answered "No query results for model
+ * [FluentCart\App\Models\Product]" — the ORM, the namespace layout and the model name. The
+ * namespace is internal structure and goes; the FINAL segment is the only word in that sentence
+ * saying WHAT was not found, and blanking the whole thing left a message no caller could act on:
+ * a bad product id, a bad customer id and a bad password all read identically. Keeping `Product`
+ * leaks no layout and restores the distinction.
+ *
+ * Three or more backslash-separated segments, so ordinary prose and a lone escape sequence are
+ * both left alone.
+ */
+const PHP_CLASS_PATH = /\b[A-Za-z_][A-Za-z0-9_]*(?:\\{1,2}[A-Za-z_][A-Za-z0-9_]*){2,}/g
 
 function isSensitiveKey(key: string): boolean {
 	const normalised = key.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -70,6 +90,7 @@ function isSensitiveKey(key: string): boolean {
 function redactText(value: string): string {
 	let text = value.replace(CREDENTIAL_IN_TEXT, (_match, scheme: string) => `${scheme} ${REDACTED}`)
 	for (const pattern of SERVER_INTERNALS) text = text.replace(pattern, REDACTED)
+	text = text.replace(PHP_CLASS_PATH, (match) => match.split(/\\+/).pop() ?? REDACTED)
 	return text
 }
 

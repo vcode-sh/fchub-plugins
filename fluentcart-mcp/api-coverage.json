@@ -4410,14 +4410,14 @@
 			"reason": "Reached by fluentcart_product_fetch_by_ids.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/products-core.ts#fluentcart_product_fetch_by_ids"
+				"src/tools/products-search.ts#fluentcart_product_fetch_by_ids"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/fetchProductsByIds",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/products-core.ts",
+				"src/tools/products-search.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []
@@ -4472,14 +4472,14 @@
 			"reason": "Reached by fluentcart_product_find_subscription_variants.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/products-core.ts#fluentcart_product_find_subscription_variants"
+				"src/tools/products-search.ts#fluentcart_product_find_subscription_variants"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/findSubscriptionVariants",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/products-core.ts",
+				"src/tools/products-search.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []
@@ -4607,14 +4607,14 @@
 			"reason": "Reached by fluentcart_product_search_variant_options.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/products-core.ts#fluentcart_product_search_variant_options"
+				"src/tools/products-search.ts#fluentcart_product_search_variant_options"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/search-product-variant-options",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/products-core.ts",
+				"src/tools/products-search.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []
@@ -4638,14 +4638,14 @@
 			"reason": "Reached by fluentcart_product_search_by_name.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/products-core.ts#fluentcart_product_search_by_name"
+				"src/tools/products-search.ts#fluentcart_product_search_by_name"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/searchProductByName",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/products-core.ts",
+				"src/tools/products-search.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []
@@ -4669,14 +4669,14 @@
 			"reason": "Reached by fluentcart_product_search_variant_by_name.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/products-core.ts#fluentcart_product_search_variant_by_name"
+				"src/tools/products-search.ts#fluentcart_product_search_variant_by_name"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/searchVariantByName",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/products-core.ts",
+				"src/tools/products-search.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []
@@ -4700,14 +4700,14 @@
 			"reason": "Reached by fluentcart_product_suggest_sku.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/products-core.ts#fluentcart_product_suggest_sku"
+				"src/tools/products-search.ts#fluentcart_product_suggest_sku"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /products/suggest-sku",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/products-core.ts",
+				"src/tools/products-search.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []

@@ -90,9 +90,17 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_order_list',
 			routes: direct('GET', '/orders'),
 			title: 'List Orders',
+			// There is NO customer filter on this route, and passing one is not rejected. Measured
+			// live against a store of 34 orders: `customer_id`, `params[customer_id]`, `customerId`
+			// and `filters[customer_id]` each returned all 34, while the customer in question has 5.
+			// An agent that believed it had filtered would report the whole store as one person's
+			// history. `search` with the email does work — it returned 19 for the customer who has 19.
 			description:
 				'List orders with customer names. Filter by date range, status tab, or search. ' +
 				'Search matches customer name, email, and invoice number. ' +
+				'There is NO customer filter: a customer_id parameter is silently ignored and you get ' +
+				"every order in the store back. To get one customer's orders, either search by their " +
+				'email, or use fluentcart_order_customer_orders, which takes a customer id properly. ' +
 				'Tabs: paid, completed, processing, refunded, subscription, renewal.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
@@ -222,7 +230,10 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_order_get',
 			title: 'Get Order',
 			description:
-				'Get full order details including items, transactions, addresses, and customer data.',
+				'Full order details for one order: the lines bought, the transactions against it, the ' +
+				'customer, and the ' +
+				'billing and shipping address it is to be delivered to. This is the tool that answers ' +
+				'where to ship an order — the address is already on the order, and no other read carries it.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 			}),

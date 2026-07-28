@@ -65,6 +65,34 @@ function errorResult(message: string) {
  *
  * @returns the registered tool names, in registration order.
  */
+/**
+ * Where to begin when a query matched nothing.
+ *
+ * Derived rather than listed, so it stays true whatever the exposure policy leaves registered: a
+ * tool qualifies when it is an entry point AND callable with no arguments. A hard-coded roster
+ * would go stale the first time a tool was renamed or filtered out.
+ *
+ * Ordered by `CATEGORIES`, which already runs from the centre of a shop outwards — product, order,
+ * customer, coupon — rather than alphabetically. Sorting by name put `activity_list` and
+ * `email_list` in front of `order_list` and `product_list`, and then cut the two that matter at the
+ * limit, which is a worse answer than none.
+ */
+export function startingPointsFor(tools: ToolDefinition[]): string[] {
+	const rank = (name: string) => {
+		const index = CATEGORIES.indexOf(inferCategory(name))
+		return index < 0 ? CATEGORIES.length : index
+	}
+
+	return tools
+		.filter((tool) => /_(list|get|list_all)$/.test(tool.name) && tool.schema.safeParse({}).success)
+		.map((tool) => tool.name)
+		.sort(
+			(a, b) =>
+				rank(a) - rank(b) || a.split('_').length - b.split('_').length || a.localeCompare(b),
+		)
+		.slice(0, 6)
+}
+
 export function registerDynamicTools(server: McpServer, tools: ToolDefinition[]): string[] {
 	const toolMap = new Map(tools.map((tool) => [tool.name, tool]))
 
@@ -96,7 +124,22 @@ export function registerDynamicTools(server: McpServer, tools: ToolDefinition[])
 				category: input.category,
 				limit: input.limit ?? SEARCH_LIMIT_DEFAULT,
 			})
-			return textResult({ total_available: tools.length, matches: rows.length, tools: rows })
+			if (rows.length > 0) {
+				return textResult({ total_available: tools.length, matches: rows.length, tools: rows })
+			}
+
+			// Nothing matched. In dynamic mode search IS the interface, so an empty array leaves the
+			// caller with nowhere to go on a question the registry can often still answer — measured:
+			// "the green shirt" scores zero against every name, title and description, while
+			// `product_list` finds it in one call because its search covers variant names. `matches`
+			// stays 0, because none of these matched; they are offered as somewhere to start.
+			return textResult({
+				total_available: tools.length,
+				matches: 0,
+				tools: [],
+				note: `No tool mentions any word in "${input.query}". Try plainer words, or start from one of the entry points below and filter there — a phrase describing a product or a person will rarely appear in a tool description, but the list tools search the store itself.`,
+				starting_points: startingPointsFor(tools),
+			})
 		},
 	)
 

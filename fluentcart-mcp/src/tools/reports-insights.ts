@@ -343,10 +343,28 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_repeat_customers',
 			title: 'Search Repeat Customers',
+			// order_status is not optional in practice, whatever its type says.
+			// CustomerHelper::getRepeatCustomerBySearch line 97 runs unconditionally:
+			//   $params["status"] = ["column"=>"status","operator"=>"in","value"=>[Arr::get($params,'order_status')]]
+			// With nothing passed, that value is [null], the whereHas becomes `status IN (NULL)`, and
+			// no customer can match. The tool did not expose the key at all, so it returned an empty
+			// list on every store forever — measured here as 0 customers against 2 who qualify.
+			// Live: params[order_status]=processing returns both, =completed returns one, omitted
+			// returns none.
 			description:
-				"Search customers with multiple purchases. Supports pagination. Use for 'who are my loyal/repeat customers' queries.",
+				'Customers who have ordered more than once. order_status is REQUIRED IN PRACTICE: ' +
+				'FluentCart filters the underlying orders by it unconditionally, so omitting it matches ' +
+				'nothing and answers with an empty list rather than an error. It takes ONE status, not ' +
+				'a list, so a customer with two orders in different statuses is only found under the ' +
+				'status both share — run it per status and combine. For a plain count of repeat purchasers, ' +
+				'fluentcart_customer_list carries purchase_count on every row.',
 			schema: z.object({
 				...dateRange,
+				order_status: z
+					.string()
+					.describe(
+						'The single order status to count repeats within, e.g. "completed", "processing", "on-hold". Omitting it returns nobody',
+					),
 				per_page: z.number().max(50).optional().describe('Results per page (max: 50)'),
 				current_page: z.number().optional().describe('Page number'),
 			}),
@@ -382,7 +400,16 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_report_subscription_chart',
 			title: 'Get Subscription Chart',
 			description:
-				'Total subscription count and projected future installments. Despite the name there is no churn here and no per-period series: the controller returns future_installments and total_subscriptions only. For churn and MRR month by month use fluentcart_report_subscription_retention.',
+				// `total_subscriptions` does not count subscriptions. SubscriptionReportService::getChartData
+				// builds its query `from('fct_orders as o')->where('o.type', $subscriptionType)` with a
+				// success-status filter, so it counts ORDERS of subscription type. Measured on this
+				// store: the chart reports 3 while fct_subscriptions holds 4 — one active, three
+				// pending — because a pending subscription has no order in a success status yet.
+				'total_subscriptions counts subscription-type ORDERS in a success status, NOT rows in ' +
+				'the subscriptions table, so it will disagree with fluentcart_subscription_list and the ' +
+				'list is the one to trust for how many subscriptions exist. Also returns projected ' +
+				'future installments. Despite the name there is no churn here and no per-period series. ' +
+				'For churn and MRR month by month use fluentcart_report_subscription_retention.',
 			schema: z.object({ ...dateRangeWithGroup }),
 			endpoint: '/reports/subscription-chart',
 		}),

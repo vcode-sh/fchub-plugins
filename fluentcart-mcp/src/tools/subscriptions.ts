@@ -82,6 +82,29 @@ function transformSubscription(item: Record<string, unknown>): Record<string, un
 	}
 }
 
+/**
+ * The nine statuses FluentCart will actually filter on.
+ *
+ * `SubscriptionFilter::tabsMap()` maps exactly these. Anything else falls through
+ * `applyActiveViewFilter` with a null column, the WHERE is never applied, and the store answers
+ * with EVERY subscription while nothing in the payload says the filter was ignored. `past_due` and
+ * `completed` are real statuses a subscription can hold — `Status::getSubscriptionStatuses()` lists
+ * both — but neither is in the map, and `active_view: 'past_due'` returned all four of this
+ * store's subscriptions as though every one were overdue. A closed enum is the only defence: a
+ * rejected argument is recoverable, a silently unfiltered table read as filtered is not.
+ */
+const FILTERABLE_VIEWS = [
+	'active',
+	'pending',
+	'intended',
+	'paused',
+	'trialing',
+	'canceled',
+	'failing',
+	'expiring',
+	'expired',
+] as const
+
 export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 	return [
 		getTool(client, {
@@ -92,16 +115,23 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 				'Money fields — recurring_amount, recurring_total, signup_fee — are MINOR UNITS: 99900 with ' +
 				'currency EUR is 999.00 EUR, not 99,900. Reading them as decimals overstates a plan by two ' +
 				'orders of magnitude. ' +
-				'Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed.',
+				'Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, ' +
+				'completed. Only nine of those are filterable with active_view; for past_due or completed pass ' +
+				'the status as search, which matches the status column.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
-				search: z.string().optional().describe('Search subscriptions by keyword'),
-				active_view: z
+				search: z
 					.string()
 					.optional()
 					.describe(
-						'Filter by status: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired',
+						'Keyword search. Matches the status column exactly, plus customer email, item name, payment method and gateway ids. This is the only way to select past_due or completed subscriptions.',
+					),
+				active_view: z
+					.enum(FILTERABLE_VIEWS)
+					.optional()
+					.describe(
+						'Filter by status. past_due and completed are deliberately absent: FluentCart maps neither, ignores the filter and returns every subscription unfiltered.',
 					),
 			}),
 			endpoint: '/subscriptions',

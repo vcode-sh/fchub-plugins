@@ -125,6 +125,34 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 					.toUpperCase(),
 			}),
 			endpoint: '/shipping/zone/states',
+			// An unrecognised code is not rejected: "ZZ" answers with an empty list, exactly as Poland
+			// does, because Poland genuinely has no subdivisions here. So an empty `states` cannot on
+			// its own tell a typo from a real answer — and a typo that looks like a valid country is
+			// how a shipping zone ends up silently covering nothing.
+			//
+			// The payload does distinguish them, though nothing says so: a country FluentCart knows
+			// carries an `address_locale` OBJECT describing its postcode and state fields, while an
+			// unknown code carries an empty ARRAY. Verified across twelve codes — ZZ, QQ, XX and the
+			// empty string all gave `[]`; PL, AT, BE, DK, CZ, GB, DE and US all gave an object,
+			// including the five that have no subdivisions at all. So the answer can be definite
+			// rather than a hedge, and it costs no second request.
+			transform: (data: unknown) => {
+				const body = data as Record<string, unknown> | null
+				const inner = body?.data as Record<string, unknown> | undefined
+				if (!(inner && Array.isArray(inner.states)) || inner.states.length > 0) return data
+
+				const locale = inner.address_locale
+				const known = locale !== null && typeof locale === 'object' && !Array.isArray(locale)
+				return {
+					...body,
+					data: {
+						...inner,
+						note: known
+							? 'This country is recognised and has no subdivisions in FluentCart, so a zone here covers the whole country.'
+							: 'This country code is NOT recognised — it is not a country without subdivisions, it is not a country. Check the code with fluentcart_shipping_zone_countries.',
+					},
+				}
+			},
 			cache: { key: 'shipping_zone_states', ttlMs: TTL.LONG },
 		}),
 

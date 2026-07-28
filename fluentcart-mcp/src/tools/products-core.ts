@@ -2,22 +2,34 @@ import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { createTool, deleteTool, getTool, postTool, type ToolDefinition } from './_factory.js'
 import { direct } from './endpoints.js'
-import { projectProductSearch } from './product-search-rows.js'
+import { productSearchTools } from './products-search.js'
 
 export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
+		// The find-a-product family lives in products-search.ts and is spread in here, so the
+		// registry composition in index.ts is unchanged by the split.
+		...productSearchTools(client),
+
 		getTool(client, {
 			name: 'fluentcart_product_list',
 			title: 'List Products',
 			description:
 				'List products with optional filtering by type, status, fulfilment, and search. ' +
-				'Use active_view to filter by product type or status.',
+				'Its search covers variant names as well as product titles, so a colour or size a ' +
+				'customer named finds the product it belongs to — nothing else in the registry does ' +
+				'that. Use active_view to filter by product type or status. Includes drafts.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
 				per_page: z.number().max(50).optional().describe('Results per page (default: 10, max: 50)'),
 				sort_by: z.string().optional().describe('Sort field (default: ID)'),
 				sort_type: z.string().optional().describe('Sort direction: ASC, DESC (default: DESC)'),
-				search: z.string().optional().describe('Search products by name'),
+				search: z
+					.string()
+					.optional()
+					.describe(
+						'Matched against the product title, the product ID, and every variant name — ' +
+							'"Green" finds a product whose only green thing is a variant',
+					),
 				active_view: z
 					.string()
 					.optional()
@@ -200,84 +212,6 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 				// which is worse than refusing. Stock tracking now has a tool that works.
 			}),
 			endpoint: '/products/detail/:detail_id',
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_product_search_by_name',
-			title: 'Search Product by Name',
-			description:
-				'Find products by name, returning id, title, price range, stock and fulfilment type — ' +
-				'enough to pick one and then fetch it with fluentcart_product_get. Omitting the term ' +
-				'returns the first page of the catalogue rather than nothing.',
-			schema: z.object({
-				name: z
-					.string()
-					.optional()
-					.describe('Search term matched against the product title, e.g. "shirt"'),
-			}),
-			endpoint: '/products/searchProductByName',
-			// Rows arrived at 1,064 characters each: three fields for the same image, prices repeated
-			// as HTML entity strings, Laravel's laravel_through_key, and timestamps. See
-			// product-search-rows.ts for the measurements.
-			transform: projectProductSearch,
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_product_search_variant_by_name',
-			title: 'Search Variant by Name',
-			description: 'Search for product variants by name.',
-			schema: z.object({
-				search: z.string().optional().describe('Search term'),
-			}),
-			endpoint: '/products/searchVariantByName',
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_product_search_variant_options',
-			title: 'Search Product Variant Options',
-			description: 'Search for product variant options (attribute combinations).',
-			schema: z.object({
-				search: z.string().optional().describe('Search term'),
-			}),
-			endpoint: '/products/search-product-variant-options',
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_product_suggest_sku',
-			title: 'Suggest SKU',
-			description: 'Generate a suggested SKU based on a product title.',
-			schema: z.object({
-				title: z.string().describe('Product title to generate SKU from'),
-			}),
-			endpoint: '/products/suggest-sku',
-		}),
-
-		createTool(client, {
-			name: 'fluentcart_product_fetch_by_ids',
-			routes: direct('GET', '/products/fetchProductsByIds'),
-			title: 'Fetch Products by IDs',
-			description: 'Retrieve multiple products by their IDs. Limit to 20 IDs per request.',
-			schema: z.object({
-				product_ids: z.array(z.number()).describe('Array of product IDs (max 20)'),
-			}),
-			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
-			handler: async (client, input) => {
-				const ids = input.product_ids as number[]
-				const response = await client.get('/products/fetchProductsByIds', {
-					productIds: ids,
-				})
-				return response.data
-			},
-		}),
-
-		getTool(client, {
-			name: 'fluentcart_product_find_subscription_variants',
-			title: 'Find Subscription Variants',
-			description: 'Find product variants that support subscription billing.',
-			schema: z.object({
-				search: z.string().optional().describe('Search term'),
-			}),
-			endpoint: '/products/findSubscriptionVariants',
 		}),
 
 		postTool(client, {

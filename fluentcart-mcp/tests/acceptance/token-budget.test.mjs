@@ -82,7 +82,62 @@ const ACCEPTED = {
 	// entities, Laravel's laravel_through_key. It now names what a row carries and what to call next.
 	// 55 definition tokens against 80% off every response: `name=shirt` went 2,446 → 484 characters
 	// and an unfiltered page 10,604 → 2,112, on the first call of the commonest product question.
-	curated: { toolCount: 19, cl100kTokens: 4434, o200kTokens: 4530 },
+	// 4,434 → 4,765 on 2026-07-28. 20 of those 331 tokens are the two curated customer tools
+	// becoming findable: `customer_list` said "List customers with optional search and sorting" and
+	// never used the word "email", so "find customer by email" — the commonest support question
+	// there is — returned customer_create, customer_update, customer_address_update and two email
+	// settings tools, and the one tool that answers it was not on the page at all. It now opens
+	// "Find customers by name or email". Both tools also spell out ltv and aov as lifetime value and
+	// average order value; before that, "average order value for a customer" surfaced three report
+	// tools and no customer tool, because the figure was only ever spelled `aov`. 11 tokens and 9
+	// tokens respectively, measured with the pinned tokenizer, and both moves are pinned in
+	// tests/tools/customer-discovery.test.ts so the ranks cannot quietly regress. The remaining 311
+	// belong to curated edits landing elsewhere in the tree in the same session and want their own
+	// line here from whoever made them.
+	//
+	// 4,765 → 4,851 on 2026-07-28: `subscription_list` stopped offering a filter value that silently
+	// returns everything. `active_view` was a free string documented as accepting past_due;
+	// `SubscriptionFilter::tabsMap()` does not map it, so `applyActiveViewFilter` passes a null
+	// column to `where()`, the constraint is never applied, and the store answers with every
+	// subscription at HTTP 200. Measured live: `active_view: 'past_due'` returned all four of the
+	// playground's subscriptions, of which zero are past due. It is now a closed enum of the nine
+	// mapped views (+25 for the enum in the schema), the field says why past_due and completed are
+	// absent (+3), and `search` — which does match the status column — says it is how to reach them
+	// (+31), with the tool description carrying the same sentence (+28). 86 tokens against an answer
+	// that names four healthy subscriptions as overdue. Pinned in
+	// tests/tools/subscription-filter-views.test.ts.
+	//
+	// 119 of the 311 above were mine and belong here rather than unattributed: `coupon_list` +64 and
+	// `coupon_get` +55. The list projection asked for `usage_count`, which no FluentCart coupon
+	// payload has ever carried — the field is `use_count` — so the key was dropped from every row and
+	// no caller could see a redemption count at all; it now carries use_count, the max_uses cap,
+	// start_date and end_date, and says that status is derived, so "which coupons have expired or hit
+	// their limit" is answerable from one call rather than one coupon_get per coupon at ~1,100
+	// characters each. `coupon_get` names the conditions fields that decide eligibility and warns
+	// that an unknown id answers HTTP 200 with `coupon:null` rather than 404 — the difference between
+	// "no such coupon" and "a coupon with no details". The list edit also moved `coupon_list` from
+	// rank 3 to rank 1 for "expired coupons".
+	//
+	// 4,851 → 4,944 on 2026-07-28, and part of it is mine — claiming it rather than leaving the line
+	// open. 187 of the running total is the two curated product tools, measured by reverting only
+	// those two and running the same script against the same tree: 4,757 without them, 4,944 with,
+	// reproduced exactly across two runs. It spans several of the steps above rather than one,
+	// because these edits were already in the tree when the intervening pins were taken.
+	//
+	// `product_search_by_name` (+125) gained `category_id` and `page`. The category filter is the
+	// ONLY route in the registry from a category to the products in it — `product_terms` returns the
+	// term tree and never says what is filed under a term — so "show me everything in Menswear" had
+	// no answer at any price. `page` maps to `current_page`, the page name this route's paginator was
+	// actually given; plain `page` and `per_page` are read by nothing, verified live, so the route
+	// served ten rows of sixteen while reporting no total, and "the most expensive thing I sell" came
+	// back as the most expensive thing on page one — 40000 against a true 180000, stated with equal
+	// confidence. The description also now says it matches product titles only, because it ranks
+	// first for colour questions it cannot answer.
+	// `product_list` (+62) says its search covers variant names as well as titles. Nothing else in
+	// the registry does, and it is the whole answer to "find the green shirt": `search=Green` returns
+	// the seven products whose only green thing is a variant name. Undocumented, that capability may
+	// as well not exist. Both are pinned in tests/integration/scenarios-products.test.ts.
+	curated: { toolCount: 19, cl100kTokens: 4946, o200kTokens: 5044 },
 	code: { toolCount: 2, cl100kTokens: 532, o200kTokens: 540 },
 }
 
