@@ -68,7 +68,20 @@ const restRootSchema = z.object({
 	routes: z.record(z.string(), routeSchema),
 })
 
-function restRootUrl(storeUrl: string): URL {
+/**
+ * The namespace index, not the whole WordPress REST index.
+ *
+ * `/wp-json/` describes every namespace a site registers, and this server routes on exactly
+ * one. Measured on the development store: the root index is 527,327 characters across 987
+ * routes, of which 386 operations survive the FluentCart filter; `/wp-json/fluent-cart/v2` is
+ * 117,444 characters and yields the identical 386 operations. Verified by diffing the derived
+ * operation sets rather than by counting routes — same set, nothing only in one, nothing only
+ * in the other. Every startup paid 4.5x for bytes that were then thrown away.
+ *
+ * The narrower URL also sharpens the failure: WordPress answers 404 `rest_no_route` for a
+ * namespace nobody registered, which is a direct statement that FluentCart is not serving here.
+ */
+function namespaceIndexUrl(storeUrl: string): URL {
 	let parsed: URL
 	try {
 		parsed = new URL(storeUrl)
@@ -88,7 +101,7 @@ function restRootUrl(storeUrl: string): URL {
 	// Append rather than resolve against the origin: a WordPress install in a subdirectory keeps
 	// its path segment, and `new URL('/wp-json/', base)` would silently discard it.
 	const base = parsed.toString().replace(/\/+$/, '')
-	return new URL(`${base}/wp-json/`)
+	return new URL(`${base}/wp-json/${FLUENT_CART_NAMESPACE}`)
 }
 
 function nextRedirectTarget(current: URL, response: Response, origin: string): URL {
@@ -116,7 +129,7 @@ function nextRedirectTarget(current: URL, response: Response, origin: string): U
 }
 
 /**
- * Fetch `/wp-json/` with an unconditional 10-second budget and manual redirect handling.
+ * Fetch the namespace index with an unconditional 10-second budget and manual redirect handling.
  *
  * Redirects are followed by hand so a hop to another origin can be refused; automatic following
  * would let a hijacked redirect define what this server believes the store supports.
@@ -171,22 +184,32 @@ function toDiscoveryFailure(error: unknown, rootUrl: URL | string): never {
 	if (isAbort) {
 		throw new FluentCartApiError(
 			'TIMEOUT',
-			`Timed out after ${DISCOVERY_TIMEOUT_MS}ms reading the WordPress REST index at ${rootUrl}. The store is reachable but slow to answer, or a firewall is holding the connection open.`,
+			`Timed out after ${DISCOVERY_TIMEOUT_MS}ms reading the FluentCart REST index at ${rootUrl}. The store is reachable but slow to answer, or a firewall is holding the connection open.`,
 		)
 	}
 
 	const detail = error instanceof Error ? error.message : String(error)
 	throw new FluentCartApiError(
 		'CONNECTION_ERROR',
-		`Could not reach the WordPress REST index at ${rootUrl} (${detail}). Check that FLUENTCART_URL points at the site root, that the site is running, and that /wp-json/ is not blocked.`,
+		`Could not reach the FluentCart REST index at ${rootUrl} (${detail}). Check that FLUENTCART_URL points at the site root, that the site is running, and that /wp-json/ is not blocked.`,
 	)
 }
 
 /** Check the transport outcome and decode the body. Shape validation belongs to the builder. */
-async function readRootDocument(response: Response): Promise<unknown> {
+async function readRootDocument(response: Response, url: URL | string): Promise<unknown> {
+	// WordPress answers 404 for a namespace that is not registered, and for a REST API that has
+	// been switched off wholesale. Both mean the same thing to this server — there is no evidence
+	// that FluentCart serves anything here — so the message names both rather than guessing.
+	if (response.status === 404) {
+		throw new CapabilityDiscoveryError(
+			`No ${FLUENT_CART_NAMESPACE} routes are registered at ${url} (HTTP 404). Either FluentCart is not active on this store, or the WordPress REST API is disabled. Check that the plugin is active and that /wp-json/ is reachable.`,
+			{ status: 404 },
+		)
+	}
+
 	if (!response.ok) {
 		throw new CapabilityDiscoveryError(
-			`REST index request failed with status ${response.status}; cannot determine store compatibility`,
+			`REST index request failed with status ${response.status} at ${url}; cannot determine store compatibility`,
 			{ status: response.status },
 		)
 	}
@@ -195,7 +218,7 @@ async function readRootDocument(response: Response): Promise<unknown> {
 		return JSON.parse(await response.text())
 	} catch {
 		throw new CapabilityDiscoveryError(
-			'REST index did not return valid JSON; a security plugin may be hiding or rewriting it',
+			`REST index at ${url} did not return valid JSON; a security plugin may be hiding or rewriting it`,
 		)
 	}
 }
@@ -241,6 +264,15 @@ export function capabilitiesFromRestIndex(document: unknown): ApiCapabilities {
 		}
 	}
 
+	// A namespace document listing only its own root passes the check above — one path, zero
+	// operations — and would hand back an empty registry that prunes every tool without ever
+	// saying why. Fail closed here too: no operations is not a store this server can serve.
+	if (operations.size === 0) {
+		throw new CapabilityDiscoveryError(
+			`Namespace ${FLUENT_CART_NAMESPACE} is registered but exposes no operations`,
+		)
+	}
+
 	return {
 		has: (method: HttpMethod, path: string) =>
 			operations.has(`${method} ${canonicaliseRoute(path)}`),
@@ -258,7 +290,7 @@ export function capabilitiesFromRestIndex(document: unknown): ApiCapabilities {
  *   reached at all.
  */
 export async function discoverApiCapabilities(storeUrl: string): Promise<ApiCapabilities> {
-	const rootUrl = restRootUrl(storeUrl)
+	const rootUrl = namespaceIndexUrl(storeUrl)
 
 	let response: Response
 	try {
@@ -269,7 +301,7 @@ export async function discoverApiCapabilities(storeUrl: string): Promise<ApiCapa
 
 	let document: unknown
 	try {
-		document = await readRootDocument(response)
+		document = await readRootDocument(response, rootUrl)
 	} catch (error) {
 		toDiscoveryFailure(error, rootUrl)
 	}

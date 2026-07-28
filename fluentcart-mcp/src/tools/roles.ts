@@ -115,7 +115,8 @@ export function roleTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_role_user_list',
 			title: 'List Role Users',
-			description: 'List all users with their assigned FluentCart roles. Requires FluentCart Pro.',
+			description:
+				'Search WordPress users who COULD be given a FluentCart role. It returns id, name and email only — no role information — and excludes anyone who already holds a WordPress administrator role. To see who currently holds which FluentCart role, use fluentcart_role_managers. Requires FluentCart Pro.',
 			schema: z.object({
 				search: z.string().optional().describe('Search users by name or email'),
 				page: z.number().optional().describe('Page number'),

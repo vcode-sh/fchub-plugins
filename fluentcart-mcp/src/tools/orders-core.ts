@@ -2,6 +2,87 @@ import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { createTool, deleteTool, getTool, type ToolDefinition } from './_factory.js'
 import { composite, direct, op } from './endpoints.js'
+import { collapseOrderDetail } from './order-detail-projection.js'
+
+/**
+ * Strip the internals every order row carries, wherever that row appears.
+ *
+ * `config` holds the payment-session id, `ip_address` is the customer's, `uuid` is an internal
+ * handle nothing here addresses orders by, and `meta`/`vendor_response` are gateway bookkeeping.
+ * On this store one customer's order list was 19,547 characters of which 10,973 was `config` —
+ * 6,813 of that pure Redsys payload — and the unpaginated variant was 46,531 characters, over the
+ * emergency cap, so it could not answer for that customer at all.
+ *
+ * Exported because three routes return order rows and only `GET /orders/{id}` had ever been
+ * projected. Writing this a third time in a third file is how the other two came to be missed.
+ */
+export function stripOrderInternals(row: unknown): unknown {
+	if (row === null || typeof row !== 'object' || Array.isArray(row)) return row
+
+	const {
+		config: _config,
+		ip_address: _ip,
+		uuid: _uuid,
+		meta: _meta,
+		vendor_response: _vendorResponse,
+		...rest
+	} = row as Record<string, unknown>
+
+	return rest
+}
+
+/** Apply {@link stripOrderInternals} across a list, whatever wrapper the route used. */
+export function stripOrderRows(value: unknown): unknown {
+	return Array.isArray(value) ? value.map(stripOrderInternals) : stripOrderInternals(value)
+}
+
+/**
+ * Project the order rows inside a response envelope, wherever the route put them.
+ *
+ * The three order-bearing routes disagree about shape: one answers `{orders: {data: [...]}}`,
+ * another `{data: {data: [...]}}`, a third a bare array. Guarding on one spelling is how the
+ * paginated customer-orders route kept its Redsys payload after the same fix had already been
+ * written twice — so this walks the envelope instead of assuming, rewriting only the array it
+ * finds and leaving the paginator around it intact.
+ */
+export function projectOrderEnvelope(data: unknown, depth = 0): unknown {
+	if (Array.isArray(data)) return data.map(stripOrderInternals)
+	if (data === null || typeof data !== 'object' || depth > 3) return data
+
+	const body = data as Record<string, unknown>
+	let changed = false
+	const output: Record<string, unknown> = {}
+
+	for (const [key, value] of Object.entries(body)) {
+		const projected = projectOrderEnvelope(value, depth + 1)
+		if (projected !== value) changed = true
+		output[key] = projected
+	}
+
+	return changed ? output : data
+}
+
+/**
+ * Remove the whole order that FluentCart embeds inside every address it returns.
+ *
+ * `GET /orders/{id}` nests a complete copy of the order under `order_addresses[].order`,
+ * `billing_address.order` and `shipping_address.order` — four copies of the same record, each
+ * carrying its own `ip_address`, `uuid` and `config`. On the seeded store that made one order
+ * 14,476 characters, of which the three address fields alone were 11,220, and put the customer's
+ * IP in the response five separate times.
+ *
+ * The parent is the thing the caller already has, so the back-reference carries no information at
+ * any price. Everything else about the address is left exactly as it was.
+ */
+function stripAddressBackReference(value: unknown): unknown {
+	const clean = (entry: unknown): unknown => {
+		if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return entry
+		const { order: _parent, ...rest } = entry as Record<string, unknown>
+		return rest
+	}
+
+	return Array.isArray(value) ? value.map(clean) : clean(value)
+}
 
 export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -149,7 +230,11 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 			transform: (data: unknown) => {
 				const resp = data as Record<string, unknown>
 				const order = (resp?.order ?? resp) as Record<string, unknown>
-				const { activities, post_content, ...rest } = order
+				// `ip_address` is the customer's IP and `config` carries the payment-session id
+				// (p24_session_id); neither is something an agent can act on, and handing either to a
+				// model is a disclosure with no upside. `uuid` is an internal handle — every tool here
+				// addresses orders by their numeric id.
+				const { activities, post_content, ip_address, config, uuid, ...rest } = order
 				if (rest.customer && typeof rest.customer === 'object') {
 					const c = rest.customer as Record<string, unknown>
 					rest.customer = {
@@ -160,11 +245,17 @@ export function orderCoreTools(client: FluentCartClient): ToolDefinition[] {
 				}
 				if (Array.isArray(rest.transactions)) {
 					rest.transactions = (rest.transactions as Record<string, unknown>[]).map((t) => {
-						const { meta, ...txRest } = t
+						const { meta, uuid: txUuid, ...txRest } = t
 						return txRest
 					})
 				}
-				return resp?.order ? { ...resp, order: rest } : rest
+				for (const key of ['order_addresses', 'billing_address', 'shipping_address']) {
+					rest[key] = stripAddressBackReference(rest[key])
+				}
+				// The two addresses arrived three times over, and every line carried the variant's whole
+				// catalogue record. See order-detail-projection.ts for the measurements.
+				const collapsed = collapseOrderDetail(rest)
+				return resp?.order ? { ...resp, order: collapsed } : collapsed
 			},
 		}),
 

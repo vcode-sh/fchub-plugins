@@ -2,10 +2,59 @@ import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { getTool, putTool, type ToolDefinition } from './_factory.js'
 
+/**
+ * The subscription rows in a list response, whichever envelope the store used.
+ *
+ * `GET /subscriptions` answers `{data: {current_page, data: [...]}}` — the rows are two levels
+ * down. The list transform used to guard on `Array.isArray(resp.data)`, which is false for that
+ * shape, so the projection below never ran once: every raw row shipped, including 1,773 characters
+ * of gateway `meta` (Redsys references, transaction UUIDs, intent phases) across four
+ * subscriptions, 28% of the payload. `fluentcart_subscription_get` was unaffected because it
+ * guards on a key that does exist.
+ */
+function subscriptionRows(payload: Record<string, unknown>): Record<string, unknown>[] | null {
+	if (Array.isArray(payload.data)) return payload.data as Record<string, unknown>[]
+
+	const nested = payload.data as Record<string, unknown> | undefined
+	if (nested && Array.isArray(nested.data)) return nested.data as Record<string, unknown>[]
+
+	return null
+}
+
+/**
+ * Reduce each related order to what identifies it.
+ *
+ * FluentCart returns the full order record for every order attached to a subscription, including
+ * `ip_address`, the internal `uuid` and a `config` blob carrying the payment-session id. A caller
+ * that wants an order in full has `fluentcart_order_get`; here it needs enough to recognise and
+ * fetch one.
+ */
+function summariseRelatedOrders(value: unknown): unknown {
+	if (!Array.isArray(value)) return value
+
+	return value.map((entry) => {
+		if (entry === null || typeof entry !== 'object') return entry
+		const order = entry as Record<string, unknown>
+		return {
+			id: order.id,
+			status: order.status,
+			payment_status: order.payment_status,
+			total_amount: order.total_amount,
+			currency: order.currency,
+			created_at: order.created_at,
+		}
+	})
+}
+
 function transformSubscription(item: Record<string, unknown>): Record<string, unknown> {
 	const customer = item.customer as Record<string, unknown> | undefined
+	// fct_subscriptions has no currency column — it lives inside the JSON `config` blob, and it is
+	// the only place to read it. Lifting it out keeps the one useful field from a payload that is
+	// otherwise gateway bookkeeping.
+	const config = item.config as Record<string, unknown> | undefined
 	return {
 		id: item.id,
+		currency: config?.currency,
 		status: item.status,
 		item_name: item.item_name,
 		billing_interval: item.billing_interval,
@@ -40,6 +89,9 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			title: 'List Subscriptions',
 			description:
 				'List subscriptions with optional filtering. ' +
+				'Money fields — recurring_amount, recurring_total, signup_fee — are MINOR UNITS: 99900 with ' +
+				'currency EUR is 999.00 EUR, not 99,900. Reading them as decimals overstates a plan by two ' +
+				'orders of magnitude. ' +
 				'Statuses: active, trialing, paused, intended, failing, past_due, expiring, canceled, expired, completed.',
 			schema: z.object({
 				page: z.number().optional().describe('Page number (default: 1)'),
@@ -55,8 +107,14 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/subscriptions',
 			transform: (data: unknown) => {
 				const resp = data as Record<string, unknown>
-				if (resp && Array.isArray(resp.data)) {
-					resp.data = (resp.data as Record<string, unknown>[]).map(transformSubscription)
+				const rows = resp ? subscriptionRows(resp) : null
+				if (!rows) return resp
+
+				const projected = rows.map(transformSubscription)
+				if (Array.isArray(resp.data)) {
+					resp.data = projected
+				} else {
+					resp.data = { ...(resp.data as Record<string, unknown>), data: projected }
 				}
 				return resp
 			},
@@ -86,7 +144,10 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 						payment_info: sub.payment_info,
 						billingInfo: sub.billingInfo,
 						url: sub.url,
-						related_orders: sub.related_orders,
+						// Each related order arrives whole, carrying the customer's IP, the internal uuid
+						// and a config blob holding the payment-session id. A subscription view needs to
+						// name its orders, not restate them.
+						related_orders: summariseRelatedOrders(sub.related_orders),
 						labels: sub.labels,
 					}
 				}
@@ -110,7 +171,24 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/orders/:order_id/subscriptions/:subscription_id/fetch',
 		}),
 
-		// NOTE: subscription_pause, subscription_resume, and subscription_reactivate
-		// have been removed — the FluentCart backend returns "Not available yet" for all three.
+		// NOTE: subscription_pause, subscription_resume and subscription_reactivate are deliberately
+		// absent, and this is not an oversight to be corrected by anyone reading the route table.
+		//
+		// All three routes ARE registered — `PUT /orders/{order}/subscriptions/{subscription}/pause`
+		// and siblings, in app/Modules/Subscriptions/Http/subscriptions-api.php lines 31-37 — so any
+		// audit that reads route registrations will report them as available and recommend adding
+		// them. One did. But every controller is a stub:
+		//
+		//   public function pauseSubscription(Request $request, Order $order, Subscription $subscription)
+		//   {
+		//       return $this->sendError(['message' => __('Not available yet', 'fluent-cart')]);
+		//   }
+		//
+		// Verified in FluentCart 1.5.5 at
+		// app/Modules/Subscriptions/Http/Controllers/SubscriptionController.php — pauseSubscription,
+		// resumeSubscription and reactivateSubscription are identical three-line stubs. Exposing them
+		// would add three tools that can only ever fail, which is worse than the gap.
+		//
+		// Re-check the controller bodies, not the route file, before adding them.
 	]
 }

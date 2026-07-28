@@ -9,7 +9,7 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 			name: 'fluentcart_product_pricing_get',
 			title: 'Get Product Pricing',
 			description:
-				'Get pricing information for a product. Returned prices are in cents (smallest currency unit).',
+				'The complete product record: pricing, every variant, downloadable files, media and taxonomy. This is the fullest view of one product and the largest — reach for fluentcart_product_get when you only need the product and its variants. Prices are in cents.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),
@@ -19,7 +19,8 @@ export function productPricingTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_pricing_widgets',
 			title: 'Get Product Pricing Widgets',
-			description: 'Get pricing widgets and display components for a product.',
+			description:
+				'Sales totals for one product over three fixed windows — all time, last 30 days and this month — with units and revenue. Despite the name this is a per-product sales report, not UI chrome. It returns PRE-RENDERED HTML, not JSON figures, so read the numbers out of the markup or use fluentcart_report_top_products for machine-readable totals.',
 			schema: z.object({
 				product_id: z.number().describe('Product ID'),
 			}),

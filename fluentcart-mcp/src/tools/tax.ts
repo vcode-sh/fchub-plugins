@@ -10,6 +10,7 @@ import {
 	type ToolDefinition,
 } from './_factory.js'
 import { direct } from './endpoints.js'
+import { taxRateViewTools } from './tax-rate-tools.js'
 
 /** Shared with tax-classes.ts, which needs it to dig an id out of a create response. */
 export function asNumber(value: unknown): number | null {
@@ -30,14 +31,8 @@ function asFlag(value: unknown): number | undefined {
 export function taxTools(client: FluentCartClient): ToolDefinition[] {
 	return [
 		// ── Tax Rates ──────────────────────────────────────────
-
-		getTool(client, {
-			name: 'fluentcart_tax_rate_list',
-			title: 'List Tax Rates',
-			description: 'List all tax rates across countries.',
-			schema: z.object({}),
-			endpoint: '/tax/rates',
-		}),
+		// The two whole-world rate views live in tax-rate-tools.ts; they share a schema and handler.
+		...taxRateViewTools(client),
 
 		getTool(client, {
 			name: 'fluentcart_tax_rate_country',
@@ -207,20 +202,34 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 
 		// ── Configuration ──────────────────────────────────────
 
-		getTool(client, {
-			name: 'fluentcart_tax_config_rates',
-			title: 'Get Tax Configuration Rates',
-			description: 'Get tax configuration with all rate overviews.',
-			schema: z.object({}),
-			endpoint: '/tax/configuration/rates',
-		}),
-
 		postTool(client, {
 			name: 'fluentcart_tax_config_countries_save',
-			title: 'Save Tax Countries',
-			description: 'Save the list of countries configured for tax collection.',
+			title: 'Seed Default Tax Rates for Countries',
+			// The old title and description — "Save Tax Countries", "Save the list of countries
+			// configured for tax collection" — described an operation FluentCart does not have. The
+			// controller calls TaxManager::generateTaxClasses($countries), which SEEDS default rates
+			// for countries that have none and SKIPS every country already present. It removes
+			// nothing, so it cannot restrict where tax is charged, and an agent told "only charge tax
+			// in Poland" would call this with ["PL"], be told "Countries saved successfully", and have
+			// changed nothing at all. Verified in FluentCart 1.5.5 at
+			// app/Http/Controllers/TaxConfigurationController.php:24 and
+			// app/Services/Tax/TaxManager.php:171 — the `in_array($country, $existingCountries)`
+			// continue is the whole story.
+			description:
+				'Create default tax rates for countries that do not have any yet. This ADDS ONLY: a ' +
+				'country that already has rates is skipped, and nothing is ever removed, so it cannot ' +
+				'be used to restrict where tax is charged or to replace an existing list — edit or ' +
+				'delete individual rates for that. Passing an empty array seeds EVERY country in the ' +
+				'ISO list, which is how a store ends up with 250 of them. To stop charging tax ' +
+				"somewhere, delete that country's rates with fluentcart_tax_country_delete_all.",
 			schema: z.object({
-				countries: z.array(z.string()).describe('Array of ISO country codes to configure for tax'),
+				countries: z
+					.array(z.string())
+					.min(1)
+					.describe(
+						'ISO country codes to seed default rates for, e.g. ["PL","DE"]. Must not be empty: ' +
+							'an empty array seeds every country on earth, which is never what a caller means',
+					),
 			}),
 			endpoint: '/tax/configuration/countries',
 		}),

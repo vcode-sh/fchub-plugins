@@ -171,6 +171,49 @@ export function allowedValues(entity: SearchEntity, filter: string): readonly st
 }
 
 /**
+ * Resolve one filter and write it into the outgoing params.
+ *
+ * `Object.hasOwn`, not a truthiness check on the lookup: every member of Object.prototype is
+ * truthy, so `toString`, `valueOf`, `hasOwnProperty` and `__proto__` all sailed past the guard.
+ * `toString` then produced a query parameter literally named `undefined`, which FluentCart ignores
+ * — so the caller got a full unfiltered page that looked like a successful narrow search, the
+ * exact outcome this guard exists to prevent. `constructor` was worse: `filter.values` resolved to
+ * `Object.values`, so the enum check called `.includes` on a function and the caller received a
+ * raw TypeError naming internals instead of the SearchError listing what is supported.
+ */
+function applyFilter(
+	params: Record<string, unknown>,
+	entity: SearchEntity,
+	spec: (typeof ENTITIES)[SearchEntity],
+	name: string,
+	value: unknown,
+): void {
+	const filter = Object.hasOwn(spec.filters, name) ? spec.filters[name] : undefined
+	if (!filter) {
+		throw new SearchError(
+			`Unknown filter "${name}" for ${entity}. Supported: ${Object.keys(spec.filters).join(', ')}.`,
+		)
+	}
+
+	const values = Array.isArray(value) ? value : [value]
+	if (!filter.repeatable && values.length > 1) {
+		throw new SearchError(`Filter "${name}" for ${entity} accepts a single value.`)
+	}
+
+	const encoded = values.map((entry) => {
+		const text = String(entry)
+		if (filter.values && !filter.values.includes(text)) {
+			throw new SearchError(
+				`Unknown value "${text}" for ${entity} filter "${name}". Allowed: ${filter.values.join(', ')}.`,
+			)
+		}
+		return text
+	})
+
+	params[filter.param] = filter.repeatable ? encoded : encoded[0]
+}
+
+/**
  * Turn a validated filter set into query parameters.
  *
  * Every failure here is local. An unknown filter name or an unknown enum value never reaches the
@@ -193,30 +236,7 @@ export function buildSearchParams(
 
 	for (const [name, value] of Object.entries(options.filters ?? {})) {
 		if (value === undefined || value === null) continue
-
-		const filter = spec.filters[name]
-		if (!filter) {
-			throw new SearchError(
-				`Unknown filter "${name}" for ${entity}. Supported: ${Object.keys(spec.filters).join(', ')}.`,
-			)
-		}
-
-		const values = Array.isArray(value) ? value : [value]
-		if (!filter.repeatable && values.length > 1) {
-			throw new SearchError(`Filter "${name}" for ${entity} accepts a single value.`)
-		}
-
-		const encoded = values.map((entry) => {
-			const text = String(entry)
-			if (filter.values && !filter.values.includes(text)) {
-				throw new SearchError(
-					`Unknown value "${text}" for ${entity} filter "${name}". Allowed: ${filter.values.join(', ')}.`,
-				)
-			}
-			return text
-		})
-
-		params[filter.param] = filter.repeatable ? encoded : encoded[0]
+		applyFilter(params, entity, spec, name, value)
 	}
 
 	return params

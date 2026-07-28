@@ -767,6 +767,11 @@ describe('P1.2 response transforms', () => {
 		expect(parsed.address_count).toBe(2)
 	})
 
+	// The fixture below carries the columns `/customers` really returns, taken from a live row.
+	// It used to assert `order_count` and `total_spend`, which FluentCart has never sent on this
+	// route — the projection named them, they resolved to undefined, and JSON.stringify dropped
+	// them, so the mock was the only place they existed. A test that pins fields the store cannot
+	// produce is pinning fiction, so both are gone and the real ones took their place.
 	it('customer_list transform returns only summary fields with status', async () => {
 		const client = mockClient()
 		const listResponse = {
@@ -778,9 +783,15 @@ describe('P1.2 response transforms', () => {
 					email: 'john@test.com',
 					full_name: 'John Doe',
 					status: 'active',
-					order_count: 3,
-					total_spend: 15000,
+					purchase_count: '3',
+					ltv: '15000',
+					aov: '5000.00',
+					purchase_value: [],
+					first_purchase_date: '2024-11-02 09:14:00',
+					last_purchase_date: '2025-01-01 10:00:00',
 					created_at: '2025-01-01',
+					uuid: 'customer-uuid',
+					notes: 'internal note',
 					addresses: [{ id: 1 }],
 					labels: [{ id: 1, name: 'VIP' }],
 				},
@@ -803,12 +814,18 @@ describe('P1.2 response transforms', () => {
 			email: 'john@test.com',
 			full_name: 'John Doe',
 			status: 'active',
-			order_count: 3,
-			total_spend: 15000,
+			purchase_count: '3',
+			ltv: '15000',
+			aov: '5000.00',
+			first_purchase_date: '2024-11-02 09:14:00',
+			last_purchase_date: '2025-01-01 10:00:00',
 			created_at: '2025-01-01',
 		})
 		expect(parsed.data[0]).not.toHaveProperty('addresses')
 		expect(parsed.data[0]).not.toHaveProperty('labels')
+		expect(parsed.data[0]).not.toHaveProperty('notes')
+		// An empty per-currency map is dropped rather than emitted as `[]` on every row.
+		expect(parsed.data[0]).not.toHaveProperty('purchase_value')
 	})
 })
 

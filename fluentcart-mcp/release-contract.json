@@ -3,9 +3,9 @@
   "serializer": "mcp-tools-list-v1",
   "tokenizer": "gpt-tokenizer@3.4.0",
   "packageVersion": "2.0.0",
-  "sourceTreeDigest": "sha256:9fb609c293cba2402d2c508275d1ae04b62d1813d8e8368c89357172b5af63ff",
+  "sourceTreeDigest": "sha256:33d48b93d3b8f139fcd843bdf10c22abbf5826c5eb9abc7046eef9e37f24ef2a",
   "sourceTreeInputs": {
-    "fileCount": 112,
+    "fileCount": 117,
     "declared": [
       {
         "file": "package.json"
@@ -84,9 +84,9 @@
         },
         "curated": {
           "toolCount": 17,
-          "characters": 14461,
-          "cl100kTokens": 3314,
-          "o200kTokens": 3381
+          "characters": 15755,
+          "cl100kTokens": 3602,
+          "o200kTokens": 3663
         },
         "code": {
           "toolCount": 2,
@@ -96,9 +96,9 @@
         },
         "full": {
           "toolCount": 140,
-          "characters": 92726,
-          "cl100kTokens": 20800,
-          "o200kTokens": 21278
+          "characters": 105395,
+          "cl100kTokens": 23587,
+          "o200kTokens": 24071
         }
       }
     },
@@ -122,9 +122,9 @@
         },
         "curated": {
           "toolCount": 17,
-          "characters": 14461,
-          "cl100kTokens": 3314,
-          "o200kTokens": 3381
+          "characters": 15755,
+          "cl100kTokens": 3602,
+          "o200kTokens": 3663
         },
         "code": {
           "toolCount": 2,
@@ -134,9 +134,9 @@
         },
         "full": {
           "toolCount": 148,
-          "characters": 96844,
-          "cl100kTokens": 21715,
-          "o200kTokens": 22201
+          "characters": 109513,
+          "cl100kTokens": 24502,
+          "o200kTokens": 24994
         }
       }
     },
@@ -160,9 +160,9 @@
         },
         "curated": {
           "toolCount": 17,
-          "characters": 14461,
-          "cl100kTokens": 3314,
-          "o200kTokens": 3381
+          "characters": 15755,
+          "cl100kTokens": 3602,
+          "o200kTokens": 3663
         },
         "code": {
           "toolCount": 2,
@@ -172,9 +172,9 @@
         },
         "full": {
           "toolCount": 158,
-          "characters": 103383,
-          "cl100kTokens": 23206,
-          "o200kTokens": 23715
+          "characters": 116269,
+          "cl100kTokens": 26037,
+          "o200kTokens": 26554
         }
       }
     },
@@ -198,9 +198,9 @@
         },
         "curated": {
           "toolCount": 19,
-          "characters": 18301,
-          "cl100kTokens": 4146,
-          "o200kTokens": 4248
+          "characters": 19595,
+          "cl100kTokens": 4434,
+          "o200kTokens": 4530
         },
         "code": {
           "toolCount": 2,
@@ -210,9 +210,9 @@
         },
         "full": {
           "toolCount": 190,
-          "characters": 142124,
-          "cl100kTokens": 31584,
-          "o200kTokens": 32332
+          "characters": 155153,
+          "cl100kTokens": 34440,
+          "o200kTokens": 35197
         }
       }
     },
@@ -236,9 +236,9 @@
         },
         "curated": {
           "toolCount": 19,
-          "characters": 18301,
-          "cl100kTokens": 4146,
-          "o200kTokens": 4248
+          "characters": 19595,
+          "cl100kTokens": 4434,
+          "o200kTokens": 4530
         },
         "code": {
           "toolCount": 2,
@@ -248,9 +248,9 @@
         },
         "full": {
           "toolCount": 190,
-          "characters": 142124,
-          "cl100kTokens": 31584,
-          "o200kTokens": 32332
+          "characters": 155153,
+          "cl100kTokens": 34440,
+          "o200kTokens": 35197
         }
       }
     }

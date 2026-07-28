@@ -75,8 +75,8 @@ export function reportCoreTools(
 			name: 'fluentcart_report_overview',
 			title: 'Get Reports Overview',
 			description:
-				'DIAGNOSTIC, not a metric. Gross/net revenue by month and quarter with growth and top countries. ' +
-				'The controller hardcodes a 30-month UTC window and ignores any date range you pass, so this cannot answer a question about a chosen period. ' +
+				'DIAGNOSTIC, not a metric. Gross/net revenue by month and quarter with year-on-year growth, plus top countries. Amounts are MINOR UNITS, unlike the neighbouring revenue reports, which return decimals. ' +
+				'The controller queries 30 months in UTC and then returns only the last 12, ending with the current month, and it ignores any date range you pass — so this cannot answer a question about a chosen period. ' +
 				'For revenue over a period use fluentcart_report_sales_summary.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/overview',
@@ -95,9 +95,10 @@ export function reportCoreTools(
 			name: 'fluentcart_report_dashboard_stats',
 			title: 'Get Report Dashboard Stats',
 			description:
-				'Order counters for a date range: all orders, paid orders, paid order items and paid order value. Amounts are cents — the payload says so with is_cents. ' +
-				'The only counter tool that honours both a date range and a currency: pass currency to pin one, otherwise the store answers for its own base currency rather than for every currency combined. ' +
-				"Omit both dates and it spans the first order to now. Use this for 'how many orders and how much did they come to' over a period; use fluentcart_report_sales_summary when you also need tax, shipping, refunds or an average.",
+				'Order counters for a date range. Amounts are cents — the payload says so with is_cents. ' +
+				'Three scopes in one payload, so the counters do not add up: total_orders counts every order whatever its payment status, pending and draft included; paid_orders and total_paid_amounts count only payment_status "paid", so anything refunded or partially paid is missing; total_paid_order_items counts item rows, not units. fluentcart_report_sales_summary counts refunded orders too, so it reports more orders and more money for the same span. ' +
+				'Honours both a date range and a currency: pass currency to pin one, or the store answers for its base currency. Omit both dates for first-order-to-now. ' +
+				'Use it for order counts and money collected, and that summary for sales over a period, tax, shipping or refunds.',
 			schema: z.object({
 				...dateRange,
 				currency: z
@@ -135,8 +136,9 @@ export function reportCoreTools(
 			name: 'fluentcart_report_sales',
 			title: 'Get Sales Report',
 			description:
-				'DIAGNOSTIC, not a metric. Sales figures for a date range. ' +
-				'The query inner-joins a subquery that filters fct_order_items.created_at as well as the order date, so an order whose line items fall outside the window loses its revenue entirely rather than just its item count. Two different columns govern one number. Use fluentcart_report_sales_summary instead.',
+				'DIAGNOSTIC, not a metric. Sales figures for a date range, split by one-time, renewal and subscription. Amounts are decimals, not cents. ' +
+				'The query inner-joins a subquery that filters fct_order_items.created_at as well as the order date, so an order whose line items fall outside the window — or which has no line items at all — loses its revenue entirely rather than just its item count. Two different columns govern one number. ' +
+				'Measured on the seeded store: 4,712.70 over 24 orders, against 4,738.69 over 25 from fluentcart_report_sales_summary for the same range and the same payment statuses. One item-less order accounts for the whole difference. Use that tool instead.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/sales-report',
 		}),
@@ -163,7 +165,9 @@ export function reportCoreTools(
 			name: 'fluentcart_report_order_chart',
 			title: 'Get Order Chart',
 			description:
-				'Order chart: gross sales, net revenue, order/item counts, averages grouped by date with comparison. Values in cents.',
+				'DIAGNOSTIC, not a metric. Gross sales, net revenue, order and item counts and their averages, grouped by date, with an optional comparison period. ' +
+				'Amounts are DECIMALS, not cents — the query divides by 100 in SQL, so gross_sale 4712.7 means 4,712.70. This tool said cents until 2026-07-28, which understated revenue by a factor of a hundred. ' +
+				'It also inner-joins a subquery over order items, so an order carrying no line items vanishes with its revenue: on the seeded store it reported 4,712.70 over 24 orders where fluentcart_report_sales_summary reported 4,738.69 over 25 for the same range. Use that one for a figure that reconciles with the order list.',
 			schema: z.object({ ...dateRangeWithCompare }),
 			endpoint: '/reports/order-chart',
 		}),
@@ -272,7 +276,9 @@ export function reportCoreTools(
 		getTool(client, {
 			name: 'fluentcart_report_country_heat_map',
 			title: 'Get Country Heat Map',
-			description: 'Order distribution by country for geographic heatmap visualisation.',
+			description:
+				'Order distribution by country for geographic heatmap visualisation — which countries ' +
+				'customers buy from, and how much each one accounts for.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/country-heat-map',
 		}),
@@ -292,7 +298,10 @@ export function reportCoreTools(
 		getTool(client, {
 			name: 'fluentcart_report_order_value_distribution',
 			title: 'Get Order Value Distribution',
-			description: 'Distribution of orders by value ranges (buckets). Values in cents.',
+			description:
+				'How many orders fall into each order-value band: 0-100, 100-200, and so on to 1000+. ' +
+				'The counts are order counts and no money is returned. Band labels are WHOLE CURRENCY UNITS, not cents — "0-100" is orders up to 100.00, since the SQL compares the minor-unit column against 10000. ' +
+				'Bands are cut on total_amount, what was ordered, where the revenue reports sum total_paid, what was collected. No currency filter unless you pass one, so bands otherwise mix currencies at face value.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/order-value-distribution',
 		}),
@@ -316,7 +325,12 @@ export function reportCoreTools(
 		getTool(client, {
 			name: 'fluentcart_report_order_completion_time',
 			title: 'Get Order Completion Time',
-			description: 'Average time from order creation to completion/fulfilment.',
+			description:
+				// The searchable phrasing here is deliberate and belongs to the search benchmark; only
+				// the "average" claim was wrong. TIMESTAMPDIFF(HOUR, created_at, completed_at) grouped
+				// by that hour is a distribution, and the controller computes no mean anywhere.
+				'How long an order takes to be completed — as a HISTOGRAM, not an average, despite the name: one row per whole-hour gap between creation and completion, with the number of orders that took that long. ' +
+				'Rows are {hour, orders}; derive the mean yourself if you need one. Orders that never completed are excluded outright, so a store that fulfils nothing returns an empty list rather than a bad figure.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/order-completion-time',
 		}),

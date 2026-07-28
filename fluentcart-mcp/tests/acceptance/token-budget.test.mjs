@@ -49,7 +49,40 @@ const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
  */
 const ACCEPTED = {
 	dynamic: { toolCount: 4, cl100kTokens: 688, o200kTokens: 699 },
-	curated: { toolCount: 19, cl100kTokens: 4146, o200kTokens: 4248 },
+	// 4,146 → 4,182 on 2026-07-28: `dashboard_overview` now states that its figures cover a fixed
+	// 30-day window. It read as all-time before, which is the kind of description that produces a
+	// confidently wrong answer rather than a missing one. 36 tokens is a fair price for that.
+	// 4,182 → 4,233 on 2026-07-28: `subscription_list` now states that recurring_amount and its
+	// siblings are minor units, with the example that makes it unmissable — a EUR 999/yr plan
+	// arrives as 99900. Without it an agent reports a EUR 99,900 subscription, so 51 tokens buys
+	// the difference between a right answer and one wrong by two orders of magnitude.
+	// 4,233 → 4,257 on 2026-07-28: `timezone` became optional on the three contract-backed
+	// reports, and the schema now says what it is — a label, echoed back, affecting no figure.
+	// It had been required, sourced from `fluentcart_get_store_context`, which can never succeed
+	// because server.ts passes `profile: null` unconditionally. Every report therefore rested on
+	// the caller guessing a value that changed nothing.
+	// 4,257 → 4,279 on 2026-07-28: `variant_list_all` gained a stock filter and both variant tools
+	// now say "stock" and "inventory" at all. Neither did before, so "what is low on stock" returned
+	// coupon settings and a PDF template while the only tool holding stock levels was invisible.
+	// `report_sales_summary` also names the fields it returns, which is what makes it findable for a
+	// refund rate; its prose list of the same figures was dropped in exchange, so that half is free.
+	// 4,279 → 4,379 on 2026-07-28: the two curated customer tools stopped lying about sorting and
+	// about what they hold. `customer_list` had advertised `purchase_value` as the sort key for
+	// finding top customers; live, that key sorts a JSON longtext column as text and returned the
+	// eight customers who have spent nothing while omitting the top spender entirely, so the free
+	// string became a closed enum of the columns FluentCart's `$fillable` allowlist actually
+	// honours. `created_at` went with it — measured, it was indistinguishable from a misspelled
+	// column. The row now carries ltv, aov and both purchase dates, so the description says they
+	// are cents summed across currencies. `customer_get` says it holds the per-customer figures,
+	// which is what makes it findable for a stats question now that `customer_stats` is marked
+	// DIAGNOSTIC and points at it. 100 tokens for a sort key that returned the exact opposite of
+	// what it promised is the cheapest thing in this file.
+	// 4,379 → 4,434 on 2026-07-28: `product_search_by_name` said "Search for products by name." and
+	// returned 1,064 characters per row — three fields for one image, prices repeated as HTML
+	// entities, Laravel's laravel_through_key. It now names what a row carries and what to call next.
+	// 55 definition tokens against 80% off every response: `name=shirt` went 2,446 → 484 characters
+	// and an unfiltered page 10,604 → 2,112, on the first call of the commonest product question.
+	curated: { toolCount: 19, cl100kTokens: 4434, o200kTokens: 4530 },
 	code: { toolCount: 2, cl100kTokens: 532, o200kTokens: 540 },
 }
 

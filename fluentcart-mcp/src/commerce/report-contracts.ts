@@ -133,7 +133,64 @@ const WARN_PRO =
 const WARN_TIMEZONE =
 	'Period boundaries are read in the store timezone according to the ORM, but no seeded assertion has confirmed which wall clock the store actually compares against. Treat a result near a day boundary as approximate.'
 
-const REVENUE_WARNINGS = [WARN_STATUSES, WARN_TEST_MODE, WARN_RETROACTIVE, WARN_PRO, WARN_TIMEZONE]
+/**
+ * The gap between this and the order list, said out loud on every result.
+ *
+ * FluentCart answers "how much did the store sell" with six different numbers, and an agent that
+ * quotes the wrong one is not slightly off — it is wrong about money. Measured 2026-07-28 on the
+ * seeded store (34 orders, EUR and PLN, FluentCart 1.5.5 with Pro 1.5.4), all time, every currency:
+ *
+ *   4,738.69 / 25 orders  /reports/revenue            ← this contract. One table, no joins.
+ *   4,738.69 / 25 orders  /reports/revenue-by-group   segmented, same figure
+ *   4,738.69 / 25 orders  /reports/fetch-order-by-group
+ *   4,712.70 / 24 orders  /reports/sales-report, /reports/order-chart
+ *   4,962.70              /reports/product-report
+ *   4,683.99 / 22 orders  /reports/dashboard-stats (paid only)
+ *          — / 34 orders  /orders
+ *
+ * The database says 25 orders carry a countable payment status and their total_paid sums to
+ * 473,869 minor units, so 4,738.69 is the correct figure and 25 the correct count. The rest are
+ * explained rather than merely different:
+ *
+ * - 34 is every order. Nine are payment_status `pending` (six on-hold, three draft) and no report
+ *   counts them. Both numbers are right; only one of them answers "what did we sell".
+ * - 4,712.70 drops one order. Those two routes inner-join a subquery over `fct_order_items`, so an
+ *   order that has no line items at all disappears with its revenue. The store holds exactly one
+ *   such order, worth 25.99.
+ * - 4,962.70 is not a different question, it is a broken query.
+ *   `ProductReportService::getProductReportData` joins a subquery grouped by
+ *   `(order_id, object_id)` and then sums the ORDER-level column `o.total_paid`, so an order is
+ *   added once per distinct variation it contains. One seeded order holds three variations and is
+ *   counted three times: 473,869 − 2,599 (the item-less order) + 25,000 (that order twice more)
+ *   = 496,270, which is the figure to the cent. It overstates, and it overstates more the more
+ *   multi-line orders a store takes.
+ *
+ * The arithmetic above is re-derived from live data by
+ * tests/integration/report-family-reconciliation.test.ts, so a change upstream fails a test rather
+ * than quietly ageing this comment.
+ */
+const WARN_ORDER_LIST_GAP =
+	'order_count counts only orders with a countable payment status, so it is lower than the total in fluentcart_order_list, which returns every order including pending, draft and on-hold ones. The difference is excluded revenue, not missing orders. Money here is total_paid — what was actually collected — not what was ordered.'
+
+/**
+ * Named for the same reason the others are: a rival figure a caller may already be holding.
+ *
+ * `fluentcart_report_product` reads `/reports/product-report` and answers the same question with a
+ * larger number. Callers reconcile the two by asking which is right, so the answer travels with
+ * every result rather than living only in a source comment.
+ */
+const WARN_RIVAL_TOTALS =
+	'Other FluentCart report routes answer this question with different figures. fluentcart_report_product overstates gross sales — its query sums the order total once per distinct product variation in the order — and fluentcart_report_sales / fluentcart_report_order_chart drop any order that has no line items. This figure reconciles with the order list; those do not.'
+
+const REVENUE_WARNINGS = [
+	WARN_STATUSES,
+	WARN_TEST_MODE,
+	WARN_RETROACTIVE,
+	WARN_PRO,
+	WARN_TIMEZONE,
+	WARN_ORDER_LIST_GAP,
+	WARN_RIVAL_TOTALS,
+]
 
 /** Shared by both projections of `/reports/revenue`; one request, two allowlists. */
 const REVENUE_BASE = {
@@ -201,7 +258,7 @@ export const REPORT_CONTRACTS: Readonly<Record<ReportName, ReportContract>> = {
 		evidence: {
 			...REVENUE_EVIDENCE,
 			notes:
-				'Single table, no joins. Amounts are divided by 100 in SQL, so the response carries decimals while the column stores minor units. The summary block uses different field names from the trend rows in the same response; both are mapped in this file.',
+				'Single table, no joins — which is exactly why this figure reconciles with the order list where the item-joining reports do not. gross_sale is SUM(o.total_paid) and net_revenue subtracts refunds, tax and shipping tax from it, so both describe money collected rather than money ordered; on an order that is partially paid the two diverge. Amounts are divided by 100 in SQL, so the response carries decimals while the column stores minor units. The summary block uses different field names from the trend rows in the same response; both are mapped in this file.',
 		},
 	},
 	sales_trend: {
@@ -215,7 +272,7 @@ export const REPORT_CONTRACTS: Readonly<Record<ReportName, ReportContract>> = {
 		evidence: {
 			...REVENUE_EVIDENCE,
 			notes:
-				'Grouped by DATE_FORMAT over created_at. groupKey accepts monthly and yearly; anything else, including an omitted value, resolves to daily.',
+				'Grouped by DATE_FORMAT over created_at. An OMITTED groupKey is resolved by range width — daily to 91 days, monthly to 365, yearly beyond (ReportHelper::defineGroupKey). An UNRECOGNISED one is rewritten to payment_method, not to daily (ReportHelper::sanitizeGroupKey), so it returns a payment-method breakdown shaped like a time series. Only monthly and yearly may safely be named.',
 		},
 	},
 	top_products: {
@@ -240,7 +297,7 @@ export const REPORT_CONTRACTS: Readonly<Record<ReportName, ReportContract>> = {
 			serviceFile: 'app/Services/Report/DefaultReportService.php',
 			serviceMethod: 'fetchTopSoldProducts',
 			notes:
-				'Ranked by SUM(quantity) descending, capped at 20 rows by the controller. Product names come from the most recent order item, not the product record, so a renamed product shows its last-sold title.',
+				'Ranked by SUM(quantity) descending, capped at 20 rows by the controller. Aggregates fct_order_items directly, so total_amount is SUM(line_total) rather than the order-level column the revenue reports use — a different figure by construction, not a discrepancy. Product names come from the most recent order item, not the product record, so a renamed product shows its last-sold title.',
 		},
 		warnings: [
 			WARN_STATUSES,
@@ -249,6 +306,7 @@ export const REPORT_CONTRACTS: Readonly<Record<ReportName, ReportContract>> = {
 			WARN_TIMEZONE,
 			'Ranking is by units sold, not revenue. A cheap high-volume product outranks an expensive one.',
 			'Limited to the 20 highest-selling products; the store applies this cap, not this server.',
+			'total_amount sums order-item line totals, so these figures do not add up to gross_sales in fluentcart_report_sales_summary. That total is order-level and also covers orders with no line items at all; the gap is a real one and neither number is wrong.',
 		],
 	},
 

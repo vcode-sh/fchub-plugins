@@ -139,12 +139,47 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/settings/payment-methods/reorder',
 		}),
 
-		getTool(client, {
+		createTool(client, {
 			name: 'fluentcart_settings_print_templates_get',
+			routes: direct('GET', '/templates/print-templates'),
 			title: 'Get Print Templates',
-			description: 'Get print templates for invoices, packing slips, etc.',
-			schema: z.object({}),
-			endpoint: '/templates/print-templates',
+			description:
+				'Which print templates exist — invoice, packing slip and so on — with their key, title and ' +
+				'the size of each body. The HTML itself is omitted unless you ask: pass include_content ' +
+				'true when you actually need the markup, remembering three templates came to 38,319 ' +
+				'characters of it.',
+			schema: z.object({
+				include_content: z
+					.boolean()
+					.optional()
+					.describe("Return each template's raw HTML body as well (large; default false)"),
+			}),
+			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+			// 99% of this response was `templates[].content` — 22,703 characters of markup across three
+			// templates, 38,669 in total against a 40,000 cap, so a fourth template would have broken
+			// the tool outright. The question it answers, "which templates are configured", needs about
+			// 190 characters. The bodies stay reachable behind the flag rather than being removed,
+			// because editing one legitimately needs them.
+			handler: async (apiClient, input) => {
+				const response = await apiClient.get('/templates/print-templates')
+				const body = response.data as Record<string, unknown> | null
+				const templates = body?.templates
+
+				if (input.include_content === true || !Array.isArray(templates)) return response.data
+
+				return {
+					...body,
+					templates: templates.map((entry) => {
+						if (entry === null || typeof entry !== 'object') return entry
+						const { content, ...rest } = entry as Record<string, unknown>
+						return {
+							...rest,
+							content_characters: typeof content === 'string' ? content.length : 0,
+						}
+					}),
+					content_omitted: 'Pass include_content true to receive the HTML bodies.',
+				}
+			},
 		}),
 
 		putTool(client, {

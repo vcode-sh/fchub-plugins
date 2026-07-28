@@ -66,17 +66,20 @@ afterEach(() => {
 })
 
 describe('discoverApiCapabilities', () => {
-	it('reads only the public REST root index, keeping any subdirectory path', async () => {
+	it('reads only the public FluentCart namespace index, keeping any subdirectory path', async () => {
 		const root = stubFetch(() => jsonResponse(REST_INDEX))
 		await discoverApiCapabilities(STORE)
 
 		expect(root).toHaveLength(1)
-		expect(root[0]?.url).toBe('http://store.test/wp-json/')
+		// The whole-site index answers the same question at 4.5x the bytes: 527,327 characters
+		// and 987 routes on the development store against 117,444 for the one namespace, for the
+		// identical 386 operations.
+		expect(root[0]?.url).toBe('http://store.test/wp-json/fluent-cart/v2')
 
 		const subdirectory = stubFetch(() => jsonResponse(REST_INDEX))
 		await discoverApiCapabilities('http://store.test/shop/')
 
-		expect(subdirectory[0]?.url).toBe('http://store.test/shop/wp-json/')
+		expect(subdirectory[0]?.url).toBe('http://store.test/shop/wp-json/fluent-cart/v2')
 	})
 
 	it('never sends application-password credentials to the public root index', async () => {

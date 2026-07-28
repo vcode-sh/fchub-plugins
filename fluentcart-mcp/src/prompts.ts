@@ -154,11 +154,17 @@ export function registerPrompts(
 				`Build an overview of customer #${customer_id}.\n\n` +
 					route(
 						[
-							{ prefer: ['fluentcart_customer_get'], goal: 'the customer profile' },
 							{
-								prefer: ['fluentcart_customer_stats'],
-								goal: 'their spending and order statistics',
+								prefer: ['fluentcart_customer_get'],
+								goal: 'the customer profile, including purchase_count, ltv and aov',
 							},
+							// There used to be a second step here preferring `fluentcart_customer_stats` for
+							// "their spending and order statistics". That route cannot supply them: it returns
+							// `apply_filters('fluent_cart/widgets/single_customer', [], $customer)` and nothing
+							// else, and no callback registers against that hook anywhere in FluentCart, so it
+							// answers `{"widgets":[]}` for a customer with 16 orders and an ltv of 450300.
+							// The figures the step asked for are on the profile the step above already fetches,
+							// so this is one call fewer rather than a substitution.
 							{ prefer: ['fluentcart_customer_addresses'], goal: 'the addresses on file' },
 						],
 						available,

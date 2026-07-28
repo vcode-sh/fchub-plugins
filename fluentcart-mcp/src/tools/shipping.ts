@@ -105,9 +105,24 @@ export function shippingTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_shipping_zone_states',
 			title: 'Get Zone States',
-			description: 'Get available states/regions for zone configuration.',
+			description:
+				'The states, provinces or regions of one country, for building a shipping zone narrower ' +
+				'than the whole country. A country with no subdivisions returns an empty list, which is ' +
+				'an answer rather than a failure.',
 			schema: z.object({
-				country: z.string().optional().describe('ISO country code to get states for'),
+				country_code: z.string().min(2).describe('ISO 3166-1 alpha-2 country code, e.g. "US"'),
+				country: z.string().optional().describe('Alias for country_code'),
+			}),
+			// The tool's parameter was `country`; the route reads `country_code`. Nothing rejected the
+			// wrong name, so nothing ever failed — `/shipping/zone/states?country=US` answers HTTP 200
+			// with `{country_code: "", states: [], address_locale: []}`. Every country returned that
+			// same empty body, so a merchant building state-level shipping for the US was told their
+			// country has no states. Verified live against the raw route: `country_code=US` returns
+			// all fifty, `country=US` returns none.
+			query: (input) => ({
+				country_code: String(input.country_code ?? input.country ?? '')
+					.trim()
+					.toUpperCase(),
 			}),
 			endpoint: '/shipping/zone/states',
 			cache: { key: 'shipping_zone_states', ttlMs: TTL.LONG },

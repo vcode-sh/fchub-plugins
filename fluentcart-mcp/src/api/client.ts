@@ -101,7 +101,13 @@ async function parseSuccessBody<T>(response: Response, method: string, path: str
 
 	const parsed = parseJsonLenient(raw)
 	if (parsed !== undefined) {
-		return parsed as T
+		// A literal `null` body is valid JSON and meaningless as a resource: it parsed, so it
+		// reached the response transforms, and the first one to destructure it failed with
+		// "Cannot destructure property 'activities' of 'order' as it is null" — a bare TypeError
+		// with no error code, naming this server's internals and giving an agent nothing to branch
+		// on. An empty body is already normalised to `{}` a few lines above for exactly this
+		// reason; `null` means the same thing and now says so the same way.
+		return (parsed === null ? {} : parsed) as T
 	}
 
 	throw new FluentCartApiError(

@@ -28,7 +28,6 @@ const FULL_TOOLS = new Set([
 	'fluentcart_order_transactions',
 	'fluentcart_activity_list',
 	'fluentcart_customer_get',
-	'fluentcart_customer_stats',
 	'fluentcart_customer_addresses',
 	'fluentcart_product_list',
 	'fluentcart_dashboard_overview',
@@ -138,7 +137,10 @@ describe('registerPrompts', () => {
 		it('names customer tools when registered', () => {
 			const text = render('customer-overview', { customer_id: '456' }, FULL_TOOLS)
 			expect(text).toContain('fluentcart_customer_get')
-			expect(text).toContain('fluentcart_customer_stats')
+			expect(text).toContain('fluentcart_customer_addresses')
+			// customer_stats is deliberately absent: it returns add-on widgets and nothing else, so a
+			// prompt sending an agent there for spending figures spends a call to be told to go back.
+			expect(text).not.toContain('fluentcart_customer_stats')
 			expect(text).toContain('#456')
 		})
 	})

@@ -2,7 +2,11 @@ import type { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
 import { cached, invalidate } from '../cache.js'
-import { assertWithinEmergencyCap, ResponseTooLargeError } from '../commerce/response-budget.js'
+import {
+	assertToolResponseBudget,
+	assertWithinEmergencyCap,
+	ResponseTooLargeError,
+} from '../commerce/response-budget.js'
 import { redactSensitive } from '../security/redaction.js'
 import type { ToolRouteMetadata } from './endpoint-types.js'
 import { auditView } from './endpoints.js'
@@ -172,6 +176,53 @@ function nestReportParams(
 	return nested
 }
 
+/**
+ * A path parameter is one segment, and only ever one segment.
+ *
+ * Interpolating it raw let a caller leave the route entirely. `fluentcart_email_get` declares
+ * `GET /email-notification/{param}`, and `{notification: '../../../wp/v2/users'}` resolved to
+ * `https://store.example/wp-json/wp/v2/users` — WordPress core's user list, requested with the
+ * store administrator's credentials attached. Every containment mechanism this server has (the
+ * `routes` declarations, `scripts/check-tool-routes.mjs`, capability pruning) describes routes a
+ * tool may reach, and all of them were bypassed by a string.
+ *
+ * Percent-encoding closes four variants at once, because each depends on a character surviving
+ * into the URL: `/` for traversal, `?` for smuggled query parameters, `#` for truncating the path
+ * so a different record is fetched and reported as the requested one, and a newline, which the URL
+ * parser silently deletes so `x\ny` and `xy` address the same record invisibly.
+ *
+ * `.` and `..` are rejected outright rather than encoded: they are never a real identifier, and a
+ * caller sending one has misunderstood something that should be corrected loudly.
+ */
+function encodePathParameter(endpoint: string, key: string, value: unknown): string {
+	const raw = String(value ?? '')
+	if (raw === '.' || raw === '..') {
+		throw new Error(
+			`Path parameter "${key}" in ${endpoint} cannot be "${raw}"; it must identify a single record.`,
+		)
+	}
+	return encodeURIComponent(raw)
+}
+
+/**
+ * A cache entry belongs to the request that produced it, not merely to the tool.
+ *
+ * `fluentcart_shipping_zone_states` takes an optional `country` and cached under the constant key
+ * `shipping_zone_states` for an hour, so asking for US and then FR within that hour returned the
+ * US states — silently, with no way for the caller to tell. Every cached tool inherits that the
+ * moment it gains a parameter, which is why the fix belongs here and not in one tool.
+ *
+ * Keys are sorted so argument order cannot produce two entries for one request.
+ */
+function cacheKeyFor(base: string, path: string, query: Record<string, unknown>): string {
+	const entries = Object.entries(query)
+		.filter(([, value]) => value !== undefined && value !== null)
+		.sort(([a], [b]) => a.localeCompare(b))
+
+	if (entries.length === 0) return `${base}:${path}`
+	return `${base}:${path}:${entries.map(([k, v]) => `${k}=${String(v)}`).join('&')}`
+}
+
 function resolveEndpoint(
 	endpoint: string,
 	input: Record<string, unknown>,
@@ -180,7 +231,7 @@ function resolveEndpoint(
 	const path = endpoint.replace(/:(\w+)/g, (_, key: string) => {
 		const value = rest[key]
 		delete rest[key]
-		return String(value ?? '')
+		return encodePathParameter(endpoint, key, value)
 	})
 	if (path.includes('//') || path.endsWith('/')) {
 		throw new Error(`Missing required path parameter in ${endpoint}`)
@@ -205,10 +256,109 @@ export function truncateResponse(data: unknown): unknown {
 	return data
 }
 
-function formatSuccess(data: unknown) {
-	const truncated = truncateResponse(data)
+/**
+ * Whether the caller has a page size to shrink.
+ *
+ * Read off the schema, because the schema is the contract the caller sees. A tool without
+ * `per_page` in it cannot be asked for a smaller answer, so it is held to the emergency cap
+ * and never told to try — that advice was the whole defect on `fluentcart_variant_list_all`.
+ *
+ * A tool that advertises `per_page` and ignores it would get advice that cannot work, which is
+ * a bug in that tool rather than in this rule: an advertised parameter that does nothing is
+ * already a lie to the caller, and `tests/tools/payload-and-cache.test.ts` exists to catch it.
+ */
+function isPageable(schema: z.ZodObject<z.ZodRawShape>): boolean {
+	return Object.hasOwn(schema.shape, 'per_page')
+}
+
+/**
+ * The Laravel paginator keys that address pages by URL, all of which a tool caller pages past
+ * by number instead. `path` additionally publishes the store's internal REST URL in every list
+ * response, which is not the tool's to give away.
+ */
+const PAGINATOR_LINK_KEYS: readonly string[] = [
+	'links',
+	'first_page_url',
+	'last_page_url',
+	'next_page_url',
+	'prev_page_url',
+	'path',
+]
+
+/**
+ * A Laravel LengthAwarePaginator, and nothing that merely resembles one.
+ *
+ * Both conditions matter. `path` and `links` are ordinary words — an attachment row, a file
+ * record and a template all legitimately carry one — so removing them by name alone would
+ * delete real data. Requiring a `data` array beside a `current_page` is the shape FluentCart
+ * actually serves on every paginated route, checked against eleven of them live.
+ */
+function isPaginator(record: Record<string, unknown>): boolean {
+	return Array.isArray(record.data) && Object.hasOwn(record, 'current_page')
+}
+
+/**
+ * Drop the URL half of the pagination envelope, keeping the facts a caller pages on.
+ *
+ * The envelope is perverse under paging: `links[]` carries one object per page, so a SMALLER
+ * per_page produces MORE of them. Measured live, `fluentcart_order_list` at per_page 1 spent
+ * 1,708 of 2,086 characters — 82% — on links to pages nobody will ever dereference, and
+ * `fluentcart_shipping_class_list` 518 of 627. Asking for less data cost more tokens.
+ *
+ * `current_page`, `last_page`, `per_page`, `total`, `from` and `to` are left exactly as the
+ * store sent them: they are how a caller knows where it is and whether to ask again.
+ *
+ * Bounded at six levels because every paginator observed sits at depth one or two, and an
+ * unbounded walk would recurse as deep as a hostile body cares to nest. Objects that lose
+ * nothing are returned by reference, so a payload with no envelope is not copied at all.
+ */
+function stripPaginationLinks(value: unknown, depth = 0): unknown {
+	if (depth > 6 || value === null || typeof value !== 'object') return value
+
+	if (Array.isArray(value)) {
+		let changed = false
+		const mapped = value.map((entry) => {
+			const next = stripPaginationLinks(entry, depth + 1)
+			if (next !== entry) changed = true
+			return next
+		})
+		return changed ? mapped : value
+	}
+
+	const record = value as Record<string, unknown>
+	const dropping = isPaginator(record)
+	let changed = false
+	const result: Record<string, unknown> = {}
+
+	for (const [key, inner] of Object.entries(record)) {
+		if (dropping && PAGINATOR_LINK_KEYS.includes(key)) {
+			changed = true
+			continue
+		}
+		const next = stripPaginationLinks(inner, depth + 1)
+		if (next !== inner) changed = true
+		result[key] = next
+	}
+
+	return changed ? result : value
+}
+
+/**
+ * Reduce the response, bound it, then serialise it.
+ *
+ * Before this, every tool outside `search` and `reference_data` was bounded solely by the
+ * 40,000-character emergency cap, so a paged read could return 24,749 characters (measured:
+ * `fluentcart_customer_list` at per_page 100) with nothing objecting. The budget that applies
+ * is the one whose remedy exists; see assertToolResponseBudget.
+ *
+ * The envelope is stripped before the budget is checked, so the limit judges what the caller
+ * actually receives rather than what the store happened to wrap it in.
+ */
+function formatSuccess(data: unknown, budget: { context: string; pageable: boolean }) {
+	const reduced = stripPaginationLinks(data)
+	assertToolResponseBudget(reduced, budget.context, { pageable: budget.pageable })
 	return {
-		content: [{ type: 'text' as const, text: JSON.stringify(truncated) }],
+		content: [{ type: 'text' as const, text: JSON.stringify(reduced) }],
 	}
 }
 
@@ -256,7 +406,7 @@ export function createTool(client: FluentCartClient, config: CustomToolConfig): 
 		handler: async (input) => {
 			try {
 				const result = await config.handler(client, input)
-				return formatSuccess(result)
+				return formatSuccess(result, { context: config.name, pageable: isPageable(config.schema) })
 			} catch (error) {
 				return formatError(error)
 			}
@@ -318,12 +468,26 @@ function createEndpointTool(
 					return config.transform ? config.transform(response.data) : response.data
 				}
 				const data = config.cache
-					? await cached(config.cache.key, config.cache.ttlMs, fetcher)
+					? await cached(cacheKeyFor(config.cache.key, path, rest), config.cache.ttlMs, fetcher)
 					: await fetcher()
 				if (config.invalidates) {
 					for (const key of config.invalidates) invalidate(key)
 				}
-				return formatSuccess(data)
+				// Redaction ran on every failure path and on logs, but never here — so a store that
+				// returned a secret in a SUCCESSFUL response handed it straight to the caller, while
+				// the same secret in an error body was scrubbed. `fluentcart_payment_get_settings` and
+				// `fluentcart_integration_get_global_settings` are plain reads, exposed in every write
+				// mode including `disabled`, and returned `secret_key`, `webhook_secret` and
+				// `api_token` verbatim. A read-only deployment leaked its own gateway credentials.
+				//
+				// Applied here rather than inside `formatSuccess` because this path returns what the
+				// STORE sent. Custom `createTool` handlers compose their own output, and one of them —
+				// the guarded-action preview — must return a `confirm_token` for the protocol to work
+				// at all; redacting that would break the mechanism rather than protect anything.
+				return formatSuccess(redactSensitive(data), {
+					context: config.name,
+					pageable: isPageable(config.schema),
+				})
 			} catch (error) {
 				return formatError(error)
 			}

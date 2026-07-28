@@ -8,11 +8,11 @@
 	"attribution": "Core and Pro both register into the fluent-cart/v2 namespace. The available captures are a core-only 1.3.9 docs contract and one all-active runtime index, and neither separates a core route from a Pro route, so every row is attributed to the namespace owner. Sub-attribution between fluent-cart and fluent-cart-pro is NOT evidenced.",
 	"counts": {
 		"routes": 386,
-		"exposed": 182,
-		"excluded": 204,
+		"exposed": 181,
+		"excluded": 205,
 		"deltaSince139": 61,
-		"tools": 286,
-		"declaredTools": 289,
+		"tools": 285,
+		"declaredTools": 288,
 		"withdrawnTools": 3,
 		"orphanToolRoutes": 4
 	},
@@ -1369,26 +1369,15 @@
 				"evidenceFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json"
 			},
 			"contractOrigin": "legacy-docs",
-			"routeDisposition": "exposed",
-			"toolExposures": [
-				{
-					"publicName": "fluentcart_customer_stats",
-					"disposition": "dynamic"
-				}
-			],
-			"reason": "Reached by fluentcart_customer_stats.",
+			"routeDisposition": "excluded",
+			"toolExposures": [],
+			"reason": "No tool reaches this route and no reviewed candidate claims it. It remains unowned pending plan 06 Tasks 2 and 3.",
 			"risk": "read",
-			"schemaEvidence": [
-				"src/tools/customers.ts#fluentcart_customer_stats"
-			],
+			"schemaEvidence": [],
 			"permissionEvidence": [
-				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /customers/get-stats/{param}",
-				"src/api/client.ts"
+				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /customers/get-stats/{param}"
 			],
-			"responseEvidence": [
-				"src/tools/customers.ts",
-				"src/tools/_factory.ts"
-			],
+			"responseEvidence": [],
 			"suppressedTools": []
 		},
 		{
@@ -9343,14 +9332,14 @@
 			"reason": "Reached by fluentcart_tax_config_rates.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/tax.ts#fluentcart_tax_config_rates"
+				"src/tools/tax-rate-tools.ts#fluentcart_tax_config_rates"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /tax/configuration/rates",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/tax.ts",
+				"src/tools/tax-rate-tools.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []
@@ -9804,14 +9793,14 @@
 			"reason": "Reached by fluentcart_tax_rate_list.",
 			"risk": "read",
 			"schemaEvidence": [
-				"src/tools/tax.ts#fluentcart_tax_rate_list"
+				"src/tools/tax-rate-tools.ts#fluentcart_tax_rate_list"
 			],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json#GET /tax/rates",
 				"src/api/client.ts"
 			],
 			"responseEvidence": [
-				"src/tools/tax.ts",
+				"src/tools/tax-rate-tools.ts",
 				"src/tools/_factory.ts"
 			],
 			"suppressedTools": []

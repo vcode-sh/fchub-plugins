@@ -13,7 +13,8 @@ export function customerWriteTools(client: FluentCartClient): ToolDefinition[] {
 		postTool(client, {
 			name: 'fluentcart_customer_create',
 			title: 'Create Customer',
-			description: 'Create a new customer record. Email is required and must be unique.',
+			description:
+				'Create a customer. Email is required and must be unique. Side effect worth knowing: if a WordPress user already exists with that email, the customer is linked to it automatically rather than created standalone.',
 			schema: z.object({
 				email: z.string().describe('Customer email address (required, must be unique)'),
 				first_name: z.string().optional().describe('First name'),

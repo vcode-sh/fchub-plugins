@@ -25,8 +25,17 @@ export interface ReportRequest {
 	to: string
 	/** ISO currency the period is pinned to. Required: nothing is ever summed across currencies. */
 	currency: string
-	/** Store timezone, echoed into the period so a reader knows what the dates meant. */
-	timezone: string
+	/**
+	 * Store timezone, echoed into the period so a reader knows what the dates meant.
+	 *
+	 * Optional, because it is a label and nothing more: the date filtering happens in the store's
+	 * own timezone whatever is passed here, so supplying it changes no figure. It was required, and
+	 * its documented source — `fluentcart_get_store_context` — can never succeed (`server.ts` passes
+	 * `profile: null` unconditionally), while `settings_get_store` carries no timezone field at all.
+	 * So every report rested on the caller guessing a value that did not matter. Omitted, the
+	 * envelope says so rather than asserting a timezone nobody established.
+	 */
+	timezone?: string
 }
 
 export interface TrendRequest extends ReportRequest {
@@ -119,7 +128,13 @@ function envelope<T>(
 ): ReportResult<T> {
 	return {
 		report: name,
-		period: { from: request.from, to: request.to, timezone: request.timezone },
+		period: {
+			from: request.from,
+			to: request.to,
+			timezone:
+				request.timezone ??
+				'store-local (not supplied; FluentCart exposes no store timezone over REST)',
+		},
 		paymentMode: contract.paymentMode.scope,
 		currency: request.currency,
 		data,

@@ -16,7 +16,7 @@ export function dashboardTools(client: FluentCartClient): ToolDefinition[] {
 			name: 'fluentcart_dashboard_overview',
 			title: 'Get Dashboard Overview',
 			description:
-				'Dashboard overview: product count, order count, revenue, and refund totals. Values in cents.',
+				'Store dashboard tiles for the LAST 30 DAYS — product count, order count, revenue and refund totals. The window is fixed and takes no arguments, so these are not all-time figures. For a period you choose, use fluentcart_report_sales_summary. Values in cents.',
 			schema: z.object({}),
 			endpoint: '/dashboard/stats',
 		}),

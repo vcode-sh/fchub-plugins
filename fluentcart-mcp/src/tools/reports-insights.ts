@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { getTool, postTool, type ToolDefinition } from './_factory.js'
+import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
+import { direct } from './endpoints.js'
 
 const dateRange = {
 	startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
@@ -11,6 +12,16 @@ const dateRangeWithPerPage = {
 	...dateRange,
 	per_page: z.number().max(50).optional().describe('Number of results to return (max: 50)'),
 }
+
+/**
+ * A date that exists only to be truthy.
+ *
+ * `ReportHelper::processParams` will not build a comparison period unless both `compareType` and
+ * `compareDate` are non-empty, but `getCompareRange` reads `compareDate` for the `custom` type
+ * alone. For the other four the value is inert, so this stands in when the caller has not supplied
+ * one and the comparison would otherwise be dropped in silence.
+ */
+const COMPARE_GATE_PLACEHOLDER = '1970-01-01'
 
 const dateRangeWithGroup = {
 	...dateRange,
@@ -106,8 +117,15 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 	return [
 		getTool(client, {
 			name: 'fluentcart_report_product',
-			title: 'Get Product Report',
-			description: 'Product performance report with sales data. Revenue in cents.',
+			title: 'Get Store Sales Report',
+			description:
+				'OVERSTATES REVENUE. Do not use gross_sale, net_sale or average_selling_price from this ' +
+				'tool: the query joins order items grouped by (order_id, object_id) and then sums the ' +
+				'ORDER-level total, so an order is added once for every distinct variation it contains, ' +
+				'while an order carrying no line items is dropped entirely. units_sold and ' +
+				'customer_count are computed from the items and are unaffected. Use ' +
+				'fluentcart_report_sales_summary for any money figure. Store-wide despite the name — it ' +
+				'takes no product filter; amounts are decimals, not cents.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/product-report',
 		}),
@@ -115,8 +133,16 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_product_performance',
 			title: 'Get Product Performance',
+			// Measured live over 2020-2027: every row is {name, post_title, value, variation_id}, keyed
+			// by month. `value` is a unit count — "Forest Green" reads 12, matching
+			// report_top_sold_variants. There is no revenue field and no conversion rate anywhere in
+			// the payload, so the old description was wrong three times in eleven words.
 			description:
-				'Individual product performance: conversion rates and revenue trends. Revenue in cents.',
+				'UNITS SOLD per product variation, bucketed by month: each row is {name, post_title, ' +
+				'value, variation_id} where value is a QUANTITY. There is no revenue in this response ' +
+				'and no conversion rate, despite the tool name — for revenue use ' +
+				'fluentcart_report_sales_summary, and for a ranked best-seller list use ' +
+				'fluentcart_report_top_sold_variants.',
 			schema: z.object({
 				...dateRange,
 				product_id: z.number().optional().describe('Specific product ID to analyse'),
@@ -140,24 +166,160 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/reports/top-products-sold',
 		}),
 
-		getTool(client, {
+		createTool(client, {
 			name: 'fluentcart_report_top_sold_variants',
+			routes: direct('GET', '/reports/fetch-top-sold-variants'),
 			title: 'Get Top Sold Variants',
 			description:
-				'Units sold and revenue per product variant, ranked by units. This is the tool for "which ' +
-				'size, colour or option sells best": the variant name carries whatever distinguishes it. ' +
-				'Amounts are decimals, not cents. Use per_page to control how many rows come back.',
-			schema: z.object({ ...dateRangeWithPerPage }),
-			endpoint: '/reports/fetch-top-sold-variants',
-			transform: dropImageUrls('topSoldVariants'),
+				'Units sold and revenue per product VARIANT, ranked by units — the tool for "which size, ' +
+				'colour or option sells best". A currency is required: without one the store adds every ' +
+				'currency into a single figure, which is not a number about anything. Amounts are ' +
+				'decimals. The store returns at most 10 rows and offers no paging, so this is a top-10, ' +
+				'not a catalogue. Includes test-mode orders.',
+			schema: z.object({
+				startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+				endDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
+				currency: z
+					.string()
+					.regex(/^[A-Z]{3}$/)
+					.describe(
+						'Three-letter ISO currency to report on, e.g. EUR. Required: totals are meaningless summed across currencies',
+					),
+			}),
+			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+			// Three faults, all measured live on a two-currency store.
+			//
+			// Currency: unscoped, "Casual Classic Hoodie / Cadet Blue" reported quantity 12 and amount
+			// 96 — that is 6 units at EUR 48 plus 6 units at PLN 48 added together. The sibling
+			// fluentcart_report_sales_summary refuses to run without a currency precisely because such
+			// a total "would be meaningless"; this tool was doing the thing that one forbids.
+			//
+			// Order: the store breaks ties on quantity arbitrarily, so two identical calls minutes
+			// apart returned different tails — a one-unit variant present in one answer and absent from
+			// the next, both presented as complete. Sorting here makes the same question give the same
+			// answer.
+			//
+			// Paging: `per_page` did nothing. 3 and 50 both returned 10 rows, and there is no second
+			// page, so rows beyond the tenth are unreachable. Advertising the parameter implied a
+			// completeness the endpoint cannot deliver.
+			handler: async (apiClient, input) => {
+				const params: Record<string, unknown> = { 'params[currency]': input.currency }
+				if (input.startDate !== undefined) params['params[startDate]'] = input.startDate
+				if (input.endDate !== undefined) params['params[endDate]'] = input.endDate
+
+				const response = await apiClient.get('/reports/fetch-top-sold-variants', params)
+				const body = response.data as Record<string, unknown> | null
+				const rows = Array.isArray(body?.topSoldVariants)
+					? (body.topSoldVariants as Record<string, unknown>[])
+					: []
+
+				const ranked = rows
+					.map(({ media_url: _media, media: _m, thumbnail: _t, ...rest }) => rest)
+					.sort((a, b) => {
+						const byQuantity = Number(b.quantity ?? 0) - Number(a.quantity ?? 0)
+						if (byQuantity !== 0) return byQuantity
+						// Deterministic tie-break, so the same question gives the same answer.
+						return `${a.product_name}/${a.variation_name}`.localeCompare(
+							`${b.product_name}/${b.variation_name}`,
+						)
+					})
+
+				return {
+					currency: input.currency,
+					period: { from: input.startDate ?? null, to: input.endDate ?? null },
+					variants: ranked,
+					ranked_by: 'units sold',
+					limit: 'the store returns at most 10 rows and offers no paging',
+					includes_test_mode: true,
+				}
+			},
 		}),
 
+		/**
+		 * Customer acquisition, and only that. The previous description promised more.
+		 *
+		 * It read "acquisition, lifetime value, and activity. Values in cents", and there is no
+		 * money in this report at all. `CustomerReportService::getCustomerReportData` is a single
+		 * `COUNT(*)` over `fct_customers` grouped by period; the only figure it can produce is
+		 * `customer_count`. Measured live over 2026-01-01 → 2026-07-28 the whole payload was
+		 * `{"summary":{"customer_count":97},"currentMetrics":[{"year":2026,"group":"2026-03",
+		 * "customer_count":86}, …]}` — seven buckets, one integer each. An agent asked for lifetime
+		 * value and told the values were cents would have reported 97 as a sum of money.
+		 *
+		 * Two live capabilities were unreachable and now are not:
+		 *
+		 * `groupKey` pins the bucket, which was otherwise chosen from the range width and therefore
+		 * changed under the caller without saying so. Measured over 2026-03-01 → 2026-04-30 (61
+		 * days): omitted → 61 rows, a dense daily series; `monthly` → 2; `yearly` → 1. `daily` and
+		 * `weekly` → 6 rows, five real days plus a leading bucket labelled "2026" holding zero.
+		 * They are rewritten to `payment_method` by `sanitizeParams`, so `processGroup` still
+		 * formats `%Y-%m-%d` — the data is daily — but `getPeriodRange` is handed the rewritten key,
+		 * cannot build a skeleton from it, and emits one junk bucket instead of zero-filling the
+		 * empty days. So the dense daily series is reached by omitting the argument, and only
+		 * `monthly` and `yearly` may be named. Note this is a different failure from the one
+		 * `dateRangeWithGroup` documents for the order charts, which is why it is spelled out again.
+		 *
+		 * `compareType` fills `previousSummary` and `fluctuations`, which were permanently `[]` —
+		 * three of the five response keys, dead. All five types verified live for April 2026:
+		 * previous_period and previous_month → 86, previous_quarter and previous_year → 0, custom →
+		 * whatever compareDate names. An unrecognised value degrades to no comparison rather than
+		 * erroring.
+		 */
 		getTool(client, {
 			name: 'fluentcart_report_customer',
-			title: 'Get Customer Report',
+			title: 'Get Customer Acquisition Report',
 			description:
-				"Customer analytics: acquisition, lifetime value, and activity. Values in cents. Use for 'how are customers performing' questions.",
-			schema: z.object({ ...dateRange }),
+				'Customer ACQUISITION counts over a date range, and nothing else: one customer_count per ' +
+				'period bucket plus a total. Counted from when the customer RECORD was created, not from a ' +
+				'purchase, so a store that imports history acquires everybody on import day. There is no ' +
+				'money in this report — no lifetime value, no spend, nothing in cents; the query is a ' +
+				'COUNT(*) over the customers table. For lifetime value sort fluentcart_customer_list by ltv ' +
+				'DESC, or read ltv off fluentcart_customer_get. previousSummary and fluctuations stay empty ' +
+				'unless compareType is passed. A store without FluentCart Pro discards your dates entirely ' +
+				'and reports the last month.',
+			schema: z.object({
+				...dateRange,
+				groupKey: z
+					.enum(['monthly', 'yearly'])
+					.optional()
+					.describe(
+						'Bucket width. Omit to let the range decide — daily up to 91 days, monthly to 365, yearly beyond. Only monthly and yearly may be named; daily and weekly are rewritten upstream and return a sparse series with a bogus leading bucket',
+					),
+				compareType: z
+					.enum([
+						'previous_period',
+						'previous_month',
+						'previous_quarter',
+						'previous_year',
+						'custom',
+					])
+					.optional()
+					.describe(
+						'Compare the range against an earlier one, filling previousSummary and fluctuations (a percentage change). Omit for no comparison',
+					),
+				compareDate: z
+					.string()
+					.optional()
+					.describe(
+						'First day of the comparison range, YYYY-MM-DD. Read only when compareType is custom, and required in that case; ignored otherwise',
+					),
+			}),
+			// ReportHelper::processParams gates the entire comparison on `$compareType &&
+			// $compareDate`, even though getCompareRange reads compareDate for the `custom` type
+			// alone. So compareType on its own answered HTTP 200 with previousSummary [] — a
+			// comparison that silently did not happen, which is the failure this module exists to
+			// stop. The placeholder opens the gate and is then discarded: verified live,
+			// previous_period returned the same 86 for compareDate 2026-01-15 and for 2025-06-30.
+			//
+			// `custom` is left alone, because it is the one type that reads the value. Without a
+			// compareDate there is nothing to compare it against and no date this side could invent
+			// would be the caller's intent, so the store returns no comparison — which is true.
+			query: (input) => {
+				const compareType = input['params[compareType]']
+				if (compareType === undefined || compareType === 'custom') return input
+				if (input['params[compareDate]'] !== undefined) return input
+				return { ...input, 'params[compareDate]': COMPARE_GATE_PLACEHOLDER }
+			},
 			endpoint: '/reports/customer-report',
 		}),
 
@@ -172,7 +334,8 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_daily_signups',
 			title: 'Get Daily Signups',
-			description: 'Daily customer signup counts over a date range.',
+			description:
+				'Daily SUBSCRIPTION signup counts over a date range — not customer registrations. The route goes to SubscriptionReportController::getDailySignups, so a store with no subscriptions returns zeros however many customers it gained. For customer acquisition use fluentcart_report_customer.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/daily-signups',
 		}),
@@ -203,7 +366,14 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_refund_by_group',
 			title: 'Get Refund Data by Group',
-			description: 'Refund data segmented by grouping dimension. Amounts in cents.',
+			// Measured live: {"":"PL", totalRefunded: 3, totalRefundedAmount: {total: 49.7, average:
+			// 16.56666667}}. Decimals, not cents, and the grouping column arrives under an EMPTY
+			// STRING key because the service aliases it to whatever it grouped by and that alias is
+			// blank here.
+			description:
+				'Refunds segmented by a grouping dimension: totalRefunded is a COUNT of refunds and ' +
+				'totalRefundedAmount holds total and average in DECIMAL currency units, not cents. The ' +
+				'group each row belongs to arrives under an empty-string key rather than a named one.',
 			schema: z.object({ ...dateRange }),
 			endpoint: '/reports/refund-data-by-group',
 		}),
@@ -211,7 +381,8 @@ export function reportInsightTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_report_subscription_chart',
 			title: 'Get Subscription Chart',
-			description: 'Subscription metrics over time: new subscriptions, renewals, and churn.',
+			description:
+				'Total subscription count and projected future installments. Despite the name there is no churn here and no per-period series: the controller returns future_installments and total_subscriptions only. For churn and MRR month by month use fluentcart_report_subscription_retention.',
 			schema: z.object({ ...dateRangeWithGroup }),
 			endpoint: '/reports/subscription-chart',
 		}),

@@ -47,7 +47,8 @@ export function productCatalogTools(client: FluentCartClient): ToolDefinition[] 
 		getTool(client, {
 			name: 'fluentcart_product_downloadable_url',
 			title: 'Get Downloadable URL',
-			description: 'Get the download URL for a downloadable file.',
+			description:
+				'Signed download URL for a file. The link EXPIRES AFTER 7 DAYS, so do not store or schedule against it — fetch a fresh one when the customer needs it.',
 			schema: z.object({
 				downloadable_id: z.number().describe('Downloadable file ID'),
 			}),

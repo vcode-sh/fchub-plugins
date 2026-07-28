@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { createTool, deleteTool, getTool, postTool, type ToolDefinition } from './_factory.js'
 import { direct } from './endpoints.js'
+import { projectProductSearch } from './product-search-rows.js'
 
 export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -204,11 +205,21 @@ export function productCoreTools(client: FluentCartClient): ToolDefinition[] {
 		getTool(client, {
 			name: 'fluentcart_product_search_by_name',
 			title: 'Search Product by Name',
-			description: 'Search for products by name.',
+			description:
+				'Find products by name, returning id, title, price range, stock and fulfilment type — ' +
+				'enough to pick one and then fetch it with fluentcart_product_get. Omitting the term ' +
+				'returns the first page of the catalogue rather than nothing.',
 			schema: z.object({
-				name: z.string().optional().describe('Search term'),
+				name: z
+					.string()
+					.optional()
+					.describe('Search term matched against the product title, e.g. "shirt"'),
 			}),
 			endpoint: '/products/searchProductByName',
+			// Rows arrived at 1,064 characters each: three fields for the same image, prices repeated
+			// as HTML entity strings, Laravel's laravel_through_key, and timestamps. See
+			// product-search-rows.ts for the measurements.
+			transform: projectProductSearch,
 		}),
 
 		getTool(client, {

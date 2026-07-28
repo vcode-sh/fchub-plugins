@@ -3,6 +3,7 @@ import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
 import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
 import { composite, direct, op } from './endpoints.js'
+import { projectOrderEnvelope } from './orders-core.js'
 
 export function orderTransactionTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -35,7 +36,8 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 		getTool(client, {
 			name: 'fluentcart_order_transaction_get',
 			title: 'Get Transaction Details',
-			description: 'Get details of a specific transaction on an order.',
+			description:
+				'One transaction on an order. Note the route returns the FULL order alongside it, the same payload as fluentcart_order_get, so this is not a cheap call — if you already hold the order, read the transaction from fluentcart_order_transactions instead.',
 			schema: z.object({
 				order_id: z.number().describe('Order ID'),
 				transaction_id: z.number().describe('Transaction ID'),
@@ -175,8 +177,36 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 		getTool(client, {
 			name: 'fluentcart_order_shipping_methods',
 			title: 'Get Shipping Methods',
-			description: 'Get available shipping methods for order creation.',
-			schema: z.object({}),
+			description:
+				'Which shipping methods can carry an order to a given destination. Returns two lists: ' +
+				'shipping_methods, the enabled methods whose zone covers that country and state, and ' +
+				'other_shipping_methods, the enabled methods that do NOT reach it. ' +
+				'Pass country_code — without a destination the store cannot decide what applies, so it ' +
+				'returns an empty shipping_methods and puts every method under other_shipping_methods. ' +
+				'That reads as "no shipping available" when the truth is "nowhere was specified". ' +
+				'shipping_charge on each method is calculated against order_items, so it is only ' +
+				'meaningful when those are supplied.',
+			// The tool declared `z.object({})` while the controller reads country_code, state and
+			// order_items, so it could only ever take the `if (empty($countryCode))` branch —
+			// OrderController::getShippingMethods, line 990. Every call on this store returned
+			// `shipping_methods: []` beside a perfectly good FREE method filed under "other", which
+			// the controller defines as the methods that do not apply.
+			schema: z.object({
+				country_code: z
+					.string()
+					.optional()
+					.describe(
+						'ISO 3166-1 alpha-2 destination country, e.g. "DE". Omit only to list every enabled method without deciding what applies',
+					),
+				state: z
+					.string()
+					.optional()
+					.describe('Destination state or region code, for zones narrower than a country'),
+				order_items: z
+					.array(z.record(z.string(), z.unknown()))
+					.optional()
+					.describe('Items being shipped; required for shipping_charge to mean anything'),
+			}),
 			endpoint: '/orders/shipping_methods',
 		}),
 
@@ -213,7 +243,10 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 				if (input.sort_type !== undefined) params.sort_type = input.sort_type
 
 				const resp = await c.get(`/customers/${customerId}/orders`, params)
-				return resp.data
+				// 56% of this response was `config`, and 35% of the whole payload was Redsys gateway
+				// internals. At the default 10 rows it measured 19,547 characters; at per_page 50 it
+				// would have blown the emergency cap outright.
+				return projectOrderEnvelope(resp.data)
 			},
 		}),
 	]

@@ -69,18 +69,52 @@ export function assertResponseBudget<T>(
 }
 
 /**
+ * Remedies for a payload of unknown shape. Only ever advice the caller can actually follow.
+ *
+ * "Retry with a smaller page size" on a tool with no page size is the failure this split
+ * exists to prevent: it reads as an instruction, costs a round trip to disprove, and leaves
+ * the caller with the same oversized answer. A tool without paging is told to narrow the
+ * question instead, which is the only lever it has.
+ */
+function remediesFor(context: string, pageable: boolean): string[] {
+	if (pageable) {
+		return [`a smaller per_page for ${context}`, 'a narrower filter or fewer requested fields']
+	}
+	return [`a narrower query for ${context}`, 'fewer requested fields']
+}
+
+/**
+ * Bound a tool payload against the budget whose remedy the caller can act on.
+ *
+ * A pageable tool is held to the default budget, because "ask for fewer rows" always works and
+ * a 24,000-character page is already a lot of context to hand an agent. A tool with no page
+ * size keeps the emergency cap, because the stricter limit would convert working reads into
+ * permanent errors: measured on the development store, `fluentcart_settings_print_templates_get`
+ * with `include_content` returns 38,669 characters that no argument can shrink, and four
+ * further reads already exceed 40,000 with nothing to page. A budget that turns a working tool
+ * into an error it cannot escape is worse than no budget.
+ */
+export function assertToolResponseBudget(
+	value: unknown,
+	context: string,
+	options: { pageable: boolean },
+): void {
+	const limit = options.pageable ? DEFAULT_RESPONSE_BUDGET.maxCharacters : EMERGENCY_RESPONSE_CAP
+	const characters = JSON.stringify(value)?.length ?? 0
+	if (characters <= limit) return
+
+	throw new ResponseTooLargeError(characters, limit, remediesFor(context, options.pageable))
+}
+
+/**
  * Final shield for a payload of unknown shape, applied after every semantic reduction.
  *
  * Returns the value untouched when it fits, and throws otherwise. It never returns partial
  * JSON, and it never marks a response as truncated-but-successful.
+ *
+ * Every caller reaching this entry point fetches its route whole — the reference-data loader,
+ * the PDF template reads, the saved-view list — so the advice it carries never mentions paging.
  */
 export function assertWithinEmergencyCap(value: unknown, context: string): void {
-	const characters = JSON.stringify(value)?.length ?? 0
-	if (characters <= EMERGENCY_RESPONSE_CAP) return
-
-	throw new ResponseTooLargeError(characters, EMERGENCY_RESPONSE_CAP, [
-		`a narrower query for ${context}`,
-		'fewer requested fields',
-		'a smaller page size',
-	])
+	assertToolResponseBudget(value, context, { pageable: false })
 }

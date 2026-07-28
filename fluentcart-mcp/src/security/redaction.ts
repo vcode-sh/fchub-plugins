@@ -25,13 +25,52 @@ const SENSITIVE_KEY_FRAGMENTS = [
 
 const CREDENTIAL_IN_TEXT = /\b(Basic|Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/gi
 
+/**
+ * Server internals that arrive inside upstream failure text.
+ *
+ * A WordPress plugin fatal comes back as prose containing the query it tried to run, the file it
+ * died in and the frames above it, and `handleErrorResponse` puts that text straight into the
+ * error a caller sees. Redacting credential-shaped KEYS never touched it, because none of this is
+ * a key — it is the message itself. Two live examples from this store:
+ *
+ *   Table 'wordpress.wp_fct_licenses' doesn't exist (SQL: select count(*) from `wp_fct_licenses`)
+ *   {"code":"plugin_exception","data":{"file":"/var/www/html/wp-content/plugins/fluent-cart/…"}}
+ *
+ * None of it helps a caller — an agent cannot act on our filesystem layout or our SQL — and all of
+ * it describes the inside of somebody's server. The human-meaningful part of the message survives;
+ * only these spans are replaced.
+ *
+ * Ordered longest-construct first: a stack frame contains a path, and a SQL statement may contain
+ * one too, so replacing paths first would leave the surrounding wreckage behind.
+ */
+const SERVER_INTERNALS: readonly RegExp[] = [
+	// A PHP fatal announces itself and then describes the inside of the server; the whole notice
+	// goes, markup and all.
+	/(?:<br\s*\/?>\s*)?<b>\s*Fatal error\s*<\/b>[\s\S]*/gi,
+	/\bFatal error:[\s\S]*/gi,
+	// `Uncaught PDOException: …` names the layer that failed and nothing a caller can use.
+	/\bUncaught\s+\w*(?:Exception|Error)\b[^\n]*/g,
+	// PHP stack frames: `#0 /path/file.php(12): Class->method()`.
+	/#\d+\s+\S*\.php\(\d+\)[^\n]*/g,
+	// `Stack trace:` and everything after it.
+	/Stack trace:[\s\S]*/gi,
+	// A bare source reference with no surrounding path: `OrderController.php:88`, `… on line 88`.
+	/\b[\w/.-]+\.php(?::\d+|\s+on\s+line\s+\d+)/gi,
+	// A SQL statement, recognised by shape rather than by any single keyword.
+	/\b(?:select\s[\s\S]{0,300}?\sfrom\s|insert\s+into\s|update\s+\S+\s+set\s|delete\s+from\s)[\s\S]{0,300}/gi,
+	// Absolute filesystem paths, POSIX and Windows.
+	/(?:\/(?:var|home|usr|srv|opt|www|Users|private|tmp|etc)\/[^\s"'),\]}]+|[A-Za-z]:\\[^\s"'),\]}]+)/g,
+]
+
 function isSensitiveKey(key: string): boolean {
 	const normalised = key.toLowerCase().replace(/[^a-z0-9]/g, '')
 	return SENSITIVE_KEY_FRAGMENTS.some((fragment) => normalised.includes(fragment))
 }
 
 function redactText(value: string): string {
-	return value.replace(CREDENTIAL_IN_TEXT, (_match, scheme: string) => `${scheme} ${REDACTED}`)
+	let text = value.replace(CREDENTIAL_IN_TEXT, (_match, scheme: string) => `${scheme} ${REDACTED}`)
+	for (const pattern of SERVER_INTERNALS) text = text.replace(pattern, REDACTED)
+	return text
 }
 
 /**

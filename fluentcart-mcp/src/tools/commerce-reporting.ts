@@ -27,8 +27,9 @@ const periodShape = {
 		),
 	timezone: z
 		.string()
+		.optional()
 		.describe(
-			'Store timezone the dates are read in, e.g. Europe/Warsaw. Obtain it from fluentcart_get_store_context; it is echoed back so the period is unambiguous',
+			'Optional label for the timezone the dates should be read in, e.g. Europe/Warsaw. It is echoed back and nothing else — the store filters in its own timezone regardless — so omit it unless you know the answer',
 		),
 }
 
@@ -41,7 +42,7 @@ export function commerceReportingTools(client: FluentCartClient): ToolDefinition
 			name: 'fluentcart_report_sales_summary',
 			routes: direct('GET', '/reports/revenue'),
 			title: 'FluentCart Sales Summary',
-			description: `Total sales, net revenue, tax, shipping, refunds, order count and average order value for one currency over an inclusive date range. ${SHARED_CAVEAT} Refunds are attributed to the order's creation date, so a closed period can still move when an old order is refunded.`,
+			description: `Store sales, refunds and order totals for one currency over an inclusive date range: gross_sales, net_revenue, tax, shipping, refunded_amount, refunded_orders, order_count and average_order_value — so it also gives a refund rate: refunded_orders over order_count. ${SHARED_CAVEAT} Refunds are attributed to the order's creation date, so a closed period can still move when an old order is refunded.`,
 			schema: z.object(periodShape),
 			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
 			handler: (apiClient, input) =>
