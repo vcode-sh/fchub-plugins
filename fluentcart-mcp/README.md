@@ -200,9 +200,9 @@ Once connected, just talk. The read-only examples work out of the box; the ones 
 
 ## Requirements
 
-- **Node.js** >= 22.0.0 (for npx/stdio mode)
+- **Node.js** >= 24.0.0 (for npx/stdio mode)
 - **Docker** (for HTTP/container mode — no Node.js needed)
-- **WordPress** >= 5.6 with [FluentCart](https://fluentcart.com) installed
+- **WordPress** >= 6.9 with [FluentCart](https://fluentcart.com) installed
 - A **WordPress account** with an Application Password and the FluentCart REST capabilities you plan to use
 
 ## Documentation

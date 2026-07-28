@@ -145,25 +145,39 @@ const SCENARIOS: Scenario[] = [
 		id: 'stock/no-skus',
 		question: 'Which of my products have no SKU set?',
 		discovery: { query: 'variants missing a sku', expect: 'fluentcart_variant_list_all' },
-		// Twenty thousand characters for a yes/no answer. That IS the finding: nothing in the
-		// registry filters on SKU, so establishing it means reading every variant in the store.
-		budget: 21_000,
+		// Was 19,739 characters over two pages: nothing filtered on SKU, so establishing the fact
+		// meant reading every variant in the store, and the cost grew with the catalogue. The filter
+		// is free — the route returns everything anyway — and `total` now answers the count without
+		// returning the rows at all.
+		budget: 1_200,
 		run: async (ctx) => {
-			const rows: Row[] = []
-			for (let page = 1; page <= 4; page += 1) {
-				const call = await ctx.call('fluentcart_variant_list_all', { page, per_page: 50 })
-				must(!call.isError, `page ${page} failed`)
-				rows.push(...variantsOf(call.body))
-				if (!call.body.has_more) break
-			}
+			const counted = await ctx.call('fluentcart_variant_list_all', {
+				sku: 'missing',
+				per_page: 1,
+			})
+			must(!counted.isError, 'the SKU filter failed')
+
 			const [total, blank] = facts(
 				ctx,
 				`select count(*), sum(sku is null or sku='') from ${VARIANTS};`,
 			)
-			must(String(rows.length) === total, `read ${rows.length} variants, store holds ${total}`)
-			const missing = rows.filter((v) => v.sku === null || v.sku === '').length
-			must(String(missing) === blank, `${missing} without a SKU, database says ${blank}`)
-			ctx.note(`all ${total} variants lack a SKU, and it cost ${ctx.spent()} characters to say so`)
+			must(
+				String(counted.body.total) === blank,
+				`filter counts ${counted.body.total} without a SKU, database says ${blank}`,
+			)
+			must(
+				String(counted.body.total_in_store) === total,
+				`the catalogue size ${counted.body.total_in_store} disagrees with ${total}`,
+			)
+			// The complement must add up, or the filter is dropping rows rather than selecting them.
+			const withSku = await ctx.call('fluentcart_variant_list_all', { sku: 'present', per_page: 1 })
+			must(
+				Number(counted.body.total) + Number(withSku.body.total) === Number(total),
+				'the two halves of the SKU filter do not sum to the catalogue',
+			)
+			ctx.note(
+				`all ${blank} of ${total} variants lack a SKU, answered in ${ctx.spent()} characters — it took 19,739 before the filter existed`,
+			)
 		},
 	},
 	{

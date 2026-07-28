@@ -1,0 +1,268 @@
+---
+title: Proof
+description: 93 questions a real merchant asks, run against a real store, every answer checked against the database. Here is what broke and what it costs now.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Separator } from '@/components/ui/separator';
+
+Every MCP server's documentation says it works. Ours used to say that too, and it was wrong in eleven interesting ways.
+
+So we stopped claiming and started measuring. 93 questions a merchant would actually ask, run against a live FluentCart store, with every number checked against MySQL rather than against another endpoint — because two endpoints agreeing proves only that they agree. Seven of FluentCart's report routes returned three different totals for the same store, and every one of them answered HTTP 200.
+
+## What "works" has to mean
+
+A tool returning `200 OK` proves nothing. `tax_rate_list` returned 200 on nothing at all. `shipping_zone_states` returned 200 with an empty list for every country on earth. `report_product` returns 200 with a revenue figure that is wrong by however many multi-line orders you have taken.
+
+So each scenario is scored on three things, and it only passes if all three hold.
+
+<Cards>
+  <Card title="Discovery" description="Does search surface the right tool in the top five? In the default mode, search IS the interface — a tool ranked sixth may as well not exist." />
+  <Card title="Answer" description="Does the chain return the facts asked for, checked against the database directly? Not against another endpoint. Not against a fixture." />
+  <Card title="Cost" description="What did the whole chain spend? A correct answer at 50,000 characters fails on any real context budget." />
+</Cards>
+
+<Callout type="info" title="The tests are in the repository">
+`tests/integration/scenarios-*.test.ts`, nine files, run against local Docker. The harness is `tests/integration/support/scenario.ts`. Nothing here is a screenshot of a good day.
+</Callout>
+
+<Separator className="my-8" />
+
+## Eleven things that were broken
+
+Not typos. Every one of these returned a plausible answer that was wrong, which is the expensive kind — an agent reports it rather than retrying.
+
+| What it looked like | What was actually happening |
+|---|---|
+| "Find repeat customers" returned nobody | The report could **never** return a row, on any store. FluentCart filters the underlying orders by `order_status` unconditionally, so with none supplied the predicate is `status IN (NULL)`. Our tool did not expose the key — and even if it had, the parameter allowlist held `orderStatus` in camelCase while the route reads snake_case. Three faults stacked. |
+| Store revenue reported as 4,962.70 | The store took **4,738.69**. The query joins order items grouped by `(order_id, object_id)` and then sums the order-level total, so an order is counted once per variation it contains, and an order with no line items is dropped entirely. The overstatement grows with every multi-line order you take. |
+| "What tax do I charge in Poland?" → a tidy 23/8/0 | Read from a **static file bundled inside the plugin**, not from the store. The store's actual Polish rates pointed at tax classes that had been deleted. |
+| State-level shipping: "your country has no states" | The tool sent `country`; the route reads `country_code`. Every country on earth came back empty. The US has 54. |
+| "This customer's orders" returned every order in the shop | `/orders` ignores `customer_id` in **every** spelling — `customer_id`, `params[customer_id]`, `customerId`, `filters[customer_id]` — and does not reject it. |
+| Storefront search returned the same ten products for everything | It sent `search`; the controller reads `post_title`. "shirt" and "zzzznothing" returned byte-identical payloads. |
+| "The most expensive thing I sell" → the wrong product | The route's real paging parameter is `current_page`; `page` and `per_page` are read by nothing. The true answer was on page two, at more than four times the price reported. |
+| "Which shipping methods can reach Germany?" → none | The tool declared no parameters at all, so it could only take the branch where no destination was given — filing every working method under "does not reach here". |
+| Sorting customers by spend hid the biggest spender | `purchase_value` is a documented sort key and is empty on every row. The store accepts it, sorts by nothing, and returns a plausible page. The top spender was absent by a factor of 45. |
+| A missing product said "Permission denied" | An ORM not-found escaping through a permission callback. An agent reads that as a credentials failure and sends you to check your application password. |
+| Asking for a subscription that does not exist | Cost 573 characters to say four words, printed the body twice, and shipped `env: "dev"` plus your full store URL on every 404. |
+
+<Callout type="warn" title="Some of these are upstream">
+Several live in FluentCart itself, not in this server. We cannot fix those from here — so the tools say so, in the description, in the words that matter. A tool that knows it is lying and admits it beats a tool that does not know.
+</Callout>
+
+<Separator className="my-8" />
+
+## What it costs now
+
+Same questions, same store, measured before and after. Every figure is a real payload, not an estimate.
+
+| Question | Before | After |
+|---|---:|---:|
+| "Show me my tax setup" | **failed** — 51,773 chars, over the cap | 688 |
+| "What are the default VAT rates?" | **failed** — 59,814 | 708 |
+| "What does a shopper see?" | **failed** — 53,762 | 396 |
+| "Which products have no SKU?" | 19,739 | **457** |
+| "What has sold out?" | 13,088 | **222** |
+| "This customer's order history" | 13,050 | 4,432 |
+| "What labels can I use?" | 12,581 | 4,761 — or **544** for ten |
+| "Show me order 59" | 11,303 | 5,510 |
+| "Find products matching 'shirt'" | 2,446 | 484 |
+| "Show me the latest orders" | 2,086 | 378 |
+| A not-found error | 573 | **103** |
+
+<Callout title="Where the weight went">
+Mostly repetition. One order carried its two addresses **three times over**, each address restating itself twice more, and every line item carrying the variant's entire catalogue record. A print template shipped 38,669 characters of HTML nobody asked for. A product search returned three separate descriptions of the same image and every price twice, once as the HTML entity `8.00&euro;`.
+</Callout>
+
+<Separator className="my-8" />
+
+## The full run
+
+93 scenarios, all passing, 193,413 characters across every sweep. `search` is the rank of the answering tool (— means the scenario is reached from another tool's output rather than by searching).
+
+<Accordions type="single">
+
+<Accordion title="Customers — 19/19 · 61,105 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| Find the customer with the email hello@vcode.sh. | #1 | 1 | 392 |
+| Who are my top 10 customers by lifetime value? | #1 | 1 | 3,043 |
+| A customer says they were charged twice — what did they actually buy? | #3 | 2 | 10,442 |
+| How many new customers in April, against March? | #1 | 1 | 267 |
+| What address should I ship order 82 to? | #3 | 1 | 4,581 |
+| This customer wants their data — show me everything on file. | #3 | 3 | 6,841 |
+| Which customers have bought more than once? | #1 | 4 | 5,117 |
+| Same question, without the report | #2 | 1 | 3,093 |
+| How many customers have never bought anything? | #1 | 1 | 3,093 |
+| Has this customer had a refund, and how much back? | #1 | 1 | 4,432 |
+| What is this customer's average order value? | #1 | 1 | 931 |
+| This customer has never ordered — what does the store say? | #1 | 2 | 940 |
+| Customer 999999 — is that a real customer? | #4 | 2 | 114 |
+| Search for a customer who is not there. | #1 | 1 | 102 |
+| What if I page past the last page? | — | 1 | 105 |
+| How many customers do I have? | #1 | 1 | 394 |
+| Show me this customer's statistics. | #1 | 2 | 1,332 |
+| Some orders show no customer — who placed them? | #1 | 2 | 9,636 |
+| Give me this customer's whole order history in one go. | #1 | 1 | 8,450 |
+
+</Accordion>
+
+<Accordion title="Store configuration — 14/14 · 37,819 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| How is my store set up — name, currency, country? | #1 | 1 | 1,908 |
+| Which payment methods are switched on? | #2 | 1 | 9,970 |
+| Which FluentCart modules are switched on? | #1 | 1 | 1,319 |
+| What emails does the store send, and who from? | #4 | 2 | 11,940 |
+| Do subscribers get warned before a renewal charges? | #1 | 1 | 1,878 |
+| Who has admin access to the shop? | #1 | 1 | 15 |
+| Who could I make a shop manager? | #1 | 2 | 251 |
+| Which WordPress roles can be given shop permissions? | #1 | 1 | 230 |
+| Show me the invoice and packing-slip templates. | #1 | 1 | 500 |
+| Are my receipt PDFs actually being produced? | #1 | 3 | 804 |
+| Is anything connected to FluentCRM or Mailchimp? | #1 | 1 | 2,623 |
+| Show me the FluentCRM integration settings. | — | 2 | 4,318 |
+| Show me just the checkout settings group. | — | 1 | 1,925 |
+| Give me the orientation summary for this store. | #1 | 1 | 138 |
+
+</Accordion>
+
+<Accordion title="Analytics, tax & shipping — 11/11 · 17,406 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| **Are t-shirt sales going well this year, and which colours sell better?** | **#1** | **2** | **3,228** |
+| Store takes EUR and PLN — are the totals mixing them? | — | 2 | 3,444 |
+| What are my total sales? (asked without naming a currency) | — | 0 | 0 |
+| Show me sales month by month this year. | #1 | 1 | 2,479 |
+| How did we do in 1990? | — | 1 | 1,712 |
+| What are my best selling products? | #1 | 1 | 2,116 |
+| What tax am I charging, and where? | #1 | 2 | 1,233 |
+| What is the standard VAT rate in Portugal? | — | 1 | 760 |
+| Can I ship to Germany, and what would it cost? | #1 | 1 | 375 |
+| Different shipping in California — what states can I pick? | — | 1 | 1,961 |
+| Show me order 999999. | — | 1 | 95 |
+
+</Accordion>
+
+<Accordion title="Subscriptions — 11/11 · 11,665 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| How many active subscriptions, and what are they worth? | #1 | 1 | 576 |
+| What is my MRR? | #1 | 1 | 1,498 |
+| Whose subscription renews next week? | #2 | 1 | 1,977 |
+| What renewals are coming up, and what are they worth? | #1 | 1 | 369 |
+| Which subscriptions failed to bill? | #3 | 3 | 1,685 |
+| They cancelled but were charged. What is the history? | #1 | 1 | 1,435 |
+| How much recurring revenue am I losing to cancellations? | #1 | 1 | 1,498 |
+| What plan is this customer on, and when did they start? | #1 | 1 | 1,043 |
+| On my list but I never got the money. What happened? | #2 | 1 | 1,033 |
+| What is on subscription 999999? | #1 | 1 | 102 |
+| The chart total differs from my list. Which is right? | #1 | 1 | 449 |
+
+</Accordion>
+
+<Accordion title="Products — 9/9 · 18,200 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| How many products, and how many published? | #1 | 1 | 4,207 |
+| Which are digital and which need shipping? | #1 | 2 | 4,301 |
+| Show me everything in the Menswear category. | #1 | 2 | 2,750 |
+| What is in the Widgets category? | — | 1 | 94 |
+| Do I sell anything called kombucha? | #1 | 1 | 94 |
+| What is the most expensive thing I sell? | #4 | 2 | 3,420 |
+| Cheapest and dearest Dual-Tone Hoodie? | #1 | 1 | 293 |
+| Find the product described as "the green shirt". | #1 | 3 | 2,905 |
+| Tell me about product 999999. | #1 | 1 | 136 |
+
+</Accordion>
+
+<Accordion title="Stock — 9/9 · 9,556 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| What am I about to run out of? | #1 | 2 | 1,220 |
+| What has sold out? | #1 | 1 | 222 |
+| How many t-shirts left in each colour? | #1 | 2 | 1,493 |
+| What does the Basic Men's T-Shirt cost, in every variant? | #3 | 1 | 1,198 |
+| How many of the name-your-price demo do I have left? | — | 1 | 401 |
+| Which of my products have no SKU set? | #1 | 2 | 661 |
+| Which variants are subscriptions rather than one-off? | #1 | 2 | 415 |
+| How many variants does each product have? | #1 | 1 | 3,593 |
+| A product with no variants — what does the tool say? | — | 3 | 353 |
+
+</Accordion>
+
+<Accordion title="Coupons — 8/8 · 5,892 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| Which discount codes are currently active? | #1 | 1 | 935 |
+| Which coupons expired or hit their usage limit? | #1 | 1 | 935 |
+| Why does the picker show fewer codes than my list? | #1 | 2 | 982 |
+| Does this coupon apply to the Zipper Hoodie? | #2 | 1 | 1,155 |
+| Can I ask the store whether this coupon is eligible? | #1 | 1 | 104 |
+| Does the code SUMMER20 exist? | #1 | 2 | 115 |
+| How much have I given away in discounts? | #3 | 2 | 1,571 |
+| How many coupons are live and how many have run out? | #2 | 1 | 95 |
+
+</Accordion>
+
+<Accordion title="Storefront — 7/7 · 20,402 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| What does a shopper see on the shop page? | #1 | 2 | 396 |
+| If a shopper searches for "hoodie", what comes up? | #1 | 2 | 422 |
+| What countries can a customer pick at checkout? | #1 | 1 | 8,776 |
+| What address fields apply in country "ZZ"? | #1 | 2 | 217 |
+| What has been changing on the store today? | #3 | 1 | 1,864 |
+| What labels can I put on an order? | #1 | 2 | 5,305 |
+| Which label values can I filter the order list by? | #1 | 2 | 3,476 |
+
+</Accordion>
+
+<Accordion title="Orders — 5/5 · 11,368 chars">
+
+| Question | search | calls | chars |
+|---|---|---|---|
+| Show me the most recent orders. | #2 | 1 | 1,528 |
+| What is in order 59, and what did the customer pay? | #1 | 1 | 5,510 |
+| Why does my order count differ from my sales report? | #1 | 2 | 2,108 |
+| Which orders were refunded, and how much back? | #2 | 1 | 1,730 |
+| Show me the payment attempts on order 59. | #1 | 1 | 492 |
+
+</Accordion>
+
+</Accordions>
+
+<Separator className="my-8" />
+
+## Three answers worth reading twice
+
+**"What are my total sales?"** costs zero characters and makes zero calls. A store taking EUR and PLN has no single total, so the tool **refuses** rather than adding them together. A number that means nothing is worse than a question you have to ask more precisely.
+
+**"Which customers have bought more than once?"** costs four calls, because FluentCart takes one order status at a time. The scenario says so in its output, and points out that the plain customer list answers the same question in one call for less. We would rather write that down than hide it behind a tidier number.
+
+**"How many t-shirts do I have left in each colour?"** is two calls and 1,493 characters. It used to be a coin toss: 27 of the store's 76 variants reported `in-stock` beside `total_stock: 0`, because the projection returned an inert counter and dropped the flag explaining it. Both readings — "in stock" and "none left" — were available, and one of them was wrong.
+
+<Separator className="my-8" />
+
+## What we did not fix
+
+Because a proof page that only lists wins is a brochure.
+
+- **`get_store_context` cannot succeed.** It ranks first for orientation queries and fails every time, for structural reasons in the server bootstrap. It is on the list.
+- **Some reports are honestly labelled rather than repaired.** A tool whose description opens `DIAGNOSTIC, not a metric` means the endpoint behind it ignores its dates, mixes currencies, or returns nothing. We rank those below tools that work rather than pretending.
+- **`email_template_preview` is fatal upstream** for every valid template key, in this FluentCart build. Not ours to fix, and not stable enough across versions to bake into a description.
+- **Nothing filters orders by customer.** FluentCart has no such route; searching by email is the workaround and the tool says so.
+
+<Callout type="info" title="Run it yourself">
+Everything above is reproducible: `npm run test:integration:local` against your own store. If your numbers differ from ours, we would genuinely like to know — [open an issue](https://github.com/vcode-sh/fchub-plugins/issues).
+</Callout>

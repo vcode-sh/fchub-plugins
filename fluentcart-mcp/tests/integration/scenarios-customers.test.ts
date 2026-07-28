@@ -453,7 +453,10 @@ const SCENARIOS: Scenario[] = [
 			query: 'refunded orders for one customer',
 			expect: 'fluentcart_order_customer_orders',
 		},
-		budget: 14_000,
+		// Was 13,050 characters: every row was the whole order record, 761 bytes of
+		// manual_discount_total, coupon_discount_total, shipping_tax, fee_total, tax_behavior and
+		// rate, for a list being scanned rather than an order being opened.
+		budget: 5_000,
 		run: async (ctx) => {
 			const [[customerId]] = ctx.db(`select id from wp_fct_customers where email='${BIG_SPENDER}';`)
 			const { isError, body } = await ctx.call('fluentcart_order_customer_orders', {

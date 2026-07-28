@@ -140,3 +140,52 @@ describe('the stock filter answers the question without a catalogue scan', () =>
 		expect(body).not.toHaveProperty('total_in_store')
 	})
 })
+
+// "Which of my products have no SKU set" had no answer short of reading every variant in the
+// store — 19,739 characters over two pages on a 76-variant catalogue, growing with the shop, to
+// establish a fact the store could have counted. Nothing in the registry filtered on it. The rows
+// are already in memory by the time the filter runs, so it costs nothing, and `total` answers the
+// question without returning a single row.
+describe('a SKU question does not cost the catalogue', () => {
+	const mixed = [
+		variant({ id: 1, sku: 'TS-WHT' }),
+		variant({ id: 2, sku: null }),
+		variant({ id: 3, sku: '' }),
+		variant({ id: 4, sku: '   ' }),
+		variant({ id: 5, sku: 'HD-BLU' }),
+	]
+
+	it('counts what is missing without returning it', async () => {
+		const body = await listAll(mixed, { sku: 'missing', per_page: 1 })
+
+		expect(body.total, 'null, empty and whitespace all count as missing').toBe(3)
+		expect(body.variants).toHaveLength(1)
+		expect(body.total_in_store).toBe(5)
+	})
+
+	it('counts what is present', async () => {
+		const body = await listAll(mixed, { sku: 'present' })
+		expect(body.variants.map((row: Record<string, unknown>) => row.id)).toEqual([1, 5])
+	})
+
+	it('splits the catalogue in two with nothing left over', async () => {
+		const missing = await listAll(mixed, { sku: 'missing' })
+		const present = await listAll(mixed, { sku: 'present' })
+		expect(missing.total + present.total).toBe(mixed.length)
+	})
+
+	it('combines with the stock filter rather than replacing it', async () => {
+		const body = await listAll(
+			[
+				variant({ id: 1, sku: null, manage_stock: '0' }),
+				variant({ id: 2, sku: null, manage_stock: '1', available: 2 }),
+				variant({ id: 3, sku: 'X', manage_stock: '1', available: 2 }),
+			],
+			{ stock: 'low', sku: 'missing' },
+		)
+
+		expect(body.variants.map((row: Record<string, unknown>) => row.id)).toEqual([2])
+		expect(String(body.filter)).toContain('no SKU')
+		expect(String(body.filter)).toContain('fewer than')
+	})
+})

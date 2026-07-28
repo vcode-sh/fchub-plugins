@@ -97,3 +97,41 @@ function finishOrder(order: Record<string, unknown>): Record<string, unknown> {
 	if (!Array.isArray(order.order_items)) return order
 	return { ...order, order_items: order.order_items.map(trimOrderItem) }
 }
+
+/**
+ * One order as a LIST row: enough to recognise it, price it and decide whether to open it.
+ *
+ * `order_customer_orders` returned the full order record per row — 761 characters each, 13,050 for
+ * one customer's nineteen orders — carrying `manual_discount_total`, `coupon_discount_total`,
+ * `shipping_tax`, `fee_total`, `tax_behavior`, `rate`, `parent_id` and the internal `type` and
+ * `mode`. Those belong to an order you have opened, not to a list you are scanning. FluentCart's
+ * own `/orders` list returns roughly this shape, so the two now agree on what a row is.
+ *
+ * `total_refund` stays, because "has this customer ever had a refund" is one of the commonest
+ * reasons to pull the list at all, and dropping it would send the caller back for every row.
+ */
+export function orderListRow(value: unknown): unknown {
+	const order = asRecord(value)
+	if (!order) return value
+
+	return {
+		id: order.id,
+		receipt_number: order.receipt_number,
+		status: order.status,
+		payment_status: order.payment_status,
+		payment_method_title: order.payment_method_title,
+		currency: order.currency,
+		total_amount: order.total_amount,
+		total_paid: order.total_paid,
+		total_refund: order.total_refund,
+		created_at: order.created_at,
+	}
+}
+
+/** Apply {@link orderListRow} to whichever key the paginator put the rows under. */
+export function projectOrderListRows(data: unknown, key: string): unknown {
+	const body = asRecord(data)
+	const page = asRecord(body?.[key])
+	if (!(body && page && Array.isArray(page.data))) return data
+	return { ...body, [key]: { ...page, data: page.data.map(orderListRow) } }
+}

@@ -1,16 +1,64 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
-import { createTool, getTool, postTool, type ToolDefinition } from './_factory.js'
+import { createTool, postTool, type ToolDefinition } from './_factory.js'
 import { direct } from './endpoints.js'
 
 export function labelTools(client: FluentCartClient): ToolDefinition[] {
 	return [
-		getTool(client, {
+		createTool(client, {
 			name: 'fluentcart_label_list',
+			routes: direct('GET', '/labels'),
 			title: 'List Labels',
-			description: 'Get all labels for organising orders, customers, and other entities.',
-			schema: z.object({}),
-			endpoint: '/labels',
+			description:
+				'The labels available for organising orders, customers and other records. Pass search to ' +
+				'narrow by name, or page and per_page to read a few at a time — the store returns the ' +
+				'whole set at once, so both are applied here.',
+			schema: z.object({
+				search: z.string().optional().describe('Keep only labels whose name contains this text'),
+				page: z.number().optional().describe('Page number (default: 1)'),
+				per_page: z
+					.number()
+					.max(100)
+					.optional()
+					.describe('Labels per page (default: 100, max: 100). Applied here, not by the store'),
+			}),
+			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+			// 96 labels cost 12,581 characters, and roughly three fifths of that was `created_at` and
+			// `updated_at` — 74 bytes of each 130-byte row. A label is a name you attach to something;
+			// when it was first typed is not part of that. The route also took no search, no page and
+			// no limit, so the only answer available was the whole set, however large it grew.
+			handler: async (apiClient, input) => {
+				const response = await apiClient.get('/labels')
+				const body = response.data as Record<string, unknown>
+				const all = Array.isArray(body?.labels) ? (body.labels as Record<string, unknown>[]) : []
+
+				const term = String(input.search ?? '')
+					.trim()
+					.toLowerCase()
+				const matching = term
+					? all.filter((label) =>
+							String(label.value ?? '')
+								.toLowerCase()
+								.includes(term),
+						)
+					: all
+
+				const page = Math.max(1, (input.page as number) ?? 1)
+				const perPage = Math.min(100, Math.max(1, (input.per_page as number) ?? 100))
+				const from = (page - 1) * perPage
+				const labels = matching
+					.slice(from, from + perPage)
+					.map((label) => ({ id: label.id, value: label.value }))
+
+				return {
+					labels,
+					page,
+					per_page: perPage,
+					total: matching.length,
+					has_more: from + labels.length < matching.length,
+					...(term ? { total_in_store: all.length } : {}),
+				}
+			},
 		}),
 
 		createTool(client, {

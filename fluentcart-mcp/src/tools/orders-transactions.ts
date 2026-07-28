@@ -3,6 +3,7 @@ import type { FluentCartClient } from '../api/client.js'
 import { FluentCartApiError } from '../api/errors.js'
 import { createTool, getTool, postTool, putTool, type ToolDefinition } from './_factory.js'
 import { composite, direct, op } from './endpoints.js'
+import { projectOrderListRows } from './order-detail-projection.js'
 import { projectOrderEnvelope } from './orders-core.js'
 
 export function orderTransactionTools(client: FluentCartClient): ToolDefinition[] {
@@ -251,8 +252,9 @@ export function orderTransactionTools(client: FluentCartClient): ToolDefinition[
 				const resp = await c.get(`/customers/${customerId}/orders`, params)
 				// 56% of this response was `config`, and 35% of the whole payload was Redsys gateway
 				// internals. At the default 10 rows it measured 19,547 characters; at per_page 50 it
-				// would have blown the emergency cap outright.
-				return projectOrderEnvelope(resp.data)
+				// would have blown the emergency cap outright. Each surviving row was still the whole
+				// order record — 761 characters — so a list is now a list: see orderListRow.
+				return projectOrderListRows(projectOrderEnvelope(resp.data), 'orders')
 			},
 		}),
 	]

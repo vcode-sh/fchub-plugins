@@ -143,15 +143,28 @@ const SCENARIOS: Scenario[] = [
 		id: 'storefront/labels',
 		question: 'What labels can I put on an order?',
 		discovery: { query: 'labels on orders', expect: 'fluentcart_label_list' },
-		budget: 14_000,
+		// Was 12,581 characters for 96 labels, three fifths of it `created_at` and `updated_at` on
+		// every row, with no search, page or limit to reach for. A label is a name you attach to
+		// something; when it was first typed is not part of that. The budget covers both calls this
+		// scenario now makes — all 96 for 4,761, plus a page of ten for 544 to prove the lever works.
+		budget: 5_500,
 		run: async (ctx) => {
 			const { isError, body, chars } = await ctx.call('fluentcart_label_list')
 			must(!isError, 'label_list failed')
 			const labels = (body.labels ?? []) as unknown[]
 			const held = count(ctx, SQL.labels)
 			must(labels.length === held, `answer lists ${labels.length} labels, the store holds ${held}`)
+			must(String(body.total) === String(held), `total ${body.total} disagrees with ${held}`)
+
+			// The lever that did not exist. A caller who wants ten should pay for ten.
+			const page = await ctx.call('fluentcart_label_list', { per_page: 10 })
+			must((page.body.labels as unknown[]).length === 10, 'per_page did not narrow the answer')
+			must(
+				page.chars < chars / 5,
+				`a page of ten cost ${page.chars} against ${chars} for all ${held}`,
+			)
 			ctx.note(
-				`${held} labels for ${chars} characters: the list takes no page, no search and no limit, so it only grows`,
+				`${held} labels for ${chars} characters, or ten for ${page.chars} — it was 12,581 with no lever at all`,
 			)
 		},
 	},

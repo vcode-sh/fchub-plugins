@@ -3,9 +3,9 @@
   "serializer": "mcp-tools-list-v1",
   "tokenizer": "gpt-tokenizer@3.4.0",
   "packageVersion": "2.0.0",
-  "sourceTreeDigest": "sha256:87ff163573db6ddf2beb6338f5aad5e7a513e4c2ceaec0a2b44f852c4c144974",
+  "sourceTreeDigest": "sha256:99e7a6a178d34150c21049813cabb680da46e047d89b6f8e26fe480ed1dd9093",
   "sourceTreeInputs": {
-    "fileCount": 119,
+    "fileCount": 120,
     "declared": [
       {
         "file": "package.json"
@@ -96,9 +96,9 @@
         },
         "full": {
           "toolCount": 140,
-          "characters": 113540,
-          "cl100kTokens": 25255,
-          "o200kTokens": 25749
+          "characters": 114209,
+          "cl100kTokens": 25407,
+          "o200kTokens": 25904
         }
       }
     },
@@ -134,9 +134,9 @@
         },
         "full": {
           "toolCount": 148,
-          "characters": 117658,
-          "cl100kTokens": 26170,
-          "o200kTokens": 26672
+          "characters": 118327,
+          "cl100kTokens": 26322,
+          "o200kTokens": 26827
         }
       }
     },
@@ -172,9 +172,9 @@
         },
         "full": {
           "toolCount": 158,
-          "characters": 124662,
-          "cl100kTokens": 27757,
-          "o200kTokens": 28283
+          "characters": 125331,
+          "cl100kTokens": 27909,
+          "o200kTokens": 28438
         }
       }
     },
@@ -210,9 +210,9 @@
         },
         "full": {
           "toolCount": 190,
-          "characters": 163546,
-          "cl100kTokens": 36160,
-          "o200kTokens": 36926
+          "characters": 164215,
+          "cl100kTokens": 36312,
+          "o200kTokens": 37081
         }
       }
     },
@@ -248,9 +248,9 @@
         },
         "full": {
           "toolCount": 190,
-          "characters": 163546,
-          "cl100kTokens": 36160,
-          "o200kTokens": 36926
+          "characters": 164215,
+          "cl100kTokens": 36312,
+          "o200kTokens": 37081
         }
       }
     }

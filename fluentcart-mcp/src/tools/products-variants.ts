@@ -2,94 +2,14 @@ import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { createTool, getTool, type ToolDefinition } from './_factory.js'
 import { composite, direct, op } from './endpoints.js'
-
-/** Whether this variant counts units. FluentCart stores the flag as the string "0" or "1". */
-function tracksStock(v: Record<string, unknown>): boolean {
-	return v.manage_stock === 1 || v.manage_stock === '1' || v.manage_stock === true
-}
-
-/**
- * A variant's stock, reported so that the numbers cannot be read the wrong way.
- *
- * FluentCart's stock columns only mean anything when `manage_stock` is on. For a variant that does
- * not track units the counters simply sit at their initial zero, and `stock_status` is the whole
- * truth. This projection used to return `total_stock` and drop `manage_stock`, which manufactured a
- * contradiction that does not exist in the store: 27 of this store's 76 variants came back as
- * `stock_status: in-stock` beside `total_stock: 0`, and nothing in the payload said the zero was
- * inert. Both readings an agent can take from that — "in stock" and "none left" — are a coin toss,
- * and one of them is wrong.
- *
- * `manage_stock` is also normalised to a boolean rather than passed through. The string "0" is
- * truthy, so `if (variant.manage_stock)` — the obvious line to write in code mode — reads every
- * untracked variant as tracked.
- *
- * `available` is included because it, not `total_stock`, is what checkout decrements and therefore
- * what "can I still sell this" means; `fluentcart_product_manage_stock_update` has said so on the
- * write side all along. `committed` and `on_hold` appear only when non-zero, since on a healthy
- * catalogue they are zero on every row and would cost tokens to say nothing.
- */
-function stockFacts(v: Record<string, unknown>): Record<string, unknown> {
-	if (!tracksStock(v)) return { stock_status: v.stock_status, manage_stock: false }
-
-	return {
-		stock_status: v.stock_status,
-		manage_stock: true,
-		total_stock: v.total_stock,
-		available: v.available,
-		...(Number(v.committed) ? { committed: v.committed } : {}),
-		...(Number(v.on_hold) ? { on_hold: v.on_hold } : {}),
-	}
-}
-
-type StockFilter = 'low' | 'out' | 'tracked' | 'untracked'
-
-/**
- * Apply a stock filter to a raw variant row.
- *
- * `low` and `out` deliberately exclude untracked variants rather than treating their zero as an
- * empty shelf. A digital subscription that counts nothing is not sold out, and returning it under
- * "what have I run out of" would be the same false reading in a different place.
- */
-function matchesStock(v: Record<string, unknown>, filter: StockFilter, lowBelow: number): boolean {
-	const tracked = tracksStock(v)
-	if (filter === 'tracked') return tracked
-	if (filter === 'untracked') return !tracked
-	if (!tracked) return false
-
-	const available = Number(v.available ?? 0)
-	if (filter === 'out') return available <= 0
-	return available > 0 && available < lowBelow
-}
-
-function describeStockFilter(filter: StockFilter, lowBelow: number): string {
-	if (filter === 'low') return `tracked variants with fewer than ${lowBelow} available`
-	if (filter === 'out') return 'tracked variants with none available'
-	if (filter === 'tracked') return 'variants that count units'
-	return 'variants that do not count units, and so have no stock level'
-}
-
-function trimVariant(v: Record<string, unknown>) {
-	const otherInfo = v.other_info as Record<string, unknown> | undefined
-	return {
-		id: v.id,
-		post_id: v.post_id,
-		variation_title: v.variation_title,
-		item_price: v.item_price,
-		compare_price: v.compare_price,
-		sku: v.sku,
-		...stockFacts(v),
-		item_status: v.item_status,
-		fulfillment_type: v.fulfillment_type,
-		payment_type: v.payment_type,
-		...(otherInfo?.payment_type === 'subscription'
-			? {
-					repeat_interval: otherInfo.repeat_interval,
-					times: otherInfo.times,
-					trial_days: otherInfo.trial_days,
-				}
-			: {}),
-	}
-}
+import {
+	describeStockFilter,
+	matchesSku,
+	matchesStock,
+	type SkuFilter,
+	type StockFilter,
+	trimVariant,
+} from './variant-projection.js'
 
 export function productVariantTools(client: FluentCartClient): ToolDefinition[] {
 	return [
@@ -109,6 +29,13 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				'and paging are applied by this server after fetching, and a large catalogue still costs a ' +
 				'full transfer upstream. For one product use fluentcart_variant_list instead.',
 			schema: z.object({
+				sku: z
+					.enum(['present', 'missing'])
+					.optional()
+					.describe(
+						'Keep only variants that have a SKU, or only those that do not. With per_page 1 the ' +
+							'total alone answers "how many are missing a SKU" without reading the catalogue',
+					),
 				stock: z
 					.enum(['low', 'out', 'tracked', 'untracked'])
 					.optional()
@@ -140,6 +67,7 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				const page = Math.max(1, (input.page as number) ?? 1)
 				const perPage = Math.min(50, Math.max(1, (input.per_page as number) ?? 50))
 				const stock = input.stock as StockFilter | undefined
+				const sku = input.sku as SkuFilter | undefined
 				const lowBelow = Math.max(1, (input.low_below as number) ?? 5)
 
 				const response = await apiClient.get('/variants')
@@ -149,7 +77,9 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 
 				// Free, and it saves the caller the only alternative: paging the whole catalogue and
 				// filtering by hand. The endpoint has already transferred every row by this point.
-				const matching = stock ? rows.filter((row) => matchesStock(row, stock, lowBelow)) : rows
+				const matching = rows
+					.filter((row) => (stock ? matchesStock(row, stock, lowBelow) : true))
+					.filter((row) => (sku ? matchesSku(row, sku) : true))
 
 				const from = (page - 1) * perPage
 				const variants = matching.slice(from, from + perPage).map(trimVariant)
@@ -162,8 +92,16 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 					// the catalogue size is reported beside it rather than silently replaced.
 					total: matching.length,
 					has_more: from + variants.length < matching.length,
-					...(stock
-						? { filter: describeStockFilter(stock, lowBelow), total_in_store: rows.length }
+					...(stock || sku
+						? {
+								filter: [
+									stock ? describeStockFilter(stock, lowBelow) : null,
+									sku ? `variants with ${sku === 'present' ? 'a' : 'no'} SKU` : null,
+								]
+									.filter(Boolean)
+									.join(', '),
+								total_in_store: rows.length,
+							}
 						: {}),
 					// Said plainly, because a caller that believes the store paged would draw the wrong
 					// conclusion about cost from a small page.
