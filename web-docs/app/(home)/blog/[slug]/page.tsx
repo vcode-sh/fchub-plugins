@@ -90,7 +90,7 @@ export default async function BlogPostPage({
             )}
 
             {tags.length > 0 && (
-              <div className="flex items-center gap-1.5 mt-4">
+              <div className="flex flex-wrap items-center gap-1.5 mt-4">
                 <Tag size={14} className="text-muted-foreground" />
                 {tags.map((tag) => (
                   <Badge key={tag} variant="outline">

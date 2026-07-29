@@ -274,6 +274,15 @@ describe('usage policy examples', () => {
 })
 
 describe('marketing and blog truth', () => {
+	it('wraps comparison-blog tags on narrow viewports', () => {
+		const blogPostPage = read('web-docs/app/(home)/blog/[slug]/page.tsx')
+
+		assert.match(
+			blogPostPage,
+			/<div className="flex flex-wrap items-center gap-1\.5 mt-4">/,
+		)
+	})
+
 	it('labels local setup as advanced and uses plain WordPress account language', () => {
 		const marketing = read('web-docs/app/(home)/fluentcart-mcp/page.tsx')
 
