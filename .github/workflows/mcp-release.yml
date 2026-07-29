@@ -48,7 +48,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.13.0'
-          registry-url: https://registry.npmjs.org
       - name: Install the reviewed staged-publishing CLI
         run: npm install --global npm@11.15.0
       - name: Verify reviewed release toolchain
@@ -61,6 +60,7 @@ jobs:
         run: |
           TARBALL="./dist-packages/fluentcart-mcp-${VERSION}.tgz"
           npm stage publish "$TARBALL" --provenance --access public --tag latest --json \
+            --registry https://registry.npmjs.org \
             > "$RUNNER_TEMP/npm-stage.json"
       - name: Bind native stage and immutable candidates into evidence
         env:

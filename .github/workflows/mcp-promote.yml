@@ -38,7 +38,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.13.0'
-          registry-url: https://registry.npmjs.org
       - name: Verify reviewed release toolchain
         run: |
           test "$(node --version)" = "v24.13.0"
@@ -60,12 +59,26 @@ jobs:
           node verification/scripts/verify-staged-release.mjs --root .
       - name: Verify approved npm latest, public bytes and both protocol eras
         env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
           VERSION: ${{ inputs.version }}
         run: |
           EXPECTED=$(node -p "const s=require('./staging-state.json'); s.npm?.expectedIntegrity ?? s.npmIntegrity")
-          ACTUAL=$(npm view "fluentcart-mcp@${VERSION}" dist.integrity --json | tr -d '"')
+          ACTUAL=$(npm view "fluentcart-mcp@${VERSION}" dist.integrity --json \
+            --registry https://registry.npmjs.org | tr -d '"')
           test "$ACTUAL" = "$EXPECTED"
-          test "$(npm view fluentcart-mcp dist-tags.latest --json | tr -d '"')" = "$VERSION"
+          test "$(npm view fluentcart-mcp dist-tags.latest --json \
+            --registry https://registry.npmjs.org | tr -d '"')" = "$VERSION"
+          SMOKE="$PWD/verification/scripts/smoke-public-stdio.mjs"
+          if [ ! -f "$SMOKE" ]; then
+            SCHEMA_VERSION=$(node -p "require('./staging-state.json').schemaVersion")
+            test "$SCHEMA_VERSION" = "2"
+            SMOKE="$RUNNER_TEMP/fluentcart-mcp-smoke-public-stdio.mjs"
+            gh api \
+              -H "Accept: application/vnd.github.raw+json" \
+              "repos/${GITHUB_REPOSITORY}/contents/fluentcart-mcp/scripts/smoke-public-stdio.mjs?ref=${SOURCE_SHA}" \
+              > "$SMOKE"
+          fi
           mkdir public clean
           npm pack "fluentcart-mcp@${VERSION}" --pack-destination public \
             --registry https://registry.npmjs.org
@@ -73,11 +86,11 @@ jobs:
           EXPECTED_SHA=$(node -e "const s=require('./SHA256SUMS.json'); console.log(s.files.find(x=>x.file==='$TARBALL').sha256)")
           ACTUAL_SHA=$(sha256sum "public/$TARBALL" | cut -d' ' -f1)
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          cp "$SMOKE" clean/smoke-public-stdio.mjs
           cd clean
           npm init -y
           npm add --ignore-scripts --registry https://registry.npmjs.org \
             "../public/$TARBALL" @modelcontextprotocol/client@2.0.0
-          cp ../scripts/smoke-public-stdio.mjs .
           node smoke-public-stdio.mjs node_modules/fluentcart-mcp/dist/index.js
       - name: Verify versioned Docker digests
         env:

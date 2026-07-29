@@ -74,6 +74,7 @@ const VERIFICATION_FILES = [
 	'scripts/inspect-mcpb.mjs',
 	'scripts/inspect-npm-pack.mjs',
 	'scripts/release-identity.mjs',
+	'scripts/smoke-public-stdio.mjs',
 	'scripts/verify-staged-release.mjs',
 	'scripts/write-staging-state.mjs',
 ]

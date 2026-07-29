@@ -15,6 +15,10 @@ const stageState = readFileSync(
 	join(ROOT, 'fluentcart-mcp', 'scripts', 'write-staging-state.mjs'),
 	'utf8',
 )
+const artifactBuilder = readFileSync(
+	join(ROOT, 'fluentcart-mcp', 'scripts', 'build-release-artifacts.mjs'),
+	'utf8',
+)
 
 function jobs(workflow) {
 	const start = workflow.search(/^jobs:\s*$/m)
@@ -60,6 +64,7 @@ describe('single-build candidate graph', () => {
 		assert.match(ci, /actions\/upload-artifact@v4/)
 		assert.match(ci, /source_tree_digest:/)
 		assert.match(ci, /smoke-public-stdio\.mjs/)
+		assert.match(artifactBuilder, /'scripts\/smoke-public-stdio\.mjs'/)
 	})
 })
 
@@ -99,11 +104,13 @@ describe('tag-triggered staging', () => {
 	})
 
 	it('uses the first reviewed npm CLI with native staged publishing support', () => {
-		assert.doesNotMatch(stage, /npm@latest/)
-		assert.match(stage, /node-version:\s*'24\.13\.0'/)
-		assert.match(stage, /npm install --global npm@11\.15\.0/)
-		assert.match(stage, /test "\$\(npm --version\)" = "11\.15\.0"/)
-		assert.ok(stage.indexOf('npm --version') < stage.indexOf('npm stage publish'))
+		const body = job(stage, 'stage-npm')
+		assert.doesNotMatch(body, /npm@latest|registry-url/)
+		assert.match(body, /node-version:\s*'24\.13\.0'/)
+		assert.match(body, /npm install --global npm@11\.15\.0/)
+		assert.match(body, /test "\$\(npm --version\)" = "11\.15\.0"/)
+		assert.match(body, /--registry https:\/\/registry\.npmjs\.org/)
+		assert.ok(body.indexOf('npm --version') < body.indexOf('npm stage publish'))
 	})
 })
 
@@ -201,7 +208,14 @@ describe('owner evidence-bound promotion', () => {
 		const body = job(promote, 'promote')
 		assert.match(body, /npm pack "fluentcart-mcp@\$\{VERSION\}"/)
 		assert.match(body, /npm add --ignore-scripts --registry https:\/\/registry\.npmjs\.org/)
-		assert.match(body, /smoke-public-stdio\.mjs/)
+		assert.match(body, /verification\/scripts\/smoke-public-stdio\.mjs/)
+		assert.match(
+			body,
+			/repos\/\$\{GITHUB_REPOSITORY\}\/contents\/fluentcart-mcp\/scripts\/smoke-public-stdio\.mjs\?ref=\$\{SOURCE_SHA\}/,
+		)
+		assert.match(body, /Accept: application\/vnd\.github\.raw\+json/)
+		assert.match(body, /test "\$SCHEMA_VERSION" = "2"/)
+		assert.match(body, /cp "\$SMOKE" clean\/smoke-public-stdio\.mjs/)
 		assert.equal((body.match(/imagetools create/g) ?? []).length, 2)
 		assert.match(body, /gh release create/)
 		assert.doesNotMatch(body, /npm dist-tag/)
@@ -230,9 +244,10 @@ describe('workflow credential boundary', () => {
 	})
 
 	it('uses the reviewed promotion toolchain without npm install or a mutable npm selector', () => {
-		assert.doesNotMatch(promote, /npm install --global|npm@latest/)
-		assert.match(promote, /node-version:\s*'24\.13\.0'/)
-		assert.match(promote, /test "\$\(npm --version\)" = "11\.6\.2"/)
-		assert.ok(promote.indexOf('npm --version') < promote.indexOf('github-token'))
+		const body = job(promote, 'promote')
+		assert.doesNotMatch(body, /npm install --global|npm@latest|registry-url/)
+		assert.match(body, /node-version:\s*'24\.13\.0'/)
+		assert.match(body, /test "\$\(npm --version\)" = "11\.6\.2"/)
+		assert.ok(body.indexOf('npm --version') < body.indexOf('github-token'))
 	})
 })
