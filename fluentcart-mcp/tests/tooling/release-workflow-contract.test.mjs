@@ -69,6 +69,7 @@ describe('tag-triggered staging', () => {
 			'verify-public',
 		])
 		assert.match(job(stage, 'stage-npm'), /needs:\s*\[validate,\s*version-gate,\s*docker\]/)
+		assert.match(job(stage, 'stage-npm'), /TARBALL="\.\/dist-packages\//)
 		assert.match(job(stage, 'stage-npm'), /npm publish "\$TARBALL".*--tag next/)
 	})
 
@@ -134,10 +135,14 @@ describe('versioned Docker candidate', () => {
 
 	it('hands a saved image to publication and pushes no mutable or short-SHA tags', () => {
 		assert.match(job(docker, 'verify'), /docker save/)
-		assert.match(job(docker, 'publish'), /docker load/)
-		assert.match(job(docker, 'publish'), /"\$\{TARGET\}:\$\{VERSION\}"/)
-		assert.doesNotMatch(job(docker, 'publish'), /SHORT_SHA|:latest/)
-		assert.doesNotMatch(job(docker, 'publish'), /docker build\b/)
+		const publish = job(docker, 'publish')
+		assert.match(publish, /if:\s*\$\{\{\s*always\(\)/)
+		assert.match(publish, /inputs\.publish/)
+		assert.match(publish, /needs\.verify\.result\s*==\s*'success'/)
+		assert.match(publish, /docker load/)
+		assert.match(publish, /"\$\{TARGET\}:\$\{VERSION\}"/)
+		assert.doesNotMatch(publish, /SHORT_SHA|:latest/)
+		assert.doesNotMatch(publish, /docker build\b/)
 	})
 
 	it('records immutable public digests as reusable workflow outputs', () => {
