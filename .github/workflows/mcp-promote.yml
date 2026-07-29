@@ -125,16 +125,30 @@ jobs:
           DOCKERHUB_LATEST=$(docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:latest" --format '{{json .Manifest.Digest}}' | tr -d '"')
           test "$GHCR_LATEST" = "$GHCR_DIGEST"
           test "$DOCKERHUB_LATEST" = "$DOCKERHUB_DIGEST"
-      - name: Publish GitHub Release from staged bytes
+      - name: Publish or verify GitHub Release from staged bytes
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
-          gh release create "fluentcart-mcp/v${VERSION}" \
-            --repo "${{ github.repository }}" \
-            --title "fluentcart-mcp v${VERSION}" \
-            --generate-notes \
-            "fluentcart-mcp.mcpb" \
-            "fluentcart-mcp-${VERSION}.tgz" \
-            "SHA256SUMS.json" \
+          TAG="fluentcart-mcp/v${VERSION}"
+          ASSETS=(
+            "fluentcart-mcp.mcpb"
+            "fluentcart-mcp-${VERSION}.tgz"
+            "SHA256SUMS.json"
             "release-contract.json"
+          )
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            RELEASE_DIR="$RUNNER_TEMP/existing-release"
+            mkdir "$RELEASE_DIR"
+            gh release download "$TAG" --repo "${{ github.repository }}" --dir "$RELEASE_DIR"
+            test "$(find "$RELEASE_DIR" -maxdepth 1 -type f | wc -l)" -eq "${#ASSETS[@]}"
+            for ASSET in "${ASSETS[@]}"; do
+              cmp "$ASSET" "$RELEASE_DIR/$ASSET"
+            done
+          else
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --title "fluentcart-mcp v${VERSION}" \
+              --generate-notes \
+              "${ASSETS[@]}"
+          fi
