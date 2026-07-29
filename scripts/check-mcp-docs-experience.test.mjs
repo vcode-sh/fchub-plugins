@@ -80,18 +80,27 @@ function assertBeginnerAccountDataBoundary(page, relativePath) {
 }
 
 function hasPrescriptiveWordPressAccessInstruction(page, target) {
-	const prescriptiveInstruction = new RegExp(
-		`\\b(?:use|assign|choose|set|give|grant|recommend|require|create|select|sign in as)\\b[^.\\n]{0,120}\\b(?:an?\\s+|the\\s+)?${target}`,
+	const prescriptiveVerb = /\b(?:use|assign|choose|set|give|grant|recommend|require|create|select|sign\s+in\s+as)\b/gi
+	const targetAfterVerb = new RegExp(
+		`^[\\s\\S]{0,120}\\b(?:an?\\s+|the\\s+)?${target}`,
 		'i',
 	)
+	const immediateNegation = /(?:\b(?:do|does|did|should|must|can|will)\s+not\s+|\bnever\s+|\bavoid\s+)$/i
 
 	return page
-		.split(/(?<=[.;!?])\s+|\s+\b(?:but|however)\b[,:]?\s*/i)
-		.some((sentence) => (
-			sentence.length <= 240
-			&& !/^\s*(?:(?:you\s+)?(?:do|should|must|can|will)?\s*not\s+(?:use|assign|choose|set|give|grant|recommend|require|create|select|sign in as)|never|avoid)\b|\b(?:is|are)\s+not\s+(?:prescribed|recommended|required)\b/i.test(sentence)
-			&& prescriptiveInstruction.test(sentence)
-		))
+		.split(/(?:[.;!?\n]+|\b(?:but|however)\b[,:]?)/i)
+		.some((clause) => {
+			for (const verb of clause.matchAll(prescriptiveVerb)) {
+				const beforeVerb = clause.slice(0, verb.index)
+				if (immediateNegation.test(beforeVerb)) {
+					continue
+				}
+				if (targetAfterVerb.test(clause.slice(verb.index + verb[0].length))) {
+					return true
+				}
+			}
+			return false
+		})
 }
 
 function assertNoUnsupportedWordPressAccessPrescription(page, relativePath) {
@@ -273,26 +282,55 @@ describe('beginner client journeys', () => {
 	it('rejects only prescriptive WordPress role and capability instructions', () => {
 		for (const allowedVariant of [
 			'Do not use an Administrator account for this connection.',
+			'For safety, do not use an Administrator account for this connection.',
 			'You should not use a Shop Manager role for this connection.',
+			'Never assign the Shop Manager role to this account.',
+			'Avoid use of an Administrator account for this connection.',
+			'We do not recommend an Administrator account for this connection.',
+			'This guide does not require the manage_woocommerce capability.',
 			'An admin account is not recommended for this connection.',
 			'Administrator is not required for this connection.',
 			'manage_woocommerce is not prescribed here.',
+			'An Administrator account has broad access, which is why this guide warns against it.',
+			'The manage_woocommerce capability is mentioned only as an example of excessive access.',
 		]) {
 			assert.doesNotThrow(() => assertNoUnsupportedWordPressAccessPrescription(allowedVariant, 'allowed variant'))
 		}
+
+		const longClauseAdjacentPrescription = 'Use an Administrator account for this connection while this deliberately long clause continues with background about setup choices, local clients, connection details, safe storage, review steps, operational context, onboarding expectations, troubleshooting notes, and several other explanatory details that must never exempt the adjacent role prescription from the guard'
+		assert.ok(longClauseAdjacentPrescription.length > 240, 'long-clause fixture must exceed 240 characters')
+
 		for (const [label, rejectedVariant] of [
 			['role', 'Use an Administrator account for this connection.'],
 			['role', 'Assign the Shop Manager role.'],
 			['role', 'Choose an admin account.'],
+			['role', 'Set the account to Administrator.'],
+			['role', 'Give the user the Shop Manager role.'],
+			['role', 'Grant the user an Administrator role.'],
+			['role', 'Recommend an Administrator account.'],
+			['role', 'Require an Administrator account.'],
 			['role', 'Create an Administrator account.'],
 			['role', 'Select the Shop Manager role.'],
 			['role', 'Sign in as an Administrator.'],
+			['role', longClauseAdjacentPrescription],
 			['role', 'Do not use a low-privilege account; choose an Administrator account.'],
+			['role', 'Do not use a low-privilege account;choose an Administrator account.'],
+			['role', 'Do not use an Administrator account.Use the Shop Manager role.'],
+			['role', 'Do not use an Administrator account\nChoose the Shop Manager role.'],
+			['role', 'Do not use an Administrator account and assign the Shop Manager role.'],
 			['role', 'Do not use an Administrator account, but select the Shop Manager role.'],
 			['role', 'Do not use an Administrator account; however, choose a Shop Manager role.'],
+			['capability', 'Use manage_woocommerce for the account.'],
+			['capability', 'Assign manage_woocommerce to the user.'],
+			['capability', 'Choose manage_woocommerce for the user.'],
 			['capability', 'Set the account to manage_woocommerce.'],
 			['capability', 'Give the user manage_woocommerce.'],
-			['capability', 'Grant manage_woocommerce.'],
+			['capability', 'Grant manage_woocommerce to the user.'],
+			['capability', 'Recommend manage_woocommerce for the account.'],
+			['capability', 'Require manage_woocommerce for the account.'],
+			['capability', 'Create a role with manage_woocommerce.'],
+			['capability', 'Select manage_woocommerce for the user.'],
+			['capability', 'Sign in as a user with manage_woocommerce.'],
 		]) {
 			assert.throws(
 				() => assertNoUnsupportedWordPressAccessPrescription(rejectedVariant, 'rejected variant'),
