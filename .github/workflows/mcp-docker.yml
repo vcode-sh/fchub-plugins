@@ -55,10 +55,13 @@ jobs:
             fluentcart-mcp/scripts
             fluentcart-mcp/tests/acceptance/docker.test.mjs
             fluentcart-mcp/package.json
+            fluentcart-mcp/package-lock.json
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Install locked script dependencies
+        run: npm ci --prefix fluentcart-mcp
       - name: Build candidate from validated context
         id: build
         env:

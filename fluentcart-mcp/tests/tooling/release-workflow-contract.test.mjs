@@ -105,6 +105,16 @@ describe('tag-triggered staging', () => {
 })
 
 describe('versioned Docker candidate', () => {
+	it('installs the locked script dependencies before building the validated image', () => {
+		const verify = job(docker, 'verify')
+		assert.match(verify, /fluentcart-mcp\/package-lock\.json/)
+		assert.match(verify, /npm ci --prefix fluentcart-mcp/)
+		assert.ok(
+			verify.indexOf('npm ci --prefix fluentcart-mcp') <
+				verify.indexOf('Build candidate from validated context'),
+		)
+	})
+
 	it('proves missing key and allowlists fail before the happy path', () => {
 		const verify = job(docker, 'verify')
 		assert.match(verify, /Refuses missing private key before listen/)
