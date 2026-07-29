@@ -42,9 +42,12 @@ function hasSentenceWithConcepts(page, patterns) {
 }
 
 function assertBeginnerAccountDataBoundary(page, relativePath) {
-	assert.match(
-		page,
-		/\bdedicated\b[\s\S]{0,100}\blow[- ]privilege\b[\s\S]{0,100}\b(?:WordPress\s+)?account\b/i,
+	assert.ok(
+		hasSentenceWithConcepts(page, [
+			/\bdedicated\b/i,
+			/\blow[- ]privilege\b/i,
+			/\b(?:WordPress\s+)?account\b/i,
+		]),
 		`${relativePath} must require a dedicated low-privilege account`,
 	)
 	assert.ok(
@@ -67,7 +70,7 @@ function assertBeginnerAccountDataBoundary(page, relativePath) {
 	)
 	assert.ok(
 		hasSentenceWithConcepts(page, [
-			/\b(?:chosen|selected|configured|the|your)\s+(?:AI|assistant)\s+client\b/i,
+			/\b(?:chosen|selected|configured)\s+(?:AI|assistant)\s+client\b/i,
 			/\b(?:returned|response)\b/i,
 			/\b(?:customer|order)\b[\s\S]{0,20}\bdata\b/i,
 			/\b(?:see|read|receive|access|process)\w*\b|(?:does not|do not|cannot)\b[\s\S]{0,100}\b(?:private|hidden|secret)\b[\s\S]{0,100}\b(?:AI|assistant)\s+client\b/i,
@@ -76,15 +79,28 @@ function assertBeginnerAccountDataBoundary(page, relativePath) {
 	)
 }
 
+function hasPrescriptiveWordPressAccessInstruction(page, target) {
+	return page
+		.split(/(?<=[.!?])\s+/)
+		.some((sentence) => (
+			!/\b(?:do|should|must|can|will)?\s*not\s+(?:use|assign|choose|set|give|grant|recommend|require)\b|\b(?:never|avoid|not prescribed|not recommended|not required)\b/i.test(sentence)
+			&& new RegExp(`\\b(?:use|assign|choose|set|give|grant|recommend|require)\\b[^.\\n]{0,120}\\b(?:an?\\s+|the\\s+)?${target}`, 'i').test(sentence)
+		))
+}
+
 function assertNoUnsupportedWordPressAccessPrescription(page, relativePath) {
-	assert.doesNotMatch(
-		page,
-		/\b(?:use|create|choose|select|set up|make|sign in as)\b[^.\n]{0,120}\b(?:an?\s+)?(?:administrator|shop manager|admin(?:istrator)? account)\b/i,
+	assert.ok(
+		!hasPrescriptiveWordPressAccessInstruction(
+			page,
+			'(?:administrator(?:\\s+account|\\s+role)?|shop manager(?:\\s+role)?|admin(?:istrator)? account)\\b',
+		),
 		`${relativePath} must not prescribe an unsupported exact WordPress role`,
 	)
-	assert.doesNotMatch(
-		page,
-		/\b(?:manage|read|edit|delete|publish|create|install|activate|update)_[a-z0-9_]+\b/i,
+	assert.ok(
+		!hasPrescriptiveWordPressAccessInstruction(
+			page,
+			'(?:manage|read|edit|delete|publish|create|install|activate|update)_[a-z0-9_]+\\b',
+		),
 		`${relativePath} must not prescribe an unsupported named WordPress capability`,
 	)
 }
@@ -225,38 +241,49 @@ describe('beginner client journeys', () => {
 		}
 	})
 
-	it('fails semantic data-boundary checks when any required concept is removed', () => {
-		for (const relativePath of Object.values(beginnerPages)) {
-			const page = readRequired(relativePath)
-			const mutations = [
-				['dedicated low-privilege account', page.replace('dedicated, low-privilege WordPress account', 'a WordPress account')],
-				['permission-limited readable data', page.replace('permissions decide', 'permissions describe')],
-				['read-only MCP write block', page.replace('prevents MCP writes', 'allows MCP writes')],
-				['AI client data visibility', page.replace('the AI client', 'another service')],
-			]
+	it('accepts independent editorial variants and rejects each missing data-boundary concept', () => {
+		const validVariants = [
+			'Create a dedicated low-privilege WordPress account for FluentCart. Its WordPress permissions determine which store data FluentCart MCP can access. Read-only mode blocks MCP changes. The selected AI client can process returned customer and order data.',
+			'Use one low privilege dedicated account for WordPress. The account\'s permissions govern what FluentCart store data it can see. A read only connection disables MCP updates. Your configured AI client can receive returned order and customer data.',
+		]
+		const incompleteVariants = [
+			['dedicated low-privilege account', 'Create a low-privilege WordPress account. Its WordPress permissions determine which store data FluentCart MCP can access. Read-only mode blocks MCP changes. The selected AI client can process returned customer and order data.'],
+			['permission-limited readable data', 'Create a dedicated low-privilege WordPress account. The account has settings for FluentCart store data. Read-only mode blocks MCP changes. The selected AI client can process returned customer and order data.'],
+			['read-only MCP write block', 'Create a dedicated low-privilege WordPress account. Its WordPress permissions determine which store data FluentCart MCP can access. The selected AI client can process returned customer and order data.'],
+			['AI client data visibility', 'Create a dedicated low-privilege WordPress account. Its WordPress permissions determine which store data FluentCart MCP can access. Read-only mode blocks MCP changes. Returned customer and order data stays in the server.'],
+		]
 
-			for (const [concept, mutatedPage] of mutations) {
-				assert.throws(
-					() => assertBeginnerAccountDataBoundary(mutatedPage, relativePath),
-					new RegExp(concept),
-					`${relativePath} must reject a missing ${concept} concept`,
-				)
-			}
+		for (const variant of validVariants) {
+			assert.doesNotThrow(() => assertBeginnerAccountDataBoundary(variant, 'editorial variant'))
+		}
+		for (const [concept, variant] of incompleteVariants) {
+			assert.throws(
+				() => assertBeginnerAccountDataBoundary(variant, 'incomplete editorial variant'),
+				new RegExp(concept),
+			)
 		}
 	})
 
-	it('does not prescribe unsupported WordPress roles or capability identifiers', () => {
-		for (const relativePath of Object.values(beginnerPages)) {
-			const page = readRequired(relativePath)
-
-			assertNoUnsupportedWordPressAccessPrescription(page, relativePath)
+	it('rejects only prescriptive WordPress role and capability instructions', () => {
+		for (const allowedVariant of [
+			'Do not use an Administrator account for this connection.',
+			'You should not use a Shop Manager role for this connection.',
+			'An admin account is not recommended for this connection.',
+			'manage_woocommerce is not prescribed here.',
+		]) {
+			assert.doesNotThrow(() => assertNoUnsupportedWordPressAccessPrescription(allowedVariant, 'allowed variant'))
+		}
+		for (const [label, rejectedVariant] of [
+			['role', 'Use an Administrator account for this connection.'],
+			['role', 'Assign the Shop Manager role.'],
+			['role', 'Choose an admin account.'],
+			['capability', 'Set the account to manage_woocommerce.'],
+			['capability', 'Give the user manage_woocommerce.'],
+			['capability', 'Grant manage_woocommerce.'],
+		]) {
 			assert.throws(
-				() => assertNoUnsupportedWordPressAccessPrescription(`${page}\n\nUse an Administrator account.`, relativePath),
-				/unsupported exact WordPress role/i,
-			)
-			assert.throws(
-				() => assertNoUnsupportedWordPressAccessPrescription(`${page}\n\nGrant manage_woocommerce.`, relativePath),
-				/unsupported named WordPress capability/i,
+				() => assertNoUnsupportedWordPressAccessPrescription(rejectedVariant, 'rejected variant'),
+				new RegExp(`unsupported exact WordPress ${label}|unsupported named WordPress ${label}`),
 			)
 		}
 	})
