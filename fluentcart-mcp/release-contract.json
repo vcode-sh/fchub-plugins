@@ -130,9 +130,9 @@
       "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED"
     }
   },
-  "sourceTreeDigest": "sha256:e274cb3e0daa023687ac6c3c34498c869aa60568e155565581c738f44c351702",
+  "sourceTreeDigest": "sha256:a0d8158b5aa900600d24d7968f6f6346a290e9284fd7aa2c750ebd64489443f7",
   "sourceTreeInputs": {
-    "fileCount": 192,
+    "fileCount": 194,
     "declared": [
       {
         "file": "package.json"
@@ -163,6 +163,9 @@
       },
       {
         "file": "compatibility-support.json"
+      },
+      {
+        "directory": "openai-plugin"
       },
       {
         "directory": "scripts"
@@ -255,9 +258,9 @@
       "modes": {
         "dynamic": {
           "toolCount": 3,
-          "characters": 2254,
-          "cl100kTokens": 494,
-          "o200kTokens": 502
+          "characters": 2302,
+          "cl100kTokens": 506,
+          "o200kTokens": 514
         },
         "curated": {
           "toolCount": 17,
@@ -292,9 +295,9 @@
       "modes": {
         "dynamic": {
           "toolCount": 3,
-          "characters": 2254,
-          "cl100kTokens": 494,
-          "o200kTokens": 502
+          "characters": 2302,
+          "cl100kTokens": 506,
+          "o200kTokens": 514
         },
         "curated": {
           "toolCount": 17,
@@ -329,9 +332,9 @@
       "modes": {
         "dynamic": {
           "toolCount": 3,
-          "characters": 2254,
-          "cl100kTokens": 494,
-          "o200kTokens": 502
+          "characters": 2302,
+          "cl100kTokens": 506,
+          "o200kTokens": 514
         },
         "curated": {
           "toolCount": 17,
@@ -366,9 +369,9 @@
       "modes": {
         "dynamic": {
           "toolCount": 4,
-          "characters": 3021,
-          "cl100kTokens": 662,
-          "o200kTokens": 673
+          "characters": 3069,
+          "cl100kTokens": 674,
+          "o200kTokens": 685
         },
         "curated": {
           "toolCount": 19,
