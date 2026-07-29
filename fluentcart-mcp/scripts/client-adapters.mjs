@@ -66,7 +66,14 @@ export function runClientCommand(binary, args, options = {}) {
 				}
 			}
 			const commandDetail = boundedProcessDetail(
-				stderr || stdout || error?.message || (timedOut ? 'command timed out' : ''),
+				stderr ||
+					stdout ||
+					error?.message ||
+					(timedOut
+						? 'command timed out'
+						: status !== 0 && status !== null
+							? `process exit status ${status}`
+							: ''),
 			)
 			const cleanupDetail = boundedProcessDetail(stopError?.message)
 			const detail = cleanupDetail

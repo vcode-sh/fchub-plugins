@@ -238,6 +238,12 @@ describe('named-client candidate authentication', () => {
 		}
 	})
 
+	it('reports a silent non-zero client exit', async () => {
+		const result = await runClientCommand(process.execPath, ['--eval', 'process.exit(75)'])
+		assert.equal(result.ok, false)
+		assert.match(result.detail, /exit status 75/)
+	})
+
 	it('settles a timed-out command when process cleanup rejects without leaking the rejection', async () => {
 		const directory = mkdtempSync(join(tmpdir(), 'fcmcp-adapter-cleanup-rejection-'))
 		let childPid

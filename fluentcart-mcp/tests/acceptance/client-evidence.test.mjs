@@ -359,12 +359,12 @@ const { readFileSync, writeFileSync } = require('node:fs')
 const args = process.argv.slice(2)
 const config = JSON.parse(readFileSync(args[args.indexOf('--config') + 1], 'utf8'))
 const server = config.mcpServers[args[args.indexOf('--server') + 1]]
-const deadline = setTimeout(() => process.exit(75), 350)
-fetch(process.env.FCMCP_CLIENT_STORE_URL.replace('host.docker.internal', '127.0.0.1') + '/wp-json/fluent-cart/v2')
+fetch(process.env.FCMCP_CLIENT_STORE_URL.replace('host.docker.internal', '127.0.0.1') + '/wp-json/fluent-cart/v2', {
+  signal: AbortSignal.timeout(5_000),
+})
   .then((response) => {
     if (!response.ok) process.exit(76)
     writeFileSync(server.args[1], JSON.stringify({ protocolVersion: '2026-07-28', observedAt: '${NOW}', candidateImageId: process.env.FCMCP_CLIENT_IMAGE_ID }))
-    clearTimeout(deadline)
   })
   .catch(() => process.exit(77))
 `,
