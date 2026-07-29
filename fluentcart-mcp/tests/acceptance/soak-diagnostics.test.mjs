@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import { get } from 'node:http'
 import { performance } from 'node:perf_hooks'
 import { describe, it } from 'node:test'
@@ -459,25 +458,39 @@ describe('schema-v4 component boundaries and privacy', () => {
 		)
 	})
 
-	it('keeps every positive schema-example count paired with bounded slowest rows', () => {
-		const reportPath = new URL(
-			'../../../.superpowers/sdd/01-atomic-2026-migration/task-11-soak-v4-report.md',
-			import.meta.url,
-		)
-		const report = readFileSync(reportPath, 'utf8')
-		const block = /## Schema-v4 Example[\s\S]*?```json\n([\s\S]*?)\n```/.exec(report)
-		assert.ok(block, 'schema-v4 report example is missing')
-		const example = JSON.parse(block[1])
-		const counted = [
-			{ count: example.latencyMs.samples, slowest: example.latencyMs.slowest },
-			example.resourceSampler,
-			example.schedulingLagMs,
-			example.componentTimings.proxy,
-			example.componentTimings.upstream,
-			example.componentTimings.candidateStore,
-		]
-		for (const section of counted) {
-			assert.equal(section.slowest.length, Math.min(section.count, 5))
+	it('keeps every positive runtime summary count paired with bounded slowest rows', async () => {
+		const store = new CandidateStore()
+		try {
+			await store.start()
+			const port = store.server.address().port
+			await new Promise((resolve, reject) => {
+				get({ host: '127.0.0.1', port, path: '/wp-json/fluent-cart/v2/orders' }, (response) => {
+					response.resume()
+					response.once('end', resolve)
+				}).once('error', reject)
+			})
+
+			const summary = summaryFor([10, 11, 12])
+			const componentTimings = parseProxyTimingLog(
+				[
+					'FCMCP_TIMING_V4|1750000000.250|200|0.125|0.100',
+					'FCMCP_TIMING_V4|1750000001.500|200|0.250|0.200',
+					'',
+				].join('\n'),
+			)
+			const counted = [
+				{ count: summary.latencyMs.samples, slowest: summary.latencyMs.slowest },
+				summary.resourceSampler,
+				summary.schedulingLagMs,
+				componentTimings.proxy,
+				componentTimings.upstream,
+				store.timingSummary(),
+			]
+			for (const section of counted) {
+				assert.equal(section.slowest.length, Math.min(section.count, 5))
+			}
+		} finally {
+			await store.close()
 		}
 	})
 })

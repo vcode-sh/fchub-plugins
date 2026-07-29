@@ -35,13 +35,15 @@ let live
  * This lane needs a store URL and nothing else — `/wp-json/` is a public document. It therefore
  * opens no credential file at all: scripts/run-live-tests.mjs is the single credential-loading
  * entry point in this repository, and a second reader would quietly become a second one.
- * The URL arrives through the environment (the launcher exports it) or defaults to loopback,
- * and the same target policy still applies so a stray value cannot reach a production shop.
+ * The URL arrives through the environment (the launcher exports it). There is deliberately no
+ * loopback default: the deterministic acceptance lane must not become a live test merely because
+ * a developer happens to have WordPress running.
  */
 function liveTargetUrl() {
-	const configured = process.env.FLUENTCART_URL ?? 'http://localhost:9081'
-	return assertAllowedLiveTarget(configured, process.env)
+	return assertAllowedLiveTarget(process.env.FLUENTCART_URL, process.env)
 }
+
+const liveTarget = process.env.FLUENTCART_URL ? liveTargetUrl() : null
 
 /** The REST root index is a public document, so this request carries no credential. */
 async function fetchRestIndex(target) {
@@ -116,10 +118,11 @@ function reduceIndex(document, normaliser) {
 }
 
 before(async () => {
+	if (!liveTarget) return
 	const normaliser = await import(
 		pathToFileURL(resolve(PACKAGE_ROOT, 'dist/api/route-normalisation.js')).href
 	)
-	live = reduceIndex(await fetchRestIndex(liveTargetUrl()), normaliser)
+	live = reduceIndex(await fetchRestIndex(liveTarget), normaliser)
 })
 
 const key = (operation) => `${operation.method} ${operation.path}`
@@ -173,7 +176,7 @@ describe('checked fixture counts', () => {
 	})
 })
 
-describe('live capture', () => {
+describe('live capture', { skip: liveTarget ? false : 'BLOCKED: FLUENTCART_URL' }, () => {
 	it('reproduces the inclusive and application-only counts', (t) => {
 		t.diagnostic(
 			`live: ${live.counts.prefixedPathsInclusive} paths, ${live.counts.exactPairsInclusive} inclusive pairs, ${live.counts.applicationExactPairs} exact, ${live.counts.applicationCanonicalPairs} canonical`,
@@ -191,7 +194,7 @@ describe('live capture', () => {
 	})
 })
 
-describe('drift', () => {
+describe('drift', { skip: liveTarget ? false : 'BLOCKED: FLUENTCART_URL' }, () => {
 	it('adds no canonical operation without an accepted explanation', () => {
 		const known = new Set(fixture.operations.map(key))
 		const added = live.operations.map(key).filter((pair) => !known.has(pair))
