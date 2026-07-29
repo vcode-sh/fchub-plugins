@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { currentFacingFiles } from './check-mcp-docs.mjs'
+import { CURRENT_FACING_MARKETING_FILES } from './mcp-doc-rules.mjs'
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const dashboardPrompt = 'Show me the FluentCart dashboard stats.'
@@ -33,6 +35,8 @@ const beginnerPages = {
 	'Other clients': 'web-docs/content/docs/fluentcart-mcp/other-clients.mdx',
 }
 
+const chatgptWebPage = 'web-docs/content/docs/fluentcart-mcp/chatgpt-web.mdx'
+
 describe('beginner client journeys', () => {
 	it('gives every primary client a distinct existing page and direct chooser links', () => {
 		const index = read('web-docs/content/docs/fluentcart-mcp/index.mdx')
@@ -45,6 +49,18 @@ describe('beginner client journeys', () => {
 			assert.match(setup, new RegExp(route))
 		}
 		assert.match(index, /\[ChatGPT web\]\(\/docs\/fluentcart-mcp\/chatgpt-web\)/)
+		expectExisting(chatgptWebPage)
+	})
+
+	it('keeps the ChatGPT web tunnel separate from local ChatGPT and Codex STDIO setup', () => {
+		const chatgptWeb = readRequired(chatgptWebPage)
+		const chatgptDesktop = readRequired(beginnerPages['ChatGPT Desktop'])
+
+		assert.match(chatgptWeb, /Secure MCP Tunnel/i)
+		assert.match(chatgptWeb, /does not read[^.]*\.codex\/config\.toml/i)
+		assert.doesNotMatch(chatgptWeb, /Settings → MCP servers → Add server|codex mcp add/i)
+		assert.match(chatgptDesktop, /Settings → MCP servers → Add server/i)
+		assert.doesNotMatch(chatgptDesktop, /Secure MCP Tunnel/i)
 	})
 
 	it('uses common beginner recipe headings and one dashboard verification prompt', () => {
@@ -63,17 +79,23 @@ describe('beginner client journeys', () => {
 		}
 	})
 
-	it('keeps Claude no-Node and local-client Node and no-global-install guidance distinct', () => {
+	it('keeps Claude no-Node and each local client Node and npx guidance distinct', () => {
 		const claude = readRequired(beginnerPages['Claude Desktop'])
-		const localClients = [
-			readRequired(beginnerPages['ChatGPT Desktop']),
-			readRequired(beginnerPages.Cursor),
-			readRequired(beginnerPages['Other clients']),
-		].join('\n')
 
 		assert.match(claude, /no Terminal or separate Node\.js installation is required/i)
-		assert.match(localClients, /Node\.js 24/i)
-		assert.match(localClients, /does not install[^.]*globally/i)
+		for (const relativePath of [
+			beginnerPages['ChatGPT Desktop'],
+			beginnerPages.Cursor,
+			beginnerPages['Other clients'],
+		]) {
+			const page = readRequired(relativePath)
+			assert.match(page, /Node\.js 24 or newer/i, `${relativePath} must require Node.js 24 or newer`)
+			assert.match(
+				page,
+				/npx -y[\s\S]{0,200}does not install[^.]*globally/i,
+				`${relativePath} must tie no-global-install guidance to npx`,
+			)
+		}
 	})
 })
 
@@ -94,14 +116,9 @@ describe('safe diagnostics', () => {
 
 describe('current release parity', () => {
 	it('keeps current-facing package versions out of non-historical content', () => {
-		for (const relativePath of [
-			'web-docs/content/docs/fluentcart-mcp/usage.mdx',
-			'web-docs/content/docs/fluentcart-mcp/tools.mdx',
-			'web-docs/app/(home)/fluentcart-mcp/page.tsx',
-			'web-docs/app/(home)/fluentcart-mcp/layout.tsx',
-			'web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx',
-		]) {
-			assert.doesNotMatch(read(relativePath), /\b2\.0\.0\b/, `${relativePath} presents a stale release version`)
+		for (const path of currentFacingFiles()) {
+			if (path.endsWith('/changelog.mdx')) continue
+			assert.doesNotMatch(readFileSync(path, 'utf8'), /\b2\.0\.0\b/, `${path} presents a stale release version`)
 		}
 	})
 
@@ -130,21 +147,39 @@ describe('current release parity', () => {
 })
 
 describe('usage policy examples', () => {
-	it('does not offer unavailable file uploads or global tax-settings writes as prompts', () => {
+	it('keeps the default read-only and does not offer unavailable writes as prompts', () => {
 		const usage = read('web-docs/content/docs/fluentcart-mcp/usage.mdx')
+		assert.match(usage, /default[^.]{0,100}(?:read-only|reads? and nothing else|writes? disabled)/i)
 		assert.doesNotMatch(usage, /["'](?:upload|attach) [^"']*(?:file|document)[^"']*["']/i)
 		assert.doesNotMatch(usage, /["'](?:save|change|update) [^"']*(?:global )?tax settings[^"']*["']/i)
+		assert.doesNotMatch(usage, /["'](?:delete|remove) [^"']*(?:order|product|customer|coupon|subscription)[^"']*["']/i)
+		assert.doesNotMatch(usage, /["'](?:bulk[- ]?(?:edit|update|delete)|update [^"']* in bulk)[^"']*["']/i)
+		assert.doesNotMatch(usage, /["'](?:change|set|update) [^"']*order status[^"']*["']/i)
+		assert.doesNotMatch(usage, /["']mark [^"']*order paid[^"']*["']/i)
+		assert.doesNotMatch(usage, /["'](?:refund|cancel|charge|capture) [^"']*(?:order|subscription|card|payment)[^"']*["']/i)
 	})
 })
 
 describe('marketing and blog truth', () => {
-	it('does not turn source definitions into unqualified marketing metadata', () => {
-		const layout = read('web-docs/app/(home)/fluentcart-mcp/layout.tsx')
+	it('does not turn source definitions into unqualified marketing counts', () => {
+		const layoutPath = 'web-docs/app/(home)/fluentcart-mcp/layout.tsx'
+		const layout = read(layoutPath)
 		assert.match(
 			layout,
 			/description: "Open-source MCP server for reading and safely administering a FluentCart store from supported AI clients\."/,
 		)
 		assert.doesNotMatch(layout, /mcpToolCount|mcpSourceDefinitionCount/)
+
+		for (const relativePath of CURRENT_FACING_MARKETING_FILES) {
+			const marketing = read(relativePath)
+			assert.doesNotMatch(marketing, /mcpToolCount|mcpSourceDefinitionCount/i, `${relativePath} exposes a source count`)
+			assert.doesNotMatch(marketing, /\b\d+\s+(?:source\s+)?tools?\b/i, `${relativePath} presents an unqualified tool count`)
+		}
+
+		const comparison = read('web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx')
+		assert.match(comparison, /source (?:registry|definitions?)/i)
+		assert.match(comparison, /measured profiles?/i)
+		assert.match(comparison, /client-visible/i)
 	})
 
 	it('links beginner and advanced readers to their truthful destinations', () => {

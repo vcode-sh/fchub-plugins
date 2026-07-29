@@ -37,6 +37,8 @@ const UNAVAILABLE_MARKER = new RegExp(
 
 const REAL_MONEY_SUBJECT =
 	/fluentcart_order_refund|fluentcart_subscription_cancel|\brefunds?\b|\brefunding\b|subscription cancellation|\bcancellations?\b|\breal-money\b/i
+const HIGH_IMPACT_WRITE_SUBJECT =
+	/\bdelet(?:e|es|ed|ing|ion|ions)\b|\bbulk(?:[- ](?:action|actions|edit|edits|update|updates|mutation|mutations))?\b|\b(?:change|set|update)\b[^.]{0,40}\border status\b|\bmark(?:ing)?\b[^.]{0,24}\border paid\b|\b(?:charge|capture)\b[^.]{0,40}\b(?:card|payment)\b|\bmoney-moving\b/i
 const OFFICIAL_MCP_CONTEXT = /\bofficial\s+(?:FluentCart\s+)?(?:MCP|server)\b/i
 const CERTIFICATION_NEGATION = /\b(not|no)\b[^.]{0,80}\b(certified|certification)\b/i
 const GUARD_MECHANICS =
@@ -283,6 +285,23 @@ export const RULES = [
 						!UNAVAILABLE_MARKER.test(part) &&
 						(!OFFICIAL_MCP_CONTEXT.test(part) ||
 							/\bFluentCart MCP\b/i.test(part.replace(OFFICIAL_MCP_CONTEXT, ''))),
+				),
+	},
+	{
+		id: 'unavailable-high-impact-write-presented-as-available',
+		selfNegating: true,
+		message:
+			'deletion, bulk work, order-state changes, marking paid and money-moving actions are unavailable in every mode',
+		test: (line) =>
+			line
+				.split('|')
+				.some(
+					(part) =>
+						HIGH_IMPACT_WRITE_SUBJECT.test(part) &&
+						(AVAILABILITY_VERB.test(part) || /\b(?:can|may)\b/i.test(part) || /\bmark\s+an\s+order\s+paid\b/i.test(part)) &&
+						!UNAVAILABLE_MARKER.test(part) &&
+						!/\b(?:does|do|is|are|can|could)\s+not\b/i.test(part) &&
+						!/\b(?:in|at)\s+no\s+mode\b/i.test(part),
 				),
 	},
 	{
