@@ -120,10 +120,18 @@ export const RULES = [
 	},
 	{
 		id: 'direct-publication-claim',
-		message: 'release truth stages npm under next and requires owner-triggered promotion',
+		message: 'release truth uses native npm staging, interactive 2FA approval and separate promotion',
 		test: (line, truth) =>
-			Boolean(truth.promotion?.npmStagingTag && truth.promotion?.npmPromotionTag) &&
+			truth.promotion?.npmPublishing === 'trusted-staged' &&
 			/\b(tag|push)\b[^.]{0,120}\b(npm\s+publish|publish\s+(?:to\s+)?npm|GitHub Release|Docker)\b/i.test(line),
+	},
+	{
+		id: 'obsolete-npm-release-flow',
+		message: 'npm release flow has no next tag or stored npm token',
+		test: (line, truth) =>
+			truth.promotion?.npmPublishing === 'trusted-staged' &&
+			(/\bnpm\b[^.\n]{0,80}\bnext\b/i.test(line) ||
+				/\b(?:NPM_PROMOTION_TOKEN|NPM_TOKEN|NODE_AUTH_TOKEN)\b/.test(line)),
 	},
 	{
 		id: 'broad-client-certification',

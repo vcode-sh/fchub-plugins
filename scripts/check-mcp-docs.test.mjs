@@ -68,6 +68,8 @@ describe('FluentCart MCP documentation truth gate', () => {
 			'obsolete-protocol.md': 'The server speaks MCP protocol 2024-11-05.',
 			'stale-red-gates.md': 'Two red gates remain before certification.',
 			'direct-publication.md': 'Tag fluentcart-mcp/v<package-version> to publish npm and create a GitHub Release.',
+			'legacy-next-flow.md': 'The release workflow publishes npm under `next` before promotion.',
+			'legacy-token-flow.md': 'Configure NPM_PROMOTION_TOKEN for the promotion workflow.',
 			'broad-certification.md': 'All MCP clients are certified for FluentCart MCP 2.0.0.',
 		}
 		const files = Object.entries(claims).map(([name, text]) => fixture(name, text))
@@ -85,6 +87,8 @@ describe('FluentCart MCP documentation truth gate', () => {
 		assert.deepEqual(byFile['obsolete-protocol.md'], ['obsolete-protocol'])
 		assert.deepEqual(byFile['stale-red-gates.md'], ['stale-red-gate-count'])
 		assert.deepEqual(byFile['direct-publication.md'], ['direct-publication-claim'])
+		assert.deepEqual(byFile['legacy-next-flow.md'], ['obsolete-npm-release-flow'])
+		assert.deepEqual(byFile['legacy-token-flow.md'], ['obsolete-npm-release-flow'])
 		assert.deepEqual(byFile['broad-certification.md'], ['broad-client-certification'])
 	})
 })

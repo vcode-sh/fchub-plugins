@@ -1,5 +1,5 @@
-# A release tag stages immutable candidate bytes. It deliberately stops before any public
-# GitHub Release, npm latest move or mutable container tag.
+# A release tag stages immutable npm bytes through Trusted Publishing and publishes immutable
+# versioned containers. Human 2FA approval is deliberately separate from mutable promotion.
 name: MCP Stage
 
 on:
@@ -49,63 +49,28 @@ jobs:
         with:
           node-version: '24.13.0'
           registry-url: https://registry.npmjs.org
+      - name: Install the reviewed staged-publishing CLI
+        run: npm install --global npm@11.15.0
       - name: Verify reviewed release toolchain
         run: |
           test "$(node --version)" = "v24.13.0"
-          test "$(npm --version)" = "11.6.2"
-      - name: Publish inspected candidate under next
+          test "$(npm --version)" = "11.15.0"
+      - name: Stage inspected candidate for interactive latest approval
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           TARBALL="./dist-packages/fluentcart-mcp-${VERSION}.tgz"
-          npm publish "$TARBALL" --provenance --access public --tag next
-
-  verify-public:
-    runs-on: ubuntu-latest
-    needs: [validate, docker, stage-npm]
-    permissions:
-      actions: write
-      contents: read
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.validate.outputs.artifact_name }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.13.0'
-          registry-url: https://registry.npmjs.org
-      - name: Verify reviewed release toolchain
-        run: |
-          test "$(node --version)" = "v24.13.0"
-          test "$(npm --version)" = "11.6.2"
-      - name: Verify public tarball checksum, clean install and both protocol eras
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
-        run: |
-          mkdir public clean
-          npm pack "fluentcart-mcp@${VERSION}" --pack-destination public --registry https://registry.npmjs.org
-          TARBALL="fluentcart-mcp-${VERSION}.tgz"
-          EXPECTED=$(node -e "const s=require('./dist-packages/SHA256SUMS.json'); console.log(s.files.find(x=>x.file==='$TARBALL').sha256)")
-          ACTUAL=$(sha256sum "public/$TARBALL" | cut -d' ' -f1)
-          test "$ACTUAL" = "$EXPECTED"
-          cd clean
-          npm init -y
-          npm add --ignore-scripts --registry https://registry.npmjs.org \
-            "../public/$TARBALL" @modelcontextprotocol/client@2.0.0
-          cp ../scripts/smoke-public-stdio.mjs .
-          node smoke-public-stdio.mjs node_modules/fluentcart-mcp/dist/index.js
-      - name: Write staging evidence
+          npm stage publish "$TARBALL" --provenance --access public --tag latest --json \
+            > "$RUNNER_TEMP/npm-stage.json"
+      - name: Bind native stage and immutable candidates into evidence
         env:
           VERSION: ${{ needs.validate.outputs.version }}
           SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
           SOURCE_TREE_DIGEST: ${{ needs.validate.outputs.source_tree_digest }}
           GHCR_DIGEST: ${{ needs.docker.outputs.ghcr_digest }}
           DOCKERHUB_DIGEST: ${{ needs.docker.outputs.dockerhub_digest }}
-        run: |
-          export NPM_INTEGRITY CHECKSUMS_SHA256
-          NPM_INTEGRITY=$(npm view "fluentcart-mcp@${VERSION}" dist.integrity --json)
-          CHECKSUMS_SHA256=$(sha256sum dist-packages/SHA256SUMS.json | cut -d' ' -f1)
-          node -e "const fs=require('fs'); fs.writeFileSync('dist-packages/staging-state.json', JSON.stringify({schemaVersion:2,version:process.env.VERSION,sourceSha:process.env.SOURCE_SHA,sourceTreeDigest:process.env.SOURCE_TREE_DIGEST,checksumsSha256:process.env.CHECKSUMS_SHA256,npmIntegrity:JSON.parse(process.env.NPM_INTEGRITY),dockerDigests:{'ghcr.io':process.env.GHCR_DIGEST,'docker.io':process.env.DOCKERHUB_DIGEST}},null,2)+'\\n')"
+          STAGE_RESULT: ${{ runner.temp }}/npm-stage.json
+        run: node dist-packages/verification/scripts/write-staging-state.mjs
       - name: Reinspect the exact staging handoff
         run: node dist-packages/verification/scripts/verify-staged-release.mjs --root dist-packages
       - uses: actions/upload-artifact@v4

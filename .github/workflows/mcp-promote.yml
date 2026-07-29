@@ -1,5 +1,5 @@
-# Owner-only release promotion. This workflow re-verifies public staged bytes and retags them;
-# it contains no checkout, dependency install, compile, package or image build.
+# Owner-only release promotion after npm's separate interactive 2FA approval. This workflow has no
+# npm credential or npm write; it only verifies public npm bytes and promotes matching containers.
 name: MCP Promote
 
 on:
@@ -58,13 +58,27 @@ jobs:
           test -f verification/scripts/inspect-npm-pack.mjs
           test -f verification/scripts/inspect-mcpb.mjs
           node verification/scripts/verify-staged-release.mjs --root .
-      - name: Verify public npm integrity
+      - name: Verify approved npm latest, public bytes and both protocol eras
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          EXPECTED=$(node -p "require('./staging-state.json').npmIntegrity")
+          EXPECTED=$(node -p "const s=require('./staging-state.json'); s.npm?.expectedIntegrity ?? s.npmIntegrity")
           ACTUAL=$(npm view "fluentcart-mcp@${VERSION}" dist.integrity --json | tr -d '"')
           test "$ACTUAL" = "$EXPECTED"
+          test "$(npm view fluentcart-mcp dist-tags.latest --json | tr -d '"')" = "$VERSION"
+          mkdir public clean
+          npm pack "fluentcart-mcp@${VERSION}" --pack-destination public \
+            --registry https://registry.npmjs.org
+          TARBALL="fluentcart-mcp-${VERSION}.tgz"
+          EXPECTED_SHA=$(node -e "const s=require('./SHA256SUMS.json'); console.log(s.files.find(x=>x.file==='$TARBALL').sha256)")
+          ACTUAL_SHA=$(sha256sum "public/$TARBALL" | cut -d' ' -f1)
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          cd clean
+          npm init -y
+          npm add --ignore-scripts --registry https://registry.npmjs.org \
+            "../public/$TARBALL" @modelcontextprotocol/client@2.0.0
+          cp ../scripts/smoke-public-stdio.mjs .
+          node smoke-public-stdio.mjs node_modules/fluentcart-mcp/dist/index.js
       - name: Verify versioned Docker digests
         env:
           VERSION: ${{ inputs.version }}
@@ -84,12 +98,10 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Promote npm and the same Docker digests
+      - name: Promote the same Docker digests
         env:
           VERSION: ${{ inputs.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm dist-tag add "fluentcart-mcp@${VERSION}" latest
           GHCR_DIGEST=$(node -p "require('./staging-state.json').dockerDigests['ghcr.io']")
           DOCKERHUB_DIGEST=$(node -p "require('./staging-state.json').dockerDigests['docker.io']")
           docker buildx imagetools create --tag "${GHCR_IMAGE}:latest" "${GHCR_IMAGE}@${GHCR_DIGEST}"
@@ -107,10 +119,3 @@ jobs:
             "fluentcart-mcp-${VERSION}.tgz" \
             "SHA256SUMS.json" \
             "release-contract.json"
-      - name: Remove temporary npm tag
-        env:
-          VERSION: ${{ inputs.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          test "$(npm view fluentcart-mcp dist-tags.next)" = "$VERSION"
-          npm dist-tag rm fluentcart-mcp next

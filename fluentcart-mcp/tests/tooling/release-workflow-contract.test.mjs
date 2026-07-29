@@ -11,6 +11,10 @@ const ci = read('mcp-ci.yml')
 const stage = read('mcp-release.yml')
 const docker = read('mcp-docker.yml')
 const promote = read('mcp-promote.yml')
+const stageState = readFileSync(
+	join(ROOT, 'fluentcart-mcp', 'scripts', 'write-staging-state.mjs'),
+	'utf8',
+)
 
 function jobs(workflow) {
 	const start = workflow.search(/^jobs:\s*$/m)
@@ -61,16 +65,13 @@ describe('single-build candidate graph', () => {
 
 describe('tag-triggered staging', () => {
 	it('stages only after candidate Docker succeeds', () => {
-		assert.deepEqual(jobs(stage), [
-			'validate',
-			'version-gate',
-			'docker',
-			'stage-npm',
-			'verify-public',
-		])
+		assert.deepEqual(jobs(stage), ['validate', 'version-gate', 'docker', 'stage-npm'])
 		assert.match(job(stage, 'stage-npm'), /needs:\s*\[validate,\s*version-gate,\s*docker\]/)
 		assert.match(job(stage, 'stage-npm'), /TARBALL="\.\/dist-packages\//)
-		assert.match(job(stage, 'stage-npm'), /npm publish "\$TARBALL".*--tag next/)
+		assert.match(
+			job(stage, 'stage-npm'),
+			/npm stage publish "\$TARBALL".*--provenance.*--access public.*--tag latest.*--json/,
+		)
 	})
 
 	it('grants the nested Docker publisher the package permission it cannot elevate itself', () => {
@@ -79,29 +80,30 @@ describe('tag-triggered staging', () => {
 		assert.match(body, /permissions:[\s\S]*?\n\s+packages:\s*write/)
 	})
 
-	it('verifies public checksum, clean install and dual-era stdio before evidence upload', () => {
-		const body = job(stage, 'verify-public')
-		assert.match(body, /npm pack "fluentcart-mcp@\$\{VERSION\}"/)
-		assert.match(body, /sha256sum/)
-		assert.match(body, /npm add --ignore-scripts --registry https:\/\/registry\.npmjs\.org/)
-		assert.match(body, /smoke-public-stdio\.mjs/)
-		assert.match(body, /staging-state\.json/)
+	it('records the native npm stage and local candidate integrity before evidence upload', () => {
+		const body = job(stage, 'stage-npm')
+		assert.match(body, /write-staging-state\.mjs/)
+		assert.match(body, /actions\/upload-artifact@v4/)
+		assert.doesNotMatch(body, /npm view|npm pack "fluentcart-mcp@/)
+		assert.match(stageState, /stageId/)
+		assert.match(stageState, /expectedIntegrity/)
+		assert.match(stageState, /staging-state\.json/)
+		assert.match(stageState, /createHash\('sha512'\)|sha\(tarballBytes,\s*'sha512'/)
 	})
 
 	it('never moves latest, creates a public release or rebuilds in a publication job', () => {
 		assert.doesNotMatch(stage, /dist-tag add .* latest/)
 		assert.doesNotMatch(stage, /gh release create/)
-		assert.doesNotMatch(stage, /:latest/)
-		for (const name of ['stage-npm', 'verify-public']) {
-			assert.doesNotMatch(job(stage, name), /\bnpm ci\b|\bnpm run build\b|\bdocker build\b/)
-		}
+		assert.doesNotMatch(stage, /imagetools create.*:latest/)
+		assert.doesNotMatch(job(stage, 'stage-npm'), /\bnpm ci\b|\bnpm run build\b|\bdocker build\b/)
 	})
 
-	it('uses one exact reviewed Node and npm toolchain without installing another CLI', () => {
-		assert.doesNotMatch(stage, /\bnpm install\b|npm@latest/)
+	it('uses the first reviewed npm CLI with native staged publishing support', () => {
+		assert.doesNotMatch(stage, /npm@latest/)
 		assert.match(stage, /node-version:\s*'24\.13\.0'/)
-		assert.match(stage, /test "\$\(npm --version\)" = "11\.6\.2"/)
-		assert.ok(stage.indexOf('npm --version') < stage.indexOf('npm publish'))
+		assert.match(stage, /npm install --global npm@11\.15\.0/)
+		assert.match(stage, /test "\$\(npm --version\)" = "11\.15\.0"/)
+		assert.ok(stage.indexOf('npm --version') < stage.indexOf('npm stage publish'))
 	})
 })
 
@@ -171,28 +173,23 @@ describe('owner evidence-bound promotion', () => {
 		assert.match(job(promote, 'promote'), /environment:\s*mcp-production/)
 	})
 
-	it('redownloads the exact run and verifies npm plus both versioned image digests', () => {
+	it('redownloads the exact run and verifies approved npm latest plus both image digests', () => {
 		const body = job(promote, 'promote')
 		assert.match(body, /run-id:\s*\$\{\{\s*inputs\.staging_run_id\s*\}\}/)
 		assert.match(body, /staging identity mismatch/)
 		assert.match(body, /npm view "fluentcart-mcp@\$\{VERSION\}" dist\.integrity/)
+		assert.match(body, /npm view fluentcart-mcp dist-tags\.latest/)
 		assert.equal((body.match(/imagetools inspect/g) ?? []).length, 2)
 	})
 
-	it('verifies every staged byte and both inspectors before exposing credentials or mutating tags', () => {
+	it('verifies every staged byte and both inspectors before mutable container tags', () => {
 		const body = job(promote, 'promote')
 		assert.match(body, /verify-staged-release\.mjs/)
 		assert.match(body, /SHA256SUMS\.json/)
 		assert.match(body, /inspect-npm-pack\.mjs/)
 		assert.match(body, /inspect-mcpb\.mjs/)
 		const verification = body.indexOf('verify-staged-release.mjs')
-		for (const mutation of [
-			'docker/login-action',
-			'NODE_AUTH_TOKEN',
-			'npm dist-tag add',
-			'imagetools create',
-			'gh release create',
-		]) {
+		for (const mutation of ['docker/login-action', 'imagetools create', 'gh release create']) {
 			assert.ok(
 				verification < body.indexOf(mutation),
 				`${mutation} precedes local evidence verification`,
@@ -200,25 +197,29 @@ describe('owner evidence-bound promotion', () => {
 		}
 	})
 
-	it('retags the same digests, then creates the release and removes next', () => {
+	it('verifies public bytes, retags the same image digests and creates the release', () => {
 		const body = job(promote, 'promote')
-		assert.match(body, /npm dist-tag add "fluentcart-mcp@\$\{VERSION\}" latest/)
+		assert.match(body, /npm pack "fluentcart-mcp@\$\{VERSION\}"/)
+		assert.match(body, /npm add --ignore-scripts --registry https:\/\/registry\.npmjs\.org/)
+		assert.match(body, /smoke-public-stdio\.mjs/)
 		assert.equal((body.match(/imagetools create/g) ?? []).length, 2)
 		assert.match(body, /gh release create/)
-		assert.match(body, /npm dist-tag rm fluentcart-mcp next/)
+		assert.doesNotMatch(body, /npm dist-tag/)
 		assert.doesNotMatch(body, /\bnpm ci\b|\bnpm run build\b|\bdocker build\b|\bpack:release\b/)
 		assert.doesNotMatch(body, /actions\/checkout/)
 	})
 })
 
 describe('workflow credential boundary', () => {
-	it('uses trusted publishing for staging and the established owner token for promotion', () => {
+	it('uses trusted publishing for staging and no npm credential for promotion', () => {
 		assert.match(job(stage, 'stage-npm'), /id-token:\s*write/)
 		assert.match(job(stage, 'stage-npm'), /--provenance/)
-		assert.doesNotMatch(stage, /NPM_TOKEN|NODE_AUTH_TOKEN/)
-		assert.match(promote, /secrets\.NPM_TOKEN/)
-		assert.match(promote, /NODE_AUTH_TOKEN/)
-		assert.doesNotMatch(promote, /secrets\.NPM_PROMOTION_TOKEN/)
+		for (const workflow of [stage, promote]) {
+			assert.doesNotMatch(
+				workflow,
+				/NPM_TOKEN|NPM_PROMOTION_TOKEN|NODE_AUTH_TOKEN|npm dist-tag|npm publish/,
+			)
+		}
 	})
 
 	it('never injects a real store credential into deterministic release jobs', () => {
@@ -229,10 +230,9 @@ describe('workflow credential boundary', () => {
 	})
 
 	it('uses the reviewed promotion toolchain without npm install or a mutable npm selector', () => {
-		assert.doesNotMatch(promote, /\bnpm install\b|npm@latest/)
+		assert.doesNotMatch(promote, /npm install --global|npm@latest/)
 		assert.match(promote, /node-version:\s*'24\.13\.0'/)
 		assert.match(promote, /test "\$\(npm --version\)" = "11\.6\.2"/)
 		assert.ok(promote.indexOf('npm --version') < promote.indexOf('github-token'))
-		assert.ok(promote.indexOf('npm --version') < promote.indexOf('NPM_TOKEN'))
 	})
 })

@@ -58,8 +58,10 @@ describe('generated release truth', () => {
 			assert.match(digest, /^sha256:[a-f0-9]{64}$/)
 		}
 		assert.deepEqual(promotion, {
-			npmStagingTag: 'next',
-			npmPromotionTag: 'latest',
+			npmPublishing: 'trusted-staged',
+			npmStageTag: 'latest',
+			npmApproval: 'interactive-2fa',
+			npmPromotionWrite: false,
 			previousLatest: fixture.npm.previousLatest,
 			previousDockerDigests: fixture.docker.previousLatestDigests,
 		})
@@ -157,9 +159,9 @@ describe('staging and promotion workflows', () => {
 	const docker = read('.github/workflows/mcp-docker.yml')
 	const promote = read('.github/workflows/mcp-promote.yml')
 
-	it('stages npm under next and publishes Docker by immutable version only', () => {
-		assert.match(stage, /npm publish "\$TARBALL".*--tag next/)
-		assert.doesNotMatch(stage, /dist-tag add .* latest/)
+	it('stages npm for interactive latest approval and publishes Docker by immutable version only', () => {
+		assert.match(stage, /npm stage publish "\$TARBALL".*--tag latest/)
+		assert.doesNotMatch(stage, /npm publish|npm dist-tag/)
 		assert.doesNotMatch(stage, /gh release create/)
 		assert.doesNotMatch(docker, /:\s*latest|:latest/)
 		assert.match(docker, /docker-content-digest|imagetools inspect/)
@@ -171,10 +173,10 @@ describe('staging and promotion workflows', () => {
 			assert.match(promote, new RegExp(`${input}:\\n[\\s\\S]*?required: true`))
 		}
 		assert.match(promote, /run-id:\s*\$\{\{\s*inputs\.staging_run_id\s*\}\}/)
-		assert.match(promote, /npm dist-tag add .* latest/)
+		assert.match(promote, /npm view fluentcart-mcp dist-tags\.latest/)
 		assert.match(promote, /imagetools create/)
 		assert.match(promote, /gh release create/)
-		assert.match(promote, /npm dist-tag rm .* next/)
+		assert.doesNotMatch(promote, /npm dist-tag|NPM_TOKEN|NODE_AUTH_TOKEN/)
 		assert.doesNotMatch(promote, /\bnpm ci\b|\bnpm run build\b|\bdocker build\b/)
 	})
 })
@@ -206,8 +208,9 @@ describe('public recovery contract', () => {
 
 	it('documents staged promotion and safe recovery without pretending versions are reusable', () => {
 		for (const pattern of [
-			/npm `?next/,
-			/npm `?latest/,
+			/trusted publishing/,
+			/staged publish/,
+			/interactive 2fa/,
 			/deprecate/,
 			/never reuse/,
 			/new patch version/,

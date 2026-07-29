@@ -120,9 +120,11 @@ FluentCart's admin or its official operator tooling for those jobs.
 
 ## Safe Release Recovery
 
-The staging workflow records the inspected package as npm `next` together with versioned Docker
-images. A separate owner-triggered promotion rechecks the immutable evidence before moving those
-same bytes to npm `latest`, updating matching Docker tags, and creating the GitHub Release.
+The staging workflow uses npm Trusted Publishing to create a native staged publish tagged
+`latest`, together with versioned Docker images. The package is not public until the owner reviews
+the staged bytes and approves them with interactive 2FA. A separate promotion with no npm
+credential or npm write rechecks public npm `latest` and the immutable evidence before updating
+matching Docker tags and creating the GitHub Release.
 
 Published package versions are immutable: never reuse a version. If a candidate is unsuitable,
 deprecate it, restore mutable tags to the previously recorded digests where necessary, fix the

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, describe, it } from 'node:test'
 import { verifyStagingChecksums } from '../../scripts/verify-staged-release.mjs'
+import { buildStagingState, parseNativeStageResult } from '../../scripts/write-staging-state.mjs'
 
 const scratch = mkdtempSync(join(tmpdir(), 'staging-evidence-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
@@ -22,7 +23,7 @@ function sha256(value) {
 	return createHash('sha256').update(value).digest('hex')
 }
 
-function writeGoodEvidence() {
+function writeGoodEvidence(schemaVersion = 3) {
 	const files = REQUIRED_ASSETS.map((file) => {
 		const value = Buffer.from(`checked bytes for ${file}\n`)
 		writeFileSync(join(scratch, file), value)
@@ -34,12 +35,20 @@ function writeGoodEvidence() {
 		join(scratch, 'staging-state.json'),
 		`${JSON.stringify(
 			{
-				schemaVersion: 2,
+				schemaVersion,
 				version: VERSION,
 				sourceSha: '1'.repeat(40),
 				sourceTreeDigest: `sha256:${'2'.repeat(64)}`,
 				checksumsSha256: sha256(checksums),
-				npmIntegrity: 'sha512-public',
+				...(schemaVersion === 2
+					? { npmIntegrity: 'sha512-legacy-public' }
+					: {
+							npm: {
+								stageId: '123e4567-e89b-42d3-a456-426614174000',
+								tag: 'latest',
+								expectedIntegrity: 'sha512-native-stage',
+							},
+						}),
 				dockerDigests: {
 					'ghcr.io': `sha256:${'3'.repeat(64)}`,
 					'docker.io': `sha256:${'4'.repeat(64)}`,
@@ -55,6 +64,20 @@ describe('downloaded staging evidence', () => {
 	it('accepts the exact checksum-bound asset set', () => {
 		writeGoodEvidence()
 		assert.doesNotThrow(() => verifyStagingChecksums(scratch))
+	})
+
+	it('accepts schema 2 evidence for the one-time 2.0.0 recovery', () => {
+		writeGoodEvidence(2)
+		assert.doesNotThrow(() => verifyStagingChecksums(scratch))
+	})
+
+	it('rejects native evidence without an npm stage identifier', () => {
+		writeGoodEvidence()
+		const statePath = join(scratch, 'staging-state.json')
+		const state = JSON.parse(readFileSync(statePath, 'utf8'))
+		state.npm.stageId = ''
+		writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`)
+		assert.throws(() => verifyStagingChecksums(scratch), /invalid npm stageId/)
 	})
 
 	for (const file of REQUIRED_ASSETS) {
@@ -81,5 +104,66 @@ describe('downloaded staging evidence', () => {
 		writeGoodEvidence()
 		writeFileSync(join(scratch, 'unreviewed.sh'), 'echo nope\n')
 		assert.throws(() => verifyStagingChecksums(scratch), /unreviewed\.sh is not checksummed/)
+	})
+})
+
+describe('native npm stage result', () => {
+	const tarball = Buffer.from('reviewed npm tarball')
+	const integrity = `sha512-${createHash('sha512').update(tarball).digest('base64')}`
+	const stageId = '123e4567-e89b-42d3-a456-426614174000'
+	const nativeResult = {
+		'fluentcart-mcp': {
+			name: 'fluentcart-mcp',
+			version: VERSION,
+			integrity,
+			stageId,
+		},
+	}
+
+	it('reads the package-keyed JSON shape emitted by npm 11.15', () => {
+		assert.equal(
+			parseNativeStageResult(nativeResult, 'fluentcart-mcp', VERSION, integrity).stageId,
+			stageId,
+		)
+	})
+
+	it('rejects the flat shape that would orphan a successful native stage', () => {
+		assert.throws(
+			() =>
+				parseNativeStageResult(
+					nativeResult['fluentcart-mcp'],
+					'fluentcart-mcp',
+					VERSION,
+					integrity,
+				),
+			/expected fluentcart-mcp package key/,
+		)
+	})
+
+	it('binds npm identity and local integrity into schema 3 evidence', () => {
+		const state = buildStagingState({
+			stageResult: JSON.stringify(nativeResult),
+			tarballBytes: tarball,
+			checksumsBytes: Buffer.from('checksums'),
+			version: VERSION,
+			sourceSha: '1'.repeat(40),
+			sourceTreeDigest: `sha256:${'2'.repeat(64)}`,
+			ghcrDigest: `sha256:${'3'.repeat(64)}`,
+			dockerhubDigest: `sha256:${'4'.repeat(64)}`,
+		})
+		assert.deepEqual(state.npm, {
+			stageId,
+			tag: 'latest',
+			expectedIntegrity: integrity,
+		})
+	})
+
+	it('rejects a stage result whose integrity differs from the inspected tarball', () => {
+		const changed = structuredClone(nativeResult)
+		changed['fluentcart-mcp'].integrity = 'sha512-wrong'
+		assert.throws(
+			() => parseNativeStageResult(changed, 'fluentcart-mcp', VERSION, integrity),
+			/integrity does not match/,
+		)
 	})
 })

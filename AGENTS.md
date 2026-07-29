@@ -35,13 +35,15 @@ owner performs publication.
 
 ## MCP release boundary
 
-A `fluentcart-mcp/v*` tag stages immutable candidate bytes only: versioned
-Docker images and an inspected npm package under the `next` tag. It does not
-move npm `latest`, create mutable Docker tags or create a GitHub Release.
-The owner alone dispatches `mcp-promote.yml` with the exact version, committed
-source SHA and staging run ID. Promotion re-verifies the staged artefacts, moves
-the same npm and Docker bytes to `latest`, creates the GitHub Release, then
-removes `next`.
+A `fluentcart-mcp/v*` tag uses npm Trusted Publishing to create a native staged
+publish with the immutable `latest` tag. It also publishes versioned Docker
+images and evidence, but does not make npm public, create mutable Docker tags or
+create a GitHub Release. The owner reviews and approves the npm stage with
+interactive 2FA, then dispatches `mcp-promote.yml` with the exact version,
+committed source SHA and staging run ID. Promotion has no npm credential or npm
+write: it verifies that npm `latest` is the approved version, rechecks the public
+bytes and versioned images, updates Docker `latest`, and creates the GitHub
+Release.
 
 ## Plugin commands
 

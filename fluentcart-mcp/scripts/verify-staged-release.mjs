@@ -13,6 +13,7 @@ import { PROVENANCE_PATH, releaseIdentityFailures } from './release-identity.mjs
 const SCRIPT_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const DIGEST = /^sha256:[0-9a-f]{64}$/
 const SHA = /^[0-9a-f]{40}$/
+const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
 const REQUIRED_FIXED = [
 	'fluentcart-mcp.mcpb',
 	'fluentcart-mcp-docker-context.tar.gz',
@@ -56,7 +57,9 @@ export function verifyStagingChecksums(root) {
 	const checksumsRaw = readFileSync(checksumsPath)
 	const checksums = JSON.parse(checksumsRaw.toString('utf8'))
 
-	if (state.schemaVersion !== 2) throw new Error('staging-state.json must use schema version 2')
+	if (![2, 3].includes(state.schemaVersion)) {
+		throw new Error('staging-state.json must use schema version 2 or 3')
+	}
 	if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(state.version ?? '')) {
 		throw new Error('staging-state.json has an invalid version')
 	}
@@ -64,8 +67,23 @@ export function verifyStagingChecksums(root) {
 	if (!DIGEST.test(state.sourceTreeDigest ?? '')) {
 		throw new Error('staging-state.json has an invalid sourceTreeDigest')
 	}
-	if (typeof state.npmIntegrity !== 'string' || !state.npmIntegrity.startsWith('sha512-')) {
-		throw new Error('staging-state.json has an invalid npmIntegrity')
+	if (state.schemaVersion === 2) {
+		if (typeof state.npmIntegrity !== 'string' || !state.npmIntegrity.startsWith('sha512-')) {
+			throw new Error('staging-state.json has an invalid npmIntegrity')
+		}
+	} else {
+		if (!UUID.test(state.npm?.stageId ?? '')) {
+			throw new Error('staging-state.json has an invalid npm stageId')
+		}
+		if (state.npm?.tag !== 'latest') {
+			throw new Error('staging-state.json npm stage must target latest')
+		}
+		if (
+			typeof state.npm?.expectedIntegrity !== 'string' ||
+			!state.npm.expectedIntegrity.startsWith('sha512-')
+		) {
+			throw new Error('staging-state.json has an invalid expected npm integrity')
+		}
 	}
 	for (const registry of ['ghcr.io', 'docker.io']) {
 		if (!DIGEST.test(state.dockerDigests?.[registry] ?? '')) {

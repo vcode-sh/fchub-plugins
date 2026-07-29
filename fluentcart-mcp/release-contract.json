@@ -23,8 +23,10 @@
       "expectedFailures": []
     },
     "promotion": {
-      "npmStagingTag": "next",
-      "npmPromotionTag": "latest",
+      "npmPublishing": "trusted-staged",
+      "npmStageTag": "latest",
+      "npmApproval": "interactive-2fa",
+      "npmPromotionWrite": false,
       "previousLatest": "1.1.0",
       "previousDockerDigests": {
         "ghcr.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c",
@@ -80,9 +82,9 @@
       "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED"
     }
   },
-  "sourceTreeDigest": "sha256:1a89efc7c068034acf6b6800877ba902fbed923fac3b06688e99c4fd6e23adc7",
+  "sourceTreeDigest": "sha256:4231467552943a10fd51542e9c6ed980be1c24b45694a92e0edccd4ce03075f8",
   "sourceTreeInputs": {
-    "fileCount": 191,
+    "fileCount": 192,
     "declared": [
       {
         "file": "package.json"

@@ -75,6 +75,7 @@ const VERIFICATION_FILES = [
 	'scripts/inspect-npm-pack.mjs',
 	'scripts/release-identity.mjs',
 	'scripts/verify-staged-release.mjs',
+	'scripts/write-staging-state.mjs',
 ]
 
 function run(command, args, cwd) {

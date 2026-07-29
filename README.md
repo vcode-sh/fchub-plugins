@@ -80,9 +80,10 @@ git tag fchub-p24/v1.0.1
 git push origin fchub-p24/v1.0.1
 ```
 
-MCP server: tag `fluentcart-mcp/v<package-version>` → validate and stage npm `next` plus immutable
-versioned Docker images. A separate owner-triggered promotion moves the same verified artefacts to
-`latest` and creates the GitHub Release; promotion never rebuilds.
+MCP server: tag `fluentcart-mcp/v<package-version>` → validate, create a native npm staged publish
+through Trusted Publishing, and publish immutable versioned Docker images. The owner approves the
+npm stage with interactive 2FA. A separate npm-credential-free promotion verifies public npm
+`latest`, updates Docker `latest`, and creates the GitHub Release; promotion never rebuilds.
 
 **Tests:**
 ```bash

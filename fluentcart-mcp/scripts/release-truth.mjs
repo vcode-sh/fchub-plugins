@@ -57,8 +57,10 @@ export function buildReleaseTruth(pkg, releaseState = null) {
 			expectedFailures: [],
 		},
 		promotion: {
-			npmStagingTag: 'next',
-			npmPromotionTag: 'latest',
+			npmPublishing: 'trusted-staged',
+			npmStageTag: 'latest',
+			npmApproval: 'interactive-2fa',
+			npmPromotionWrite: false,
 			previousLatest: state.npm.previousLatest,
 			previousDockerDigests: state.docker.previousLatestDigests,
 		},
