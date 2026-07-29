@@ -125,6 +125,22 @@ describe('safe diagnostics', () => {
 		const jsonLint = troubleshooting.match(/.{0,160}jsonlint\.com.{0,160}/is)?.[0] ?? ''
 		assert.ok(!jsonLint || /redact/i.test(jsonLint))
 	})
+
+	it('keeps generated private-HTTP keys available to Docker and Compose', () => {
+		const deployment = read('web-docs/content/docs/fluentcart-mcp/deployment.mdx')
+		assert.match(deployment, /FLUENTCART_HTTP_KEY="\$\(openssl rand -hex 32\)"/)
+		assert.match(deployment, /FLUENTCART_MCP_API_KEY=\$FLUENTCART_HTTP_KEY/)
+		assert.match(deployment, /127\.0\.0\.1:3000:3000/)
+	})
+
+	it('demotes TLS verification bypass to a removable local diagnostic', () => {
+		const troubleshooting = read('web-docs/content/docs/fluentcart-mcp/troubleshooting.mdx')
+		assert.match(troubleshooting, /valid TLS certificate or a trusted local CA/i)
+		assert.match(
+			troubleshooting,
+			/NODE_TLS_REJECT_UNAUTHORIZED[\s\S]{0,400}(?:final temporary local diagnostic|remove it immediately)/i,
+		)
+	})
 })
 
 describe('current release parity', () => {

@@ -1,126 +1,43 @@
 ---
-title: Deployment
-description: Run FluentCart MCP on a VPS with Docker, because apparently localhost wasn't enough for you.
+title: Private HTTP deployment
+description: Run FluentCart MCP with Docker and a guarded private HTTP endpoint.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Callout } from 'fumadocs-ui/components/callout';
-import { Separator } from '@/components/ui/separator';
 
-Local clients should use the [Setup Guide](/docs/fluentcart-mcp/setup). This page covers two
-different jobs: connecting ChatGPT web without exposing a public listener, and running the private
-HTTP profile for other remote clients.
+This page is for an always-on Streamable HTTP server. Local desktop clients should use their
+standard STDIO recipe. [ChatGPT web](/docs/fluentcart-mcp/chatgpt-web) uses Secure MCP Tunnel
+instead; it is outbound-only and does not need this HTTP bearer-key deployment.
 
-## ChatGPT web with Secure MCP Tunnel
+## Generate and retain the HTTP key
 
-ChatGPT web does not read local Codex configuration. The recommended private route is
-[OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels), an
-outbound-only connection from your machine or private network to OpenAI. FluentCart MCP itself
-stays private.
-
-<Steps>
-<Step>
-
-**Save the store credentials on the tunnel host**
-
-Install Node.js 24 or newer, then run:
+Generate the bearer key once in a shell with a secret manager or service manager behind it:
 
 ```bash
-npx -y fluentcart-mcp setup
+FLUENTCART_HTTP_KEY="$(openssl rand -hex 32)"
 ```
 
-Use a dedicated, least-privilege WordPress user. `npx -y` downloads the package on demand; there
-is no global package install.
+Store that exact value in the deployment secret manager and configure the same value in the HTTP
+client. Do not regenerate it inside `docker run`: a client cannot authenticate to a key that was
+created and immediately discarded. Do not commit the value, either. It is not a decorative string.
 
-</Step>
-<Step>
+## Docker image
 
-**Get the two separate sets of OpenAI permissions**
-
-Platform tunnel permissions and ChatGPT Developer mode are separate authorisation decisions:
-
-- creating or editing a tunnel needs **Tunnels Read + Manage**;
-- running `tunnel-client` and selecting the tunnel needs **Tunnels Read + Use**;
-- ChatGPT Developer mode is a separate workspace permission, enabled under **Settings → Security
-  and login** after the workspace allows it.
-
-The Platform organisation that owns the tunnel and the ChatGPT workspace that will use it must be
-associated with that tunnel.
-
-</Step>
-<Step>
-
-**Create the tunnel and runtime key**
-
-Open [Platform tunnel settings](https://platform.openai.com/settings/organization/tunnels), create
-the tunnel, associate the target ChatGPT workspace, and create a runtime API key for
-`tunnel-client`. Download the current `tunnel-client` build from that page.
-
-Keep the runtime key in your shell secret store or service manager. Do not commit it, paste it into
-FluentCart MCP config, or print a real value into a runbook.
-
-</Step>
-<Step>
-
-**Initialise and check the local STDIO profile**
-
-Use placeholders below; supply the real values through your local secret tooling:
-
-```bash
-export CONTROL_PLANE_API_KEY="<runtime-api-key>"
-
-tunnel-client init \
-  --sample sample_mcp_stdio_local \
-  --profile fluentcart-local \
-  --tunnel-id tunnel_0123456789abcdef0123456789abcdef \
-  --mcp-command "npx -y fluentcart-mcp"
-
-tunnel-client doctor --profile fluentcart-local --explain
-tunnel-client run --profile fluentcart-local
-```
-
-Keep `tunnel-client run` healthy. The process starts FluentCart MCP over STDIO and carries requests
-outbound; no public WordPress or MCP listener is required.
-
-</Step>
-<Step>
-
-**Add the tunnel in ChatGPT Plugins**
-
-Open [ChatGPT Plugins](https://chatgpt.com/plugins), enable Developer mode, select the plus button
-to create a developer-mode app, choose **Tunnel under Connection**, and select the tunnel. If it
-does not appear, check the workspace association and **Tunnels Read + Use** permission.
-
-Start a chat and ask: *"Show me the FluentCart dashboard stats."*
-
-</Step>
-</Steps>
-
-<Callout type="warn" title="Two keys, two different jobs">
-`CONTROL_PLANE_API_KEY` authenticates `tunnel-client` to OpenAI. `FLUENTCART_MCP_API_KEY` protects
-the generic private HTTP profile described below; it is not ChatGPT plugin authentication. Do not
-put either key in a repository.
-</Callout>
-
-This unofficial connector is not eligible for the public ChatGPT Plugins Directory without
-FluentCart authorisation. Secure MCP Tunnel is the private connection path, not a creative way to
-rename an unauthorised public submission.
-
-## Docker Image
-
-The image is on Docker Hub and GitHub Container Registry, built for `linux/amd64`. That covers every ordinary VPS. On an arm64 host it runs under emulation, or you build it yourself from the tab below — which takes about a minute and skips the emulation tax.
+The images are published for `linux/amd64`. The container starts HTTP transport on port `3000`.
+Bind the host port to loopback when the reverse proxy or tunnel is on the same host:
 
 <Tabs items={['Docker Hub', 'GitHub Container Registry', 'Build from source']}>
 <Tab value="Docker Hub">
 
 ```bash
 docker run -d \
-  -p 3000:3000 \
+  -p 127.0.0.1:3000:3000 \
   -e FLUENTCART_URL=https://your-store.com \
-  -e FLUENTCART_USERNAME=admin \
-  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP" \
-  -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
+  -e FLUENTCART_USERNAME=fluentcart-reader \
+  -e FLUENTCART_APP_PASSWORD="read from your deployment secret manager" \
+  -e FLUENTCART_MCP_API_KEY=$FLUENTCART_HTTP_KEY \
   -e FLUENTCART_MCP_ALLOWED_HOSTS=mcp.your-domain.com \
   -e FLUENTCART_MCP_ALLOWED_ORIGINS=mcp.your-domain.com \
   --name fluentcart-mcp \
@@ -132,11 +49,11 @@ docker run -d \
 
 ```bash
 docker run -d \
-  -p 3000:3000 \
+  -p 127.0.0.1:3000:3000 \
   -e FLUENTCART_URL=https://your-store.com \
-  -e FLUENTCART_USERNAME=admin \
-  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP" \
-  -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
+  -e FLUENTCART_USERNAME=fluentcart-reader \
+  -e FLUENTCART_APP_PASSWORD="read from your deployment secret manager" \
+  -e FLUENTCART_MCP_API_KEY=$FLUENTCART_HTTP_KEY \
   -e FLUENTCART_MCP_ALLOWED_HOSTS=mcp.your-domain.com \
   -e FLUENTCART_MCP_ALLOWED_ORIGINS=mcp.your-domain.com \
   --name fluentcart-mcp \
@@ -146,18 +63,16 @@ docker run -d \
 </Tab>
 <Tab value="Build from source">
 
-If you insist on building it yourself — I respect the paranoia:
-
 ```bash
 git clone https://github.com/vcode-sh/fchub-plugins.git
 cd fchub-plugins/fluentcart-mcp
 docker build -t fluentcart-mcp .
 docker run -d \
-  -p 3000:3000 \
+  -p 127.0.0.1:3000:3000 \
   -e FLUENTCART_URL=https://your-store.com \
-  -e FLUENTCART_USERNAME=admin \
-  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP" \
-  -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
+  -e FLUENTCART_USERNAME=fluentcart-reader \
+  -e FLUENTCART_APP_PASSWORD="read from your deployment secret manager" \
+  -e FLUENTCART_MCP_API_KEY=$FLUENTCART_HTTP_KEY \
   -e FLUENTCART_MCP_ALLOWED_HOSTS=mcp.your-domain.com \
   -e FLUENTCART_MCP_ALLOWED_ORIGINS=mcp.your-domain.com \
   --name fluentcart-mcp \
@@ -167,166 +82,121 @@ docker run -d \
 </Tab>
 </Tabs>
 
-The container exposes port `3000` and starts with `--transport http` by default. Your MCP endpoint lives at `http://localhost:3000/mcp`.
+The same-host endpoint is `http://127.0.0.1:3000/mcp`; terminate TLS at a trusted proxy or tunnel
+before giving clients the public `https://` address.
 
-## Environment Variables
+## Required environment
 
 | Variable | Required | Description |
 |---|---|---|
-| `FLUENTCART_URL` | Yes | Full URL to your WordPress site |
-| `FLUENTCART_USERNAME` | Yes | WordPress username the server authenticates as |
-| `FLUENTCART_APP_PASSWORD` | Yes | WordPress Application Password |
-| `FLUENTCART_MCP_API_KEY` | Yes, for any bind that isn't loopback | Bearer token for `/mcp`. At least 32 characters. |
-| `FLUENTCART_MCP_ALLOWED_HOSTS` | Yes, in the private profile | Comma-separated hostname allowlist. |
-| `FLUENTCART_MCP_ALLOWED_ORIGINS` | Yes, in the private profile | Comma-separated browser Origin hostname allowlist. |
-| `FLUENTCART_WRITE_MODE` | No | `disabled` (default) or `reversible` |
-| `FLUENTCART_TIMEOUT` | No | Request timeout in milliseconds. Default 30000 |
+| `FLUENTCART_URL` | Yes | WordPress site root |
+| `FLUENTCART_USERNAME` | Yes | Least-privilege WordPress principal |
+| `FLUENTCART_APP_PASSWORD` | Yes | Its Application Password from a secret manager |
+| `FLUENTCART_MCP_API_KEY` | Yes, for private HTTP | Bearer token, at least 32 characters |
+| `FLUENTCART_MCP_ALLOWED_HOSTS` | Yes, for private HTTP | Comma-separated allowed Host names |
+| `FLUENTCART_MCP_ALLOWED_ORIGINS` | Yes, for private HTTP | Comma-separated allowed browser Origin names |
+| `FLUENTCART_WRITE_MODE` | No | `disabled` by default or explicitly `reversible` |
+| `FLUENTCART_TIMEOUT` | No | Request timeout in milliseconds; default 30000 |
 
-## Binding and Authentication
+## Binding and authentication
 
-The HTTP transport binds `127.0.0.1` by default. The Docker image overrides that with `--host 0.0.0.0`, because a container that only talks to itself is a philosophical exercise rather than a deployment.
+The HTTP transport itself binds `127.0.0.1` by default. The Docker entry point binds inside the
+container, while `-p 127.0.0.1:3000:3000` keeps the host listener loopback-only. A non-loopback
+private profile refuses to listen without a 32-character-or-longer bearer key and both Host and
+Origin allowlists. These checks happen before listening.
 
-The **local profile** is the loopback default. The Docker entry point selects the **private
-profile** because it binds `0.0.0.0`. Private HTTP requires
-`FLUENTCART_MCP_API_KEY` of at least 32 characters and both allowlists above; every check runs
-*before* the server listens. Miss one and you get an exit, not an exciting new unauthenticated
-store endpoint.
+Every `/mcp` request needs `Authorization: Bearer <key>`. Missing, malformed, and wrong keys all
+return the same `{"error":"Unauthorized"}` response and use a constant-time comparison.
 
-Once a key is set, every request to `/mcp` needs `Authorization: Bearer <key>`. Every rejection — no header, malformed header, wrong key — returns the same thing:
-
-```json
-{"error":"Unauthorized"}
-```
-
-Identical body, identical status, and the comparison is constant-time. A prober cannot tell a wrong key from a missing one, or measure its way towards a right one.
-
-<Callout type="warn" title="The key protects the endpoint, not your store">
-A bearer key stops strangers reaching your MCP endpoint. It does not decide what that endpoint can do — `FLUENTCART_WRITE_MODE` does, and it defaults to `disabled`. Leave it there unless you have a reason not to. The most secure deployment is still one where nothing dangerous is exposed in the first place.
+<Callout type="warn" title="One bearer key is one transport principal">
+The token maps to one configured WordPress principal. There is no OAuth or multi-user identity
+mapping. Run separate processes when callers require different WordPress roles; routing a single
+token through a proxy does not turn it into identity management.
 </Callout>
 
-The bearer token is one static transport principal mapped to one configured WordPress principal.
-This release has no OAuth and no multi-user identity mapping. If two callers need different store roles,
-run two separately configured processes; one token does not magically become an identity provider
-because it crossed a reverse proxy.
+The bearer key guards endpoint access. It does not change what FluentCart MCP can do:
+`FLUENTCART_WRITE_MODE` still defaults to `disabled`, and the WordPress user still bounds available
+routes. Refunds and subscription cancellation are absent, as are deletion, bulk mutations,
+order-status changes, marking an order paid, and dispute handling.
 
-## Refunds and Cancellations
-
-They are not part of this server. `fluentcart_order_refund` and
-`fluentcart_subscription_cancel` are absent, and no environment variable enables them. Use
-FluentCart's admin or its official operator tooling for those jobs.
-
-## Safe Release Recovery
-
-The staging workflow uses npm Trusted Publishing to create a native staged publish tagged
-`latest`, together with versioned Docker images. The package is not public until the owner reviews
-the staged bytes and approves them with interactive 2FA. A separate promotion with no npm
-credential or npm write rechecks public npm `latest` and the immutable evidence before updating
-matching Docker tags and creating the GitHub Release.
-
-Published package versions are immutable: never reuse a version. If a candidate is unsuitable,
-deprecate it, restore mutable tags to the previously recorded digests where necessary, fix the
-source, and publish a new patch version. Recovery consumes recorded artefact identities; it does
-not rebuild an old version and hope for the same bytes.
-
-## Dokploy Setup
-
-If you're running [Dokploy](https://dokploy.com) (or similar), point it at the image and you're done in about 90 seconds.
+## Dokploy
 
 <Steps>
 <Step>
 
-**Create a new application** — choose **Docker Image** as the source and set the image to `vcodesh/fluentcart-mcp:latest`. Or if you prefer building from Git: point it at the repo with build context `fluentcart-mcp/`.
+**Create a Docker Image application**
+
+Use `vcodesh/fluentcart-mcp:latest`, or use Git with build context `fluentcart-mcp/`.
 
 </Step>
 <Step>
 
-**Set environment variables** — the three FluentCart credentials plus
-`FLUENTCART_MCP_API_KEY`, `FLUENTCART_MCP_ALLOWED_HOSTS`, and
-`FLUENTCART_MCP_ALLOWED_ORIGINS`. Set both allowlists to the hostname exposed by Dokploy, your
-reverse proxy, or your tunnel. The container binds beyond loopback, so an incomplete private
-profile exits instead of starting.
+**Add deployment secrets and allowlists**
+
+Set the three WordPress values, the retained `FLUENTCART_MCP_API_KEY`, and both allowlists through
+Dokploy secrets. Set the allowlists to the public hostname exposed by Dokploy, the reverse proxy,
+or the tunnel.
 
 </Step>
 <Step>
 
-**Deploy** — exposed port is `3000`. The container starts the HTTP transport automatically.
+**Expose only the intended path**
+
+Route port `3000` through Dokploy’s TLS proxy and configure the MCP client with the HTTPS `/mcp`
+URL and the same retained bearer token.
 
 </Step>
 </Steps>
 
-## Cloudflare Tunnel
+## Cloudflare Tunnel or a same-host reverse proxy
 
-If you're using Cloudflare Tunnels (and you should be — free SSL, no port forwarding, no firewall fiddling):
+For Cloudflare Tunnel, create a public hostname such as `mcp.your-domain.com`, then point the
+service at `http://127.0.0.1:3000`. For a same-host reverse proxy, upstream to the same loopback
+address. In both cases keep the Docker port mapping as `127.0.0.1:3000:3000`, terminate valid TLS
+at the public edge, and set both allowlists to `mcp.your-domain.com`.
 
-1. In Cloudflare Zero Trust dashboard, add a public hostname
-2. Set the subdomain (e.g. `mcp.your-domain.com`)
-3. Point it at `http://localhost:3000` (or whatever your container's internal address is)
-4. Save
+The externally configured MCP URL is then `https://mcp.your-domain.com/mcp`; keep its bearer token
+in that client’s secret configuration. The tunnel or proxy does not replace bearer authentication.
 
-Your MCP endpoint is now at `https://mcp.your-domain.com/mcp`. Encrypted, routed through
-Cloudflare's network, and still protected by the MCP bearer key.
+## Health and HTTP clients
 
-## Health Check
+Check liveness without a bearer token:
 
 ```bash
 curl https://mcp.your-domain.com/health
 ```
 
-Should return:
-
-```json
-{"status":"ok"}
-```
-
-`/health` is deliberately unauthenticated so load balancers and uptime monitors can reach it. It says nothing about your store — only that the process is alive. The bearer key guards `/mcp` and nothing else needs it.
-
-If it doesn't answer, something's broken. Check the container logs:
+It returns `{"status":"ok"}` when the process is alive. `/health` says nothing about store access;
+`/mcp` remains bearer-protected. For failures, inspect:
 
 ```bash
 docker logs fluentcart-mcp
 ```
 
-## Connecting an HTTP-capable MCP client
-
-Point a client that supports Streamable HTTP at your `/mcp` endpoint and set the bearer token when configured. Check the client’s own MCP documentation for its transport and authentication requirements.
-
-<Callout type="info" title="Stateless mode">
-The HTTP transport creates a fresh server instance per request. That keeps things simple and works
-with scale-to-zero deployments, at the cost of resolving config and rebuilding the registry each
-time. Dynamic mode keeps that surface to three read tools, or four when reversible writes are
-enabled.
-</Callout>
-
-<Separator className="my-8" />
+Point an MCP client that supports Streamable HTTP at the `/mcp` URL and configure the retained
+bearer token in that client’s authentication field. The HTTP transport creates a fresh server per
+request, which suits scale-to-zero deployments but rebuilds the filtered registry each time.
 
 ## Docker Compose
 
-If you prefer compose (or want to run it alongside other services):
+Put secrets in an ignored `.env` or the deployment secret manager, then reference them rather than
+embedding them in source:
 
 ```yaml title="docker-compose.yml"
 services:
   fluentcart-mcp:
     image: vcodesh/fluentcart-mcp:latest
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      FLUENTCART_URL: https://your-store.com
-      FLUENTCART_USERNAME: admin
-      FLUENTCART_APP_PASSWORD: "aBcD eFgH iJkL mNoP"
-      FLUENTCART_MCP_API_KEY: "a-32-character-minimum-secret-goes-here"
+      FLUENTCART_URL: ${FLUENTCART_URL}
+      FLUENTCART_USERNAME: ${FLUENTCART_USERNAME}
+      FLUENTCART_APP_PASSWORD: ${FLUENTCART_APP_PASSWORD}
+      FLUENTCART_MCP_API_KEY: ${FLUENTCART_HTTP_KEY}
       FLUENTCART_MCP_ALLOWED_HOSTS: mcp.your-domain.com
       FLUENTCART_MCP_ALLOWED_ORIGINS: mcp.your-domain.com
     restart: unless-stopped
 ```
 
-```bash
-docker compose up -d
-```
-
-The compose service is configured to survive reboots until you stop it.
-
-Need the old CLI while upgrading? Pin the explicit fallback:
-
-```bash
-npx -y fluentcart-mcp@1
-```
+Create `FLUENTCART_HTTP_KEY` with the command above, retain it in the deployment secret manager,
+configure the same value in the HTTP client, and then run `docker compose up -d`.

@@ -1,304 +1,155 @@
 ---
 title: Troubleshooting
-description: Something broke? Auth errors, timeouts, missing tools — every failure mode is covered here.
+description: Diagnose setup, connection, permissions, private HTTP, and certificate failures by stage.
 ---
 
-import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Cards, Card } from 'fumadocs-ui/components/card';
+Start at the first stage that fails. A green client indicator confirms only that client’s local
+configuration; returned store data is the useful proof.
 
-Something's not working. It happens. Every failure mode encountered (and reported by users) is catalogued here so you can fix it without filing an issue. Most problems are one of three things: connection, authentication, or timeouts.
+## 1. Credential setup failed
 
-## Quick Diagnosis
-
-Before you do anything else, run this in your terminal:
+Run the setup wizard again before changing client configuration:
 
 ```bash
-curl -u "username:application_password" https://your-store.com/wp-json/fluent-cart/v2/app/init
+npx -y fluentcart-mcp setup
 ```
 
-Replace `username` and `application_password` with your actual values. What you get back tells you exactly where the problem is:
+It needs the WordPress site root, login name, and Application Password. The URL must not include
+`/wp-admin/` or `/wp-json/`. WordPress shows an Application Password once; if it was lost, create a
+new one rather than trying to recover it from the ether.
 
-| Response | What It Means |
-|----------|---------------|
-| JSON with store data | Connection and auth work fine. Your issue is in the AI client config. |
-| `401 Unauthorized` | Wrong username or Application Password. |
-| `403 Forbidden` | That user lacks the FluentCart permission behind this endpoint. |
-| `404 Not Found` | FluentCart isn't installed, or the URL is wrong. |
-| Connection refused | WordPress is unreachable. Network or server issue. |
+## 2. The client cannot start the server
 
-## Common Issues
+Local `npx` clients need Node.js 24 or newer:
 
-<Accordions type="multiple">
-<Accordion title="Server Not Starting / No Tools Appearing">
+```bash
+node --version
+```
 
-**What you see**: the client reports `fluentcart` as stopped, Cursor shows a red status, or the AI
-says it cannot find any FluentCart tools.
+If `npx` cannot be found, use `which npx` on macOS/Linux or `where npx` on Windows, then configure
+the returned absolute path. Windows JSON needs doubled backslashes or forward slashes. Claude
+Desktop MCPB users do not need a separate Node installation because Claude Desktop supplies it.
 
-Client indicators confirm that client's local setup, not a release certification result. Candidate
-checks exercise MCP Inspector, Claude Code and Docker.
+For a JSON configuration file, validate locally instead of uploading credentials to a website:
 
-**What's actually wrong** (in order of likelihood):
+```bash
+python3 -m json.tool ~/.cursor/mcp.json >/dev/null
+```
 
-1. **Node.js missing or too old for a local `npx` client**
-   ```bash
-   node --version
-   ```
-   Local recipes need `v24.0.0` or higher. If you don't have Node, get it from
-   [nodejs.org](https://nodejs.org). Claude Desktop extension users skip this check because Claude
-   Desktop supplies its own Node runtime.
+Check the client’s actual file location: ChatGPT Desktop, Codex CLI, and Codex IDE extension share
+`~/.codex/config.toml`; Cursor uses its global `mcp.json`; VS Code uses workspace `.vscode/mcp.json`
+or the user MCP configuration. Restart or reload the client after changing its command.
 
-2. **npx not found**
-   It comes with Node.js. If `which npx` returns nothing, repair the local Node installation.
-   `npx -y` downloads FluentCart MCP on demand; it does not install the package globally.
+## 3. The store connection or startup discovery failed
 
-3. **JSON syntax error**
-   The number one cause of "it just doesn't work." A trailing comma, a missing quote, a rogue bracket. Paste your config into [jsonlint.com](https://jsonlint.com) and see what it says. Nobody can debug your JSON for you.
+The server reads the FluentCart REST index before it registers tools. An unreachable site, blocked
+`/wp-json/`, bad URL, or unavailable FluentCart route therefore stops startup instead of creating a
+server that fails later on every call.
 
-4. **Wrong config file location**
-   - ChatGPT Desktop, Codex CLI and Codex IDE extension: `~/.codex/config.toml`
-   - Claude Desktop extension: **Settings → Extensions → Advanced settings**
-   - Cursor: Check **Settings → MCP** for the path
-   - VS Code: workspace `.vscode/mcp.json` or **MCP: Open User Configuration**
+An optional advanced check prompts for the Application Password instead of putting it in shell
+history or documentation:
 
-5. **Didn't restart the app**
-   ChatGPT Desktop exposes **Restart** beside a saved MCP server. Other clients expose a restart or
-   reload action in their MCP server list; use it after changing the command.
+```bash
+curl --user "fluentcart-reader" https://your-store.com/wp-json/fluent-cart/v2/app/init
+```
 
-6. **The store rejected the startup check**
-   Before serving anything, the server asks your site which FluentCart routes exist. Bad URL, bad credentials or an unreachable site and it stops there rather than connecting and failing on every call afterwards. The error lands in your client's MCP log.
+`curl` prompts for the password. JSON with store data means connection and authentication work;
+`401` means the username or Application Password is wrong, `403` means a missing FluentCart
+permission, `404` usually means the URL or FluentCart installation is wrong, and a refused
+connection is a network or server problem.
 
-</Accordion>
-<Accordion title="ChatGPT Web Cannot See the Tunnel">
+## 4. WordPress authentication returned 401
 
-**What you see**: the tunnel runs locally, but ChatGPT Plugins does not list it under **Tunnel under
-Connection**.
+Use the WordPress login name, not the display name. Copy the Application Password exactly,
+including its spaces. Check that Application Passwords have not been disabled by a security plugin
+or host policy. Regenerating one invalidates the previous value, so update the credential source and
+restart the MCP process after rotation.
 
-**What to check:**
+WordPress normally requires HTTPS for Application Passwords. For a legitimate local development
+site, configure WordPress as local rather than weakening a production connection.
 
-1. ChatGPT web does not read `~/.codex/config.toml`; a working desktop server does not automatically
-   become a web connection.
-2. The tunnel must be associated with the target ChatGPT workspace, not only its Platform
-   organisation.
-3. Running and selecting it needs **Tunnels Read + Use**. Creating it needs **Tunnels Read +
-   Manage**. ChatGPT Developer mode is a separate workspace permission.
-4. Run `tunnel-client doctor --profile fluentcart-local --explain`, then keep
-   `tunnel-client run --profile fluentcart-local` alive while adding the plugin.
+## 5. WordPress permission returned 403
 
-The runtime `CONTROL_PLANE_API_KEY` authenticates the tunnel client to OpenAI.
-`FLUENTCART_MCP_API_KEY` is not ChatGPT plugin authentication.
+The server inherits the configured WordPress user’s FluentCart permissions. A narrow role that can
+read reports but not customer records is valid; a 403 for the latter is expected. If every tool
+returns 403, give the user the required FluentCart capability. This is separate from
+`FLUENTCART_WRITE_MODE`: a WordPress role cannot enable a write that product policy omits.
 
-</Accordion>
-<Accordion title="A Tool I Expected Isn't There">
+## 6. FluentCart returned 404
 
-**What you see**: The AI says it has no tool for creating a product, updating a status, or refunding. Search comes back empty for something the [Tool Reference](/docs/fluentcart-mcp/tools) clearly lists.
+Confirm FluentCart is installed and active, use the site root as `FLUENTCART_URL`, and set WordPress
+permalinks to anything except **Plain**. Security plugins or server rules can also block
+`/wp-json/`. Older FluentCart builds can legitimately lack a route; startup discovery removes its
+dependent tool instead of advertising a broken call.
 
-**What's wrong**: It isn't hidden — it isn't registered. Exposure is decided before registration, so a tool your policy excludes cannot be listed, searched, described or called by name.
+## 7. The expected tool is missing
 
-**Fix**, in order of likelihood:
+The tool list is filtered before registration by write policy, the connected WordPress principal,
+and the store’s discovered routes. With `FLUENTCART_WRITE_MODE=disabled`, writes cannot be listed,
+searched, described, or called. `reversible` adds only reviewed reversible creates and updates.
 
-1. **Write mode.** `FLUENTCART_WRITE_MODE` defaults to `disabled`. Creating or updating something needs `reversible`.
-2. **It isn't exposed in any mode.** Refunds, subscription cancellation, every deletion, bulk
-   action, order status change, marking an order paid and dispute handling are absent. No
-   environment variable brings them back.
-3. **Your store doesn't serve that route.** Startup discovery prunes the registry: a tool whose endpoint your FluentCart build doesn't expose is never registered, and a tool that needs several routes needs all of them. A Pro-only endpoint on a core-only site is legitimately absent, and installing the missing component brings the tool back on the next restart.
-4. **It never existed.** Subscription pause, resume and reactivate are not tools. Neither is a customer address dropdown helper. Check the reference rather than the AI's optimism.
+Refunds, subscription cancellation, deletion, bulk actions, order-status changes, marking an order
+paid, dispute handling, role changes, integration credentials, uploads, email, and login actions
+are absent in every mode. A missing unsupported action is not a hidden checkbox. See the
+[tool guide](/docs/fluentcart-mcp/tools) for the exact boundary.
 
-The tool list is therefore a property of your store, not a fixed catalogue. Two sites on different FluentCart builds will legitimately show different tools, and the reference page lists what ships rather than what any particular store exposes.
+## 8. The private HTTP endpoint returned 401
 
-</Accordion>
-<Accordion title="401 From the MCP Endpoint Itself">
+This is the MCP bearer key, not WordPress authentication. The private endpoint needs
+`Authorization: Bearer <key>` matching `FLUENTCART_MCP_API_KEY`. Missing, malformed, and incorrect
+keys intentionally produce the same `{"error":"Unauthorized"}` response.
 
-**What you see**: `{"error":"Unauthorized"}` from your own HTTP deployment, not from WordPress.
+If the container refuses to start, confirm the retained key is at least 32 characters and that both
+`FLUENTCART_MCP_ALLOWED_HOSTS` and `FLUENTCART_MCP_ALLOWED_ORIGINS` name the public hostname. The
+private profile checks those values before listening. See [private HTTP deployment](/docs/fluentcart-mcp/deployment).
 
-**What's wrong**: The bearer key. Every rejection returns that identical body — missing header, malformed header, wrong key, all the same. That's deliberate: a prober shouldn't be able to tell which mistake they made. It does mean you can't debug it by reading the response, so check the client config instead.
+## 9. The response is too large or times out
 
-Requests need `Authorization: Bearer <key>` matching `FLUENTCART_MCP_API_KEY` exactly. Watch for a trailing newline from `echo` when you set it in a shell.
+`RESPONSE_TOO_LARGE` means the server refused to return a payload that would be quietly truncated.
+Ask for a smaller date range, a known ID, fewer fields, or the specific tool’s documented limit.
+Do not assume every list schema supports the same `page` or `per_page` parameters; inspect the
+tool’s schema first.
 
-If the container won't start at all and the logs say `Refusing to bind`, the key is missing or under 32 characters. The server checks before it listens, so there is no window where the endpoint exists unprotected.
+For timeouts, first check whether the WordPress site responds at all:
 
-</Accordion>
-<Accordion title="RESPONSE_TOO_LARGE">
+```bash
+curl https://your-store.com/wp-json/
+```
 
-**What you see**: A tool call fails with `RESPONSE_TOO_LARGE` instead of returning data.
+If the site is slow, increase `FLUENTCART_TIMEOUT` within the supported configuration range and
+narrow the request. Ten thousand orders is not a debugging strategy.
 
-**What's happening**: The response exceeded the budget, and the server would rather refuse than hand your model a payload that has been quietly trimmed and looks complete. The error names the ways out.
+## 10. Certificate verification failed
 
-**Fix**: Narrow the request. A smaller `per_page`, a tighter date range, a specific ID instead of a list. "Show me every order ever placed" is not a question with a useful answer anyway.
+Use a valid TLS certificate or a trusted local CA first. For Cloudflare, use a valid origin
+certificate and **Full (strict)** where appropriate. Repair the certificate chain rather than
+making certificate verification someone else’s problem.
 
-</Accordion>
-<Accordion title="Authentication Failed (401)">
+`NODE_TLS_REJECT_UNAUTHORIZED=0` is only a final temporary local diagnostic after those checks. If
+you use it to isolate a local CA issue, remove it immediately after the test and restore normal
+verification before connecting to any non-local store. Never leave it in a deployment environment.
 
-**What you see**: Errors about "authentication failed", "invalid credentials", or HTTP 401.
+## 11. The AI does not use FluentCart tools
 
-**What's actually wrong:**
+Confirm the server is enabled in the selected client, start a new chat where required, and ask a
+specific question such as **Show me the FluentCart dashboard stats.** Disable unrelated MCP servers
+temporarily if the client has per-server or per-tool controls. A client can be connected yet still
+need an explicit request to use the FluentCart tools.
 
-1. **Wrong Application Password**
-   The password has spaces between groups: `aBcD eFgH iJkL mNoP`. Include the spaces. It's case-sensitive. Copy it exactly.
+## 12. Prices look 100 times too large
 
-2. **Wrong username**
-   Use the WordPress login name, not the display name. If your display name is "John Smith" but your login is "john", use `john`. Check **Users → Profile** in WordPress admin.
+FluentCart stores money in the smallest currency unit. `4999` means `$49.99`; raw values are not a
+new economic theory. Ask the client to format prices in the store currency.
 
-3. **Application Passwords disabled**
-   Security plugins love disabling things. Wordfence, iThemes Security, Solid Security — any of them might have turned off Application Passwords. Check your security plugin settings.
+## 13. An upstream FluentCart issue is involved
 
-   Some managed hosts (WP Engine, Kinsta, etc.) also disable them by default. Check with your host.
+Attribute-term creation can return `Information mismatch`; use the FluentCart admin until upstream
+fixes it. Variant listing without a product ID can fail; use product pricing for a specific product.
+Some older stores omit report routes, which startup discovery removes. Customer address selection is
+frontend-session scoped; use the read-only customer-addresses route instead.
 
-4. **HTTP instead of HTTPS**
-   WordPress blocks Application Passwords over plain HTTP. If you're on a local dev site, add this to `wp-config.php`:
-   ```php
-   define('WP_ENVIRONMENT_TYPE', 'local');
-   ```
+## Still stuck?
 
-5. **Password was deleted or regenerated**
-   If you made a new Application Password in WordPress, update it in your MCP config and restart the client. The old one is dead.
-
-</Accordion>
-<Accordion title="Permission Denied (403)">
-
-**What you see**: "permission denied", "forbidden", HTTP 403.
-
-**What's wrong**: The WordPress user the server authenticates as lacks the FluentCart capability behind that particular endpoint.
-
-**Fix**: Go to **Users** in WordPress admin and look at what that account can do. The server inherits exactly the permissions of the user in your config — no more, no less — so a narrow role is a supported choice, not a broken one. If you want the AI to read reports but never see customer records, that's a role question, and FluentCart's own roles and permissions screens are where you answer it.
-
-A 403 on one tool while everything else works is the system behaving correctly. A 403 on everything usually means the account has no FluentCart permissions at all.
-
-</Accordion>
-<Accordion title="Not Found (404)">
-
-**What you see**: "not found", "route not found", HTTP 404.
-
-**What's actually wrong:**
-
-1. **FluentCart not installed**
-   Check **Plugins** in WordPress admin. FluentCart must be installed and activated. The MCP server talks to FluentCart endpoints — if FluentCart isn't there, those endpoints don't exist.
-
-2. **Wrong URL**
-   The URL should be the root of your WordPress site:
-   - Correct: `https://shop.example.com`
-   - Wrong: `https://shop.example.com/wp-admin/`
-   - Wrong: `https://shop.example.com/wp-json/`
-   - Wrong: `https://shop.example.com/` (trailing slash is technically fine, the server strips it)
-
-3. **Permalinks set to "Plain"**
-   WordPress REST API needs pretty permalinks. Go to **Settings → Permalinks** and pick literally anything except "Plain". Hit Save even if you don't change anything — this flushes rewrite rules.
-
-4. **REST API blocked**
-   Security plugins and `.htaccess` rules sometimes block `/wp-json/`. Check your security plugin settings and server config.
-
-</Accordion>
-<Accordion title="Timeout Errors">
-
-**What you see**: Requests die after 30 seconds. "timeout", "aborted", "ETIMEDOUT".
-
-**What to do:**
-
-1. **Increase the timeout**
-   The default is 30 seconds. If your server is slow, bump it up via the `FLUENTCART_TIMEOUT` env var (milliseconds):
-   ```json
-   "env": {
-     "FLUENTCART_URL": "https://your-store.com",
-     "FLUENTCART_USERNAME": "admin",
-     "FLUENTCART_APP_PASSWORD": "...",
-     "FLUENTCART_TIMEOUT": "60000"
-   }
-   ```
-
-2. **Check your server**
-   Run `curl https://your-store.com/wp-json/`. If curl also hangs, that's a network or server problem. Not something the MCP server can fix.
-
-3. **Ask for less data**
-   Listing 10,000 orders in one request will be slow on any server. Use pagination — "Show me the last 10 orders" instead of "Show me all orders." Every list tool supports `per_page` and `page` parameters for exactly this reason.
-
-</Accordion>
-<Accordion title="AI Ignores FluentCart / Won't Use Tools">
-
-**What you see**: The AI doesn't mention FluentCart. It says it can't access your store. It just... doesn't use the tools.
-
-**What's happening:**
-
-1. **Server not connected**
-   Verify the connection:
-   - ChatGPT Desktop and Codex: use `/mcp` or `codex mcp list`
-   - Claude Desktop extension: **Settings → Extensions → Advanced settings**
-   - Cursor: **Settings → MCP** — green dot = connected
-   - Claude Code: `claude mcp list`
-
-2. **Too many MCP servers**
-   Some clients choke when you have 15 MCP servers connected. Try disabling the ones you're not using right now.
-
-3. **Tools disabled in the client**
-   Some clients have per-server or per-tool switches. Check the MCP server details and make sure
-   `fluentcart` is enabled. Current VS Code releases surface MCP tools from the Chat view without an
-   Agent-only requirement.
-
-4. **The AI just needs a nudge**
-   Sometimes the AI doesn't realise it has FluentCart tools until you mention them explicitly: "Use the FluentCart tools to show me my recent orders." After the first use, it remembers.
-
-</Accordion>
-<Accordion title="SSL / Certificate Errors">
-
-**What you see**: UNABLE_TO_VERIFY_LEAF_SIGNATURE, certificate chain errors, SSL handshake failures.
-
-**What to do:**
-
-1. **Self-signed certs (local dev)**
-   If your local WordPress has a self-signed cert, add this env var:
-   ```json
-   "env": {
-     "NODE_TLS_REJECT_UNAUTHORIZED": "0"
-   }
-   ```
-
-   <Callout type="warn" title="Local Development Only">
-   Do not use this in production. It disables all SSL verification. You know this, but I'm contractually obligated to say it.
-   </Callout>
-
-2. **Cloudflare issues**
-   If you're behind Cloudflare with "Full (strict)" SSL, your origin server needs a valid cert. "Full" (without strict) is more forgiving.
-
-</Accordion>
-<Accordion title="Prices Look Insane">
-
-**What you see**: A $49.99 product shows as 4999. Totals are 100x too large.
-
-**That's correct.** FluentCart stores money in the smallest currency unit — cents, pence, grosze. 4999 = $49.99. 10000 = €100.00. 4000 = 40.00 PLN.
-
-The AI usually converts these for you. If it doesn't, tell it: "Show prices in dollars, not cents." The currency format is documented in every tool description so the AI knows to convert, but occasionally it shows the raw value.
-
-</Accordion>
-<Accordion title="Known FluentCart Bugs (Upstream)">
-
-Some things break because of upstream FluentCart issues, not the MCP server. They're documented here so you don't file a bug report that can't be fixed from the MCP side.
-
-**Attribute Term Creation** — `POST /options/attr/group/:id/term` returns "Information mismatch". FluentCart queries the wrong table when validating. Create terms via the admin UI instead.
-
-**Variant Listing Without Product ID** — Calling `variant_list` without a `product_id` crashes the server. Use `product_pricing_get` to list variants for a specific product instead.
-
-**Price 100x Multiplier** — FluentCart's `Helper::toCent()` multiplies by 100 again internally. When passing prices via MCP, pass them in cents (e.g. 4999 for $49.99) — the API handles the rest. If prices look 100x too large, this is why.
-
-**Some Report Endpoints Missing** — A handful of report routes (`cart-report`, `order-value-distribution`, `sales-report`, `license-chart`, `license-pie-chart`) don't exist on older FluentCart builds. On such a store those tools are pruned at startup rather than offered and failed, so the symptom is a missing tool, not an error. This release is verified against FluentCart 1.5.5 with Pro 1.5.4 on WordPress 7.0.2. Each affected tool's description names an alternative.
-
-**Customer Address Select** — The old `customer_address_select` endpoint is scoped to frontend sessions with cookie auth, not the REST API, so the tool wrapping it has been removed rather than left in to fail politely. Use `fluentcart_customer_addresses` and filter client-side.
-
-For the full list of 14 documented upstream bugs, check the [GitHub repository](https://github.com/vcode-sh/fchub-plugins/issues).
-
-</Accordion>
-</Accordions>
-
-## Still Stuck?
-
-Before filing an issue, check the Known FluentCart Bugs section above — your problem might be upstream.
-
-If none of the above helps:
-
-1. Check [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues) — someone might've hit the same problem
-2. Open a new issue with: error message, Node.js version, AI client name, and what you tried
-3. Do not include your Application Password in the issue. Nobody wants it
-
-<Cards>
-  <Card title="GitHub Issues" href="https://github.com/vcode-sh/fchub-plugins/issues">
-    Report bugs, request features, or just tell me what went wrong.
-  </Card>
-</Cards>
+Check [GitHub Issues](https://github.com/vcode-sh/fchub-plugins/issues), then open an issue with the
+error message, Node.js version, AI client, and steps tried. Redact URLs, bearer keys, Application
+Passwords, cookies, and customer data. Nobody needs a credential-shaped souvenir.

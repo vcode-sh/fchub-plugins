@@ -1,0 +1,98 @@
+---
+title: ChatGPT web
+description: Connect ChatGPT web privately through OpenAI Secure MCP Tunnel.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+ChatGPT web does not read `~/.codex/config.toml` and cannot start a local STDIO command. Use
+[OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) for a
+private, outbound-only connection from your machine or private network to OpenAI. FluentCart MCP
+stays local; this is not the Docker or generic private-HTTP route.
+
+## What you need
+
+You need Node.js 24 or newer on the tunnel host and a WordPress user with the FluentCart
+permissions you intend to use. You also need the separate OpenAI tunnel permissions below and
+ChatGPT Developer mode in the target workspace.
+
+## Connect the tunnel
+
+<Steps>
+<Step>
+
+**Save FluentCart credentials on the tunnel host**
+
+```bash
+npx -y fluentcart-mcp setup
+```
+
+Use a dedicated, least-privilege WordPress user such as `fluentcart-reader`. `npx -y` downloads the
+package on demand; it does not install it globally.
+
+</Step>
+<Step>
+
+**Grant the separate OpenAI permissions**
+
+Creating or editing a tunnel requires **Tunnels Read + Manage**. Running `tunnel-client` and
+selecting the tunnel requires **Tunnels Read + Use**. ChatGPT Developer mode is a separate
+workspace permission, enabled under **Settings → Security and login** after the workspace allows it.
+
+The Platform organisation that owns the tunnel and the ChatGPT workspace that will use it must both
+be associated with that tunnel.
+
+</Step>
+<Step>
+
+**Create the tunnel and control-plane key**
+
+Open [Platform tunnel settings](https://platform.openai.com/settings/organization/tunnels), create
+the tunnel, associate the target ChatGPT workspace, and create a runtime key for `tunnel-client`.
+Download the current tunnel client from that page. Keep the key in your shell secret store or
+service manager; do not commit it or put a real value in a runbook.
+
+</Step>
+<Step>
+
+**Initialise, diagnose, and run the local STDIO profile**
+
+```bash
+export CONTROL_PLANE_API_KEY="<runtime-api-key>"
+
+tunnel-client init \
+  --sample sample_mcp_stdio_local \
+  --profile fluentcart-local \
+  --tunnel-id tunnel_0123456789abcdef0123456789abcdef \
+  --mcp-command "npx -y fluentcart-mcp"
+
+tunnel-client doctor --profile fluentcart-local --explain
+tunnel-client run --profile fluentcart-local
+```
+
+Keep `tunnel-client run` healthy. It starts FluentCart MCP over STDIO and carries requests
+outbound, so neither a public WordPress listener nor a public MCP listener is required.
+
+</Step>
+<Step>
+
+**Select the tunnel in ChatGPT web**
+
+Open [ChatGPT Plugins](https://chatgpt.com/plugins), enable Developer mode, select the plus button
+to create a developer-mode app, choose **Tunnel** under **Connection**, and select the tunnel. If
+it is missing, check the workspace association and **Tunnels Read + Use** permission.
+
+Start a chat and ask: **Show me the FluentCart dashboard stats.** Store data confirms the connection
+is live. Verify the tunnel’s running state in the Platform dashboard as well.
+
+</Step>
+</Steps>
+
+<Callout type="warn" title="Two keys, different jobs">
+`CONTROL_PLANE_API_KEY` authenticates `tunnel-client` to OpenAI. `FLUENTCART_MCP_API_KEY` protects
+the separate generic private HTTP profile and is not ChatGPT plugin authentication. Do not put
+either secret in a repository.
+</Callout>
+
+This private connector is not a claim of eligibility for a universal public ChatGPT directory.

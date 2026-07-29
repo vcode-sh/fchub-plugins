@@ -1,0 +1,162 @@
+---
+title: Advanced configuration
+description: Credential precedence, access boundaries, presentation modes, and multi-store setup.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+This page is for operators changing how FluentCart MCP runs. Start with your client’s normal setup
+first; a configuration switch is not a substitute for a limited WordPress account.
+
+## Credentials and precedence
+
+The server resolves complete environment credentials first, then its credential file. A partial set
+of environment variables is ignored, so provide all three together when you use them.
+
+```bash
+FLUENTCART_URL=https://your-store.com
+FLUENTCART_USERNAME=fluentcart-reader
+FLUENTCART_APP_PASSWORD="store this in your secret manager"
+```
+
+The credential file is `~/.config/fluentcart-mcp/config.json` on macOS/Linux, or
+`%APPDATA%\\fluentcart-mcp\\config.json` on Windows:
+
+```json
+{
+  "url": "https://your-store.com",
+  "username": "fluentcart-reader",
+  "appPassword": "store this in your secret manager"
+}
+```
+
+The setup wizard writes that file:
+
+```bash
+npx -y fluentcart-mcp setup
+```
+
+Credentials load once when the process starts. After rotating or revoking an Application Password,
+update the environment or file and restart the MCP process; this also purges its short-lived cache.
+
+## WordPress scope and write mode are different controls
+
+`FLUENTCART_USERNAME` determines which FluentCart REST capabilities the server can reach. Give
+`fluentcart-reader` only the WordPress and FluentCart permissions it needs; a narrow role is a
+supported configuration, not a degraded one.
+
+`FLUENTCART_WRITE_MODE` is separate product policy. It defaults to `disabled`, so writes cannot be
+listed, searched, described, or called. `reversible` adds only reviewed creates and updates with
+read-back and a supported undo. It does not grant WordPress permissions, and a broad role does not
+switch writes on by itself.
+
+```json
+{
+  "env": {
+    "FLUENTCART_WRITE_MODE": "reversible"
+  }
+}
+```
+
+Refunds, subscription cancellation, deletion, bulk mutations, order-status changes, marking an
+order paid, dispute handling, role or permission changes, plugin installation, integration
+credential changes, uploads, email, login actions, and other external side effects remain absent.
+No presentation mode or environment variable enables them.
+
+## Presentation modes
+
+Every mode uses the same registry filtered by the connected store, WordPress principal, and write
+policy. A different mode changes the client surface; it cannot widen authority.
+
+| Mode | Flag | Client surface |
+|---|---|---|
+| `dynamic` *(default)* | none | Three read meta-tools; reversible mode adds its write executor |
+| `curated` | `--mode curated` | A reviewed shortlist for common shop workflows |
+| `code` | `--mode code` | Search plus read-only JavaScript in a WebAssembly sandbox |
+| `full` | `--mode full` | Every definition admitted for this store, role, and write policy |
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp", "--mode", "curated"],
+      "env": { "FLUENTCART_WRITE_MODE": "reversible" }
+    }
+  }
+}
+```
+
+At startup the server discovers the store’s REST routes. A route that the store or principal cannot
+serve is pruned before registration; two stores can therefore expose different tool lists.
+
+## Native FluentCart Abilities
+
+FluentCart’s optional native Abilities bridge is a separate, read-only principal. It never reuses
+the general REST credentials:
+
+```bash
+FLUENTCART_ABILITIES_MODE=enabled
+FLUENTCART_ABILITIES_USERNAME=fluentcart-abilities-reader
+FLUENTCART_ABILITIES_APP_PASSWORD="store this separate password in your secret manager"
+```
+
+The bridge discovers the live catalogue and admits only audited reads. Unknown abilities and all
+native writes remain absent. If its credentials, discovery, metadata, canonical name, input schema,
+or execution fingerprint do not match the audited contract, startup fails closed rather than
+guessing that an ability is harmless. The external FluentCart MCP adapter is not required.
+
+## Multiple stores
+
+Use one server entry per store, with separate credentials and a name that makes the destination
+obvious:
+
+```json
+{
+  "mcpServers": {
+    "store-production": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://shop.example.com",
+        "FLUENTCART_USERNAME": "fluentcart-reader",
+        "FLUENTCART_APP_PASSWORD": "store in your secret manager"
+      }
+    },
+    "store-staging": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"],
+      "env": {
+        "FLUENTCART_URL": "https://staging.example.com",
+        "FLUENTCART_USERNAME": "fluentcart-reader",
+        "FLUENTCART_APP_PASSWORD": "store in your secret manager"
+      }
+    }
+  }
+}
+```
+
+State which store you mean in a request. A production-looking name is cheaper than reconstructing
+an accidental staging edit from vibes.
+
+## Command recovery and optional marketplace
+
+If a desktop client cannot find `npx`, use `which npx` on macOS/Linux or `where npx` on Windows,
+then set that absolute path as the command. Windows JSON needs doubled backslashes or forward
+slashes, for example `C:/Program Files/nodejs/npx.cmd`.
+
+ChatGPT Desktop users may optionally add the repository marketplace for plugin-managed enable and
+disable controls:
+
+```bash
+codex plugin marketplace add vcode-sh/fchub-plugins --ref main
+codex plugin marketplace list
+```
+
+Install `fluentcart-mcp` from the `fchub-plugins` marketplace after restarting ChatGPT Desktop.
+It starts the same server. This repository marketplace is not a claim of eligibility for a universal
+public directory.
+
+<Callout type="info" title="Next step">
+For the exact supported and unavailable operations, use the [tool guide](/docs/fluentcart-mcp/tools).
+</Callout>
