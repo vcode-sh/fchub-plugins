@@ -190,6 +190,19 @@ describe('usage policy examples', () => {
 })
 
 describe('marketing and blog truth', () => {
+	it('labels local setup as advanced and uses plain WordPress account language', () => {
+		const marketing = read('web-docs/app/(home)/fluentcart-mcp/page.tsx')
+
+		assert.match(marketing, /Advanced local setup/i)
+		assert.match(marketing, /Node\.js 24 or newer/i)
+		assert.match(
+			marketing,
+			/npx -y[\s\S]{0,200}does not install[^.]*globally/i,
+		)
+		assert.match(marketing, /WordPress account whose permissions the server uses/i)
+		assert.doesNotMatch(marketing, /\bprincipal\b/i)
+	})
+
 	it('does not turn source definitions into unqualified marketing counts', () => {
 		const layoutPath = 'web-docs/app/(home)/fluentcart-mcp/layout.tsx'
 		const layout = read(layoutPath)

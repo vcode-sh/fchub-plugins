@@ -156,7 +156,7 @@ export default function FluentCartMcpPage() {
               <div className="mb-3 flex items-center gap-2">
                 <ClipboardCopy className="size-4 text-muted-foreground" />
                 <span className="text-sm font-medium">
-                  Save local store access
+                  Advanced local setup
                 </span>
               </div>
               <button
@@ -175,8 +175,9 @@ export default function FluentCartMcpPage() {
                 )}
               </button>
               <p className="mt-3 text-xs text-muted-foreground">
-                The setup wizard verifies your store URL, WordPress username,
-                and Application Password, then saves them locally.{" "}
+                This advanced local route needs Node.js 24 or newer. The setup
+                wizard verifies your store URL, WordPress username, and
+                Application Password, then saves them locally.{" "}
                 <code>npx -y</code> downloads on demand and does not install the
                 package globally. The{" "}
                 <Link
@@ -348,7 +349,7 @@ export default function FluentCartMcpPage() {
             ["Your FluentCart store", "A WordPress site running FluentCart."],
             [
               "A WordPress username",
-              "The principal whose capabilities you want to use.",
+              "The WordPress account whose permissions the server uses.",
             ],
             [
               "An Application Password",

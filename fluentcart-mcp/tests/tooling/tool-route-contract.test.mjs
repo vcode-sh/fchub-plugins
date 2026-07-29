@@ -10,6 +10,7 @@ import {
 	readJson,
 	SUPPORT_PATH,
 	unresolvedPlaceholder,
+	validateLegacyEvidence,
 } from '../../scripts/check-tool-routes.mjs'
 
 const CURRENT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
@@ -183,8 +184,10 @@ describe('compatibility support gate', () => {
 		result = checkCompatibility()
 	})
 
-	it('records the legacy runtime as an explicit, reviewed status', () => {
-		assert.ok(['tested', 'docs-contract-only'].includes(support.legacyRuntime))
+	it('records the legacy capture as route-surface-only evidence', () => {
+		assert.equal(support.legacyRuntime, 'route-surface-captured')
+		assert.match(support.legacyClaimPolicy, /route surface evidence only/i)
+		assert.match(support.legacyClaimPolicy, /does not prove tool compatibility or supported operation/i)
 	})
 
 	it('always judges the docs contract, core-only, core+Pro and all-active profiles', () => {
@@ -202,14 +205,16 @@ describe('compatibility support gate', () => {
 		}
 	})
 
-	it('checks the legacy runtime fixture only when the status is tested', () => {
+	it('keeps the legacy fixture out of tool/runtime support claims', () => {
 		const legacy = result.profiles.find((profile) => profile.id === 'legacy-runtime-1.3.9')
-		if (support.legacyRuntime === 'tested') {
-			assert.notEqual(legacy.status, 'SKIPPED')
-			return
-		}
-		assert.equal(legacy.status, 'SKIPPED')
+		assert.equal(legacy.status, 'ROUTE-SURFACE-CAPTURED')
 		assert.deepEqual(result.legacyClaims, [], 'legacy runtime support is claimed but never proven')
+	})
+
+	it('rejects a legacy status that would imply tool or runtime support', () => {
+		const invalid = structuredClone(support)
+		invalid.legacyRuntime = 'tested'
+		assert.match(validateLegacyEvidence(invalid).join('\n'), /legacyRuntime must be one of/i)
 	})
 
 	it('blocks a profile whose fixture was never captured, rather than assuming it', () => {

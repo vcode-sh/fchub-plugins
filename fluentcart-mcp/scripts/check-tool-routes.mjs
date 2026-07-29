@@ -16,6 +16,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 export const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 export const SUPPORT_PATH = join(PACKAGE_ROOT, 'compatibility-support.json')
 
+const LEGACY_RUNTIME_STATUSES = new Set(['route-surface-captured', 'docs-contract-only'])
+
 const FIXTURE_ENV = {
 	FLUENTCART_URL: 'https://fixture.invalid',
 	FLUENTCART_USERNAME: 'fixture',
@@ -193,13 +195,16 @@ function checkProfile(profile, legacyRuntime) {
 	}
 
 	if (problems.length > 0) return { id: profile.id, status: 'FAILED', problems }
+	if (profile.evidenceScope === 'route-surface-only') {
+		return { id: profile.id, status: 'ROUTE-SURFACE-CAPTURED', problems: [] }
+	}
 	if (profile.isolationProven === false) {
 		return { id: profile.id, status: 'ATTESTED', note: profile.isolationNote, problems: [] }
 	}
 	return { id: profile.id, status: 'MEASURED', problems: [] }
 }
 
-/** While the legacy runtime is unproven, nothing we ship may claim it was tested. */
+/** A route capture alone never authorises a tool or runtime support claim. */
 function checkLegacyClaims({ legacyClaimScan: { files, version } }) {
 	const claim = /\b(support|supported|supports|compatible|compatibility|tested|works with)\b/i
 	const problems = []
@@ -216,14 +221,37 @@ function checkLegacyClaims({ legacyClaimScan: { files, version } }) {
 	return problems
 }
 
+export function validateLegacyEvidence(support) {
+	const problems = []
+	if (!LEGACY_RUNTIME_STATUSES.has(support.legacyRuntime)) {
+		problems.push(`legacyRuntime must be one of ${[...LEGACY_RUNTIME_STATUSES].join(', ')}`)
+	}
+
+	const legacy = support.profiles.find((profile) => profile.id === 'legacy-runtime-1.3.9')
+	if (!legacy) {
+		problems.push('legacy runtime profile is missing')
+		return problems
+	}
+	if (support.legacyRuntime === 'route-surface-captured') {
+		if (legacy.checkedWhen !== support.legacyRuntime) {
+			problems.push('legacy route-surface profile must use the route-surface-captured status')
+		}
+		if (legacy.evidenceScope !== 'route-surface-only') {
+			problems.push('legacy route-surface profile must be marked route-surface-only')
+		}
+	}
+	return problems
+}
+
 export function checkCompatibility() {
 	const support = readJson(SUPPORT_PATH)
 	const results = support.profiles.map((profile) => checkProfile(profile, support.legacyRuntime))
-	const legacyClaims = support.legacyRuntime === 'tested' ? [] : checkLegacyClaims(support)
+	const legacyStatusProblems = validateLegacyEvidence(support)
+	const legacyClaims = checkLegacyClaims(support)
 	const delta = verifySpecificationDelta(support)
 	const blocked = results.some((r) => r.status === 'BLOCKED' || r.status === 'FAILED')
-	const ok = !blocked && legacyClaims.length === 0 && delta.problems.length === 0
-	return { legacyRuntime: support.legacyRuntime, profiles: results, legacyClaims, specificationDelta: delta, ok }
+	const ok = !blocked && legacyStatusProblems.length === 0 && legacyClaims.length === 0 && delta.problems.length === 0
+	return { legacyRuntime: support.legacyRuntime, profiles: results, legacyStatusProblems, legacyClaims, specificationDelta: delta, ok }
 }
 
 /** The recorded delta is a measurement, so it is recomputed rather than trusted. */
@@ -263,6 +291,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
 			const note = profile.note ? ` — ${profile.note}` : ''
 			process.stderr.write(`${profile.status.padEnd(9)} ${profile.id}${note}${capture}\n`)
 		}
+		for (const problem of result.legacyStatusProblems) process.stderr.write(`LEGACY    ${problem}\n`)
 		for (const claim of result.legacyClaims) process.stderr.write(`CLAIM     ${claim}\n`)
 		process.exit(result.ok ? 0 : 1)
 	}
