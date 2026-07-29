@@ -72,6 +72,12 @@ describe('tag-triggered staging', () => {
 		assert.match(job(stage, 'stage-npm'), /npm publish "\$TARBALL".*--tag next/)
 	})
 
+	it('grants the nested Docker publisher the package permission it cannot elevate itself', () => {
+		const body = job(stage, 'docker')
+		assert.match(body, /permissions:\s*\n\s+contents:\s*read/)
+		assert.match(body, /permissions:[\s\S]*?\n\s+packages:\s*write/)
+	})
+
 	it('verifies public checksum, clean install and dual-era stdio before evidence upload', () => {
 		const body = job(stage, 'verify-public')
 		assert.match(body, /npm pack "fluentcart-mcp@\$\{VERSION\}"/)

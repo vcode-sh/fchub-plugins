@@ -24,6 +24,9 @@ jobs:
 
   docker:
     needs: [validate, version-gate]
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/mcp-docker.yml
     with:
       publish: true
