@@ -19,7 +19,7 @@ const PACKAGE = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf
 const VERSION = PACKAGE.version
 const PACKED_PACKAGE = {
 	version: VERSION,
-	files: ['dist'],
+	files: PACKAGE.files,
 	engines: PACKAGE.engines,
 	dependencies: PACKAGE.dependencies,
 	devDependencies: PACKAGE.devDependencies,
@@ -282,12 +282,24 @@ describe('MCPB archive inspection', () => {
 	})
 })
 
+const OPENAI_PLUGIN_ENTRIES = [
+	{
+		name: 'package/openai-plugin/.codex-plugin/plugin.json',
+		data: '{"name":"fluentcart-mcp"}',
+	},
+	{
+		name: 'package/openai-plugin/.mcp.json',
+		data: '{"fluentcart":{"command":"npx"}}',
+	},
+]
+
 function goodTarEntries(extra = [], provenance = GOOD_PROVENANCE) {
 	return [
 		{ name: 'package/package.json', data: JSON.stringify(PACKED_PACKAGE) },
 		{ name: 'package/README.md', data: '# readme\n' },
 		{ name: 'package/dist/index.js', data: 'export {}\n' },
 		{ name: 'package/dist/release-provenance.json', data: JSON.stringify(provenance) },
+		...OPENAI_PLUGIN_ENTRIES,
 		...extra,
 	]
 }
@@ -355,6 +367,25 @@ describe('npm tarball inspection', () => {
 	it('rejects a missing runtime entry point', () => {
 		const entries = goodTarEntries().filter((entry) => entry.name !== 'package/dist/index.js')
 		assert.match(npmFailures(entries), /missing dist\/index\.js/)
+	})
+
+	it('rejects either missing OpenAI plugin manifest', () => {
+		for (const { name } of OPENAI_PLUGIN_ENTRIES) {
+			const entries = goodTarEntries().filter((entry) => entry.name !== name)
+			assert.match(
+				npmFailures(entries),
+				new RegExp(`missing ${name.slice('package/'.length).replaceAll('.', '\\.')}`),
+			)
+		}
+	})
+
+	it('rejects undeclared files inside the OpenAI plugin package root', () => {
+		assert.match(
+			npmFailures(
+				goodTarEntries([{ name: 'package/openai-plugin/internal-notes.txt', data: 'private' }]),
+			),
+			/exact OpenAI plugin allowlist/,
+		)
 	})
 
 	it('rejects a same-version tarball built with a different package lock', () => {

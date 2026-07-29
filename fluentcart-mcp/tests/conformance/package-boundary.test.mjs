@@ -63,6 +63,11 @@ function createFreshPackage(root) {
 	for (const name of RUNTIME_METADATA) {
 		cpSync(join(PACKAGE_ROOT, name), join(packageRoot, name))
 	}
+	for (const relative of ['openai-plugin/.codex-plugin/plugin.json', 'openai-plugin/.mcp.json']) {
+		const destination = join(packageRoot, relative)
+		mkdirSync(dirname(destination), { recursive: true })
+		cpSync(join(PACKAGE_ROOT, relative), destination)
+	}
 	symlinkSync(join(PACKAGE_ROOT, 'node_modules'), join(packageRoot, 'node_modules'), 'junction')
 	const dist = compileReleaseDist(join(packageRoot, 'dist'))
 	return { packageRoot, dist }
@@ -173,6 +178,19 @@ test('fresh npm and MCPB archives exclude diagnostics from paths and file conten
 				{ path: dockerfile, content: command },
 			])
 		}
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test('fresh npm package preserves both OpenAI plugin manifests', () => {
+	const root = mkdtempSync(join(tmpdir(), 'fluentcart-conformance-openai-plugin-'))
+	try {
+		const { packageRoot } = createFreshPackage(root)
+		const entries = npmArchiveEntries(packFreshNpmArchive(root, packageRoot))
+		const paths = entries.map(({ path }) => path)
+		assert.ok(paths.includes('openai-plugin/.codex-plugin/plugin.json'))
+		assert.ok(paths.includes('openai-plugin/.mcp.json'))
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}

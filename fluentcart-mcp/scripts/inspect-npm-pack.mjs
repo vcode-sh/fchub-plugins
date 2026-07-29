@@ -24,6 +24,10 @@ const BLOCK = 512
 
 /** npm always adds these regardless of the `files` allowlist. */
 const ALWAYS_ALLOWED = ['package.json', 'README.md', 'LICENSE']
+const REQUIRED_OPENAI_PLUGIN_FILES = [
+	'openai-plugin/.codex-plugin/plugin.json',
+	'openai-plugin/.mcp.json',
+]
 
 const FORBIDDEN_PATTERNS = [
 	{ pattern: /\.map$/, reason: 'source or declaration map' },
@@ -115,6 +119,18 @@ export function inspectNpmPack(archivePath, options = {}) {
 		const root = relative.split('/')[0]
 		if (!allowedRoots.includes(root) && !allowedRoots.includes(relative)) {
 			fail(`not covered by the package files allowlist: ${relative}`)
+		}
+		if (
+			relative.startsWith('openai-plugin/') &&
+			!REQUIRED_OPENAI_PLUGIN_FILES.includes(relative)
+		) {
+			fail(`not covered by the exact OpenAI plugin allowlist: ${relative}`)
+		}
+	}
+
+	for (const required of REQUIRED_OPENAI_PLUGIN_FILES) {
+		if (!files.some((entry) => withoutPrefix(entry.name) === required)) {
+			fail(`missing ${required}`)
 		}
 	}
 

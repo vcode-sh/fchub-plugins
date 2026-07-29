@@ -66,6 +66,10 @@ const DOCKER_CONTEXT_NAME = 'fluentcart-mcp-docker-context.tar.gz'
 const CHECKSUMS_NAME = 'SHA256SUMS.json'
 const RELEASE_STATE_NAME = 'previous-release-state.json'
 const RELEASE_CONTRACT_NAME = 'release-contract.json'
+export const NPM_OPENAI_PLUGIN_FILES = [
+	'openai-plugin/.codex-plugin/plugin.json',
+	'openai-plugin/.mcp.json',
+]
 const VERIFICATION_DIR = 'verification'
 const VERIFICATION_FILES = [
 	'package.json',
@@ -92,11 +96,16 @@ function sha256(path) {
  * keeps the staging directory from running `prepublishOnly`, which would try to compile without
  * a `node_modules` and fail for entirely the wrong reason.
  */
-function packNpm({ root, releaseDist, destination }) {
+export function packNpm({ root, releaseDist, destination }) {
 	const staging = join(root, 'npm')
 	mkdirSync(staging, { recursive: true })
 	for (const name of ['package.json', 'README.md', 'LICENSE']) {
 		cpSync(join(PACKAGE_ROOT, name), join(staging, name))
+	}
+	for (const relative of NPM_OPENAI_PLUGIN_FILES) {
+		const target = join(staging, relative)
+		mkdirSync(dirname(target), { recursive: true })
+		cpSync(join(PACKAGE_ROOT, relative), target)
 	}
 	cpSync(releaseDist, join(staging, 'dist'), { recursive: true })
 

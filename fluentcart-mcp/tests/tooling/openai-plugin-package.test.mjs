@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { gunzipSync } from 'node:zlib'
+import * as releaseArtifacts from '../../scripts/build-release-artifacts.mjs'
+import { readTar } from '../../scripts/inspect-npm-pack.mjs'
 import { digestInputPaths } from '../../scripts/release-contract-inputs.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
@@ -68,5 +72,31 @@ describe('OpenAI plugin package', () => {
 		assert.ok(archiveFiles.includes('openai-plugin/.mcp.json'))
 		assert.ok(digestInputPaths().includes('openai-plugin/.codex-plugin/plugin.json'))
 		assert.ok(digestInputPaths().includes('openai-plugin/.mcp.json'))
+	})
+
+	it('preserves both plugin manifests through hardened release staging', () => {
+		assert.equal(
+			typeof releaseArtifacts.packNpm,
+			'function',
+			'release staging must expose its npm boundary for package tests',
+		)
+		const root = mkdtempSync(join(tmpdir(), 'openai-plugin-release-stage-'))
+		try {
+			const releaseDist = join(root, 'release-dist')
+			const destination = join(root, 'output')
+			mkdirSync(releaseDist)
+			mkdirSync(destination)
+			writeFileSync(join(releaseDist, 'index.js'), 'export {}\n')
+
+			const archive = releaseArtifacts.packNpm({ root, releaseDist, destination })
+			const paths = readTar(gunzipSync(readFileSync(archive))).map(({ name }) =>
+				name.startsWith('package/') ? name.slice('package/'.length) : name,
+			)
+
+			assert.ok(paths.includes('openai-plugin/.codex-plugin/plugin.json'))
+			assert.ok(paths.includes('openai-plugin/.mcp.json'))
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
 	})
 })
