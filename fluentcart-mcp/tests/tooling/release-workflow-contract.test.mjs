@@ -212,13 +212,13 @@ describe('owner evidence-bound promotion', () => {
 })
 
 describe('workflow credential boundary', () => {
-	it('uses npm trusted publishing and no long-lived npm token', () => {
+	it('uses trusted publishing for staging and the established owner token for promotion', () => {
 		assert.match(job(stage, 'stage-npm'), /id-token:\s*write/)
 		assert.match(job(stage, 'stage-npm'), /--provenance/)
 		assert.doesNotMatch(stage, /NPM_TOKEN|NODE_AUTH_TOKEN/)
-		assert.match(promote, /secrets\.NPM_PROMOTION_TOKEN/)
+		assert.match(promote, /secrets\.NPM_TOKEN/)
 		assert.match(promote, /NODE_AUTH_TOKEN/)
-		assert.doesNotMatch(promote, /secrets\.NPM_TOKEN/)
+		assert.doesNotMatch(promote, /secrets\.NPM_PROMOTION_TOKEN/)
 	})
 
 	it('never injects a real store credential into deterministic release jobs', () => {
@@ -233,6 +233,6 @@ describe('workflow credential boundary', () => {
 		assert.match(promote, /node-version:\s*'24\.13\.0'/)
 		assert.match(promote, /test "\$\(npm --version\)" = "11\.6\.2"/)
 		assert.ok(promote.indexOf('npm --version') < promote.indexOf('github-token'))
-		assert.ok(promote.indexOf('npm --version') < promote.indexOf('NPM_PROMOTION_TOKEN'))
+		assert.ok(promote.indexOf('npm --version') < promote.indexOf('NPM_TOKEN'))
 	})
 })

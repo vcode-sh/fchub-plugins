@@ -87,7 +87,7 @@ jobs:
       - name: Promote npm and the same Docker digests
         env:
           VERSION: ${{ inputs.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_PROMOTION_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm dist-tag add "fluentcart-mcp@${VERSION}" latest
           GHCR_DIGEST=$(node -p "require('./staging-state.json').dockerDigests['ghcr.io']")
@@ -110,7 +110,7 @@ jobs:
       - name: Remove temporary npm tag
         env:
           VERSION: ${{ inputs.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_PROMOTION_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           test "$(npm view fluentcart-mcp dist-tags.next)" = "$VERSION"
           npm dist-tag rm fluentcart-mcp next
