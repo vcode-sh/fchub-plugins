@@ -1,0 +1,67 @@
+---
+title: ChatGPT Desktop
+description: Connect ChatGPT Desktop to FluentCart with a local STDIO server.
+---
+
+## What you need
+
+You need ChatGPT Desktop, Node.js 24 or newer, a Terminal, and a WordPress user that can read the
+FluentCart data you need.
+
+## Create safe store access
+
+In WordPress, open **Users → Profile**. Under **Application Passwords**, create one named
+`FluentCart MCP` and copy it immediately. The setup wizard asks for these three fields:
+
+| Field | Value |
+|---|---|
+| **WordPress URL** | Your site root, such as `https://your-store.com` |
+| **Username** | The WordPress login name |
+| **Application Password** | The password WordPress just displayed |
+
+Use a limited WordPress role where practical. The default connection is read-only.
+
+## Add the local server
+
+Open Terminal and check Node.js:
+
+```bash
+node --version
+```
+
+If it is older than 24, install a current release from [nodejs.org](https://nodejs.org). Then save
+the store credentials:
+
+```bash
+npx -y fluentcart-mcp setup
+```
+
+`npx -y` downloads FluentCart MCP when needed and does not install the package globally.
+
+In ChatGPT Desktop, open **Settings → MCP servers → Add server**. Choose **STDIO** and enter:
+
+```text
+Name: fluentcart
+Command: npx
+Arguments: -y fluentcart-mcp
+```
+
+Save and restart the server if ChatGPT Desktop requests it. ChatGPT Desktop, Codex CLI, and the
+Codex IDE extension share the local `~/.codex/config.toml` configuration on the same computer.
+
+## Confirm it works
+
+Open a new chat and ask: **Show me the FluentCart dashboard stats.** A reply with store data means
+the connection is live.
+
+## If it does not work
+
+Confirm that `node --version` reports Node.js 24 or newer, then run the setup wizard again and
+check the WordPress URL, username, and Application Password. If the server is connected but cannot
+read store data, check that the WordPress user has the required FluentCart permissions. See
+[Troubleshooting](/docs/fluentcart-mcp/troubleshooting) for the usual culprits.
+
+## Optional next steps
+
+Try the safe [usage examples](/docs/fluentcart-mcp/usage), or read the
+[advanced reference](/docs/fluentcart-mcp/tools) for policy and capability details.

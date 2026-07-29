@@ -1,0 +1,53 @@
+---
+title: Claude Desktop
+description: Connect Claude Desktop to FluentCart without a Terminal.
+---
+
+## What you need
+
+You need Claude Desktop, a WordPress user allowed to read the FluentCart data you need, and your
+store URL. No Terminal or separate Node.js installation is required because Claude Desktop extension
+users do not install Node for its MCPB extension.
+
+## Create safe store access
+
+In WordPress, open **Users → Profile**, find **Application Passwords**, enter a name such as
+`FluentCart MCP`, and select **Add New Application Password**. Copy it before leaving the page.
+
+Have these three fields ready:
+
+| Field | Value |
+|---|---|
+| **WordPress URL** | Your site root, such as `https://your-store.com` |
+| **Username** | The WordPress login name |
+| **Application Password** | The password WordPress just displayed |
+
+Use a WordPress role with only the FluentCart permissions the person needs. Keep write mode
+**disabled** for the default read-only connection.
+
+## Install the Claude extension
+
+1. Download <McpbDownload />.
+2. In Claude Desktop, open **Settings → Extensions → Advanced settings → Install Extension**.
+3. Select `fluentcart-mcp.mcpb`.
+4. Enter the WordPress URL, Username, and Application Password. Leave write mode set to
+   **disabled**, then enable the extension.
+
+The MCPB contains the server JavaScript and its production dependencies, not a Node executable.
+Claude Desktop supplies that runtime.
+
+## Confirm it works
+
+Start a new Claude chat and ask: **Show me the FluentCart dashboard stats.** Store data is the
+proof; an attractive status light has never processed an order.
+
+## If it does not work
+
+Check that the extension is enabled, the URL is the site root (not `/wp-admin/`), and the username
+and Application Password are the values you created. Make sure that WordPress user can read the
+needed FluentCart data, then see [Troubleshooting](/docs/fluentcart-mcp/troubleshooting).
+
+## Optional next steps
+
+Read [usage examples](/docs/fluentcart-mcp/usage) for safe questions, or consult the
+[advanced reference](/docs/fluentcart-mcp/tools) before changing any server policy.

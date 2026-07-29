@@ -49,18 +49,6 @@ describe('beginner client journeys', () => {
 			assert.match(setup, new RegExp(route))
 		}
 		assert.match(index, /\[ChatGPT web\]\(\/docs\/fluentcart-mcp\/chatgpt-web\)/)
-		expectExisting(chatgptWebPage)
-	})
-
-	it('keeps the ChatGPT web tunnel separate from local ChatGPT and Codex STDIO setup', () => {
-		const chatgptWeb = readRequired(chatgptWebPage)
-		const chatgptDesktop = readRequired(beginnerPages['ChatGPT Desktop'])
-
-		assert.match(chatgptWeb, /Secure MCP Tunnel/i)
-		assert.match(chatgptWeb, /does not read[^.]*\.codex\/config\.toml/i)
-		assert.doesNotMatch(chatgptWeb, /Settings → MCP servers → Add server|codex mcp add/i)
-		assert.match(chatgptDesktop, /Settings → MCP servers → Add server/i)
-		assert.doesNotMatch(chatgptDesktop, /Secure MCP Tunnel/i)
 	})
 
 	it('uses common beginner recipe headings and one dashboard verification prompt', () => {
@@ -96,6 +84,20 @@ describe('beginner client journeys', () => {
 				`${relativePath} must tie no-global-install guidance to npx`,
 			)
 		}
+	})
+})
+
+describe('advanced client boundaries', () => {
+	it('keeps the ChatGPT web tunnel separate from local ChatGPT and Codex STDIO setup', () => {
+		expectExisting(chatgptWebPage)
+		const chatgptWeb = readRequired(chatgptWebPage)
+		const chatgptDesktop = readRequired(beginnerPages['ChatGPT Desktop'])
+
+		assert.match(chatgptWeb, /Secure MCP Tunnel/i)
+		assert.match(chatgptWeb, /does not read[^.]*\.codex\/config\.toml/i)
+		assert.doesNotMatch(chatgptWeb, /Settings → MCP servers → Add server|codex mcp add/i)
+		assert.match(chatgptDesktop, /Settings → MCP servers → Add server/i)
+		assert.doesNotMatch(chatgptDesktop, /Secure MCP Tunnel/i)
 	})
 })
 

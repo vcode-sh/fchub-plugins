@@ -1,19 +1,26 @@
 {
   "title": "FluentCart MCP",
   "root": true,
-  "description": "AI-agent MCP server for FluentCart.",
+  "description": "Connect your AI app to FluentCart.",
   "pages": [
     "---Getting Started---",
     "index",
     "setup",
-    "---Usage---",
+    "claude-desktop",
+    "chatgpt-desktop",
+    "cursor",
+    "other-clients",
+    "---Use---",
     "usage",
+    "---Advanced---",
+    "configuration",
     "tools",
-    "proof",
-    "---Deployment---",
+    "chatgpt-web",
     "deployment",
-    "---Reference---",
+    "---Evidence & Support---",
+    "proof",
     "troubleshooting",
+    "---Releases---",
     "changelog"
   ]
 }

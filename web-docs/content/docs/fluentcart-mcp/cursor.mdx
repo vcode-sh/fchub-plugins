@@ -1,0 +1,71 @@
+---
+title: Cursor
+description: Connect Cursor to FluentCart with one global MCP entry.
+---
+
+## What you need
+
+You need Cursor, Node.js 24 or newer, and a WordPress user that can read the FluentCart data you
+need.
+
+## Create safe store access
+
+In WordPress, open **Users → Profile**. Create and copy an **Application Password** named
+`FluentCart MCP`. The setup wizard needs these three fields:
+
+| Field | Value |
+|---|---|
+| **WordPress URL** | Your site root, such as `https://your-store.com` |
+| **Username** | The WordPress login name |
+| **Application Password** | The password WordPress just displayed |
+
+Use a limited WordPress role where practical. The default connection is read-only.
+
+## Add the global server
+
+Check that Node.js is current:
+
+```bash
+node --version
+```
+
+Install Node.js 24 or newer if needed, then run the setup wizard:
+
+```bash
+npx -y fluentcart-mcp setup
+```
+
+`npx -y` downloads FluentCart MCP on demand and does not install the package globally.
+
+Open **Settings → Cursor Settings → MCP → Add new global MCP server** and add only this entry to
+the global `mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"]
+    }
+  }
+}
+```
+
+If Cursor reports that the command cannot be found, run `which npx` on macOS or Linux, or
+`where npx` on Windows. Replace `"npx"` in the entry with the returned absolute path.
+
+## Confirm it works
+
+Save the file, check that `fluentcart` is enabled in **Settings → MCP**, then ask:
+**Show me the FluentCart dashboard stats.** The returned store data is the useful confirmation.
+
+## If it does not work
+
+Run the setup wizard again and check the WordPress URL, username, and Application Password. If
+Cursor still reports command-not-found, use the absolute `npx` path above. If the server cannot
+read store data, make sure the WordPress user has the required FluentCart permissions.
+
+## Optional next steps
+
+Use the safe [usage examples](/docs/fluentcart-mcp/usage), or read the
+[advanced reference](/docs/fluentcart-mcp/tools) before changing server policy.

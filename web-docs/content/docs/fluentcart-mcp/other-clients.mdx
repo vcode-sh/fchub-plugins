@@ -1,0 +1,111 @@
+---
+title: Other clients
+description: Connect Claude Code, Codex, VS Code with Copilot, or Windsurf to FluentCart.
+---
+
+## What you need
+
+You need Node.js 24 or newer, a Terminal, and a WordPress user that can read the FluentCart data
+you need. These are configuration recipes, not client certification.
+
+## Create safe store access
+
+In WordPress, open **Users → Profile**, create an **Application Password** named `FluentCart MCP`,
+and copy it immediately. The setup wizard needs your WordPress URL, username, and that Application
+Password. Use a limited WordPress role where practical; the default connection is read-only.
+
+## Add your client
+
+Check Node.js first:
+
+```bash
+node --version
+```
+
+Install Node.js 24 or newer if needed. Before adding any client below, run:
+
+```bash
+npx -y fluentcart-mcp setup
+```
+
+`npx -y` downloads FluentCart MCP on demand and does not install the package globally.
+
+### Claude Code
+
+After the setup wizard finishes, run:
+
+```bash
+claude mcp add fluentcart -- npx -y fluentcart-mcp
+claude mcp list
+```
+
+Start a new session and ask: **Show me the FluentCart dashboard stats.**
+
+### Codex CLI and Codex IDE extension
+
+After the setup wizard finishes, run:
+
+```bash
+codex mcp add fluentcart -- npx -y fluentcart-mcp
+codex mcp list
+```
+
+Codex CLI and the Codex IDE extension share `~/.codex/config.toml`. In the IDE, you can instead
+open **MCP servers → Add server** and use the same command and arguments. Ask: **Show me the
+FluentCart dashboard stats.**
+
+### VS Code with GitHub Copilot
+
+After the setup wizard finishes, run **MCP: Add Server** from the Command Palette, or create
+`.vscode/mcp.json` in the workspace:
+
+```json
+{
+  "servers": {
+    "fluentcart": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"]
+    }
+  }
+}
+```
+
+Use **MCP: List Servers** to inspect it, then ask GitHub Copilot Chat: **Show me the FluentCart
+dashboard stats.**
+
+### Windsurf
+
+After the setup wizard finishes, open the **MCPs** icon in Cascade or **Devin Settings → Cascade →
+MCP Servers**. For manual setup, add this to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "npx",
+      "args": ["-y", "fluentcart-mcp"]
+    }
+  }
+}
+```
+
+Enable `fluentcart`, then ask: **Show me the FluentCart dashboard stats.**
+
+Docker and [ChatGPT web](/docs/fluentcart-mcp/chatgpt-web) are advanced routes, not local clients.
+
+## Confirm it works
+
+In the app you selected, ask: **Show me the FluentCart dashboard stats.** A response containing
+store data means the connection is live.
+
+## If it does not work
+
+Check that Node.js is 24 or newer and rerun the setup wizard. Then recheck the WordPress URL,
+username, Application Password, and the selected app's server list. A connected server without
+store access usually means the WordPress role lacks the required FluentCart permissions.
+
+## Optional next steps
+
+See [usage examples](/docs/fluentcart-mcp/usage) for safe questions, or the
+[advanced reference](/docs/fluentcart-mcp/tools) for capability details.
