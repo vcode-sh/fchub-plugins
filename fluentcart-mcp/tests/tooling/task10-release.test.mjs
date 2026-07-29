@@ -16,12 +16,96 @@ const read = (path) => readFileSync(join(REPO_ROOT, path), 'utf8')
 const readJson = (path) => JSON.parse(read(path))
 
 const expectedTruth = {
-	version: '2.0.0',
+	version: '2.0.1',
 	protocols: ['2025-11-25', '2026-07-28'],
 	httpProfiles: ['local', 'private'],
 	sdk: { server: '2.0.0', node: '2.0.0', express: '2.0.0' },
 	conformance: { package: '0.2.0-alpha.10', expectedFailures: [] },
 }
+
+const expectedRecipes = [
+	[
+		'ChatGPT Desktop',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://learn.chatgpt.com/docs/extend/mcp',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Codex CLI',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://learn.chatgpt.com/docs/extend/mcp',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Codex IDE extension',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://learn.chatgpt.com/docs/extend/mcp',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Claude Desktop',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'MCPB/STDIO',
+			distribution: 'extension',
+			capabilitySource:
+				'https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Cursor',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://docs.cursor.com/context/model-context-protocol',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'VS Code with GitHub Copilot',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://code.visualstudio.com/docs/copilot/chat/mcp-servers',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Windsurf',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://docs.windsurf.com/windsurf/cascade/mcp',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'ChatGPT web',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'Secure MCP Tunnel',
+			distribution: 'private web',
+			capabilitySource: 'https://developers.openai.com/api/docs/guides/secure-mcp-tunnels',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+]
 
 describe('generated release truth', () => {
 	it('is concrete, current and identical in the contract and MCPB manifest', () => {
@@ -70,7 +154,7 @@ describe('generated release truth', () => {
 	it('separates five automated handshakes from documented configuration recipes', () => {
 		const support = readJson('fluentcart-mcp/compatibility-support.json')
 		assert.deepEqual(support.releaseEvidence, {
-			version: '2.0.0',
+			version: '2.0.1',
 			protocols: ['2025-11-25', '2026-07-28'],
 			httpProfiles: ['local', 'private'],
 			finalCandidate: 'AUTOMATED_CLIENT_CERTIFICATION_REQUIRED',
@@ -83,7 +167,16 @@ describe('generated release truth', () => {
 			'Claude Code',
 			'Docker smoke',
 		])
-		assert.deepEqual(Object.keys(truth.clients.configurationRecipes), ['Claude Desktop', 'Cursor'])
+		assert.deepEqual(Object.entries(truth.clients.configurationRecipes), expectedRecipes)
+		for (const [, recipe] of expectedRecipes) {
+			assert.deepEqual(Object.keys(recipe).sort(), [
+				'capabilitySource',
+				'distribution',
+				'reason',
+				'status',
+				'transport',
+			])
+		}
 		assert.equal(Object.hasOwn(truth.clients, 'configurationTargets'), false)
 		assert.equal(truth.evidence.finalCandidate, 'AUTOMATED_CLIENT_CERTIFICATION_REQUIRED')
 	})
@@ -110,21 +203,21 @@ describe('generated release truth', () => {
 
 	it('rejects missing, mutable, unknown and already-current capture inputs', () => {
 		const good = readJson('fluentcart-mcp/tests/fixtures/releases/previous-release-state.json')
-		assert.throws(() => validateReleaseState({}, '2.0.0'), /schema version 1/)
+		assert.throws(() => validateReleaseState({}, '2.0.1'), /schema version 1/)
 		assert.throws(
 			() =>
-				validateReleaseState({ ...good, npm: { ...good.npm, previousLatest: '2.0.0' } }, '2.0.0'),
+				validateReleaseState({ ...good, npm: { ...good.npm, previousLatest: '2.0.1' } }, '2.0.1'),
 			/already equals npm latest/,
 		)
 		const mutable = structuredClone(good)
 		mutable.docker.previousLatestDigests['ghcr.io'] = 'ghcr.io/vcode-sh/fluentcart-mcp:latest'
-		assert.throws(() => validateReleaseState(mutable, '2.0.0'), /not an immutable digest/)
+		assert.throws(() => validateReleaseState(mutable, '2.0.1'), /not an immutable digest/)
 		const unknown = structuredClone(good)
 		unknown.docker.previousLatestDigests = {
 			'ghcr.io': unknown.docker.previousLatestDigests['ghcr.io'],
 			'example.invalid': unknown.docker.previousLatestDigests['docker.io'],
 		}
-		assert.throws(() => validateReleaseState(unknown, '2.0.0'), /unknown Docker registry/)
+		assert.throws(() => validateReleaseState(unknown, '2.0.1'), /unknown Docker registry/)
 	})
 })
 

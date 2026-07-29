@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "fluentcart-mcp",
   "display_name": "FluentCart",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Curated and capability-discovered tools for a FluentCart store — orders, products, customers, subscriptions, coupons and reports. Read-only unless you opt in to writes.",
   "long_description": "Connects an MCP client to the FluentCart REST API of your own WordPress site.\n\nDynamic mode is the default: a handful of meta-tools let the agent search the catalogue, read a tool definition and execute it, which keeps the definition payload small no matter how large the store API grows. Curated mode advertises a small reviewed set directly, code mode exposes a sandboxed scripting pair, and full mode lists everything the current policy permits.\n\nExposure is decided before anything is listed. Writes are hidden entirely until write mode is raised, and what you actually get depends on what your store and your role support. FluentCart native abilities are a separate read-only opt-in with their own credentials; discovery admits only the audited read allowlist.",
   "author": {
@@ -212,10 +212,10 @@
   "_meta": {
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
-      "packageVersion": "2.0.0",
-      "sourceTreeDigest": "sha256:9cd0f43ba5c4abf8cfa1fdf555890fd67f1b3ad68cf4824d1ec9975b9d0f8f91",
+      "packageVersion": "2.0.1",
+      "sourceTreeDigest": "sha256:e274cb3e0daa023687ac6c3c34498c869aa60568e155565581c738f44c351702",
       "release": {
-        "version": "2.0.0",
+        "version": "2.0.1",
         "protocols": [
           "2025-11-25",
           "2026-07-28"
@@ -238,10 +238,10 @@
           "npmStageTag": "latest",
           "npmApproval": "interactive-2fa",
           "npmPromotionWrite": false,
-          "previousLatest": "1.1.0",
+          "previousLatest": "2.0.0",
           "previousDockerDigests": {
-            "ghcr.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c",
-            "docker.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c"
+            "ghcr.io": "sha256:c38a54db74f07da03be544539b8bb36f502ae36987f00567293e48a985574174",
+            "docker.io": "sha256:c38a54db74f07da03be544539b8bb36f502ae36987f00567293e48a985574174"
           }
         },
         "clients": {
@@ -271,12 +271,60 @@
             }
           },
           "configurationRecipes": {
+            "ChatGPT Desktop": {
+              "status": "CONFIGURATION_TARGET",
+              "transport": "STDIO",
+              "distribution": "local",
+              "capabilitySource": "https://learn.chatgpt.com/docs/extend/mcp",
+              "reason": "manual configuration is documented, not certified"
+            },
+            "Codex CLI": {
+              "status": "CONFIGURATION_TARGET",
+              "transport": "STDIO",
+              "distribution": "local",
+              "capabilitySource": "https://learn.chatgpt.com/docs/extend/mcp",
+              "reason": "manual configuration is documented, not certified"
+            },
+            "Codex IDE extension": {
+              "status": "CONFIGURATION_TARGET",
+              "transport": "STDIO",
+              "distribution": "local",
+              "capabilitySource": "https://learn.chatgpt.com/docs/extend/mcp",
+              "reason": "manual configuration is documented, not certified"
+            },
             "Claude Desktop": {
               "status": "CONFIGURATION_TARGET",
+              "transport": "MCPB/STDIO",
+              "distribution": "extension",
+              "capabilitySource": "https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop",
               "reason": "manual configuration is documented, not certified"
             },
             "Cursor": {
               "status": "CONFIGURATION_TARGET",
+              "transport": "STDIO",
+              "distribution": "local",
+              "capabilitySource": "https://docs.cursor.com/context/model-context-protocol",
+              "reason": "manual configuration is documented, not certified"
+            },
+            "VS Code with GitHub Copilot": {
+              "status": "CONFIGURATION_TARGET",
+              "transport": "STDIO",
+              "distribution": "local",
+              "capabilitySource": "https://code.visualstudio.com/docs/copilot/chat/mcp-servers",
+              "reason": "manual configuration is documented, not certified"
+            },
+            "Windsurf": {
+              "status": "CONFIGURATION_TARGET",
+              "transport": "STDIO",
+              "distribution": "local",
+              "capabilitySource": "https://docs.windsurf.com/windsurf/cascade/mcp",
+              "reason": "manual configuration is documented, not certified"
+            },
+            "ChatGPT web": {
+              "status": "CONFIGURATION_TARGET",
+              "transport": "Secure MCP Tunnel",
+              "distribution": "private web",
+              "capabilitySource": "https://developers.openai.com/api/docs/guides/secure-mcp-tunnels",
               "reason": "manual configuration is documented, not certified"
             }
           }

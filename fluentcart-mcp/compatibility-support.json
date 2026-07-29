@@ -1,7 +1,7 @@
 {
   "generatedBy": "hand-maintained; consumed by scripts/check-tool-routes.mjs --compatibility",
   "releaseEvidence": {
-    "version": "2.0.0",
+    "version": "2.0.1",
     "protocols": ["2025-11-25", "2026-07-28"],
     "httpProfiles": ["local", "private"],
     "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED",

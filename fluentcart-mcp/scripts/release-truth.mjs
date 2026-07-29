@@ -11,6 +11,90 @@ const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
 const DIGEST = /^sha256:[a-f0-9]{64}$/
 const REGISTRIES = new Set(['ghcr.io', 'docker.io'])
 
+export const CONFIGURATION_RECIPES = [
+	[
+		'ChatGPT Desktop',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://learn.chatgpt.com/docs/extend/mcp',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Codex CLI',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://learn.chatgpt.com/docs/extend/mcp',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Codex IDE extension',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://learn.chatgpt.com/docs/extend/mcp',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Claude Desktop',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'MCPB/STDIO',
+			distribution: 'extension',
+			capabilitySource:
+				'https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Cursor',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://docs.cursor.com/context/model-context-protocol',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'VS Code with GitHub Copilot',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://code.visualstudio.com/docs/copilot/chat/mcp-servers',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'Windsurf',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'STDIO',
+			distribution: 'local',
+			capabilitySource: 'https://docs.windsurf.com/windsurf/cascade/mcp',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+	[
+		'ChatGPT web',
+		{
+			status: 'CONFIGURATION_TARGET',
+			transport: 'Secure MCP Tunnel',
+			distribution: 'private web',
+			capabilitySource: 'https://developers.openai.com/api/docs/guides/secure-mcp-tunnels',
+			reason: 'manual configuration is documented, not certified',
+		},
+	],
+]
+
 export function validateReleaseState(state, candidateVersion) {
 	if (state?.redacted !== true || state?.schemaVersion !== 1) {
 		throw new Error('release state must be schema version 1 and explicitly redacted')
@@ -85,12 +169,7 @@ export function buildReleaseTruth(pkg, releaseState = null) {
 				],
 				[
 					'configurationRecipes',
-					Object.fromEntries(
-						['Claude Desktop', 'Cursor'].map((name) => [
-							name,
-							{ status: 'CONFIGURATION_TARGET', reason: 'manual configuration is documented, not certified' },
-						]),
-					),
+					Object.fromEntries(CONFIGURATION_RECIPES),
 				],
 			],
 		),
