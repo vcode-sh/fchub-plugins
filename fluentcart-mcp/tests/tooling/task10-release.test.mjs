@@ -277,6 +277,7 @@ describe('staging and promotion workflows', () => {
 describe('public recovery contract', () => {
 	const docs = [
 		read('fluentcart-mcp/README.md'),
+		read('AGENTS.md'),
 		...['setup.mdx', 'deployment.mdx', 'proof.mdx'].map((name) =>
 			read(`web-docs/content/docs/fluentcart-mcp/${name}`),
 		),
@@ -302,7 +303,7 @@ describe('public recovery contract', () => {
 	it('documents staged promotion and safe recovery without pretending versions are reusable', () => {
 		for (const pattern of [
 			/trusted publishing/,
-			/staged publish/,
+			/staged\s+publish/,
 			/interactive 2fa/,
 			/deprecate/,
 			/never reuse/,
@@ -349,13 +350,19 @@ describe('documentation checker structure', () => {
 describe('client-first documentation contracts', () => {
 	const packageReadme = read('fluentcart-mcp/README.md')
 	const index = read('web-docs/content/docs/fluentcart-mcp/index.mdx')
-	const setup = read('web-docs/content/docs/fluentcart-mcp/setup.mdx')
-	const deployment = read('web-docs/content/docs/fluentcart-mcp/deployment.mdx')
-	const onboarding = [packageReadme, index, setup].join('\n')
-	const webSetup = [setup, deployment].join('\n')
+	const chatgptDesktop = read('web-docs/content/docs/fluentcart-mcp/chatgpt-desktop.mdx')
+	const claudeDesktop = read('web-docs/content/docs/fluentcart-mcp/claude-desktop.mdx')
+	const cursor = read('web-docs/content/docs/fluentcart-mcp/cursor.mdx')
+	const otherClients = read('web-docs/content/docs/fluentcart-mcp/other-clients.mdx')
+	const configuration = read('web-docs/content/docs/fluentcart-mcp/configuration.mdx')
+	const chatgptWeb = read('web-docs/content/docs/fluentcart-mcp/chatgpt-web.mdx')
+	const onboarding = [packageReadme, index, chatgptDesktop, claudeDesktop, cursor, otherClients].join('\n')
+	const clientGuides = [chatgptDesktop, claudeDesktop, cursor, otherClients, chatgptWeb].join('\n')
 	const compactOnboarding = onboarding.replace(/\s+/g, ' ')
-	const compactSetup = setup.replace(/\s+/g, ' ')
-	const compactDeployment = deployment.replace(/\s+/g, ' ')
+	const compactChatgptDesktop = chatgptDesktop.replace(/\s+/g, ' ')
+	const compactConfiguration = configuration.replace(/\s+/g, ' ')
+	const compactChatgptWeb = chatgptWeb.replace(/\s+/g, ' ')
+	const chatgptWebGuidance = [chatgptWeb, read('AGENTS.md')].join('\n').replace(/\s+/g, ' ')
 
 	it('keeps the Claude extension runtime separate from the MCPB archive contents', () => {
 		assert.match(
@@ -377,24 +384,21 @@ describe('client-first documentation contracts', () => {
 			/npx -y[^.]{0,140}(?:does not|doesn't)[^.]{0,40}install[^.]{0,30}globally/i,
 		)
 		assert.match(
-			compactSetup,
+			compactChatgptDesktop,
 			/ChatGPT Desktop[^.]{0,120}Codex CLI[^.]{0,120}Codex IDE extension[^.]{0,160}share/i,
 		)
-		assert.match(compactSetup, /~\/\.codex\/config\.toml/)
-		assert.match(compactSetup, /Settings\s*→\s*MCP servers\s*→\s*Add server/)
+		assert.match(compactChatgptDesktop, /~\/\.codex\/config\.toml/)
+		assert.match(compactChatgptDesktop, /Settings\s*→\s*MCP servers\s*→\s*Add server/)
 	})
 
 	it('provides an actionable repository marketplace route for the optional OpenAI plugin', () => {
-		assert.match(compactSetup, /codex plugin marketplace add vcode-sh\/fchub-plugins --ref main/)
-		assert.match(compactSetup, /codex plugin marketplace list/)
-		assert.match(compactSetup, /restart ChatGPT Desktop/i)
+		assert.match(compactConfiguration, /codex plugin marketplace add vcode-sh\/fchub-plugins --ref main/)
+		assert.match(compactConfiguration, /codex plugin marketplace list/)
+		assert.match(compactConfiguration, /restart(?:ing)? ChatGPT Desktop/i)
+		assert.match(compactConfiguration, /Install[^.]{0,80}fluentcart-mcp[^.]{0,100}from[^.]{0,80}fchub-plugins/i)
 		assert.match(
-			compactSetup,
-			/Plugins Directory[^.]{0,180}fchub-plugins[^.]{0,180}fluentcart-mcp/i,
-		)
-		assert.match(
-			compactSetup,
-			/(?:separate from|not listed in)[^.]{0,100}(?:universal )?public directory/i,
+			compactConfiguration,
+			/not a claim[^.]{0,100}(?:universal )?public directory/i,
 		)
 	})
 
@@ -409,42 +413,42 @@ describe('client-first documentation contracts', () => {
 			'Windsurf',
 			'ChatGPT web',
 		]) {
-			assert.match(webSetup, new RegExp(client.replaceAll(' ', '\\s+'), 'i'), client)
+			assert.match(clientGuides, new RegExp(client.replaceAll(' ', '\\s+'), 'i'), client)
 		}
-		assert.match(setup, /"servers"\s*:\s*\{[\s\S]{0,180}"type"\s*:\s*"stdio"/)
-		assert.match(setup, /Cursor[\s\S]{0,500}"mcpServers"/)
-		assert.match(setup, /Windsurf[\s\S]{0,500}"mcpServers"/)
-		assert.match(compactSetup, /MCPs icon/)
-		assert.match(compactSetup, /Devin Settings\s*→\s*Cascade\s*→\s*MCP Servers/)
-		assert.match(compactSetup, /~\/\.codeium\/windsurf\/mcp_config\.json/)
-		assert.doesNotMatch(compactSetup, /Open MCP Config/)
+		assert.match(otherClients, /"servers"\s*:\s*\{[\s\S]{0,180}"type"\s*:\s*"stdio"/)
+		assert.match(cursor, /"mcpServers"/)
+		assert.match(otherClients, /Windsurf[\s\S]{0,500}"mcpServers"/)
+		assert.match(otherClients, /MCPs[\s\S]{0,20}icon/)
+		assert.match(otherClients, /Devin Settings\s*→\s*Cascade\s*→\s*MCP Servers/)
+		assert.match(otherClients, /~\/\.codeium\/windsurf\/mcp_config\.json/)
+		assert.doesNotMatch(otherClients, /Open MCP Config/)
 		assert.doesNotMatch(
-			setup,
+			clientGuides,
 			/must be in \*\*Agent\*\* mode|Regular Chat (?:mode )?(?:doesn't|does not) use MCP/i,
 		)
 	})
 
 	it('documents ChatGPT web as a separately authorised Secure MCP Tunnel connection', () => {
-		assert.match(compactDeployment, /OpenAI Secure MCP Tunnel/)
-		assert.match(compactDeployment, /Developer mode/)
-		assert.match(compactDeployment, /Platform tunnel settings/)
-		assert.match(compactDeployment, /CONTROL_PLANE_API_KEY/)
-		assert.match(compactDeployment, /tunnel-client init/)
-		assert.match(compactDeployment, /--mcp-command "npx -y fluentcart-mcp"/)
-		assert.match(compactDeployment, /tunnel-client doctor/)
-		assert.match(compactDeployment, /tunnel-client run/)
-		assert.match(compactDeployment, /ChatGPT Plugins/)
-		assert.match(compactDeployment, /Tunnel under Connection/)
+		assert.match(compactChatgptWeb, /OpenAI Secure MCP Tunnel/)
+		assert.match(compactChatgptWeb, /Developer mode/)
+		assert.match(compactChatgptWeb, /Platform tunnel settings/)
+		assert.match(compactChatgptWeb, /CONTROL_PLANE_API_KEY/)
+		assert.match(compactChatgptWeb, /tunnel-client init/)
+		assert.match(compactChatgptWeb, /--mcp-command "npx -y fluentcart-mcp"/)
+		assert.match(compactChatgptWeb, /tunnel-client doctor/)
+		assert.match(compactChatgptWeb, /tunnel-client run/)
+		assert.match(compactChatgptWeb, /ChatGPT Plugins/)
+		assert.match(compactChatgptWeb, /Tunnel[\s\S]{0,30}Connection/)
 		assert.match(
-			compactDeployment,
+			compactChatgptWeb,
 			/(?:separate|different)[^.]{0,100}(?:permission|authori[sz]ation)/i,
 		)
 		assert.match(
-			compactDeployment,
+			compactChatgptWeb,
 			/FLUENTCART_MCP_API_KEY[^.]{0,160}(?:is not|isn't)[^.]{0,80}ChatGPT[^.]{0,80}auth/i,
 		)
 		assert.match(
-			compactDeployment,
+			chatgptWebGuidance,
 			/public[^.]{0,100}(?:directory|submission)[^.]{0,160}FluentCart[^.]{0,80}authori[sz]ation/i,
 		)
 	})

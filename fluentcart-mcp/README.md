@@ -23,13 +23,14 @@ client certification. Candidate certification requires a candidate-bound handsha
 | **Windsurf** | `mcp_config.json` |
 | **ChatGPT web** | OpenAI Secure MCP Tunnel |
 
-The complete recipes and one-read verification steps live in the
-[setup guide](https://fchub.co/docs/fluentcart-mcp/setup).
+Start with the [client chooser](https://fchub.co/docs/fluentcart-mcp), then use the standalone
+guide for that client. It keeps local STDIO, Claude Desktop MCPB, and ChatGPT web tunnel setup from
+becoming one large configuration accident.
 
 ## Three-Step First Run
 
 1. Create a WordPress Application Password for a suitably narrow FluentCart user.
-2. For local clients, save it once:
+2. For a local client with Node.js 24 or newer, save it once:
 
    ```bash
    npx -y fluentcart-mcp setup
@@ -121,7 +122,7 @@ to “probably read-only”, the traditional prelude to a very long afternoon.
 }
 ```
 
-### 3. Setup Wizard
+### 3. Setup Wizard for local Node.js 24+ clients
 
 ```bash
 npx -y fluentcart-mcp setup
@@ -228,7 +229,8 @@ Once connected, just talk. The read-only examples work out of the box; the ones 
 
 2.0 is deliberately breaking: Node 24 is required for local clients, the modular MCP SDK v2 packages replace the
 legacy SDK, dynamic mode is the default, both protocol eras above are supported, and private HTTP
-requires key and allowlists before listen. If a client is not ready, keep the 1.x line explicit:
+requires key and allowlists before listen. For a local Node.js 24+ client that is not ready, keep the
+1.x line explicit:
 
 ```bash
 npx -y fluentcart-mcp@1

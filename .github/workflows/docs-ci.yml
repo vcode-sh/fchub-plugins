@@ -16,12 +16,21 @@ on:
       - 'scripts/check-fchub-docs.mjs'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
+      - 'scripts/mcp-doc-rules.mjs'
+      - 'scripts/check-mcp-docs.test.mjs'
+      - 'scripts/check-mcp-docs-experience.test.mjs'
       - 'fluentcart-mcp/package.json'
       - 'fluentcart-mcp/release-contract.json'
       - 'fluentcart-mcp/manifest.json'
       - 'fluentcart-mcp/api-coverage.json'
+      - 'fluentcart-mcp/compatibility-support.json'
       - 'fluentcart-mcp/README.md'
       - 'README.md'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'web-docs/content/docs/fluentcart-mcp/**'
+      - 'web-docs/app/(home)/fluentcart-mcp/**'
+      - 'web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx'
       - 'fluentcart-mcp/Dockerfile'
       - 'fluentcart-mcp/docker-mcp-registry/**'
       - 'scripts/check-mcp-docs.mjs'
@@ -39,12 +48,21 @@ on:
       - 'scripts/check-fchub-docs.mjs'
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
+      - 'scripts/mcp-doc-rules.mjs'
+      - 'scripts/check-mcp-docs.test.mjs'
+      - 'scripts/check-mcp-docs-experience.test.mjs'
       - 'fluentcart-mcp/package.json'
       - 'fluentcart-mcp/release-contract.json'
       - 'fluentcart-mcp/manifest.json'
       - 'fluentcart-mcp/api-coverage.json'
+      - 'fluentcart-mcp/compatibility-support.json'
       - 'fluentcart-mcp/README.md'
       - 'README.md'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'web-docs/content/docs/fluentcart-mcp/**'
+      - 'web-docs/app/(home)/fluentcart-mcp/**'
+      - 'web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx'
       - 'fluentcart-mcp/Dockerfile'
       - 'fluentcart-mcp/docker-mcp-registry/**'
       - 'scripts/check-mcp-docs.mjs'
@@ -100,6 +118,9 @@ jobs:
       # is release-contract.json, so this cannot drift from the measurement that produced it.
       - name: Verify MCP documentation claims
         run: node scripts/check-mcp-docs.mjs
+
+      - name: Test FluentCart MCP documentation contracts
+        run: node --test scripts/check-mcp-docs.test.mjs scripts/check-mcp-docs-experience.test.mjs
 
       - name: Check for hardcoded release URLs
         run: |

@@ -39,16 +39,16 @@ Docs, install guides, changelogs, screenshots — all at **[fchub.co](https://fc
 ## FluentCart MCP server
 
 An [MCP server](fluentcart-mcp/) that lets the client you already use talk to one FluentCart store.
-Start with **ChatGPT Desktop**, **Codex CLI or IDE**, **Claude Desktop**, **Claude Code**,
-**Cursor**, **VS Code with GitHub Copilot**, **Windsurf**, or **ChatGPT web**. Orders, products,
-customers and subscriptions are read-only until you deliberately enable reversible admin work.
+Start with the [client chooser and three-step setup](https://fchub.co/docs/fluentcart-mcp): ChatGPT
+Desktop, Codex CLI or IDE, Claude Desktop, Claude Code, Cursor, VS Code with GitHub Copilot,
+Windsurf, or ChatGPT web. Orders, products, customers and subscriptions are read-only until you
+deliberately enable reversible admin work.
 
-Local clients run `npx -y fluentcart-mcp`; `npx -y` downloads on demand and does not install the
-package globally. Claude Desktop supplies Node for its MCPB extension. ChatGPT web uses OpenAI
-Secure MCP Tunnel rather than pretending a browser can read `~/.codex/config.toml`.
+For a local client with Node.js 24 or newer, `npx -y fluentcart-mcp` downloads on demand and does
+not install the package globally. Claude Desktop supplies Node for its MCPB extension. ChatGPT web
+uses OpenAI Secure MCP Tunnel rather than pretending a browser can read `~/.codex/config.toml`.
 
-On npm as `fluentcart-mcp`. Start with the
-**[client chooser and three-step setup](https://fchub.co/docs/fluentcart-mcp)**.
+On npm as `fluentcart-mcp`.
 
 ---
 

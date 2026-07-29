@@ -39,6 +39,18 @@ owner performs publication.
   Secure MCP Tunnel with separate Platform tunnel and ChatGPT Developer mode
   permissions. Never present `FLUENTCART_MCP_API_KEY` as ChatGPT plugin auth or
   promise public-directory eligibility without FluentCart authorisation.
+- Beginner documentation starts with the client chooser at
+  `/docs/fluentcart-mcp` (with `/setup` retained as the chooser for existing
+  links), then uses the standalone `claude-desktop`, `chatgpt-desktop`,
+  `cursor` and `other-clients` routes. Keep modes, multiple stores and the
+  optional repository marketplace in `configuration`; keep Secure MCP Tunnel
+  in `chatgpt-web`; keep Docker and generic private HTTP in `deployment`.
+- Current-facing truth includes all FluentCart MCP documentation, the public
+  MCP marketing layout and components, and the comparison blog. Preserve the
+  historical changelog as history rather than current product copy. From the
+  repository root, run `node scripts/check-mcp-docs.mjs` and
+  `node --test scripts/check-mcp-docs.test.mjs scripts/check-mcp-docs-experience.test.mjs`
+  whenever a documentation truth input changes.
 - Local checks from `fluentcart-mcp/` include `npm run test:tooling`,
   `npm run test:conformance`, `npm run check:contract`,
   `npm run check:manifest` and `npm run check:compatibility`. Run
@@ -56,6 +68,11 @@ committed source SHA and staging run ID. Promotion has no npm credential or npm
 write: it verifies that npm `latest` is the approved version, rechecks the public
 bytes and versioned images, updates Docker `latest`, and creates the GitHub
 Release.
+
+If a staged or promoted release needs correcting, deprecate the faulty
+publication where the registry permits it, never reuse a released version or
+tag, and ship a new patch version with fresh evidence. Old release identifiers
+are recovery records, not templates for another attempt.
 
 ## Plugin commands
 
