@@ -290,9 +290,11 @@ describe('marketing and blog truth', () => {
 	it('does not turn source definitions into unqualified marketing counts', () => {
 		const layoutPath = 'web-docs/app/(home)/fluentcart-mcp/layout.tsx'
 		const layout = read(layoutPath)
-		assert.match(
-			layout.replace(/\s+/g, ' '),
-			/description: "Open-source MCP server for reading and safely administering a FluentCart store from supported AI clients\."/,
+		const descriptionPattern = /description:\s*"Open-source MCP server for reading and safely administering a FluentCart store from supported AI clients\."/
+		assert.match(layout, descriptionPattern)
+		assert.doesNotMatch(
+			layout.replaceAll('reading and safely', 'reading  and safely'),
+			descriptionPattern,
 		)
 		assert.doesNotMatch(layout, /mcpToolCount|mcpSourceDefinitionCount/)
 
