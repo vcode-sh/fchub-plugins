@@ -1,0 +1,6 @@
+{
+  "fluentcart": {
+    "command": "npx",
+    "args": ["-y", "fluentcart-mcp@2.0.1"]
+  }
+}

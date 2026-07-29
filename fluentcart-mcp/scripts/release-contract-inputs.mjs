@@ -17,6 +17,7 @@ export const DIGEST_INPUTS = [
 	{ file: 'Dockerfile.release' },
 	{ file: 'docker-mcp-registry/server.yaml' },
 	{ file: 'compatibility-support.json' },
+	{ directory: 'openai-plugin' },
 	{ directory: 'scripts' },
 	{ directory: 'src' },
 	{ directory: 'tests/fixtures' },

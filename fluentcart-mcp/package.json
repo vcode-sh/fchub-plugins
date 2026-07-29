@@ -13,7 +13,8 @@
     "fluentcart-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "openai-plugin"
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync(require('node:path').resolve('dist'), { recursive: true, force: true })\" && tsc",
