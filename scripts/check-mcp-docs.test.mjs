@@ -106,6 +106,18 @@ describe('FluentCart MCP documentation truth gate', () => {
 				'For ChatGPT web, add',
 				'FLUENTCART_MCP_API_KEY as bearer authentication.',
 			].join('\n'),
+			'contradictory-claude-runtime.md': [
+				'Claude Desktop MCPB extension users do not install Node!',
+				'Claude Desktop MCPB extension users must install Node.js 24 before setup.',
+			].join('\n'),
+			'contradictory-mcpb-runtime.md': [
+				'The MCPB does not contain Node.',
+				'The MCPB archive contains a Node runtime.',
+			].join('\n'),
+			'contradictory-chatgpt-auth.md': [
+				'FLUENTCART_MCP_API_KEY is not ChatGPT plugin authentication!',
+				'ChatGPT web uses FLUENTCART_MCP_API_KEY as bearer authentication.',
+			].join('\n'),
 			'supported-negations.md': [
 				'Claude Desktop supplies its own Node runtime. Extension users do not',
 				'install Node separately.',
@@ -127,6 +139,9 @@ describe('FluentCart MCP documentation truth gate', () => {
 		assert.deepEqual(byFile['wrapped-claude-runtime.md'], ['claude-extension-node-prerequisite'])
 		assert.deepEqual(byFile['wrapped-mcpb-runtime.md'], ['mcpb-bundles-node-runtime'])
 		assert.deepEqual(byFile['wrapped-chatgpt-auth.md'], ['chatgpt-static-bearer-auth'])
+		assert.deepEqual(byFile['contradictory-claude-runtime.md'], ['claude-extension-node-prerequisite'])
+		assert.deepEqual(byFile['contradictory-mcpb-runtime.md'], ['mcpb-bundles-node-runtime'])
+		assert.deepEqual(byFile['contradictory-chatgpt-auth.md'], ['chatgpt-static-bearer-auth'])
 		assert.deepEqual(byFile['supported-negations.md'], [])
 	})
 })
