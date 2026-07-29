@@ -84,7 +84,7 @@ export function registerDynamicTools(server: McpServer, tools: ToolDefinition[])
 						`Maximum matches to return (default: ${SEARCH_LIMIT_DEFAULT}, max: ${SEARCH_LIMIT_MAX})`,
 					),
 			}),
-			annotations: { readOnlyHint: true, openWorldHint: false },
+			annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
 		},
 		async (input) => {
 			const rows = searchTools(tools, input.query, {
@@ -118,7 +118,7 @@ export function registerDynamicTools(server: McpServer, tools: ToolDefinition[])
 					.max(DESCRIBE_MAX)
 					.describe(`Exact tool names to describe (max ${DESCRIBE_MAX})`),
 			}),
-			annotations: { readOnlyHint: true, openWorldHint: false },
+			annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
 		},
 		async (input) => {
 			const results = input.tools.map((name) => {

@@ -107,6 +107,13 @@ describe('dynamic mode registration', () => {
 
 	it('annotates each executor according to its actual risk boundary', () => {
 		const { byName } = setup(DEFAULT_TOOLS)
+		for (const name of ['fluentcart_search_tools', 'fluentcart_describe_tools']) {
+			expect(byName.get(name)?.config.annotations).toMatchObject({
+				readOnlyHint: true,
+				destructiveHint: false,
+				openWorldHint: false,
+			})
+		}
 		expect(byName.get('fluentcart_execute_read_tool')?.config.annotations).toMatchObject({
 			readOnlyHint: true,
 			destructiveHint: false,
