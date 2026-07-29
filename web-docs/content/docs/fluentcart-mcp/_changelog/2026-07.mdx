@@ -1,0 +1,36 @@
+### v2.0.1
+
+[npm](https://www.npmjs.com/package/fluentcart-mcp) · [Latest release](https://github.com/vcode-sh/fchub-plugins/releases/latest)
+
+The client-first release. Pick the app you already use, follow its exact recipe, and verify one
+store read. Revolutionary stuff, assuming one ignores the decade software spent making setup pages
+start with architecture diagrams.
+
+#### Eight clear connection paths
+
+ChatGPT Desktop, Codex CLI, Codex IDE extension, Claude Desktop, Cursor, VS Code with GitHub
+Copilot, Windsurf, and ChatGPT web now sit together in one chooser. Each has its current
+configuration surface and a useful verification step.
+
+#### Claude Desktop supplies Node
+
+The MCPB extension no longer asks Claude Desktop users to install Node.js. Claude Desktop supplies
+the runtime; the archive contains FluentCart MCP's JavaScript and production dependencies, not a
+secret Node executable wearing a trench coat.
+
+#### No global npm install
+
+Local recipes now explain that `npx -y fluentcart-mcp` downloads the package on demand and reuses
+the package-manager cache. It does not install FluentCart MCP globally.
+
+#### OpenAI desktop and web are no longer muddled together
+
+ChatGPT Desktop shares `~/.codex/config.toml` with Codex CLI and the Codex IDE extension, with
+**Settings → MCP servers → Add server** as the shortest route. ChatGPT web uses OpenAI Secure MCP
+Tunnel, separate Platform and Developer mode permissions, and an outbound-only private connection.
+The FluentCart HTTP bearer key is not passed off as ChatGPT authentication.
+
+The public ChatGPT Plugins Directory still requires FluentCart authorisation. A patch release may
+improve onboarding; it does not acquire somebody else's trademark permission by sheer optimism.
+
+---

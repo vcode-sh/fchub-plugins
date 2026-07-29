@@ -1,8 +1,8 @@
 {
   "plugins": {
     "fluentcart-mcp": {
-      "version": "2.0.0",
-      "tagName": "fluentcart-mcp/v2.0.0",
+      "version": "2.0.1",
+      "tagName": "fluentcart-mcp/v2.0.1",
       "zipFilename": null,
       "mcpbFilename": "fluentcart-mcp.mcpb"
     },

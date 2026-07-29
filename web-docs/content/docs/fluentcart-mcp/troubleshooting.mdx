@@ -32,36 +32,61 @@ Replace `username` and `application_password` with your actual values. What you 
 <Accordions type="multiple">
 <Accordion title="Server Not Starting / No Tools Appearing">
 
-**What you see**: Claude Desktop has no hammer icon. Cursor shows a red dot. The AI says it can't find any FluentCart tools.
+**What you see**: the client reports `fluentcart` as stopped, Cursor shows a red status, or the AI
+says it cannot find any FluentCart tools.
 
-Claude Desktop and Cursor use configuration recipes: a green indicator confirms that client's
-local setup, not a release certification result. Candidate checks exercise MCP Inspector and Claude
-Code over stdio and HTTP, plus the Docker HTTP image. ChatGPT follows the deployment guidance.
+Client indicators confirm that client's local setup, not a release certification result. Candidate
+checks exercise MCP Inspector, Claude Code and Docker.
 
 **What's actually wrong** (in order of likelihood):
 
-1. **Node.js missing or too old**
+1. **Node.js missing or too old for a local `npx` client**
    ```bash
    node --version
    ```
-   The MCP server needs `v24.0.0` or higher. If you don't have Node at all, get it from [nodejs.org](https://nodejs.org). If you have an older version, upgrade. No apologies for requiring modern JavaScript.
+   Local recipes need `v24.0.0` or higher. If you don't have Node, get it from
+   [nodejs.org](https://nodejs.org). Claude Desktop extension users skip this check because Claude
+   Desktop supplies its own Node runtime.
 
 2. **npx not found**
-   It comes with Node.js. If `which npx` returns nothing, your Node installation is broken. Reinstall.
+   It comes with Node.js. If `which npx` returns nothing, repair the local Node installation.
+   `npx -y` downloads FluentCart MCP on demand; it does not install the package globally.
 
 3. **JSON syntax error**
    The number one cause of "it just doesn't work." A trailing comma, a missing quote, a rogue bracket. Paste your config into [jsonlint.com](https://jsonlint.com) and see what it says. Nobody can debug your JSON for you.
 
 4. **Wrong config file location**
-   - Claude Desktop (macOS): `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Claude Desktop (Windows): `%APPDATA%\Claude\claude_desktop_config.json`
+   - ChatGPT Desktop, Codex CLI and Codex IDE extension: `~/.codex/config.toml`
+   - Claude Desktop extension: **Settings → Extensions → Advanced settings**
    - Cursor: Check **Settings → MCP** for the path
+   - VS Code: workspace `.vscode/mcp.json` or **MCP: Open User Configuration**
 
 5. **Didn't restart the app**
-   Claude Desktop, Cursor, and VS Code don't hot-reload MCP configs. Close the app completely (not just the window — quit it) and reopen.
+   ChatGPT Desktop exposes **Restart** beside a saved MCP server. Other clients expose a restart or
+   reload action in their MCP server list; use it after changing the command.
 
 6. **The store rejected the startup check**
    Before serving anything, the server asks your site which FluentCart routes exist. Bad URL, bad credentials or an unreachable site and it stops there rather than connecting and failing on every call afterwards. The error lands in your client's MCP log.
+
+</Accordion>
+<Accordion title="ChatGPT Web Cannot See the Tunnel">
+
+**What you see**: the tunnel runs locally, but ChatGPT Plugins does not list it under **Tunnel under
+Connection**.
+
+**What to check:**
+
+1. ChatGPT web does not read `~/.codex/config.toml`; a working desktop server does not automatically
+   become a web connection.
+2. The tunnel must be associated with the target ChatGPT workspace, not only its Platform
+   organisation.
+3. Running and selecting it needs **Tunnels Read + Use**. Creating it needs **Tunnels Read +
+   Manage**. ChatGPT Developer mode is a separate workspace permission.
+4. Run `tunnel-client doctor --profile fluentcart-local --explain`, then keep
+   `tunnel-client run --profile fluentcart-local` alive while adding the plugin.
+
+The runtime `CONTROL_PLANE_API_KEY` authenticates the tunnel client to OpenAI.
+`FLUENTCART_MCP_API_KEY` is not ChatGPT plugin authentication.
 
 </Accordion>
 <Accordion title="A Tool I Expected Isn't There">
@@ -195,16 +220,18 @@ A 403 on one tool while everything else works is the system behaving correctly. 
 
 1. **Server not connected**
    Verify the connection:
-   - Claude Desktop: **Settings → Developer** — is `fluentcart` green?
+   - ChatGPT Desktop and Codex: use `/mcp` or `codex mcp list`
+   - Claude Desktop extension: **Settings → Extensions → Advanced settings**
    - Cursor: **Settings → MCP** — green dot = connected
    - Claude Code: `claude mcp list`
 
 2. **Too many MCP servers**
    Some clients choke when you have 15 MCP servers connected. Try disabling the ones you're not using right now.
 
-3. **Wrong mode**
-   - VS Code Copilot: You must be in **Agent** mode. Regular Chat won't use MCP tools. That's Microsoft's design choice.
-   - Some clients have "tool use" toggles — make sure it's on.
+3. **Tools disabled in the client**
+   Some clients have per-server or per-tool switches. Check the MCP server details and make sure
+   `fluentcart` is enabled. Current VS Code releases surface MCP tools from the Chat view without an
+   Agent-only requirement.
 
 4. **The AI just needs a nudge**
    Sometimes the AI doesn't realise it has FluentCart tools until you mention them explicitly: "Use the FluentCart tools to show me my recent orders." After the first use, it remembers.

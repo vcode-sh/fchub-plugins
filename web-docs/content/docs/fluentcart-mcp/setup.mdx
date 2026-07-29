@@ -9,7 +9,9 @@ import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-Five minutes. Generate a password in WordPress, paste a config snippet into your AI client, then verify its connection. Three paths depending on how much you enjoy terminals.
+Three things happen: FluentCart MCP gets a WordPress Application Password, your client starts the
+same MCP command, and you ask one read-only question to prove the connection. Package-manager
+theatre has not been invited.
 
 ## Generate an Application Password
 
@@ -55,70 +57,137 @@ The server inherits whatever that WordPress user can do and nothing more, so a s
 
 <Separator className="my-8" />
 
-## Pick Your Path
+## Choose Your Client
 
-Three ways to connect, from easiest to most manual.
+| Client | Best route | Separate install? |
+|---|---|---|
+| **ChatGPT Desktop** | **Settings → MCP servers → Add server** | Node.js 24+, but no global package install |
+| **Codex CLI** | `codex mcp add` | Node.js 24+, but no global package install |
+| **Codex IDE extension** | Shared Codex configuration | Node.js 24+, but no global package install |
+| **Claude Desktop** | MCPB extension | No separate Node install |
+| **Claude Code** | `claude mcp add` | Node.js 24+, but no global package install |
+| **Cursor** | Global `mcp.json` | Node.js 24+, but no global package install |
+| **VS Code with GitHub Copilot** | User or workspace `mcp.json` | Node.js 24+, but no global package install |
+| **Windsurf** | `mcp_config.json` | Node.js 24+, but no global package install |
+| **ChatGPT web** | OpenAI Secure MCP Tunnel | Private web connection |
 
-<Tabs items={['Claude Desktop Extension', 'Setup Wizard', 'Manual Config']}>
-<Tab value="Claude Desktop Extension">
+These are exact setup recipes, not certification claims. The release's unattended checks cover MCP
+Inspector, Claude Code and Docker; a configuration file does not become certification merely by
+looking confident.
 
-No terminal configuration and no JSON editing. Node.js 24+ is still required because the extension
-launches the Node server declared in its manifest. Download a file, double-click it, fill in three
-fields.
+## Local Client First Run
 
-**1. Download <McpbDownload />** from the latest release.
+Skip this section only if you are using the Claude Desktop extension.
 
-**2. Double-click the file.** Claude Desktop picks it up automatically. Or drag it into the app, or go to **Settings → Extensions → Install Extension**.
+<Steps>
+<Step>
 
-**3. Enter your credentials** — WordPress URL, username, and Application Password.
+**Install Node.js 24 or newer**
 
-**4. Open a new chat** and try: *"Show me today's orders"*
+Check with `node --version`. Local `npx` recipes need Node.js 24; download it from
+[nodejs.org](https://nodejs.org) if needed.
 
-See store data? The Claude Desktop configuration is in place.
+</Step>
+<Step>
 
-<Callout type="info" title="Claude Desktop Only">
-The extension only works with Claude Desktop. For other AI clients, use the Setup Wizard or Manual Config tabs.
-</Callout>
-
-</Tab>
-<Tab value="Setup Wizard">
-
-A guided terminal walkthrough. Asks three questions, tests the connection, saves the config.
-
-<Callout type="info" title="Requires Node.js 24+">
-Check with `node --version`. Don't have it? Grab it from [nodejs.org](https://nodejs.org).
-</Callout>
-
-**Run this:**
+**Save the store credentials once**
 
 ```bash
-npx fluentcart-mcp setup
+npx -y fluentcart-mcp setup
 ```
 
-It looks like this:
+`npx -y` downloads FluentCart MCP on demand and reuses the package-manager cache afterward. It
+does not install the package globally. The wizard tests the store and writes the credentials to
+`~/.config/fluentcart-mcp/config.json` on macOS/Linux or
+`%APPDATA%\fluentcart-mcp\config.json` on Windows with private file permissions.
 
-```
-┌  fluentcart-mcp setup
-│
-◇  WordPress URL
-│  https://your-store.com
-│
-◇  WordPress username
-│  admin
-│
-◇  Application Password
-│  ••••••••••••••••••••••••
-│
-◇  Connected to Your Store Name
-│
-◇  Config written to ~/.config/fluentcart-mcp/config.json
-│
-└  You're all set. Run fluentcart-mcp to start the server.
+</Step>
+<Step>
+
+**Add the server and verify one read**
+
+Every local recipe below starts the same command:
+
+```text
+command: npx
+arguments: -y fluentcart-mcp
 ```
 
-If the credentials are wrong, it tells you why and offers to retry. If they work, it saves a config file at `~/.config/fluentcart-mcp/config.json`. After that, your AI client configs don't need credentials at all — the MCP server reads them from the saved file.
+After the client reports the server as connected, ask: *"Show me the FluentCart dashboard stats."*
+Store data is the useful proof. A green dot alone is merely a very optimistic dot.
 
-**Then configure your AI client** using the simplified snippet (no env vars needed):
+</Step>
+</Steps>
+
+## Exact Client Recipes
+
+<Tabs items={['ChatGPT + Codex', 'Claude Desktop', 'Claude Code', 'Cursor', 'VS Code', 'Windsurf', 'ChatGPT web', 'Docker']}>
+<Tab value="ChatGPT + Codex">
+
+### ChatGPT Desktop
+
+ChatGPT Desktop, Codex CLI and the Codex IDE extension share MCP configuration on the same host in
+`~/.codex/config.toml`. Configure it once and the three clients can use the same server.
+
+1. Open **Settings → MCP servers → Add server**.
+2. Name it `fluentcart`, choose **STDIO**, set command to `npx`, and set arguments to
+   `-y fluentcart-mcp`.
+3. Save, select **Restart**, then type `/mcp` in a chat to confirm `fluentcart` is connected.
+4. Ask *"Show me the FluentCart dashboard stats."*
+
+This direct **Add server** route is the shortest OpenAI setup. The optional local FluentCart plugin
+is available for workspaces that prefer plugin-managed enable and disable controls; it starts the
+same server and is not required.
+
+### Codex CLI
+
+```bash
+codex mcp add fluentcart -- npx -y fluentcart-mcp
+codex mcp list
+```
+
+Start a new Codex session, use `/mcp` to confirm the server, then ask the verification question.
+
+### Codex IDE extension
+
+The server added above appears automatically because the IDE extension reads the same
+`~/.codex/config.toml`. If you start in the IDE instead, open the gear menu, choose **MCP servers →
+Add server**, and enter the same STDIO command. Restart the server, then verify it in the MCP list.
+
+</Tab>
+<Tab value="Claude Desktop">
+
+### Claude Desktop extension
+
+Claude Desktop supplies a built-in Node runtime for Node MCPB extensions, so extension users do not
+install Node.js separately.
+
+1. Download <McpbDownload /> from the latest GitHub Release.
+2. In Claude Desktop open **Settings → Extensions → Advanced settings → Install Extension** and
+   select `fluentcart-mcp.mcpb`.
+3. Enter the WordPress URL, username and Application Password, then enable the extension.
+4. Start a new chat and ask *"Show me the FluentCart dashboard stats."*
+
+The MCPB contains the server's JavaScript and production dependencies. It does not contain a Node
+executable; Claude Desktop supplies that runtime.
+
+</Tab>
+<Tab value="Claude Code">
+
+Run the credential wizard first, then add the server:
+
+```bash
+claude mcp add fluentcart -- npx -y fluentcart-mcp
+claude mcp list
+```
+
+Start a new session and ask the verification question. `claude mcp list` confirms configuration;
+the returned store data confirms the live connection.
+
+</Tab>
+<Tab value="Cursor">
+
+Open **Settings → Cursor Settings → MCP → Add new global MCP server** and add this to `mcp.json`:
 
 ```json
 {
@@ -131,192 +200,63 @@ If the credentials are wrong, it tells you why and offers to retry. If they work
 }
 ```
 
-Where to paste this depends on your client — see the Manual Config tab for the exact location.
+Save it. `fluentcart` should show a green status in **Settings → MCP**; then ask the verification
+question.
 
 </Tab>
-<Tab value="Manual Config">
+<Tab value="VS Code">
 
-Full control. You'll need **Node.js 24+** installed (`node --version` to check — grab it from [nodejs.org](https://nodejs.org) if needed).
-
-These are configuration recipes, not client certification claims. Apply them only in the profile
-you intend to use. Candidate checks exercise MCP Inspector and Claude Code over stdio and HTTP,
-plus the Docker HTTP image. Docker remains a deployment recipe, and ChatGPT is deployment guidance.
-
-Pick your AI client below:
-
-<Tabs items={['Claude Desktop', 'Claude Code', 'Cursor', 'VS Code + Copilot', 'Windsurf', 'Codex CLI', 'Docker']}>
-<Tab value="Claude Desktop">
-
-<Callout type="info" title="Prefer the Easy Way?">
-The Claude Desktop Extension tab above does this without any JSON editing.
-</Callout>
-
-**Open the config file:**
-- **macOS**: Claude menu → Settings → Developer → Edit Config
-- **Windows**: File → Settings → Developer → Edit Config
-
-Or find it manually at `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
-
-**Paste this** (replace with your actual values):
-
-```json
-{
-  "mcpServers": {
-    "fluentcart": {
-      "command": "npx",
-      "args": ["-y", "fluentcart-mcp"],
-      "env": {
-        "FLUENTCART_URL": "https://your-store.com",
-        "FLUENTCART_USERNAME": "admin",
-        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
-      }
-    }
-  }
-}
-```
-
-**Restart Claude Desktop** completely (quit and reopen, not just close the window). Look for the hammer icon in the chat input.
-
-<Callout type="info" title="Already Have Other MCP Servers?">
-Don't replace the whole file. Add `"fluentcart": {...}` inside your existing `mcpServers` object.
-</Callout>
-
-</Tab>
-<Tab value="Claude Code">
-
-One command:
-
-```bash
-claude mcp add fluentcart \
-  -e FLUENTCART_URL=https://your-store.com \
-  -e FLUENTCART_USERNAME=admin \
-  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
-  -- npx -y fluentcart-mcp
-```
-
-Start a new session and ask about your store. Verify with `claude mcp list`.
-
-</Tab>
-<Tab value="Cursor">
-
-**Settings → Cursor Settings → MCP → Add new global MCP server.** This opens `mcp.json`.
-
-**Paste this:**
-
-```json
-{
-  "mcpServers": {
-    "fluentcart": {
-      "command": "npx",
-      "args": ["-y", "fluentcart-mcp"],
-      "env": {
-        "FLUENTCART_URL": "https://your-store.com",
-        "FLUENTCART_USERNAME": "admin",
-        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
-      }
-    }
-  }
-}
-```
-
-Save. Back in Settings → MCP, `fluentcart` should show a green dot. Red means something's wrong — click it for the error.
-
-</Tab>
-<Tab value="VS Code + Copilot">
-
-**Create or edit** `.vscode/mcp.json` in your workspace:
+Run **MCP: Add Server** from the Command Palette for a guided setup, or create
+`.vscode/mcp.json` for the current workspace:
 
 ```json
 {
   "servers": {
     "fluentcart": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "fluentcart-mcp"],
-      "env": {
-        "FLUENTCART_URL": "https://your-store.com",
-        "FLUENTCART_USERNAME": "admin",
-        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
-      }
+      "args": ["-y", "fluentcart-mcp"]
     }
   }
 }
 ```
 
-**Switch to Agent mode** in Copilot Chat using the mode selector at the top. Regular Chat mode doesn't use MCP servers — that's Microsoft's design choice.
+Use **MCP: List Servers** to start or inspect `fluentcart`, then ask the verification question in
+GitHub Copilot Chat. Current VS Code releases expose MCP tools from the Chat view; this recipe does
+not require a special Agent-only mode.
 
 </Tab>
 <Tab value="Windsurf">
 
-**Command Palette** (Cmd+Shift+P / Ctrl+Shift+P) → search **"Open MCP Config"**. This opens `mcp_config.json`.
-
-**Paste this:**
+Open the Command Palette and choose **Open MCP Config**, then add this to `mcp_config.json`:
 
 ```json
 {
   "mcpServers": {
     "fluentcart": {
       "command": "npx",
-      "args": ["-y", "fluentcart-mcp"],
-      "env": {
-        "FLUENTCART_URL": "https://your-store.com",
-        "FLUENTCART_USERNAME": "admin",
-        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
-      }
+      "args": ["-y", "fluentcart-mcp"]
     }
   }
 }
 ```
 
-Save. Windsurf picks up the change automatically.
+Save the file, confirm `fluentcart` is enabled in Windsurf's MCP settings, and ask the verification
+question.
 
 </Tab>
-<Tab value="Codex CLI">
+<Tab value="ChatGPT web">
 
-**Run:**
-
-```bash
-codex mcp add fluentcart \
-  --env FLUENTCART_URL=https://your-store.com \
-  --env FLUENTCART_USERNAME=admin \
-  --env FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
-  -- npx -y fluentcart-mcp
-```
-
-Codex stores MCP configuration in `~/.codex/config.toml`. Start a new session and ask about your
-store.
+ChatGPT web does not read `~/.codex/config.toml` or start local commands. Use the
+[ChatGPT web Secure MCP Tunnel guide](/docs/fluentcart-mcp/deployment#chatgpt-web-with-secure-mcp-tunnel)
+for the private connection, its separate OpenAI permissions, and the verification sequence.
 
 </Tab>
 <Tab value="Docker">
 
-For a persistent endpoint that remote clients can reach. Docker supplies the Node runtime, but the
-private HTTP profile still requires an API key plus Host and Origin allowlists.
-
-```bash
-docker run -d \
-  -p 3000:3000 \
-  -e FLUENTCART_URL=https://your-store.com \
-  -e FLUENTCART_USERNAME=admin \
-  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
-  -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
-  -e FLUENTCART_MCP_ALLOWED_HOSTS=localhost,mcp.your-domain.com \
-  -e FLUENTCART_MCP_ALLOWED_ORIGINS=localhost,mcp.your-domain.com \
-  --name fluentcart-mcp \
-  vcodesh/fluentcart-mcp
-```
-
-Your endpoint is at `http://localhost:3000/mcp`. Verify with `curl http://localhost:3000/health`.
-
-For remote access, put it behind a reverse proxy or Cloudflare Tunnel — the [Deployment Guide](/docs/fluentcart-mcp/deployment) covers the details.
-
-<Callout type="warn" title="FLUENTCART_MCP_API_KEY is not optional here">
-The container binds beyond loopback, so the server checks the bearer key and both allowlists before
-it listens. Replace `mcp.your-domain.com` with the hostname exposed by your proxy or tunnel. A
-missing key, short key or missing allowlist makes the process exit rather than opening an incomplete
-private profile.
-</Callout>
-
-</Tab>
-</Tabs>
+Docker is for an always-on HTTP server, not a prerequisite for local clients. It supplies its own
+Node runtime. Follow the [Deployment Guide](/docs/fluentcart-mcp/deployment#docker-image) for the
+private HTTP profile, bearer key, and Host and Origin allowlists.
 
 </Tab>
 </Tabs>
@@ -342,7 +282,7 @@ so no mode can widen what is exposed.
 **`FLUENTCART_WRITE_MODE`** decides what is in that registry at all. It accepts `disabled` or
 `reversible` and defaults to `disabled` — reads only. `reversible` adds creating and updating
 products, variants, coupons, customers, shipping rules, tax rules, attributes and order bumps.
-Refunds and subscription cancellation are not product tools in 2.0.0.
+Refunds and subscription cancellation are not product tools in this release.
 
 Deletions, bulk operations, order status changes, marking an order paid and anything that moves money are not exposed in any mode. FluentCart offers no supported way to undo them, so they are not classed as reversible. See the [Tool Reference](/docs/fluentcart-mcp/tools) for the full picture.
 

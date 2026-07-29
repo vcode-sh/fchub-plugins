@@ -8,7 +8,104 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-The stdio transport is the local transport recipe for clients such as Claude Desktop and Cursor. For remote agents or a public endpoint, run the HTTP transport on a server somewhere.
+Local clients should use the [Setup Guide](/docs/fluentcart-mcp/setup). This page covers two
+different jobs: connecting ChatGPT web without exposing a public listener, and running the private
+HTTP profile for other remote clients.
+
+## ChatGPT web with Secure MCP Tunnel
+
+ChatGPT web does not read local Codex configuration. The recommended private route is
+[OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels), an
+outbound-only connection from your machine or private network to OpenAI. FluentCart MCP itself
+stays private.
+
+<Steps>
+<Step>
+
+**Save the store credentials on the tunnel host**
+
+Install Node.js 24 or newer, then run:
+
+```bash
+npx -y fluentcart-mcp setup
+```
+
+Use a dedicated, least-privilege WordPress user. `npx -y` downloads the package on demand; there
+is no global package install.
+
+</Step>
+<Step>
+
+**Get the two separate sets of OpenAI permissions**
+
+Platform tunnel permissions and ChatGPT Developer mode are separate authorisation decisions:
+
+- creating or editing a tunnel needs **Tunnels Read + Manage**;
+- running `tunnel-client` and selecting the tunnel needs **Tunnels Read + Use**;
+- ChatGPT Developer mode is a separate workspace permission, enabled under **Settings → Security
+  and login** after the workspace allows it.
+
+The Platform organisation that owns the tunnel and the ChatGPT workspace that will use it must be
+associated with that tunnel.
+
+</Step>
+<Step>
+
+**Create the tunnel and runtime key**
+
+Open [Platform tunnel settings](https://platform.openai.com/settings/organization/tunnels), create
+the tunnel, associate the target ChatGPT workspace, and create a runtime API key for
+`tunnel-client`. Download the current `tunnel-client` build from that page.
+
+Keep the runtime key in your shell secret store or service manager. Do not commit it, paste it into
+FluentCart MCP config, or print a real value into a runbook.
+
+</Step>
+<Step>
+
+**Initialise and check the local STDIO profile**
+
+Use placeholders below; supply the real values through your local secret tooling:
+
+```bash
+export CONTROL_PLANE_API_KEY="<runtime-api-key>"
+
+tunnel-client init \
+  --sample sample_mcp_stdio_local \
+  --profile fluentcart-local \
+  --tunnel-id tunnel_0123456789abcdef0123456789abcdef \
+  --mcp-command "npx -y fluentcart-mcp"
+
+tunnel-client doctor --profile fluentcart-local --explain
+tunnel-client run --profile fluentcart-local
+```
+
+Keep `tunnel-client run` healthy. The process starts FluentCart MCP over STDIO and carries requests
+outbound; no public WordPress or MCP listener is required.
+
+</Step>
+<Step>
+
+**Add the tunnel in ChatGPT Plugins**
+
+Open [ChatGPT Plugins](https://chatgpt.com/plugins), enable Developer mode, select the plus button
+to create a developer-mode app, choose **Tunnel under Connection**, and select the tunnel. If it
+does not appear, check the workspace association and **Tunnels Read + Use** permission.
+
+Start a chat and ask: *"Show me the FluentCart dashboard stats."*
+
+</Step>
+</Steps>
+
+<Callout type="warn" title="Two keys, two different jobs">
+`CONTROL_PLANE_API_KEY` authenticates `tunnel-client` to OpenAI. `FLUENTCART_MCP_API_KEY` protects
+the generic private HTTP profile described below; it is not ChatGPT plugin authentication. Do not
+put either key in a repository.
+</Callout>
+
+This unofficial connector is not eligible for the public ChatGPT Plugins Directory without
+FluentCart authorisation. Secure MCP Tunnel is the private connection path, not a creative way to
+rename an unauthorised public submission.
 
 ## Docker Image
 
@@ -108,11 +205,11 @@ A bearer key stops strangers reaching your MCP endpoint. It does not decide what
 </Callout>
 
 The bearer token is one static transport principal mapped to one configured WordPress principal.
-2.0.0 has no OAuth and no multi-user identity mapping. If two callers need different store roles,
+This release has no OAuth and no multi-user identity mapping. If two callers need different store roles,
 run two separately configured processes; one token does not magically become an identity provider
 because it crossed a reverse proxy.
 
-## Refunds and Cancellations in 2.0.0
+## Refunds and Cancellations
 
 They are not part of this server. `fluentcart_order_refund` and
 `fluentcart_subscription_cancel` are absent, and no environment variable enables them. Use
@@ -189,19 +286,7 @@ If it doesn't answer, something's broken. Check the container logs:
 docker logs fluentcart-mcp
 ```
 
-## Connecting Clients
-
-### ChatGPT
-
-If your ChatGPT account offers custom MCP connector configuration, add your endpoint URL there:
-
-```
-https://mcp.your-domain.com/mcp
-```
-
-ChatGPT is deployment guidance, not a certified client. Check its current connector requirements, then add the bearer token in the applicable auth settings. A non-loopback FluentCart MCP endpoint will not start without its bearer key.
-
-### Any HTTP-capable MCP client
+## Connecting an HTTP-capable MCP client
 
 Point a client that supports Streamable HTTP at your `/mcp` endpoint and set the bearer token when configured. Check the client’s own MCP documentation for its transport and authentication requirements.
 

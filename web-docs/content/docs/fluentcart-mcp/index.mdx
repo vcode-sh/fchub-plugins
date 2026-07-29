@@ -7,31 +7,44 @@ import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-FluentCart's admin panel is fine if you enjoy clicking through seventeen screens to find out what last week actually earned. For everyone else, there's this — an MCP server that connects an MCP client to your store's REST API. It supports protocol `2025-11-25` and `2026-07-28`; certification requires candidate-bound handshakes from the five unattended client cells.
+FluentCart MCP connects the AI client you already use to one WordPress store. It reads orders,
+products, customers, subscriptions, reports and settings by default. Reversible admin work is a
+separate choice; money-moving, destructive and bulk actions stay out.
 
-Out of the box it reads. Orders, products, customers, subscriptions, reports, settings. Reversible admin work is a separate decision you have to make on purpose. Money-moving, destructive and bulk actions are not part of this release.
+## Choose Your Client
+
+| I use | Start here | Package requirement |
+|---|---|---|
+| **ChatGPT Desktop** | **Settings → MCP servers → Add server** | Node.js 24+, no global package install |
+| **Codex CLI or Codex IDE extension** | Shared `~/.codex/config.toml` | Node.js 24+, no global package install |
+| **Claude Desktop** | Download the MCPB extension | Claude Desktop supplies Node |
+| **Claude Code** | One `claude mcp add` command | Node.js 24+, no global package install |
+| **Cursor** | Global MCP settings | Node.js 24+, no global package install |
+| **VS Code with GitHub Copilot** | User or workspace `mcp.json` | Node.js 24+, no global package install |
+| **Windsurf** | `mcp_config.json` | Node.js 24+, no global package install |
+| **ChatGPT web** | OpenAI Secure MCP Tunnel | Private web connection |
 
 Open source. On [npm](https://www.npmjs.com/package/fluentcart-mcp). On [GitHub](https://github.com/vcode-sh/fchub-plugins).
 
-<Callout type="info" title="No AI Expertise Required">
-You don't need to understand how MCP works. If you can double-click a file or paste a config snippet, you're overqualified.
+## Three-Step First Run
+
+1. **Give FluentCart MCP store access.** Create a WordPress Application Password. Local clients run
+   `npx -y fluentcart-mcp setup`; Claude Desktop extension users enter the same values during
+   extension setup.
+2. **Add the server to your client.** Every local recipe starts `npx` with arguments
+   `-y fluentcart-mcp`. `npx -y` downloads FluentCart MCP on demand and does not install it globally.
+3. **Verify one read.** Ask *"Show me the FluentCart dashboard stats."* Store data proves the
+   connection; a decorative green indicator proves only that green remains a popular colour.
+
+<Callout type="info" title="Claude Desktop needs no separate Node install">
+Claude Desktop supplies a built-in Node runtime for MCPB extensions. The MCPB contains JavaScript
+and production dependencies; it does not contain a Node executable. Install it through
+**Settings → Extensions → Advanced settings → Install Extension**.
 </Callout>
 
-## Quick Start
-
-**Claude Desktop — one click:**
-
-Install Node.js 24+, download <McpbDownload />, double-click, then enter your WordPress
-credentials. The extension avoids JSON editing and terminal configuration; it does not bundle a
-Node runtime.
-
-**Everyone else:**
-
-```bash
-npx fluentcart-mcp setup
-```
-
-Asks three questions (WordPress URL, username, Application Password), tests the connection, saves the config. Then point your AI client at `npx fluentcart-mcp`. The [Setup Guide](/docs/fluentcart-mcp/setup) covers every platform step by step.
+The [Setup Guide](/docs/fluentcart-mcp/setup) gives each client its exact configuration and
+verification step. ChatGPT web has a separate private route because browsers, rather stubbornly,
+do not read local config files.
 
 <Separator className="my-8" />
 
@@ -85,7 +98,7 @@ Those work on a default install. Anything that changes data — a new product, a
 
 Filtering happens before registration, not at call time. A tool the policy excludes is not disabled — it is absent, and cannot be listed, searched, described or called by name.
 
-<Callout type="warn" title="Refunds and cancellations are not available in 2.0.0">
+<Callout type="warn" title="Refunds and cancellations are not available in this release">
 `fluentcart_order_refund` and `fluentcart_subscription_cancel` are not product tools in this release. No write mode or environment variable enables them. Use FluentCart's own admin or official operator tooling when you need to move money or end a subscription.
 </Callout>
 
@@ -114,7 +127,7 @@ travels only through the AI client, MCP server, and network infrastructure you c
 |-------------|---------|
 | **WordPress** | 7.0.2 with [FluentCart](https://fluentcart.com) 1.5.5 and FluentCart Pro 1.5.4 — the combination this release is verified against |
 | **Application Password** | Generated in WordPress admin (Users → Profile) |
-| **Node.js 24+** | [Download](https://nodejs.org) — required for local clients and the Claude Desktop Extension; Docker supplies its own runtime |
+| **Runtime** | Node.js 24+ for local `npx` clients; Claude Desktop and Docker supply their own runtimes |
 
 Older FluentCart builds are a different question. The route surface of an older 1.3.9 install has been captured from a real runtime, so there is hard evidence of which endpoints that build serves — but evidence about a store is not the same as proof these tools work against it, and support for it isn't claimed.
 
@@ -122,21 +135,20 @@ What does happen on any store, old or new: the server reads your REST index at s
 
 ## Client configuration recipes
 
-These are setup recipes, not certification claims. Claude Desktop, Cursor, VS Code, Windsurf and
-Codex CLI need their documented configuration in the user's own profile. Candidate checks exercise
-MCP Inspector and Claude Code over stdio and HTTP, plus the Docker HTTP image. ChatGPT remains
-deployment guidance.
+These are setup recipes, not certification claims. Candidate checks exercise MCP Inspector,
+Claude Code and Docker. The other rows describe supported configuration targets and the verification
+you perform in that client.
 
-| Client | How Hard? |
+| Client | Route |
 |--------|-----------|
-| [**Claude Desktop (Extension)**](/docs/fluentcart-mcp/setup) | Download, install, then verify the connection |
-| [**Claude Desktop**](/docs/fluentcart-mcp/setup) | Paste some JSON |
-| [**Claude Code**](/docs/fluentcart-mcp/setup) | One command; unattended candidate check |
-| [**Cursor**](/docs/fluentcart-mcp/setup) | Paste some JSON |
-| [**VS Code + Copilot**](/docs/fluentcart-mcp/setup) | Add to settings |
-| [**Windsurf**](/docs/fluentcart-mcp/setup) | Paste some JSON |
-| [**Codex CLI**](/docs/fluentcart-mcp/setup) | Config file |
-| [**ChatGPT / Docker**](/docs/fluentcart-mcp/setup) | Deployment guidance / Docker recipe |
+| [**ChatGPT Desktop**](/docs/fluentcart-mcp/setup) | Direct **Add server** |
+| [**Codex CLI**](/docs/fluentcart-mcp/setup) | Shared Codex configuration |
+| [**Codex IDE extension**](/docs/fluentcart-mcp/setup) | Shared Codex configuration |
+| [**Claude Desktop**](/docs/fluentcart-mcp/setup) | MCPB extension |
+| [**Cursor**](/docs/fluentcart-mcp/setup) | `mcpServers` config |
+| [**VS Code with GitHub Copilot**](/docs/fluentcart-mcp/setup) | `servers` config |
+| [**Windsurf**](/docs/fluentcart-mcp/setup) | `mcpServers` config |
+| [**ChatGPT web**](/docs/fluentcart-mcp/deployment#chatgpt-web-with-secure-mcp-tunnel) | OpenAI Secure MCP Tunnel |
 
 Follow the client’s own MCP documentation as well as these recipes; supported transports and account settings vary by client.
 

@@ -25,8 +25,20 @@ owner performs publication.
   Reversible mode exposes a fourth executor only for proven reversible writes.
   Refunds, subscription cancellation, deletion and bulk actions remain absent.
 - MCP Inspector, Claude Code and Docker smoke are candidate-bound automated
-  handshakes. Claude Desktop and Cursor are configuration recipes, not client
-  certification.
+  handshakes. The documented configuration-recipe matrix is ChatGPT Desktop,
+  Codex CLI, Codex IDE extension, Claude Desktop, Cursor, VS Code with GitHub
+  Copilot, Windsurf and ChatGPT web through OpenAI Secure MCP Tunnel. Recipes
+  are not client certification.
+- Current onboarding starts from the reader's client. Local recipes use
+  `npx -y fluentcart-mcp`, explain that it downloads on demand without a global
+  install, and require Node.js 24. Claude Desktop supplies Node for MCPB
+  extensions; the MCPB contains JavaScript and dependencies, not Node itself.
+- ChatGPT Desktop, Codex CLI and the Codex IDE extension share
+  `~/.codex/config.toml`; the direct desktop path is **Settings → MCP servers →
+  Add server**. ChatGPT web does not read that file. Its private route is
+  Secure MCP Tunnel with separate Platform tunnel and ChatGPT Developer mode
+  permissions. Never present `FLUENTCART_MCP_API_KEY` as ChatGPT plugin auth or
+  promise public-directory eligibility without FluentCart authorisation.
 - Local checks from `fluentcart-mcp/` include `npm run test:tooling`,
   `npm run test:conformance`, `npm run check:contract`,
   `npm run check:manifest` and `npm run check:compatibility`. Run

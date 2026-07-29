@@ -345,3 +345,71 @@ describe('documentation checker structure', () => {
 		)
 	})
 })
+
+describe('client-first documentation contracts', () => {
+	const packageReadme = read('fluentcart-mcp/README.md')
+	const index = read('web-docs/content/docs/fluentcart-mcp/index.mdx')
+	const setup = read('web-docs/content/docs/fluentcart-mcp/setup.mdx')
+	const deployment = read('web-docs/content/docs/fluentcart-mcp/deployment.mdx')
+	const onboarding = [packageReadme, index, setup].join('\n')
+	const webSetup = [setup, deployment].join('\n')
+	const compactOnboarding = onboarding.replace(/\s+/g, ' ')
+	const compactSetup = setup.replace(/\s+/g, ' ')
+	const compactDeployment = deployment.replace(/\s+/g, ' ')
+
+	it('keeps the Claude extension runtime separate from the MCPB archive contents', () => {
+		assert.match(compactOnboarding, /Claude Desktop supplies (?:its own |a built-in )?Node(?:\.js)? runtime/i)
+		assert.match(compactOnboarding, /MCPB[^.]{0,160}(?:contains|includes)[^.]{0,80}JavaScript/i)
+		assert.match(compactOnboarding, /(?:not|does not)[^.]{0,80}(?:Node executable|Node runtime)/i)
+		assert.doesNotMatch(
+			compactOnboarding,
+			/Claude Desktop (?:MCPB )?extension[^.]{0,180}(?:requires? Node|Node(?:\.js)? 24\+ is required|users (?:must|need to|should) install Node)/i,
+		)
+	})
+
+	it('explains local npx installation behaviour and the shared OpenAI desktop configuration', () => {
+		assert.match(compactOnboarding, /npx -y[^.]{0,100}downloads?[^.]{0,60}on demand/i)
+		assert.match(compactOnboarding, /npx -y[^.]{0,140}(?:does not|doesn't)[^.]{0,40}install[^.]{0,30}globally/i)
+		assert.match(compactSetup, /ChatGPT Desktop[^.]{0,120}Codex CLI[^.]{0,120}Codex IDE extension[^.]{0,160}share/i)
+		assert.match(compactSetup, /~\/\.codex\/config\.toml/)
+		assert.match(compactSetup, /Settings\s*→\s*MCP servers\s*→\s*Add server/)
+	})
+
+	it('represents every generated configuration target with its current client shape', () => {
+		for (const client of [
+			'ChatGPT Desktop',
+			'Codex CLI',
+			'Codex IDE extension',
+			'Claude Desktop',
+			'Cursor',
+			'VS Code with GitHub Copilot',
+			'Windsurf',
+			'ChatGPT web',
+		]) {
+			assert.match(webSetup, new RegExp(client.replaceAll(' ', '\\s+'), 'i'), client)
+		}
+		assert.match(setup, /"servers"\s*:\s*\{[\s\S]{0,180}"type"\s*:\s*"stdio"/)
+		assert.match(setup, /Cursor[\s\S]{0,500}"mcpServers"/)
+		assert.match(setup, /Windsurf[\s\S]{0,500}"mcpServers"/)
+		assert.doesNotMatch(setup, /must be in \*\*Agent\*\* mode|Regular Chat (?:mode )?(?:doesn't|does not) use MCP/i)
+	})
+
+	it('documents ChatGPT web as a separately authorised Secure MCP Tunnel connection', () => {
+		assert.match(compactDeployment, /OpenAI Secure MCP Tunnel/)
+		assert.match(compactDeployment, /Developer mode/)
+		assert.match(compactDeployment, /Platform tunnel settings/)
+		assert.match(compactDeployment, /CONTROL_PLANE_API_KEY/)
+		assert.match(compactDeployment, /tunnel-client init/)
+		assert.match(compactDeployment, /--mcp-command "npx -y fluentcart-mcp"/)
+		assert.match(compactDeployment, /tunnel-client doctor/)
+		assert.match(compactDeployment, /tunnel-client run/)
+		assert.match(compactDeployment, /ChatGPT Plugins/)
+		assert.match(compactDeployment, /Tunnel under Connection/)
+		assert.match(compactDeployment, /(?:separate|different)[^.]{0,100}(?:permission|authori[sz]ation)/i)
+		assert.match(
+			compactDeployment,
+			/FLUENTCART_MCP_API_KEY[^.]{0,160}(?:is not|isn't)[^.]{0,80}ChatGPT[^.]{0,80}auth/i,
+		)
+		assert.match(compactDeployment, /public[^.]{0,100}(?:directory|submission)[^.]{0,160}FluentCart[^.]{0,80}authori[sz]ation/i)
+	})
+})

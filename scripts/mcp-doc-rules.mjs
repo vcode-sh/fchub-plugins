@@ -152,6 +152,40 @@ export const RULES = [
 		test: (line) => /fluentcart-mcp\/v\d+\.\d+\.\d+/.test(line),
 	},
 	{
+		id: 'claude-extension-node-prerequisite',
+		message: 'Claude Desktop supplies Node for MCPB extensions; extension users do not install Node',
+		test: (line) =>
+			/\bClaude Desktop\b[^.\n]{0,100}\b(extension|MCPB)\b[^.\n]{0,100}\b(Node(?:\.js)?(?:\s+24\+)?\s+(?:is\s+)?(?:required|prerequisite)|install Node)\b/i.test(
+				line,
+			) ||
+			/\bNode(?:\.js)?(?:\s+24\+)?.{0,180}\b(?:required|prerequisite)\b.{0,140}\bClaude Desktop\b.{0,60}\b(extension|MCPB)\b/i.test(
+				line,
+			),
+	},
+	{
+		id: 'mcpb-bundles-node-runtime',
+		message: 'the MCPB contains JavaScript and dependencies, not a Node executable or runtime',
+		test: (line) =>
+			/\b(MCPB|archive|extension)\b[^.\n]{0,100}\b(contains?|includes?|bundles?|ships?)\b[^.\n]{0,60}\bNode(?:\.js)?\s+(runtime|executable|binary)\b/i.test(
+				line,
+			),
+	},
+	{
+		id: 'chatgpt-static-bearer-auth',
+		message: 'a FluentCart bearer key is not ChatGPT plugin authentication',
+		test: (line) => {
+			if (/\b(is not|isn'?t|never present)\b[^.\n]{0,100}\bChatGPT\b/i.test(line)) return false
+			return (
+				/\bChatGPT\b[^.\n]{0,140}\b(bearer|FLUENTCART_MCP_API_KEY)\b[^.\n]{0,80}\b(auth|token|key|setting)\b/i.test(
+					line,
+				) ||
+				/\b(bearer|FLUENTCART_MCP_API_KEY)\b[^.\n]{0,100}\bChatGPT\b[^.\n]{0,80}\b(auth|token|key|setting)\b/i.test(
+					line,
+				)
+			)
+		},
+	},
+	{
 		id: 'unqualified-full-access',
 		message: '"full access" without a capability or write-policy qualification',
 		test: (line) =>

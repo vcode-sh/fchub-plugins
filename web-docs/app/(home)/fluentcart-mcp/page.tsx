@@ -112,9 +112,9 @@ export default function FluentCartMcpPage() {
           better questions
         </h1>
         <p className="mx-auto mb-8 max-w-2xl text-balance text-lg text-muted-foreground">
-          FluentCart MCP gives an AI assistant a careful way to read, analyse,
-          and handle reversible store administration. Less tab-hopping, fewer
-          heroic claims, and a clear boundary around what it will not do.
+          Choose ChatGPT, Codex, Claude, Cursor, VS Code, Windsurf, or a private
+          ChatGPT web tunnel. Give it one store, verify one read, and keep
+          reversible administration behind an explicit switch.
         </p>
         <div className="mb-4 flex items-center justify-center gap-3">
           <Button
@@ -155,7 +155,9 @@ export default function FluentCartMcpPage() {
             <CardContent className="p-6">
               <div className="mb-3 flex items-center gap-2">
                 <ClipboardCopy className="size-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Start locally</span>
+                <span className="text-sm font-medium">
+                  Save local store access
+                </span>
               </div>
               <button
                 type="button"
@@ -174,7 +176,9 @@ export default function FluentCartMcpPage() {
               </button>
               <p className="mt-3 text-xs text-muted-foreground">
                 The setup wizard verifies your store URL, WordPress username,
-                and Application Password, then saves them locally. The{" "}
+                and Application Password, then saves them locally.{" "}
+                <code>npx -y</code> downloads on demand and does not install the
+                package globally. The{" "}
                 <Link
                   href="/docs/fluentcart-mcp/setup"
                   className="underline underline-offset-4 transition-colors hover:text-foreground"

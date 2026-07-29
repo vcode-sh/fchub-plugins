@@ -10,79 +10,60 @@ The server speaks MCP `2025-11-25` and `2026-07-28`. The recipes below are setup
 client certification. Candidate certification requires a candidate-bound handshake from MCP Inspector
 (stdio and HTTP), Claude Code (stdio and HTTP), and Docker HTTP.
 
-## Quick Start
+## Pick Your Client
 
-### Claude Desktop — One Click
+| Client | Shortest route |
+|---|---|
+| **ChatGPT Desktop** | **Settings → MCP servers → Add server** |
+| **Codex CLI / Codex IDE extension** | Shared `~/.codex/config.toml` |
+| **Claude Desktop** | Install the MCPB extension |
+| **Claude Code** | `claude mcp add` |
+| **Cursor** | Global `mcp.json` |
+| **VS Code with GitHub Copilot** | User or workspace `mcp.json` |
+| **Windsurf** | `mcp_config.json` |
+| **ChatGPT web** | OpenAI Secure MCP Tunnel |
 
-Download the extension — no JSON editing or terminal configuration. Node.js 24+ is still required
-because the bundle launches the Node server declared in its manifest:
+The complete recipes and one-read verification steps live in the
+[setup guide](https://fchub.co/docs/fluentcart-mcp/setup).
 
-**[Download the latest fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases?q=fluentcart-mcp&expanded=true)**
+## Three-Step First Run
 
-Double-click the file. Claude Desktop prompts for your WordPress URL, username, and Application Password. Fill those in, then confirm the connection in Claude Desktop.
+1. Create a WordPress Application Password for a suitably narrow FluentCart user.
+2. For local clients, save it once:
 
-### Setup Wizard
+   ```bash
+   npx -y fluentcart-mcp setup
+   ```
 
-```bash
-npx fluentcart-mcp setup
-```
+   `npx -y` downloads FluentCart MCP on demand and reuses the package-manager cache. It does not
+   install the package globally. Local clients require Node.js 24 or newer.
+3. Add command `npx` with arguments `-y fluentcart-mcp` to your client, then ask:
+   *"Show me the FluentCart dashboard stats."*
 
-Asks three questions, tests the connection, saves the config. Your AI client reads the saved credentials automatically.
+### ChatGPT Desktop and Codex
 
-### Claude Desktop — Manual Config
+ChatGPT Desktop, Codex CLI and the Codex IDE extension share MCP configuration in
+`~/.codex/config.toml`. In ChatGPT Desktop use **Settings → MCP servers → Add server**, choose
+STDIO, set command `npx`, set arguments `-y fluentcart-mcp`, save and restart. Direct **Add server**
+is the shortest OpenAI route; the optional local plugin is available afterward for workspaces that
+prefer plugin-managed controls.
 
-Add to `claude_desktop_config.json`:
+### Claude Desktop extension
 
-```json
-{
-  "mcpServers": {
-    "fluentcart": {
-      "command": "npx",
-      "args": ["-y", "fluentcart-mcp"],
-      "env": {
-        "FLUENTCART_URL": "https://your-store.com",
-        "FLUENTCART_USERNAME": "admin",
-        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
-      }
-    }
-  }
-}
-```
+**[Download the latest fluentcart-mcp.mcpb](https://github.com/vcode-sh/fchub-plugins/releases?q=fluentcart-mcp&expanded=true)**,
+then open **Settings → Extensions → Advanced settings → Install Extension**.
 
-### Claude Code
+Claude Desktop supplies a built-in Node runtime for MCPB extensions, so extension users do not
+install Node separately. The MCPB contains the server's JavaScript and production dependencies; it
+does not contain a Node executable. Enter the WordPress URL, username and Application Password,
+enable the extension, then ask the verification question above.
 
-```bash
-claude mcp add fluentcart \
-  -e FLUENTCART_URL=https://your-store.com \
-  -e FLUENTCART_USERNAME=admin \
-  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
-  -- npx -y fluentcart-mcp
-```
+### ChatGPT web
 
-### Cursor / VS Code / Windsurf
-
-Same JSON config as Claude Desktop — paste into your MCP settings file. [Full setup guide](https://fchub.co/docs/fluentcart-mcp/setup) has platform-specific paths.
-
-### Docker
-
-For a local or always-on endpoint on the same machine, use the Docker recipe below. For a public
-hostname, follow the deployment guide and replace the allowlists with that hostname. ChatGPT is
-deployment guidance only, not a certified client.
-
-```bash
-MCP_API_KEY="$(openssl rand -hex 32)"
-docker run -d \
-  -p 3000:3000 \
-  -e FLUENTCART_URL=https://your-store.com \
-  -e FLUENTCART_USERNAME=admin \
-  -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
-  -e FLUENTCART_MCP_API_KEY="$MCP_API_KEY" \
-  -e FLUENTCART_MCP_ALLOWED_HOSTS=localhost \
-  -e FLUENTCART_MCP_ALLOWED_ORIGINS=localhost \
-  vcodesh/fluentcart-mcp
-```
-
-Your MCP endpoint is at `http://localhost:3000/mcp`. Also available on GHCR: `ghcr.io/vcode-sh/fluentcart-mcp`.
+ChatGPT web does not read local Codex configuration. Use the
+[OpenAI Secure MCP Tunnel recipe](https://fchub.co/docs/fluentcart-mcp/deployment#chatgpt-web-with-secure-mcp-tunnel)
+for a private, outbound-only connection. The FluentCart HTTP bearer key is not ChatGPT plugin
+authentication.
 
 ## Authentication
 
@@ -143,20 +124,20 @@ to “probably read-only”, the traditional prelude to a very long afternoon.
 ### 3. Setup Wizard
 
 ```bash
-npx fluentcart-mcp setup
+npx -y fluentcart-mcp setup
 ```
 
 ## Transports
 
 | Transport | Flag | Use Case |
 |-----------|------|----------|
-| **stdio** (default) | — | Local clients: Claude Desktop, Cursor, VS Code |
-| **HTTP** | `--transport http` | Remote clients: ChatGPT, VPS deployments, Docker |
+| **stdio** (default) | — | Local clients using the recipes above |
+| **HTTP** | `--transport http` | Generic private HTTP clients, VPS deployments, Docker |
 
 HTTP transport uses Streamable HTTP on port 3000 and has two profiles. The **local profile** binds
 loopback for one machine. The **private profile** is required for a non-loopback bind and refuses
 to listen without a 32-byte bearer key plus explicit Host and Origin allowlists. The static bearer
-maps to one configured WordPress principal; 2.0.0 has no OAuth and no multi-user identity mapping.
+maps to one configured WordPress principal; this release has no OAuth and no multi-user identity mapping.
 Run separate processes when separate callers need separate WordPress principals.
 
 ## Toolset Modes
@@ -191,7 +172,7 @@ name. Capability discovery then prunes the reviewed read surface to the connecte
 | `reversible` | Writes with a verified read-back and a supported undo |
 
 Refunds, subscription cancellation, deletions, bulk mutations, order-status changes, marking an
-order paid and disputes are not product tools in 2.0.0. No mode or environment variable enables
+order paid and disputes are not product tools in this release. No mode or environment variable enables
 them.
 
 The native Abilities bridge does not bypass this policy. `refund-order`, order and subscription
@@ -245,7 +226,7 @@ Once connected, just talk. The read-only examples work out of the box; the ones 
 
 ## Upgrading to 2.0
 
-2.0.0 is deliberately breaking: Node 24 is required, the modular MCP SDK v2 packages replace the
+2.0 is deliberately breaking: Node 24 is required for local clients, the modular MCP SDK v2 packages replace the
 legacy SDK, dynamic mode is the default, both protocol eras above are supported, and private HTTP
 requires key and allowlists before listen. If a client is not ready, keep the 1.x line explicit:
 
@@ -254,9 +235,10 @@ npx -y fluentcart-mcp@1
 ```
 
 Release evidence is generated in `release-contract.json`. It records the supported protocols,
-measured presentation profiles and the five automated candidate handshakes. Claude Desktop, Cursor,
-VS Code, Windsurf and Codex CLI use configuration recipes; they are not silently promoted to
-certified clients.
+measured presentation profiles and automated candidate handshakes. ChatGPT Desktop, Codex CLI,
+Codex IDE extension, Claude Desktop, Cursor, VS Code with GitHub Copilot, Windsurf and ChatGPT web
+through Secure MCP Tunnel are documented configuration targets; recipes are not silently promoted
+to certified clients.
 
 ## Documentation
 
