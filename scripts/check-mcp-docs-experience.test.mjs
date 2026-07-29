@@ -85,6 +85,17 @@ describe('beginner client journeys', () => {
 			)
 		}
 	})
+
+	it('keeps the Cursor Windows PATH recovery valid JSON', () => {
+		const cursor = readRequired(beginnerPages.Cursor)
+		const windowsJson = cursor.match(/complete valid example:\n\n```json\n([\s\S]*?)\n```/)?.[1]
+
+		assert.match(cursor, /where npx.*Windows/is)
+		assert.match(cursor, /"command": "C:\\\\Program Files\\\\nodejs\\\\npx\.cmd"/)
+		assert.match(cursor, /double backslashes|forward slashes/i)
+		assert.ok(windowsJson, 'Cursor must show a complete Windows JSON example')
+		assert.equal(JSON.parse(windowsJson).mcpServers.fluentcart.command, 'C:\\Program Files\\nodejs\\npx.cmd')
+	})
 })
 
 describe('advanced client boundaries', () => {

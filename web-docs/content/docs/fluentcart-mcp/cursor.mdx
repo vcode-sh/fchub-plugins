@@ -52,7 +52,24 @@ the global `mcp.json`:
 ```
 
 If Cursor reports that the command cannot be found, run `which npx` on macOS or Linux, or
-`where npx` on Windows. Replace `"npx"` in the entry with the returned absolute path.
+`where npx` on Windows. On macOS or Linux, replace `"npx"` with the returned absolute path.
+
+On Windows, do not paste a normal path with single backslashes into JSON. Double every backslash,
+as in this complete valid example:
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": ["-y", "fluentcart-mcp"]
+    }
+  }
+}
+```
+
+The doubled backslashes are required by JSON. You can instead replace the backslashes in the
+`where npx` result with forward slashes, for example `C:/Program Files/nodejs/npx.cmd`.
 
 ## Confirm it works
 
