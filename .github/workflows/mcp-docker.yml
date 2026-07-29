@@ -46,9 +46,6 @@ jobs:
       version: ${{ steps.build.outputs.version }}
       source_sha: ${{ steps.build.outputs.source_sha }}
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ inputs.artifact_name || needs.validate.outputs.artifact_name }}
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
@@ -62,6 +59,9 @@ jobs:
           node-version: '24'
       - name: Install locked script dependencies
         run: npm ci --prefix fluentcart-mcp
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name || needs.validate.outputs.artifact_name }}
       - name: Build candidate from validated context
         id: build
         env:

@@ -105,6 +105,15 @@ describe('tag-triggered staging', () => {
 })
 
 describe('versioned Docker candidate', () => {
+	it('checks out before downloading the validated handoff so checkout cannot delete it', () => {
+		const verify = job(docker, 'verify')
+		const checkout = verify.indexOf('actions/checkout@v4')
+		const download = verify.indexOf('actions/download-artifact@v4')
+		const build = verify.indexOf('Build candidate from validated context')
+		assert.ok(checkout < download)
+		assert.ok(download < build)
+	})
+
 	it('installs the locked script dependencies before building the validated image', () => {
 		const verify = job(docker, 'verify')
 		assert.match(verify, /fluentcart-mcp\/package-lock\.json/)
