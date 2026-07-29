@@ -136,16 +136,21 @@ describe('FluentCart MCP documentation truth gate', () => {
 			'bulk-products.md': 'Use bulk actions to update products.',
 			'order-status.md': 'You can change an order status through FluentCart MCP.',
 			'order-transition.md': 'Move an order to completed from the chat.',
+			'moving-order.md': 'FluentCart MCP supports moving an order to completed.',
 			'mark-paid.md': 'Mark an order paid from the chat.',
 			'charge-card.md': 'FluentCart MCP can charge a credit card.',
 			'collect-payment.md': 'Collect a payment from the customer.',
 			'take-payment.md': 'Take payment for the order.',
 			'debit-card.md': 'Debit a card for the invoice.',
 			'capture-payment.md': 'Capture a payment for order #42.',
+			'collecting-payments.md': 'FluentCart MCP supports collecting payments.',
+			'payment-capture.md': 'Payment capture is supported.',
+			'payment-captures.md': 'Payment captures are supported.',
 			'policy.md': [
 				'Deletion, bulk operations, order status changes, marking an order paid and money-moving actions are not exposed.',
 				'Do not move an order to completed.',
 				'No mode can collect payments.',
+				'Payment capture is not supported.',
 			].join('\n'),
 		}
 		const files = Object.entries(claims).map(([name, text]) => fixture(name, text))
@@ -161,12 +166,16 @@ describe('FluentCart MCP documentation truth gate', () => {
 			'bulk-products.md',
 			'order-status.md',
 			'order-transition.md',
+			'moving-order.md',
 			'mark-paid.md',
 			'charge-card.md',
 			'collect-payment.md',
 			'take-payment.md',
 			'debit-card.md',
 			'capture-payment.md',
+			'collecting-payments.md',
+			'payment-capture.md',
+			'payment-captures.md',
 		]) {
 			assert.deepEqual(byFile[name], ['unavailable-high-impact-write-presented-as-available'])
 		}
@@ -177,6 +186,10 @@ describe('FluentCart MCP documentation truth gate', () => {
 		const truth = groundTruth()
 		const claims = {
 			'bare-tools.md': 'tools: 289',
+			'tool-count.md': 'Tool count: 289',
+			'hyphenated-tool-count.md': 'MCP tool-count — 289',
+			'mcp-tools.md': '289 MCP tools',
+			'singular-mcp-tool.md': '1 MCP tool',
 			'scattered-terms.md': '289 tools. Source definitions, measured profiles and client-visible tools are distinct.',
 			'stale-source.md': `Source definitions: ${truth.sourceDefinitionCount + 1}`,
 			'current-source.md': `Source definitions: ${truth.sourceDefinitionCount}`,
@@ -191,7 +204,16 @@ describe('FluentCart MCP documentation truth gate', () => {
 			findings.map(({ path, findings: fileFindings }) => [path.split('/').at(-1), fileFindings.map(({ rule }) => rule)]),
 		)
 
-		for (const name of ['bare-tools.md', 'scattered-terms.md', 'stale-source.md', 'stale-profile.md']) {
+		for (const name of [
+			'bare-tools.md',
+			'tool-count.md',
+			'hyphenated-tool-count.md',
+			'mcp-tools.md',
+			'singular-mcp-tool.md',
+			'scattered-terms.md',
+			'stale-source.md',
+			'stale-profile.md',
+		]) {
 			assert.deepEqual(byFile[name], ['unqualified-tool-count'])
 		}
 		for (const name of ['current-source.md', 'current-profile.md', 'client-visible.md', 'evergreen.md']) {

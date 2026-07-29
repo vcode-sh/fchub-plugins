@@ -38,7 +38,7 @@ const UNAVAILABLE_MARKER = new RegExp(
 const REAL_MONEY_SUBJECT =
 	/fluentcart_order_refund|fluentcart_subscription_cancel|\brefunds?\b|\brefunding\b|subscription cancellation|\bcancellations?\b|\breal-money\b/i
 const HIGH_IMPACT_WRITE_SUBJECT =
-	/\bdelet(?:e|es|ed|ing|ion|ions)\b|\bremov(?:e|es|ed|ing|al)\b[^.]{0,40}\b(?:order|product|customer|coupon|subscription|card|payment)\b|\bbulk(?:[- ](?:action|actions|edit|edits|update|updates|mutation|mutations))?\b|\b(?:change|set|update|move|transition)\b[^.]{0,60}\border(?:\s*#\d+)?\b[^.]{0,40}\b(?:status|state|completed|processing|fulfilled|paid|cancelled)\b|\bmark(?:ing)?\b[^.]{0,24}\border paid\b|\b(?:collect|take|debit|capture|charge)\b[^.]{0,40}\b(?:card|payment)\b|\bmoney-moving\b/i
+	/\bdelet(?:e|es|ed|ing|ion|ions)\b|\bremov(?:e|es|ed|ing|al)\b[^.]{0,40}\b(?:order|product|customer|coupon|subscription|card|payment)\b|\bbulk(?:[- ](?:action|actions|edit|edits|update|updates|mutation|mutations))?\b|\b(?:change|set|update|mov(?:e|es|ed|ing)|transition(?:s|ed|ing)?)\b[^.]{0,60}\border(?:\s*#\d+)?\b[^.]{0,40}\b(?:status|state|completed|processing|fulfilled|paid|cancelled)\b|\bmark(?:ing)?\b[^.]{0,24}\border paid\b|\b(?:collect(?:s|ed|ing)?|tak(?:e|es|ing)|debit(?:s|ed|ing)?|captur(?:e|es|ed|ing)|charg(?:e|es|ed|ing))\b[^.]{0,40}\b(?:cards?|payments?)\b|\b(?:cards?|payments?)\s+(?:collection|collections|capture|captures|charge|charges|debit|debits)\b|\bmoney-moving\b/i
 const HIGH_IMPACT_IMPERATIVE =
 	/\b(?:delete|remove)\b|\b(?:move|transition)\s+(?:an?\s+)?order\b|\bmark\s+an?\s+order\s+paid\b|\b(?:collect|take|debit|capture|charge)\b[^.]{0,40}\b(?:card|payment)\b/i
 const OFFICIAL_MCP_CONTEXT = /\bofficial\s+(?:FluentCart\s+)?(?:MCP|server)\b/i
@@ -80,13 +80,15 @@ function claimedCount(line, subject) {
 }
 
 function claimedToolCount(line) {
-	const labelled = line.match(/\b(?:tools?|source(?:\s+tool)?\s+definitions?)\s*:\s*(\d+)\b/i)
+	const labelled = line.match(
+		/\b(?:(?:mcp\s+)?tools?(?:\s*[- ]?\s*count)?|source(?:\s+tool)?\s+definitions?)\b\s*(?::|—|-|\()\s*(\d+)\b/i,
+	)
 	if (labelled) return Number(labelled[1])
 
 	const sourceDefinitions = line.match(/\b(\d+)\s+(?:source\s+)?(?:tool\s+)?definitions?\b/i)
 	if (sourceDefinitions) return Number(sourceDefinitions[1])
 
-	const tools = line.match(/\b(\d+)\s+tools?\b/i)
+	const tools = line.match(/\b(\d+)\s+(?:mcp\s+)?tools?\b/i)
 	return tools ? Number(tools[1]) : null
 }
 

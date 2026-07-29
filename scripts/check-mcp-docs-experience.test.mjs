@@ -175,7 +175,7 @@ describe('marketing and blog truth', () => {
 			assert.doesNotMatch(marketing, /mcpToolCount|mcpSourceDefinitionCount/i, `${relativePath} exposes a source count`)
 			assert.doesNotMatch(
 				marketing,
-				/\b(?:\d+\s+(?:source\s+)?(?:tool\s+)?definitions?|\d+\s+tools?|tools?\s*:\s*\d+)\b/i,
+				/\b(?:\d+\s+(?:mcp\s+)?tools?|\d+\s+(?:source\s+)?(?:tool\s+)?definitions?|(?:mcp\s+)?tools?(?:\s*[- ]?\s*count)?\s*(?::|—|-)\s*\d+)\b/i,
 				`${relativePath} presents an unqualified tool count`,
 			)
 		}
