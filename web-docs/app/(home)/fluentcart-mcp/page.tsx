@@ -75,7 +75,7 @@ const prompts = [
   "Summarise orders that need attention today",
   "Which products sold best this month, and why?",
   "Find the customer behind this order and show their history",
-  "Create a coupon for the weekend sale",
+  "Create a coupon for the weekend sale (reversible mode only)",
 ];
 
 const QUICK_START_CMD = "npx -y fluentcart-mcp setup";

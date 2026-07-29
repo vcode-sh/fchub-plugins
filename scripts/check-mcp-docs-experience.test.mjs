@@ -496,6 +496,12 @@ describe('marketing and blog truth', () => {
 		assert.doesNotMatch(marketing, /\bprincipal\b/i)
 	})
 
+	it('labels the coupon prompt as reversible-mode-only', () => {
+		const marketing = read('web-docs/app/(home)/fluentcart-mcp/page.tsx')
+
+		assert.match(marketing, /Create a coupon for the weekend sale \(reversible mode only\)/i)
+	})
+
 	it('does not turn source definitions into unqualified marketing counts', () => {
 		const layoutPath = 'web-docs/app/(home)/fluentcart-mcp/layout.tsx'
 		const layout = read(layoutPath)
