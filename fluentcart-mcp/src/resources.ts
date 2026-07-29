@@ -1,4 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { McpServer } from '@modelcontextprotocol/server'
 import type { FluentCartClient } from './api/client.js'
 import type { CacheScope } from './commerce/cache.js'
 import { PrincipalScopedCache, STORE_CONTEXT_TTL_MS } from './commerce/cache.js'

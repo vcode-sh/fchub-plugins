@@ -11,8 +11,16 @@ import { storeOrigin } from './context.js'
  * the principal is part of the key, not metadata beside it.
  */
 
-/** Reference lists change rarely; a minute of staleness is cheaper than a request per call. */
-export const REFERENCE_DATA_TTL_MS = 60_000
+/**
+ * Longest an authorised response may survive without re-checking the store.
+ *
+ * WordPress cannot notify this process when an Application Password is revoked. A running server
+ * may therefore answer from memory until this window ends; restarting it purges immediately.
+ */
+export const AUTHORIZATION_CACHE_MAX_TTL_MS = 60_000
+
+/** Reference lists change rarely, but authorisation still wins over their natural lifetime. */
+export const REFERENCE_DATA_TTL_MS = AUTHORIZATION_CACHE_MAX_TTL_MS
 
 /** Store context reflects live configuration, so it is held only long enough to deduplicate. */
 export const STORE_CONTEXT_TTL_MS = 15_000
@@ -53,7 +61,8 @@ function sha256(value: string): string {
  * inspected and compared. The user and the origin are what actually decide what may be read.
  *
  * The consequence is stated rather than hidden: a revoked credential leaves its principal's
- * entries readable until they expire, which is why the TTLs here are seconds and not hours.
+ * entries readable for at most AUTHORIZATION_CACHE_MAX_TTL_MS unless the process is restarted or
+ * its authorisation cache is explicitly purged.
  */
 export function principalDigest(identity: PrincipalIdentity): string {
 	const origin = storeOrigin(identity.storeUrl)
@@ -143,6 +152,7 @@ export class PrincipalScopedCache {
 	readonly #now: () => number
 	readonly #maxEntries: number
 	#stats: CacheStats = { hits: 0, misses: 0, coalesced: 0, evictions: 0 }
+	#generation = 0
 
 	constructor(options: CacheOptions = {}) {
 		this.#now = options.now ?? Date.now
@@ -193,14 +203,15 @@ export class PrincipalScopedCache {
 		}
 
 		this.#stats.misses += 1
+		const generation = this.#generation
 		const request = loader()
 			.then((value) => {
 				// Only a resolved read is worth remembering; anything else is a transient fact.
-				this.#store(key, value, ttlMs)
+				if (this.#generation === generation) this.#store(key, value, ttlMs)
 				return value
 			})
 			.finally(() => {
-				this.#inFlight.delete(key)
+				if (this.#inFlight.get(key) === request) this.#inFlight.delete(key)
 			})
 
 		this.#inFlight.set(key, request)
@@ -227,6 +238,7 @@ export class PrincipalScopedCache {
 	 * write actually touched.
 	 */
 	invalidate(scope: CacheScope, operation?: string): number {
+		this.#generation += 1
 		const prefix = scopePrefix(scope, operation)
 		let removed = 0
 		for (const key of [...this.#entries.keys()]) {
@@ -239,6 +251,7 @@ export class PrincipalScopedCache {
 	}
 
 	clear(): void {
+		this.#generation += 1
 		this.#entries.clear()
 		this.#inFlight.clear()
 		this.#stats = { hits: 0, misses: 0, coalesced: 0, evictions: 0 }
@@ -246,7 +259,8 @@ export class PrincipalScopedCache {
 
 	#store(key: string, value: unknown, ttlMs: number): void {
 		if (ttlMs <= 0) return
-		this.#entries.set(key, { value, expiresAt: this.#now() + ttlMs })
+		const boundedTtl = Math.min(ttlMs, AUTHORIZATION_CACHE_MAX_TTL_MS)
+		this.#entries.set(key, { value, expiresAt: this.#now() + boundedTtl })
 		this.#evictIfNeeded()
 	}
 

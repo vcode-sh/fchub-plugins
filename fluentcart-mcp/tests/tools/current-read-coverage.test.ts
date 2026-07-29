@@ -111,6 +111,17 @@ describe('saved view input contract', () => {
 })
 
 describe('pdf template input contract', () => {
+	it('requires every input-selectable source route before registration', () => {
+		const routes = byName.get('fluentcart_pdf_template_list')?.routes
+
+		expect(routes?.kind).toBe('composite')
+		expect(routes?.variants.map((variant) => `${variant.method} ${variant.path}`)).toEqual([
+			'GET /settings/pdf-templates/receipt',
+			'GET /settings/pdf-templates/saved',
+			'GET /settings/pdf-templates/factory-default',
+		])
+	})
+
 	it('offers only the three evidenced template sources', () => {
 		const tool = byName.get('fluentcart_pdf_template_list')
 		for (const source of ['active', 'saved', 'factory-default']) {

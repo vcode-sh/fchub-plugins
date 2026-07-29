@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cached, cacheSize, clearCache, invalidate, TTL } from '../src/cache.js'
+import { AUTHORIZATION_CACHE_MAX_TTL_MS } from '../src/commerce/cache.js'
 
 describe('cache module', () => {
 	beforeEach(() => {
@@ -126,10 +127,10 @@ describe('cache module', () => {
 	})
 
 	describe('TTL constants', () => {
-		it('has correct values', () => {
-			expect(TTL.LONG).toBe(3_600_000)
-			expect(TTL.MEDIUM).toBe(600_000)
-			expect(TTL.SHORT).toBe(120_000)
+		it('keeps every preset inside the authorisation revocation window', () => {
+			expect(TTL.LONG).toBeLessThanOrEqual(AUTHORIZATION_CACHE_MAX_TTL_MS)
+			expect(TTL.MEDIUM).toBeLessThanOrEqual(AUTHORIZATION_CACHE_MAX_TTL_MS)
+			expect(TTL.SHORT).toBeLessThanOrEqual(AUTHORIZATION_CACHE_MAX_TTL_MS)
 		})
 	})
 })

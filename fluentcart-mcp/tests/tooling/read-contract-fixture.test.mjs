@@ -68,10 +68,25 @@ describe('read contract fixture provenance', () => {
 		assert.equal(versions.get('fluent-cart-pro'), '1.5.4')
 	})
 
+	it('keeps Core, Core plus Pro, and all-active evidence scopes distinct', () => {
+		assert.deepEqual(
+			fixture.compatibilityScopes.map(({ scope, status }) => ({ scope, status })),
+			[
+				{ scope: 'core', status: 'BLOCKED' },
+				{ scope: 'core-pro', status: 'BLOCKED' },
+				{ scope: 'all-active', status: 'CAPTURED' },
+			],
+		)
+		for (const row of fixture.compatibilityScopes.filter((entry) => entry.status === 'BLOCKED')) {
+			assert.match(row.reason, /\S/, row.scope)
+		}
+	})
+
 	it('covers exactly the allowlisted endpoints, sorted and deduplicated', () => {
 		const paths = fixture.contracts.map((contract) => contract.canonicalPath)
 		assert.deepEqual(paths, [...ENDPOINTS.map((entry) => entry.path)].sort())
 		assert.equal(new Set(paths).size, paths.length)
+		assert.ok(paths.length >= 30, `expected broad safe-read evidence, found ${paths.length}`)
 	})
 
 	it('cites a controller file and method for every contract', () => {
@@ -79,7 +94,7 @@ describe('read contract fixture provenance', () => {
 			const { evidence } = contract
 			assert.match(
 				evidence.controllerFile,
-				/^app\/Http\/Controllers\/.+\.php$/,
+				/^app\/.+\/Controllers\/.+\.php$/,
 				contract.canonicalPath,
 			)
 			assert.match(evidence.controllerMethod, /^[a-zA-Z]+$/, contract.canonicalPath)

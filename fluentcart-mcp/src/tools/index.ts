@@ -1,6 +1,5 @@
 import type { ApiCapabilities } from '../api/capabilities.js'
 import type { FluentCartClient } from '../api/client.js'
-import type { GuardRuntime } from '../security/guard-config.js'
 import { configureToolCache, type ToolCacheDeps, type ToolDefinition } from './_factory.js'
 import { activityTools } from './activity.js'
 import { applicationTools } from './application.js'
@@ -21,7 +20,6 @@ import { orderBumpTools } from './order-bumps.js'
 import { orderCoreTools } from './orders-core.js'
 import { orderCustomerTools } from './orders-customer.js'
 import { orderLifecycleTools } from './orders-lifecycle.js'
-import { orderRefundTools } from './orders-refunds.js'
 import { orderTransactionTools } from './orders-transactions.js'
 import { pdfTemplateTools } from './pdf-templates.js'
 import { productOptionTools } from './product-options.js'
@@ -42,7 +40,6 @@ import { settingsCoreTools } from './settings-core.js'
 import { shippingTools } from './shipping.js'
 import { shippingProfileTools } from './shipping-profile.js'
 import { subscriptionTools } from './subscriptions.js'
-import { subscriptionCancellationTools } from './subscriptions-cancellation.js'
 import { taxTools } from './tax.js'
 import { taxClassTools } from './tax-classes.js'
 import { taxConfigurationTools } from './tax-configuration.js'
@@ -52,18 +49,14 @@ import { taxProductOverrideTools } from './tax-product-overrides.js'
 export function createAllTools(
 	client: FluentCartClient,
 	options: {
-		guard?: GuardRuntime | null
 		capabilities?: ApiCapabilities
 		cache?: ToolCacheDeps
 	} = {},
 ): ToolDefinition[] {
-	const guard = options.guard ?? null
 	const { capabilities } = options
 	configureToolCache(client, options.cache)
 
 	return [
-		...orderRefundTools(client, guard),
-		...subscriptionCancellationTools(client, guard),
 		// Split out of tax.ts; both select their route from live capability evidence, so a store
 		// that only serves DELETE at /tax/classes/{id} never sees an update tool it cannot honour.
 		...taxClassTools(client, capabilities),

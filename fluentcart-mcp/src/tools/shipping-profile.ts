@@ -15,7 +15,7 @@ function projectMethod(value: unknown): Record<string, unknown> {
 		title: method.title ?? null,
 		type: method.type ?? null,
 		amount: method.amount ?? null,
-		enabled: method.enabled ?? null,
+		enabled: method.is_enabled ?? null,
 	}
 	if (method.min_amount !== undefined) projected.min_amount = method.min_amount
 	return projected

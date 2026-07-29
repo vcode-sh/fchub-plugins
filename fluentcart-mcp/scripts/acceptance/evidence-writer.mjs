@@ -193,8 +193,16 @@ export function resolveFixture(raw) {
 	if (typeof raw !== 'string' || raw.trim() === '') fail('--fixture requires a path')
 	if (raw.includes('\0')) fail('--fixture must not contain a NUL byte')
 	const absolute = isAbsolute(raw) ? normalize(raw) : resolve(PACKAGE_ROOT, raw)
+	const packageRoot = canonicalRoot(PACKAGE_ROOT)
+	if (!isInside(absolute, packageRoot)) {
+		fail(`fixture must be inside the package root ${packageRoot}: ${absolute}`)
+	}
 	assertNotSymlink(absolute, 'fixture')
 	if (!existsSync(absolute)) fail(`fixture does not exist: ${absolute}`)
 	if (!lstatSync(absolute).isFile()) fail(`fixture must be a regular file: ${absolute}`)
-	return absolute
+	const canonical = realpathSync(absolute)
+	if (!isInside(canonical, packageRoot)) {
+		fail(`fixture must resolve inside the package root ${packageRoot}: ${absolute}`)
+	}
+	return canonical
 }

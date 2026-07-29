@@ -20,9 +20,7 @@ const FIXTURE_ENV = {
 	FLUENTCART_URL: 'https://fixture.invalid',
 	FLUENTCART_USERNAME: 'fixture',
 	FLUENTCART_APP_PASSWORD: 'fixture',
-	FLUENTCART_WRITE_MODE: 'guarded',
-	FLUENTCART_GUARD_SECRET: 'compatibility-fixture-guard-secret-never-signs',
-	FLUENTCART_GUARD_STATE_DIR: join(PACKAGE_ROOT, '.compatibility-fixture-guard-state'),
+	FLUENTCART_WRITE_MODE: 'reversible',
 }
 
 function applyFixtureEnv() {

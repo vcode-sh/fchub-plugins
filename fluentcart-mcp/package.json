@@ -1,7 +1,7 @@
 {
   "name": "fluentcart-mcp",
   "version": "2.0.0",
-  "description": "MCP server for the FluentCart REST API \u2014 AI-agent-friendly tools for managing orders, products, customers, subscriptions, and more.",
+  "description": "MCP server for the FluentCart REST API — AI-agent-friendly tools for managing orders, products, customers, subscriptions, and more.",
   "type": "module",
   "exports": {
     ".": {
@@ -16,12 +16,14 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"require('node:fs').rmSync(require('node:path').resolve('dist'), { recursive: true, force: true })\" && tsc",
     "dev": "tsc --watch",
     "test": "vitest run --config vitest.config.ts",
     "test:unit": "vitest run --config vitest.config.ts",
-    "test:tooling": "node --test tests/tooling/*.test.mjs",
+    "test:tooling": "npm run build && node --test tests/tooling/*.test.mjs",
     "test:acceptance": "node --test tests/acceptance/*.test.mjs",
+    "test:conformance": "npm run build && npm run test:conformance:contracts && node scripts/run-conformance.mjs",
+    "test:conformance:contracts": "node --test tests/conformance/fixture.test.mjs tests/conformance/package-boundary.test.mjs",
     "test:integration:local": "node scripts/run-live-tests.mjs",
     "test:watch": "vitest --config vitest.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
@@ -40,7 +42,8 @@
     "check:compatibility": "node scripts/check-tool-routes.mjs --compatibility",
     "prepublishOnly": "npm run build",
     "pack:mcpb": "node scripts/build-mcpb.mjs",
-    "pack:release": "node scripts/build-release-artifacts.mjs"
+    "pack:release": "node scripts/build-release-artifacts.mjs",
+    "capture:release-state": "node scripts/capture-release-state.mjs"
   },
   "keywords": [
     "mcp",
@@ -74,7 +77,9 @@
   "dependencies": {
     "@clack/prompts": "^1.7.0",
     "@jitl/quickjs-wasmfile-release-asyncify": "0.32.0",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/express": "2.0.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "express": "^5.2.1",
     "quickjs-emscripten-core": "0.32.0",
     "zod": "^4.4.3"
@@ -82,6 +87,8 @@
   "devDependencies": {
     "@anthropic-ai/mcpb": "2.1.2",
     "@biomejs/biome": "^2.5.5",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/conformance": "0.2.0-alpha.10",
     "@types/express": "^5.0.6",
     "@types/node": "^24.13.3",
     "@vitest/coverage-v8": "^4.1.10",

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 
 /**
- * Deterministic encodings shared by the confirmation token and the idempotency ledger.
+ * Deterministic encodings for security-sensitive identifiers.
  *
  * Both consumers compare bytes that were produced on a previous run, possibly by a previous
  * process, so every function here must be stable across runs, platforms and locales.

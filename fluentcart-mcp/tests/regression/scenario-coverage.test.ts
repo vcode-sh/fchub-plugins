@@ -13,7 +13,7 @@ import { createAllTools } from '../../src/tools/index.js'
  * | Programme | Mutation targets | Ownership defect | Disposition |
  * |---|---|---|---|
  * | `_cleanup.ts` | deletes hard-coded numeric ids | deletes records no run created | dropped |
- * | `_scenarios-orders-audit.ts` | refunds a DISCOVERED charge, mutates an existing order | real-money action on someone else's record | dropped; refund is now a guarded action |
+ * | `_scenarios-orders-audit.ts` | refunds a DISCOVERED charge, mutates an existing order | real-money action on someone else's record | dropped; refunds are unavailable |
  * | `_scenarios-reports-new.ts` | order status of discovered orders | mutates pre-existing records | dropped |
  * | `_scenarios-complex-1.ts`, `-complex-2.ts` | creates products/coupons/customers | creates without registering or deleting | names preserved below |
  * | `_scenarios-simple-1.ts`, `-simple-2.ts` | read-mostly tool sweeps | loads `.env` directly | names preserved below |
@@ -235,6 +235,8 @@ const SCENARIO_COVERED_TOOLS = [
  * assertion below fails if a withdrawn name is still registered, so this list cannot rot.
  */
 const WITHDRAWN_TOOLS: Record<string, string> = {
+	fluentcart_order_refund:
+		'Real-money refunds are retained only as an execution:none audit row; the public implementation is intentionally absent.',
 	fluentcart_customer_address_select:
 		'Never existed in the direct registry. The scenario invoked a name the server does not register; the underlying route is GET /customers/{id}/update-address-select.',
 	fluentcart_report_cart:

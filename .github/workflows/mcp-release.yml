@@ -1,21 +1,6 @@
-# Release fluentcart-mcp — validate once, then publish exactly what was validated.
-#
-# Usage:
-#   git tag fluentcart-mcp/v2.0.0
-#   git push origin fluentcart-mcp/v2.0.0
-#
-# The graph has one build. `validate` (mcp-ci.yml) compiles, inspects and checksums the npm
-# tarball, MCPB and Docker context, then uploads them as immutable workflow artefacts. Every
-# publication job downloads those bytes; none of them checks out the source, reinstalls
-# dependencies or rebuilds anything. Docker is verified and smoked before either registry
-# publication runs, so a broken image cannot be discovered after npm has gone public.
-#
-# npm publication uses trusted publishing (OIDC) — no NPM_TOKEN. The grant is bound to this
-# repository and this workflow file, so renaming or relocating this file stops publication
-# until the trusted publisher entry on npm is updated to match.
-#
-# Requires secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
-name: MCP Release
+# A release tag stages immutable candidate bytes. It deliberately stops before any public
+# GitHub Release, npm latest move or mutable container tag.
+name: MCP Stage
 
 on:
   push:
@@ -23,122 +8,106 @@ on:
       - 'fluentcart-mcp/v*'
 
 jobs:
-  # Build and inspect every artefact exactly once.
   validate:
-    name: Validate
     uses: ./.github/workflows/mcp-ci.yml
 
-  # The tag must name the version the artefacts actually contain. Reads the packaged version
-  # rather than the working tree, and needs no checkout to do it.
   version-gate:
-    name: Version Gate
     runs-on: ubuntu-latest
     needs: [validate]
     steps:
       - name: Tag matches packaged version
         env:
           TAG_REF: ${{ github.ref_name }}
-          PACKAGED_VERSION: ${{ needs.validate.outputs.version }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          TAG_VERSION="${TAG_REF#fluentcart-mcp/v}"
-          echo "Tag: $TAG_VERSION"
-          echo "Packaged: $PACKAGED_VERSION"
-          if [ "$TAG_VERSION" != "$PACKAGED_VERSION" ]; then
-            echo "::error::Version mismatch — tag says $TAG_VERSION, artefacts contain $PACKAGED_VERSION"
-            exit 1
-          fi
+          test "${TAG_REF#fluentcart-mcp/v}" = "$VERSION"
 
-  # Builds the image from the validated context and proves it runs, before anything publishes.
   docker:
-    name: Docker
     needs: [validate, version-gate]
     uses: ./.github/workflows/mcp-docker.yml
     with:
       publish: true
       artifact_name: ${{ needs.validate.outputs.artifact_name }}
       source_sha: ${{ needs.validate.outputs.source_sha }}
+      source_tree_digest: ${{ needs.validate.outputs.source_tree_digest }}
     secrets: inherit
 
-  publish-npm:
-    name: Publish to npm
+  stage-npm:
     runs-on: ubuntu-latest
-    # Gated on a proven-good image: npm publication is irreversible, so it goes last among the
-    # things that can still fail.
     needs: [validate, version-gate, docker]
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Download validated artefacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ needs.validate.outputs.artifact_name }}
-          path: dist-packages
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '24.13.0'
           registry-url: https://registry.npmjs.org
-
-      # Trusted publishing is an npm 11.5.1+ feature and Node 22 still ships npm 10.x, so the
-      # CLI is upgraded before publishing. Without this npm falls back to looking for a token
-      # and fails with ENEEDAUTH rather than exchanging the OIDC identity.
-      - name: Use an npm that supports trusted publishing
+      - name: Verify reviewed release toolchain
         run: |
-          npm install -g npm@latest
-          npm --version
-
-      # Publishes the inspected tarball itself. There is no source tree here to rebuild from,
-      # which is the point: what npm receives is byte-identical to what was inspected.
-      #
-      # Authentication is npm trusted publishing (OIDC): the `id-token: write` permission above
-      # lets npm exchange this workflow's short-lived GitHub identity for publish rights. There
-      # is deliberately no NODE_AUTH_TOKEN and no NPM_TOKEN secret — a long-lived token is a
-      # standing credential that outlives the job and can publish from anywhere, which is the
-      # thing trusted publishing exists to remove. npm binds the grant to this repository and
-      # this workflow file, so renaming or moving it will correctly stop publication until the
-      # trusted publisher entry is updated.
-      #
-      # Provenance is generated automatically under trusted publishing; passing --provenance
-      # keeps the intent explicit and fails loudly if the OIDC exchange did not happen.
-      - name: Publish inspected tarball via trusted publishing
+          test "$(node --version)" = "v24.13.0"
+          test "$(npm --version)" = "11.6.2"
+      - name: Publish inspected candidate under next
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           TARBALL="dist-packages/fluentcart-mcp-${VERSION}.tgz"
-          if [ ! -f "$TARBALL" ]; then
-            echo "::error::Validated tarball $TARBALL is missing from the artefact"
-            ls -la dist-packages
-            exit 1
-          fi
-          sha256sum "$TARBALL"
-          npm publish "$TARBALL" --provenance --access public
+          npm publish "$TARBALL" --provenance --access public --tag next
 
-  github-release:
-    name: GitHub Release
+  verify-public:
     runs-on: ubuntu-latest
-    needs: [validate, version-gate, docker, publish-npm]
+    needs: [validate, docker, stage-npm]
     permissions:
-      contents: write
+      actions: write
+      contents: read
     steps:
-      - name: Download validated artefacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ needs.validate.outputs.artifact_name }}
-          path: dist-packages
-
-      # Notes are generated by GitHub from the tag, so this job needs no checkout at all.
-      - name: Create release with validated artefacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG_REF: ${{ github.ref_name }}
-          VERSION: ${{ needs.validate.outputs.version }}
-          REPO: ${{ github.repository }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+          registry-url: https://registry.npmjs.org
+      - name: Verify reviewed release toolchain
         run: |
-          gh release create "$TAG_REF" \
-            --repo "$REPO" \
-            --title "fluentcart-mcp v${VERSION}" \
-            --generate-notes \
-            "dist-packages/fluentcart-mcp.mcpb#MCPB bundle (fluentcart-mcp.mcpb)" \
-            "dist-packages/fluentcart-mcp-${VERSION}.tgz#npm tarball (fluentcart-mcp-${VERSION}.tgz)" \
-            "dist-packages/SHA256SUMS.json#SHA-256 checksums"
+          test "$(node --version)" = "v24.13.0"
+          test "$(npm --version)" = "11.6.2"
+      - name: Verify public tarball checksum, clean install and both protocol eras
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          mkdir public clean
+          npm pack "fluentcart-mcp@${VERSION}" --pack-destination public --registry https://registry.npmjs.org
+          TARBALL="fluentcart-mcp-${VERSION}.tgz"
+          EXPECTED=$(node -e "const s=require('./dist-packages/SHA256SUMS.json'); console.log(s.files.find(x=>x.file==='$TARBALL').sha256)")
+          ACTUAL=$(sha256sum "public/$TARBALL" | cut -d' ' -f1)
+          test "$ACTUAL" = "$EXPECTED"
+          cd clean
+          npm init -y
+          npm add --ignore-scripts --registry https://registry.npmjs.org \
+            "../public/$TARBALL" @modelcontextprotocol/client@2.0.0
+          cp ../scripts/smoke-public-stdio.mjs .
+          node smoke-public-stdio.mjs node_modules/fluentcart-mcp/dist/index.js
+      - name: Write staging evidence
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          SOURCE_TREE_DIGEST: ${{ needs.validate.outputs.source_tree_digest }}
+          GHCR_DIGEST: ${{ needs.docker.outputs.ghcr_digest }}
+          DOCKERHUB_DIGEST: ${{ needs.docker.outputs.dockerhub_digest }}
+        run: |
+          export NPM_INTEGRITY CHECKSUMS_SHA256
+          NPM_INTEGRITY=$(npm view "fluentcart-mcp@${VERSION}" dist.integrity --json)
+          CHECKSUMS_SHA256=$(sha256sum dist-packages/SHA256SUMS.json | cut -d' ' -f1)
+          node -e "const fs=require('fs'); fs.writeFileSync('dist-packages/staging-state.json', JSON.stringify({schemaVersion:2,version:process.env.VERSION,sourceSha:process.env.SOURCE_SHA,sourceTreeDigest:process.env.SOURCE_TREE_DIGEST,checksumsSha256:process.env.CHECKSUMS_SHA256,npmIntegrity:JSON.parse(process.env.NPM_INTEGRITY),dockerDigests:{'ghcr.io':process.env.GHCR_DIGEST,'docker.io':process.env.DOCKERHUB_DIGEST}},null,2)+'\\n')"
+      - name: Reinspect the exact staging handoff
+        run: node dist-packages/verification/scripts/verify-staged-release.mjs --root dist-packages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fluentcart-mcp-staging-${{ needs.validate.outputs.version }}
+          path: dist-packages/
+          if-no-files-found: error
+          retention-days: 30

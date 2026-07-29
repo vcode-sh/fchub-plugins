@@ -29,16 +29,14 @@ export interface ToolSafety {
 	risk: ToolRisk
 	/**
 	 * `inherent` — repeating the call cannot double-apply it.
-	 * `guard-required` — repetition is unsafe and needs this server's idempotency ledger.
 	 * `unsupported` — the action cannot be made safely repeatable at all.
 	 */
-	idempotency: 'inherent' | 'guard-required' | 'unsupported'
+	idempotency: 'inherent' | 'unsupported'
 	/**
 	 * `rest` — call FluentCart directly.
-	 * `guarded-rest` — only through the signed-preview and durable-claim guard.
 	 * `none` — not executable by this server under any configuration.
 	 */
-	execution: 'rest' | 'guarded-rest' | 'none'
+	execution: 'rest' | 'none'
 }
 
 export const READ_SAFETY: ToolSafety = {

@@ -1,0 +1,49 @@
+services:
+  backend:
+    image: ${FLUENTCART_PROXY_BACKEND_IMAGE:?set FLUENTCART_PROXY_BACKEND_IMAGE}
+    command:
+      - node
+      - dist/index.js
+      - --transport
+      - http
+      - --port
+      - "3000"
+      - --host
+      - 0.0.0.0
+      - --http-profile
+      - private
+    environment:
+      FLUENTCART_URL: ${FLUENTCART_URL:?set FLUENTCART_URL}
+      FLUENTCART_USERNAME: ${FLUENTCART_USERNAME:?set FLUENTCART_USERNAME}
+      FLUENTCART_APP_PASSWORD: ${FLUENTCART_APP_PASSWORD:?set FLUENTCART_APP_PASSWORD}
+      FLUENTCART_WRITE_MODE: disabled
+      FLUENTCART_MCP_API_KEY: ${FLUENTCART_MCP_API_KEY:?set FLUENTCART_MCP_API_KEY}
+      FLUENTCART_MCP_ALLOWED_HOSTS: ${FLUENTCART_PROXY_ALLOWED_HOSTS:-mcp.fixture.test}
+      FLUENTCART_MCP_ALLOWED_ORIGINS: ${FLUENTCART_PROXY_ALLOWED_ORIGINS:-mcp.fixture.test}
+    expose:
+      - "3000"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks:
+      - private
+
+  proxy:
+    image: nginx:1.29.4-alpine@sha256:4870c12cd2ca986de501a804b4f506ad3875a0b1874940ba0a2c7f763f1855b2
+    depends_on:
+      - backend
+    ports:
+      - 127.0.0.1:${FLUENTCART_PROXY_PORT:?set FLUENTCART_PROXY_PORT}:8443
+    volumes:
+      - ${FLUENTCART_PROXY_NGINX_CONFIG:?set FLUENTCART_PROXY_NGINX_CONFIG}:/etc/nginx/nginx.conf:ro
+      - ${FLUENTCART_PROXY_CERT:?set FLUENTCART_PROXY_CERT}:/run/certs/server.crt:ro
+      - ${FLUENTCART_PROXY_KEY:?set FLUENTCART_PROXY_KEY}:/run/certs/server.key:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    networks:
+      - private
+
+networks:
+  private: {}

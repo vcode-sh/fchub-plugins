@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { assertWithinEmergencyCap } from '../commerce/response-budget.js'
 import { createTool, encodePathParameter, getTool, type ToolDefinition } from './_factory.js'
-import { direct } from './endpoints.js'
+import { composite, direct, op } from './endpoints.js'
 
 /**
  * Receipt and invoice PDF template configuration.
@@ -58,7 +58,8 @@ export function pdfTemplateTools(client: FluentCartClient): ToolDefinition[] {
 			description:
 				'Report whether the seller identity, contact, bank and tax fields needed by invoice ' +
 				'templates are configured. This deliberately returns booleans only and never exposes ' +
-				'the seller values or the private WordPress administration URL.',
+				'the seller values or the private WordPress administration URL. `e_invoice_profile` ' +
+				'is the configured ZUGFeRD/Factur-X profile name, not a seller identity profile.',
 			schema: z.object({}),
 			endpoint: '/settings/pdf-templates/seller-details',
 			transform: (data) => {
@@ -68,7 +69,8 @@ export function pdfTemplateTools(client: FluentCartClient): ToolDefinition[] {
 					typeof seller[key] === 'string' && seller[key].trim() !== ''
 				return {
 					e_invoice_enabled: seller.zugferd_enabled === '1' || seller.zugferd_enabled === true,
-					profile: typeof seller.zugferd_profile === 'string' ? seller.zugferd_profile : null,
+					e_invoice_profile:
+						typeof seller.zugferd_profile === 'string' ? seller.zugferd_profile : null,
 					store_country_configured: body.store_country_set === true,
 					configured: {
 						contact_name: configured('seller_contact_name'),
@@ -129,11 +131,12 @@ export function pdfTemplateTools(client: FluentCartClient): ToolDefinition[] {
 					.describe('Which template set to read (default: active)'),
 			}),
 			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
-			routes: direct(
-				'GET',
-				'/settings/pdf-templates/receipt',
-				{ method: 'GET', path: '/settings/pdf-templates/saved' },
-				{ method: 'GET', path: '/settings/pdf-templates/factory-default' },
+			// One route is selected by `source`, but every documented input must work before the
+			// tool is advertised. Composite availability therefore requires all three branches.
+			routes: composite(
+				op('GET', '/settings/pdf-templates/receipt'),
+				op('GET', '/settings/pdf-templates/saved'),
+				op('GET', '/settings/pdf-templates/factory-default'),
 			),
 			handler: async (c, input) => {
 				const source = (input.source as TemplateSource | undefined) ?? 'active'

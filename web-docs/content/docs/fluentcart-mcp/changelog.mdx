@@ -19,34 +19,37 @@ What changed, when, and why you should care.
 A breaking release, and unapologetically so. Version 1.x handed an AI assistant the whole store on connection and trusted everyone involved to be careful. This one starts from the opposite assumption.
 
 <Callout type="warn" title="Upgrading from 1.x will change what your AI can do">
-Writes are off unless you switch them on, the default mode presents five meta-tools instead of the entire catalogue, and refunds, cancellations, deletions and bulk actions are not exposed at all. If your workflow depended on any of that, it will stop working. Read the two sections below before upgrading, not after.
+Writes are off unless you switch them on, the default mode presents three compact read tools
+instead of the entire catalogue, and refunds, cancellations, deletions and bulk actions are not
+exposed at all. Enabling reversible writes adds one executor. If your workflow depended on removed
+actions, it will stop working.
 </Callout>
 
 #### Writes are absent by default
 
-`FLUENTCART_WRITE_MODE` is new and defaults to `disabled`. Values are `disabled`, `reversible` and `guarded`.
+`FLUENTCART_WRITE_MODE` is new and defaults to `disabled`. Values are `disabled` and `reversible`.
 
 Filtering happens before registration, not at call time, which is the part that matters: a tool your policy excludes cannot be listed, searched, described or invoked by name. There is no "the model found it anyway" path, because there is nothing to find.
 
-`disabled` exposes the reads. `reversible` adds the writes that can be undone — creating and updating products, variants, coupons, customers, shipping rules, tax rules, attributes, order bumps and upgrade paths. `guarded` is accepted and, in this release, exposes exactly the same set as `reversible`.
+`disabled` exposes reads. `reversible` adds work that can be undone — creating and updating
+products, variants, coupons, customers, shipping rules, tax rules, attributes, order bumps and
+upgrade paths.
 
 Deletion, bulk operations, order status changes, marking an order paid and dispute handling are exposed in no mode. FluentCart provides no supported way to reverse any of them, so none qualifies as a reversible write. This is narrower than 1.x, on purpose.
 
 #### Refunding and cancellation are not available
 
-`fluentcart_order_refund` and `fluentcart_subscription_cancel` ship absent from every write mode, `guarded` included. No secret, state directory or environment variable turns them on. If you are adopting this to automate refunds, it will not do that.
-
-The guard they were built for is complete and unit-tested: previews signed and pinned to the exact payload, a durable single-writer ledger that recognises a retried call instead of charging twice, replay and conflict detection, and crash handling that never silently retries an ambiguous result. What is missing is acceptance evidence — proof of the whole path against a real store — and for an action that moves customer money that distinction is the entire argument.
-
-Producing that proof needs one run to create an order, refund it, and remove the traces. FluentCart 1.5.5 forecloses every route: transactions have no DELETE endpoint, deleting an order does not cascade to them, `canPurchase()` rejects unpublished products so no draft fixture can stand in, and a run cannot create a subscription at all. Any refundable fixture leaves rows the API cannot remove.
-
-The rule was that a guarded capability either passes both acceptance lanes or ships unavailable. It could not pass, so it ships unavailable. The ceremony is built; the proof is not, so it is not switched on. `FLUENTCART_GUARD_SECRET`, `FLUENTCART_GUARD_STATE_DIR` and `FLUENTCART_ALLOW_LIVE_GATEWAY_ACTIONS` stay documented as reserved, because that is where this returns once FluentCart offers a way to remove a test-mode charge.
+`fluentcart_order_refund` and `fluentcart_subscription_cancel` are not product tools in 2.0.0. No
+write mode or environment variable enables them. Use FluentCart's admin or official operator
+tooling for those jobs.
 
 #### Modes: `static` is gone, `dynamic` is the default
 
 What 1.x called `static` is now called `full`. The four you can choose between are `dynamic`, `curated`, `code` and `full`, and `dynamic` is what you get if you say nothing.
 
-- **`dynamic`** — five meta-tools: `fluentcart_search_tools`, `fluentcart_describe_tools`, `fluentcart_execute_read_tool`, `fluentcart_execute_reversible_write`, `fluentcart_execute_guarded_write`. The reversible executor appears only when your write mode allows a write; the guarded executor is reserved and routes nothing in this release.
+- **`dynamic`** — three read tools: `fluentcart_search_tools`,
+  `fluentcart_describe_tools`, and `fluentcart_execute_read_tool`. Reversible mode adds
+  `fluentcart_execute_reversible_write`.
 - **`code`** — two tools over a QuickJS WebAssembly sandbox, `fluentcart_search_api` and `fluentcart_execute_code`. Read-only by construction: the sandbox has no route to a write.
 - **`curated`** — a shortlist for the workflows people actually run.
 - **`full`** — everything exposed, registered up front, exactly as `static` used to behave.

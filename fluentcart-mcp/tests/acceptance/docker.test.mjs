@@ -5,26 +5,19 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { installSignalCleanup, openCandidateStore } from '../../scripts/candidate-store.mjs'
+import { removeDockerContainer } from '../../scripts/docker-container-cleanup.mjs'
 
 const PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 const VERSION = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8')).version
 const IMAGE = process.env.FLUENTCART_ACCEPTANCE_IMAGE ?? null
 const EXPECTED_SOURCE_SHA = process.env.FLUENTCART_ACCEPTANCE_SOURCE_SHA ?? null
+const EXPECTED_CONTENT_DIGEST = process.env.FLUENTCART_ACCEPTANCE_SOURCE_TREE_DIGEST ?? null
 const REQUIRED = process.env.FLUENTCART_ACCEPTANCE_REQUIRED === 'yes'
-const STORE_URL = process.env.FLUENTCART_ACCEPTANCE_STORE_URL ?? 'https://fixture.invalid'
+const EXTERNAL_STORE_URL = process.env.FLUENTCART_ACCEPTANCE_STORE_URL ?? null
 
 /** Long enough to satisfy the 32-character floor, and obviously disposable. */
 const STRONG_KEY = `acceptance-${randomBytes(24).toString('hex')}`
-const PORT = 39081
-
-const STORE_ENV = [
-	'-e',
-	`FLUENTCART_URL=${STORE_URL}`,
-	'-e',
-	'FLUENTCART_USERNAME=fixture',
-	'-e',
-	'FLUENTCART_APP_PASSWORD=fixture',
-]
 
 function docker(args, options = {}) {
 	return spawnSync('docker', args, { encoding: 'utf8', timeout: 60_000, ...options })
@@ -62,11 +55,62 @@ if (blocked && REQUIRED) {
 	throw new Error(`required Docker acceptance cannot run: ${blocked}`)
 }
 let containerId = null
+let port = null
+let storeRuntime = null
+let cleanupPromise = null
+
+function storeArguments() {
+	return [
+		...(storeRuntime.url.includes('host.docker.internal')
+			? ['--add-host', 'host.docker.internal:host-gateway']
+			: []),
+		'-e',
+		`FLUENTCART_URL=${storeRuntime.url}`,
+		'-e',
+		'FLUENTCART_USERNAME=fixture',
+		'-e',
+		'FLUENTCART_APP_PASSWORD=fixture',
+		'-e',
+		'FLUENTCART_MCP_ALLOWED_HOSTS=127.0.0.1',
+		'-e',
+		'FLUENTCART_MCP_ALLOWED_ORIGINS=127.0.0.1',
+	]
+}
+
+async function cleanup() {
+	if (cleanupPromise) return cleanupPromise
+	cleanupPromise = (async () => {
+		let failure = null
+		if (containerId) {
+			try {
+				removeDockerContainer(containerId, { runDocker: docker })
+				containerId = null
+			} catch (error) {
+				failure = error
+			}
+		}
+		try {
+			await storeRuntime?.close()
+			storeRuntime = null
+		} catch (error) {
+			failure ??= error
+		}
+		if (failure) throw failure
+	})()
+	try {
+		return await cleanupPromise
+	} catch (error) {
+		cleanupPromise = null
+		throw error
+	}
+}
+
+const removeSignalCleanup = blocked ? () => undefined : installSignalCleanup(cleanup)
 
 async function waitForPort(attempts = 40) {
 	for (let attempt = 0; attempt < attempts; attempt += 1) {
 		try {
-			await fetch(`http://127.0.0.1:${PORT}/mcp`, { method: 'GET' })
+			await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'GET' })
 			return true
 		} catch {
 			await new Promise((resolve) => setTimeout(resolve, 250))
@@ -75,29 +119,46 @@ async function waitForPort(attempts = 40) {
 	return false
 }
 
+async function waitForPublishedPort(attempts = 40) {
+	let detail = ''
+	for (let attempt = 0; attempt < attempts; attempt += 1) {
+		const mapping = docker(['port', containerId, '3000/tcp'])
+		detail = mapping.stderr || mapping.stdout
+		const published = Number(mapping.stdout.trim().match(/:(\d+)$/)?.[1])
+		if (mapping.status === 0 && published > 0) return published
+		await new Promise((resolve) => setTimeout(resolve, 100))
+	}
+	throw new Error(`container did not publish a dynamic loopback port: ${detail}`)
+}
+
 before(async () => {
 	if (blocked) return
-	const run = docker([
-		'run',
-		'--rm',
-		'--detach',
-		'--publish',
-		`127.0.0.1:${PORT}:3000`,
-		...(STORE_URL.includes('host.docker.internal')
-			? ['--add-host', 'host.docker.internal:host-gateway']
-			: []),
-		...STORE_ENV,
-		'-e',
-		`FLUENTCART_MCP_API_KEY=${STRONG_KEY}`,
-		IMAGE,
-	])
-	assert.equal(run.status, 0, `container did not start: ${run.stderr}`)
-	containerId = run.stdout.trim()
-	assert.ok(await waitForPort(), 'container never became reachable on its published port')
+	try {
+		storeRuntime = await openCandidateStore(EXTERNAL_STORE_URL)
+		const run = docker([
+			'run',
+			'--rm',
+			'--detach',
+			'--publish',
+			'127.0.0.1::3000',
+			...storeArguments(),
+			'-e',
+			`FLUENTCART_MCP_API_KEY=${STRONG_KEY}`,
+			IMAGE,
+		])
+		assert.equal(run.status, 0, `container did not start: ${run.stderr}`)
+		containerId = run.stdout.trim()
+		port = await waitForPublishedPort()
+		assert.ok(await waitForPort(), 'container never became reachable on its published port')
+	} catch (error) {
+		await cleanup()
+		throw error
+	}
 })
 
-after(() => {
-	if (containerId) docker(['stop', '--time', '2', containerId])
+after(async () => {
+	removeSignalCleanup()
+	await cleanup()
 })
 
 describe('docker image contract', () => {
@@ -114,11 +175,16 @@ describe('docker image contract', () => {
 		const labels = inspectImage().Config.Labels ?? {}
 		assert.equal(labels['org.opencontainers.image.version'], VERSION)
 		const revision = labels['org.opencontainers.image.revision'] ?? ''
-		assert.match(revision, /^[0-9a-f]{40}$/, 'revision label must be a full commit SHA')
 		if (EXPECTED_SOURCE_SHA) {
 			assert.match(EXPECTED_SOURCE_SHA, /^[0-9a-f]{40}$/, 'expected source SHA is malformed')
+			assert.match(revision, /^[0-9a-f]{40}$/, 'revision label must be a full commit SHA')
 			assert.equal(revision, EXPECTED_SOURCE_SHA, 'image revision is not the validated source SHA')
+		} else {
+			assert.equal(revision, '', 'an uncommitted local image must not claim a Git revision')
 		}
+		const content = labels['sh.vcode.fluentcart-mcp.candidate-content-digest'] ?? ''
+		assert.match(content, /^sha256:[0-9a-f]{64}$/)
+		if (EXPECTED_CONTENT_DIGEST) assert.equal(content, EXPECTED_CONTENT_DIGEST)
 	})
 
 	it('bakes no credential into the image', (t) => {
@@ -147,7 +213,7 @@ describe('docker image contract', () => {
 describe('docker startup policy', () => {
 	/** Non-loopback binding without a usable key must abort, not serve. */
 	function runWithKey(key) {
-		const args = ['run', '--rm', ...STORE_ENV]
+		const args = ['run', '--rm', ...storeArguments()]
 		if (key !== null) args.push('-e', `FLUENTCART_MCP_API_KEY=${key}`)
 		args.push(IMAGE)
 		return docker(args, { timeout: 30_000 })
@@ -157,21 +223,21 @@ describe('docker startup policy', () => {
 		if (blocked) return t.skip(blocked)
 		const result = runWithKey(null)
 		assert.notEqual(result.status, 0, 'container started while bound to 0.0.0.0 with no key')
-		assert.match(result.stderr, /Refusing to bind 0\.0\.0\.0/)
+		assert.match(result.stderr, /Private HTTP on 0\.0\.0\.0 requires/)
 		assert.match(result.stderr, /FLUENTCART_MCP_API_KEY/)
 	})
 
-	it('refuses to start with a key shorter than 32 characters', (t) => {
+	it('refuses to start with a key shorter than 32 UTF-8 bytes', (t) => {
 		if (blocked) return t.skip(blocked)
 		const result = runWithKey('too-short-to-be-useful')
 		assert.notEqual(result.status, 0, 'container started with a weak key')
-		assert.match(result.stderr, /at least 32 characters/)
+		assert.match(result.stderr, /at least 32 UTF-8 bytes/)
 	})
 })
 
 describe('docker authenticated endpoint', () => {
 	async function request(headers) {
-		const response = await fetch(`http://127.0.0.1:${PORT}/mcp`, { method: 'GET', headers })
+		const response = await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'GET', headers })
 		return { status: response.status, body: await response.text() }
 	}
 
@@ -199,7 +265,7 @@ describe('docker authenticated endpoint', () => {
 		if (blocked) return t.skip(blocked)
 		const ports = docker(['port', containerId, '3000'])
 		assert.equal(ports.status, 0, ports.stderr)
-		assert.match(ports.stdout, /127\.0\.0\.1:39081/)
+		assert.match(ports.stdout, new RegExp(`127\\.0\\.0\\.1:${port}`))
 	})
 
 	it('completes initialize, initialized notification, and tools/list', (t) => {
@@ -208,7 +274,7 @@ describe('docker authenticated endpoint', () => {
 			process.execPath,
 			[
 				join(PACKAGE_ROOT, 'scripts', 'smoke-mcp-http.mjs'),
-				`http://127.0.0.1:${PORT}/mcp`,
+				`http://127.0.0.1:${port}/mcp`,
 				STRONG_KEY,
 			],
 			{ encoding: 'utf8', timeout: 30_000 },

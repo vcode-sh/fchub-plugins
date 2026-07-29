@@ -3,32 +3,125 @@
   "serializer": "mcp-tools-list-v1",
   "tokenizer": "gpt-tokenizer@3.4.0",
   "packageVersion": "2.0.0",
-  "sourceTreeDigest": "sha256:925d43bae14a02bab3ae7f916a395ea44b52253fe36e3e4326e63a948ea81f2c",
+  "release": {
+    "version": "2.0.0",
+    "protocols": [
+      "2025-11-25",
+      "2026-07-28"
+    ],
+    "httpProfiles": [
+      "local",
+      "private"
+    ],
+    "sdk": {
+      "server": "2.0.0",
+      "node": "2.0.0",
+      "express": "2.0.0"
+    },
+    "conformance": {
+      "package": "0.2.0-alpha.10",
+      "expectedFailures": []
+    },
+    "promotion": {
+      "npmStagingTag": "next",
+      "npmPromotionTag": "latest",
+      "previousLatest": "1.1.0",
+      "previousDockerDigests": {
+        "ghcr.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c",
+        "docker.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c"
+      }
+    },
+    "clients": {
+      "automated": {
+        "MCP Inspector": {
+          "status": "AUTOMATED_CANDIDATE",
+          "transports": [
+            "stdio",
+            "streamable-http"
+          ],
+          "requirement": "candidate-bound MCP handshake"
+        },
+        "Claude Code": {
+          "status": "AUTOMATED_CANDIDATE",
+          "transports": [
+            "stdio",
+            "streamable-http"
+          ],
+          "requirement": "candidate-bound MCP handshake"
+        },
+        "Docker smoke": {
+          "status": "AUTOMATED_CANDIDATE",
+          "transports": [
+            "docker-http"
+          ],
+          "requirement": "candidate-bound MCP handshake"
+        }
+      },
+      "configurationRecipes": {
+        "Claude Desktop": {
+          "status": "CONFIGURATION_TARGET",
+          "reason": "manual configuration is documented, not certified"
+        },
+        "Cursor": {
+          "status": "CONFIGURATION_TARGET",
+          "reason": "manual configuration is documented, not certified"
+        }
+      }
+    },
+    "evidence": {
+      "live": [
+        "FluentCart 1.5.5 REST index",
+        "WordPress 7.0.2 Abilities catalogue"
+      ],
+      "fixtures": [
+        "legacy 1.3.9 route surface",
+        "deterministic protocol and capability lanes"
+      ],
+      "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED"
+    }
+  },
+  "sourceTreeDigest": "sha256:d7c992ac926bf65a9d03f43efa2090c45f1013e7fe59e203f789f6d196e75be8",
   "sourceTreeInputs": {
-    "fileCount": 123,
+    "fileCount": 191,
     "declared": [
       {
         "file": "package.json"
       },
       {
+        "file": "package-lock.json"
+      },
+      {
+        "file": "README.md"
+      },
+      {
+        "file": "LICENSE"
+      },
+      {
         "file": "tsconfig.json"
       },
       {
-        "file": "scripts/measure-tool-context.mjs"
+        "file": "tsconfig.release.json"
       },
       {
-        "file": "scripts/build-release-contract.mjs"
+        "file": "Dockerfile"
       },
       {
-        "file": "scripts/build-manifest.mjs"
+        "file": "Dockerfile.release"
       },
       {
-        "directory": "src",
-        "extension": ".ts"
+        "file": "docker-mcp-registry/server.yaml"
       },
       {
-        "directory": "tests/fixtures/routes",
-        "extension": ".json"
+        "file": "compatibility-support.json"
+      },
+      {
+        "directory": "scripts"
+      },
+      {
+        "directory": "src"
+      },
+      {
+        "directory": "tests/fixtures"
       }
     ],
     "excluded": [
@@ -36,13 +129,11 @@
       "manifest.json"
     ]
   },
-  "sourceDefinitionCount": 291,
+  "sourceDefinitionCount": 289,
   "categoryCount": 20,
   "writePolicyExposure": {
     "disabled": 162,
     "reversible": 194,
-    "guarded": 194,
-    "realMoneyExposable": 0,
     "composedBeyondModules": 2,
     "note": "Exposure per write mode as the server composes it, independent of route evidence."
   },
@@ -54,6 +145,43 @@
   "capabilityFiltering": {
     "appliedToToolRegistry": true,
     "note": "Discovered routes prune the registry before registration: a direct tool needs one declared variant served, a composite needs every route it may call, and a tool with no supported route is not registered at all. Each profile row below is measured under its own fixture, so the counts differ by store."
+  },
+  "abilitiesBridge": {
+    "status": "MEASURED",
+    "evidence": "live-wordpress-abilities-rest",
+    "fixture": "tests/fixtures/abilities/fluentcart-1.5.5-wordpress-7.0.2.json",
+    "wordpress": "7.0.2",
+    "components": {
+      "fchub": "1.0.1",
+      "fchub-memberships": "1.4.1",
+      "fchub-payment-plans": "0.1.0",
+      "fchub-redsys": "0.1.0",
+      "fluent-cart": "1.5.5",
+      "fluent-cart-pro": "1.5.4",
+      "fluent-community": "2.7.5",
+      "fluent-community-pro": "2.7.5",
+      "fluent-crm": "3.1.8",
+      "fluent-smtp": "2.2.95",
+      "plugin-check": "2.0.0"
+    },
+    "capturedCatalogueSize": 33,
+    "auditedReadCount": 26,
+    "writeCount": 7,
+    "adapter": {
+      "status": "BLOCKED",
+      "reason": "The runtime reports no available MCP adapter. No adapter was activated for this audit.",
+      "endpoint": "/fluent-cart/mcp"
+    },
+    "executionMethod": "POST",
+    "executionMethodEvidence": {
+      "wordpress": "7.0.2",
+      "fluentCart": "1.5.5",
+      "ability": "fluent-cart/get-store-context",
+      "getStatus": 405,
+      "getCode": "rest_ability_invalid_method",
+      "postStatus": 200,
+      "reason": "FluentCart supplied meta.annotations.readOnlyHint=true but no WordPress readonly annotation. WordPress therefore rejected GET and executed the same read through POST."
+    }
   },
   "legacyRuntimeSupport": {
     "status": "ROUTE-SURFACE-CAPTURED",
@@ -67,7 +195,6 @@
     {
       "name": "legacy-1.3.9-runtime-rest-disabled",
       "componentFixture": "tests/fixtures/routes/fluentcart-1.3.9-runtime.json",
-      "guardFixture": null,
       "writeMode": "disabled",
       "evidenceKind": "live-rest-index",
       "replaces": null,
@@ -78,34 +205,33 @@
       "modes": {
         "dynamic": {
           "toolCount": 3,
-          "characters": 2359,
-          "cl100kTokens": 512,
-          "o200kTokens": 520
+          "characters": 2254,
+          "cl100kTokens": 494,
+          "o200kTokens": 502
         },
         "curated": {
           "toolCount": 17,
-          "characters": 18228,
-          "cl100kTokens": 4114,
-          "o200kTokens": 4177
+          "characters": 17633,
+          "cl100kTokens": 4012,
+          "o200kTokens": 4075
         },
         "code": {
           "toolCount": 2,
-          "characters": 2427,
-          "cl100kTokens": 532,
-          "o200kTokens": 540
+          "characters": 2357,
+          "cl100kTokens": 520,
+          "o200kTokens": 528
         },
         "full": {
           "toolCount": 140,
-          "characters": 114267,
-          "cl100kTokens": 25415,
-          "o200kTokens": 25912
+          "characters": 109358,
+          "cl100kTokens": 24573,
+          "o200kTokens": 25070
         }
       }
     },
     {
       "name": "core-1.5.5-rest-disabled",
       "componentFixture": "tests/fixtures/routes/fluentcart-1.5.5-core.json",
-      "guardFixture": null,
       "writeMode": "disabled",
       "evidenceKind": "live-rest-index",
       "replaces": null,
@@ -116,34 +242,33 @@
       "modes": {
         "dynamic": {
           "toolCount": 3,
-          "characters": 2359,
-          "cl100kTokens": 512,
-          "o200kTokens": 520
+          "characters": 2254,
+          "cl100kTokens": 494,
+          "o200kTokens": 502
         },
         "curated": {
           "toolCount": 17,
-          "characters": 18228,
-          "cl100kTokens": 4114,
-          "o200kTokens": 4177
+          "characters": 17633,
+          "cl100kTokens": 4012,
+          "o200kTokens": 4075
         },
         "code": {
           "toolCount": 2,
-          "characters": 2427,
-          "cl100kTokens": 532,
-          "o200kTokens": 540
+          "characters": 2357,
+          "cl100kTokens": 520,
+          "o200kTokens": 528
         },
         "full": {
           "toolCount": 151,
-          "characters": 120855,
-          "cl100kTokens": 26873,
-          "o200kTokens": 27385
+          "characters": 115561,
+          "cl100kTokens": 25965,
+          "o200kTokens": 26477
         }
       }
     },
     {
       "name": "core-1.5.5-pro-1.5.4-rest-disabled",
       "componentFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json",
-      "guardFixture": null,
       "writeMode": "disabled",
       "evidenceKind": "live-rest-index",
       "replaces": null,
@@ -154,34 +279,33 @@
       "modes": {
         "dynamic": {
           "toolCount": 3,
-          "characters": 2359,
-          "cl100kTokens": 512,
-          "o200kTokens": 520
+          "characters": 2254,
+          "cl100kTokens": 494,
+          "o200kTokens": 502
         },
         "curated": {
           "toolCount": 17,
-          "characters": 18228,
-          "cl100kTokens": 4114,
-          "o200kTokens": 4177
+          "characters": 17633,
+          "cl100kTokens": 4012,
+          "o200kTokens": 4075
         },
         "code": {
           "toolCount": 2,
-          "characters": 2427,
-          "cl100kTokens": 532,
-          "o200kTokens": 540
+          "characters": 2357,
+          "cl100kTokens": 520,
+          "o200kTokens": 528
         },
         "full": {
           "toolCount": 162,
-          "characters": 128436,
-          "cl100kTokens": 28581,
-          "o200kTokens": 29120
+          "characters": 122857,
+          "cl100kTokens": 27632,
+          "o200kTokens": 28171
         }
       }
     },
     {
       "name": "core-1.5.5-pro-1.5.4-rest-reversible",
       "componentFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json",
-      "guardFixture": null,
       "writeMode": "reversible",
       "evidenceKind": "live-rest-index",
       "replaces": null,
@@ -192,65 +316,27 @@
       "modes": {
         "dynamic": {
           "toolCount": 4,
-          "characters": 3172,
-          "cl100kTokens": 688,
-          "o200kTokens": 699
+          "characters": 3021,
+          "cl100kTokens": 662,
+          "o200kTokens": 673
         },
         "curated": {
           "toolCount": 19,
-          "characters": 22068,
-          "cl100kTokens": 4946,
-          "o200kTokens": 5044
+          "characters": 21403,
+          "cl100kTokens": 4832,
+          "o200kTokens": 4930
         },
         "code": {
           "toolCount": 2,
-          "characters": 2427,
-          "cl100kTokens": 532,
-          "o200kTokens": 540
+          "characters": 2357,
+          "cl100kTokens": 520,
+          "o200kTokens": 528
         },
         "full": {
           "toolCount": 194,
-          "characters": 167320,
-          "cl100kTokens": 36984,
-          "o200kTokens": 37763
-        }
-      }
-    },
-    {
-      "name": "core-1.5.5-pro-1.5.4-standalone-guarded",
-      "componentFixture": "tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json",
-      "guardFixture": "tests/fixtures/security/standalone-guard.json",
-      "writeMode": "guarded",
-      "evidenceKind": "live-rest-index",
-      "replaces": null,
-      "status": "MEASURED",
-      "missingFixture": null,
-      "reason": null,
-      "exposedDefinitionCount": 194,
-      "modes": {
-        "dynamic": {
-          "toolCount": 4,
-          "characters": 3172,
-          "cl100kTokens": 688,
-          "o200kTokens": 699
-        },
-        "curated": {
-          "toolCount": 19,
-          "characters": 22068,
-          "cl100kTokens": 4946,
-          "o200kTokens": 5044
-        },
-        "code": {
-          "toolCount": 2,
-          "characters": 2427,
-          "cl100kTokens": 532,
-          "o200kTokens": 540
-        },
-        "full": {
-          "toolCount": 194,
-          "characters": 167320,
-          "cl100kTokens": 36984,
-          "o200kTokens": 37763
+          "characters": 160621,
+          "cl100kTokens": 35843,
+          "o200kTokens": 36622
         }
       }
     }

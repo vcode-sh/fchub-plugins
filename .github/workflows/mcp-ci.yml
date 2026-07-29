@@ -1,9 +1,3 @@
-# CI and release packaging for fluentcart-mcp.
-#
-# This workflow is the single place artefacts are built and inspected. Release and Docker
-# publication both call it rather than repeating the steps, so the tarball, MCPB and Docker
-# context that ship are provably the ones that were validated here — there is no second build
-# to drift from the first.
 name: MCP CI
 
 on:
@@ -16,6 +10,7 @@ on:
       - '.github/workflows/mcp-ci.yml'
       - '.github/workflows/mcp-release.yml'
       - '.github/workflows/mcp-docker.yml'
+      - '.github/workflows/mcp-promote.yml'
   pull_request:
     branches: [main]
     paths:
@@ -25,18 +20,20 @@ on:
       - '.github/workflows/mcp-ci.yml'
       - '.github/workflows/mcp-release.yml'
       - '.github/workflows/mcp-docker.yml'
-  # Called by mcp-release.yml and mcp-docker.yml. Reusable workflows share the calling run, so
-  # the artefacts uploaded here are downloadable by the caller's publication jobs.
+      - '.github/workflows/mcp-promote.yml'
   workflow_call:
     outputs:
       version:
-        description: 'Package version proved by the packaging job.'
+        description: 'Validated package version.'
         value: ${{ jobs.package.outputs.version }}
       source_sha:
-        description: 'Commit the artefacts were built from.'
+        description: 'Committed source SHA represented by the artefacts.'
         value: ${{ jobs.package.outputs.source_sha }}
+      source_tree_digest:
+        description: 'Content-bound candidate identity.'
+        value: ${{ jobs.package.outputs.source_tree_digest }}
       artifact_name:
-        description: 'Workflow artefact holding dist-packages/.'
+        description: 'Immutable validated release artefact.'
         value: ${{ jobs.package.outputs.artifact_name }}
 
 concurrency:
@@ -52,181 +49,120 @@ env:
 
 jobs:
   quality:
-    name: Quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: fluentcart-mcp/package-lock.json
-
       - run: npm ci
-
-      - name: Typecheck
-        run: |
-          npm run typecheck
-          npm run typecheck:tests
-
-      - name: Lint
-        run: npm run lint
+      - run: npm run typecheck && npm run typecheck:tests
+      - run: npm run lint
 
   test:
-    name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: fluentcart-mcp/package-lock.json
-
       - run: npm ci
-
-      # The unit lane by name. It loads no environment file and performs no network I/O, so no
-      # store credential is available to it even by accident.
-      - name: Unit tests with coverage
+      - name: Unit
         run: npm run test:unit -- --coverage
-
-      # Includes the token-budget and release-workflow contracts.
-      - name: Tooling contract tests
+      - name: Tooling
         run: npm run test:tooling
-
-      # The acceptance lane: capability matrix, guard state, transport, code sandbox, token
-      # baselines and route drift. It existed for some time without being wired into any script or
-      # job, which is exactly how its pinned baselines went stale — four of them were still
-      # describing a registry two deliberate changes out of date, and nothing said so. Like the
-      # tooling lane it loads no environment file and makes no network call.
-      - name: Acceptance contract tests
+      - name: Acceptance contracts
         run: npm run test:acceptance
 
-      - name: Coverage summary
-        if: always()
-        run: |
-          echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f coverage/coverage-summary.json ]; then
-            node -e "
-              const c = require('./coverage/coverage-summary.json').total;
-              const fmt = (m) => m.pct + '%';
-              console.log('| Metric | Coverage |');
-              console.log('| --- | --- |');
-              console.log('| Statements | ' + fmt(c.statements) + ' |');
-              console.log('| Branches | ' + fmt(c.branches) + ' |');
-              console.log('| Functions | ' + fmt(c.functions) + ' |');
-              console.log('| Lines | ' + fmt(c.lines) + ' |');
-            " >> $GITHUB_STEP_SUMMARY
-          fi
-
-  package:
-    name: Validate & Package
+  conformance:
     runs-on: ubuntu-latest
     needs: [quality, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: fluentcart-mcp/package-lock.json
+      - run: npm ci
+      - run: npm run test:conformance
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-conformance-${{ github.run_id }}
+          path: fluentcart-mcp/test-results/conformance/failure-metadata.json
+          if-no-files-found: error
+
+  protocol:
+    runs-on: ubuntu-latest
+    needs: [quality, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: fluentcart-mcp/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Dual-era stdio and HTTP production surfaces
+        run: |
+          node --test tests/protocol/stdio-dual-era.test.mjs
+          node --test tests/protocol/http-dual-era.test.mjs
+          node --test tests/protocol/production-surface.test.mjs
+
+  package:
+    runs-on: ubuntu-latest
+    needs: [conformance, protocol]
     outputs:
       version: ${{ steps.identity.outputs.version }}
       source_sha: ${{ steps.identity.outputs.source_sha }}
+      source_tree_digest: ${{ steps.identity.outputs.source_tree_digest }}
       artifact_name: ${{ steps.identity.outputs.artifact_name }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: fluentcart-mcp/package-lock.json
-
       - run: npm ci
-
-      # ---- Generated truth must match its sources before anything is packed ----
-
-      - name: Tool counts match source
+      - name: Generated truth
         working-directory: .
-        run: node scripts/count-mcp-tools.mjs --check
-
-      - name: API coverage ledger
-        run: node scripts/build-api-coverage.mjs --check
-
-      - name: Release contract
-        run: npm run check:contract
-
-      - name: MCPB manifest
-        run: npm run check:manifest
-
-      # ---- Build, smoke and route evidence ----
-
-      - name: Build
-        run: npm run build
-
-      - name: Verify dist
         run: |
-          if [ ! -f dist/index.js ]; then
-            echo "::error::Missing dist/index.js"
-            exit 1
-          fi
-          echo "## Build" >> $GITHUB_STEP_SUMMARY
-          echo "dist/index.js: $(du -h dist/index.js | cut -f1)" >> $GITHUB_STEP_SUMMARY
-
-      - name: Smoke test
-        run: |
-          node dist/index.js --version
-          node dist/index.js --help
-
-      # Which FluentCart profiles we hold evidence for. A profile whose fixture was never
-      # captured is reported BLOCKED rather than assumed to work.
-      - name: Compatibility profiles
-        run: npm run check:compatibility
-
-      # Every tool must point at an endpoint the captured fixture actually serves. Needs the
-      # build above, because the checker reads the compiled registry rather than the source.
-      - name: Tool route contract
-        run: npm run check:routes -- --fixture tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json
-
-      # ---- Package once, inspect what was packed ----
-
-      - name: npm pack dry run
-        run: npm pack --dry-run
-
-      # Builds the tarball, MCPB and Docker context in an isolated staging directory and writes
-      # SHA256SUMS.json. The working tree is an input only: nothing is written back to dist/,
-      # node_modules/ or package-lock.json, so no publication step needs to reinstall.
-      - name: Build release artefacts
-        run: npm run pack:release
-
-      - name: Inspect npm tarball
-        run: node scripts/inspect-npm-pack.mjs dist-packages/fluentcart-mcp-*.tgz
-
-      - name: Inspect MCPB archive
-        run: node scripts/inspect-mcpb.mjs dist-packages/fluentcart-mcp.mcpb
-
-      - name: Packaging did not mutate the dependency tree
-        run: git diff --exit-code -- package-lock.json package.json
-
-      - name: Record artefact identity
+          node scripts/count-mcp-tools.mjs --check
+          node fluentcart-mcp/scripts/build-api-coverage.mjs --check
+          cd fluentcart-mcp
+          npm run check:contract
+          npm run check:manifest
+          npm run check:compatibility
+          npm run check:routes -- --fixture tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json
+      - run: npm run build
+      - run: node dist/index.js --version && node dist/index.js --help
+      - run: npm pack --dry-run
+      - name: Package once from explicit captured state
+        run: npm run pack:release -- --release-state tests/fixtures/releases/previous-release-state.json
+      - run: node scripts/inspect-npm-pack.mjs dist-packages/fluentcart-mcp-*.tgz
+      - run: node scripts/inspect-mcpb.mjs dist-packages/fluentcart-mcp.mcpb
+      - run: git diff --exit-code -- package-lock.json package.json
+      - name: Record identity
         id: identity
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          DIGEST=$(node -p "require('./release-contract.json').sourceTreeDigest")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "source_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "artifact_name=${RELEASE_ARTIFACT_NAME}" >> "$GITHUB_OUTPUT"
-          {
-            echo "## Release artefacts"
-            echo ""
-            echo "Version \`$VERSION\` from \`${{ github.sha }}\`"
-            echo ""
-            echo '```json'
-            cat dist-packages/SHA256SUMS.json
-            echo '```'
-          } >> $GITHUB_STEP_SUMMARY
-
-      # Immutable handoff. Every publication job consumes these bytes and their digests.
-      - name: Upload release artefacts
-        uses: actions/upload-artifact@v4
+          echo "source_tree_digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=${RELEASE_ARTIFACT_NAME}-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.RELEASE_ARTIFACT_NAME }}
-          path: fluentcart-mcp/dist-packages/
+          name: ${{ steps.identity.outputs.artifact_name }}
+          path: |
+            fluentcart-mcp/dist-packages/
+            fluentcart-mcp/scripts/smoke-public-stdio.mjs
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 14

@@ -25,8 +25,8 @@ const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
 
 /**
  * Acceptance measurements taken on 2026-07-27 against this tree, under the measurement fixture's
- * guarded write mode with both guard prerequisites present — the widest registry any legitimate
- * configuration produces, so no mode's ceiling is understated.
+ * reversible write mode — the widest public registry any legitimate configuration produces, so
+ * no mode's ceiling is understated.
  *
  * Only the three gated modes are pinned. Full mode is measured and reported but never gated, and
  * every edit to any of a couple of hundred tool descriptions moves it — pinning it would turn this
@@ -34,11 +34,7 @@ const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
  *
  * ## Re-recorded 2026-07-27, later the same day. Both moves are deliberate and cheaper.
  *
- * `dynamic` 5 tools / 863 cl100k → 4 / 688, about 20% off the definition payload. The guarded
- * executor is no longer registered unconditionally: every real-money tool ships `execution: 'none'`
- * in 2.0.0, so it could only ever answer "not exposed" while advertising `destructiveHint: true`.
- * It returns automatically the moment a guard-wired action is exposed, and the count returns with
- * it.
+ * Dynamic has four tools in reversible mode: discovery, a read executor and a reversible executor.
  *
  * `curated` 20 tools / 3,652 cl100k → 19 / 4,146. Four raw report passthroughs were replaced by the
  * three contract-backed reports. Two of the four could not answer at all — `/reports/sales-growth`
@@ -48,7 +44,7 @@ const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
  * descriptions; that is the trade, and it is the right way round.
  */
 const ACCEPTED = {
-	dynamic: { toolCount: 4, cl100kTokens: 688, o200kTokens: 699 },
+	dynamic: { toolCount: 4, cl100kTokens: 662, o200kTokens: 673 },
 	// 4,146 → 4,182 on 2026-07-28: `dashboard_overview` now states that its figures cover a fixed
 	// 30-day window. It read as all-time before, which is the kind of description that produces a
 	// confidently wrong answer rather than a missing one. 36 tokens is a fair price for that.
@@ -137,8 +133,8 @@ const ACCEPTED = {
 	// the registry does, and it is the whole answer to "find the green shirt": `search=Green` returns
 	// the seven products whose only green thing is a variant name. Undocumented, that capability may
 	// as well not exist. Both are pinned in tests/integration/scenarios-products.test.ts.
-	curated: { toolCount: 19, cl100kTokens: 4946, o200kTokens: 5044 },
-	code: { toolCount: 2, cl100kTokens: 532, o200kTokens: 540 },
+	curated: { toolCount: 19, cl100kTokens: 4832, o200kTokens: 4930 },
+	code: { toolCount: 2, cl100kTokens: 520, o200kTokens: 528 },
 }
 
 /** Above this, a move is a decision that needs writing down, not a rounding error. */
@@ -268,7 +264,7 @@ describe('regression against the verified dynamic baseline', () => {
 		const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'))
 		const widest = contract.profiles.find(
 			(profile) =>
-				profile.name === 'core-1.5.5-pro-1.5.4-standalone-guarded' && profile.status === 'MEASURED',
+				profile.name === 'core-1.5.5-pro-1.5.4-rest-reversible' && profile.status === 'MEASURED',
 		)
 
 		assert.ok(widest, 'the widest measured profile is absent from the release contract')
@@ -295,8 +291,8 @@ describe('release contract agreement', () => {
 		assert.equal(contract.serializer, SERIALIZER)
 		assert.equal(contract.tokenizer, TOKENIZER)
 
-		// The measurement fixture uses guarded mode with both prerequisites, whose registry equals
-		// the reversible profile's, so that row is the one these fresh numbers must agree with.
+		// The measurement fixture uses reversible mode, so that profile is the one these fresh
+		// numbers must agree with.
 		// Only the gated modes are compared: full mode is reported, not published as a budget, and
 		// `scripts/build-release-contract.mjs --check` owns whole-contract freshness.
 		const profile = contract.profiles.find(

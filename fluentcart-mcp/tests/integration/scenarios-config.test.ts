@@ -115,7 +115,10 @@ const SCENARIOS: Scenario[] = [
 		id: 'config/who-manages',
 		question: 'Who has admin access to the shop?',
 		discovery: { query: 'shop managers', expect: 'fluentcart_role_managers' },
-		budget: 400,
+		// The Abilities-on lane deliberately adds one short-lived accountant while this sweep
+		// runs. Keep the payload bounded without making the separate-principal proof fight the
+		// response-size proof.
+		budget: 600,
 		run: async (ctx) => {
 			const { body } = await ok(ctx, 'fluentcart_role_managers')
 			const managers = (body.managers ?? []) as unknown[]

@@ -37,14 +37,17 @@ Options:
   --mode <dynamic|curated|code|full>  Toolset mode (default: dynamic)
   --port <number>             HTTP server port (default: 3000)
   --host <address>            HTTP server bind address (default: 127.0.0.1)
-
-Binding a non-loopback address requires FLUENTCART_MCP_API_KEY (32+ characters);
-the server refuses to start otherwise.
+  --http-profile <local|private>  HTTP exposure profile (default: local)
+  --allowed-hosts <host,...>  Private profile Host allowlist (hostnames only)
+  --allowed-origins <host,...>  Private profile Origin allowlist (hostnames only)
 
 Environment variables:
   FLUENTCART_URL              WordPress site URL
   FLUENTCART_USERNAME         WordPress username
   FLUENTCART_APP_PASSWORD     WordPress Application Password
+  FLUENTCART_MCP_API_KEY      Private HTTP bearer key (32+ UTF-8 bytes)
+  FLUENTCART_MCP_ALLOWED_HOSTS  Private Host allowlist (comma-separated hostnames)
+  FLUENTCART_MCP_ALLOWED_ORIGINS  Private Origin allowlist (comma-separated hostnames)
 
 Documentation: https://github.com/vcode-sh/fchub-plugins/tree/main/fluentcart-mcp
 `)
@@ -64,25 +67,43 @@ if (transport === 'stdio' && args.length > 0 && !args[0]!.startsWith('--')) {
 if (transport === 'http') {
 	const port = Number.parseInt(getFlag('port', '3000'), 10)
 	const host = getFlag('host', '127.0.0.1')
+	const profile = getFlag('http-profile', 'local')
+	const allowedHosts = getFlag('allowed-hosts', process.env.FLUENTCART_MCP_ALLOWED_HOSTS ?? '')
+	const allowedOrigins = getFlag(
+		'allowed-origins',
+		process.env.FLUENTCART_MCP_ALLOWED_ORIGINS ?? '',
+	)
 	const { startHttpServer } = await import('./transport/http.js')
+	const { parseHttpProfile, resolveHttpExposure } = await import('./transport/http-config.js')
+	const { installSignalShutdown } = await import('./transport/lifecycle.js')
 	try {
-		await startHttpServer(port, host, mode)
+		const exposure = resolveHttpExposure({
+			profile: parseHttpProfile(profile),
+			host,
+			...(allowedHosts !== '' && { allowedHosts: allowedHosts.split(',') }),
+			...(allowedOrigins !== '' && { allowedOrigins: allowedOrigins.split(',') }),
+			bearerKey: process.env.FLUENTCART_MCP_API_KEY,
+		})
+		const handle = await startHttpServer(port, exposure, mode)
+		installSignalShutdown(handle)
 	} catch (error) {
 		// A refused exposure is a configuration answer, not a crash. Print the reason only.
 		console.error(error instanceof Error ? error.message : String(error))
 		process.exit(1)
 	}
 } else {
-	const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js')
-	const { createServerFromContextAsync, resolveServerContextAsync } = await import('./server.js')
+	const { serveStdio } = await import('@modelcontextprotocol/server/stdio')
+	const { createMcpServerFactory, resolveRuntimeContext } = await import('./server.js')
+	const { installSignalShutdown, reportOperationalError } = await import('./transport/lifecycle.js')
 
 	try {
-		// Discover the store's real routes before any transport is connected, so a store that
-		// cannot describe itself produces a startup error rather than a half-working session.
-		const context = await resolveServerContextAsync()
-		const server = await createServerFromContextAsync(context, mode)
-		const stdioTransport = new StdioServerTransport()
-		await server.connect(stdioTransport)
+		const runtime = await resolveRuntimeContext(mode)
+		const factory = createMcpServerFactory(runtime, mode)
+		const handle = serveStdio(factory, {
+			legacy: 'serve',
+			onerror: reportOperationalError,
+		})
+		installSignalShutdown(handle)
 	} catch (error) {
 		// Nothing is connected yet, so this line is the entire failure report the user gets — in a
 		// desktop client it is the whole crash log. Say what could not be done, not just what threw.

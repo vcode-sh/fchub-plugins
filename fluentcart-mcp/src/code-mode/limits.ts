@@ -45,6 +45,8 @@ export const CODE_MODE_LIMITS = {
 } as const satisfies ResolvedLimits
 
 export type CodeModeErrorCode =
+	/** The owning MCP request was cancelled before execution completed. */
+	| 'EXECUTION_CANCELLED'
 	/** Source exceeded `maxSourceCharacters`. */
 	| 'SOURCE_TOO_LARGE'
 	/** Source contained a module-loading construct that the sandbox refuses to run. */

@@ -209,8 +209,8 @@ describe('stock tracking toggle', () => {
 })
 
 describe('categories and brands', () => {
-	it('assigns a set of terms and puts the previous set back', async () => {
-		if (termIds.length < 2) return // Store has no category vocabulary to assign.
+	it('assigns a set of terms and puts the previous set back', async ({ skip }) => {
+		if (termIds.length < 2) skip('the live store has fewer than two product category terms')
 		const productId = await createOwnedProduct('taxonomy')
 		const before = await snapshot(productId)
 
@@ -232,8 +232,8 @@ describe('categories and brands', () => {
 		expect((await snapshot(productId)).categories).toEqual(before.categories)
 	})
 
-	it('removes one term without disturbing the others, and can restore it', async () => {
-		if (termIds.length < 2) return
+	it('removes one term without disturbing the others, and can restore it', async ({ skip }) => {
+		if (termIds.length < 2) skip('the live store has fewer than two product category terms')
 		const productId = await createOwnedProduct('taxonomy-one')
 
 		await call('fluentcart_product_taxonomy_sync', {
@@ -262,10 +262,10 @@ describe('categories and brands', () => {
 		)
 	})
 
-	it('leaves the term itself in the store after unassigning it', async () => {
+	it('leaves the term itself in the store after unassigning it', async ({ skip }) => {
 		// The distinction that makes these reversible: the assignment changes, the vocabulary does
 		// not. If unassigning destroyed the term, restoring it would be impossible.
-		if (termIds.length < 1) return
+		if (termIds.length < 1) skip('the live store has no product category term')
 		const productId = await createOwnedProduct('taxonomy-vocab')
 
 		await call('fluentcart_product_taxonomy_sync', {

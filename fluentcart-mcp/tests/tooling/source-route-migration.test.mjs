@@ -27,9 +27,6 @@ const LEGACY_ONLY = new Set([
 	'POST /options/attr/group/{param}/term/{param}/serial',
 ])
 
-/** Modules owned by other workstreams; their tools are reported, never asserted. */
-const NOT_YET_MIGRATED = new Set(['orders-refunds.ts', 'subscriptions-cancellation.ts'])
-
 function canonical(path) {
 	const withParams = path
 		.replace(/:[A-Za-z_][A-Za-z0-9_]*/g, '{param}')
@@ -100,7 +97,6 @@ const modules = readdirSync(toolsDir)
 	.filter(({ blocks }) => blocks.length > 0)
 
 const allTools = modules.flatMap(({ file, blocks }) => blocks.map((block) => ({ ...block, file })))
-const auditable = allTools.filter((tool) => !NOT_YET_MIGRATED.has(tool.file))
 
 describe('source route migration', () => {
 	it('finds the tool registry in source', () => {
@@ -116,7 +112,7 @@ describe('source route migration', () => {
 		// An endpoint-factory tool derives its metadata from the `endpoint` it already declares,
 		// so it cannot drift. A hand-written handler has to say where it goes: nothing else can
 		// know, and an undeclared route is exactly the implicit routing this migration removes.
-		const undeclared = auditable
+		const undeclared = allTools
 			.filter((tool) => tool.factory === 'create' && !/\broutes:/.test(tool.body))
 			.map((tool) => `${tool.name} (${tool.file})`)
 			.sort()
@@ -129,7 +125,7 @@ describe('source route migration', () => {
 	})
 
 	it('leaves no endpoint tool without an endpoint', () => {
-		const undeclared = auditable
+		const undeclared = allTools
 			.filter((tool) => tool.factory !== 'create' && !/\bendpoint:/.test(tool.body))
 			.map((tool) => `${tool.name} (${tool.file})`)
 			.sort()
@@ -145,7 +141,7 @@ describe('source route migration', () => {
 		// of a branch that formats a legacy body one way and a current body another — reach one
 		// route between them, and counting them as two would force a false `composite`.
 		const misdeclared = []
-		for (const tool of auditable) {
+		for (const tool of allTools) {
 			if (tool.factory !== 'create') continue
 
 			const targets = new Set(
@@ -166,7 +162,6 @@ describe('source route migration', () => {
 	it('declares only routes the current store serves, or a documented legacy fallback', () => {
 		const unknown = []
 		for (const { file, blocks } of modules) {
-			if (NOT_YET_MIGRATED.has(file)) continue
 			for (const block of blocks) {
 				for (const [, method, path] of block.body.matchAll(
 					/(?:direct|composite|op)\('(GET|POST|PUT|PATCH|DELETE)', '([^']+)'/g,

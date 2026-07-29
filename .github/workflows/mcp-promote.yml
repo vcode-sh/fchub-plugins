@@ -1,0 +1,116 @@
+# Owner-only release promotion. This workflow re-verifies public staged bytes and retags them;
+# it contains no checkout, dependency install, compile, package or image build.
+name: MCP Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact staged version.'
+        required: true
+        type: string
+      source_sha:
+        description: 'Exact committed source SHA from staging.'
+        required: true
+        type: string
+      staging_run_id:
+        description: 'Run containing immutable staging evidence.'
+        required: true
+        type: string
+
+concurrency:
+  group: mcp-promote-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  GHCR_IMAGE: ghcr.io/vcode-sh/fluentcart-mcp
+  DOCKERHUB_IMAGE: vcodesh/fluentcart-mcp
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: mcp-production
+    permissions:
+      actions: read
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+          registry-url: https://registry.npmjs.org
+      - name: Verify reviewed release toolchain
+        run: |
+          test "$(node --version)" = "v24.13.0"
+          test "$(npm --version)" = "11.6.2"
+      - name: Download exact staging evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: fluentcart-mcp-staging-${{ inputs.version }}
+          run-id: ${{ inputs.staging_run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify every downloaded byte and embedded provenance
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          node -e "const s=require('./staging-state.json'); if(s.version!==process.env.VERSION||s.sourceSha!==process.env.SOURCE_SHA) throw Error('staging identity mismatch')"
+          test -f verification/scripts/inspect-npm-pack.mjs
+          test -f verification/scripts/inspect-mcpb.mjs
+          node verification/scripts/verify-staged-release.mjs --root .
+      - name: Verify public npm integrity
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          EXPECTED=$(node -p "require('./staging-state.json').npmIntegrity")
+          ACTUAL=$(npm view "fluentcart-mcp@${VERSION}" dist.integrity --json | tr -d '"')
+          test "$ACTUAL" = "$EXPECTED"
+      - name: Verify versioned Docker digests
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          GHCR_EXPECTED=$(node -p "require('./staging-state.json').dockerDigests['ghcr.io']")
+          DOCKERHUB_EXPECTED=$(node -p "require('./staging-state.json').dockerDigests['docker.io']")
+          GHCR_ACTUAL=$(docker buildx imagetools inspect "${GHCR_IMAGE}:${VERSION}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          DOCKERHUB_ACTUAL=$(docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:${VERSION}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          test "$GHCR_ACTUAL" = "$GHCR_EXPECTED"
+          test "$DOCKERHUB_ACTUAL" = "$DOCKERHUB_EXPECTED"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Promote npm and the same Docker digests
+        env:
+          VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PROMOTION_TOKEN }}
+        run: |
+          npm dist-tag add "fluentcart-mcp@${VERSION}" latest
+          GHCR_DIGEST=$(node -p "require('./staging-state.json').dockerDigests['ghcr.io']")
+          DOCKERHUB_DIGEST=$(node -p "require('./staging-state.json').dockerDigests['docker.io']")
+          docker buildx imagetools create --tag "${GHCR_IMAGE}:latest" "${GHCR_IMAGE}@${GHCR_DIGEST}"
+          docker buildx imagetools create --tag "${DOCKERHUB_IMAGE}:latest" "${DOCKERHUB_IMAGE}@${DOCKERHUB_DIGEST}"
+      - name: Publish GitHub Release from staged bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "fluentcart-mcp/v${VERSION}" \
+            --repo "${{ github.repository }}" \
+            --title "fluentcart-mcp v${VERSION}" \
+            --generate-notes \
+            "fluentcart-mcp.mcpb" \
+            "fluentcart-mcp-${VERSION}.tgz" \
+            "SHA256SUMS.json" \
+            "release-contract.json"
+      - name: Remove temporary npm tag
+        env:
+          VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PROMOTION_TOKEN }}
+        run: |
+          test "$(npm view fluentcart-mcp dist-tags.next)" = "$VERSION"
+          npm dist-tag rm fluentcart-mcp next

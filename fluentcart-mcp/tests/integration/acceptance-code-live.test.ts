@@ -1,12 +1,11 @@
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client'
+
 // Code Mode composition against a live store.
 //
 // The isolation attack matrix lives in tests/acceptance/code-sandbox.test.mjs and runs offline.
 // What can only be proven here is the other half of the claim: that the sandbox genuinely reaches
 // the read API, composes several calls into one answer without a round trip per call, and still
 // cannot write — not even when the surrounding policy has writes switched on.
-
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildApiIndex } from '../../src/code-mode/api-index.js'
 import { CODE_MODE_LIMITS } from '../../src/code-mode/limits.js'

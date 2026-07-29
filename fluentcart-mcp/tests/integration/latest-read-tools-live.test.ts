@@ -52,7 +52,7 @@ describe('latest FluentCart 1.5.5 read tools', () => {
 		expect(Object.keys(body).sort()).toEqual([
 			'configured',
 			'e_invoice_enabled',
-			'profile',
+			'e_invoice_profile',
 			'store_country_configured',
 		])
 		const serialised = text(body)

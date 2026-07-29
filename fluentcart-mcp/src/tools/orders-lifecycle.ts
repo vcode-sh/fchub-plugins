@@ -61,10 +61,6 @@ export function orderLifecycleTools(client: FluentCartClient): ToolDefinition[] 
 			},
 		}),
 
-		// fluentcart_order_refund lives in orders-refunds.ts. It moves real money, so it needs a
-		// signed preview, a state fingerprint and a durable idempotency claim — none of which a
-		// plain endpoint handler can offer.
-
 		createTool(client, {
 			name: 'fluentcart_order_update_statuses',
 			routes: composite(op('GET', '/orders/{param}'), op('PUT', '/orders/{param}/statuses')),

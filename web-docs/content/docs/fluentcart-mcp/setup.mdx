@@ -9,7 +9,7 @@ import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-Five minutes. Generate a password in WordPress, paste a config snippet into your AI client, done. Three paths depending on how much you enjoy terminals.
+Five minutes. Generate a password in WordPress, paste a config snippet into your AI client, then verify its connection. Three paths depending on how much you enjoy terminals.
 
 ## Generate an Application Password
 
@@ -62,7 +62,9 @@ Three ways to connect, from easiest to most manual.
 <Tabs items={['Claude Desktop Extension', 'Setup Wizard', 'Manual Config']}>
 <Tab value="Claude Desktop Extension">
 
-No terminal. No JSON. No Node.js. Download a file, double-click it, fill in three fields.
+No terminal configuration and no JSON editing. Node.js 24+ is still required because the extension
+launches the Node server declared in its manifest. Download a file, double-click it, fill in three
+fields.
 
 **1. Download <McpbDownload />** from the latest release.
 
@@ -72,7 +74,7 @@ No terminal. No JSON. No Node.js. Download a file, double-click it, fill in thre
 
 **4. Open a new chat** and try: *"Show me today's orders"*
 
-See store data? Done.
+See store data? The Claude Desktop configuration is in place.
 
 <Callout type="info" title="Claude Desktop Only">
 The extension only works with Claude Desktop. For other AI clients, use the Setup Wizard or Manual Config tabs.
@@ -135,6 +137,10 @@ Where to paste this depends on your client — see the Manual Config tab for the
 <Tab value="Manual Config">
 
 Full control. You'll need **Node.js 24+** installed (`node --version` to check — grab it from [nodejs.org](https://nodejs.org) if needed).
+
+These are configuration recipes, not client certification claims. Apply them only in the profile
+you intend to use. Candidate checks exercise MCP Inspector and Claude Code over stdio and HTTP,
+plus the Docker HTTP image. Docker remains a deployment recipe, and ChatGPT is deployment guidance.
 
 Pick your AI client below:
 
@@ -266,30 +272,24 @@ Save. Windsurf picks up the change automatically.
 </Tab>
 <Tab value="Codex CLI">
 
-**Add to** `~/.codex/config.json`:
+**Run:**
 
-```json
-{
-  "mcpServers": {
-    "fluentcart": {
-      "command": "npx",
-      "args": ["-y", "fluentcart-mcp"],
-      "env": {
-        "FLUENTCART_URL": "https://your-store.com",
-        "FLUENTCART_USERNAME": "admin",
-        "FLUENTCART_APP_PASSWORD": "aBcD eFgH iJkL mNoP qRsT uVwX"
-      }
-    }
-  }
-}
+```bash
+codex mcp add fluentcart \
+  --env FLUENTCART_URL=https://your-store.com \
+  --env FLUENTCART_USERNAME=admin \
+  --env FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
+  -- npx -y fluentcart-mcp
 ```
 
-Start a Codex session and ask about your store.
+Codex stores MCP configuration in `~/.codex/config.toml`. Start a new session and ask about your
+store.
 
 </Tab>
 <Tab value="Docker">
 
-For a persistent endpoint that remote clients (ChatGPT, custom agents, other machines) can reach. No Node.js needed.
+For a persistent endpoint that remote clients can reach. Docker supplies the Node runtime, but the
+private HTTP profile still requires an API key plus Host and Origin allowlists.
 
 ```bash
 docker run -d \
@@ -298,6 +298,8 @@ docker run -d \
   -e FLUENTCART_USERNAME=admin \
   -e FLUENTCART_APP_PASSWORD="aBcD eFgH iJkL mNoP qRsT uVwX" \
   -e FLUENTCART_MCP_API_KEY="$(openssl rand -hex 32)" \
+  -e FLUENTCART_MCP_ALLOWED_HOSTS=localhost,mcp.your-domain.com \
+  -e FLUENTCART_MCP_ALLOWED_ORIGINS=localhost,mcp.your-domain.com \
   --name fluentcart-mcp \
   vcodesh/fluentcart-mcp
 ```
@@ -307,7 +309,10 @@ Your endpoint is at `http://localhost:3000/mcp`. Verify with `curl http://localh
 For remote access, put it behind a reverse proxy or Cloudflare Tunnel — the [Deployment Guide](/docs/fluentcart-mcp/deployment) covers the details.
 
 <Callout type="warn" title="FLUENTCART_MCP_API_KEY is not optional here">
-The container binds beyond loopback, so the server checks the bearer key before it listens and exits with an error if the key is missing or shorter than 32 characters. A container that keeps restarting with `Refusing to bind 0.0.0.0` in its logs is telling you exactly this. Generate one properly — `openssl rand -hex 32` — and keep it out of your shell history.
+The container binds beyond loopback, so the server checks the bearer key and both allowlists before
+it listens. Replace `mcp.your-domain.com` with the hostname exposed by your proxy or tunnel. A
+missing key, short key or missing allowlist makes the process exit rather than opening an incomplete
+private profile.
 </Callout>
 
 </Tab>
@@ -322,16 +327,22 @@ The container binds beyond loopback, so the server checks the bearer key before 
 
 Two independent switches. Neither has to be touched to get a working read-only server, which is why none of the configs above mention them.
 
-**`--mode`** decides how the tool definitions are presented. The default is `dynamic`: five meta-tools your AI uses to search the catalogue, read the schema of whatever it found, and then execute it. Every other mode draws from the same filtered registry, so no mode can widen what is exposed.
+**`--mode`** decides how tool definitions are presented. The default is `dynamic`: three compact
+read tools search the catalogue, describe a result and execute it. Enabling reversible writes adds
+one write executor, for four tools in total. Every other mode draws from the same filtered registry,
+so no mode can widen what is exposed.
 
 | Mode | What your AI sees |
 |---|---|
-| `dynamic` *(default)* | Five meta-tools: `fluentcart_search_tools`, `fluentcart_describe_tools`, `fluentcart_execute_read_tool`, `fluentcart_execute_reversible_write`, `fluentcart_execute_guarded_write` |
+| `dynamic` *(default)* | Three read tools; four when reversible writes are enabled |
 | `curated` | A hand-picked shortlist of the tools most workflows actually need |
 | `code` | Two tools over a read-only WebAssembly sandbox: `fluentcart_search_api` and `fluentcart_execute_code` |
 | `full` | Every exposed definition registered up front |
 
-**`FLUENTCART_WRITE_MODE`** decides what is in that registry at all. It defaults to `disabled` — reads only. `reversible` adds the writes that can be undone: creating and updating products, variants, coupons, customers, shipping rules, tax rules, attributes and order bumps. `guarded` is accepted and exposes exactly the same set in 2.0.0, because the two tools it exists for are not available in this release — see [No refunds or cancellations](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0).
+**`FLUENTCART_WRITE_MODE`** decides what is in that registry at all. It accepts `disabled` or
+`reversible` and defaults to `disabled` — reads only. `reversible` adds creating and updating
+products, variants, coupons, customers, shipping rules, tax rules, attributes and order bumps.
+Refunds and subscription cancellation are not product tools in 2.0.0.
 
 Deletions, bulk operations, order status changes, marking an order paid and anything that moves money are not exposed in any mode. FluentCart offers no supported way to undo them, so they are not classed as reversible. See the [Tool Reference](/docs/fluentcart-mcp/tools) for the full picture.
 
@@ -394,7 +405,7 @@ Ask your AI:
 
 > "Show me the FluentCart dashboard stats"
 
-See store data? You're done. If not, head to [Troubleshooting](/docs/fluentcart-mcp/troubleshooting).
+See store data? That client has completed a live connection. If not, head to [Troubleshooting](/docs/fluentcart-mcp/troubleshooting).
 
 ## Next Steps
 
@@ -403,6 +414,6 @@ See store data? You're done. If not, head to [Troubleshooting](/docs/fluentcart-
     What to say to your AI now that it's connected. Example prompts for every category.
   </Card>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    Every tool definition in this release, by module — and what each mode costs in context.
+    What the default surface exposes, what reversible mode adds, and what stays absent.
   </Card>
 </Cards>

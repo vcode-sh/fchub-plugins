@@ -5,6 +5,9 @@ import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+const packageJson = JSON.parse(
+	readFileSync(resolve(repoRoot, 'fluentcart-mcp/package.json'), 'utf8'),
+)
 
 const ci = readFileSync(resolve(repoRoot, '.github/workflows/mcp-ci.yml'), 'utf8')
 const release = readFileSync(resolve(repoRoot, '.github/workflows/mcp-release.yml'), 'utf8')
@@ -29,6 +32,14 @@ describe('workflow test lanes', () => {
 
 	it('runs the Node tooling contract lane in CI', () => {
 		assert.match(ci, /npm run test:tooling/)
+	})
+
+	it('builds before the parallel tooling runner can import compiled contracts', () => {
+		assert.match(
+			packageJson.scripts['test:tooling'],
+			/^npm run build && node --test /,
+			'test:tooling must create dist before any Node test worker starts',
+		)
 	})
 
 	it('runs the Node tooling contract lane during release validation', () => {

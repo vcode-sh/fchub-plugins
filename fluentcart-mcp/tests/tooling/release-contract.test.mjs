@@ -16,16 +16,15 @@ const pkg = readJson('package.json')
 const manifest = readJson('manifest.json')
 
 const MODE_KEYS = ['toolCount', 'characters', 'cl100kTokens', 'o200kTokens']
-const WRITE_MODES = ['disabled', 'reversible', 'guarded']
+const WRITE_MODES = ['disabled', 'reversible']
 const LEGACY_RUNTIME_FIXTURE = 'tests/fixtures/routes/fluentcart-1.3.9-runtime.json'
 
-/** The five mandatory rows, in order. */
+/** The four mandatory rows, in order. */
 const MANDATORY_PROFILES = [
 	'legacy-1.3.9-runtime-rest-disabled',
 	'core-1.5.5-rest-disabled',
 	'core-1.5.5-pro-1.5.4-rest-disabled',
 	'core-1.5.5-pro-1.5.4-rest-reversible',
-	'core-1.5.5-pro-1.5.4-standalone-guarded',
 ]
 
 /**
@@ -33,9 +32,6 @@ const MANDATORY_PROFILES = [
  * gate is `build-release-contract.mjs --check`.
  *
  * Dynamic is three under the disabled policy and four when reversible writes survive filtering.
- * The guarded executor remains conditional on a real-money tool surviving the same filter.
- * Advertising an executor that can only answer "not exposed" would claim a capability the
- * connected policy does not provide.
  */
 function expectedMetaToolCount(profile, mode) {
 	if (mode === 'code') return 2
@@ -45,9 +41,9 @@ function expectedMetaToolCount(profile, mode) {
 
 /** A profile is measurable only when every fixture it declares is actually on disk. */
 function fixturesPresent(profile) {
-	return [profile.componentFixture, profile.guardFixture]
-		.filter((path) => path !== null)
-		.every((path) => existsSync(join(PACKAGE_ROOT, path.split('/').join(sep))))
+	return [profile.componentFixture].every((path) =>
+		existsSync(join(PACKAGE_ROOT, path.split('/').join(sep))),
+	)
 }
 
 function profileNamed(name) {
@@ -98,6 +94,32 @@ describe('release contract source digest', () => {
 		assert.doesNotMatch(rawContract, /"(gitSha|commit|sourceSha|revision)"/i)
 		assert.equal(rawContract, `${JSON.stringify(contract, null, 2)}\n`)
 	})
+
+	it('binds the response-contract generator and value-free REST evidence', () => {
+		assert.ok(contract.sourceTreeInputs.declared.some((input) => input.directory === 'scripts'))
+		assert.ok(
+			contract.sourceTreeInputs.declared.some((input) => input.directory === 'tests/fixtures'),
+		)
+		assert.ok(
+			contract.sourceTreeInputs.declared.some(
+				(input) => input.file === 'compatibility-support.json',
+			),
+		)
+	})
+})
+
+describe('optional native abilities evidence', () => {
+	it('records the measured 1.5.5 catalogue and read-only admission boundary', () => {
+		const bridge = contract.abilitiesBridge
+		assert.equal(bridge.status, 'MEASURED')
+		assert.equal(bridge.capturedCatalogueSize, 33)
+		assert.equal(bridge.auditedReadCount, 26)
+		assert.equal(bridge.writeCount, 7)
+		assert.equal(bridge.executionMethod, 'POST')
+		assert.equal(bridge.executionMethodEvidence.getStatus, 405)
+		assert.equal(bridge.executionMethodEvidence.postStatus, 200)
+		assert.equal(bridge.adapter.status, 'BLOCKED')
+	})
 })
 
 describe('release contract registry counts', () => {
@@ -106,19 +128,8 @@ describe('release contract registry counts', () => {
 		assert.ok(contract.sourceDefinitionCount > 0)
 		assert.ok(exposure.disabled > 0)
 		assert.ok(exposure.disabled < exposure.reversible, 'writes must widen exposure')
-		assert.ok(exposure.guarded <= contract.sourceDefinitionCount)
+		assert.ok(exposure.reversible <= contract.sourceDefinitionCount)
 		assert.equal(contract.categoryCount, 20)
-	})
-
-	/**
-	 * Guarded may only exceed reversible by the real-money rows actually wired to `guarded-rest`.
-	 * Stated as an identity rather than two pinned totals, so it keeps holding as those rows are
-	 * built out — and still catches a guarded mode that quietly exposed something else.
-	 */
-	it('lets guarded exceed reversible by exactly the guarded-rest rows', () => {
-		const exposure = contract.writePolicyExposure
-		assert.equal(exposure.guarded - exposure.reversible, exposure.realMoneyExposable)
-		assert.ok(exposure.realMoneyExposable >= 0)
 	})
 
 	it('accounts for every curated name, resolvable or not', () => {
@@ -135,7 +146,7 @@ describe('release contract registry counts', () => {
 })
 
 describe('release contract profiles', () => {
-	it('emits all five mandatory rows, in order, measuring 1.3.9 against a real runtime', () => {
+	it('emits all mandatory rows, in order, measuring 1.3.9 against a real runtime', () => {
 		assert.deepEqual(
 			contract.profiles.map((profile) => profile.name),
 			MANDATORY_PROFILES,
@@ -175,7 +186,7 @@ describe('blocked profiles', () => {
 
 	it('names a fixture that is genuinely absent, never one sitting on disk', () => {
 		for (const profile of blocked()) {
-			const declared = [profile.componentFixture, profile.guardFixture, LEGACY_RUNTIME_FIXTURE]
+			const declared = [profile.componentFixture, LEGACY_RUNTIME_FIXTURE]
 			assert.ok(declared.includes(profile.missingFixture), profile.name)
 		}
 	})
@@ -290,5 +301,25 @@ describe('legacy 1.3.9 runtime support', () => {
 				assert.match(line, disclaimer, `${page} mentions 1.3.9 without disclaiming support`)
 			}
 		}
+	})
+})
+
+describe('current user-facing contract notes', () => {
+	it('documents report timezone labels and the non-identity seller profile precisely', () => {
+		const toolsPage = join(
+			PACKAGE_ROOT,
+			'..',
+			'web-docs',
+			'content',
+			'docs',
+			'fluentcart-mcp',
+			'tools.mdx',
+		)
+		if (!existsSync(toolsPage)) return
+
+		const prose = readFileSync(toolsPage, 'utf8')
+		assert.match(prose, /timezone is optional and echoed/i)
+		assert.match(prose, /e_invoice_profile.*ZUGFeRD\/Factur-X profile/i)
+		assert.match(prose, /not a seller identity profile/i)
 	})
 })

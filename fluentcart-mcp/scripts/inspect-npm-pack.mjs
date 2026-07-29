@@ -13,6 +13,11 @@ import { readFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gunzipSync } from 'node:zlib'
+import {
+	expectedReleaseIdentity,
+	PROVENANCE_PATH,
+	releaseIdentityFailures,
+} from './release-identity.mjs'
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const BLOCK = 512
@@ -31,6 +36,16 @@ const FORBIDDEN_PATTERNS = [
 	{ pattern: /(^|\/)(vitest|biome)\.[a-z]*$/, reason: 'development config' },
 	{ pattern: /(^|\/)tsconfig[^/]*\.json$/, reason: 'development config' },
 	{ pattern: /(^|\/)\.git($|\/)/, reason: 'repository metadata' },
+	{
+		pattern: /(^|\/)node_modules\/@modelcontextprotocol\/(sdk|conformance)\//,
+		reason: 'legacy or conformance-only module',
+	},
+]
+
+const SDK_V2 = [
+	'@modelcontextprotocol/server',
+	'@modelcontextprotocol/node',
+	'@modelcontextprotocol/express',
 ]
 
 /** Minimal ustar reader: enough to list entries, spot symlinks and read a small file. */
@@ -72,7 +87,7 @@ function withoutPrefix(name) {
 	return name.startsWith('package/') ? name.slice('package/'.length) : name
 }
 
-export function inspectNpmPack(archivePath) {
+export function inspectNpmPack(archivePath, options = {}) {
 	const raw = readFileSync(archivePath)
 	const entries = readTar(gunzipSync(raw))
 	const failures = []
@@ -111,6 +126,16 @@ export function inspectNpmPack(archivePath) {
 		if (parsed.version !== pkg.version) {
 			fail(`tarball package.json version ${parsed.version} does not match ${pkg.version}`)
 		}
+		if (parsed.engines?.node !== '>=24.0.0') fail('package requires an unexpected Node engine')
+		for (const name of SDK_V2) {
+			if (parsed.dependencies?.[name] !== '2.0.0') fail(`${name} is not pinned to 2.0.0`)
+		}
+		if (parsed.dependencies?.['@modelcontextprotocol/sdk']) {
+			fail('legacy @modelcontextprotocol/sdk is a direct runtime dependency')
+		}
+		if (parsed.dependencies?.['@modelcontextprotocol/conformance']) {
+			fail('@modelcontextprotocol/conformance is a runtime dependency')
+		}
 		// `devDependencies` stays in a published manifest — consumers never install it. What must
 		// not appear is dev dependency *code*, which the files allowlist check above covers.
 	}
@@ -119,11 +144,29 @@ export function inspectNpmPack(archivePath) {
 		fail('missing dist/index.js')
 	}
 
+	const provenanceEntry = files.find((entry) => withoutPrefix(entry.name) === PROVENANCE_PATH)
+	let provenance = null
+	if (provenanceEntry) {
+		try {
+			provenance = JSON.parse(provenanceEntry.data.toString('utf8'))
+		} catch {
+			fail(`invalid JSON in ${PROVENANCE_PATH}`)
+		}
+	}
+	for (const finding of releaseIdentityFailures(
+		provenance,
+		options.expectedIdentity ?? expectedReleaseIdentity(),
+		options.invocationId,
+	)) {
+		fail(finding)
+	}
+
 	return {
 		archive: basename(archivePath),
 		version: pkg.version,
 		fileCount: files.length,
 		sha256: createHash('sha256').update(raw).digest('hex'),
+		provenance,
 		failures,
 	}
 }

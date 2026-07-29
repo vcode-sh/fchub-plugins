@@ -14,8 +14,8 @@
 		"exposed": 185,
 		"excluded": 201,
 		"deltaSince139": 61,
-		"tools": 289,
-		"declaredTools": 292,
+		"tools": 287,
+		"declaredTools": 290,
 		"withdrawnTools": 3,
 		"orphanToolRoutes": 4
 	},
@@ -3410,10 +3410,8 @@
 			"suppressedTools": [
 				"fluentcart_coupon_apply",
 				"fluentcart_coupon_cancel",
-				"fluentcart_order_refund",
 				"fluentcart_order_update",
-				"fluentcart_order_update_statuses",
-				"fluentcart_subscription_cancel"
+				"fluentcart_order_update_statuses"
 			]
 		},
 		{
@@ -3581,16 +3579,14 @@
 			"contractOrigin": "legacy-docs",
 			"routeDisposition": "excluded",
 			"toolExposures": [],
-			"reason": "Served only by fluentcart_order_refund, whose reviewed risk makes it non-executable, so no caller can reach this route.",
+			"reason": "No tool reaches this route and no reviewed candidate claims it. It remains unowned pending plan 06 Tasks 2 and 3.",
 			"risk": "read",
 			"schemaEvidence": [],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core.json#POST /orders/{param}/refund"
 			],
 			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_order_refund"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "PUT",
@@ -3625,16 +3621,14 @@
 			"contractOrigin": "legacy-docs",
 			"routeDisposition": "excluded",
 			"toolExposures": [],
-			"reason": "Served only by fluentcart_subscription_cancel, whose reviewed risk makes it non-executable, so no caller can reach this route.",
+			"reason": "No tool reaches this route and no reviewed candidate claims it. It remains unowned pending plan 06 Tasks 2 and 3.",
 			"risk": "read",
 			"schemaEvidence": [],
 			"permissionEvidence": [
 				"tests/fixtures/routes/fluentcart-1.5.5-core.json#PUT /orders/{param}/subscriptions/{param}/cancel"
 			],
 			"responseEvidence": [],
-			"suppressedTools": [
-				"fluentcart_subscription_cancel"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "POST",
@@ -3798,9 +3792,7 @@
 				"src/tools/orders-transactions.ts",
 				"src/tools/_factory.ts"
 			],
-			"suppressedTools": [
-				"fluentcart_order_refund"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",
@@ -8418,9 +8410,7 @@
 				"src/tools/subscriptions.ts",
 				"src/tools/_factory.ts"
 			],
-			"suppressedTools": [
-				"fluentcart_subscription_cancel"
-			]
+			"suppressedTools": []
 		},
 		{
 			"method": "GET",

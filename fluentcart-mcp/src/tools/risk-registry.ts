@@ -99,23 +99,10 @@ const REVERSIBLE_UPDATES = [
 /**
  * Moves money through a gateway. Shipped UNAVAILABLE in 2.0.0.
  *
- * The guard itself is complete and unit-tested — signed state-pinned previews, a durable
- * single-writer ledger, replay and conflict detection, and ambiguous-crash handling that never
- * auto-retries. What does not exist is acceptance evidence, and for a money-moving action that
- * distinction is the whole argument.
- *
- * Proving a refund end to end needs an order this run created, refunded and then removed. Four
- * verified FluentCart 1.5.5 limits make that impossible: there is no DELETE route for a
- * transaction; deleting an order does not cascade to its transactions; `canPurchase()` rejects
- * any non-published product, so no hidden draft fixture; and a run cannot create a subscription
- * at all. Any fixture capable of being refunded therefore leaves rows the API cannot remove.
- *
- * Plan 08's rule is that a guarded capability either passes both acceptance lanes or ships
- * unavailable. It cannot pass here, so `execution: 'none'` is the honest setting and the tools
- * are absent from every write mode. Restore `guarded-rest` when FluentCart exposes a way to
- * remove a test-mode charge and the guarded lanes can run for real.
+ * The public server deliberately does not implement money-moving operations. They remain
+ * classified for audit completeness, with `execution: 'none'`, and are absent in every mode.
  */
-const GUARDED_REAL_MONEY = ['fluentcart_order_refund', 'fluentcart_subscription_cancel']
+const UNAVAILABLE_REAL_MONEY = ['fluentcart_order_refund', 'fluentcart_subscription_cancel']
 
 /** Money-adjacent actions with no safe repeatable contract. Never executable. */
 const UNSUPPORTED_REAL_MONEY = [
@@ -261,10 +248,9 @@ const REGISTRY = new Map<string, ToolSafety>([
 		idempotency: 'inherent',
 		execution: 'rest',
 	}),
-	...rows(GUARDED_REAL_MONEY, {
+	...rows(UNAVAILABLE_REAL_MONEY, {
 		risk: 'real-money',
-		idempotency: 'guard-required',
-		// Unavailable in 2.0.0: built and unit-tested, never acceptance-proven. See above.
+		idempotency: 'unsupported',
 		execution: 'none',
 	}),
 	...rows(UNSUPPORTED_REAL_MONEY, {

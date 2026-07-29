@@ -155,9 +155,9 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		expect(busiestCurrency(), 'no countable order carried a currency').not.toBeNull()
 	})
 
-	it('counts exactly the orders the contract says it counts', async () => {
+	it('counts exactly the orders the contract says it counts', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 		const { from, to } = fullRange()
 
 		const expected = countedOrders(currency, from, to)
@@ -168,9 +168,9 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		expect(result.data.order_count).toBe(expected.length)
 	})
 
-	it('sums the same money the order list does', async () => {
+	it('sums the same money the order list does', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 		const { from, to } = fullRange()
 
 		const expectedMinor = countedOrders(currency, from, to).reduce(
@@ -186,9 +186,9 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		expect(result.data.gross_sales as number).toBeCloseTo(expectedMinor / 100, 2)
 	})
 
-	it('honours the caller date range rather than a fixed rolling window', async () => {
+	it('honours the caller date range rather than a fixed rolling window', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 		const { from, to } = fullRange()
 
 		// WARN_PRO claims the store silently substitutes a rolling 30-day window when Pro is
@@ -206,13 +206,13 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		expect(full.data.order_count as number).toBeGreaterThan(0)
 	})
 
-	it('scopes to the requested currency instead of summing across all of them', async () => {
+	it('scopes to the requested currency instead of summing across all of them', async ({ skip }) => {
 		const currencies = [
 			...new Set(
 				orders.filter((o) => COUNTED_STATUSES.has(o.payment_status)).map((o) => o.currency),
 			),
 		].filter((c) => c !== '')
-		if (currencies.length < 2) return // Single-currency store: nothing to mix up.
+		if (currencies.length < 2) return skip('the live store has fewer than two countable currencies')
 
 		const { from, to } = fullRange()
 		for (const currency of currencies) {
@@ -224,9 +224,9 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		}
 	})
 
-	it('returns trend buckets that add back up to the summary', async () => {
+	it('returns trend buckets that add back up to the summary', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 		const { from, to } = fullRange()
 
 		const summary = await salesSummary(client, { from, to, currency, timezone: TZ })
@@ -242,9 +242,9 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		expect(bucketed).toBe(summary.data.order_count)
 	})
 
-	it('admits when the store widened the bucket instead of claiming daily', async () => {
+	it('admits when the store widened the bucket instead of claiming daily', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 
 		// Deliberately wider than FluentCart's 91-day daily band, so the store auto-selects a
 		// coarser bucket. The tool used to present the result as daily regardless.
@@ -263,9 +263,9 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		expect(trend.data.length).toBeLessThan(100)
 	})
 
-	it('never asks for a group key the store would read as payment method', async () => {
+	it('never asks for a group key the store would read as payment method', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 
 		// The trap: FluentCart maps any unwhitelisted groupKey to payment_method, so a time series
 		// silently becomes a payment-method breakdown. Buckets must still look like dates.
@@ -283,13 +283,13 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		}
 	})
 
-	it('ranks top products the way the tool says it does', async () => {
+	it('ranks top products the way the tool says it does', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 		const { from, to } = fullRange()
 
 		const result = await topProducts(client, { from, to, currency, timezone: TZ })
-		if (result.data.length === 0) return // Nothing sold in range; nothing to order.
+		if (result.data.length === 0) return skip('the selected range has no sold products to rank')
 
 		// The tool tells callers the ranking is by units sold, not revenue, and warns them not to
 		// read it as a revenue league table. That claim is only safe if the order really is by
@@ -310,20 +310,22 @@ describe('revenue report semantics, reconciled against the order list', () => {
 		}
 	})
 
-	it('reports top-product revenue in the same units as the sales summary', async () => {
+	it('reports top-product revenue in the same units as the sales summary', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 		const { from, to } = fullRange()
 
 		const top = await topProducts(client, { from, to, currency, timezone: TZ })
-		if (top.data.length === 0) return
+		if (top.data.length === 0) return skip('the selected range has no product revenue to compare')
 		const summary = await salesSummary(client, { from, to, currency, timezone: TZ })
 
 		// Both are decimals, not minor units. If one silently switched, a single product would
 		// appear to out-earn the entire store by a factor of a hundred.
 		const best = Math.max(...top.data.map((row) => row.total_amount ?? 0))
 		const gross = summary.data.gross_sales
-		if (gross === null || gross === undefined || gross <= 0) return
+		if (gross === null || gross === undefined || gross <= 0) {
+			return skip('the selected range has no positive gross sales to compare')
+		}
 		expect(best).toBeLessThanOrEqual(gross * 1.01)
 	})
 
@@ -450,7 +452,7 @@ describe('subscription retention semantics, reconciled against the subscription 
 		expect(wide.length).toBeGreaterThan(narrow.length)
 	})
 
-	it('discards a currency argument, which is why it is not a metric', async () => {
+	it('discards a currency argument, which is why it is not a metric', async ({ skip }) => {
 		const scoped = async (currency: string) =>
 			JSON.stringify(
 				(
@@ -465,17 +467,19 @@ describe('subscription retention semantics, reconciled against the subscription 
 		const [first, second] = [...new Set(orders.map((order) => order.currency))].filter(
 			(currency) => currency !== '',
 		)
-		if (!(first && second)) return // Single-currency store: the claim cannot be tested here.
+		if (!(first && second)) {
+			return skip('the live store has fewer than two subscription currencies')
+		}
 
 		// Byte-identical answers for two different currencies is the proof the filter is dropped.
 		expect(await scoped(first)).toBe(await scoped(second))
 	})
 
-	it('reports the monthly equivalent of every countable subscription as MRR', async () => {
+	it('reports the monthly equivalent of every countable subscription as MRR', async ({ skip }) => {
 		const subscriptions = (await fetchSubscriptions()).filter(
 			(row) => !UNCOUNTED.has(row.status) && row.createdDay.length === 10,
 		)
-		if (subscriptions.length === 0) return // Nothing recurring: no figure to reconcile.
+		if (subscriptions.length === 0) return skip('the live store has no countable subscription')
 
 		// A month every countable subscription had already started and none had left.
 		const latestStart = subscriptions
@@ -485,13 +489,17 @@ describe('subscription retention semantics, reconciled against the subscription 
 		const stillRunning = subscriptions.filter(
 			(row) => row.canceledAt === null && row.expireAt === null,
 		)
-		if (stillRunning.length !== subscriptions.length) return // Churn in play; pick a simpler store.
+		if (stillRunning.length !== subscriptions.length) {
+			return skip(
+				'the live subscription cohort includes churn and cannot use this simple reconciliation',
+			)
+		}
 
 		const month = `${latestStart.slice(0, 7)}-01`
 		const rows = await retention(month, `${latestStart.slice(0, 7)}-28`)
 		const row = rows.at(-1)
 		expect(row, 'no bucket returned for the month every subscription was running').toBeDefined()
-		if (!row) return
+		if (!row) return skip('the retention report returned no matching monthly bucket')
 
 		const expectedMinor = subscriptions.reduce(
 			(sum, entry) => sum + monthlyEquivalent(entry.recurringMinor, entry.interval),
@@ -504,10 +512,10 @@ describe('subscription retention semantics, reconciled against the subscription 
 		)
 	})
 
-	it('reports mrr as a decimal string, not as minor units', async () => {
+	it('reports mrr as a decimal string, not as minor units', async ({ skip }) => {
 		const rows = await retention('2026-01-01', '2026-12-31')
 		const funded = rows.find((row) => Number(row.mrr) > 0)
-		if (!funded) return
+		if (!funded) return skip('the live retention report has no funded MRR bucket')
 
 		// future-renewals returns minor units from the same table; this route does not. Confusing
 		// the two overstates recurring revenue by a factor of a hundred.
@@ -517,9 +525,9 @@ describe('subscription retention semantics, reconciled against the subscription 
 })
 
 describe('trailing revenue checks', () => {
-	it('labels every trend bucket it returns', async () => {
+	it('labels every trend bucket it returns', async ({ skip }) => {
 		const currency = busiestCurrency()
-		if (!currency) return
+		if (!currency) return skip('the live store has no countable order currency')
 		const { from, to } = fullRange()
 
 		const trend = await salesTrend(client, {

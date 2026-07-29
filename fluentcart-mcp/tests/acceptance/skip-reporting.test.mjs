@@ -48,10 +48,13 @@ describe('a skipped test can never read as a pass', () => {
 				['records why the fixture cannot be owned', 'pass'],
 				['registers nothing for cleanup', 'pass'],
 				['the lane itself is inert', 'pass'],
-				['previews a guarded refund (BLOCKED: transaction rows cannot be cleaned up)', 'skipped'],
+				[
+					'previews an unavailable refund (BLOCKED: transaction rows cannot be cleaned up)',
+					'skipped',
+				],
 			]),
 		)
-		const verdict = classify(report, { exitCode: 0, proves: ['previews a guarded refund'] })
+		const verdict = classify(report, { exitCode: 0, proves: ['previews an unavailable refund'] })
 		assert.equal(verdict.status, 'BLOCKED')
 		assert.match(verdict.note, /transaction rows cannot be cleaned up/)
 		assert.equal(verdict.unproven.length, 1)
@@ -60,7 +63,7 @@ describe('a skipped test can never read as a pass', () => {
 	it('blocks when a declared proof is absent from the run entirely', () => {
 		// A renamed test must fail towards BLOCKED, never towards a pass nobody noticed.
 		const report = parseJunit(junit([['something unrelated', 'pass']]))
-		const verdict = classify(report, { exitCode: 0, proves: ['previews a guarded refund'] })
+		const verdict = classify(report, { exitCode: 0, proves: ['previews an unavailable refund'] })
 		assert.equal(verdict.status, 'BLOCKED')
 		assert.match(verdict.note, /declared proof is absent/)
 	})

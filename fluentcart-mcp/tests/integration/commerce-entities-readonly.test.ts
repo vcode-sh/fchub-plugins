@@ -68,9 +68,9 @@ function expectNoRawLeak(row: object): void {
 }
 
 describe('order projection against the live store', () => {
-	it('projects real rows to the allowlist', async () => {
+	it('projects real rows to the allowlist', async ({ skip }) => {
 		const rows = await fetchRows('/orders')
-		if (rows.length === 0) return
+		if (rows.length === 0) skip('the live store has no orders to project')
 
 		for (const raw of rows) {
 			const row = projectOrder(raw)
@@ -99,9 +99,9 @@ describe('order projection against the live store', () => {
 		}
 	})
 
-	it('returns detail collections only when asked', async () => {
+	it('returns detail collections only when asked', async ({ skip }) => {
 		const rows = await fetchRows('/orders')
-		if (rows.length === 0) return
+		if (rows.length === 0) skip('the live store has no order details to project')
 		const first = rows[0] as Record<string, unknown>
 
 		expect(projectOrder(first).items).toBeUndefined()
@@ -112,9 +112,9 @@ describe('order projection against the live store', () => {
 })
 
 describe('product projection against the live store', () => {
-	it('projects the WordPress post shape and its detail row', async () => {
+	it('projects the WordPress post shape and its detail row', async ({ skip }) => {
 		const rows = await fetchRows('/products')
-		if (rows.length === 0) return
+		if (rows.length === 0) skip('the live store has no products to project')
 
 		for (const raw of rows) {
 			const row = projectProduct(raw)
@@ -137,9 +137,9 @@ describe('product projection against the live store', () => {
 })
 
 describe('customer projection against the live store', () => {
-	it('withholds email unless authorised', async () => {
+	it('withholds email unless authorised', async ({ skip }) => {
 		const rows = await fetchRows('/customers')
-		if (rows.length === 0) return
+		if (rows.length === 0) skip('the live store has no customers for the privacy projection')
 
 		for (const raw of rows) {
 			expect('email' in projectCustomer(raw)).toBe(false)
@@ -158,9 +158,9 @@ describe('customer projection against the live store', () => {
 })
 
 describe('subscription projection against the live store', () => {
-	it('projects the allowlist and keeps recurring amounts exact', async () => {
+	it('projects the allowlist and keeps recurring amounts exact', async ({ skip }) => {
 		const rows = await fetchRows('/subscriptions')
-		if (rows.length === 0) return
+		if (rows.length === 0) skip('the live store has no subscriptions to project')
 
 		for (const raw of rows) {
 			const row = projectSubscription(raw)
@@ -182,18 +182,18 @@ describe('subscription projection against the live store', () => {
 })
 
 describe('transaction projection against the live store', () => {
-	it('projects transactions reached through an order', async () => {
+	it('projects transactions reached through an order', async ({ skip }) => {
 		const orders = await fetchRows('/orders')
-		if (orders.length === 0) return
+		if (orders.length === 0) skip('the live store has no orders for a transaction projection')
 
 		const orderId = projectOrder(orders[0] as Record<string, unknown>).id
-		if (orderId === null) return
+		if (orderId === null) skip('the first live order has no projectable identifier')
 
 		const res = await client.get(`/orders/${orderId}`)
 		const transactions = firstCollection(
 			(res.data as Record<string, unknown>)?.transactions ?? res.data,
 		)
-		if (transactions.length === 0) return
+		if (transactions.length === 0) skip('the selected live order has no transactions')
 
 		for (const raw of transactions) {
 			if (raw.transaction_type === undefined && raw.payment_mode === undefined) continue

@@ -28,9 +28,9 @@ export interface EndpointVariant {
  * The routes a tool is allowed to reach.
  *
  * `direct` means one REST call, chosen once at registration from the ordered variants. A
- * `composite` tool orchestrates several calls, and must list every operation it may issue —
- * including the ones it only reaches on a branch — so the contract checker can see all of them
- * without executing anything.
+ * `composite` tool may reach several operations in one execution or across input-selected
+ * branches, and must list every operation it may issue. Every listed route must exist before the
+ * tool is advertised, so every valid input has the capability evidence it needs.
  */
 export interface ToolRouteMetadata {
 	kind: 'direct' | 'composite'

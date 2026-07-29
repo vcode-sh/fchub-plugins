@@ -19,7 +19,9 @@ import {
 	exposedNames,
 	findTool,
 } from './support/acceptance-fixture.js'
+import { captureActivityBoundary, cleanupRunActivities } from './support/activity-cleanup.js'
 import { CleanupLedger } from './support/cleanup-ledger.js'
+import { getLiveClient } from './support/live-client.js'
 import { getLiveRun } from './support/live-run.js'
 
 const run = getLiveRun()
@@ -32,8 +34,10 @@ let ctx: Awaited<ReturnType<typeof acceptanceContext>>
 let customer: OwnedCustomer
 let product: OwnedProduct
 let coupon: OwnedCoupon
+let activityBoundary: number
 
 beforeAll(async () => {
+	activityBoundary = await captureActivityBoundary()
 	ctx = await acceptanceContext('disabled')
 	customer = await createOwnedCustomer(ledger)
 	product = await createOwnedProduct(ledger)
@@ -41,8 +45,21 @@ beforeAll(async () => {
 }, 120_000)
 
 afterAll(async () => {
-	// Deliberately unguarded: a cleanup failure must fail this suite.
-	await ledger.cleanup()
+	const failures: unknown[] = []
+	try {
+		await ledger.cleanup()
+	} catch (error) {
+		failures.push(error)
+	}
+	try {
+		await cleanupRunActivities(getLiveClient(), activityBoundary, run.prefix)
+	} catch (error) {
+		failures.push(error)
+	}
+	if (failures.length === 1) throw failures[0]
+	if (failures.length > 1) {
+		throw new AggregateError(failures, 'entity and collateral activity cleanup both failed')
+	}
 })
 
 const has = (name: string) => ctx.tools.some((tool) => tool.name === name)
@@ -88,7 +105,7 @@ describe('store context', () => {
 		expect(String(shop?.currency).length).toBeGreaterThan(0)
 		expect(typeof shop?.currency_position).toBe('string')
 
-		// `order_mode` is FluentCart's payment mode. Recorded loudly: every guarded lane in this
+		// `order_mode` is FluentCart's payment mode. Recorded loudly: every write lane in this
 		// programme is allowed to execute only because this store is not taking real money.
 		expect(shop?.order_mode, 'acceptance requires a test-mode store').toBe('test')
 		console.error(`readonly lane: currency ${shop?.currency}, order_mode ${shop?.order_mode}`)
@@ -232,8 +249,8 @@ describe('reports over an isolated period', () => {
 	]
 
 	for (const name of reportTools) {
-		it(`${name} answers completely for a period with no trading`, async () => {
-			if (!has(name)) return
+		it(`${name} answers completely for a period with no trading`, async ({ skip }) => {
+			if (!has(name)) skip(`${name} is unavailable under the discovered capability profile`)
 			const tool = findTool(ctx, name)
 			// Only send the period fields this report actually declares, plus anything the report
 			// requires beyond a period. `report_repeat_customers` needs an order_status: FluentCart

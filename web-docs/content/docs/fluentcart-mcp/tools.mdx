@@ -1,668 +1,183 @@
 ---
-title: Tool Reference
-description: Every tool definition in FluentCart MCP, listed by module — orders, products, customers, subscriptions, shipping, tax, reports, and more.
+title: Tool Guide
+description: What FluentCart MCP exposes by default, what reversible mode adds, and what deliberately stays absent.
 ---
 
-import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { Callout } from 'fumadocs-ui/components/callout';
-import { Separator } from '@/components/ui/separator';
+import { Cards, Card } from 'fumadocs-ui/components/card';
 
-The inventory of tool definitions shipped in this release, by module, with the HTTP method behind each one.
+FluentCart MCP does three things:
 
-How many of them your AI can actually see is a different question, and the honest answer is: it depends. Two filters run before anything is registered — your write mode decides which risk classes may exist, and your store's discovered routes remove every tool it cannot serve. Your WordPress user's permissions then decide which of the survivors succeed. No fixed number can describe that, so this page doesn't print one — `release-contract.json` in the repository carries the measured figures for each configuration at a known revision, which is the only place a count means anything.
+1. finds the part of the store you are asking about;
+2. describes the exact input before calling it;
+3. reads the store, or performs an explicitly enabled reversible change.
 
-You'll never call these yourself — the AI picks the right tool from what you ask. This page is for confirming that something you want to do is possible before you ask for it.
+The server discovers your store's REST routes at startup. A tool appears only when both the product
+policy and the connected WordPress principal allow it.
 
-Every tool follows the naming pattern `fluentcart_{resource}_{action}`.
-
-<Callout type="info" title="Relax">
-This page is a lookup table, not homework. The AI already knows all of this. You're here out of curiosity or because you want to confirm something specific.
+<Callout type="info" title="The source catalogue is not your tool list">
+The source contains reviewed definitions for FluentCart routes that the product deliberately refuses
+to execute. Your client's `tools/list` response is the authority for that connection. A definition
+in source does not make an operation available.
 </Callout>
 
-## Exposure Comes First
+## The default surface
 
-Before any mode registers anything, the write policy decides what may exist:
+Dynamic mode is the default. With writes disabled it presents three tools:
 
-| `FLUENTCART_WRITE_MODE` | What's in the registry |
+| Tool | Purpose |
 |---|---|
-| `disabled` *(the default)* | Read-only tools |
-| `reversible` | Reads plus writes you can undo |
-| `guarded` | The same set as `reversible` in 2.0.0. It is the mode the money tools will return to; today it adds nothing |
+| `fluentcart_search_tools` | Find relevant reads by plain-English query and optional category |
+| `fluentcart_describe_tools` | Return exact input schemas and annotations for selected reads |
+| `fluentcart_execute_read_tool` | Validate and execute one discovered read |
 
-`reversible` is the read set plus the writes that can be undone — creates and updates, nothing more. Deletion, bulk operations, order status changes, marking an order paid and dispute handling are exposed in no mode at all, because FluentCart offers no supported way to reverse them.
+Set `FLUENTCART_WRITE_MODE=reversible` and one more tool appears:
 
-`guarded` exists and is accepted, but in 2.0.0 it exposes exactly what `reversible` does. The two tools it was built for are unavailable in this release — the reasoning is in [the deployment guide](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0), and the short version is that the guard is finished but could not be acceptance-proven against a store that has no way to clean up a test refund.
-
-Then your store gets a say. The routes discovered at startup prune what's left: a tool needs its endpoint served to be registered, and a tool that calls several endpoints needs all of them. Anything your FluentCart build doesn't offer is not registered at all.
-
-Both filters are exposure, not permission-checking at call time. A tool that fails either is missing from every registry: it cannot be listed, searched, described, or invoked by name. Every mode below draws from the same filtered set, so no choice of mode can widen what the write mode and your store's routes allow.
-
-## Modes
-
-`--mode` changes how those definitions are presented to the model, and what that presentation costs in context.
-
-### Dynamic *(the default)*
-
-Five meta-tools. The AI searches, reads a schema, then executes — instead of holding the whole catalogue in context.
-
-| Tool | What It Does |
-|------|-------------|
-| `fluentcart_search_tools` | Search by keyword and optional category. Returns names, titles, descriptions. |
-| `fluentcart_describe_tools` | Full input schemas and annotations for named tools, five per request. |
-| `fluentcart_execute_read_tool` | Execute a read-only tool by name. |
-| `fluentcart_execute_reversible_write` | Execute a reversible write. Present only when the write mode allows one. |
-| `fluentcart_execute_guarded_write` | Reserved for guarded actions. No tool is routed through it in 2.0.0. |
-
-Categories for filtering: `product`, `order`, `customer`, `coupon`, `report`, `subscription`, `integration`, `setting`, `shipping`, `tax`, `email`, `role`, `file`, `label`, `activity`, `note`, `dashboard`, `application`, `public`, `misc`.
-
-### Curated
-
-A shortlist of the tools most workflows actually reach for, registered up front. No search step, a fraction of the definitions.
-
-### Code
-
-Two tools — `fluentcart_search_api` and `fluentcart_execute_code` — over a QuickJS WebAssembly sandbox. The AI writes a small script that queries the API and returns a result, which beats twelve round trips when it needs to correlate things. The sandbox is read-only by construction: it has no route to a write tool, whatever your write mode says.
-
-### Full
-
-Every exposed definition registered at connection time. Fastest per call, most expensive in context, and the only mode where the exposed count is also the number of definitions your model must hold.
-
-### What each one costs
-
-Each mode has a definition-token budget the build enforces. Not a target anyone aims at — a ceiling that fails the build when crossed, which is what stops the tool list quietly bloating release by release:
-
-| Mode | Budget |
+| Tool | Purpose |
 |---|---|
-| `dynamic` | 1,500 tokens |
-| `code` | 1,200 tokens |
-| `curated` | 12,000 tokens |
-| `full` | measured and reported, never gated |
-
-Dynamic and code are fixed costs by design: their payload is a handful of meta-tools, so it doesn't grow when your catalogue does. Curated grows slowly. Full grows with everything your write mode exposes, which is the entire argument for the other three.
-
-The actual figures for a given revision come from `node scripts/measure-tool-context.mjs` in the package, serialised with `mcp-tools-list-v1` and counted with `gpt-tokenizer@3.4.0`, and are recorded per profile in `release-contract.json`. They are not reproduced here: a measurement copied into a documentation page is wrong by the next release and nothing tells you.
-
-<Callout type="info" title="Trade-off">
-Dynamic mode spends 2-3 extra tool calls per workflow: search, describe, execute. If round-trip latency hurts you more than context does, `full` is there and it is a legitimate choice.
-</Callout>
-
-## Tool Annotations
-
-Every tool is tagged with metadata so the AI knows what it's dealing with:
-
-| Annotation | What It Means |
-|------------|---------------|
-| **Read-only** | Only reads data. Can't break anything. Call it all day. |
-| **Idempotent** | Same call, same result. Safe to retry if something times out. |
-| **Destructive** | Deletes data permanently. The AI should (and usually does) confirm first. |
-| **Open-world** | Creates new data — orders, products, customers. |
-
-<Separator className="my-8" />
-
-<Accordions type="multiple">
-<Accordion title="Orientation & Search">
-
-Start here. These answer "what am I connected to and what can I ask" without a fishing expedition through the rest of the list.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_get_store_context` | GET | Store origin, name, currency, timezone, component versions, exposed capabilities and the current write mode. Unset values come back as null with a warning rather than a guess |
-| `fluentcart_get_search_capabilities` | GET | Which filters this store has actually been proven to accept, per entity |
-| `fluentcart_search_commerce` | GET | Search orders, products, customers or subscriptions. Rejects a filter the store hasn't proven, rather than sending it and getting a full unfiltered page back that looks like a narrow result |
-| `fluentcart_list_reference_data` | GET | Resolve the identifiers other tools expect — payment methods, tax classes, shipping zones, countries, labels, categories — instead of guessing a slug |
-
-</Accordion>
-<Accordion title="Orders — Core">
-
-The bread and butter. Every support interaction starts with orders.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_order_list` | GET | List orders with pagination, filtering by status, date, customer |
-| `fluentcart_order_get` | GET | Get a single order by ID with full details |
-| `fluentcart_order_create` | POST | Create a new order |
-| `fluentcart_order_update` | PUT | Update order fields (status, notes, custom fields) |
-| `fluentcart_order_delete` | DELETE | Delete an order permanently |
-| `fluentcart_order_mark_paid` | POST | Mark an order as paid (manual payment confirmation) |
-| `fluentcart_order_refund` | POST | **Not available in 2.0.0** — absent from every write mode |
-| `fluentcart_order_change_customer` | POST | Reassign an order to a different customer |
-| `fluentcart_order_create_and_change_customer` | POST | Create a new customer and assign an order to them in one go |
-| `fluentcart_order_create_custom` | POST | Create a custom order with manual line items |
-| `fluentcart_order_update_statuses` | PUT | Bulk-update order statuses |
-| `fluentcart_order_sync_statuses` | POST | Sync order statuses with the payment gateway |
-| `fluentcart_order_update_address` | PUT | Update an order's billing or shipping address |
-| `fluentcart_order_update_address_id` | PUT | Swap which saved address is linked to an order |
-| `fluentcart_order_generate_licenses` | POST | Generate missing licence keys for an order |
-
-</Accordion>
-<Accordion title="Orders — Transactions">
-
-Transaction-level stuff. Payments, disputes, shipping calculations.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_order_transactions` | GET | List transactions for an order |
-| `fluentcart_order_transaction_get` | GET | Get detailed transaction info |
-| `fluentcart_order_transaction_update_status` | PUT | Update a transaction's status |
-| `fluentcart_order_accept_dispute` | POST | Accept a payment dispute |
-| `fluentcart_order_bulk_action` | POST | Bulk actions on multiple orders |
-| `fluentcart_order_calculate_shipping` | POST | Calculate shipping costs for an order |
-| `fluentcart_order_shipping_methods` | GET | Get available shipping methods |
-| `fluentcart_order_customer_orders` | GET | Get orders for a specific customer |
-
-</Accordion>
-<Accordion title="Products — Core">
-
-Product CRUD, search, and bulk operations.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_product_list` | GET | List products with pagination and filtering |
-| `fluentcart_product_get` | GET | Get a single product by ID |
-| `fluentcart_product_create` | POST | Create a new product |
-| `fluentcart_product_delete` | DELETE | Delete a product |
-| `fluentcart_product_duplicate` | POST | Duplicate an existing product |
-| `fluentcart_product_bulk_action` | POST | Bulk actions on multiple products |
-| `fluentcart_product_update_detail` | PUT | Update product detail fields |
-| `fluentcart_product_search_by_name` | GET | Search products by name |
-| `fluentcart_product_search_variant_by_name` | GET | Search product variants by name |
-| `fluentcart_product_search_variant_options` | GET | Search variant options |
-| `fluentcart_product_suggest_sku` | GET | Generate a SKU suggestion |
-| `fluentcart_product_fetch_by_ids` | POST | Fetch multiple products by ID |
-| `fluentcart_product_find_subscription_variants` | GET | Find subscription-enabled variants |
-| `fluentcart_product_editor_mode_update` | POST | Switch long description between wp-editor and block-editor |
-| `fluentcart_product_create_dummy` | POST | Generate test products for development |
-| `fluentcart_product_variant_option_update` | POST | Configure attribute combinations for advanced_variations products |
-
-</Accordion>
-<Accordion title="Products — Pricing">
-
-Pricing, bundles, tax classes, shipping classes, stock management.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_product_pricing_get` | GET | Get pricing details for a product |
-| `fluentcart_product_pricing_update` | POST | Save product pricing (full product payload with variants) |
-| `fluentcart_product_pricing_widgets` | GET | Get pricing widget configuration |
-| `fluentcart_product_related` | GET | Get related products |
-| `fluentcart_product_bundle_info` | GET | Get bundle composition |
-| `fluentcart_product_bundle_save` | POST | Save bundle configuration |
-| `fluentcart_product_tax_class_update` | PUT | Assign a tax class |
-| `fluentcart_product_tax_class_remove` | DELETE | Remove tax class |
-| `fluentcart_product_shipping_class_update` | PUT | Assign a shipping class |
-| `fluentcart_product_shipping_class_remove` | DELETE | Remove shipping class from a product |
-| `fluentcart_product_manage_stock_update` | PUT | Toggle inventory management on/off |
-| `fluentcart_product_inventory_update` | PUT | Update stock levels |
-
-</Accordion>
-<Accordion title="Products — Variants">
-
-Variation management for variable products.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_variant_list_all` | GET | List all variants across products |
-| `fluentcart_variant_list` | GET | List variants for a specific product |
-| `fluentcart_variant_create` | POST | Create a new variant |
-| `fluentcart_variant_update` | PUT | Update a variant |
-| `fluentcart_variant_delete` | DELETE | Delete a variant |
-| `fluentcart_variant_set_media` | PUT | Set media/images for a variant |
-| `fluentcart_variant_pricing_table_update` | PUT | Update variant pricing tiers |
-| `fluentcart_variant_fetch_by_ids` | POST | Fetch multiple variants by ID |
-| `fluentcart_variant_upgrade_paths` | GET | Get upgrade paths for a variant |
-
-</Accordion>
-<Accordion title="Products — Catalogue">
-
-Downloads, upgrade paths, taxonomies, product-level integrations.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_product_sync_downloadable_files` | POST | Sync downloadable file list |
-| `fluentcart_product_downloadable_update` | PUT | Update a downloadable file |
-| `fluentcart_product_downloadable_delete` | DELETE | Remove a downloadable file |
-| `fluentcart_product_downloadable_url` | GET | Generate a download URL |
-| `fluentcart_product_upgrade_settings` | GET | Get upgrade settings |
-| `fluentcart_product_upgrade_path_save` | POST | Save an upgrade path |
-| `fluentcart_product_upgrade_path_update` | PUT | Update an existing upgrade path |
-| `fluentcart_product_upgrade_path_delete` | DELETE | Delete an upgrade path |
-| `fluentcart_product_terms` | GET | Fetch available taxonomy terms |
-| `fluentcart_product_terms_by_parent` | GET | Get child terms of a parent |
-| `fluentcart_product_terms_add` | POST | Add terms to a product |
-| `fluentcart_product_taxonomy_sync` | POST | Sync taxonomy terms |
-| `fluentcart_product_taxonomy_delete` | DELETE | Remove taxonomy terms |
-| `fluentcart_product_integrations` | GET | Get product-level integration settings |
-| `fluentcart_product_integration_settings` | GET | Get specific integration settings |
-| `fluentcart_product_integration_save` | POST | Save product integration config |
-| `fluentcart_product_integration_delete` | DELETE | Remove a product integration |
-| `fluentcart_product_integration_feed_status` | POST | Toggle product integration feed status |
-
-</Accordion>
-<Accordion title="Customers">
-
-Profiles, addresses, stats, user linking.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_customer_list` | GET | List customers with search and pagination |
-| `fluentcart_customer_get` | GET | Get customer profile by ID |
-| `fluentcart_customer_create` | POST | Create a new customer |
-| `fluentcart_customer_update` | PUT | Update customer info |
-| `fluentcart_customer_update_additional_info` | PUT | Update additional customer fields |
-| `fluentcart_customer_stats` | GET | Get customer statistics |
-| `fluentcart_customer_recalculate_ltv` | POST | Recalculate lifetime value |
-| `fluentcart_customer_orders_simple` | GET | Get a simplified list of customer orders |
-| `fluentcart_customer_addresses` | GET | List customer addresses |
-| `fluentcart_customer_address_create` | POST | Create a new address |
-| `fluentcart_customer_address_update` | PUT | Update an address |
-| `fluentcart_customer_address_delete` | DELETE | Delete an address |
-| `fluentcart_customer_address_make_primary` | POST | Set an address as primary |
-| `fluentcart_customer_attachable_users` | GET | Find WordPress users that can be linked |
-| `fluentcart_customer_attach_user` | POST | Link a WordPress user to a customer |
-| `fluentcart_customer_detach_user` | POST | Unlink a WordPress user |
-| `fluentcart_customer_bulk_action` | POST | Bulk customer operations |
-
-</Accordion>
-<Accordion title="Subscriptions">
-
-Read-only in this release. You can inspect a billing relationship; you cannot change one.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_subscription_list` | GET | List subscriptions with filtering |
-| `fluentcart_subscription_get` | GET | Get subscription by ID |
-| `fluentcart_subscription_fetch` | GET | Fetch subscription with gateway sync |
-| `fluentcart_subscription_cancel` | POST | **Not available in 2.0.0** — absent from every write mode |
-
-Pausing, resuming and reactivating are not exposed as tools. The FluentCart admin still does all three.
-
-**Statuses:** `active`, `trialing`, `paused`, `failing`, `past_due`, `expiring`, `canceled`, `expired`, `completed`
-
-</Accordion>
-<Accordion title="Coupons">
-
-Creation, application, and eligibility checks.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_coupon_list` | GET | List coupons with pagination |
-| `fluentcart_coupon_list_alt` | GET | List coupons with alternative view/format |
-| `fluentcart_coupon_get` | GET | Get coupon by ID |
-| `fluentcart_coupon_create` | POST | Create a new coupon |
-| `fluentcart_coupon_update` | PUT | Update a coupon |
-| `fluentcart_coupon_delete` | DELETE | Delete a coupon |
-| `fluentcart_coupon_apply` | POST | Apply a coupon to an order |
-| `fluentcart_coupon_cancel` | POST | Remove a coupon from an order |
-| `fluentcart_coupon_reapply` | POST | Re-apply a previously removed coupon |
-| `fluentcart_coupon_check_eligibility` | POST | Check if a product qualifies |
-| `fluentcart_coupon_settings_get` | GET | Get coupon system settings |
-| `fluentcart_coupon_settings_save` | POST | Update coupon system settings |
-
-</Accordion>
-<Accordion title="Reports — Core">
-
-Revenue, sales, orders, and dashboard metrics.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_report_overview` | GET | Full reports overview |
-| `fluentcart_report_meta` | GET | Report metadata and filters |
-| `fluentcart_report_dashboard_stats` | GET | Dashboard statistics |
-| `fluentcart_report_dashboard_summary` | GET | Dashboard summary with key metrics and trends |
-| `fluentcart_report_summary` | GET | Report overview with aggregated metrics |
-| `fluentcart_report_revenue` | GET | Revenue report with date range |
-| `fluentcart_report_revenue_by_group` | GET | Revenue by day/week/month |
-| `fluentcart_report_sales` | GET | Sales report |
-| `fluentcart_report_sales_growth` | GET | Sales growth metrics |
-| `fluentcart_report_sales_growth_chart` | GET | Sales growth chart data |
-| `fluentcart_report_order_chart` | GET | Order volume chart |
-| `fluentcart_report_orders_by_group` | GET | Orders by time period |
-| `fluentcart_report_quick_order_stats` | GET | Quick order summary |
-| `fluentcart_report_recent_orders` | GET | Most recent orders |
-| `fluentcart_report_unfulfilled_orders` | GET | Orders awaiting fulfilment |
-| `fluentcart_report_recent_activities` | GET | Recent store activities |
-| `fluentcart_report_top_sold_products` | GET | Top products by units sold with revenue |
-| `fluentcart_report_country_heat_map` | GET | Order distribution by country |
-| `fluentcart_report_cart` | GET | Cart analytics and conversion funnel |
-| `fluentcart_report_order_value_distribution` | GET | Distribution of orders by value ranges |
-| `fluentcart_report_day_and_hour` | GET | Order volume by day of week and hour |
-| `fluentcart_report_item_count_distribution` | GET | Distribution of orders by item count |
-| `fluentcart_report_order_completion_time` | GET | Average time from order to fulfilment |
-| `fluentcart_report_weeks_between_refund` | GET | Time between purchase and refund |
-
-</Accordion>
-<Accordion title="Reports — Insights">
-
-Product performance, customer behaviour, subscription trends, refund analysis, retention cohorts, and licence tracking.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_report_product` | GET | Product-level report |
-| `fluentcart_report_product_performance` | GET | Detailed product performance |
-| `fluentcart_report_top_products_sold` | GET | Top-selling products |
-| `fluentcart_report_top_sold_variants` | GET | Top-selling variants |
-| `fluentcart_report_customer` | GET | Customer analytics |
-| `fluentcart_report_new_vs_returning` | GET | New vs returning breakdown |
-| `fluentcart_report_daily_signups` | GET | Daily signups |
-| `fluentcart_report_repeat_customers` | GET | Repeat buyers |
-| `fluentcart_report_refund_chart` | GET | Refund trends |
-| `fluentcart_report_refund_by_group` | GET | Refunds by period |
-| `fluentcart_report_subscription_chart` | GET | Subscription trends |
-| `fluentcart_report_future_renewals` | GET | Upcoming renewals |
-| `fluentcart_report_license_summary` | GET | Licence key summary |
-| `fluentcart_report_license_chart` | GET | Licence issuance and activation trends |
-| `fluentcart_report_license_pie_chart` | GET | Licence distribution by status |
-| `fluentcart_report_retention_chart` | GET | Customer retention rates over time |
-| `fluentcart_report_subscription_retention` | GET | Subscription-specific retention analysis |
-| `fluentcart_report_subscription_cohorts` | GET | Subscription cohort analysis |
-| `fluentcart_report_retention_snapshots_status` | GET | Check retention snapshot generation status |
-| `fluentcart_report_retention_snapshots_generate` | POST | Trigger retention snapshot generation |
-| `fluentcart_report_sources` | GET | Traffic and attribution sources |
-
-</Accordion>
-<Accordion title="Order Bumps">
-
-Post-purchase upsell offers.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_order_bump_list` | GET | List all order bumps |
-| `fluentcart_order_bump_get` | GET | Get order bump by ID |
-| `fluentcart_order_bump_create` | POST | Create an order bump |
-| `fluentcart_order_bump_update` | PUT | Update an order bump |
-| `fluentcart_order_bump_delete` | DELETE | Delete an order bump |
-
-</Accordion>
-<Accordion title="Product Options">
-
-Attribute groups and terms — the building blocks of product variations.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_attribute_group_list` | GET | List attribute groups (Size, Colour, etc.) |
-| `fluentcart_attribute_group_get` | GET | Get an attribute group by ID |
-| `fluentcart_attribute_group_create` | POST | Create a new attribute group |
-| `fluentcart_attribute_group_update` | PUT | Update an attribute group |
-| `fluentcart_attribute_group_delete` | DELETE | Delete an attribute group |
-| `fluentcart_attribute_term_list` | GET | List terms in a group |
-| `fluentcart_attribute_term_create` | POST | Create a term (e.g. "Large") |
-| `fluentcart_attribute_term_update` | PUT | Update a term |
-| `fluentcart_attribute_term_delete` | DELETE | Delete a term |
-| `fluentcart_attribute_term_reorder` | PUT | Reorder terms |
-
-</Accordion>
-<Accordion title="Integrations">
-
-Third-party addon and feed management.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_integration_list_addons` | GET | List installed addons |
-| `fluentcart_integration_get_global_settings` | GET | Get global integration settings |
-| `fluentcart_integration_save_global_settings` | POST | Save global integration settings |
-| `fluentcart_integration_get_global_feeds` | GET | List all integration feeds |
-| `fluentcart_integration_get_feed_settings` | GET | Get feed settings |
-| `fluentcart_integration_save_feed_settings` | POST | Save feed settings |
-| `fluentcart_integration_change_feed_status` | POST | Enable/disable a feed |
-| `fluentcart_integration_delete_feed` | DELETE | Delete a feed |
-| `fluentcart_integration_get_feed_lists` | GET | Get available list options |
-| `fluentcart_integration_get_dynamic_options` | GET | Get dynamic option values |
-| `fluentcart_integration_get_chained_data` | GET | Get chained/dependent options |
-| `fluentcart_integration_install_plugin` | POST | Install an integration plugin |
-
-</Accordion>
-<Accordion title="Shipping">
-
-Zones, methods, and classes. The holy trinity of "why does this parcel cost that much."
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_shipping_zone_list` | GET | List all shipping zones with methods and regions |
-| `fluentcart_shipping_zone_get` | GET | Get a specific shipping zone |
-| `fluentcart_shipping_zone_create` | POST | Create a new shipping zone |
-| `fluentcart_shipping_zone_update` | PUT | Update a shipping zone |
-| `fluentcart_shipping_zone_delete` | DELETE | Delete a shipping zone |
-| `fluentcart_shipping_zone_reorder` | POST | Reorder shipping zones by priority |
-| `fluentcart_shipping_zone_states` | GET | Get available states/regions for zones |
-| `fluentcart_shipping_method_create` | POST | Add a shipping method to a zone |
-| `fluentcart_shipping_method_update` | PUT | Update a shipping method |
-| `fluentcart_shipping_method_delete` | DELETE | Delete a shipping method |
-| `fluentcart_shipping_class_list` | GET | List all shipping classes |
-| `fluentcart_shipping_class_get` | GET | Get a specific shipping class |
-| `fluentcart_shipping_class_create` | POST | Create a shipping class |
-| `fluentcart_shipping_class_update` | PUT | Update a shipping class |
-| `fluentcart_shipping_class_delete` | DELETE | Delete a shipping class |
-
-</Accordion>
-<Accordion title="Tax">
-
-Classes, rates, EU VAT, and tax records. Everything your accountant wishes you'd sorted out months ago.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_tax_class_list` | GET | List all tax classes |
-| `fluentcart_tax_class_create` | POST | Create a new tax class |
-| `fluentcart_tax_class_update` | PUT | Update a tax class |
-| `fluentcart_tax_class_delete` | DELETE | Delete a tax class |
-| `fluentcart_tax_rate_list` | GET | List all tax rates across countries |
-| `fluentcart_tax_rate_country` | GET | Get tax rates for a specific country |
-| `fluentcart_tax_rate_create` | POST | Create a tax rate for a country |
-| `fluentcart_tax_rate_update` | PUT | Update a tax rate |
-| `fluentcart_tax_rate_delete` | DELETE | Delete a tax rate |
-| `fluentcart_tax_country_delete_all` | DELETE | Delete all tax rates for a country |
-| `fluentcart_tax_country_id_get` | GET | Get country tax ID settings (VAT number) |
-| `fluentcart_tax_country_id_save` | POST | Save country tax ID settings |
-| `fluentcart_tax_shipping_override_create` | POST | Create a shipping tax override |
-| `fluentcart_tax_shipping_override_delete` | DELETE | Delete a shipping tax override |
-| `fluentcart_tax_config_rates` | GET | Get tax configuration with rate overviews |
-| `fluentcart_tax_config_countries_save` | POST | Save countries configured for tax |
-| `fluentcart_tax_settings_get` | GET | Get global tax settings |
-| `fluentcart_tax_settings_save` | POST | Save global tax settings |
-| `fluentcart_tax_eu_vat_save` | POST | Save EU VAT configuration |
-| `fluentcart_tax_eu_rates` | GET | Get EU VAT rates for all member states |
-| `fluentcart_tax_records_list` | GET | List tax records for reporting |
-| `fluentcart_tax_records_mark_filed` | POST | Mark tax records as filed |
-
-</Accordion>
-<Accordion title="Email Notifications">
-
-Templates and settings for every transactional email. Customise them, preview them, toggle them off when you've had enough.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_email_list` | GET | List all email notification templates |
-| `fluentcart_email_get` | GET | Get a specific email template |
-| `fluentcart_email_update` | PUT | Update an email template |
-| `fluentcart_email_toggle` | POST | Enable or disable a notification |
-| `fluentcart_email_shortcodes` | GET | Get available template shortcodes |
-| `fluentcart_email_template_preview` | POST | Preview a rendered email template |
-| `fluentcart_email_settings_get` | GET | Get global email settings |
-| `fluentcart_email_settings_save` | POST | Save global email settings |
-
-</Accordion>
-<Accordion title="Roles & Permissions">
-
-Access control. Decide who gets to touch what — and who absolutely shouldn't.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_role_list` | GET | List all roles with capabilities |
-| `fluentcart_role_get` | GET | Get a specific role |
-| `fluentcart_role_create` | POST | Create a custom role |
-| `fluentcart_role_update` | POST | Update a role |
-| `fluentcart_role_delete` | DELETE | Delete a custom role |
-| `fluentcart_role_managers` | GET | List users with management roles |
-| `fluentcart_role_user_list` | GET | List all users with their roles |
-
-</Accordion>
-<Accordion title="Files">
-
-Upload, list, and delete files. Riveting stuff.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_file_list` | GET | List uploaded files |
-| `fluentcart_file_upload` | POST | Upload a file |
-| `fluentcart_file_bucket_list` | GET | List file storage buckets |
-| `fluentcart_file_delete` | DELETE | Delete a file |
-
-</Accordion>
-<Accordion title="Settings">
-
-Store config, payment methods, modules, permissions, and print templates.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_settings_get_store` | GET | Get store settings |
-| `fluentcart_settings_save_store` | POST | Save store settings |
-| `fluentcart_payment_get_all` | GET | List all payment methods |
-| `fluentcart_payment_get_settings` | GET | Get a specific payment method's settings |
-| `fluentcart_settings_save_payment_method` | POST | Save specific payment method settings |
-| `fluentcart_settings_reorder_payment_methods` | POST | Set display order of payment methods |
-| `fluentcart_settings_get_modules` | GET | Get module settings |
-| `fluentcart_settings_save_modules` | POST | Save module activation and configuration |
-| `fluentcart_settings_get_permissions` | GET | Get permissions |
-| `fluentcart_settings_save_permissions` | POST | Save permissions |
-| `fluentcart_settings_get_confirmation_shortcodes` | GET | Get confirmation page shortcodes |
-| `fluentcart_settings_save_confirmation` | POST | Save order confirmation page settings |
-| `fluentcart_settings_print_templates_get` | GET | Get print templates (invoices, packing slips) |
-| `fluentcart_settings_print_templates_save` | PUT | Update print templates |
-
-</Accordion>
-<Accordion title="Labels">
-
-Order tagging and organisation.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_label_list` | GET | List all labels |
-| `fluentcart_label_create` | POST | Create a new label |
-| `fluentcart_label_update_selections` | PUT | Update label assignments on orders |
-
-</Accordion>
-<Accordion title="Activity">
-
-Audit trail.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_activity_list` | GET | List recent activities |
-| `fluentcart_activity_delete` | DELETE | Delete an activity entry |
-| `fluentcart_activity_mark_read` | POST | Mark as read |
-
-</Accordion>
-<Accordion title="Notes">
-
-Exactly what it sounds like.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_note_attach` | POST | Add a note to an order |
-
-</Accordion>
-<Accordion title="Dashboard">
-
-Store overview.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_dashboard_onboarding` | GET | Get onboarding status |
-| `fluentcart_dashboard_overview` | GET | Get dashboard overview stats |
-
-</Accordion>
-<Accordion title="Application">
-
-App init and widgets.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_app_init` | GET | Initialise the app (doubles as a connection test) |
-| `fluentcart_app_get_attachments` | GET | List attachments |
-| `fluentcart_app_upload_attachment` | POST | Upload an attachment |
-| `fluentcart_app_get_widgets` | GET | Get dashboard widget data |
-
-</Accordion>
-<Accordion title="Public">
-
-Unauthenticated endpoints. For storefronts and bots.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_public_product_views` | GET | Get public product listing |
-| `fluentcart_public_product_search` | GET | Search products publicly |
-| `fluentcart_public_products` | GET | Get public product catalogue |
-| `fluentcart_public_user_login` | POST | Customer login |
-
-</Accordion>
-<Accordion title="Miscellaneous">
-
-Lookup data that other tools depend on.
-
-| Tool | Method | What It Does |
-|------|--------|--------------|
-| `fluentcart_misc_countries` | GET | List all countries |
-| `fluentcart_misc_country_info` | GET | Get states/provinces for a country |
-| `fluentcart_misc_filter_options` | GET | Get available filter options |
-| `fluentcart_misc_form_search_options` | GET | Search form field options |
-
-</Accordion>
-</Accordions>
-
-<Separator className="my-8" />
-
-## Responses
-
-Key endpoints feature **response transforms** — `order_get`, `product_get`, `customer_get` and all list endpoints strip HTML blobs, embedded objects, and serialised metadata before returning. Less noise, fewer tokens, same useful data.
-
-When a response is too big to be useful even after trimming, the call fails with `RESPONSE_TOO_LARGE` and names the ways to narrow it — a page size, a date range, fewer fields. Earlier versions returned a quietly truncated payload with a `_truncated` marker, which looked like data and read like a lie. An error you can act on beats a half-answer you can't detect.
-
-<Separator className="my-8" />
-
-## MCP Resources
-
-Four read-only resources for reference data. These are browsable context the AI can read without calling tools — useful for grounding conversations with store configuration:
-
-| Resource URI | Description |
-|-------------|-------------|
-| `fluentcart://store/config` | Store settings and configuration (currency, locale, modules) |
-| `fluentcart://store/countries` | Supported countries and their details |
-| `fluentcart://store/payment-methods` | Configured payment methods |
-| `fluentcart://store/filter-options` | Available filter options for orders, products, customers |
-
-Resources are application-controlled — the client decides when to read them. Each read goes to your store: the resource layer holds no cache of its own, so treat a resource read as an API call, not a free lookup.
-
-<Separator className="my-8" />
-
-## MCP Prompts
-
-Five pre-built workflows that guide the AI through multi-step operations. Think of them as recipes — the AI knows which tools to call and in what order:
-
-| Prompt | Arguments | What It Does |
-|--------|-----------|-------------|
-| `analyze-store-performance` | `startDate`, `endDate` | Revenue overview, KPIs, and best sellers for a date range |
-| `investigate-order` | `order_id` | Deep-dive into order details, transactions, and activity timeline |
-| `customer-overview` | `customer_id` | Full customer profile with stats, addresses, and spending history |
-| `catalog-summary` | *(none)* | Catalog health report — product count, top sellers, store metrics |
-| `subscription-health` | `startDate`, `endDate` | Subscription churn, renewal success, and revenue forecast |
-
-Not all MCP clients support prompts yet. Claude Desktop and Claude Code do. If yours doesn't, just ask for the same thing in plain English — the AI will figure out the same tool sequence on its own.
-
-<Separator className="my-8" />
-
-## Response Caching
-
-A handful of read tools opt into a TTL cache so the AI doesn't re-fetch the same 250-country list every time it validates an address. It is opt-in per tool, not a blanket policy:
-
-| Tool | TTL |
-|------|-----|
-| `fluentcart_misc_countries` | 1 hour |
-| `fluentcart_shipping_zone_states` | 1 hour |
-| `fluentcart_email_shortcodes` | 1 hour |
-| `fluentcart_tax_eu_rates` | 1 hour |
-| `fluentcart_app_init` | 10 minutes |
-| `fluentcart_misc_filter_options` | 10 minutes |
-| `fluentcart_report_meta` | 10 minutes |
-| `fluentcart_shipping_zone_list`, `fluentcart_shipping_class_list` | 10 minutes |
-| `fluentcart_role_list`, `fluentcart_tax_class_list`, `fluentcart_tax_settings_get` | 10 minutes |
-
-Everything else goes to your store every time. The store of values lives in the server process and dies with it — no Redis, no external dependency, and nothing shared between processes, so an HTTP deployment behind several replicas gets whatever each replica happens to have seen. Resource reads do not use it at all.
+| `fluentcart_execute_reversible_write` | Execute a reviewed create or update that has read-back and a supported undo |
+
+There is no destructive or real-money executor.
+
+## What you can read
+
+The exact names depend on the routes your store serves, but the reviewed surface covers:
+
+| Area | Typical work |
+|---|---|
+| Orders | Orders, line items, transactions, addresses, activity and fulfilment state |
+| Products | Catalogue, variants, pricing, stock, downloads, licences, taxonomy and bundles |
+| Customers | Profiles, addresses, order history, subscriptions and lifetime-value context |
+| Subscriptions | Billing relationships, renewal state, transactions and upcoming payments |
+| Reports | Revenue, trends, top products, customers, refunds, retention and attribution |
+| Coupons | Coupon definitions, eligibility and usage |
+| Shipping | Zones, methods, classes, packages and destination calculations |
+| Tax | Classes, rates, EU VAT settings, records and overrides |
+| Store configuration | Modules, roles, permissions, email, print templates and integrations |
+| Reference data | Countries, currencies, payment methods, statuses, labels and categories |
+
+Search is the normal entry point. You do not need to memorise endpoint names:
+
+```text
+Show me unpaid orders from the last seven days.
+Which products are below their stock threshold?
+What renews next week in PLN?
+```
+
+### Two field semantics worth knowing
+
+- In sales-report inputs, timezone is optional and echoed only as a label. FluentCart still filters dates in the store timezone, so supplying a different label does not change the figures.
+- In PDF seller-status output, `e_invoice_profile` is the configured ZUGFeRD/Factur-X profile; it is not a seller identity profile. The tool returns configuration status rather than private seller values.
+
+## What reversible mode adds
+
+Reversible mode is for routine admin work that can be read back and restored or removed:
+
+- create or update products and variants;
+- create or update coupons and customers;
+- create or update shipping zones, methods and classes;
+- create or update tax classes, rates and shipping overrides;
+- create or update attribute groups and terms;
+- create or update order bumps and upgrade paths;
+- update product stock and taxonomy assignments;
+- update the reviewed tax settings document.
+
+Create operations are not advertised as idempotent when FluentCart would create a duplicate on
+retry. Update operations are marked idempotent only when writing the same state twice has the same
+result.
+
+Enable the mode explicitly:
+
+```json
+{
+  "env": {
+    "FLUENTCART_WRITE_MODE": "reversible"
+  }
+}
+```
+
+## What is not available
+
+FluentCart MCP 2.0.0 does not expose:
+
+- refunds or subscription cancellation;
+- deletion;
+- bulk mutations;
+- order-status changes or marking an order paid;
+- dispute handling or transaction-status changes;
+- role and permission changes;
+- plugin installation or integration credential changes;
+- file uploads, emails, login actions or other external side effects.
+
+No mode, environment variable or presentation style brings those actions back. Use FluentCart's
+admin or official operator tooling when you need them.
+
+## Presentation modes
+
+All modes use the same filtered registry. Changing mode changes presentation, not authority.
+
+| Mode | What the client sees | Best for |
+|---|---|---|
+| `dynamic` *(default)* | Three read tools; four with reversible writes | Small context and broad discovery |
+| `curated` | A reviewed shortlist registered directly | Common shop workflows with fewer discovery calls |
+| `code` | Two read-only tools over an isolated JavaScript sandbox | Joining several reads before returning a concise result |
+| `full` | Every definition this store and principal may use | Clients that prefer direct schemas and have room for them |
+
+Current measured counts and definition-token costs live in
+`fluentcart-mcp/release-contract.json`. They are generated from the built server rather than copied
+into this page.
+
+## Optional native FluentCart abilities
+
+FluentCart 1.5.4+ supplies native WordPress Abilities for several advanced reads. The bridge is off
+by default and requires its own WordPress Application Password:
+
+```bash
+FLUENTCART_ABILITIES_MODE=enabled
+FLUENTCART_ABILITIES_USERNAME=ability-reader
+FLUENTCART_ABILITIES_APP_PASSWORD=your-separate-application-password
+```
+
+It adds three read-only entry points:
+
+| Tool | Purpose |
+|---|---|
+| `fluentcart_search_abilities` | Search the audited reads discovered on this store |
+| `fluentcart_describe_abilities` | Inspect the live input and output schema |
+| `fluentcart_execute_read_ability` | Validate and execute one admitted read |
+
+Unknown abilities and all native writes remain absent. If the live catalogue or its read-only
+metadata drifts from the audited contract, startup fails closed.
+
+## Annotations
+
+Tool annotations tell a client what it may safely do:
+
+| Annotation | Meaning |
+|---|---|
+| Read-only | The operation does not change store state |
+| Idempotent | Repeating the same call has the same effect |
+| Destructive | The operation removes or irreversibly overwrites data |
+| Open-world | The operation creates data or reaches outside the current record |
+
+The server uses annotations together with its own risk registry. A friendly description never
+overrides policy.
+
+## Where the exact truth lives
+
+- `release-contract.json` — measured profiles, modes, counts, protocols and release evidence
+- `manifest.json` — packaged MCP metadata and advertised public tools
+- `compatibility-support.json` — captured FluentCart route and Ability evidence
+- your client's `tools/list` response — the actual surface for that store and principal
+
+<Cards>
+  <Card title="Setup Guide" href="/docs/fluentcart-mcp/setup">
+    Connect a client and choose whether reversible work is enabled.
+  </Card>
+  <Card title="Usage Examples" href="/docs/fluentcart-mcp/usage">
+    Practical prompts for reading and managing a store.
+  </Card>
+  <Card title="Proof" href="/docs/fluentcart-mcp/proof">
+    How the merchant scenarios and release gates are measured.
+  </Card>
+</Cards>

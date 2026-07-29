@@ -1,13 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { resolveServerContext, resolveWritePolicy } from '../src/server.js'
+import { createAbilityBridgeTools } from '../src/abilities/tools.js'
+import {
+	purgeAuthorizationCaches,
+	resolveServerContext,
+	resolveWritePolicy,
+} from '../src/server.js'
 
 const ENV_KEYS = [
 	'FLUENTCART_URL',
 	'FLUENTCART_USERNAME',
 	'FLUENTCART_APP_PASSWORD',
 	'FLUENTCART_WRITE_MODE',
-	'FLUENTCART_GUARD_SECRET',
-	'FLUENTCART_GUARD_STATE_DIR',
+	'FLUENTCART_ABILITIES_MODE',
+	'FLUENTCART_ABILITIES_USERNAME',
+	'FLUENTCART_ABILITIES_APP_PASSWORD',
 ]
 
 const original: Record<string, string | undefined> = {}
@@ -34,6 +40,47 @@ function exposedNames(): Set<string> {
 }
 
 describe('registry exposure is filtered before registration', () => {
+	it('does not expose the optional ability bridge in the synchronous/default context', () => {
+		const names = exposedNames()
+		expect(names.has('fluentcart_search_abilities')).toBe(false)
+		expect(names.has('fluentcart_execute_read_ability')).toBe(false)
+	})
+
+	it('includes only explicitly injected, already-discovered ability bridge tools', () => {
+		const bridgeTools = createAbilityBridgeTools({
+			abilities: [
+				{
+					name: 'fluent-cart/get-store-context',
+					label: 'Get Store Context',
+					description: 'Context',
+					category: 'fluent-cart',
+					inputSchema: { type: 'object', properties: {} },
+					outputSchema: [],
+					annotations: {
+						abilitiesReadonly: true,
+						abilitiesDestructive: false,
+						abilitiesIdempotent: null,
+						mcpReadOnlyHint: true,
+						mcpDestructiveHint: false,
+						mcpIdempotentHint: null,
+						mcpOpenWorldHint: null,
+					},
+					rest: {
+						discoveryPath: '/wp-abilities/v1/abilities/fluent-cart/get-store-context',
+						runPath: '/wp-abilities/v1/abilities/fluent-cart/get-store-context/run',
+						methods: ['GET'],
+					},
+				},
+			],
+			execute: async () => ({ ok: true }),
+		})
+		const names = new Set(resolveServerContext(null, bridgeTools).tools.map((tool) => tool.name))
+
+		expect(names.has('fluentcart_search_abilities')).toBe(true)
+		expect(names.has('fluentcart_describe_abilities')).toBe(true)
+		expect(names.has('fluentcart_execute_read_ability')).toBe(true)
+	})
+
 	it('defaults to write mode disabled', () => {
 		delete process.env.FLUENTCART_WRITE_MODE
 		expect(resolveWritePolicy().writeMode).toBe('disabled')
@@ -73,56 +120,16 @@ describe('registry exposure is filtered before registration', () => {
 		expect(names.has('fluentcart_order_refund')).toBe(false)
 	})
 
-	it('keeps guarded actions hidden in guarded mode without state and secret', () => {
-		process.env.FLUENTCART_WRITE_MODE = 'guarded'
-		delete process.env.FLUENTCART_GUARD_SECRET
-		delete process.env.FLUENTCART_GUARD_STATE_DIR
-
+	it('keeps audited real-money rows absent in reversible mode', () => {
+		process.env.FLUENTCART_WRITE_MODE = 'reversible'
 		const names = exposedNames()
 		expect(names.has('fluentcart_order_refund')).toBe(false)
 		expect(names.has('fluentcart_subscription_cancel')).toBe(false)
-	})
-
-	it('ships refund and cancellation unavailable, even in fully configured guarded mode', () => {
-		// 2.0.0 ships these unavailable. The guard is complete and unit-tested, but it was never
-		// acceptance-proven: refunding an order this run owns is impossible on FluentCart 1.5.5,
-		// because a transaction has no DELETE route and does not cascade from order deletion. A
-		// money-moving capability that cannot be proven does not get to be present.
-		process.env.FLUENTCART_WRITE_MODE = 'guarded'
-		process.env.FLUENTCART_GUARD_SECRET = 'g'.repeat(32)
-		process.env.FLUENTCART_GUARD_STATE_DIR = '/tmp/fluentcart-guard-fixture'
-
-		const names = exposedNames()
-		expect(names.has('fluentcart_order_refund')).toBe(false)
-		expect(names.has('fluentcart_subscription_cancel')).toBe(false)
-	})
-
-	it('still exposes reversible writes in guarded mode', () => {
-		process.env.FLUENTCART_WRITE_MODE = 'guarded'
-		process.env.FLUENTCART_GUARD_SECRET = 'g'.repeat(32)
-		process.env.FLUENTCART_GUARD_STATE_DIR = '/tmp/fluentcart-guard-fixture'
-
-		expect(exposedNames().has('fluentcart_coupon_create')).toBe(true)
-	})
-
-	it('fails startup on a weak guard secret rather than quietly dropping the guarded tools', () => {
-		process.env.FLUENTCART_WRITE_MODE = 'guarded'
-		process.env.FLUENTCART_GUARD_SECRET = 'too-short'
-		process.env.FLUENTCART_GUARD_STATE_DIR = '/tmp/fluentcart-guard-fixture'
-
-		// The policy layer already refuses to advertise the guard...
-		expect(resolveWritePolicy().guard.signingSecret).toBe(false)
-
-		// ...and startup refuses outright, with an actionable message. Silently starting without
-		// refund and cancellation would look like a missing feature rather than a bad secret.
-		expect(() => exposedNames()).toThrow(/FLUENTCART_GUARD_SECRET must be at least 32 bytes/)
 	})
 
 	it('never exposes a destructive, control-plane or credential tool in any write mode', () => {
-		for (const mode of ['disabled', 'reversible', 'guarded']) {
+		for (const mode of ['disabled', 'reversible']) {
 			process.env.FLUENTCART_WRITE_MODE = mode
-			process.env.FLUENTCART_GUARD_SECRET = 'g'.repeat(32)
-			process.env.FLUENTCART_GUARD_STATE_DIR = '/tmp/fluentcart-guard-fixture'
 
 			const names = exposedNames()
 			for (const hidden of [
@@ -140,7 +147,26 @@ describe('registry exposure is filtered before registration', () => {
 	})
 
 	it('fails startup on an invalid write mode instead of falling back to a safe-looking default', () => {
-		process.env.FLUENTCART_WRITE_MODE = 'enabled'
+		process.env.FLUENTCART_WRITE_MODE = 'guarded'
 		expect(() => resolveWritePolicy()).toThrow(/Invalid FLUENTCART_WRITE_MODE/)
+	})
+})
+
+describe('authorisation cache revocation', () => {
+	it('purges every authorised response held by the production cache', async () => {
+		const context = resolveServerContext()
+		await context.resourceDeps.cache.getOrLoad(
+			context.resourceDeps.scope,
+			'fixture',
+			{},
+			60_000,
+			async () => 'authorised-data',
+		)
+
+		expect(context.resourceDeps.cache.peek(context.resourceDeps.scope, 'fixture')).toBe(
+			'authorised-data',
+		)
+		purgeAuthorizationCaches()
+		expect(context.resourceDeps.cache.peek(context.resourceDeps.scope, 'fixture')).toBeUndefined()
 	})
 })

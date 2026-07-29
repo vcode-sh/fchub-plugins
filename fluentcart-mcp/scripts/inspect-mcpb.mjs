@@ -11,6 +11,11 @@ import { readFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
+import {
+	expectedReleaseIdentity,
+	PROVENANCE_PATH,
+	releaseIdentityFailures,
+} from './release-identity.mjs'
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -33,6 +38,15 @@ const OWN_TREE_PATTERNS = [
 	/(^|\/)coverage\//,
 	/(^|\/)\.git($|\/)/,
 	/(^|\/)(vitest|biome|tsconfig.*)\.(json|jsonc|ts)$/,
+]
+const FORBIDDEN_MODULES = [
+	'node_modules/@modelcontextprotocol/sdk/',
+	'node_modules/@modelcontextprotocol/conformance/',
+]
+const SDK_V2 = [
+	'@modelcontextprotocol/server',
+	'@modelcontextprotocol/node',
+	'@modelcontextprotocol/express',
 ]
 
 export function readCentralDirectory(buffer) {
@@ -124,7 +138,7 @@ function checkToolInventory(manifest, contract, fail) {
 	}
 }
 
-export function inspectMcpb(archivePath) {
+export function inspectMcpb(archivePath, options = {}) {
 	const buffer = readFileSync(archivePath)
 	const entries = readCentralDirectory(buffer)
 	const failures = []
@@ -137,6 +151,9 @@ export function inspectMcpb(archivePath) {
 		if (isSymlink(entry)) fail(`symlink: ${entry.name}`)
 		if (CREDENTIAL_PATTERNS.some((pattern) => pattern.test(entry.name))) {
 			fail(`credential material: ${entry.name}`)
+		}
+		if (FORBIDDEN_MODULES.some((path) => entry.name.startsWith(path))) {
+			fail(`legacy or conformance-only module: ${entry.name}`)
 		}
 		if (entry.name.startsWith('node_modules/')) continue
 		if (OWN_TREE_PATTERNS.some((pattern) => pattern.test(entry.name))) {
@@ -151,12 +168,28 @@ export function inspectMcpb(archivePath) {
 	const packed = readJsonEntry(buffer, entries, 'package.json')
 	const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'))
 	const contract = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'release-contract.json'), 'utf8'))
+	const provenance = readJsonEntry(buffer, entries, PROVENANCE_PATH)
 
 	if (manifest && manifest.version !== pkg.version) {
 		fail(`manifest version ${manifest.version} does not match package ${pkg.version}`)
 	}
 	if (packed && packed.version !== pkg.version) {
 		fail(`bundled package.json version ${packed.version} does not match ${pkg.version}`)
+	}
+	if (packed?.engines?.node !== '>=24.0.0') fail('bundled package requires an unexpected Node engine')
+	for (const name of SDK_V2) {
+		if (packed?.dependencies?.[name] !== '2.0.0') fail(`${name} is not pinned to 2.0.0`)
+		const installed = readJsonEntry(buffer, entries, `node_modules/${name}/package.json`)
+		if (!installed) fail(`missing installed ${name} package.json`)
+		else if (installed.name !== name || installed.version !== '2.0.0') {
+			fail(`${name} installed version ${installed.version ?? 'missing'}, expected 2.0.0`)
+		}
+	}
+	if (packed?.dependencies?.['@modelcontextprotocol/sdk']) {
+		fail('legacy @modelcontextprotocol/sdk is a direct runtime dependency')
+	}
+	if (packed?.dependencies?.['@modelcontextprotocol/conformance']) {
+		fail('@modelcontextprotocol/conformance is a runtime dependency')
 	}
 	if (manifest && manifest.server?.entry_point !== 'dist/index.js') {
 		fail(`manifest entry_point is ${manifest.server?.entry_point}, expected dist/index.js`)
@@ -169,8 +202,15 @@ export function inspectMcpb(archivePath) {
 	}
 
 	if (manifest) checkToolInventory(manifest, contract, fail)
+	for (const finding of releaseIdentityFailures(
+		provenance,
+		options.expectedIdentity ?? expectedReleaseIdentity(),
+		options.invocationId,
+	)) {
+		fail(finding)
+	}
 
-	return { archive: basename(archivePath), entryCount: entries.length, failures }
+	return { archive: basename(archivePath), entryCount: entries.length, provenance, failures }
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

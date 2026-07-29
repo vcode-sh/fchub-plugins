@@ -188,7 +188,7 @@ describe('curated graduation review (plan 06 Task 5)', () => {
 		const reads = CURATED_TOOL_NAMES.filter((name) => !writes.includes(name))
 
 		expect(CURATED_TOOL_NAMES.filter((name) => writes.includes(name))).toEqual(writes)
-		// Everything else must be a read: a guarded write never graduates by popularity.
+		// Everything else must be a read: unavailable high-impact work never graduates by popularity.
 		const hiddenWrites = new Set(writes)
 		const readOnlyRegistry = CURATED_TOOL_NAMES.filter((name) => !hiddenWrites.has(name)).map(
 			(name) => fakeTool(name, 'read'),

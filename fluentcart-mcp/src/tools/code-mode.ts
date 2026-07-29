@@ -1,4 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 import { buildApiIndex, MAX_SEARCH_RESULTS, type ReadOnlyApiIndex } from '../code-mode/api-index.js'
 import { CODE_MODE_LIMITS } from '../code-mode/limits.js'
@@ -20,6 +20,13 @@ export interface CodeModeOptions extends SandboxOptions {
 	sandbox?: CodeSandbox
 	/** Skip the WebAssembly self-test. Only ever set by tests that supply their own sandbox. */
 	skipSelfTest?: boolean
+	/** App-lifetime host already self-tested by the HTTP transport. */
+	runtime?: PreparedCodeModeRuntime
+}
+
+export interface PreparedCodeModeRuntime {
+	index: ReadOnlyApiIndex
+	sandbox: CodeSandbox
 }
 
 const EXECUTION_GUIDE = [
@@ -93,8 +100,8 @@ function handleSearch(index: ReadOnlyApiIndex, query: string, limit?: number) {
 	return textResult(payload)
 }
 
-async function handleExecute(sandbox: CodeSandbox, code: string) {
-	const result = await sandbox.execute(code)
+async function handleExecute(sandbox: CodeSandbox, code: string, signal?: AbortSignal) {
+	const result = await sandbox.execute(code, signal)
 
 	if (!result.ok || result.json === undefined) {
 		const error = result.error
@@ -122,6 +129,32 @@ async function handleExecute(sandbox: CodeSandbox, code: string) {
 }
 
 /**
+ * Build and self-test the immutable Code Mode host once.
+ *
+ * The host serialises access to one Asyncify module, while CodeSandbox still creates and destroys
+ * a fresh runtime and context for every execution. Sharing this object therefore removes repeated
+ * WebAssembly load/self-test work without sharing a JavaScript realm between requests.
+ */
+export async function prepareCodeModeRuntime(
+	tools: readonly ToolDefinition[],
+	options: Omit<CodeModeOptions, 'runtime'> = {},
+): Promise<PreparedCodeModeRuntime> {
+	const index = buildApiIndex(tools)
+	const sandbox = options.sandbox ?? new CodeSandbox(index, options)
+
+	if (!options.skipSelfTest) {
+		const selfTest = await sandbox.selfTest()
+		if (!selfTest.ok) {
+			throw new Error(
+				`Code mode sandbox failed its startup self-test: ${selfTest.reason ?? 'unknown reason'}`,
+			)
+		}
+	}
+
+	return { index, sandbox }
+}
+
+/**
  * Register the read-only code-mode surface.
  *
  * The registry passed in must already be capability and write-policy filtered; this function
@@ -134,19 +167,17 @@ export async function registerCodeModeTools(
 	tools: readonly ToolDefinition[],
 	options: CodeModeOptions = {},
 ): Promise<CodeModeRegistration> {
-	const index = buildApiIndex(tools)
-	const sandbox = options.sandbox ?? new CodeSandbox(index, options)
-
-	if (!options.skipSelfTest) {
-		const selfTest = await sandbox.selfTest()
-		if (!selfTest.ok) {
-			return {
-				registered: false,
-				reason: `Code mode sandbox failed its startup self-test: ${selfTest.reason ?? 'unknown reason'}`,
-				toolNames: [],
-			}
+	let runtime: PreparedCodeModeRuntime
+	try {
+		runtime = options.runtime ?? (await prepareCodeModeRuntime(tools, options))
+	} catch (error) {
+		return {
+			registered: false,
+			reason: error instanceof Error ? error.message : String(error),
+			toolNames: [],
 		}
 	}
+	const { index, sandbox } = runtime
 
 	server.registerTool(
 		'fluentcart_search_api',
@@ -177,7 +208,8 @@ export async function registerCodeModeTools(
 				openWorldHint: true,
 			},
 		},
-		async (input) => handleExecute(sandbox, input.code),
+		async (input, requestContext) =>
+			handleExecute(sandbox, input.code, requestContext.mcpReq.signal),
 	)
 
 	return {

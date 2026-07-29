@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { DESCRIPTION, LONG_DESCRIPTION, USER_CONFIG } from './manifest-config.mjs'
 import { loadServerModule, MEASURED_MODES } from './measure-tool-context.mjs'
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -20,82 +21,14 @@ export const MANIFEST_PATH = join(PACKAGE_ROOT, 'manifest.json')
 export const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
 export const META_NAMESPACE = 'sh.vcode.fluentcart-mcp'
 
-/**
- * Every declared user config key and the runtime environment variable it feeds. A key with no
- * real variable behind it is a setting that silently does nothing, which is worse than absent.
- */
-export const USER_CONFIG = [
-	{
-		key: 'store_url',
-		env: 'FLUENTCART_URL',
-		type: 'string',
-		title: 'WordPress URL',
-		description: 'Full URL of the WordPress site running FluentCart (e.g. https://your-store.com).',
-		required: true,
-	},
-	{
-		key: 'username',
-		env: 'FLUENTCART_USERNAME',
-		type: 'string',
-		title: 'WordPress Username',
-		description: 'WordPress user whose role grants the FluentCart REST capabilities you need.',
-		required: true,
-	},
-	{
-		key: 'app_password',
-		env: 'FLUENTCART_APP_PASSWORD',
-		type: 'string',
-		title: 'Application Password',
-		description: 'Generate at WordPress Admin > Users > Profile > Application Passwords.',
-		required: true,
-		sensitive: true,
-	},
-	{
-		key: 'write_mode',
-		env: 'FLUENTCART_WRITE_MODE',
-		type: 'string',
-		title: 'Write Mode',
-		description: 'disabled (read-only, the default), reversible (writes with a verified undo), or guarded (adds real-money actions behind a signed preview).',
-		required: false,
-		default: 'disabled',
-	},
-	{
-		key: 'guard_secret',
-		env: 'FLUENTCART_GUARD_SECRET',
-		type: 'string',
-		title: 'Guard Signing Secret',
-		description: 'At least 32 characters. Required by guarded write mode; without it real-money tools stay hidden.',
-		required: false,
-		sensitive: true,
-	},
-	{
-		key: 'guard_state_dir',
-		env: 'FLUENTCART_GUARD_STATE_DIR',
-		type: 'directory',
-		title: 'Guard State Directory',
-		description: 'Durable directory for the idempotency ledger. Required by guarded write mode; without it a replayed refund cannot be stopped.',
-		required: false,
-	},
-]
-
-/** Product copy that stays true whatever the connected store permits. No count belongs here. */
-export const DESCRIPTION =
-	'Curated and capability-discovered tools for a FluentCart store — orders, products, customers, subscriptions, coupons and reports. Read-only unless you opt in to writes.'
-
-export const LONG_DESCRIPTION = `Connects an MCP client to the FluentCart REST API of your own WordPress site.
-
-Dynamic mode is the default: a handful of meta-tools let the agent search the catalogue, read a tool definition and execute it, which keeps the definition payload small no matter how large the store API grows. Curated mode advertises a small reviewed set directly, code mode exposes a sandboxed scripting pair, and full mode lists everything the current policy permits.
-
-Exposure is decided before anything is listed. Writes are hidden entirely until write mode is raised, real-money actions additionally require a signing secret and a durable state directory, and what you actually get depends on what your store and your role support.`
-
 function sha256(value) {
 	return `sha256:${createHash('sha256').update(value).digest('hex')}`
 }
 
 /** Record the `tools/list` result exactly as the SDK hands it to the transport. */
 async function collectWireTools(serverModule, mode) {
-	const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
-	const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js')
+	const { Client } = await import('@modelcontextprotocol/client')
+	const { InMemoryTransport } = await import('@modelcontextprotocol/server')
 
 	const context = serverModule.resolveServerContext()
 	const server = await serverModule.createServerFromContextAsync(context, mode)
@@ -246,6 +179,7 @@ export async function buildManifest() {
 				generatedBy: 'scripts/build-manifest.mjs',
 				packageVersion: pkg.version,
 				sourceTreeDigest: contract.sourceTreeDigest,
+				release: contract.release,
 				serializer: contract.serializer,
 				advertisedToolCount: names.length,
 				userConfigEnvironment: Object.fromEntries(USER_CONFIG.map((e) => [e.key, e.env])),

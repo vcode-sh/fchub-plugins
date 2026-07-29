@@ -37,6 +37,7 @@ export const SHAPE_TOKENS = ['string', 'number', 'boolean', 'null', 'empty', 'mi
  */
 const C = 'app/Http/Controllers'
 const R = `${C}/Reports`
+const S = 'app/Modules/Shipping/Http/Controllers'
 
 function endpoint(path, controller, method, paginated = false) {
 	return { path, controller, method, paginated }
@@ -46,20 +47,129 @@ function endpoint(path, controller, method, paginated = false) {
 // customer email addresses. The capture refuses it, and the right answer is not to fetch it.
 export const ENDPOINTS = [
 	endpoint('/products', `${C}/ProductController.php`, 'index', true),
+	endpoint('/products/bulk-edit-data', `${C}/ProductController.php`, 'bulkEditFetch'),
 	endpoint('/products/fetch-term', `${C}/ProductController.php`, 'getProductTermsList'),
+	endpoint(
+		'/products/findSubscriptionVariants',
+		`${C}/ProductController.php`,
+		'findSubscriptionVariants',
+	),
+	endpoint(
+		'/products/get-max-excerpt-word-count',
+		`${C}/ProductController.php`,
+		'getMaxExcerptWordCount',
+	),
 	endpoint('/labels', `${C}/LabelController.php`, 'index', true),
 	endpoint('/address-info/countries', `${C}/AddressInfoController.php`, 'countriesOption'),
 	endpoint('/integration/addons', `${C}/AddonsController.php`, 'getAddons'),
 	endpoint('/dashboard/stats', `${C}/DashboardController.php`, 'getDashboardStats'),
+	endpoint('/shipping/classes', `${S}/ShippingClassController.php`, 'index'),
+	endpoint('/shipping/packages', `${S}/ShippingClassController.php`, 'getPackages'),
+	endpoint('/shipping/zone/countries', `${S}/ShippingZoneController.php`, 'getCountriesByContinent'),
+	endpoint('/shipping/zone/states', `${S}/ShippingZoneController.php`, 'getZoneStates'),
+	endpoint('/shipping/zones', `${S}/ShippingZoneController.php`, 'index'),
+	endpoint('/tax/classes', `${C}/TaxRateController.php`, 'getClasses'),
+	endpoint('/tax/rates', `${C}/TaxRateController.php`, 'index'),
+	endpoint('/tax/configuration/rates', `${C}/TaxConfigurationController.php`, 'getTaxRates'),
+	endpoint(
+		'/tax/configuration/settings/eu-vat/oss-rates',
+		`${C}/TaxEUController.php`,
+		'getOssCountryRates',
+	),
+	endpoint(
+		'/tax/configuration/settings/eu-vat/product-overrides',
+		`${C}/TaxEUController.php`,
+		'getEuProductOverrides',
+	),
 	endpoint('/reports/overview', `${R}/OverviewReportController.php`, 'getOverview'),
 	endpoint('/reports/revenue', `${R}/RevenueReportController.php`, 'getRevenue'),
 	endpoint('/reports/sales-report', `${R}/DefaultReportController.php`, 'getSalesReport'),
 	endpoint('/reports/fetch-report-meta', `${R}/ReportingController.php`, 'getReportMeta'),
+	endpoint('/reports/quick-order-stats', `${R}/ReportingController.php`, 'getOrderQuickStats'),
+	endpoint('/reports/report-overview', `${R}/ReportingController.php`, 'getReportOverview'),
+	endpoint('/reports/dashboard-stats', `${R}/ReportingController.php`, 'getDashboardStats'),
+	endpoint('/reports/sales-growth-chart', `${R}/ReportingController.php`, 'getSalesGrowthChart'),
+	endpoint('/reports/country-heat-map', `${R}/ReportingController.php`, 'getCountryHeatMap'),
+	endpoint('/reports/get-dashboard-summary', `${R}/ReportingController.php`, 'getDashBoardSummary'),
+	endpoint(
+		'/reports/order-value-distribution',
+		`${R}/OrderReportController.php`,
+		'getOrderValueDistribution',
+	),
+	endpoint('/reports/fetch-order-by-group', `${R}/OrderReportController.php`, 'getOrderByGroup'),
+	endpoint(
+		'/reports/fetch-report-by-day-and-hour',
+		`${R}/OrderReportController.php`,
+		'getReportByDayAndHour',
+	),
+	endpoint(
+		'/reports/item-count-distribution',
+		`${R}/OrderReportController.php`,
+		'getItemCountDistribution',
+	),
+	endpoint(
+		'/reports/order-completion-time',
+		`${R}/OrderReportController.php`,
+		'getOrderCompletionTime',
+	),
+	endpoint('/reports/order-chart', `${R}/OrderReportController.php`, 'getOrderChart'),
+	endpoint(
+		'/reports/fetch-top-sold-products',
+		`${R}/DefaultReportController.php`,
+		'getTopSoldProducts',
+	),
+	endpoint(
+		'/reports/fetch-top-sold-variants',
+		`${R}/DefaultReportController.php`,
+		'getTopSoldVariants',
+	),
+	endpoint('/reports/refund-chart', `${R}/RefundReportController.php`, 'getRefundChart'),
+	endpoint(
+		'/reports/weeks-between-refund',
+		`${R}/RefundReportController.php`,
+		'getWeeksBetweenRefund',
+	),
+	endpoint(
+		'/reports/refund-data-by-group',
+		`${R}/RefundReportController.php`,
+		'getRefundDataByGroup',
+	),
+	endpoint(
+		'/reports/subscription-chart',
+		`${R}/SubscriptionReportController.php`,
+		'getSubscriptionChart',
+	),
+	endpoint('/reports/daily-signups', `${R}/SubscriptionReportController.php`, 'getDailySignups'),
+	endpoint(
+		'/reports/retention-chart',
+		`${R}/SubscriptionReportController.php`,
+		'getRetentionChart',
+	),
+	endpoint(
+		'/reports/subscription-retention',
+		`${R}/SubscriptionReportController.php`,
+		'getRetentionData',
+	),
+	endpoint(
+		'/reports/subscription-cohorts',
+		`${R}/SubscriptionReportController.php`,
+		'getCohortData',
+	),
+	endpoint(
+		'/reports/product-performance',
+		`${R}/ProductReportController.php`,
+		'getProductPerformance',
+	),
+	endpoint('/reports/sources', `${R}/SourceReportController.php`, 'index'),
 ]
 
 /** Keys that mean a person or a secret. Encountering one is a stop, not a redaction. */
+// `/tax/configuration/settings` is also absent: its shape contains `require_vat_number`. Even
+// though the observed leaf is configuration rather than a stored identifier, preserving the
+// fail-closed key policy is safer than adding a contextual exception. `/reports/sales-growth`
+// returned HTTP 500 without extra inputs, so it is not promoted to a successful default contract.
 const FORBIDDEN_KEY =
-	/^(.*_)?(email|phone|mobile|password|secret|token|nonce|authorization|cookie|iban|cvv|ssn|last4)(_.*)?$/i
+	/^(.*_)?(email|phone|mobile|password|secret|token|nonce|authorization|cookie|iban|cvv|ssn|last4|vat_number|tax_id)(_.*)?$/i
 const FORBIDDEN_KEY_EXACT = new Set(
 	'first_name last_name full_name display_name user_login username address_1 address_2 street postcode postal_code zip ip_address api_key access_key private_key card_last4 vat_number tax_id'.split(' '),
 )
@@ -252,6 +362,9 @@ async function captureAll() {
 		}
 
 		const { status, body } = await getJson(base, credentials, endpoint.path)
+		if (status !== 200) {
+			fail(`${endpoint.path} returned HTTP ${status}; only successful default GET contracts may be recorded.`)
+		}
 		const contract = {
 			profileDigest,
 			method: 'GET',
@@ -274,9 +387,30 @@ async function captureAll() {
 	return {
 		schemaVersion: 1,
 		generatedBy: 'scripts/capture-read-contracts.mjs',
+		evidenceScope: 'all-active-compatibility',
 		profileDigest,
 		profile,
 		routeFixture: ROUTE_FIXTURE,
+		compatibilityScopes: [
+			{
+				scope: 'core',
+				status: 'BLOCKED',
+				reason:
+					'No isolated FluentCart Core-only live runtime was available. The all-active response evidence is not promoted to this scope.',
+			},
+			{
+				scope: 'core-pro',
+				status: 'BLOCKED',
+				reason:
+					'No isolated FluentCart Core plus Pro live runtime was available. The all-active response evidence is not promoted to this scope.',
+			},
+			{
+				scope: 'all-active',
+				status: 'CAPTURED',
+				profileDigest,
+				fixture: OUTPUT,
+			},
+		],
 		contracts: contracts.sort((a, b) => (a.canonicalPath < b.canonicalPath ? -1 : 1)),
 	}
 }

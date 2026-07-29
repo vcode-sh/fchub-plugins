@@ -1,11 +1,11 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 
 /**
  * Prompts that work in whichever mode the server is running.
  *
  * These used to hardcode a numbered list of tool names. Every one of those names is absent in
- * `dynamic` mode — the default — which exposes five meta-tools and discovers the rest at call
+ * `dynamic` mode — the default — which exposes discovery and risk-matched execution tools and discovers the rest at call
  * time, so the flagship "Analyze Store Performance" prompt was instructing the model to call four
  * tools that did not exist. Six of the fifteen names were missing in `curated` too, and two of
  * them were broken upstream regardless: `report_sales_growth` answers HTTP 500 on FluentCart
@@ -84,7 +84,7 @@ export function registerPrompts(
 		{
 			title: 'Analyze Store Performance',
 			description: 'Revenue, order volume and best sellers over a date range, with trends.',
-			argsSchema: DATE_ARGS,
+			argsSchema: z.object(DATE_ARGS),
 		},
 		({ startDate, endDate }) =>
 			userMessage(
@@ -118,7 +118,7 @@ export function registerPrompts(
 		{
 			title: 'Investigate Order',
 			description: 'Deep-dive one order: payment status, transactions and activity timeline.',
-			argsSchema: { order_id: z.string().describe('Order ID to investigate') },
+			argsSchema: z.object({ order_id: z.string().describe('Order ID to investigate') }),
 		},
 		({ order_id }) =>
 			userMessage(
@@ -147,7 +147,7 @@ export function registerPrompts(
 		{
 			title: 'Customer Overview',
 			description: 'A complete customer profile: stats, addresses and spending history.',
-			argsSchema: { customer_id: z.string().describe('Customer ID to look up') },
+			argsSchema: z.object({ customer_id: z.string().describe('Customer ID to look up') }),
 		},
 		({ customer_id }) =>
 			userMessage(
@@ -205,7 +205,7 @@ export function registerPrompts(
 		{
 			title: 'Subscription Health',
 			description: 'Subscription health: active base, renewals and cancellations.',
-			argsSchema: DATE_ARGS,
+			argsSchema: z.object(DATE_ARGS),
 		},
 		({ startDate, endDate }) =>
 			userMessage(

@@ -7,16 +7,14 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { before, describe, it } from 'node:test'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url'
+import { PACKAGE_ROOT, resolveFixture } from '../../scripts/acceptance/evidence-writer.mjs'
 import { assertAllowedLiveTarget } from '../../scripts/live-target-policy.mjs'
 
-const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const FIXTURE_PATH = resolve(
-	PACKAGE_ROOT,
-	'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
-)
+const DEFAULT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
+const FIXTURE_PATH = resolveFixture(process.env.FLUENTCART_ACCEPTANCE_FIXTURE ?? DEFAULT_FIXTURE)
 const FETCH_TIMEOUT_MS = 15_000
 
 /**
@@ -127,6 +125,12 @@ before(async () => {
 const key = (operation) => `${operation.method} ${operation.path}`
 
 describe('checked fixture counts', () => {
+	it('uses the exact fixture selected by the acceptance harness', () => {
+		const selected = process.env.FLUENTCART_ACCEPTANCE_FIXTURE
+		const expected = selected ? resolveFixture(selected) : resolve(PACKAGE_ROOT, DEFAULT_FIXTURE)
+		assert.equal(FIXTURE_PATH, expected)
+	})
+
 	it('records 329 paths and 388 exact pairs including the namespace root', () => {
 		assert.equal(fixture.counts.prefixedPathsInclusive, 329)
 		assert.equal(fixture.counts.exactPairsInclusive, 388)

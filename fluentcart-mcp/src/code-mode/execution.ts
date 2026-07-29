@@ -51,6 +51,7 @@ export async function runExecution(
 	limits: ResolvedLimits,
 	startedAt: number,
 	hooks: ExecutionHooks,
+	signal?: AbortSignal,
 ): Promise<ExecutionResult> {
 	const cpu = new CpuBudget(limits.maxCpuMs)
 	const live: LiveFlag = { value: true }
@@ -62,16 +63,35 @@ export async function runExecution(
 	const runtime = context.runtime
 	runtime.setMemoryLimit(limits.maxHeapBytes)
 	runtime.setMaxStackSize(limits.maxStackBytes)
-	runtime.setInterruptHandler(() => cpu.exceeded || Date.now() > deadline)
+	runtime.setInterruptHandler(
+		() => signal?.aborted === true || cpu.exceeded || Date.now() > deadline,
+	)
 
 	const bridge = new HostBridge(index, {
 		maxCalls: limits.maxApiCalls,
+		signal,
 	})
 	const pristine = capturePristineJson(context)
 
 	try {
 		installFluentCartBridge(context, bridge, pristine, live)
-		return await evaluate(context, source, { bridge, pristine, cpu, limits, deadline, startedAt })
+		const result = await evaluate(context, source, {
+			bridge,
+			pristine,
+			cpu,
+			limits,
+			deadline,
+			startedAt,
+			signal,
+		})
+		return signal?.aborted
+			? {
+					ok: false,
+					error: codeModeError('EXECUTION_CANCELLED', 'Execution cancelled by the caller.'),
+					callCount: bridge.callCount,
+					durationMs: Date.now() - startedAt,
+				}
+			: result
 	} catch (error) {
 		return {
 			ok: false,
@@ -100,6 +120,7 @@ interface EvaluationScope {
 	limits: ResolvedLimits
 	deadline: number
 	startedAt: number
+	signal?: AbortSignal
 }
 
 async function evaluate(
@@ -107,7 +128,7 @@ async function evaluate(
 	source: string,
 	scope: EvaluationScope,
 ): Promise<ExecutionResult> {
-	const { bridge, pristine, cpu, limits, deadline, startedAt } = scope
+	const { bridge, pristine, cpu, limits, deadline, startedAt, signal } = scope
 
 	const finish = (partial: Omit<ExecutionResult, 'callCount' | 'durationMs'>): ExecutionResult => ({
 		...partial,
@@ -133,7 +154,7 @@ async function evaluate(
 		return finish({ ok: false, error })
 	}
 
-	const settled = await settle(context, evaluated.value, deadline, bridge, cpu)
+	const settled = await settle(context, evaluated.value, deadline, bridge, cpu, signal)
 
 	if (!settled.settled || settled.handle === null) {
 		return finish({
@@ -171,6 +192,7 @@ async function settle(
 	deadline: number,
 	bridge: HostBridge,
 	cpu: CpuBudget,
+	signal?: AbortSignal,
 ): Promise<SettledValue> {
 	const runtime = context.runtime
 	const handle = promise
@@ -191,7 +213,7 @@ async function settle(
 		const jobs = runtime.executePendingJobs()
 		if (jobs.error) jobs.error.dispose()
 
-		if (Date.now() > deadline) {
+		if (signal?.aborted || Date.now() > deadline) {
 			handle.dispose()
 			return { settled: false, handle: null, rejected: false }
 		}

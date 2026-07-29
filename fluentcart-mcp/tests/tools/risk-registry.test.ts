@@ -43,27 +43,24 @@ describe('risk registry completeness', () => {
 		}
 	})
 
-	it('carries no stale row for a tool that no longer exists', () => {
-		const stale = reviewedToolNames().filter((name) => !names.has(name))
-		expect(stale).toEqual([])
+	it('keeps explicit audit-only rows only for unavailable real-money operations', () => {
+		const auditOnly = reviewedToolNames().filter((name) => !names.has(name))
+		expect(auditOnly).toEqual(['fluentcart_order_refund', 'fluentcart_subscription_cancel'])
 	})
 
-	it('classifies refund and subscription cancellation as real money needing a guard', () => {
+	it('classifies refund and subscription cancellation as unavailable real-money operations', () => {
 		for (const name of ['fluentcart_order_refund', 'fluentcart_subscription_cancel']) {
 			const safety = resolveToolSafety(name, false)
 			expect(safety.risk).toBe('real-money')
-			expect(safety.idempotency).toBe('guard-required')
+			expect(safety.idempotency).toBe('unsupported')
 		}
 	})
 
-	it('ships refund and cancellation unavailable pending acceptance evidence', () => {
-		// Classified real-money and guard-required so the classification survives, but execution
-		// is 'none' for 2.0.0: the guard is built and unit-tested yet never acceptance-proven,
-		// because no run-owned refundable order can be created and then removed on this store.
+	it('ships refund and cancellation with no executable implementation', () => {
 		for (const name of ['fluentcart_order_refund', 'fluentcart_subscription_cancel']) {
 			const safety = resolveToolSafety(name, false)
 			expect(safety.risk).toBe('real-money')
-			expect(safety.idempotency).toBe('guard-required')
+			expect(safety.idempotency).toBe('unsupported')
 			expect(safety.execution).toBe('none')
 		}
 	})
@@ -135,6 +132,8 @@ describe('risk registry completeness', () => {
 			'fluentcart_customer_recalculate_ltv',
 			'fluentcart_report_retention_snapshots_generate',
 			'fluentcart_label_create',
+			'fluentcart_product_pricing_update',
+			'fluentcart_customer_address_make_primary',
 			'fluentcart_product_terms_add',
 		]) {
 			const safety = resolveToolSafety(name, false)

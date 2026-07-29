@@ -254,14 +254,17 @@ Mostly repetition. One order carried its two addresses **three times over**, eac
 
 <Separator className="my-8" />
 
-## What we did not fix
+## Known boundaries
 
 Because a proof page that only lists wins is a brochure.
 
-- **`get_store_context` cannot succeed.** It ranks first for orientation queries and fails every time, for structural reasons in the server bootstrap. It is on the list.
-- **Some reports are honestly labelled rather than repaired.** A tool whose description opens `DIAGNOSTIC, not a metric` means the endpoint behind it ignores its dates, mixes currencies, or returns nothing. We rank those below tools that work rather than pretending.
-- **`email_template_preview` is fatal upstream** for every valid template key, in this FluentCart build. Not ours to fix, and not stable enough across versions to bake into a description.
-- **Nothing filters orders by customer.** FluentCart has no such route; searching by email is the workaround and the tool says so.
+- **Diagnostic reports stay labelled as diagnostic.** If FluentCart ignores a range, mixes
+  currencies or returns an empty figure despite existing data, the tool says so rather than
+  promoting the response to a metric.
+- **The release does not execute destructive or money-moving work.** Refunds, subscription
+  cancellation, deletions, bulk actions, order-status changes and marking paid are absent.
+- **Compatibility is discovered, not guessed from a version string.** A route missing from the
+  connected store produces a smaller registry, not a tool that fails after registration.
 
 <Callout type="info" title="Run it yourself">
 Everything above is reproducible: `npm run test:integration:local` against your own store. If your numbers differ from ours, we would genuinely like to know — [open an issue](https://github.com/vcode-sh/fchub-plugins/issues).

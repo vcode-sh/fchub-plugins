@@ -128,7 +128,7 @@ async function runOneLane(name, context) {
 				exitCode: null,
 				signal: null,
 				status: 'SKIPPED',
-				note: `not run after ${aborted} failed`,
+				note: `not run after ${aborted.id} ${aborted.status.toLowerCase()}`,
 				stdoutBytes: 0,
 				stderrBytes: 0,
 			})
@@ -138,7 +138,9 @@ async function runOneLane(name, context) {
 		report(name, outcome)
 		const { tail: _tail, ...persisted } = outcome
 		steps.push(persisted)
-		if (outcome.status === 'FAIL') aborted = step.id
+		if (outcome.status === 'FAIL' || (outcome.status === 'BLOCKED' && step.blocksLane)) {
+			aborted = { id: step.id, status: outcome.status }
+		}
 	}
 	const status = aggregate(steps)
 	const laneFile = join(context.runDirectory, `lane-${name}.json`)

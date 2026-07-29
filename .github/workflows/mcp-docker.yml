@@ -1,35 +1,28 @@
-# Build, smoke and publish the fluentcart-mcp container image.
-#
-# The image is built from the Docker context archive that mcp-ci.yml already inspected and
-# checksummed, never from a second checkout. Build and push are separate jobs: the built image
-# is handed over as a saved layer tar, so publication loads exactly the bytes that passed the
-# container smoke rather than building again and hoping for the same result.
-#
-# The tag path lives in mcp-release.yml, which calls this workflow. Manual dispatch runs the
-# same validation graph first, so there is no shortcut around it.
-#
-# Requires secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
-name: MCP Docker
+name: MCP Docker Candidate
 
 on:
   workflow_call:
     inputs:
       publish:
-        description: 'Push the verified image to GHCR and Docker Hub.'
         type: boolean
         default: false
       artifact_name:
-        description: 'Workflow artefact holding dist-packages/.'
         type: string
         required: true
       source_sha:
-        description: 'Commit the context was built from.'
         type: string
         required: true
+      source_tree_digest:
+        type: string
+        required: true
+    outputs:
+      ghcr_digest:
+        value: ${{ jobs.publish.outputs.ghcr_digest }}
+      dockerhub_digest:
+        value: ${{ jobs.publish.outputs.dockerhub_digest }}
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Push the verified image to GHCR and Docker Hub.'
         type: boolean
         default: false
 
@@ -38,113 +31,82 @@ env:
   DOCKERHUB_IMAGE: vcodesh/fluentcart-mcp
   LOCAL_REPOSITORY: vcodesh/fluentcart-mcp
   IMAGE_ARTIFACT: fluentcart-mcp-image
-  # Injected only at run time. The image binds 0.0.0.0, so the server refuses to start without
-  # a key of at least 32 characters; this fixture proves both the refusal and the authorised path.
   SMOKE_API_KEY: smoke-test-key-0123456789abcdefghijklmnop
 
 jobs:
-  # Manual dispatch has no caller to validate for it, so it runs the same graph itself.
   validate:
-    name: Validate
     if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/mcp-ci.yml
 
   verify:
-    name: Build & Smoke
     runs-on: ubuntu-latest
     needs: [validate]
-    # A skipped dependency would skip this job too, so the gate is expressed explicitly.
     if: always() && (github.event_name != 'workflow_dispatch' || needs.validate.result == 'success')
     outputs:
       version: ${{ steps.build.outputs.version }}
       source_sha: ${{ steps.build.outputs.source_sha }}
     steps:
-      - name: Download validated artefacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.artifact_name || needs.validate.outputs.artifact_name }}
-          path: dist-packages
-
-      # Only the build tooling is checked out. It verifies the context digest against
-      # SHA256SUMS.json before extracting a single byte, so the image cannot be built from
-      # anything other than the archive that was inspected.
-      - name: Checkout build tooling
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           sparse-checkout: |
             fluentcart-mcp/scripts
             fluentcart-mcp/tests/acceptance/docker.test.mjs
             fluentcart-mcp/package.json
           sparse-checkout-cone-mode: false
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-
-      - name: Build image from the validated context
+      - name: Build candidate from validated context
         id: build
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || needs.validate.outputs.source_sha }}
         run: |
+          node -e "if (!/^[0-9a-f]{40}$/.test(process.env.SOURCE_SHA ?? '')) throw Error('source_sha must be exactly 40 lowercase hexadecimal characters')"
           node fluentcart-mcp/scripts/build-validated-docker-image.mjs \
             --context dist-packages/fluentcart-mcp-docker-context.tar.gz \
             --checksums dist-packages/SHA256SUMS.json \
-            --source-sha "${{ inputs.source_sha || needs.validate.outputs.source_sha }}" \
-            --repository "${{ env.LOCAL_REPOSITORY }}" > build.json
-          cat build.json
+            --source-sha "$SOURCE_SHA" \
+            --repository "${LOCAL_REPOSITORY}" > build.json
           echo "version=$(node -p "require('./build.json').version")" >> "$GITHUB_OUTPUT"
           echo "source_sha=$(node -p "require('./build.json').sourceSha")" >> "$GITHUB_OUTPUT"
-
-      # ---- Container smoke: the image must refuse to be unsafe, then work when configured ----
-
-      - name: Refuses to start without a key
-        run: |
-          set +e
-          OUTPUT=$(docker run --rm "${LOCAL_REPOSITORY}:${VERSION}" 2>&1)
-          STATUS=$?
-          set -e
-          if [ $STATUS -eq 0 ]; then
-            echo "::error::Container started on 0.0.0.0 with no FLUENTCART_MCP_API_KEY"
-            exit 1
-          fi
-          echo "$OUTPUT" | grep -qi "FLUENTCART_MCP_API_KEY" || {
-            echo "::error::Refusal did not name the missing key. Output was: $OUTPUT"
-            exit 1
-          }
+      - name: Refuses missing private key before listen
         env:
           VERSION: ${{ steps.build.outputs.version }}
-
-      - name: Refuses to start with a short key
         run: |
-          set +e
-          docker run --rm -e FLUENTCART_MCP_API_KEY=too-short \
-            "${LOCAL_REPOSITORY}:${VERSION}" >/dev/null 2>&1
-          STATUS=$?
-          set -e
-          if [ $STATUS -eq 0 ]; then
-            echo "::error::Container accepted a key shorter than 32 characters"
-            exit 1
-          fi
+          ! docker run --rm \
+            -e FLUENTCART_MCP_ALLOWED_HOSTS=127.0.0.1 \
+            -e FLUENTCART_MCP_ALLOWED_ORIGINS=127.0.0.1 \
+            "${LOCAL_REPOSITORY}:${VERSION}"
+      - name: Refuses missing private allowlists before listen
         env:
           VERSION: ${{ steps.build.outputs.version }}
-
-      - name: Start deterministic FluentCart capability fixture
         run: |
-          node fluentcart-mcp/scripts/serve-mcp-capability-fixture.mjs --port 39082 \
-            > capability-fixture.log 2>&1 &
-          echo "$!" > capability-fixture.pid
+          ! docker run --rm -e FLUENTCART_MCP_API_KEY="${SMOKE_API_KEY}" \
+            "${LOCAL_REPOSITORY}:${VERSION}"
+      - name: Refuses a short private key before listen
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          ! docker run --rm \
+            -e FLUENTCART_MCP_API_KEY=too-short \
+            -e FLUENTCART_MCP_ALLOWED_HOSTS=127.0.0.1 \
+            -e FLUENTCART_MCP_ALLOWED_ORIGINS=127.0.0.1 \
+            "${LOCAL_REPOSITORY}:${VERSION}"
+      - name: Start deterministic capability fixture
+        run: |
+          node fluentcart-mcp/scripts/serve-mcp-capability-fixture.mjs --port 39082 > fixture.log 2>&1 &
+          echo "$!" > fixture.pid
           for attempt in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:39082/wp-json/fluent-cart/v2 >/dev/null 2>&1; then break; fi
-            if [ "$attempt" -eq 20 ]; then
-              echo "::error::Capability fixture did not start"
-              cat capability-fixture.log
-              exit 1
-            fi
+            curl -fsS http://127.0.0.1:39082/wp-json/fluent-cart/v2 >/dev/null 2>&1 && break
+            test "$attempt" != 20
             sleep 1
           done
-
           mkdir -p smoke-config
           node -e "require('fs').writeFileSync('smoke-config/config.json', JSON.stringify({url:'http://host.docker.internal:39082',username:'fixture',appPassword:'fixture'}))"
-
-      - name: Reachable on the published host port and speaks MCP
+      - name: Private candidate speaks authenticated MCP
         env:
           VERSION: ${{ steps.build.outputs.version }}
         run: |
@@ -153,113 +115,74 @@ jobs:
             -p 127.0.0.1:3000:3000 \
             -v "${PWD}/smoke-config:/home/node/.config/fluentcart-mcp:ro" \
             -e FLUENTCART_MCP_API_KEY="${SMOKE_API_KEY}" \
+            -e FLUENTCART_MCP_ALLOWED_HOSTS=127.0.0.1 \
+            -e FLUENTCART_MCP_ALLOWED_ORIGINS=127.0.0.1 \
             "${LOCAL_REPOSITORY}:${VERSION}"
-
           for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3000/health >/dev/null 2>&1; then break; fi
-            if [ "$attempt" -eq 30 ]; then
-              echo "::error::Container never became reachable on the published host port"
-              docker logs fcmcp-smoke
-              exit 1
-            fi
+            curl -fsS http://127.0.0.1:3000/health >/dev/null 2>&1 && break
+            test "$attempt" != 30
             sleep 1
           done
-
-          UNAUTH=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/mcp)
-          if [ "$UNAUTH" != "401" ]; then
-            echo "::error::Unauthorised /mcp returned $UNAUTH, expected 401"
-            docker logs fcmcp-smoke
-            exit 1
-          fi
-
-          BADKEY=$(curl -s -o /dev/null -w '%{http_code}' \
-            -H "Authorization: Bearer wrong-key-wrong-key-wrong-key-xx" \
-            http://127.0.0.1:3000/mcp)
-          if [ "$BADKEY" != "401" ]; then
-            echo "::error::Wrong bearer returned $BADKEY, expected 401"
-            exit 1
-          fi
-
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/mcp)" = 401
           node fluentcart-mcp/scripts/smoke-mcp-http.mjs \
             http://127.0.0.1:3000/mcp "${SMOKE_API_KEY}"
-
-      - name: Stop protocol smoke container
-        if: always()
-        run: |
-          docker rm -f fcmcp-smoke || true
-
-      - name: Run required image acceptance against the validated revision
+      - name: Required image acceptance
         env:
           FLUENTCART_ACCEPTANCE_REQUIRED: 'yes'
           FLUENTCART_ACCEPTANCE_IMAGE: ${{ env.LOCAL_REPOSITORY }}:${{ steps.build.outputs.version }}
           FLUENTCART_ACCEPTANCE_SOURCE_SHA: ${{ steps.build.outputs.source_sha }}
+          FLUENTCART_ACCEPTANCE_SOURCE_TREE_DIGEST: ${{ inputs.source_tree_digest || needs.validate.outputs.source_tree_digest }}
           FLUENTCART_ACCEPTANCE_STORE_URL: http://host.docker.internal:39082
         run: node --test fluentcart-mcp/tests/acceptance/docker.test.mjs
-
-      - name: Stop capability fixture
-        if: always()
+      - if: always()
         run: |
-          if [ -f capability-fixture.pid ]; then
-            kill "$(cat capability-fixture.pid)" || true
-          fi
-
-      # The verified image itself becomes the handoff, so publication never rebuilds.
-      - name: Save verified image
-        env:
-          VERSION: ${{ steps.build.outputs.version }}
-        run: docker save "${LOCAL_REPOSITORY}:${VERSION}" -o fluentcart-mcp-image.tar
-
-      - name: Upload verified image
-        uses: actions/upload-artifact@v4
+          docker rm -f fcmcp-smoke || true
+          test ! -f fixture.pid || kill "$(cat fixture.pid)" || true
+      - run: docker save "${LOCAL_REPOSITORY}:${{ steps.build.outputs.version }}" -o image.tar
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.IMAGE_ARTIFACT }}
-          path: fluentcart-mcp-image.tar
+          path: image.tar
           if-no-files-found: error
-          retention-days: 7
 
   publish:
-    name: Push
     runs-on: ubuntu-latest
     needs: [verify]
     if: inputs.publish
     permissions:
       contents: read
       packages: write
+    outputs:
+      ghcr_digest: ${{ steps.digests.outputs.ghcr_digest }}
+      dockerhub_digest: ${{ steps.digests.outputs.dockerhub_digest }}
     steps:
-      - name: Download verified image
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ env.IMAGE_ARTIFACT }}
-
-      - name: Load verified image
-        run: docker load -i fluentcart-mcp-image.tar
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      - run: docker load -i image.tar
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Only linux/amd64 is built, so only linux/amd64 is tagged. Claiming an architecture we
-      # never produced is a lie the user discovers at `docker run`, not at release time.
-      - name: Tag and push
+      - name: Push versioned tags only
         env:
           VERSION: ${{ needs.verify.outputs.version }}
-          SOURCE_SHA: ${{ needs.verify.outputs.source_sha }}
         run: |
-          SHORT_SHA="${SOURCE_SHA:0:12}"
           for TARGET in "${GHCR_IMAGE}" "${DOCKERHUB_IMAGE}"; do
             docker tag "${LOCAL_REPOSITORY}:${VERSION}" "${TARGET}:${VERSION}"
-            docker tag "${LOCAL_REPOSITORY}:${VERSION}" "${TARGET}:${SHORT_SHA}"
-            docker tag "${LOCAL_REPOSITORY}:${VERSION}" "${TARGET}:latest"
             docker push "${TARGET}:${VERSION}"
-            docker push "${TARGET}:${SHORT_SHA}"
-            docker push "${TARGET}:latest"
           done
+      - name: Record immutable registry digests
+        id: digests
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          GHCR_DIGEST=$(docker buildx imagetools inspect "${GHCR_IMAGE}:${VERSION}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          DOCKERHUB_DIGEST=$(docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:${VERSION}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "ghcr_digest=$GHCR_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "dockerhub_digest=$DOCKERHUB_DIGEST" >> "$GITHUB_OUTPUT"

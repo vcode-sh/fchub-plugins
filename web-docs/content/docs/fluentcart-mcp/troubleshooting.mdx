@@ -34,13 +34,17 @@ Replace `username` and `application_password` with your actual values. What you 
 
 **What you see**: Claude Desktop has no hammer icon. Cursor shows a red dot. The AI says it can't find any FluentCart tools.
 
+Claude Desktop and Cursor use configuration recipes: a green indicator confirms that client's
+local setup, not a release certification result. Candidate checks exercise MCP Inspector and Claude
+Code over stdio and HTTP, plus the Docker HTTP image. ChatGPT follows the deployment guidance.
+
 **What's actually wrong** (in order of likelihood):
 
 1. **Node.js missing or too old**
    ```bash
    node --version
    ```
-   The MCP server needs `v22.0.0` or higher. If you don't have Node at all, get it from [nodejs.org](https://nodejs.org). If you have an older version, upgrade. No apologies for requiring modern JavaScript.
+   The MCP server needs `v24.0.0` or higher. If you don't have Node at all, get it from [nodejs.org](https://nodejs.org). If you have an older version, upgrade. No apologies for requiring modern JavaScript.
 
 2. **npx not found**
    It comes with Node.js. If `which npx` returns nothing, your Node installation is broken. Reinstall.
@@ -69,20 +73,13 @@ Replace `username` and `application_password` with your actual values. What you 
 **Fix**, in order of likelihood:
 
 1. **Write mode.** `FLUENTCART_WRITE_MODE` defaults to `disabled`. Creating or updating something needs `reversible`.
-2. **It isn't exposed in any mode.** Refunds, subscription cancellation, every deletion, bulk actions, order status changes, marking an order paid and dispute handling are absent from all three write modes — including `guarded`, which in 2.0.0 exposes exactly what `reversible` does. No environment variable brings them back. [Why](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0).
+2. **It isn't exposed in any mode.** Refunds, subscription cancellation, every deletion, bulk
+   action, order status change, marking an order paid and dispute handling are absent. No
+   environment variable brings them back.
 3. **Your store doesn't serve that route.** Startup discovery prunes the registry: a tool whose endpoint your FluentCart build doesn't expose is never registered, and a tool that needs several routes needs all of them. A Pro-only endpoint on a core-only site is legitimately absent, and installing the missing component brings the tool back on the next restart.
 4. **It never existed.** Subscription pause, resume and reactivate are not tools. Neither is a customer address dropdown helper. Check the reference rather than the AI's optimism.
 
 The tool list is therefore a property of your store, not a fixed catalogue. Two sites on different FluentCart builds will legitimately show different tools, and the reference page lists what ships rather than what any particular store exposes.
-
-</Accordion>
-<Accordion title="Setting the Guard Variables Did Nothing">
-
-**What you see**: You set `FLUENTCART_WRITE_MODE=guarded`, generated a signing secret, mounted a state directory — and no refund or cancellation tool appeared. No error either.
-
-**That's correct.** Those two tools are absent from every write mode in 2.0.0. `guarded` is a valid setting that currently exposes exactly what `reversible` does, and `FLUENTCART_GUARD_SECRET`, `FLUENTCART_GUARD_STATE_DIR` and `FLUENTCART_ALLOW_LIVE_GATEWAY_ACTIONS` are reserved for the release that brings them back. Setting them today changes nothing at all.
-
-The guard is finished and tested; what's missing is proof it survives contact with a real store, which FluentCart 1.5.5 makes impossible to gather cleanly. The [deployment guide explains it properly](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0). If you need refunds automated, this release is not the tool for it.
 
 </Accordion>
 <Accordion title="401 From the MCP Endpoint Itself">

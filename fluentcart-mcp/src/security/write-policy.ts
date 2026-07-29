@@ -1,22 +1,14 @@
 import type { ToolSafety } from '../tools/risk.js'
 import { isNonExecutableRisk } from '../tools/risk.js'
 
-export type WriteMode = 'disabled' | 'reversible' | 'guarded'
+export type WriteMode = 'disabled' | 'reversible'
 
-export const WRITE_MODES: readonly WriteMode[] = ['disabled', 'reversible', 'guarded']
+export const WRITE_MODES: readonly WriteMode[] = ['disabled', 'reversible']
 
 export const DEFAULT_WRITE_MODE: WriteMode = 'disabled'
 
-export interface GuardAvailability {
-	/** A writable, persistent, owner-only state directory exists. */
-	persistentState: boolean
-	/** A signing secret of sufficient length was supplied, never generated. */
-	signingSecret: boolean
-}
-
 export interface WritePolicyConfig {
 	writeMode: WriteMode
-	guard: GuardAvailability
 }
 
 export function parseWriteMode(value: string | undefined): WriteMode {
@@ -44,18 +36,7 @@ export function canExposeTool(safety: ToolSafety, config: WritePolicyConfig): bo
 	if (safety.execution === 'none') return false
 
 	if (safety.risk === 'reversible-write') {
-		return config.writeMode === 'reversible' || config.writeMode === 'guarded'
-	}
-
-	if (safety.risk === 'real-money') {
-		// Guarded mode alone is not enough: without durable state and a signing secret there is
-		// no way to prevent a replayed refund, so the tool stays hidden.
-		return (
-			config.writeMode === 'guarded' &&
-			safety.execution === 'guarded-rest' &&
-			config.guard.persistentState &&
-			config.guard.signingSecret
-		)
+		return config.writeMode === 'reversible'
 	}
 
 	return false

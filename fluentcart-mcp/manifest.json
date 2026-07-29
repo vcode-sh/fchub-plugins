@@ -4,7 +4,7 @@
   "display_name": "FluentCart",
   "version": "2.0.0",
   "description": "Curated and capability-discovered tools for a FluentCart store — orders, products, customers, subscriptions, coupons and reports. Read-only unless you opt in to writes.",
-  "long_description": "Connects an MCP client to the FluentCart REST API of your own WordPress site.\n\nDynamic mode is the default: a handful of meta-tools let the agent search the catalogue, read a tool definition and execute it, which keeps the definition payload small no matter how large the store API grows. Curated mode advertises a small reviewed set directly, code mode exposes a sandboxed scripting pair, and full mode lists everything the current policy permits.\n\nExposure is decided before anything is listed. Writes are hidden entirely until write mode is raised, real-money actions additionally require a signing secret and a durable state directory, and what you actually get depends on what your store and your role support.",
+  "long_description": "Connects an MCP client to the FluentCart REST API of your own WordPress site.\n\nDynamic mode is the default: a handful of meta-tools let the agent search the catalogue, read a tool definition and execute it, which keeps the definition payload small no matter how large the store API grows. Curated mode advertises a small reviewed set directly, code mode exposes a sandboxed scripting pair, and full mode lists everything the current policy permits.\n\nExposure is decided before anything is listed. Writes are hidden entirely until write mode is raised, and what you actually get depends on what your store and your role support. FluentCart native abilities are a separate read-only opt-in with their own credentials; discovery admits only the audited read allowlist.",
   "author": {
     "name": "Vibe Code",
     "email": "hello@vcode.sh",
@@ -42,8 +42,9 @@
         "FLUENTCART_USERNAME": "${user_config.username}",
         "FLUENTCART_APP_PASSWORD": "${user_config.app_password}",
         "FLUENTCART_WRITE_MODE": "${user_config.write_mode}",
-        "FLUENTCART_GUARD_SECRET": "${user_config.guard_secret}",
-        "FLUENTCART_GUARD_STATE_DIR": "${user_config.guard_state_dir}"
+        "FLUENTCART_ABILITIES_MODE": "${user_config.abilities_mode}",
+        "FLUENTCART_ABILITIES_USERNAME": "${user_config.abilities_username}",
+        "FLUENTCART_ABILITIES_APP_PASSWORD": "${user_config.abilities_app_password}"
       }
     }
   },
@@ -80,22 +81,29 @@
     "write_mode": {
       "type": "string",
       "title": "Write Mode",
-      "description": "disabled (read-only, the default), reversible (writes with a verified undo), or guarded (adds real-money actions behind a signed preview).",
+      "description": "disabled (read-only, the default) or reversible (writes with a verified undo).",
       "required": false,
       "default": "disabled"
     },
-    "guard_secret": {
+    "abilities_mode": {
       "type": "string",
-      "title": "Guard Signing Secret",
-      "description": "At least 32 characters. Required by guarded write mode; without it real-money tools stay hidden.",
+      "title": "Native Abilities Bridge",
+      "description": "disabled (default) or enabled. Adds only audited FluentCart native read abilities after live discovery.",
+      "required": false,
+      "default": "disabled"
+    },
+    "abilities_username": {
+      "type": "string",
+      "title": "Abilities Username",
+      "description": "Separate WordPress user for the optional read-only Abilities bridge. Required when the bridge is enabled.",
+      "required": false
+    },
+    "abilities_app_password": {
+      "type": "string",
+      "title": "Abilities Application Password",
+      "description": "Separate WordPress Application Password for the optional read-only Abilities bridge.",
       "required": false,
       "sensitive": true
-    },
-    "guard_state_dir": {
-      "type": "directory",
-      "title": "Guard State Directory",
-      "description": "Durable directory for the idempotency ledger. Required by guarded write mode; without it a replayed refund cannot be stopped.",
-      "required": false
     }
   },
   "tools_generated": true,
@@ -146,7 +154,7 @@
     },
     {
       "name": "fluentcart_execute_reversible_write",
-      "description": "Execute a FluentCart write that has a verified read-back and a supported delete or restore. Requires FLUENTCART_WRITE_MODE=reversible or guarded. Refuses destructive and real-money actions."
+      "description": "Execute a FluentCart write that has a verified read-back and a supported delete or restore. Requires FLUENTCART_WRITE_MODE=reversible. Refuses destructive and real-money actions."
     },
     {
       "name": "fluentcart_order_get",
@@ -205,7 +213,84 @@
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
       "packageVersion": "2.0.0",
-      "sourceTreeDigest": "sha256:925d43bae14a02bab3ae7f916a395ea44b52253fe36e3e4326e63a948ea81f2c",
+      "sourceTreeDigest": "sha256:d7c992ac926bf65a9d03f43efa2090c45f1013e7fe59e203f789f6d196e75be8",
+      "release": {
+        "version": "2.0.0",
+        "protocols": [
+          "2025-11-25",
+          "2026-07-28"
+        ],
+        "httpProfiles": [
+          "local",
+          "private"
+        ],
+        "sdk": {
+          "server": "2.0.0",
+          "node": "2.0.0",
+          "express": "2.0.0"
+        },
+        "conformance": {
+          "package": "0.2.0-alpha.10",
+          "expectedFailures": []
+        },
+        "promotion": {
+          "npmStagingTag": "next",
+          "npmPromotionTag": "latest",
+          "previousLatest": "1.1.0",
+          "previousDockerDigests": {
+            "ghcr.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c",
+            "docker.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c"
+          }
+        },
+        "clients": {
+          "automated": {
+            "MCP Inspector": {
+              "status": "AUTOMATED_CANDIDATE",
+              "transports": [
+                "stdio",
+                "streamable-http"
+              ],
+              "requirement": "candidate-bound MCP handshake"
+            },
+            "Claude Code": {
+              "status": "AUTOMATED_CANDIDATE",
+              "transports": [
+                "stdio",
+                "streamable-http"
+              ],
+              "requirement": "candidate-bound MCP handshake"
+            },
+            "Docker smoke": {
+              "status": "AUTOMATED_CANDIDATE",
+              "transports": [
+                "docker-http"
+              ],
+              "requirement": "candidate-bound MCP handshake"
+            }
+          },
+          "configurationRecipes": {
+            "Claude Desktop": {
+              "status": "CONFIGURATION_TARGET",
+              "reason": "manual configuration is documented, not certified"
+            },
+            "Cursor": {
+              "status": "CONFIGURATION_TARGET",
+              "reason": "manual configuration is documented, not certified"
+            }
+          }
+        },
+        "evidence": {
+          "live": [
+            "FluentCart 1.5.5 REST index",
+            "WordPress 7.0.2 Abilities catalogue"
+          ],
+          "fixtures": [
+            "legacy 1.3.9 route surface",
+            "deterministic protocol and capability lanes"
+          ],
+          "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED"
+        }
+      },
       "serializer": "mcp-tools-list-v1",
       "advertisedToolCount": 25,
       "userConfigEnvironment": {
@@ -213,15 +298,16 @@
         "username": "FLUENTCART_USERNAME",
         "app_password": "FLUENTCART_APP_PASSWORD",
         "write_mode": "FLUENTCART_WRITE_MODE",
-        "guard_secret": "FLUENTCART_GUARD_SECRET",
-        "guard_state_dir": "FLUENTCART_GUARD_STATE_DIR"
+        "abilities_mode": "FLUENTCART_ABILITIES_MODE",
+        "abilities_username": "FLUENTCART_ABILITIES_USERNAME",
+        "abilities_app_password": "FLUENTCART_ABILITIES_APP_PASSWORD"
       },
       "tools": [
         {
           "name": "fluentcart_app_init",
           "provenance": "curated",
           "descriptionSha256": "sha256:0eab223558a0ca6e207ca74ca4c18e279fc76680ef00576b9ea4bdb4dda6fec2",
-          "inputSchemaSha256": "sha256:e70a91efa7d51df66e3870ea687b68ea0f49b50832bdb901db7c1cbaa881a7cf",
+          "inputSchemaSha256": "sha256:b2781d24c456a1b00cec63831664f6bd0726bfa309501325828891f50dff77e4",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -232,13 +318,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -264,17 +343,10 @@
           "name": "fluentcart_coupon_create",
           "provenance": "curated",
           "descriptionSha256": "sha256:2e58f4cc58cf85f085f71cae4ea045b1ea172829c283ad1edeb090d685f2e26e",
-          "inputSchemaSha256": "sha256:770f4bbd0843eaa945a8d3e7f2c96ea548e9a753191986b38556d2f1b2250bcb",
+          "inputSchemaSha256": "sha256:f07a8ba51b1aec51e2d2598f38b863b65e01c7c7372baf9810f5592d8ea921a6",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -286,7 +358,7 @@
           "name": "fluentcart_coupon_get",
           "provenance": "curated",
           "descriptionSha256": "sha256:ad30691980b54d02337cf78cd35c538bcf257f80e972d5dce22a81af151cee93",
-          "inputSchemaSha256": "sha256:d5f19e225dd2ee8e3cce2fb6bd1967e9a954f6e61ae9bfd5a56ac976c804df97",
+          "inputSchemaSha256": "sha256:5ddb305c0ef657fbce719ac34d1ac2bf10e7ff84d416c9e0582cc54b56dfad49",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -297,13 +369,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -329,7 +394,7 @@
           "name": "fluentcart_coupon_list",
           "provenance": "curated",
           "descriptionSha256": "sha256:f9406e877afc68102c3d4d9bd4cea1881dd70db2860f94e648c7d3e44364b848",
-          "inputSchemaSha256": "sha256:a74561ebbd389ac4f029add264ec4f365fd259260003762513666f4d7c6a28a7",
+          "inputSchemaSha256": "sha256:195b48463fdd55cfdfeea55a99f953cf0ca2a05db7c01e8965b42b79a04dafc2",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -340,13 +405,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -372,17 +430,10 @@
           "name": "fluentcart_coupon_update",
           "provenance": "curated",
           "descriptionSha256": "sha256:8007271bea41f84ffee069b289017ea86654a3af8518a5de425248caebf3248a",
-          "inputSchemaSha256": "sha256:7d6772eac5e2b83d0376c7b97aba1f7ae7617e3ea5a558c3df2175909e844485",
+          "inputSchemaSha256": "sha256:3e797f9c08c88606b41fbdd058b653b552b1c848cd790d6a3d928bd3b99969bb",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -394,7 +445,7 @@
           "name": "fluentcart_customer_get",
           "provenance": "curated",
           "descriptionSha256": "sha256:0edc428922e907d5f87ac18d1a54c4218d47d1e44028ae15b1a855ba10d53a3f",
-          "inputSchemaSha256": "sha256:48dc085f53c10290ba76baed4586b5d28a98bd98a44cf83ef7cea2d5e0f3b455",
+          "inputSchemaSha256": "sha256:bd5fe8ff68465977b4d7713961d17e1056bc3ecfe012ffbc63edbb74a4985030",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -405,13 +456,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -437,7 +481,7 @@
           "name": "fluentcart_customer_list",
           "provenance": "curated",
           "descriptionSha256": "sha256:0ed219872a95e883128322558251a34777be20fa930dbb4d17c91e6939db1a06",
-          "inputSchemaSha256": "sha256:992589fbb018a3139216847a6edf80f4a0a5440694a5abbe61eed184ac808bdf",
+          "inputSchemaSha256": "sha256:09170195b80dacc4cdb547360e6701da1921f041c0daef5893c32e39bd4601de",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -448,13 +492,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -480,7 +517,7 @@
           "name": "fluentcart_dashboard_overview",
           "provenance": "curated",
           "descriptionSha256": "sha256:2744f7a0262f5a9953d3b45e7cfdf7d5ca5d64c97f197a325927ddc13e478139",
-          "inputSchemaSha256": "sha256:e70a91efa7d51df66e3870ea687b68ea0f49b50832bdb901db7c1cbaa881a7cf",
+          "inputSchemaSha256": "sha256:b2781d24c456a1b00cec63831664f6bd0726bfa309501325828891f50dff77e4",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -491,13 +528,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -523,7 +553,7 @@
           "name": "fluentcart_describe_tools",
           "provenance": "dynamic-meta",
           "descriptionSha256": "sha256:d88c12d1e13d91733126bad86f395a2a083fd669a8e0473416e46b74bc947816",
-          "inputSchemaSha256": "sha256:c654f2f9866cc0588186f131415f3d6c224776dcbba8df2126608ac56092811b",
+          "inputSchemaSha256": "sha256:3b5c8a45bb2cf81576a0073d0cea68f5050014a4d07ee257d6d0d5e3df3e5772",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -533,12 +563,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "dynamic"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "dynamic"
               ]
@@ -561,7 +585,7 @@
           "name": "fluentcart_execute_code",
           "provenance": "code-meta",
           "descriptionSha256": "sha256:9ecd9dce444fa1ce80ba324aaa3090d8d242ab0fb1e2cea840afc62ed2f9e1a3",
-          "inputSchemaSha256": "sha256:5710e409057d856ad9ceaa484ff720ffb64e0d0e8e03978ae5d2ac78dc914e0d",
+          "inputSchemaSha256": "sha256:56c9c9ef98ac75803719ff5e729e3f4653297ee3969f81626969d837ce2186ee",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -571,12 +595,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "code"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "code"
               ]
@@ -599,7 +617,7 @@
           "name": "fluentcart_execute_read_tool",
           "provenance": "dynamic-meta",
           "descriptionSha256": "sha256:ca64d52b815653f4f3889240731b84cf7c549c70e5b0372754f8271e27a26bbf",
-          "inputSchemaSha256": "sha256:ff4904c3b337d8209ef1c07f8d7264e4b49c4ef022d0da5153f620c9a2a667fc",
+          "inputSchemaSha256": "sha256:2a2c931cc488590e8146076227def81eb8524ba82cbff8507c2726d1359e5db3",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -609,12 +627,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "dynamic"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "dynamic"
               ]
@@ -636,17 +648,11 @@
         {
           "name": "fluentcart_execute_reversible_write",
           "provenance": "dynamic-meta",
-          "descriptionSha256": "sha256:dbfe15595149ac489b3e498f99c88b59bb59ef1649215d6481109a6b838592a5",
-          "inputSchemaSha256": "sha256:ff4904c3b337d8209ef1c07f8d7264e4b49c4ef022d0da5153f620c9a2a667fc",
+          "descriptionSha256": "sha256:b4e727e4606033454e5755fbd4d1385abb59e323bf916771e8f80fb96c3b4ccd",
+          "inputSchemaSha256": "sha256:2a2c931cc488590e8146076227def81eb8524ba82cbff8507c2726d1359e5db3",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "dynamic"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "dynamic"
               ]
@@ -657,7 +663,7 @@
           "name": "fluentcart_order_get",
           "provenance": "curated",
           "descriptionSha256": "sha256:2ef0d619745a5ef4727b89a20be4186cb67416d6a8763ec387d7cc163bc34b15",
-          "inputSchemaSha256": "sha256:448e96d643317d84f8f78a354dd115b7a38b900fde9844ca3c849f15e5485186",
+          "inputSchemaSha256": "sha256:65c5a4f164e9137d5c04385eee4dcbc5de1481bf3b86f9963d7783f779fbbe8c",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -668,13 +674,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -700,7 +699,7 @@
           "name": "fluentcart_order_list",
           "provenance": "curated",
           "descriptionSha256": "sha256:1fe2c10a87ad4cbb9f676b5df7cad4589a8dcc83a511ce5486f116b76fbadd97",
-          "inputSchemaSha256": "sha256:f5634cbe1c4df89b9dbbd30a51069432723449abd4fd7006ec2b220120144922",
+          "inputSchemaSha256": "sha256:58400cf37f2df0857204aa08cfdc375126c86778bb366be974ec95076453868b",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -711,13 +710,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -743,7 +735,7 @@
           "name": "fluentcart_order_transactions",
           "provenance": "curated",
           "descriptionSha256": "sha256:9b8f914cb8446ab921566983b7bb6c67f57ade340156084bd65e62a14efd2e77",
-          "inputSchemaSha256": "sha256:448e96d643317d84f8f78a354dd115b7a38b900fde9844ca3c849f15e5485186",
+          "inputSchemaSha256": "sha256:65c5a4f164e9137d5c04385eee4dcbc5de1481bf3b86f9963d7783f779fbbe8c",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -754,13 +746,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -786,7 +771,7 @@
           "name": "fluentcart_product_get",
           "provenance": "curated",
           "descriptionSha256": "sha256:77c75c509050772ff8e576791d54a6729a9acac00575c583c5474a92caddef04",
-          "inputSchemaSha256": "sha256:594e401b7c336b41c5808f7ee7512f994a04138d721bc6754f0f551742c83491",
+          "inputSchemaSha256": "sha256:134de17d09f2b58f59bff992980e129ab6dd76e779a7a6c8bac34779b6dc5e48",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -797,13 +782,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -829,7 +807,7 @@
           "name": "fluentcart_product_list",
           "provenance": "curated",
           "descriptionSha256": "sha256:d22a1742b6c55e984c8b9af7cc45dd90a23ef9aa66e96b98c53ef3323c2f82ce",
-          "inputSchemaSha256": "sha256:90ea5b100a261c2aa037d06cc3d757cd3cb82181d9d2ae653327d49d7d6d4cac",
+          "inputSchemaSha256": "sha256:c03af1f30f702ae435da48876d06efb93a944309b5def2c692c6dc868cec45ad",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -840,13 +818,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -872,7 +843,7 @@
           "name": "fluentcart_product_search_by_name",
           "provenance": "curated",
           "descriptionSha256": "sha256:6b25ed9072a4cec15518526d5e2a0c1c1afdb59103a42590df1e6a19a96f6803",
-          "inputSchemaSha256": "sha256:a720b638cc4a91be35268f9ab6a7448dce576b1151f61f189879cad22f71f8c2",
+          "inputSchemaSha256": "sha256:abaa7f0658fde3c45b352cbdd8d525a61fb71aa886163544205442dfbf4999d5",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -883,13 +854,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -915,7 +879,7 @@
           "name": "fluentcart_report_sales_summary",
           "provenance": "curated",
           "descriptionSha256": "sha256:3cf3036720f86f00cc3635b86feb2ad0edf668c63b4f5db5a50126f69e0e0545",
-          "inputSchemaSha256": "sha256:cc6661aa36a2c64b94026661d000ecb28085d2db913484b6a21d0a7bd5fc868d",
+          "inputSchemaSha256": "sha256:8a302313ad664b24c1d73b6aa1354d31d51642183892a13f7aa5550e7619b24d",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -926,13 +890,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -958,7 +915,7 @@
           "name": "fluentcart_report_sales_trend",
           "provenance": "curated",
           "descriptionSha256": "sha256:70a987ae5f1922098e592dee15cd07a07c6875610cb7c3c8ce04e4e9a7c516b8",
-          "inputSchemaSha256": "sha256:91c8a15df3a251f684e65bf8b7f9da25cf77c40e826391371cfc131942558d4f",
+          "inputSchemaSha256": "sha256:47db834fd7965589f061e35bd4c906d9611c441eaf04a1b59102e6c39bd173f3",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -969,13 +926,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -1001,7 +951,7 @@
           "name": "fluentcart_report_top_products",
           "provenance": "curated",
           "descriptionSha256": "sha256:e204942d0ad4d4ed77aa3d6d1de08ad377fe9b94169d672d092822e31d21fbec",
-          "inputSchemaSha256": "sha256:cc6661aa36a2c64b94026661d000ecb28085d2db913484b6a21d0a7bd5fc868d",
+          "inputSchemaSha256": "sha256:8a302313ad664b24c1d73b6aa1354d31d51642183892a13f7aa5550e7619b24d",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -1012,13 +962,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -1044,7 +987,7 @@
           "name": "fluentcart_search_api",
           "provenance": "code-meta",
           "descriptionSha256": "sha256:7550bdca2f512e6dc2ca3b8f25c1f679d923a8a2c7099a28b4abfa1099407a32",
-          "inputSchemaSha256": "sha256:224d67629619fa180f875ff000aab7b0279b128bf2e9d5f0d577042b429131cc",
+          "inputSchemaSha256": "sha256:b43ddcfca8bf59b17685b9d6399021e180955c24fe9e7a47225070391bf8196c",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -1054,12 +997,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "code"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "code"
               ]
@@ -1082,7 +1019,7 @@
           "name": "fluentcart_search_tools",
           "provenance": "dynamic-meta",
           "descriptionSha256": "sha256:433d2d7e372ec94f5c626c0d60496b68941e06a8a234bcffe331a6bc3cb1b434",
-          "inputSchemaSha256": "sha256:c6f2457979e7942829bb7a153beb4738b04ea42d5b8075bcd9b34d9f67da937b",
+          "inputSchemaSha256": "sha256:5e22f61324296b30c0ceed43b1a6f1f8084267f34bdeef072d290bd11c991a84",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -1092,12 +1029,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "dynamic"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "dynamic"
               ]
@@ -1120,7 +1051,7 @@
           "name": "fluentcart_subscription_get",
           "provenance": "curated",
           "descriptionSha256": "sha256:5d81e218f96df813b785058c20177ebdc8453a241b133736eb4042db92e7a37e",
-          "inputSchemaSha256": "sha256:b309e300aba235784e77b2f12d50b67e3153b642c750a7bda70d38091e83211c",
+          "inputSchemaSha256": "sha256:3f6f4f6b85294224b30fb0388f760f04405036b86f4c9c3dc0a2ca99434cdfca",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -1131,13 +1062,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"
@@ -1163,7 +1087,7 @@
           "name": "fluentcart_subscription_list",
           "provenance": "curated",
           "descriptionSha256": "sha256:524fabcea390a2f40764dfb95aca333840e37a7e1aa210e02cd94f2e121ec992",
-          "inputSchemaSha256": "sha256:ae4e33391bc1ce18706e4496fe2bda545513d615dc8684032fa7aeff5e83b528",
+          "inputSchemaSha256": "sha256:a105c0b4d545b1ef102b37435c652e44099d7fd6931c0956e0a4bf250154f9ba",
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-disabled",
@@ -1174,13 +1098,6 @@
             },
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
-              "modes": [
-                "curated",
-                "full"
-              ]
-            },
-            {
-              "profile": "core-1.5.5-pro-1.5.4-standalone-guarded",
               "modes": [
                 "curated",
                 "full"

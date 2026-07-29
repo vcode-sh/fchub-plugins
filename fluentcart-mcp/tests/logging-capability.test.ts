@@ -1,20 +1,4 @@
-// Log notifications must actually reach the client.
-//
-// The server has always built log lines — a startup summary naming the mode and tool count, and a
-// config-source line — and none of them were ever delivered. The SDK wraps `sendLoggingMessage`
-// in `if (this._capabilities.logging)`, and the server declared no such capability, so every call
-// returned silently. `createLogger` was dead code: the strings were assembled, redacted, and
-// dropped. The Inspector's Notifications pane, one of the four surfaces it offers, stayed empty
-// no matter what the server did.
-//
-// Declaring the capability exposed a second defect the silence had been hiding. The startup lines
-// were emitted during construction, before any transport was connected, so the same call that
-// used to no-op began throwing "Not connected". They are now sent from the `initialized`
-// notification, which is the first moment a client exists to receive them.
-
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createServerFromContextAsync, resolveServerContext, TOOLSET_MODES } from '../src/server.js'
 
@@ -35,88 +19,24 @@ afterEach(() => {
 	}
 })
 
-interface Connected {
-	client: Client
-	messages: { level: string; data: string }[]
-	close: () => Promise<void>
-}
-
-async function connect(mode: string): Promise<Connected> {
-	const server = await createServerFromContextAsync(
-		resolveServerContext(),
-		mode as Parameters<typeof createServerFromContextAsync>[1],
-	)
-	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
-	const messages: { level: string; data: string }[] = []
-
-	const client = new Client({ name: 'logging-test', version: '1' }, { capabilities: {} })
-	client.setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {
-		messages.push({
-			level: String(notification.params.level),
-			data: String(notification.params.data),
-		})
-	})
-
-	await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
-	// The startup lines ride on the `initialized` notification, which is delivered asynchronously.
-	await new Promise((resolve) => setTimeout(resolve, 50))
-
-	return {
-		client,
-		messages,
-		close: async () => {
-			await client.close()
-			await server.close()
-		},
-	}
-}
-
-describe('logging capability', () => {
+describe('MCP capabilities', () => {
 	for (const mode of TOOLSET_MODES) {
-		it(`${mode} mode declares logging and delivers its startup line`, async () => {
-			const session = await connect(mode)
-			try {
-				expect(
-					session.client.getServerCapabilities()?.logging,
-					`${mode} must declare the logging capability or every notification is discarded`,
-				).toBeDefined()
+		it(`${mode} mode exposes immutable registries without MCP logging`, async () => {
+			const server = await createServerFromContextAsync(resolveServerContext(), mode)
+			const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+			const client = new Client({ name: 'capability-test', version: '1' }, { capabilities: {} })
 
-				const info = session.messages.find((message) => message.level === 'info')
-				expect(info, `${mode} delivered no startup line`).toBeDefined()
-				expect(info?.data).toContain('fluentcart-mcp')
-				expect(info?.data).toContain('tools registered')
+			await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+			try {
+				const capabilities = client.getServerCapabilities()
+				expect(capabilities?.logging).toBeUndefined()
+				expect(capabilities?.tools?.listChanged).toBe(false)
+				expect(capabilities?.resources?.listChanged).toBe(false)
+				expect(capabilities?.prompts?.listChanged).toBe(false)
 			} finally {
-				await session.close()
+				await client.close()
+				await server.close()
 			}
 		}, 30_000)
 	}
-
-	it('answers logging/setLevel rather than -32601', async () => {
-		// Declaring the capability is also what makes the SDK register the setLevel handler, so a
-		// client that dials the level down is honoured instead of rejected.
-		const session = await connect('curated')
-		try {
-			await expect(session.client.setLoggingLevel('error')).resolves.toBeDefined()
-		} finally {
-			await session.close()
-		}
-	}, 30_000)
-
-	it('names the mode and a tool count that matches what it lists', async () => {
-		const session = await connect('dynamic')
-		try {
-			const info = session.messages.find((message) => message.level === 'info')
-			expect(info?.data).toMatch(/dynamic mode/)
-
-			// This used to be pinned at five. The guarded executor is now registered only when a
-			// real-money action survives the exposure filter, and none does in this release, so a
-			// fixed number would have the startup line announce a tool the client cannot see. The
-			// count is checked against the real listing instead, which cannot drift from it.
-			const names = (await session.client.listTools()).tools.map((tool) => tool.name)
-			expect(info?.data).toMatch(new RegExp(`\\b${names.length} tools registered\\b`))
-			expect(names).not.toContain('fluentcart_execute_guarded_write')
-		} finally {
-			await session.close()
-		}
-	}, 30_000)
 })

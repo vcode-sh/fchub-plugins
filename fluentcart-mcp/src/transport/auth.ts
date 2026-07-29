@@ -1,70 +1,66 @@
-import { timingSafeEqual } from 'node:crypto'
-import type { NextFunction, Request, Response } from 'express'
+import { createHash, timingSafeEqual } from 'node:crypto'
+import type { NextFunction, Request, RequestHandler, Response } from 'express'
+import type { HttpExposureConfig } from './http-config.js'
 
-/** Shortest bearer key accepted for a bind that is reachable beyond loopback. */
-const MINIMUM_PUBLIC_KEY_LENGTH = 32
+export interface TransportPrincipal {
+	kind: 'anonymous-loopback' | 'static'
+	id: string
+}
 
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', '[::1]', 'localhost'])
+const principals = new WeakMap<Request, TransportPrincipal>()
+const ANONYMOUS_LOOPBACK = Object.freeze({
+	kind: 'anonymous-loopback',
+	id: 'loopback',
+} satisfies TransportPrincipal)
+
+export function getTransportPrincipal(request: Request): TransportPrincipal | undefined {
+	return principals.get(request)
+}
+
+function reject(res: Response): void {
+	res.set('WWW-Authenticate', 'Bearer')
+	res.status(401).json({ error: 'Unauthorized' })
+}
 
 /**
- * Refuse to expose an unauthenticated MCP endpoint beyond loopback.
+ * Authenticate the resolved profile without creating SDK AuthInfo.
  *
- * Called before `app.listen()`, so a misconfigured deployment fails at startup rather than
- * serving an open store-administration API to the network and finding out later.
- *
- * @throws when the bind address is reachable off-host and no strong bearer key is configured.
+ * The successful header is removed before the Node adapter creates its web Request, so neither
+ * the raw key nor an impersonation-capable AuthInfo reaches the MCP factory context.
  */
-export function assertSafeHttpExposure(host: string, apiKey?: string): void {
-	if (isLoopbackHost(host)) return
-
-	if (!apiKey || apiKey.trim().length === 0) {
-		throw new Error(
-			`Refusing to bind ${host}: a non-loopback HTTP transport requires FLUENTCART_MCP_API_KEY ` +
-				`(at least ${MINIMUM_PUBLIC_KEY_LENGTH} characters). Bind 127.0.0.1 for local use.`,
-		)
-	}
-
-	if (apiKey.trim().length < MINIMUM_PUBLIC_KEY_LENGTH) {
-		throw new Error(
-			`Refusing to bind ${host}: FLUENTCART_MCP_API_KEY must be at least ${MINIMUM_PUBLIC_KEY_LENGTH} characters.`,
-		)
-	}
-}
-
-function isLoopbackHost(host: string): boolean {
-	// Exact matching only. "localhost.example.com" is somebody else's domain, not our loopback.
-	return LOOPBACK_HOSTS.has(host.trim().toLowerCase())
-}
-
-export function createBearerAuth(): (req: Request, res: Response, next: NextFunction) => void {
-	const apiKey = process.env.FLUENTCART_MCP_API_KEY
-
-	if (!apiKey) {
-		// Only reachable on loopback: assertSafeHttpExposure refuses any other bind without a key.
-		return (_req, _res, next) => next()
-	}
-
-	const keyBuf = Buffer.from(apiKey, 'utf8')
-
-	return (req, res, next) => {
-		// One opaque failure for every rejection. A caller must not be able to distinguish
-		// "no key configured" from "wrong key" from "malformed header".
-		const reject = () => {
-			res.status(401).json({ error: 'Unauthorized' })
+export function createBearerAuth(config: HttpExposureConfig): RequestHandler {
+	if (!config.bearerKey) {
+		return (req, _res, next) => {
+			principals.set(req, ANONYMOUS_LOOPBACK)
+			next()
 		}
+	}
 
+	const key = config.bearerKey
+	const expected = Buffer.from(key, 'utf8')
+	const principal = Object.freeze({
+		kind: 'static',
+		id: `sha256:${createHash('sha256').update(key).digest('hex')}`,
+	} satisfies TransportPrincipal)
+
+	return (req: Request, res: Response, next: NextFunction) => {
 		const header = req.headers.authorization
-		if (!header?.startsWith('Bearer ')) {
-			reject()
+		const hasBearerScheme = header?.startsWith('Bearer ') === true
+		const supplied = Buffer.from(hasBearerScheme ? header.slice(7) : '', 'utf8')
+		const comparable = Buffer.alloc(expected.length)
+		supplied.copy(comparable, 0, 0, expected.length)
+		const matches =
+			timingSafeEqual(comparable, expected) &&
+			supplied.length === expected.length &&
+			hasBearerScheme
+
+		if (!matches) {
+			reject(res)
 			return
 		}
 
-		const tokenBuf = Buffer.from(header.slice(7), 'utf8')
-		if (tokenBuf.length !== keyBuf.length || !timingSafeEqual(tokenBuf, keyBuf)) {
-			reject()
-			return
-		}
-
+		req.headers.authorization = undefined
+		principals.set(req, principal)
 		next()
 	}
 }

@@ -27,6 +27,7 @@ const PROGRAMME_PATHS = [
 	'.github/workflows/mcp-ci.yml',
 	'.github/workflows/mcp-release.yml',
 	'.github/workflows/mcp-docker.yml',
+	'.github/workflows/mcp-promote.yml',
 ]
 
 /**
@@ -36,6 +37,32 @@ const PROGRAMME_PATHS = [
  * This allowlist is what separates a reviewed removal from a tidied tree. It is deliberately keyed
  * by exact path: a deletion nobody wrote down still fails, however plausible it looks.
  */
+const SIMPLIFIED_PATHS = [
+	'fluentcart-mcp/src/cli/guard-state.ts',
+	'fluentcart-mcp/src/security/confirmation-token.ts',
+	'fluentcart-mcp/src/security/guard-config.ts',
+	'fluentcart-mcp/src/security/guarded-action.ts',
+	'fluentcart-mcp/src/security/guarded-contract.ts',
+	'fluentcart-mcp/src/security/idempotency-ledger.ts',
+	'fluentcart-mcp/src/security/ledger-maintenance.ts',
+	'fluentcart-mcp/src/security/ledger-records.ts',
+	'fluentcart-mcp/src/security/ledger-store.ts',
+	'fluentcart-mcp/src/tools/orders-refunds.ts',
+	'fluentcart-mcp/src/tools/subscriptions-cancellation.ts',
+	'fluentcart-mcp/tests/acceptance/guard-state.test.mjs',
+	'fluentcart-mcp/tests/cli/guard-state.test.ts',
+	'fluentcart-mcp/tests/fixtures/security/standalone-guard.json',
+	'fluentcart-mcp/tests/integration/acceptance-guarded-writes.test.ts',
+	'fluentcart-mcp/tests/integration/guarded-previews.test.ts',
+	'fluentcart-mcp/tests/integration/support/guarded-payment-fixture.ts',
+	'fluentcart-mcp/tests/security/confirmation-token.test.ts',
+	'fluentcart-mcp/tests/security/guarded-action.test.ts',
+	'fluentcart-mcp/tests/security/idempotency-ledger.test.ts',
+	'fluentcart-mcp/tests/security/standalone-guard.test.ts',
+	'fluentcart-mcp/tests/tools/orders-refunds.test.ts',
+	'fluentcart-mcp/tests/tools/subscriptions-cancellation.test.ts',
+]
+
 const MANDATED_DELETIONS = [
 	{
 		path: 'fluentcart-mcp/scripts/generate-manifest-tools.ts',
@@ -53,6 +80,22 @@ const MANDATED_DELETIONS = [
 			'plan 08 task 8 — stop claiming an all-active capture is exclusive Core plus Pro evidence',
 		replacedBy: 'tests/fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json',
 	},
+	{
+		path: 'fluentcart-mcp/src/logging.ts',
+		mandate: 'plan 08 task 2 — replace process-global logging with factory-owned handlers',
+		replacedBy: 'src/server.ts',
+	},
+	{
+		path: 'fluentcart-mcp/tests/logging.test.ts',
+		mandate: 'plan 08 task 2 — replace the legacy process-global logging test',
+		replacedBy: 'tests/logging-capability.test.ts',
+	},
+	...SIMPLIFIED_PATHS.map((path) => ({
+		path,
+		mandate:
+			'plan 02 task 1 — remove the retired guarded-write implementation and its direct tests',
+		replacedBy: 'tests/acceptance/capability-matrix.test.mjs',
+	})),
 ]
 
 /** Files acceptance cannot run without. Their absence is the signature of a tidied tree. */
@@ -131,7 +174,7 @@ function unexplainedDeletions(deleted, mandated = MANDATED_DELETIONS) {
 
 describe('programme scope', () => {
 	it('names exactly the paths the plan puts in scope', () => {
-		assert.equal(PROGRAMME_PATHS.length, 7)
+		assert.equal(PROGRAMME_PATHS.length, 8)
 		for (const path of PROGRAMME_PATHS) {
 			assert.ok(!path.startsWith('/'), `${path} must be repository-relative`)
 			assert.ok(!path.includes('*'), `${path} must not be a glob`)

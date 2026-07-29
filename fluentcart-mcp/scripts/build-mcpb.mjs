@@ -13,6 +13,8 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { computeSourceTreeDigest } from './release-contract-inputs.mjs'
+import { META_NAMESPACE } from './build-manifest.mjs'
 
 export const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 export const DIST_PACKAGES = join(PACKAGE_ROOT, 'dist-packages')
@@ -83,6 +85,18 @@ export function assertVersionsAgree() {
 	}
 	if (contract.packageVersion !== pkg.version) {
 		throw new Error(`release-contract.json version ${contract.packageVersion} does not match package.json ${pkg.version}.`)
+	}
+	const currentDigest = computeSourceTreeDigest()
+	if (contract.sourceTreeDigest !== currentDigest) {
+		throw new Error(
+			`release-contract.json source tree ${contract.sourceTreeDigest} does not match current ${currentDigest}.`,
+		)
+	}
+	const manifestMeta = manifest._meta?.[META_NAMESPACE]
+	if (manifestMeta?.sourceTreeDigest !== contract.sourceTreeDigest) {
+		throw new Error(
+			`manifest.json source tree ${manifestMeta?.sourceTreeDigest} does not match release contract ${contract.sourceTreeDigest}.`,
+		)
 	}
 	return pkg.version
 }

@@ -80,7 +80,9 @@ git tag fchub-p24/v1.0.1
 git push origin fchub-p24/v1.0.1
 ```
 
-MCP server: tag `fluentcart-mcp/v<package-version>` → npm publish + GitHub Release + Docker to GHCR & Docker Hub.
+MCP server: tag `fluentcart-mcp/v<package-version>` → validate and stage npm `next` plus immutable
+versioned Docker images. A separate owner-triggered promotion moves the same verified artefacts to
+`latest` and creates the GitHub Release; promotion never rebuilds.
 
 **Tests:**
 ```bash

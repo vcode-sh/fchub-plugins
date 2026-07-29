@@ -119,8 +119,8 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/:product_id — gets a single product', async () => {
-			if (!productId) return
+		it('GET /products/:product_id — gets a single product', async ({ skip }) => {
+			if (!productId) skip('the live store has no product to read')
 			const res = await client.get(`/products/${productId}`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -158,8 +158,8 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/fetchProductsByIds — fetches by IDs', async () => {
-			if (!productId) return
+		it('GET /products/fetchProductsByIds — fetches by IDs', async ({ skip }) => {
+			if (!productId) skip('the live store has no product to fetch')
 			const res = await client.get('/products/fetchProductsByIds', {
 				product_ids: String(productId),
 			})
@@ -183,29 +183,29 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 
 		// ── Product Pricing ──
 
-		it('GET /products/:product_id/pricing — gets pricing', async () => {
-			if (!productId) return
+		it('GET /products/:product_id/pricing — gets pricing', async ({ skip }) => {
+			if (!productId) skip('the live store has no product pricing to read')
 			const res = await client.get(`/products/${productId}/pricing`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/:product_id/pricing-widgets — gets pricing widgets', async () => {
-			if (!productId) return
+		it('GET /products/:product_id/pricing-widgets — gets pricing widgets', async ({ skip }) => {
+			if (!productId) skip('the live store has no product pricing widgets to read')
 			const res = await client.get(`/products/${productId}/pricing-widgets`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/:product_id/related-products — gets related products', async () => {
-			if (!productId) return
+		it('GET /products/:product_id/related-products — gets related products', async ({ skip }) => {
+			if (!productId) skip('the live store has no product for a related-products query')
 			const res = await client.get(`/products/${productId}/related-products`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/:product_id/get-bundle-info — gets bundle info', async () => {
-			if (!productId) return
+		it('GET /products/:product_id/get-bundle-info — gets bundle info', async ({ skip }) => {
+			if (!productId) skip('the live store has no product for a bundle-info query')
 			const res = await client.get(`/products/${productId}/get-bundle-info`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -213,15 +213,15 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 
 		// ── Product Catalog (requires product_id) ──
 
-		it('GET /products/:product_id/upgrade-paths — gets upgrade settings', async () => {
-			if (!productId) return
+		it('GET /products/:product_id/upgrade-paths — gets upgrade settings', async ({ skip }) => {
+			if (!productId) skip('the live store has no product for an upgrade-path query')
 			const res = await client.get(`/products/${productId}/upgrade-paths`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/:product_id/integrations — gets product integrations', async () => {
-			if (!productId) return
+		it('GET /products/:product_id/integrations — gets product integrations', async ({ skip }) => {
+			if (!productId) skip('the live store has no product integrations to read')
 			const res = await client.get(`/products/${productId}/integrations`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -248,19 +248,19 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/variants — lists variations (needs product_id)', async () => {
-			if (!variantId) return
+		it('GET /products/variants — lists variations (needs product_id)', async ({ skip }) => {
+			if (!variantId) skip('the live store has no product variation')
 			// The server requires product_id even though the schema marks it optional
 			const productRes = await client.get('/products', { per_page: 1 })
 			const pid = firstId(productRes.data)
-			if (!pid) return
+			if (!pid) skip('the live store has no product for the variation query')
 			const res = await client.get('/products/variants', { product_id: pid })
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/fetchVariationsByIds — fetches by IDs', async () => {
-			if (!variantId) return
+		it('GET /products/fetchVariationsByIds — fetches by IDs', async ({ skip }) => {
+			if (!variantId) skip('the live store has no product variation to fetch')
 			const res = await client.get('/products/fetchVariationsByIds', {
 				variation_ids: String(variantId),
 			})
@@ -268,8 +268,10 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /products/variation/:variant_id/upgrade-paths — gets variant upgrade paths', async () => {
-			if (!variantId) return
+		it('GET /products/variation/:variant_id/upgrade-paths — gets variant upgrade paths', async ({
+			skip,
+		}) => {
+			if (!variantId) skip('the live store has no variation for an upgrade-path query')
 			const res = await client.get(`/products/variation/${variantId}/upgrade-paths`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -304,36 +306,38 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /customers/:customer_id — gets a single customer', async () => {
-			if (!customerId) return
+		it('GET /customers/:customer_id — gets a single customer', async ({ skip }) => {
+			if (!customerId) skip('the live store has no customer to read')
 			const res = await client.get(`/customers/${customerId}`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /customers/:customer_id/order — gets customer orders (simple)', async () => {
-			if (!customerId) return
+		it('GET /customers/:customer_id/order — gets customer orders (simple)', async ({ skip }) => {
+			if (!customerId) skip('the live store has no customer for an order query')
 			const res = await client.get(`/customers/${customerId}/order`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /customers/get-stats/:customer_id — gets customer stats', async () => {
-			if (!customerId) return
+		it('GET /customers/get-stats/:customer_id — gets customer stats', async ({ skip }) => {
+			if (!customerId) skip('the live store has no customer statistics to read')
 			const res = await client.get(`/customers/get-stats/${customerId}`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /customers/:customer_id/address — gets customer addresses', async () => {
-			if (!customerId) return
+		it('GET /customers/:customer_id/address — gets customer addresses', async ({ skip }) => {
+			if (!customerId) skip('the live store has no customer addresses to read')
 			const res = await client.get(`/customers/${customerId}/address`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /customers/:customer_id/update-address-select — gets address select options', async () => {
-			if (!customerId) return
+		it('GET /customers/:customer_id/update-address-select — gets address select options', async ({
+			skip,
+		}) => {
+			if (!customerId) skip('the live store has no customer address options to read')
 			const res = await client.get(`/customers/${customerId}/update-address-select`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -345,8 +349,8 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /customers/:customerId/orders — gets customer orders (paginated)', async () => {
-			if (!customerId) return
+		it('GET /customers/:customerId/orders — gets customer orders (paginated)', async ({ skip }) => {
+			if (!customerId) skip('the live store has no customer for a paginated order query')
 			const res = await client.get(`/customers/${customerId}/orders`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -381,15 +385,15 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /orders/:order_id — gets a single order', async () => {
-			if (!orderId) return
+		it('GET /orders/:order_id — gets a single order', async ({ skip }) => {
+			if (!orderId) skip('the live store has no order to read')
 			const res = await client.get(`/orders/${orderId}`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /orders/:order_id/transactions — gets order transactions', async () => {
-			if (!orderId) return
+		it('GET /orders/:order_id/transactions — gets order transactions', async ({ skip }) => {
+			if (!orderId) skip('the live store has no order transaction history to read')
 			const res = await client.get(`/orders/${orderId}/transactions`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -424,8 +428,8 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /subscriptions/:subscription_id — gets a single subscription', async () => {
-			if (!subscriptionId) return
+		it('GET /subscriptions/:subscription_id — gets a single subscription', async ({ skip }) => {
+			if (!subscriptionId) skip('the live store has no subscription to read')
 			const res = await client.get(`/subscriptions/${subscriptionId}`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -454,8 +458,8 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /coupons/:coupon_id — gets a single coupon', async () => {
-			if (!couponId) return
+		it('GET /coupons/:coupon_id — gets a single coupon', async ({ skip }) => {
+			if (!couponId) skip('the live store has no coupon to read')
 			const res = await client.get(`/coupons/${couponId}`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -865,13 +869,15 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 		 * `fakturownia`, which this store does not have, and then recorded the store's entirely
 		 * correct 422 as a test failure.
 		 */
-		it('GET /integration/global-settings — only for integrations this store reports', async () => {
+		it('GET /integration/global-settings — only for integrations this store reports', async ({
+			skip,
+		}) => {
 			const { all, enabled } = await discoverAddons(client)
 			expect(all.length, 'addon discovery returned nothing to test against').toBeGreaterThan(0)
 
 			// No active integration means there is no settings payload to fetch. We do not invent a
 			// key to manufacture a refusal and call that coverage.
-			if (enabled.length === 0) return
+			if (enabled.length === 0) skip('the live store reports no enabled integration settings')
 
 			for (const key of enabled) {
 				const outcome = await integrationSettingsOutcome(client, key)
@@ -885,7 +891,9 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /integration/global-feeds/settings — gets feed settings (with valid integration)', async () => {
+		it('GET /integration/global-feeds/settings — gets feed settings (with valid integration)', async ({
+			skip,
+		}) => {
 			// This endpoint requires a valid integration_name for an installed & configured integration.
 			// First, get available addons to find a valid integration_name.
 			const addonsRes = await client.get('/integration/addons')
@@ -900,7 +908,7 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 					integrationName = installed.key ?? installed.name
 				}
 			}
-			if (!integrationName) return // skip if no integrations installed
+			if (!integrationName) skip('the live store reports no installed integration')
 			const res = await client.get('/integration/global-feeds/settings', {
 				integration_name: integrationName,
 			})
@@ -946,8 +954,8 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /order_bump/:id — gets a single order bump', async () => {
-			if (!bumpId) return
+		it('GET /order_bump/:id — gets a single order bump', async ({ skip }) => {
+			if (!bumpId) skip('the live store has no enabled order-bump record')
 			const res = await client.get(`/order_bump/${bumpId}`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
@@ -978,15 +986,15 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /options/attr/group/:group_id — gets a single group', async () => {
-			if (!groupId) return
+		it('GET /options/attr/group/:group_id — gets a single group', async ({ skip }) => {
+			if (!groupId) skip('the live store has no attribute group to read')
 			const res = await client.get(`/options/attr/group/${groupId}`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()
 		})
 
-		it('GET /options/attr/group/:group_id/terms — lists group terms', async () => {
-			if (!groupId) return
+		it('GET /options/attr/group/:group_id/terms — lists group terms', async ({ skip }) => {
+			if (!groupId) skip('the live store has no attribute group terms to read')
 			const res = await client.get(`/options/attr/group/${groupId}/terms`)
 			expect(res.status).toBe(200)
 			expect(res.data).toBeDefined()

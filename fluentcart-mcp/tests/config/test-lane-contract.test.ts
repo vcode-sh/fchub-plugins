@@ -17,10 +17,16 @@ const integrationConfig = readPackageRootFile('vitest.integration.config.ts')
 
 describe('test lane contract', () => {
 	it('binds every npm test script to an explicit configuration', () => {
+		expect(pkg.scripts.build).toBe(
+			`node -e "require('node:fs').rmSync(require('node:path').resolve('dist'), { recursive: true, force: true })" && tsc`,
+		)
 		expect(pkg.scripts.test).toBe('vitest run --config vitest.config.ts')
 		expect(pkg.scripts['test:unit']).toBe('vitest run --config vitest.config.ts')
 		expect(pkg.scripts['test:integration:local']).toBe('node scripts/run-live-tests.mjs')
-		expect(pkg.scripts['test:tooling']).toBe('node --test tests/tooling/*.test.mjs')
+		expect(pkg.scripts['test:tooling']).toBe(
+			'npm run build && node --test tests/tooling/*.test.mjs',
+		)
+		expect(pkg.scripts['test:acceptance']).toBe('node --test tests/acceptance/*.test.mjs')
 		expect(pkg.scripts['typecheck:tests']).toBe('tsc --project tsconfig.tests.json')
 		expect(pkg.scripts['check:routes']).toBe(
 			'node scripts/check-tool-routes.mjs --fixture tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
@@ -55,5 +61,11 @@ describe('test lane contract', () => {
 			expect(config).not.toContain('FLUENTCART_APP_PASSWORD')
 			expect(config).not.toContain('FLUENTCART_USERNAME')
 		}
+	})
+
+	it('gates HTTP coverage at the implementation modules rather than the compatibility adapter', () => {
+		expect(unitConfig).toContain("'src/transport/http-config.ts'")
+		expect(unitConfig).toContain("'src/transport/http-service.ts'")
+		expect(unitConfig).not.toContain("'src/transport/http.ts'")
 	})
 })

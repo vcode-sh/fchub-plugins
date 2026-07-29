@@ -1,16 +1,10 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { McpServer } from '@modelcontextprotocol/server'
 import { toJSONSchema, z } from 'zod'
 import type { ToolDefinition } from './_factory.js'
 import { CATEGORIES, inferCategory, searchTools } from './dynamic-search.js'
 import type { ToolRisk } from './risk.js'
 
-/**
- * Meta-tools dynamic mode registers unconditionally: search, describe and two executors.
- *
- * The guarded executor is absent from this list on purpose — see `GUARDED_EXECUTOR_TOOL_NAME`.
- * Callers that need the real roster should use the names `registerDynamicTools` returns, which
- * describe what was actually registered for a given registry.
- */
+/** Dynamic tools that register whenever their matching risk class is available. */
 export const DYNAMIC_TOOL_NAMES: readonly string[] = Object.freeze([
 	'fluentcart_search_tools',
 	'fluentcart_describe_tools',
@@ -20,33 +14,14 @@ export const DYNAMIC_TOOL_NAMES: readonly string[] = Object.freeze([
 
 export const DYNAMIC_TOOL_COUNT = DYNAMIC_TOOL_NAMES.length
 
-/**
- * The fifth meta-tool, registered only when a real-money action survived the exposure filter.
- *
- * Registering it unconditionally advertised a `destructiveHint: true` tool with a 100% failure
- * rate: every real-money entry in the risk registry ships `execution: 'none'`, so `canExposeTool`
- * removes them all and the executor could only ever answer "not exposed". A tool that cannot
- * succeed is worse than a missing one — it tells an agent the capability exists and that its own
- * call was somehow wrong. Absence is the honest answer, and it becomes present again the moment a
- * guard-wired refund is exposed, with no further change here.
- */
-export const GUARDED_EXECUTOR_TOOL_NAME = 'fluentcart_execute_guarded_write'
-
 const SEARCH_LIMIT_DEFAULT = 5
 const SEARCH_LIMIT_MAX = 10
 const DESCRIBE_MAX = 5
 
-/**
- * Which executor may dispatch which risk class.
- *
- * Splitting execution by risk is the whole point: a single generic executor would have to
- * advertise one set of annotations for a product lookup and a refund alike, which tells the
- * caller nothing and lets a client that only permitted reads invoke a write.
- */
-const EXECUTOR_RISKS: Record<'read' | 'reversible' | 'guarded', readonly ToolRisk[]> = {
+/** Each executor may dispatch only its matching reviewed risk class. */
+const EXECUTOR_RISKS: Record<'read' | 'reversible', readonly ToolRisk[]> = {
 	read: ['read'],
 	reversible: ['reversible-write'],
-	guarded: ['real-money'],
 }
 
 function textResult(payload: unknown) {
@@ -57,14 +32,6 @@ function errorResult(message: string) {
 	return { content: [{ type: 'text' as const, text: message }], isError: true }
 }
 
-/**
- * Register the dynamic meta-tools and report which ones were actually registered.
- *
- * The return value is the roster, not `DYNAMIC_TOOL_NAMES`: the guarded executor is conditional,
- * so a caller that counted the constant would announce a tool the client cannot see.
- *
- * @returns the registered tool names, in registration order.
- */
 /**
  * Where to begin when a query matched nothing.
  *
@@ -128,11 +95,7 @@ export function registerDynamicTools(server: McpServer, tools: ToolDefinition[])
 				return textResult({ total_available: tools.length, matches: rows.length, tools: rows })
 			}
 
-			// Nothing matched. In dynamic mode search IS the interface, so an empty array leaves the
-			// caller with nowhere to go on a question the registry can often still answer — measured:
-			// "the green shirt" scores zero against every name, title and description, while
-			// `product_list` finds it in one call because its search covers variant names. `matches`
-			// stays 0, because none of these matched; they are offered as somewhere to start.
+			// Search is the dynamic interface, so offer callable entry points when no text matched.
 			return textResult({
 				total_available: tools.length,
 				matches: 0,
@@ -189,22 +152,13 @@ export function registerDynamicTools(server: McpServer, tools: ToolDefinition[])
 		registered.push(registerExecutor(server, toolMap, 'reversible'))
 	}
 
-	// The registry handed in here is already filtered by `canExposeTool`, which rejects anything
-	// with `execution: 'none'`. A real-money entry surviving that filter therefore means a
-	// guard-wired action is genuinely callable, which is exactly when the executor earns its place.
-	// The risk class alone is the test; the executor keeps its own `execution` check as defence in
-	// depth for callers that hand it an unfiltered registry.
-	if (tools.some((tool) => tool.safety.risk === 'real-money')) {
-		registered.push(registerExecutor(server, toolMap, 'guarded'))
-	}
-
 	return registered
 }
 
 function executorFor(risk: ToolRisk): string | null {
 	for (const [executor, risks] of Object.entries(EXECUTOR_RISKS)) {
 		if (risks.includes(risk))
-			return `fluentcart_execute_${executor === 'read' ? 'read_tool' : `${executor}_write`}`
+			return `fluentcart_execute_${executor === 'read' ? 'read_tool' : 'reversible_write'}`
 	}
 	return null
 }
@@ -221,7 +175,7 @@ const EXECUTOR_META = {
 		name: 'fluentcart_execute_reversible_write',
 		title: 'Execute a Reversible FluentCart Write',
 		description:
-			'Execute a FluentCart write that has a verified read-back and a supported delete or restore. Requires FLUENTCART_WRITE_MODE=reversible or guarded. Refuses destructive and real-money actions.',
+			'Execute a FluentCart write that has a verified read-back and a supported delete or restore. Requires FLUENTCART_WRITE_MODE=reversible. Refuses destructive and real-money actions.',
 		annotations: {
 			readOnlyHint: false,
 			destructiveHint: false,
@@ -232,20 +186,13 @@ const EXECUTOR_META = {
 			openWorldHint: true,
 		},
 	},
-	guarded: {
-		name: GUARDED_EXECUTOR_TOOL_NAME,
-		title: 'Execute a Guarded Real-Money FluentCart Action',
-		description:
-			'Execute a real-money FluentCart action through the signed-preview and durable-claim guard. Requires a fresh confirmation token and a unique idempotency key. Requires FLUENTCART_WRITE_MODE=guarded.',
-		annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-	},
 } as const
 
 /** @returns the registered tool name, so the caller can report the roster it actually built. */
 function registerExecutor(
 	server: McpServer,
 	toolMap: Map<string, ToolDefinition>,
-	executor: 'read' | 'reversible' | 'guarded',
+	executor: 'read' | 'reversible',
 ): string {
 	const meta = EXECUTOR_META[executor]
 	const permitted = EXECUTOR_RISKS[executor]
@@ -265,7 +212,7 @@ function registerExecutor(
 			}),
 			annotations: meta.annotations,
 		},
-		async (args) => {
+		async (args, requestContext) => {
 			const tool = toolMap.get(args.tool_name)
 			if (!tool) {
 				return errorResult(
@@ -292,7 +239,9 @@ function registerExecutor(
 				return errorResult(`Validation error: ${JSON.stringify(parsed.error.issues)}`)
 			}
 
-			return tool.handler(parsed.data as Record<string, unknown>)
+			return tool.handler(parsed.data as Record<string, unknown>, {
+				signal: requestContext?.mcpReq.signal,
+			})
 		},
 	)
 

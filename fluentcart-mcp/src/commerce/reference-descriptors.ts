@@ -54,7 +54,7 @@ const COMMON_LABEL = ['label', 'title', 'name', 'display_name', 'text'] as const
  * Every kind names one exact route the current runtime serves.
  *
  * All six are GET reads over the authenticated admin namespace, so none of them can be reached
- * by the write-exposure policy and none needs a guarded path.
+ * by the write-exposure policy and none needs a write path.
  */
 export const REFERENCE_DESCRIPTORS: Readonly<Record<ReferenceKind, ReferenceDescriptor>> = {
 	payment_methods: {

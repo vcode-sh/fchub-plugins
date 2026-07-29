@@ -90,10 +90,10 @@ export class CodeSandbox {
 	 * per WebAssembly module, so overlapping executions on a shared module are a documented
 	 * error rather than a slow path.
 	 */
-	async execute(source: string): Promise<ExecutionResult> {
+	async execute(source: string, signal?: AbortSignal): Promise<ExecutionResult> {
 		const run = this.#queue.then(
-			() => this.#executeOnce(source),
-			() => this.#executeOnce(source),
+			() => this.#executeOnce(source, signal),
+			() => this.#executeOnce(source, signal),
 		)
 		this.#queue = run.catch(() => undefined)
 		return run
@@ -111,7 +111,7 @@ export class CodeSandbox {
 		return this.#modulePromise
 	}
 
-	async #executeOnce(source: string): Promise<ExecutionResult> {
+	async #executeOnce(source: string, signal?: AbortSignal): Promise<ExecutionResult> {
 		const startedAt = Date.now()
 		const fail = (error: CodeModeError): ExecutionResult => ({
 			ok: false,
@@ -119,7 +119,10 @@ export class CodeSandbox {
 			callCount: 0,
 			durationMs: Date.now() - startedAt,
 		})
+		const cancelled = () =>
+			fail(codeModeError('EXECUTION_CANCELLED', 'Execution cancelled by the caller.'))
 
+		if (signal?.aborted) return cancelled()
 		const rejection = this.#guardSource(source)
 		if (rejection) return fail(rejection)
 
@@ -134,15 +137,24 @@ export class CodeSandbox {
 				),
 			)
 		}
+		if (signal?.aborted) return cancelled()
 
-		return runExecution(quickjs, source, this.#index, this.#limits, startedAt, {
-			onContextCreated: () => {
-				this.#contextsCreated += 1
+		return runExecution(
+			quickjs,
+			source,
+			this.#index,
+			this.#limits,
+			startedAt,
+			{
+				onContextCreated: () => {
+					this.#contextsCreated += 1
+				},
+				onContextDestroyed: () => {
+					this.#contextsDestroyed += 1
+				},
 			},
-			onContextDestroyed: () => {
-				this.#contextsDestroyed += 1
-			},
-		})
+			signal,
+		)
 	}
 
 	/** Cheap static refusals, applied before a context is ever created. */

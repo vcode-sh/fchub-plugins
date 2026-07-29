@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FluentCartApiError } from '../../src/api/errors.js'
 import {
+	AUTHORIZATION_CACHE_MAX_TTL_MS,
 	buildCacheScope,
 	type CacheScope,
 	cacheKey,
@@ -258,8 +259,22 @@ describe('identical in-flight reads coalesce', () => {
 
 describe('time to live', () => {
 	it('pins the documented durations', () => {
+		expect(AUTHORIZATION_CACHE_MAX_TTL_MS).toBe(60_000)
 		expect(REFERENCE_DATA_TTL_MS).toBe(60_000)
 		expect(STORE_CONTEXT_TTL_MS).toBe(15_000)
+	})
+
+	it('clamps every authenticated entry to the revocation window', async () => {
+		const time = clock()
+		const cache = new PrincipalScopedCache({ now: time.now })
+		const scope = scopeFor('alice')
+		const loader = vi.fn(async () => ['fresh'])
+
+		await cache.getOrLoad(scope, 'op', {}, 3_600_000, loader)
+		time.advance(AUTHORIZATION_CACHE_MAX_TTL_MS + 1)
+		await cache.getOrLoad(scope, 'op', {}, 3_600_000, loader)
+
+		expect(loader).toHaveBeenCalledTimes(2)
 	})
 
 	it('serves within the window and reloads after it', async () => {
@@ -322,6 +337,28 @@ describe('invalidation is scoped', () => {
 		const cache = new PrincipalScopedCache()
 		await populate(cache)
 		expect(cache.invalidate(scopeFor('carol'))).toBe(0)
+	})
+
+	it('does not let an in-flight authorised read repopulate after a purge', async () => {
+		const cache = new PrincipalScopedCache()
+		const scope = scopeFor('alice')
+		let release: ((value: string) => void) | undefined
+		const pending = cache.getOrLoad(
+			scope,
+			'reference:labels',
+			{},
+			60_000,
+			() =>
+				new Promise<string>((resolve) => {
+					release = resolve
+				}),
+		)
+
+		cache.clear()
+		release?.('stale-authorised-data')
+		await pending
+
+		expect(cache.peek(scope, 'reference:labels')).toBeUndefined()
 	})
 })
 

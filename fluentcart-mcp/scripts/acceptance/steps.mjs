@@ -6,6 +6,7 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import { PACKAGE_ROOT } from './evidence-writer.mjs'
@@ -47,7 +48,23 @@ function matchDynamicArgument(step) {
 // READY with a command, or BLOCKED/SKIPPED with the exact prerequisite that is missing.
 export function resolveStep(step, context) {
 	if (step.optIn && !context.optIns?.[step.optIn]) return { status: 'SKIPPED', note: step.skipNote }
+	for (const required of step.requiresEnvironment ?? []) {
+		if (!process.env[required]) {
+			return {
+				status: 'BLOCKED',
+				note: `missing ${step.prerequisiteLabel ?? 'required environment variable'}: ${required}`,
+			}
+		}
+	}
 	const cwd = resolve(PACKAGE_ROOT, step.cwd ?? '.')
+	const requireFromCwd = createRequire(join(cwd, 'package.json'))
+	for (const required of step.requiresModules ?? []) {
+		try {
+			requireFromCwd.resolve(required)
+		} catch {
+			return { status: 'BLOCKED', note: `missing required module: ${required}` }
+		}
+	}
 	for (const required of step.requiresFiles ?? []) {
 		if (!existsSync(resolve(PACKAGE_ROOT, required))) {
 			return { status: 'BLOCKED', note: `missing required file: ${required}` }
@@ -62,7 +79,9 @@ export function resolveStep(step, context) {
 		if (matched.missing) return { status: 'BLOCKED', note: `missing required archive: ${matched.missing}` }
 		args.push(matched.value)
 	}
-	if (step.acceptsFixture && context.fixture) args.push('--fixture', context.fixture)
+	if (step.kind !== 'node-test' && step.acceptsFixture && context.fixture) {
+		args.push('--fixture', context.fixture)
+	}
 	// The Docker build stamps the commit onto the image labels and tags, so it needs the same
 	// SHA the run is recorded under. Passing it from the run context keeps image provenance and
 	// evidence provenance identical by construction rather than by the operator remembering.
@@ -106,7 +125,7 @@ function buildCommand(step, args, cwd) {
 	const missing = step.files.filter((file) => !existsSync(resolve(PACKAGE_ROOT, file)))
 	if (missing.length > 0) return { status: 'BLOCKED', note: `missing test file: ${missing.join(', ')}` }
 	const files = step.files.map((file) => resolve(PACKAGE_ROOT, file))
-	return { status: 'READY', command: [process.execPath, '--test', ...files, ...args], cwd }
+	return { status: 'READY', command: [process.execPath, '--test', ...args, ...files], cwd }
 }
 
 // Child output is counted, never persisted: a live lane's stdout can carry real commerce records.
@@ -143,6 +162,7 @@ export async function runStep(step, context) {
 
 	const began = Date.now()
 	const env = { ...process.env, ...(step.env ?? {}), FLUENTCART_ACCEPTANCE_RUN_DIR: context.runDirectory }
+	Reflect.deleteProperty(env, 'FLUENTCART_ACCEPTANCE_FIXTURE')
 	if (context.fixture) env.FLUENTCART_ACCEPTANCE_FIXTURE = context.fixture
 	if (step.reporterVia === 'env' && reportPath) {
 		env.NODE_OPTIONS = [process.env.NODE_OPTIONS ?? '', ...reporterArgs(step.reporter, reportPath)]
@@ -154,6 +174,12 @@ export async function runStep(step, context) {
 	const report = signalled ? null : readReport(reportPath)
 	const verdict = signalled
 		? { status: 'FAIL', note: `killed by ${outcome.signal}`, unproven: [] }
+		: step.blockedExitCodes?.includes(outcome.exitCode)
+			? {
+					status: 'BLOCKED',
+					note: step.blockedNote ?? 'candidate prerequisite unavailable',
+					unproven: [],
+				}
 		: classify(report, { exitCode: outcome.exitCode, proves: step.proves ?? [] })
 
 	return {

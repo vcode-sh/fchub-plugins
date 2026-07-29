@@ -5,13 +5,34 @@ import { dirname, join } from 'node:path'
 import { after, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { crc32, gunzipSync, gzipSync } from 'node:zlib'
-import { assertSafeContext } from '../../scripts/build-validated-docker-image.mjs'
+import {
+	assertSafeContext,
+	readContextIdentity,
+} from '../../scripts/build-validated-docker-image.mjs'
 import { inspectMcpb } from '../../scripts/inspect-mcpb.mjs'
 import { inspectNpmPack, readTar } from '../../scripts/inspect-npm-pack.mjs'
+import { expectedReleaseIdentity } from '../../scripts/release-identity.mjs'
 
 const PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 const DIST_PACKAGES = join(PACKAGE_ROOT, 'dist-packages')
-const VERSION = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8')).version
+const PACKAGE = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'))
+const VERSION = PACKAGE.version
+const PACKED_PACKAGE = {
+	version: VERSION,
+	files: ['dist'],
+	engines: PACKAGE.engines,
+	dependencies: PACKAGE.dependencies,
+	devDependencies: PACKAGE.devDependencies,
+}
+const CONTRACT = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'release-contract.json'), 'utf8'))
+const CONTRACT_RAW = readFileSync(join(PACKAGE_ROOT, 'release-contract.json'), 'utf8')
+const RELEASE_IDENTITY = expectedReleaseIdentity(PACKAGE_ROOT)
+const GOOD_PROVENANCE = { ...RELEASE_IDENTITY, invocationId: 'current-build' }
+const SDK_PACKAGES = [
+	'@modelcontextprotocol/server',
+	'@modelcontextprotocol/node',
+	'@modelcontextprotocol/express',
+]
 
 /**
  * How many tools a well-formed bundle advertises, read from the generated manifest.
@@ -128,9 +149,17 @@ function goodMcpbEntries(overrides = {}) {
 		{ name: 'manifest.json', data: JSON.stringify(manifest) },
 		{
 			name: 'package.json',
-			data: JSON.stringify({ version: VERSION, devDependencies: { vitest: '^4' } }),
+			data: JSON.stringify(PACKED_PACKAGE),
 		},
 		{ name: 'dist/index.js', data: 'export {}\n' },
+		{
+			name: 'dist/release-provenance.json',
+			data: JSON.stringify(overrides.provenance ?? GOOD_PROVENANCE),
+		},
+		...SDK_PACKAGES.map((name) => ({
+			name: `node_modules/${name}/package.json`,
+			data: JSON.stringify({ name, version: '2.0.0' }),
+		})),
 		{ name: 'node_modules/zod/index.js', data: 'module.exports={}\n' },
 		...(overrides.extra ?? []),
 	]
@@ -158,6 +187,26 @@ describe('MCPB archive inspection', () => {
 	it('rejects a development dependency inside the bundle', () => {
 		const entries = goodMcpbEntries({ extra: [{ name: 'node_modules/vitest/index.js', data: '' }] })
 		assert.match(mcpbFailures(entries), /development dependency shipped: vitest/)
+	})
+
+	it('rejects every missing installed modular SDK package', () => {
+		for (const name of SDK_PACKAGES) {
+			const path = `node_modules/${name}/package.json`
+			const entries = goodMcpbEntries().filter((entry) => entry.name !== path)
+			assert.match(mcpbFailures(entries), new RegExp(`missing installed ${name}`))
+		}
+	})
+
+	it('rejects every installed modular SDK package at the wrong version', () => {
+		for (const name of SDK_PACKAGES) {
+			const path = `node_modules/${name}/package.json`
+			const entries = goodMcpbEntries().map((entry) =>
+				entry.name === path
+					? { ...entry, data: JSON.stringify({ name, version: '2.0.1' }) }
+					: entry,
+			)
+			assert.match(mcpbFailures(entries), new RegExp(`${name} installed version 2\\.0\\.1`))
+		}
 	})
 
 	it('rejects tests, maps, coverage and dev config from our own tree', () => {
@@ -224,13 +273,21 @@ describe('MCPB archive inspection', () => {
 		})
 		assert.match(mcpbFailures(entries), /stale tool count/)
 	})
+
+	it('rejects a same-version bundle built from a different source tree', () => {
+		const entries = goodMcpbEntries({
+			provenance: { ...GOOD_PROVENANCE, sourceTreeDigest: 'sha256:stale' },
+		})
+		assert.match(mcpbFailures(entries), /source tree digest/)
+	})
 })
 
-function goodTarEntries(extra = []) {
+function goodTarEntries(extra = [], provenance = GOOD_PROVENANCE) {
 	return [
-		{ name: 'package/package.json', data: JSON.stringify({ version: VERSION, files: ['dist'] }) },
+		{ name: 'package/package.json', data: JSON.stringify(PACKED_PACKAGE) },
 		{ name: 'package/README.md', data: '# readme\n' },
 		{ name: 'package/dist/index.js', data: 'export {}\n' },
+		{ name: 'package/dist/release-provenance.json', data: JSON.stringify(provenance) },
 		...extra,
 	]
 }
@@ -299,6 +356,24 @@ describe('npm tarball inspection', () => {
 		const entries = goodTarEntries().filter((entry) => entry.name !== 'package/dist/index.js')
 		assert.match(npmFailures(entries), /missing dist\/index\.js/)
 	})
+
+	it('rejects a same-version tarball built with a different package lock', () => {
+		const entries = goodTarEntries([], {
+			...GOOD_PROVENANCE,
+			sourceTreeDigest: CONTRACT.sourceTreeDigest,
+			packageLockDigest: 'sha256:stale',
+		})
+		assert.match(npmFailures(entries), /package-lock digest/)
+	})
+
+	it('rejects an otherwise-current tarball from an earlier pack invocation', () => {
+		const path = writeArchive('tgz', makeTgz(goodTarEntries()))
+		const result = inspectNpmPack(path, {
+			expectedIdentity: RELEASE_IDENTITY,
+			invocationId: 'new-build',
+		})
+		assert.match(result.failures.join(' | '), /release invocation id/)
+	})
 })
 
 describe('built release artefacts', () => {
@@ -312,8 +387,11 @@ describe('built release artefacts', () => {
 			return
 		}
 
-		assert.deepEqual(inspectNpmPack(join(DIST_PACKAGES, tarball)).failures, [])
-		assert.deepEqual(inspectMcpb(join(DIST_PACKAGES, bundle)).failures, [])
+		const npmResult = inspectNpmPack(join(DIST_PACKAGES, tarball))
+		const mcpbResult = inspectMcpb(join(DIST_PACKAGES, bundle))
+		assert.deepEqual(npmResult.failures, [])
+		assert.deepEqual(mcpbResult.failures, [])
+		assert.equal(npmResult.provenance.invocationId, mcpbResult.provenance.invocationId)
 	})
 })
 
@@ -325,8 +403,9 @@ function goodContextEntries(extra = []) {
 	return [
 		{ name: 'Dockerfile.release', data: 'FROM node:22-alpine\n' },
 		{ name: 'package.json', data: JSON.stringify({ name: 'fluentcart-mcp', version: VERSION }) },
-		{ name: 'release-contract.json', data: '{}' },
+		{ name: 'release-contract.json', data: CONTRACT_RAW },
 		{ name: 'dist/index.js', data: 'console.error("ok")\n' },
+		{ name: 'dist/release-provenance.json', data: JSON.stringify(GOOD_PROVENANCE) },
 		{ name: 'node_modules/which/bin/node-which', data: '#!/usr/bin/env node\n' },
 		...extra,
 	]
@@ -436,6 +515,28 @@ describe('Docker build context validation', () => {
 		assert.match(message, /absolute path/)
 		assert.match(message, /symlink/)
 		assert.match(message, /outside the context allowlist/)
+	})
+
+	it('binds the context package, contract, source tree, lockfile record, and source SHA', () => {
+		const entries = readTar(gunzipSync(makeTgz(goodContextEntries())))
+		const identity = readContextIdentity(entries, RELEASE_IDENTITY.sourceSha)
+		assert.equal(identity.version, VERSION)
+		assert.equal(identity.provenance.packageLockDigest, RELEASE_IDENTITY.packageLockDigest)
+	})
+
+	it('rejects a same-version context whose source tree record is stale', () => {
+		const entries = goodContextEntries().map((entry) =>
+			entry.name === 'dist/release-provenance.json'
+				? {
+						...entry,
+						data: JSON.stringify({ ...GOOD_PROVENANCE, sourceTreeDigest: 'sha256:stale' }),
+					}
+				: entry,
+		)
+		assert.throws(
+			() => readContextIdentity(readTar(gunzipSync(makeTgz(entries))), RELEASE_IDENTITY.sourceSha),
+			/source tree digest/,
+		)
 	})
 })
 

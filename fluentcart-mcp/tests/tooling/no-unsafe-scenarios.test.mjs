@@ -105,9 +105,9 @@ describe('repository contract: no unsafe live entry points', () => {
 	})
 
 	it('never refunds, cancels or restatuses a discovered record', () => {
-		// Reviewed homes for guarded-action coverage. Everywhere else, a refund or cancellation
-		// is by definition acting on a record the test did not create this run.
-		const reviewedGuardDirectories = [
+		// Fixture and policy tests may name unavailable actions; everywhere else, a refund or
+		// cancellation is by definition acting on a record the test did not create this run.
+		const reviewedDirectories = [
 			'tests/tooling/',
 			'tests/security/',
 			'tests/tools/',
@@ -120,7 +120,7 @@ describe('repository contract: no unsafe live entry points', () => {
 		const offenders = []
 		for (const file of sourceFiles) {
 			const name = rel(file)
-			if (reviewedGuardDirectories.some((dir) => name.startsWith(dir))) continue
+			if (reviewedDirectories.some((dir) => name.startsWith(dir))) continue
 
 			const text = readFileSync(file, 'utf8')
 			const rawRoute = /\.(post|put)\(\s*[`'"][^`'"]*(refund|\/cancel|change-status|update-status)/i
@@ -136,7 +136,7 @@ describe('repository contract: no unsafe live entry points', () => {
 		assert.deepEqual(
 			offenders,
 			[],
-			`refund/cancel/status mutation found outside the guarded modules: ${offenders.join(', ')}`,
+			`refund/cancel/status mutation found outside the reviewed test directories: ${offenders.join(', ')}`,
 		)
 	})
 

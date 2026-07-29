@@ -30,13 +30,7 @@ export default defineConfig({
 					functions: 100,
 					lines: 100,
 				},
-				'src/security/guarded-action.ts': {
-					statements: 90,
-					branches: 86,
-					functions: 85,
-					lines: 93,
-				},
-				'src/tools/_factory.ts': {
+					'src/tools/_factory.ts': {
 					statements: 92,
 					branches: 87,
 					functions: 83,
@@ -48,23 +42,35 @@ export default defineConfig({
 					functions: 100,
 					lines: 96,
 				},
-				'src/tools/orders-refunds.ts': {
-					statements: 97,
-					branches: 86,
-					functions: 100,
-					lines: 96,
+					'src/tools/coupons-writes.ts': {
+					statements: 75,
+					branches: 65,
+					functions: 80,
+					lines: 75,
 				},
-				'src/tools/subscriptions-cancellation.ts': {
-					statements: 98,
-					branches: 79,
-					functions: 100,
-					lines: 98,
+				'src/tools/customers-writes.ts': {
+					statements: 75,
+					branches: 65,
+					functions: 80,
+					lines: 75,
 				},
-				'src/transport/http.ts': {
-					statements: 74,
-					branches: 66,
-					functions: 63,
-					lines: 74,
+				'src/tools/products-variant-writes.ts': {
+					statements: 75,
+					branches: 65,
+					functions: 80,
+					lines: 75,
+				},
+				'src/transport/http-config.ts': {
+					statements: 82,
+					branches: 80,
+					functions: 85,
+					lines: 85,
+				},
+				'src/transport/http-service.ts': {
+					statements: 92,
+					branches: 69,
+					functions: 93,
+					lines: 94,
 				},
 			},
 		},

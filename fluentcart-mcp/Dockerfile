@@ -23,8 +23,7 @@ LABEL org.opencontainers.image.url="https://fchub.co/docs/fluentcart-mcp"
 
 EXPOSE 3000
 
-# The container binds 0.0.0.0 so the published port is reachable. That is a non-loopback
-# exposure, so the server refuses to start unless FLUENTCART_MCP_API_KEY is injected at run
-# time with at least 32 characters. Inject it with `-e FLUENTCART_MCP_API_KEY=...`; it is
-# deliberately never baked into the image.
-CMD ["node", "dist/index.js", "--transport", "http", "--port", "3000", "--host", "0.0.0.0"]
+# The published port uses the private profile. Inject FLUENTCART_MCP_API_KEY (32+ bytes),
+# FLUENTCART_MCP_ALLOWED_HOSTS and FLUENTCART_MCP_ALLOWED_ORIGINS at run time; none belongs
+# in the image. The two allowlists are comma-separated, hostname-only values.
+CMD ["node", "dist/index.js", "--transport", "http", "--port", "3000", "--host", "0.0.0.0", "--http-profile", "private"]

@@ -124,12 +124,11 @@ describe('server internals in a tool result', () => {
 })
 
 /**
- * DEFECT — redaction is applied to error results and log lines, never to a successful one.
+ * SECURITY CONTRACT — successful MCP output boundaries redact upstream credentials.
  *
- * `redactSensitive` has exactly three call sites (src/logging.ts:17 and src/tools/_factory.ts:225
- * and :239), all of them failure paths, despite its own docstring claiming it is "applied at every
- * output boundary — logs, MCP errors and tool content". `formatSuccess` JSON-stringifies whatever
- * the store returned.
+ * Successful tool, resource and Ability responses all redact at their real MCP output boundaries.
+ * This test family keeps that contract pinned independently of optional protocol capabilities:
+ * removing client-directed MCP logging must never remove response redaction with it.
  *
  * That matters because the credential-bearing risk class only covers writes. A GET is never in the
  * risk registry, so it resolves to READ_SAFETY and is exposed in every write mode including

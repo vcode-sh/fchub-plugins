@@ -56,7 +56,7 @@ const DESCRIPTION = [
 	'and FluentCart Pro versions when independently verified, otherwise null without inference;',
 	'a digest identifying the verified route profile; and the',
 	'entity and report capability names this configuration actually exposes, alongside the current',
-	'write mode (disabled, reversible or guarded).',
+	'write mode (disabled or reversible).',
 	'Unconfigured optional values are returned as null with a short warning rather than a guess, so',
 	'an absent currency is visible instead of assumed. Raw settings, payment configuration, user',
 	'identity and the full route list are deliberately not included.',

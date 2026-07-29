@@ -77,7 +77,7 @@ describe('current FluentCart read projections', () => {
 
 		expect(body).toMatchObject({
 			e_invoice_enabled: true,
-			profile: 'en16931',
+			e_invoice_profile: 'en16931',
 			store_country_configured: true,
 			configured: {
 				contact_name: true,
@@ -86,6 +86,7 @@ describe('current FluentCart read projections', () => {
 				vat_id: true,
 			},
 		})
+		expect(body).not.toHaveProperty('profile')
 		for (const secret of [
 			'Private Person',
 			'owner@example.com',
@@ -116,7 +117,9 @@ describe('current FluentCart read projections', () => {
 						region: 'PL',
 						order: '1',
 						created_at: 'internal timestamp',
-						methods: [{ id: 9, title: 'Courier', type: 'flat_rate', amount: 1200, enabled: 'yes' }],
+						methods: [
+							{ id: 9, title: 'Courier', type: 'flat_rate', amount: 1200, is_enabled: true },
+						],
 					},
 				],
 			},
@@ -137,7 +140,7 @@ describe('current FluentCart read projections', () => {
 						name: 'Poland',
 						region: 'PL',
 						order: '1',
-						methods: [{ id: 9, title: 'Courier', type: 'flat_rate', amount: 1200, enabled: 'yes' }],
+						methods: [{ id: 9, title: 'Courier', type: 'flat_rate', amount: 1200, enabled: true }],
 					},
 				],
 			},

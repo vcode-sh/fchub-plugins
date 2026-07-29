@@ -40,16 +40,14 @@ export const REGRESSION_BASELINES = {
 }
 
 /**
- * Guarded write mode with both guard prerequisites present is the widest registry any legitimate
- * configuration produces. A narrower policy would understate every mode's real ceiling.
+ * Reversible mode is the widest public registry. A narrower policy would understate every mode's
+ * real ceiling.
  */
 const FIXTURE_ENV = {
 	FLUENTCART_URL: 'https://fixture.invalid',
 	FLUENTCART_USERNAME: 'fixture',
 	FLUENTCART_APP_PASSWORD: 'fixture',
-	FLUENTCART_WRITE_MODE: 'guarded',
-	FLUENTCART_GUARD_SECRET: 'measurement-fixture-guard-secret-never-used-to-sign',
-	FLUENTCART_GUARD_STATE_DIR: join(PACKAGE_ROOT, '.measurement-fixture-guard-state'),
+	FLUENTCART_WRITE_MODE: 'reversible',
 }
 
 function applyFixtureEnv() {
@@ -117,8 +115,8 @@ export function resolveMode(serverModule, mode) {
 
 /** Record the outgoing `tools/list` result exactly as the SDK hands it to the transport. */
 async function collectWireTools(serverModule, resolvedMode) {
-	const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
-	const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js')
+	const { Client } = await import('@modelcontextprotocol/client')
+	const { InMemoryTransport } = await import('@modelcontextprotocol/server')
 
 	const context = serverModule.resolveServerContext()
 	// Code mode starts a WebAssembly sandbox, so construction is asynchronous.

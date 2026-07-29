@@ -3,6 +3,9 @@ type: server
 meta:
   category: ecommerce
   tags: [ecommerce, wordpress, fluentcart, orders, products, subscriptions]
+  # 2.0.0 negotiates both supported MCP eras; final named-client certification is recorded
+  # separately because metadata is not, despite industry tradition, a runtime test.
+  protocols: ["2025-11-25", "2026-07-28"]
 about:
   title: FluentCart
   # Deliberately no tool count. The exposed surface depends on the connected store's
@@ -36,3 +39,9 @@ config:
     - name: fluentcart.mcp_api_key
       env: FLUENTCART_MCP_API_KEY
       example: "a-32-character-or-longer-random-secret"
+    - name: fluentcart.allowed_hosts
+      env: FLUENTCART_MCP_ALLOWED_HOSTS
+      example: "mcp.your-domain.com"
+    - name: fluentcart.allowed_origins
+      env: FLUENTCART_MCP_ALLOWED_ORIGINS
+      example: "mcp.your-domain.com"

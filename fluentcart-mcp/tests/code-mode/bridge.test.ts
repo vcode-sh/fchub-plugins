@@ -270,6 +270,50 @@ describe('termination', () => {
 		expect(cancelled).toBe(true)
 	})
 
+	it('propagates an external cancellation and removes its abort listener', async () => {
+		let operationSignal: AbortSignal | undefined
+		const handler = ((_input: Record<string, unknown>, execution?: { signal?: AbortSignal }) =>
+			new Promise((resolve) => {
+				operationSignal = execution?.signal
+				setTimeout(
+					() =>
+						resolve({
+							content: [{ type: 'text' as const, text: '{"late":true}' }],
+						}),
+					30,
+				)
+			})) as Handler
+		const caller = new AbortController()
+		const removeListener = vi.spyOn(caller.signal, 'removeEventListener')
+		const bridge = bridgeFor([tool('fluentcart_slow', 'read', handler)], {
+			signal: caller.signal,
+		})
+
+		const pending = bridge.call('fluentcart_slow', {})
+		caller.abort(new Error('client cancelled'))
+		const outcome = await pending
+
+		expect(outcome.ok).toBe(false)
+		expect(operationSignal?.aborted).toBe(true)
+		expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function))
+	})
+
+	it('classifies an already-cancelled external signal without dispatching', async () => {
+		const handler = vi.fn(jsonHandler({ late: true }))
+		const caller = new AbortController()
+		caller.abort(new Error('cancelled before dispatch'))
+		const bridge = bridgeFor([tool('fluentcart_slow', 'read', handler)], {
+			signal: caller.signal,
+		})
+
+		const outcome = await bridge.call('fluentcart_slow', {})
+
+		expect(outcome.ok).toBe(false)
+		if (outcome.ok) return
+		expect(outcome.error.code).toBe('EXECUTION_CANCELLED')
+		expect(handler).not.toHaveBeenCalled()
+	})
+
 	it('is idempotent', () => {
 		const bridge = bridgeFor([])
 		bridge.abort('first')

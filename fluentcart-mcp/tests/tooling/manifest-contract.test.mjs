@@ -21,13 +21,12 @@ const meta = manifest._meta[META_NAMESPACE]
 
 /**
  * The meta-tools are fixed by the exposure design, so they are pinned by name: dynamic registers
- * search, describe and three risk-split executors, code registers a sandboxed pair. The curated
+ * search, describe and two risk-split executors, code registers a sandboxed pair. The curated
  * members are not pinned here — curated membership is a reviewed product decision tracked by the
  * release contract's own `curatedNames` block, and duplicating the roster would only mean editing
  * two files whenever one tool is added.
  */
-// `fluentcart_execute_guarded_write` is deliberately absent: it is registered only when a
-// real-money tool survives the exposure filter, and in 2.0.0 none does.
+// Real-money actions are audit-only and never contribute a public executor.
 const DYNAMIC_META = [
 	'fluentcart_describe_tools',
 	'fluentcart_execute_read_tool',
@@ -37,7 +36,7 @@ const DYNAMIC_META = [
 
 const CODE_META = ['fluentcart_execute_code', 'fluentcart_search_api']
 
-const SENSITIVE_KEYS = ['app_password', 'guard_secret']
+const SENSITIVE_KEYS = ['abilities_app_password', 'app_password']
 
 /** Environment variables the built server actually reads, taken from the source it reads them in. */
 function runtimeEnvironmentVariables(directory = join(PACKAGE_ROOT, 'src')) {
@@ -148,6 +147,28 @@ describe('manifest user configuration', () => {
 	it('defaults the write mode to the read-only policy', () => {
 		assert.equal(manifest.user_config.write_mode.default, 'disabled')
 	})
+
+	it('defaults the native abilities bridge off and gives it separate credentials', () => {
+		assert.equal(manifest.user_config.abilities_mode.default, 'disabled')
+		assert.equal(manifest.user_config.abilities_username.required, false)
+		assert.equal(manifest.user_config.abilities_app_password.required, false)
+		assert.notEqual(
+			meta.userConfigEnvironment.abilities_username,
+			meta.userConfigEnvironment.username,
+		)
+		assert.notEqual(
+			meta.userConfigEnvironment.abilities_app_password,
+			meta.userConfigEnvironment.app_password,
+		)
+	})
+
+	it('does not advertise inert real-money installer settings', () => {
+		assert.equal(contract.writePolicyExposure.realMoneyExposable, undefined)
+		assert.equal(manifest.user_config.guard_secret, undefined)
+		assert.equal(manifest.user_config.guard_state_dir, undefined)
+		assert.doesNotMatch(manifest.user_config.write_mode.description, /guarded|real-money/i)
+		assert.doesNotMatch(manifest.long_description, /guarded|real-money|signing secret/i)
+	})
 })
 
 describe('manifest tool inventory', () => {
@@ -183,7 +204,7 @@ describe('manifest tool inventory', () => {
 		}
 	})
 
-	it('advertises the five dynamic and two code-mode meta-tools', () => {
+	it('advertises the four dynamic and two code-mode meta-tools', () => {
 		const byProvenance = (value) => meta.tools.filter((tool) => tool.provenance === value).length
 		assert.equal(byProvenance('dynamic-meta'), 4)
 		assert.equal(byProvenance('code-meta'), 2)
@@ -233,10 +254,7 @@ describe('manifest tool provenance', () => {
 			)
 		const byMode = new Map(measured.map((profile) => [profile.writeMode, namesFor(profile)]))
 
-		for (const [narrow, wide] of [
-			['disabled', 'reversible'],
-			['reversible', 'guarded'],
-		]) {
+		for (const [narrow, wide] of [['disabled', 'reversible']]) {
 			const from = byMode.get(narrow)
 			const to = byMode.get(wide)
 			if (from && to) for (const name of from) assert.ok(to.has(name), `${wide} dropped ${name}`)

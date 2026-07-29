@@ -9,7 +9,7 @@ import { buildApiIndex } from '../../src/code-mode/api-index.js'
 import { CODE_MODE_LIMITS } from '../../src/code-mode/limits.js'
 import { CodeSandbox, type SandboxLimits } from '../../src/code-mode/sandbox.js'
 import type { ToolDefinition } from '../../src/tools/_factory.js'
-import { registerCodeModeTools } from '../../src/tools/code-mode.js'
+import { prepareCodeModeRuntime, registerCodeModeTools } from '../../src/tools/code-mode.js'
 import type { ToolRisk } from '../../src/tools/risk.js'
 
 type Handler = ToolDefinition['handler']
@@ -637,6 +637,86 @@ describe('context lifecycle', () => {
 		expect(sandbox.stats).toEqual({ contextsCreated: 3, contextsDestroyed: 3 })
 	}, 15_000)
 
+	it('cancels a queued execution before it creates a context or dispatches a call', async () => {
+		let releaseFirst: (() => void) | undefined
+		const firstBarrier = new Promise<void>((resolve) => {
+			releaseFirst = resolve
+		})
+		const blockingHandler = vi.fn(async () => {
+			await firstBarrier
+			return { content: [{ type: 'text' as const, text: '{"first":true}' }] }
+		})
+		let secondSideEffects = 0
+		const secondHandler: Handler = async () => {
+			secondSideEffects += 1
+			return { content: [{ type: 'text' as const, text: '{"second":true}' }] }
+		}
+		const sandbox = makeSandbox([
+			tool('fluentcart_blocking', 'read', blockingHandler),
+			tool('fluentcart_second', 'read', secondHandler),
+		])
+		const first = sandbox.execute("return await fluentcart.call('fluentcart_blocking')")
+		await vi.waitFor(() => expect(blockingHandler).toHaveBeenCalledTimes(1))
+		const caller = new AbortController()
+		const second = sandbox.execute(
+			"return await fluentcart.call('fluentcart_second')",
+			caller.signal,
+		)
+
+		caller.abort(new Error('queued request cancelled'))
+		if (!releaseFirst) throw new Error('The first execution barrier did not initialise.')
+		releaseFirst()
+		await first
+		const cancelled = await second
+
+		expect(cancelled.ok).toBe(false)
+		expect(cancelled.error?.code).toBe('EXECUTION_CANCELLED')
+		expect(secondSideEffects).toBe(0)
+		expect(sandbox.stats.contextsCreated).toBe(sandbox.stats.contextsDestroyed)
+		expect(sandbox.stats.contextsCreated).toBe(1)
+	}, 15_000)
+
+	it('cancels an active bridge call, disposes its context and ignores the late result', async () => {
+		let operationSignal: AbortSignal | undefined
+		let resolveLate: ((value: Awaited<ReturnType<Handler>>) => void) | undefined
+		const blockingHandler = ((
+			_input: Record<string, unknown>,
+			execution?: { signal?: AbortSignal },
+		) =>
+			new Promise<Awaited<ReturnType<Handler>>>((resolve) => {
+				operationSignal = execution?.signal
+				resolveLate = resolve
+			})) as Handler
+		const sandbox = makeSandbox(
+			[
+				tool('fluentcart_blocking', 'read', blockingHandler),
+				tool('fluentcart_ping', 'read', jsonHandler({ healthy: true })),
+			],
+			{ maxWallClockMs: 350 },
+		)
+		const caller = new AbortController()
+		const pending = sandbox.execute(
+			"return await fluentcart.call('fluentcart_blocking')",
+			caller.signal,
+		)
+		await vi.waitFor(() => expect(operationSignal).toBeDefined())
+
+		caller.abort(new Error('active request cancelled'))
+		const cancelled = await pending
+
+		expect(cancelled.ok).toBe(false)
+		expect(cancelled.error?.code).toBe('EXECUTION_CANCELLED')
+		expect(operationSignal?.aborted).toBe(true)
+		expect(sandbox.stats).toEqual({ contextsCreated: 1, contextsDestroyed: 1 })
+
+		if (!resolveLate) throw new Error('The blocking handler did not start.')
+		resolveLate({ content: [{ type: 'text' as const, text: '{"late":true}' }] })
+		await new Promise<void>((resolve) => setImmediate(resolve))
+		const recovered = await sandbox.execute("return await fluentcart.call('fluentcart_ping')")
+		expect(recovered).toMatchObject({ ok: true, json: '{"healthy":true}' })
+		expect(sandbox.stats).toEqual({ contextsCreated: 2, contextsDestroyed: 2 })
+	}, 15_000)
+
 	it('keeps working after an execution that breached a budget', async () => {
 		const sandbox = makeSandbox(DEFAULT_TOOLS, { maxCpuMs: 200 })
 
@@ -678,7 +758,10 @@ describe('startup self-test', () => {
 interface Registered {
 	name: string
 	config: { description: string; annotations?: Record<string, unknown> }
-	handler: (input: Record<string, never>) => Promise<{
+	handler: (
+		input: Record<string, never>,
+		requestContext?: { mcpReq: { signal: AbortSignal } },
+	) => Promise<{
 		content: { type: string; text: string }[]
 		isError?: boolean
 	}>
@@ -701,6 +784,80 @@ function fakeServer() {
 }
 
 describe('tool registration', () => {
+	it('passes the exact SDK request signal into Code Mode execution', async () => {
+		const requestSignal = new AbortController().signal
+		const execute = vi.fn(async () => ({ ok: true, json: '1', callCount: 0, durationMs: 1 }))
+		const { server, registered } = fakeServer()
+		await registerCodeModeTools(server, DEFAULT_TOOLS, {
+			sandbox: { execute } as unknown as CodeSandbox,
+			skipSelfTest: true,
+		})
+		const executeTool = registered[1]
+		if (!executeTool) throw new Error('execute tool was not registered')
+
+		await executeTool.handler({ code: 'return 1' } as never, { mcpReq: { signal: requestSignal } })
+
+		expect(execute).toHaveBeenCalledWith('return 1', requestSignal)
+	})
+
+	it('reuses one self-tested host while every execution still gets a fresh context', async () => {
+		const sandbox = makeSandbox()
+		const runtime = await prepareCodeModeRuntime(DEFAULT_TOOLS, { sandbox })
+		expect(sandbox.stats).toEqual({ contextsCreated: 1, contextsDestroyed: 1 })
+
+		const first = fakeServer()
+		const second = fakeServer()
+		await registerCodeModeTools(first.server, DEFAULT_TOOLS, { runtime })
+		await registerCodeModeTools(second.server, DEFAULT_TOOLS, { runtime })
+		expect(sandbox.stats).toEqual({ contextsCreated: 1, contextsDestroyed: 1 })
+
+		const firstExecute = first.registered[1]
+		const secondExecute = second.registered[1]
+		if (!(firstExecute && secondExecute)) throw new Error('execute tool was not registered')
+		await Promise.all([
+			firstExecute.handler({ code: 'return 1' } as never, {
+				mcpReq: { signal: new AbortController().signal },
+			}),
+			secondExecute.handler({ code: 'return 2' } as never, {
+				mcpReq: { signal: new AbortController().signal },
+			}),
+		])
+
+		expect(sandbox.stats).toEqual({ contextsCreated: 3, contextsDestroyed: 3 })
+	}, 15_000)
+
+	it('recovers a shared host after an aborted call and keeps concurrent results isolated', async () => {
+		const never: Handler = () => new Promise(() => undefined)
+		const tools = [tool('fluentcart_slow', 'read', never)]
+		const sandbox = makeSandbox(tools, { maxWallClockMs: 150 })
+		const runtime = await prepareCodeModeRuntime(tools, { sandbox, skipSelfTest: true })
+		const first = fakeServer()
+		const second = fakeServer()
+		await registerCodeModeTools(first.server, tools, { runtime })
+		await registerCodeModeTools(second.server, tools, { runtime })
+		const firstExecute = first.registered[1]
+		const secondExecute = second.registered[1]
+		if (!(firstExecute && secondExecute)) throw new Error('execute tool was not registered')
+
+		const [aborted, recovered] = await Promise.all([
+			firstExecute.handler(
+				{
+					code: "return await fluentcart.call('fluentcart_slow')",
+				} as never,
+				{ mcpReq: { signal: new AbortController().signal } },
+			),
+			secondExecute.handler({ code: 'return { request: 2 }' } as never, {
+				mcpReq: { signal: new AbortController().signal },
+			}),
+		])
+
+		expect(aborted.isError).toBe(true)
+		expect(aborted.content[0]?.text).toContain('WALL_CLOCK_EXCEEDED')
+		expect(recovered.isError).toBeUndefined()
+		expect(recovered.content[0]?.text).toContain('"request":2')
+		expect(sandbox.stats).toEqual({ contextsCreated: 2, contextsDestroyed: 2 })
+	}, 15_000)
+
 	it('registers exactly two read-only tools', async () => {
 		const { server, registered } = fakeServer()
 
@@ -758,9 +915,12 @@ describe('tool registration', () => {
 		const execute = registered[1]
 		if (!execute) throw new Error('execute tool was not registered')
 
-		const response = await execute.handler({
-			code: "const o = await fluentcart.call('fluentcart_order_list'); return o.orders.length",
-		} as never)
+		const response = await execute.handler(
+			{
+				code: "const o = await fluentcart.call('fluentcart_order_list'); return o.orders.length",
+			} as never,
+			{ mcpReq: { signal: new AbortController().signal } },
+		)
 
 		expect(response.isError).toBeUndefined()
 		expect(JSON.parse(response.content[0]?.text ?? '{}')).toEqual({ result: 1, api_calls: 1 })
@@ -775,7 +935,9 @@ describe('tool registration', () => {
 		const execute = registered[1]
 		if (!execute) throw new Error('execute tool was not registered')
 
-		const response = await execute.handler({ code: 'throw new Error("nope")' } as never)
+		const response = await execute.handler({ code: 'throw new Error("nope")' } as never, {
+			mcpReq: { signal: new AbortController().signal },
+		})
 
 		expect(response.isError).toBe(true)
 		expect(JSON.parse(response.content[0]?.text ?? '{}')).toMatchObject({

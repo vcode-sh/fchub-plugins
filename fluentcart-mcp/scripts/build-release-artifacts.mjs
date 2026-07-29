@@ -10,10 +10,18 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import {
+	cpSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
 	assertVersionsAgree,
@@ -26,6 +34,12 @@ import {
 } from './build-mcpb.mjs'
 import { inspectMcpb } from './inspect-mcpb.mjs'
 import { inspectNpmPack } from './inspect-npm-pack.mjs'
+import {
+	buildReleaseProvenance,
+	expectedReleaseIdentity,
+	PROVENANCE_PATH,
+} from './release-identity.mjs'
+import { buildReleaseTruth, validateReleaseState } from './release-truth.mjs'
 
 /** Exactly what the Docker build may see. Anything else is a source leak into a shipped image. */
 export const DOCKER_CONTEXT_ALLOWLIST = [
@@ -50,6 +64,18 @@ export const DOCKER_CONTEXT_EXCLUSIONS = ['node_modules/.bin']
 const MCPB_NAME = 'fluentcart-mcp.mcpb'
 const DOCKER_CONTEXT_NAME = 'fluentcart-mcp-docker-context.tar.gz'
 const CHECKSUMS_NAME = 'SHA256SUMS.json'
+const RELEASE_STATE_NAME = 'previous-release-state.json'
+const RELEASE_CONTRACT_NAME = 'release-contract.json'
+const VERIFICATION_DIR = 'verification'
+const VERIFICATION_FILES = [
+	'package.json',
+	'package-lock.json',
+	'release-contract.json',
+	'scripts/inspect-mcpb.mjs',
+	'scripts/inspect-npm-pack.mjs',
+	'scripts/release-identity.mjs',
+	'scripts/verify-staged-release.mjs',
+]
 
 function run(command, args, cwd) {
 	execFileSync(command, args, { cwd, stdio: ['ignore', 2, 2] })
@@ -112,15 +138,48 @@ function reportFindings(label, result) {
 	return true
 }
 
-export function buildReleaseArtifacts() {
+function stageVerificationBundle() {
+	const root = join(DIST_PACKAGES, VERIFICATION_DIR)
+	rmSync(root, { recursive: true, force: true })
+	for (const relative of VERIFICATION_FILES) {
+		const destination = join(root, relative)
+		mkdirSync(dirname(destination), { recursive: true })
+		cpSync(join(PACKAGE_ROOT, relative), destination)
+	}
+	return VERIFICATION_FILES.map((relative) => join(root, relative))
+}
+
+export function buildReleaseArtifacts(options = {}) {
 	const version = assertVersionsAgree()
+	if (!options.releaseState) {
+		throw new Error('release packaging requires --release-state <redacted-capture.json>')
+	}
+	const releaseState = validateReleaseState(
+		JSON.parse(readFileSync(options.releaseState, 'utf8')),
+		version,
+	)
+	const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'))
+	const contract = JSON.parse(readFileSync(join(PACKAGE_ROOT, RELEASE_CONTRACT_NAME), 'utf8'))
+	if (JSON.stringify(contract.release) !== JSON.stringify(buildReleaseTruth(pkg, releaseState))) {
+		throw new Error('explicit release state does not match generated release-contract.json')
+	}
+	const invocationId = randomUUID()
+	const expectedIdentity = expectedReleaseIdentity()
 	mkdirSync(DIST_PACKAGES, { recursive: true })
 
 	// A stale tarball from an earlier version would otherwise sit beside the new one and both
 	// would look equally publishable.
 	for (const name of readdirSync(DIST_PACKAGES)) {
-		if (name.endsWith('.tgz') || name === MCPB_NAME || name === DOCKER_CONTEXT_NAME) {
-			rmSync(join(DIST_PACKAGES, name), { force: true })
+		if (
+			name.endsWith('.tgz') ||
+			name === MCPB_NAME ||
+			name === DOCKER_CONTEXT_NAME ||
+			name === CHECKSUMS_NAME ||
+			name === RELEASE_STATE_NAME ||
+			name === RELEASE_CONTRACT_NAME ||
+			name === VERIFICATION_DIR
+		) {
+			rmSync(join(DIST_PACKAGES, name), { recursive: true, force: true })
 		}
 	}
 
@@ -128,6 +187,12 @@ export function buildReleaseArtifacts() {
 	let artefacts
 	try {
 		const releaseDist = compileReleaseDist(join(root, 'dist'))
+		const provenance = buildReleaseProvenance(invocationId)
+		writeFileSync(
+			join(root, PROVENANCE_PATH),
+			`${JSON.stringify(provenance, null, 2)}\n`,
+			'utf8',
+		)
 		const tarball = packNpm({ root, releaseDist, destination: DIST_PACKAGES })
 		const stagingDir = stageRuntimeTree({ stagingDir: join(root, 'bundle'), releaseDist })
 		const mcpb = packMcpb({ stagingDir, outputPath: join(DIST_PACKAGES, MCPB_NAME) })
@@ -137,8 +202,9 @@ export function buildReleaseArtifacts() {
 		rmSync(root, { recursive: true, force: true })
 	}
 
-	const npmResult = inspectNpmPack(artefacts.tarball)
-	const mcpbResult = inspectMcpb(artefacts.mcpb)
+	const inspection = { expectedIdentity, invocationId }
+	const npmResult = inspectNpmPack(artefacts.tarball, inspection)
+	const mcpbResult = inspectMcpb(artefacts.mcpb, inspection)
 	const rejected = [
 		reportFindings('npm tarball', npmResult),
 		reportFindings('MCPB bundle', mcpbResult),
@@ -148,9 +214,19 @@ export function buildReleaseArtifacts() {
 		for (const path of Object.values(artefacts)) rmSync(path, { force: true })
 		throw new Error('release artefacts failed inspection; nothing was kept in dist-packages/')
 	}
+	const releaseStateOutput = join(DIST_PACKAGES, RELEASE_STATE_NAME)
+	const releaseContractOutput = join(DIST_PACKAGES, RELEASE_CONTRACT_NAME)
+	writeFileSync(releaseStateOutput, `${JSON.stringify(releaseState, null, 2)}\n`)
+	cpSync(join(PACKAGE_ROOT, RELEASE_CONTRACT_NAME), releaseContractOutput)
+	const verificationFiles = stageVerificationBundle()
 
 	const checksums = writeChecksums(
-		Object.values(artefacts).map((path) => ({
+		[
+			...Object.values(artefacts),
+			releaseStateOutput,
+			releaseContractOutput,
+			...verificationFiles,
+		].map((path) => ({
 			file: path.slice(DIST_PACKAGES.length + 1),
 			sha256: sha256(path),
 		})),
@@ -161,7 +237,8 @@ export function buildReleaseArtifacts() {
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-	const result = buildReleaseArtifacts()
+	const index = process.argv.indexOf('--release-state')
+	const result = buildReleaseArtifacts({ releaseState: index < 0 ? null : process.argv[index + 1] })
 	process.stdout.write(`${JSON.stringify(result.checksums, null, 2)}\n`)
 	process.stderr.write(
 		`fluentcart-mcp ${result.version}: npm ${result.npm.fileCount} files, MCPB ${result.mcpb.entryCount} entries, all inspections clean\n`,

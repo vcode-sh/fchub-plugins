@@ -1,8 +1,7 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiCapabilities } from '../src/api/capabilities.js'
-import { createServerFromContext, resolveServerContext } from '../src/server.js'
+import { createMcpServerFactory, resolveServerContext } from '../src/server.js'
 
 const REFERENCE_ROUTES = [
 	'GET /settings/payment-methods/all',
@@ -71,7 +70,7 @@ describe('server cache wiring', () => {
 			.mockResolvedValue(response({ countries: [{ code: 'PL', name: 'Poland' }] }))
 		vi.stubGlobal('fetch', fetch)
 		const context = resolveServerContext(capabilities('GET /resource-cache-profile'))
-		const server = createServerFromContext(context, 'full')
+		const server = await createMcpServerFactory(context, 'full')({ era: 'modern' })
 		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
 		const client = new Client({ name: 'cache-test', version: '1' }, { capabilities: {} })
 

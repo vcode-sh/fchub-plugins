@@ -4,6 +4,7 @@
  * Module-scoped singleton — no class instantiation needed.
  * Concurrent requests for the same key use "last write wins" semantics.
  */
+import { AUTHORIZATION_CACHE_MAX_TTL_MS } from './commerce/cache.js'
 
 interface CacheEntry {
 	data: unknown
@@ -21,7 +22,10 @@ export async function cached<T>(key: string, ttlMs: number, fetcher: () => Promi
 		return entry.data as T
 	}
 	const data = await fetcher()
-	cache.set(key, { data, expires: Date.now() + ttlMs })
+	cache.set(key, {
+		data,
+		expires: Date.now() + Math.min(ttlMs, AUTHORIZATION_CACHE_MAX_TTL_MS),
+	})
 	return data
 }
 
@@ -48,10 +52,10 @@ export function cacheSize(): number {
 
 /** Pre-defined TTL constants (milliseconds). */
 export const TTL = {
-	/** 1 hour — for rarely-changing reference data */
-	LONG: 3_600_000,
-	/** 10 minutes — for semi-static configuration */
-	MEDIUM: 600_000,
-	/** 2 minutes — for frequently-read data */
-	SHORT: 120_000,
+	/** Maximum authorised-response window, for rarely-changing reference data. */
+	LONG: AUTHORIZATION_CACHE_MAX_TTL_MS,
+	/** Configuration is refreshed sooner than reference catalogues. */
+	MEDIUM: 30_000,
+	/** Frequently-read state receives only brief request deduplication. */
+	SHORT: 15_000,
 } as const

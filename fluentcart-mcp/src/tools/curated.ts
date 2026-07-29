@@ -91,6 +91,13 @@ const ANALYTICS = [
 	'fluentcart_report_top_products',
 ]
 
+/** Present only after an operator opts into and passes live WordPress Abilities discovery. */
+export const OPTIONAL_CURATED_ABILITY_TOOLS = [
+	'fluentcart_search_abilities',
+	'fluentcart_describe_abilities',
+	'fluentcart_execute_read_ability',
+]
+
 /**
  * Writes that may appear in curated mode when the write policy already permits them.
  * Deliberately tiny: curated exists to keep the definition payload small.
@@ -115,7 +122,7 @@ export function selectCuratedTools(tools: readonly ToolDefinition[]): ToolDefini
 	const available = new Map(tools.map((tool) => [tool.name, tool]))
 	const selected: ToolDefinition[] = []
 
-	for (const name of CURATED_TOOL_NAMES) {
+	for (const name of [...CURATED_TOOL_NAMES, ...OPTIONAL_CURATED_ABILITY_TOOLS]) {
 		const tool = available.get(name)
 		if (tool) selected.push(tool)
 	}

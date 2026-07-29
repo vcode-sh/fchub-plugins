@@ -1,6 +1,5 @@
 import type { Server } from 'node:http'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/transport/http.js'
 import { getLiveRun } from './support/live-run.js'
@@ -186,7 +185,7 @@ describe('E2E: MCP Protocol over HTTP', () => {
 describe('E2E: Bearer Auth Enforcement', () => {
 	let baseUrl: string
 	let server: Server
-	const TEST_API_KEY = 'e2e-test-secret-key-12345'
+	const TEST_API_KEY = 'e2e-test-secret-key-123456789012'
 
 	beforeAll(async () => {
 		process.env.FLUENTCART_MCP_API_KEY = TEST_API_KEY
@@ -221,7 +220,7 @@ describe('E2E: Bearer Auth Enforcement', () => {
 				id: 1,
 				method: 'initialize',
 				params: {
-					protocolVersion: '2025-03-26',
+					protocolVersion: '2025-11-25',
 					capabilities: {},
 					clientInfo: { name: 'test-client', version: '1.0.0' },
 				},
@@ -246,7 +245,7 @@ describe('E2E: Bearer Auth Enforcement', () => {
 				id: 1,
 				method: 'initialize',
 				params: {
-					protocolVersion: '2025-03-26',
+					protocolVersion: '2025-11-25',
 					capabilities: {},
 					clientInfo: { name: 'test-client', version: '1.0.0' },
 				},
@@ -271,7 +270,7 @@ describe('E2E: Bearer Auth Enforcement', () => {
 				id: 1,
 				method: 'initialize',
 				params: {
-					protocolVersion: '2025-03-26',
+					protocolVersion: '2025-11-25',
 					capabilities: {},
 					clientInfo: { name: 'test-client', version: '1.0.0' },
 				},
@@ -375,14 +374,11 @@ describe('E2E: dynamic default mode', () => {
 	})
 
 	it('exposes exactly the meta-tools it can honour by default', async () => {
-		// Was pinned at five. The guarded executor is registered only when a real-money action
-		// survives the exposure filter, and none does while every one of them ships
-		// `execution: 'none'`, so advertising it here would assert a permanently failing tool.
+		// Disabled mode exposes only discovery and the read executor.
 		const result = await mcpClient.listTools()
 		expect(result.tools.map((t) => t.name).sort()).toEqual([
 			'fluentcart_describe_tools',
 			'fluentcart_execute_read_tool',
-			'fluentcart_execute_reversible_write',
 			'fluentcart_search_tools',
 		])
 	}, 30_000)
@@ -414,14 +410,12 @@ describe('E2E: dynamic default mode', () => {
 		expect(() => JSON.parse(text.text)).not.toThrow()
 	}, 60_000)
 
-	it('refuses a hidden write by name even through the executor', async () => {
-		const result = await mcpClient.callTool({
-			name: 'fluentcart_execute_reversible_write',
-			arguments: { tool_name: 'fluentcart_order_delete', input: {} },
-		})
-
-		expect(result.isError).toBe(true)
-		const text = (result.content as Array<{ type: string; text: string }>)[0]
-		expect(text.text).toMatch(/not exposed/)
+	it('does not leave a reversible-write executor callable when writes are disabled', async () => {
+		await expect(
+			mcpClient.callTool({
+				name: 'fluentcart_execute_reversible_write',
+				arguments: { tool_name: 'fluentcart_order_delete', input: {} },
+			}),
+		).rejects.toThrow(/not found/)
 	}, 60_000)
 })

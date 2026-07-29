@@ -1,5 +1,13 @@
 {
   "generatedBy": "hand-maintained; consumed by scripts/check-tool-routes.mjs --compatibility",
+  "releaseEvidence": {
+    "version": "2.0.0",
+    "protocols": ["2025-11-25", "2026-07-28"],
+    "httpProfiles": ["local", "private"],
+    "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED",
+    "namedClients": "AUTOMATED_FIVE_REQUIRED",
+    "configurationRecipes": "DOCUMENTED_NOT_CERTIFIED"
+  },
   "legacyRuntime": "tested",
   "legacyClaimPolicy": "FluentCart 1.3.9 booted and served its REST index on the isolated matrix below, so runtime support may now be claimed. Any claim must cite the 324-operation runtime fixture, never the 342-operation specification: the specification documents 27 operations that 1.3.9 does not serve.",
   "legacyClaimScan": {
@@ -126,5 +134,256 @@
       "added": 31,
       "note": "Operations attributable to FluentCart Pro 1.5.4 alone: 386 minus 355."
     }
+  },
+  "abilityParity": {
+    "fixture": "tests/fixtures/abilities/fluentcart-1.5.5-wordpress-7.0.2.json",
+    "capturedCatalogueSize": 33,
+    "auditedReadCount": 26,
+    "writeCount": 7,
+    "bridgePolicy": "Opt-in and read-only. Runtime discovery intersects the captured exact-name allowlist with category=fluent-cart and meta.annotations.readOnlyHint=true. Unknown, missing and write abilities are never exposed.",
+    "adapterDisposition": "The external MCP adapter was absent and was not installed for the audit. The optional bridge uses the public WordPress Abilities REST endpoints directly.",
+    "executionMethod": "POST",
+    "executionMethodEvidence": {
+      "wordpress": "7.0.2",
+      "fluentCart": "1.5.5",
+      "ability": "fluent-cart/get-store-context",
+      "getStatus": 405,
+      "getCode": "rest_ability_invalid_method",
+      "postStatus": 200,
+      "reason": "FluentCart supplied meta.annotations.readOnlyHint=true but no WordPress readonly annotation. WordPress therefore rejected GET and executed the same read through POST."
+    },
+    "rows": [
+      {
+        "ability": "fluent-cart/add-order-note",
+        "standaloneEquivalent": "fluentcart_note_attach",
+        "semanticDifference": "Both add an order note; the standalone write is classified irreversible because FluentCart exposes no supported note removal.",
+        "bridgeAvailable": false,
+        "disposition": "unavailable"
+      },
+      {
+        "ability": "fluent-cart/apply-labels",
+        "standaloneEquivalent": "fluentcart_label_update_selections",
+        "semanticDifference": "Both change label assignments; no exact read-back plus restore contract has been proven for this write.",
+        "bridgeAvailable": false,
+        "disposition": "unavailable"
+      },
+      {
+        "ability": "fluent-cart/change-order-status",
+        "standaloneEquivalent": "fluentcart_order_update_statuses",
+        "semanticDifference": "The native ability changes one order; the standalone bulk status route is destructive and deliberately unavailable.",
+        "bridgeAvailable": false,
+        "disposition": "unavailable"
+      },
+      {
+        "ability": "fluent-cart/change-subscription-status",
+        "standaloneEquivalent": "fluentcart_subscription_cancel",
+        "semanticDifference": "The native ability covers several lifecycle transitions; standalone cancellation is unavailable in every write mode until a cleanable acceptance lane proves it.",
+        "bridgeAvailable": false,
+        "disposition": "unavailable"
+      },
+      {
+        "ability": "fluent-cart/get-customer",
+        "standaloneEquivalent": "fluentcart_customer_get",
+        "semanticDifference": "Both return customer detail; the native ability additionally offers bounded optional orders, subscriptions, addresses, labels and notes in one call.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/get-inventory",
+        "standaloneEquivalent": "fluentcart_product_list + fluentcart_product_pricing_get",
+        "semanticDifference": "Standalone inventory is split across catalogue and pricing reads; the native ability provides one inventory-oriented projection.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/get-order",
+        "standaloneEquivalent": "fluentcart_order_get",
+        "semanticDifference": "Both return one order; their response projections are independently owned and not asserted byte-equivalent.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/get-order-activity",
+        "standaloneEquivalent": "fluentcart_activity_list",
+        "semanticDifference": "The native ability is order-scoped; the standalone activity list is a general activity endpoint.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/get-product",
+        "standaloneEquivalent": "fluentcart_product_get",
+        "semanticDifference": "Both return one product; their projections are independently owned and not asserted byte-equivalent.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/get-product-financials",
+        "standaloneEquivalent": "none",
+        "semanticDifference": "No standalone tool combines one-time performance, forward subscription metrics and an optional payment schedule.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/get-refund-report",
+        "standaloneEquivalent": "fluentcart_report_refund_by_group + fluentcart_report_refund_chart",
+        "semanticDifference": "Standalone exposes raw report routes; the native ability owns a semantic refund report contract.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/get-sales-report",
+        "standaloneEquivalent": "fluentcart_report_sales_summary",
+        "semanticDifference": "Both answer period sales, but standalone adds explicit scope, currency and warning metadata verified against orders.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/get-sales-trend",
+        "standaloneEquivalent": "fluentcart_report_sales_trend",
+        "semanticDifference": "Both return a time series; standalone explicitly reports requested versus applied granularity and scope warnings.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/get-search-schema",
+        "standaloneEquivalent": "fluentcart_get_search_capabilities",
+        "semanticDifference": "Standalone documents its reviewed search abstraction; native returns FluentCart's current advanced-query schema.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/get-store-context",
+        "standaloneEquivalent": "fluentcart_get_store_context",
+        "semanticDifference": "Both orient the caller; standalone derives capability claims from its filtered REST tool registry.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/get-subscription",
+        "standaloneEquivalent": "fluentcart_subscription_get",
+        "semanticDifference": "Both return one subscription; their response projections are independently owned and not asserted byte-equivalent.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/get-top-products",
+        "standaloneEquivalent": "fluentcart_report_top_products",
+        "semanticDifference": "Both rank products; standalone states its units-sold ranking, scope and title-history caveat.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/get-upcoming-payments",
+        "standaloneEquivalent": "fluentcart_report_future_renewals",
+        "semanticDifference": "Standalone exposes a raw renewal report; native provides a bounded schedule with product, variation, currency and bucket controls.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/list-coupons",
+        "standaloneEquivalent": "fluentcart_coupon_list",
+        "semanticDifference": "Standalone additionally derives scheduled and expired status from coupon dates.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/list-customers",
+        "standaloneEquivalent": "fluentcart_customer_list",
+        "semanticDifference": "Both list customers; standalone documents cross-currency LTV and AOV limitations.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/list-orders",
+        "standaloneEquivalent": "fluentcart_order_list",
+        "semanticDifference": "Both list orders; standalone documents the ignored customer_id behaviour and a supported customer-order alternative.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/list-products",
+        "standaloneEquivalent": "fluentcart_product_list",
+        "semanticDifference": "Both list products; standalone search is verified to include variation names.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/list-reference-data",
+        "standaloneEquivalent": "fluentcart_list_reference_data",
+        "semanticDifference": "Both provide reference data; standalone response is cached per authorised principal and route profile for at most 60 seconds.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/list-subscriptions",
+        "standaloneEquivalent": "fluentcart_subscription_list",
+        "semanticDifference": "Both list subscriptions; standalone documents minor-unit money and FluentCart's incomplete status filter.",
+        "bridgeAvailable": true,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/list-transactions",
+        "standaloneEquivalent": "fluentcart_order_transactions",
+        "semanticDifference": "Standalone transactions require one order; native can query the store ledger by order, subscription, customer, gateway, currency, mode and date.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/manage-coupon",
+        "standaloneEquivalent": "fluentcart_coupon_create + fluentcart_coupon_update",
+        "semanticDifference": "Standalone create and update are reversible-policy writes; native also owns action semantics not automatically admitted by that proof.",
+        "bridgeAvailable": false,
+        "disposition": "standalone"
+      },
+      {
+        "ability": "fluent-cart/query-customers",
+        "standaloneEquivalent": "fluentcart_search_commerce",
+        "semanticDifference": "Standalone offers reviewed filters and projections; native owns FluentCart's current metric and dimension vocabulary.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/query-orders",
+        "standaloneEquivalent": "fluentcart_search_commerce",
+        "semanticDifference": "Standalone offers reviewed filters and projections; native owns FluentCart's current metric and dimension vocabulary.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/query-products",
+        "standaloneEquivalent": "fluentcart_search_commerce",
+        "semanticDifference": "Native adds product financial dimensions and metrics including discounts, refunds and order type.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/query-sources",
+        "standaloneEquivalent": "fluentcart_report_sources",
+        "semanticDifference": "Standalone exposes the raw sources report; native owns a structured query contract.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/query-subscriptions",
+        "standaloneEquivalent": "fluentcart_search_commerce",
+        "semanticDifference": "Standalone offers reviewed filters and projections; native owns FluentCart's current subscription metric and dimension vocabulary.",
+        "bridgeAvailable": true,
+        "disposition": "optional-read-bridge"
+      },
+      {
+        "ability": "fluent-cart/refund-order",
+        "standaloneEquivalent": "fluentcart_order_refund",
+        "semanticDifference": "Both move money. Standalone execution remains unavailable because no cleanable live acceptance lane exists.",
+        "bridgeAvailable": false,
+        "disposition": "unavailable"
+      },
+      {
+        "ability": "fluent-cart/upsert-customer",
+        "standaloneEquivalent": "fluentcart_customer_create + fluentcart_customer_update",
+        "semanticDifference": "Standalone separates create and update so each operation retains its own idempotency and rollback contract.",
+        "bridgeAvailable": false,
+        "disposition": "standalone"
+      }
+    ]
   }
 }

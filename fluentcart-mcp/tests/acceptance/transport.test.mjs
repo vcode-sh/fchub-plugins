@@ -1,12 +1,6 @@
-// Transport and principal boundaries, exercised against the built server.
-//
-// Two properties matter more than any status code here. The first is that a misconfigured public
-// bind dies before a socket exists, so there is never a window in which an unauthenticated store
-// administration API is reachable. The second is that every rejection looks identical: a caller
-// must not be able to tell a wrong key from a missing one, because that difference is an oracle.
-
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { request as nodeRequest } from 'node:http'
 import { connect } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { after, before, describe, it } from 'node:test'
@@ -14,41 +8,83 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const ENTRYPOINT = join(PACKAGE_ROOT, 'dist', 'index.js')
-const API_KEY = 'acceptance-transport-key-of-sufficient-length'
-const WRONG_KEY = 'x'.repeat(API_KEY.length)
-const UNAUTHORIZED = '{"error":"Unauthorized"}'
-
-// A store host that cannot resolve, so nothing here can reach a real shop by accident.
-const FIXTURE_ENV = { FLUENTCART_URL: 'https://fixture.invalid', FLUENTCART_USERNAME: 'fixture' }
-FIXTURE_ENV.FLUENTCART_APP_PASSWORD = 'fixture'
-FIXTURE_ENV.FLUENTCART_WRITE_MODE = 'disabled'
-
+const KEY = 'acceptance-private-key-0123456789abcdef'
+const WRONG_KEY = 'x'.repeat(KEY.length)
 const CLIENT = { name: 'acceptance-transport', version: '1.0.0' }
-const PARAMS = { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: CLIENT }
-const INITIALIZE = { jsonrpc: '2.0', id: 1, method: 'initialize', params: PARAMS }
+const INITIALIZE = {
+	jsonrpc: '2.0',
+	id: 1,
+	method: 'initialize',
+	params: {
+		protocolVersion: '2025-11-25',
+		capabilities: {},
+		clientInfo: CLIENT,
+	},
+}
+const FIXTURE_ENV = {
+	FLUENTCART_URL: 'https://fixture.invalid',
+	FLUENTCART_USERNAME: 'fixture',
+	FLUENTCART_APP_PASSWORD: 'fixture',
+	FLUENTCART_WRITE_MODE: 'disabled',
+	FLUENTCART_ABILITIES_MODE: 'disabled',
+}
 
-let auth
+let application
 let baseUrl
-let server
+let listener
+let config
+let factory
 
 function distImport(...segments) {
 	return import(pathToFileURL(join(PACKAGE_ROOT, 'dist', ...segments)).href)
 }
 
-function mcp(headers, body = INITIALIZE) {
-	return fetch(`${baseUrl}/mcp`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Accept: 'application/json, text/event-stream',
-			...headers,
-		},
-		body: typeof body === 'string' ? body : JSON.stringify(body),
+function rpc(headers = {}, body = INITIALIZE) {
+	const payload = typeof body === 'string' ? body : JSON.stringify(body)
+	return new Promise((resolveRequest, rejectRequest) => {
+		const outgoing = nodeRequest(`${baseUrl}/mcp`, {
+			method: 'POST',
+			headers: {
+				Host: 'mcp.internal',
+				'Content-Type': 'application/json',
+				Accept: 'application/json, text/event-stream',
+				'Content-Length': Buffer.byteLength(payload),
+				...headers,
+			},
+		})
+		outgoing.on('response', (incoming) => {
+			const chunks = []
+			incoming.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+			incoming.on('end', () => {
+				resolveRequest(
+					new Response(Buffer.concat(chunks), {
+						status: incoming.statusCode,
+						headers: incoming.headers,
+					}),
+				)
+			})
+		})
+		outgoing.on('error', rejectRequest)
+		outgoing.end(payload)
 	})
 }
 
-/** Run the built entrypoint to completion and capture both streams separately. */
-function runEntrypoint(args, env) {
+function isListening(port) {
+	return new Promise((settle) => {
+		const socket = connect({ host: '127.0.0.1', port })
+		socket.on('connect', () => {
+			socket.destroy()
+			settle(true)
+		})
+		socket.on('error', () => settle(false))
+		socket.setTimeout(1000, () => {
+			socket.destroy()
+			settle(false)
+		})
+	})
+}
+
+function runEntrypoint(args, env = {}) {
 	return new Promise((settle) => {
 		const child = spawn(process.execPath, [ENTRYPOINT, ...args], {
 			cwd: PACKAGE_ROOT,
@@ -64,227 +100,178 @@ function runEntrypoint(args, env) {
 			stderr += chunk
 		})
 		child.on('close', (code) => settle({ code, stdout, stderr }))
-		setTimeout(() => child.kill('SIGKILL'), 20_000).unref()
-	})
-}
-
-/**
- * Build the app around a context resolved without capability discovery.
- *
- * `createApp` now discovers the store's real routes before building anything, which is the whole
- * point of the fix that introduced it — but this lane deliberately points at a host that cannot
- * resolve, so discovery would refuse before a single transport assertion ran. The transport
- * boundaries under test here are the same either way, so the context is supplied directly.
- */
-async function appForFixtureStore() {
-	const { createAppFromContext } = await distImport('transport', 'http.js')
-	const { resolveServerContext } = await distImport('server.js')
-	return createAppFromContext('127.0.0.1', resolveServerContext())
-}
-
-function isListening(port) {
-	return new Promise((settle) => {
-		const socket = connect({ host: '127.0.0.1', port })
-		socket.on('connect', () => {
-			socket.destroy()
-			settle(true)
-		})
-		socket.on('error', () => settle(false))
-		socket.setTimeout(2000, () => {
-			socket.destroy()
-			settle(false)
-		})
+		setTimeout(() => child.kill('SIGKILL'), 10_000).unref()
 	})
 }
 
 before(async () => {
 	Object.assign(process.env, FIXTURE_ENV)
-	process.env.FLUENTCART_MCP_API_KEY = API_KEY
-	auth = await distImport('transport', 'auth.js')
-	const app = await appForFixtureStore()
+	const { resolveHttpExposure } = await distImport('transport', 'http-config.js')
+	const { createHttpApplication } = await distImport('transport', 'http.js')
+	const { createMcpServerFactory, resolveServerContext } = await distImport('server.js')
+	config = resolveHttpExposure({
+		profile: 'private',
+		host: '0.0.0.0',
+		allowedHosts: ['mcp.internal'],
+		allowedOrigins: ['console.internal'],
+		bearerKey: KEY,
+	})
+	factory = createMcpServerFactory(resolveServerContext(), 'full')
+	application = createHttpApplication(factory, config)
 	await new Promise((ready) => {
-		server = app.listen(0, '127.0.0.1', () => {
-			baseUrl = `http://127.0.0.1:${server.address().port}`
+		listener = application.app.listen(0, config.host, () => {
+			baseUrl = `http://127.0.0.1:${listener.address().port}`
 			ready()
 		})
 	})
 })
 
-after(() => {
-	server?.close()
-	delete process.env.FLUENTCART_MCP_API_KEY
+after(async () => {
+	await new Promise((closed) => listener.close(closed))
+	await application.mcp.close()
+	for (const key of Object.keys(FIXTURE_ENV)) delete process.env[key]
 })
 
-describe('exposure policy', () => {
-	it('permits every loopback form with no key at all', () => {
-		for (const host of ['127.0.0.1', '::1', '[::1]', 'localhost', 'LOCALHOST', ' localhost ']) {
-			assert.doesNotThrow(() => auth.assertSafeHttpExposure(host), host)
-		}
-	})
-
-	it('refuses a wildcard or non-loopback bind without a key', () => {
-		for (const host of ['0.0.0.0', '::', '192.168.1.10', 'mcp.example.com']) {
-			assert.throws(() => auth.assertSafeHttpExposure(host), /Refusing to bind/, host)
-		}
-	})
-
-	it('refuses a loopback lookalike, which is somebody else’s domain', () => {
-		assert.throws(() => auth.assertSafeHttpExposure('localhost.example.com'), /Refusing to bind/)
-		assert.throws(() => auth.assertSafeHttpExposure('notlocalhost'), /Refusing to bind/)
-	})
-
-	it('refuses a key shorter than 32 characters, padding included', () => {
-		assert.throws(() => auth.assertSafeHttpExposure('0.0.0.0', 'short'), /at least 32/)
-		assert.throws(() => auth.assertSafeHttpExposure('0.0.0.0', `${' '.repeat(40)}k`), /at least 32/)
-		assert.throws(
-			() => auth.assertSafeHttpExposure('0.0.0.0', ''),
-			/requires FLUENTCART_MCP_API_KEY/,
-		)
-	})
-
-	it('permits a public bind once a strong key exists, and names the host when it refuses', () => {
-		assert.doesNotThrow(() => auth.assertSafeHttpExposure('0.0.0.0', API_KEY))
-		assert.throws(() => auth.assertSafeHttpExposure('10.0.0.5'), /10\.0\.0\.5/)
-	})
-})
-
-describe('built entrypoint startup', () => {
-	it('exits 1 before binding when a public bind has no key', async () => {
+describe('built HTTP entrypoint profiles', () => {
+	it('refuses a non-loopback local profile before binding', async () => {
 		const port = 39_517
-		const result = await runEntrypoint(
-			['--transport', 'http', '--host', '0.0.0.0', '--port', String(port)],
-			{ FLUENTCART_MCP_API_KEY: '' },
-		)
-		assert.equal(result.code, 1)
-		assert.match(result.stderr, /Refusing to bind 0\.0\.0\.0/)
-		assert.equal(result.stdout, '', 'stdout is reserved for JSON-RPC')
-		assert.equal(await isListening(port), false, 'nothing may listen after a refused exposure')
-	})
-
-	it('keeps stdout free of anything but JSON-RPC when startup fails', async () => {
-		// The store host is unresolvable, so discovery fails and the process reports and exits.
-		const result = await runEntrypoint([], {})
-		assert.equal(result.code, 1)
-		assert.equal(result.stdout, '', 'a diagnostic on stdout would corrupt the JSON-RPC stream')
-		assert.ok(result.stderr.length > 0, 'the reason must still be reported, on stderr')
-	})
-
-	it('answers --version on stdout and stops', async () => {
-		const result = await runEntrypoint(['--version'], {})
-		assert.equal(result.code, 0)
-		assert.match(result.stdout.trim(), /^\d+\.\d+\.\d+/)
-	})
-})
-
-describe('bearer authentication', () => {
-	it('accepts the configured key', async () => {
-		const response = await mcp({ Authorization: `Bearer ${API_KEY}` })
-		assert.equal(response.status, 200)
-		assert.match(await response.text(), /"serverInfo"/)
-	})
-
-	it('rejects a missing, malformed and wrong key with one identical body', async () => {
-		const responses = await Promise.all([
-			mcp({}),
-			mcp({ Authorization: API_KEY }),
-			mcp({ Authorization: `Basic ${Buffer.from('a:b').toString('base64')}` }),
-			mcp({ Authorization: `Bearer ${WRONG_KEY}` }),
-			mcp({ Authorization: 'Bearer ' }),
+		const result = await runEntrypoint([
+			'--transport',
+			'http',
+			'--http-profile',
+			'local',
+			'--host',
+			'0.0.0.0',
+			'--port',
+			String(port),
 		])
 
-		const bodies = new Set()
-		for (const response of responses) {
-			assert.equal(response.status, 401)
-			bodies.add((await response.text()).trim())
-		}
-		assert.deepEqual([...bodies], [UNAUTHORIZED], 'every rejection must be indistinguishable')
-		// The same-length wrong key above also proves the comparison never echoes the real one.
-		assert.ok(![...bodies].some((body) => body.includes(API_KEY)))
+		assert.equal(result.code, 1)
+		assert.match(result.stderr, /loopback/)
+		assert.equal(result.stdout, '')
+		assert.equal(await isListening(port), false)
 	})
 
-	it('guards /mcp but leaves /health open for a liveness probe', async () => {
-		const health = await fetch(`${baseUrl}/health`)
-		assert.equal(health.status, 200)
-		assert.deepEqual(await health.json(), { status: 'ok' })
-	})
-})
-
-describe('adversarial requests', () => {
-	it('refuses malformed JSON-RPC with 400 and stays up', async () => {
-		const response = await mcp({ Authorization: `Bearer ${API_KEY}` }, { not: 'a message' })
-		assert.equal(response.status, 400)
-		const alive = await fetch(`${baseUrl}/health`)
-		assert.equal(alive.status, 200)
-	})
-
-	it('refuses a body that is not JSON at all', async () => {
-		const response = await mcp({ Authorization: `Bearer ${API_KEY}` }, '{"jsonrpc": ')
-		assert.ok(response.status >= 400 && response.status < 500, `got ${response.status}`)
-	})
-
-	it('refuses an oversized body rather than buffering it', async () => {
-		const huge = JSON.stringify({ ...INITIALIZE, params: { pad: 'p'.repeat(8 * 1024 * 1024) } })
-		const response = await mcp({ Authorization: `Bearer ${API_KEY}` }, huge)
-		assert.ok(response.status >= 400, `an 8 MB body must be refused, got ${response.status}`)
-		assert.equal((await fetch(`${baseUrl}/health`)).status, 200, 'the server must survive it')
-	})
-
-	it('requires an event-stream-capable Accept header', async () => {
-		const response = await fetch(`${baseUrl}/mcp`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
-			body: JSON.stringify(INITIALIZE),
-		})
-		assert.equal(response.status, 406)
-	})
-
-	it('does not support session termination in stateless mode', async () => {
-		const response = await fetch(`${baseUrl}/mcp`, {
-			method: 'DELETE',
-			headers: { Authorization: `Bearer ${API_KEY}` },
-		})
-		assert.equal(response.status, 405)
-	})
-
-	it('serves concurrent sessions independently', async () => {
-		const responses = await Promise.all(
-			Array.from({ length: 6 }, (_, index) =>
-				mcp({ Authorization: `Bearer ${API_KEY}` }, { ...INITIALIZE, id: index + 1 }),
-			),
+	it('refuses an incomplete private profile before binding', async () => {
+		const port = 39_518
+		const result = await runEntrypoint(
+			[
+				'--transport',
+				'http',
+				'--http-profile',
+				'private',
+				'--host',
+				'0.0.0.0',
+				'--allowed-hosts',
+				'mcp.internal',
+				'--port',
+				String(port),
+			],
+			{ FLUENTCART_MCP_API_KEY: KEY },
 		)
-		for (const response of responses) assert.equal(response.status, 200)
+
+		assert.equal(result.code, 1)
+		assert.match(result.stderr, /allowed origins/i)
+		assert.equal(result.stdout, '')
+		assert.equal(await isListening(port), false)
 	})
 
-	it('survives an aborted request', async () => {
-		const controller = new AbortController()
-		const inFlight = fetch(`${baseUrl}/mcp`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Accept: 'application/json, text/event-stream',
-				Authorization: `Bearer ${API_KEY}`,
+	it('consumes Docker private allowlists from the environment before discovery', async () => {
+		const result = await runEntrypoint(
+			['--transport', 'http', '--port', '0', '--host', '0.0.0.0', '--http-profile', 'private'],
+			{
+				FLUENTCART_MCP_API_KEY: KEY,
+				FLUENTCART_MCP_ALLOWED_HOSTS: 'mcp.internal',
+				FLUENTCART_MCP_ALLOWED_ORIGINS: 'console.internal',
 			},
-			body: JSON.stringify(INITIALIZE),
-			signal: controller.signal,
-		})
-		controller.abort()
-		await inFlight.catch(() => undefined)
+		)
 
-		const after = await mcp({ Authorization: `Bearer ${API_KEY}` })
-		assert.equal(after.status, 200, 'an aborted request must not poison the next one')
+		assert.equal(result.code, 1)
+		assert.match(result.stderr, /fixture\.invalid/)
+		assert.doesNotMatch(result.stderr, /explicit allowed (hosts|origins)/i)
+		assert.equal(result.stdout, '')
 	})
 })
 
-describe('shutdown', () => {
-	it('stops accepting connections once closed', async () => {
-		const app = await appForFixtureStore()
-		const temporary = await new Promise((ready) => {
-			const listener = app.listen(0, '127.0.0.1', () => ready(listener))
+describe('built private HTTP boundary', () => {
+	it('accepts the configured key and keeps the response non-cacheable', async () => {
+		const response = await rpc({ Authorization: `Bearer ${KEY}` })
+		assert.equal(response.status, 200)
+		assert.equal(response.headers.get('cache-control'), 'no-store')
+		assert.doesNotMatch(await response.text(), new RegExp(KEY))
+	})
+
+	it('returns one generic Bearer challenge for missing, malformed and wrong keys', async () => {
+		const responses = await Promise.all([
+			rpc(),
+			rpc({ Authorization: KEY }),
+			rpc({ Authorization: `Basic ${KEY}` }),
+			rpc({ Authorization: `Bearer ${WRONG_KEY}` }),
+		])
+		const outcomes = []
+		for (const response of responses) {
+			outcomes.push({
+				status: response.status,
+				challenge: response.headers.get('www-authenticate'),
+				cache: response.headers.get('cache-control'),
+				body: await response.text(),
+			})
+		}
+		assert.deepEqual(
+			new Set(outcomes.map(({ body }) => body)),
+			new Set(['{"error":"Unauthorized"}']),
+		)
+		for (const outcome of outcomes) {
+			assert.equal(outcome.status, 401)
+			assert.equal(outcome.challenge, 'Bearer')
+			assert.equal(outcome.cache, 'no-store')
+		}
+	})
+
+	it('orders Host and Origin rejection before body handling', async () => {
+		const invalidHost = await rpc(
+			{ Host: 'evil.example', Authorization: `Bearer ${KEY}` },
+			'{"broken":',
+		)
+		const invalidOrigin = await rpc({
+			Origin: 'https://evil.example',
+			Authorization: `Bearer ${KEY}`,
 		})
-		const port = temporary.address().port
+		const absentOrigin = await rpc({ Authorization: `Bearer ${KEY}` })
+
+		assert.equal(invalidHost.status, 403)
+		assert.equal(invalidOrigin.status, 403)
+		assert.equal(absentOrigin.status, 200)
+	})
+
+	it('bounds malformed and oversized JSON errors and leaves only health public', async () => {
+		const malformed = await rpc({ Authorization: `Bearer ${KEY}` }, '{"jsonrpc":')
+		const oversized = await rpc(
+			{ Authorization: `Bearer ${KEY}` },
+			JSON.stringify({ pad: 'x'.repeat(101 * 1024) }),
+		)
+		const health = await fetch(`${baseUrl}/health`)
+		const ready = await fetch(`${baseUrl}/ready`)
+
+		assert.equal(malformed.status, 400)
+		assert.ok((await malformed.text()).length < 256)
+		assert.equal(oversized.status, 413)
+		assert.ok((await oversized.text()).length < 256)
+		assert.deepEqual(await health.json(), { status: 'ok' })
+		assert.equal(ready.status, 404)
+	})
+})
+
+describe('built HTTP service handle', () => {
+	it('closes its listener and handler as one bounded service', async () => {
+		const { startHttpService } = await distImport('transport', 'http.js')
+		const handle = await startHttpService(factory, 0, config, { drainMs: 20 })
+		const port = Number(new URL(handle.url).port)
+		const loopbackUrl = `http://127.0.0.1:${port}`
 		assert.equal(await isListening(port), true)
 
-		await new Promise((closed) => temporary.close(closed))
-		assert.equal(await isListening(port), false, 'the port must be free after shutdown')
+		await handle.close()
+		assert.equal(await isListening(port), false)
+		await assert.rejects(fetch(`${loopbackUrl}/health`))
 	})
 })

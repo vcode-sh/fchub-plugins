@@ -2,7 +2,7 @@
 //
 // This is the regression guard for a defect that shipped in every mode: the prompts hardcoded a
 // numbered list of concrete tool names, and `dynamic` — the default mode — registers none of
-// them. It exposes five meta-tools and discovers the rest at call time. So "Analyze Store
+// them. It exposes discovery and risk-matched execution tools and discovers the rest at call time. So "Analyze Store
 // Performance", the prompt a store owner is most likely to click, told the model to call four
 // tools that did not exist, in the configuration most people run. Six of the fifteen names were
 // missing from `curated` as well.
@@ -36,8 +36,8 @@ interface Rendered {
 
 /** Connect a client, list the prompts, and render each one with placeholder arguments. */
 async function renderPrompts(mode: string): Promise<{ tools: Set<string>; prompts: Rendered[] }> {
-	const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
-	const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js')
+	const { Client } = await import('@modelcontextprotocol/client')
+	const { InMemoryTransport } = await import('@modelcontextprotocol/server')
 
 	const server = await createServerFromContextAsync(
 		resolveServerContext(),

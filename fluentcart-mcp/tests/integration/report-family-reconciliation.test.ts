@@ -238,13 +238,13 @@ describe('/reports/product-report overstates, by an amount that is fully explain
 		}
 	})
 
-	it('overstates outright once a multi-line order exists', async () => {
+	it('overstates outright once a multi-line order exists', async ({ skip }) => {
 		// The descriptions say this tool reports too much, not merely something else. That is only
 		// safe to say while the fan-out actually dominates, so the direction is checked and not
 		// assumed — and skipped honestly on a store where every order holds a single variation,
 		// because there the claim has nothing to bite on.
 		const fannedOut = counted().filter((order) => order.variations > 1 && order.totalPaid > 0)
-		if (fannedOut.length === 0) return
+		if (fannedOut.length === 0) skip('the live store has no paid multi-line order')
 
 		const actual = await figureFrom('/reports/product-report', undefined, 'gross_sale')
 		const truth = counted().reduce((sum, order) => sum + order.totalPaid, 0) / 100
@@ -271,12 +271,12 @@ describe('the item-joining reports drop orders that carry no line items', () => 
 		})
 	}
 
-	it('reports those amounts as decimals, not as cents', async () => {
+	it('reports those amounts as decimals, not as cents', async ({ skip }) => {
 		// This tool's description claimed cents until 2026-07-28. On any store with real revenue
 		// the decimal figure is two orders of magnitude below the minor-unit total, and that gap
 		// is the whole assertion.
 		const gross = await figureFrom('/reports/order-chart', undefined, 'gross_sale')
-		if (gross <= 0) return
+		if (gross <= 0) skip('the live store has no reportable gross sales')
 		const minorUnits = predicted() * 100
 		expect(gross).toBeLessThan(minorUnits / 10)
 	})
@@ -284,10 +284,10 @@ describe('the item-joining reports drop orders that carry no line items', () => 
 
 describe('the by-group reports agree with the summary', () => {
 	for (const path of ['/reports/revenue-by-group', '/reports/fetch-order-by-group']) {
-		it(`${path} segments add back up to the same total`, async () => {
+		it(`${path} segments add back up to the same total`, async ({ skip }) => {
 			const res = await client.get(path, params())
 			const rows = firstCollection(res.data)
-			if (rows.length === 0) return // Nothing segmented; nothing to add up.
+			if (rows.length === 0) skip(`${path} returned no segments to reconcile`)
 
 			const gross = rows.reduce((sum, row) => sum + numberOf(row, 'gross_sale'), 0)
 			const segmentOrders = rows.reduce((sum, row) => sum + numberOf(row, 'orders'), 0)

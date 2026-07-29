@@ -15,7 +15,9 @@ You just... talk. No special syntax. No commands to memorise. No tool names to r
 <Callout type="warn" title="Read what this release can't do before you plan around it">
 A default install reads and nothing else. Setting `FLUENTCART_WRITE_MODE=reversible` adds one specific family of writes: **creating and updating** products, variants, coupons, customers, shipping rules, tax rules, attribute groups and terms, order bumps and upgrade paths. [Setup covers the switch](/docs/fluentcart-mcp/setup#decide-what-it-can-see).
 
-Not exposed in any mode: refunds, subscription cancellation, deletions, bulk actions, order status changes, marking an order paid, and dispute handling. Ask for one and the AI won't find a tool, because there isn't one to find. The [reasoning is in the deployment guide](/docs/fluentcart-mcp/deployment#refunds-and-cancellations-in-2-0-0) and it is short: FluentCart offers no supported way to undo these, and for the money-moving ones the guard could not be acceptance-proven.
+Not exposed in any mode: refunds, subscription cancellation, deletions, bulk actions, order status
+changes, marking an order paid, and dispute handling. Ask for one and the AI will not find a tool,
+because there is not one to find. Use FluentCart's admin or official operator tooling for those jobs.
 </Callout>
 
 ## How to Talk to It
@@ -315,13 +317,8 @@ Shipping zones and tax rates sound intimidating, but the AI handles the complexi
 
 ## Why Refunds Aren't Here
 
-The obvious thing to want from an AI attached to a shop is to hand back a customer's money without opening the admin panel. That is not available in this release, and the reason is worth two minutes of your time.
-
-`fluentcart_order_refund` and `fluentcart_subscription_cancel` are absent from every write mode — including `guarded` with a valid signing secret and state directory. No configuration turns them on.
-
-The guard they were built for is finished: previews signed and pinned to the exact payload, a durable ledger that recognises a retried call instead of charging twice, crash handling that refuses to guess whether a payment went through. All of it unit-tested. What is missing is acceptance evidence — a test that creates a real order, refunds it, and cleans up after itself. FluentCart 1.5.5 makes that impossible to finish: transactions have no delete route, deleting an order strands them, unpublished products can't be purchased so there's no throwaway fixture, and a test run can't create a subscription at all. Every route to a proof leaves debris in the store it ran against.
-
-So the rule applied was the boring one: a money-moving capability either passes acceptance or ships unavailable. The ceremony is built; the proof is not, so it is not switched on. It returns when FluentCart offers a way to remove a test-mode charge.
+This server is for reading, analysis and reversible admin work. It does not move money or end
+subscriptions. Use FluentCart's admin or official operator tooling for those jobs.
 
 ## What It Can't Do
 
@@ -330,7 +327,7 @@ Plenty, and deliberately so:
 | Can't Do | Why |
 |----------|-----|
 | **Change anything by default** | The default write mode is `disabled`. Reads work; nothing else is exposed until you say so. |
-| **Refund or cancel** | Not in any mode in 2.0.0. The guard is built but unproven — see above. |
+| **Refund or cancel** | Not in FluentCart MCP 2.0.0. Use FluentCart's admin or official operator tooling. |
 | **Delete anything** | No deletion is exposed. FluentCart offers no supported restore, so none of it qualifies as reversible. |
 | **Change order statuses or mark orders paid** | Same reasoning. Orders are read-only in this release. |
 | **Charge credit cards** | Payments need customer interaction — redirects, card forms. Taking money was never on the table. |
@@ -356,7 +353,7 @@ The AI usually converts these when presenting results to you. But if you see num
 
 <Cards>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    Every tool definition in this release, by module — and which ones your write mode exposes.
+    The default read surface, optional reversible work, and deliberately absent actions.
   </Card>
   <Card title="Troubleshooting" href="/docs/fluentcart-mcp/troubleshooting">
     Something not working? Every failure mode is covered. Start here.

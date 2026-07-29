@@ -193,6 +193,15 @@ describe('emitted evidence contract', () => {
 		}
 		assert.equal(new Set(LANE_NAMES).size, LANE_NAMES.length)
 	})
+
+	it('makes protocol evidence count three mandatory test reports', () => {
+		assert.equal(LANES.protocol.steps.length, 3)
+		for (const step of LANES.protocol.steps) {
+			assert.equal(step.reporter, 'node-test')
+			assert.equal(step.optIn, undefined)
+			assert.ok(step.files.length > 0)
+		}
+	})
 })
 
 const IGNORE_FILE = join(PACKAGE_ROOT, '.gitignore')

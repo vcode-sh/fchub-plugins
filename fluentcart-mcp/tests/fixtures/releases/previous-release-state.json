@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "redacted": true,
+  "capturedAt": "2026-07-29T08:26:40.244Z",
+  "candidate": {
+    "version": "2.0.0",
+    "npmPublished": false,
+    "remoteTagPresent": false
+  },
+  "npm": {
+    "package": "fluentcart-mcp",
+    "registry": "https://registry.npmjs.org",
+    "previousLatest": "1.1.0"
+  },
+  "docker": {
+    "images": {
+      "ghcr.io": "ghcr.io/vcode-sh/fluentcart-mcp:latest",
+      "docker.io": "docker.io/vcodesh/fluentcart-mcp:latest"
+    },
+    "previousLatestDigests": {
+      "ghcr.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c",
+      "docker.io": "sha256:ff6185a8a9abb3dce35dcc387d5a9b638e887a0c5b6574dee2320b3000ebdd2c"
+    }
+  }
+}

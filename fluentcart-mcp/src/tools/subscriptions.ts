@@ -185,10 +185,6 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			},
 		}),
 
-		// fluentcart_subscription_cancel lives in subscriptions-cancellation.ts. It acts on the
-		// gateway immediately and irreversibly, so it needs a signed preview, a state fingerprint
-		// and a durable idempotency claim rather than a bare endpoint mapping.
-
 		putTool(client, {
 			name: 'fluentcart_subscription_fetch',
 			title: 'Fetch Subscription from Gateway',

@@ -17,6 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gunzipSync } from 'node:zlib'
 import { DOCKER_CONTEXT_ALLOWLIST, DOCKER_CONTEXT_EXCLUSIONS } from './build-release-artifacts.mjs'
 import { readTar, unsafePath } from './inspect-npm-pack.mjs'
+import { PROVENANCE_PATH, PROVENANCE_SCHEMA_VERSION } from './release-identity.mjs'
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -92,31 +93,78 @@ export function assertSafeContext(entries) {
  * Version comes from the context's own `package.json` rather than the working tree, so a stale
  * checkout cannot label an image with a version it does not contain.
  */
-export function readContextIdentity(entries, sourceSha) {
+export function readContextIdentity(entries, sourceSha = null) {
 	const packageEntry = entries.find((entry) => entry.name.replace(/^\.\//, '') === 'package.json')
 	if (!packageEntry) throw new Error('context archive has no package.json')
+	const contractEntry = entries.find(
+		(entry) => entry.name.replace(/^\.\//, '') === 'release-contract.json',
+	)
+	if (!contractEntry) throw new Error('context archive has no release-contract.json')
+	const provenanceEntry = entries.find(
+		(entry) => entry.name.replace(/^\.\//, '') === PROVENANCE_PATH,
+	)
+	if (!provenanceEntry) throw new Error(`context archive has no ${PROVENANCE_PATH}`)
 
 	const { version } = JSON.parse(packageEntry.data.toString('utf8'))
-	if (!sourceSha || !/^[0-9a-f]{40}$/.test(sourceSha)) {
+	const contract = JSON.parse(contractEntry.data.toString('utf8'))
+	const provenance = JSON.parse(provenanceEntry.data.toString('utf8'))
+	if (sourceSha !== null && !/^[0-9a-f]{40}$/.test(sourceSha)) {
 		throw new Error('--source-sha must be the full 40-character commit SHA the context was built from')
 	}
-	return { version, sourceSha }
+	const contractDigest = `sha256:${createHash('sha256').update(contractEntry.data).digest('hex')}`
+	const mismatches = []
+	if (provenance.schemaVersion !== PROVENANCE_SCHEMA_VERSION) {
+		mismatches.push(`provenance schema ${provenance.schemaVersion}`)
+	}
+	if (provenance.packageVersion !== version) {
+		mismatches.push(`package version ${provenance.packageVersion} != ${version}`)
+	}
+	if (provenance.sourceTreeDigest !== contract.sourceTreeDigest) {
+		mismatches.push('source tree digest does not match the embedded release contract')
+	}
+	if (provenance.candidateContentDigest !== contract.sourceTreeDigest) {
+		mismatches.push('candidate content digest does not match the embedded release contract')
+	}
+	if (provenance.releaseContractDigest !== contractDigest) {
+		mismatches.push('release contract digest does not match the embedded contract bytes')
+	}
+	if (sourceSha !== null && provenance.sourceSha !== sourceSha) {
+		mismatches.push(`source SHA ${provenance.sourceSha} != ${sourceSha}`)
+	}
+	if (typeof provenance.packageLockDigest !== 'string') {
+		mismatches.push('package-lock digest is missing')
+	}
+	if (typeof provenance.invocationId !== 'string' || provenance.invocationId === '') {
+		mismatches.push('release invocation id is missing')
+	}
+	if (mismatches.length > 0) {
+		throw new Error(`Docker context identity rejected:\n${mismatches.map((line) => `  - ${line}`).join('\n')}`)
+	}
+	return { version, sourceSha: provenance.sourceSha, candidateContentDigest: contract.sourceTreeDigest, provenance }
 }
 
 export function buildValidatedDockerImage(options) {
 	const contextPath = options.context
 	const checksumsPath = options.checksums
 	if (!contextPath || !checksumsPath) {
-		throw new Error('usage: --context <archive.tar.gz> --checksums <SHA256SUMS.json> --source-sha <sha>')
+		throw new Error(
+			'usage: --context <archive.tar.gz> --checksums <SHA256SUMS.json> [--source-sha <committed-sha>]',
+		)
 	}
 
 	const digest = verifyContextDigest({ contextPath, checksumsPath })
 	const entries = readTar(gunzipSync(readFileSync(contextPath)))
 	assertSafeContext(entries)
-	const { version, sourceSha } = readContextIdentity(entries, options['source-sha'])
+	const { version, sourceSha, candidateContentDigest } = readContextIdentity(
+		entries,
+		options['source-sha'],
+	)
 
 	const repository = options.repository ?? 'vcodesh/fluentcart-mcp'
-	const tags = [`${repository}:${version}`, `${repository}:${sourceSha.slice(0, 12)}`]
+	const tags = [
+		`${repository}:${version}`,
+		...(sourceSha === null ? [] : [`${repository}:${sourceSha.slice(0, 12)}`]),
+	]
 	const staging = mkdtempSync(join(tmpdir(), 'fluentcart-docker-'))
 
 	try {
@@ -129,8 +177,11 @@ export function buildValidatedDockerImage(options) {
 				join(staging, 'Dockerfile.release'),
 				'--label',
 				`org.opencontainers.image.version=${version}`,
+				...(sourceSha === null
+					? []
+					: ['--label', `org.opencontainers.image.revision=${sourceSha}`]),
 				'--label',
-				`org.opencontainers.image.revision=${sourceSha}`,
+				`sh.vcode.fluentcart-mcp.candidate-content-digest=${candidateContentDigest}`,
 				...tags.flatMap((tag) => ['--tag', tag]),
 				staging,
 			],
@@ -140,7 +191,7 @@ export function buildValidatedDockerImage(options) {
 		rmSync(staging, { recursive: true, force: true })
 	}
 
-	return { version, sourceSha, digest, tags, entryCount: entries.length }
+	return { version, sourceSha, candidateContentDigest, digest, tags, entryCount: entries.length }
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

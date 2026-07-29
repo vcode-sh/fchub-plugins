@@ -16,10 +16,10 @@ const ledger = buildLedger()
 const rowFor = (route) => ledger.routes.find((row) => `${row.method} ${row.path}` === route)
 
 /**
- * The only two operations plan 02 reviewed for guarded execution. Nothing else may ever be
- * reachable at real-money risk, however well-behaved it looks.
+ * The two operations retained as audit-only real-money rows. Nothing may ever be reachable at
+ * real-money risk.
  */
-const REVIEWED_GUARDED_ACTIONS = ['fluentcart_order_refund', 'fluentcart_subscription_cancel']
+const AUDIT_ONLY_MONEY_ACTIONS = ['fluentcart_order_refund', 'fluentcart_subscription_cancel']
 
 describe('every high-impact route is accounted for', () => {
 	it('has a ledger row for each classified high-impact route', () => {
@@ -110,63 +110,23 @@ describe('mandated risk classification', () => {
 	})
 })
 
-describe('guarded execution is the only exception', () => {
+describe('real-money operations are audit-only', () => {
 	const registry = extractRiskRegistry()
 	const tools = extractTools()
 
-	it('permits guarded execution for nobody, because 2.0.0 ships it unavailable', () => {
-		// The two reviewed actions remain classified real-money and guard-required, but their
-		// execution is 'none' for this release. The guard is built and unit-tested; it was never
-		// acceptance-proven, because no run-owned refundable order can be created and removed on
-		// FluentCart 1.5.5. Nothing else may quietly take their place either, so the assertion is
-		// that the guarded-rest set is empty rather than that it contains those two.
-		const guarded = tools
-			.filter((tool) => safetyFor(tool, registry).execution === 'guarded-rest')
-			.map((tool) => tool.name)
-			.sort()
-		assert.deepEqual(guarded, [], 'no tool may execute through the guard in this release')
-	})
-
-	it('keeps the two reviewed actions classified, so the withdrawal is deliberate', () => {
-		// Withdrawal must not look like an oversight: both keep real-money/guard-required, so a
-		// future release restores execution rather than reclassifying from scratch.
-		for (const name of REVIEWED_GUARDED_ACTIONS) {
-			const tool = tools.find((candidate) => candidate.name === name)
-			assert.ok(tool, `${name} must still be defined`)
-			const safety = safetyFor(tool, registry)
+	it('keeps the two audited actions classified as non-executable', () => {
+		for (const name of AUDIT_ONLY_MONEY_ACTIONS) {
+			const safety = registry.get(name)
+			assert.ok(safety, `${name} must retain its audit row`)
 			assert.equal(safety.risk, 'real-money')
-			assert.equal(safety.idempotency, 'guard-required')
+			assert.equal(safety.idempotency, 'unsupported')
 			assert.equal(safety.execution, 'none')
 		}
 	})
 
-	it('exposes real-money risk only through those two actions', () => {
+	it('exposes no real-money route', () => {
 		for (const row of ledger.routes.filter((r) => r.routeDisposition === 'exposed')) {
-			if (row.risk !== 'real-money') continue
-			for (const exposure of row.toolExposures) {
-				assert.ok(
-					REVIEWED_GUARDED_ACTIONS.includes(exposure.publicName),
-					`${row.method} ${row.path} exposes unreviewed real-money tool ${exposure.publicName}`,
-				)
-			}
-		}
-	})
-
-	it('requires the guard evidence to exist rather than assuming it does', () => {
-		// The ledger must fail, not pass, when a guarded action has no guard behind it.
-		const guardModules = [
-			'src/security/confirmation-token.ts',
-			'src/security/idempotency-ledger.ts',
-		]
-		for (const name of REVIEWED_GUARDED_ACTIONS) {
-			const safety = registry.get(name)
-			if (safety?.execution !== 'guarded-rest') continue
-			for (const guardModule of guardModules) {
-				assert.ok(
-					readFileSync(join(PACKAGE_ROOT, guardModule), 'utf8').length > 0,
-					`${name} claims guarded execution but ${guardModule} is missing or empty`,
-				)
-			}
+			assert.notEqual(row.risk, 'real-money', `${row.method} ${row.path} exposes real-money risk`)
 		}
 	})
 

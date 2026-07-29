@@ -72,7 +72,7 @@ const EXCLUDED_INTERNAL = {
 }
 
 /**
- * High-impact operations. Every one stays excluded unless it is a reviewed guarded action.
+ * High-impact operations that stay excluded from the public server.
  *
  * Reversibility is decided by evidence in the same capture, not by how ordinary the verb looks:
  * `POST /shipping/packages` is destructive precisely because the runtime serves no delete for it.
@@ -236,12 +236,6 @@ const REVIEWED_UNREGISTERED_READS = {
 		reason:
 			'Declares readOnlyHint in its tool annotations, so the server resolves it to READ_SAFETY, but it is absent from POST_SHAPED_READS in src/tools/risk-registry.ts. It reads product terms by parent and changes nothing; it needs a reviewed registry row so the classification stops depending on a per-tool annotation.',
 	},
-}
-
-/** Guard evidence required before any tool may claim `execution: 'guarded-rest'`. */
-const GUARD_EVIDENCE = {
-	fluentcart_order_refund: ['src/security/confirmation-token.ts', 'src/security/idempotency-ledger.ts'],
-	fluentcart_subscription_cancel: ['src/security/confirmation-token.ts', 'src/security/idempotency-ledger.ts'],
 }
 
 // ---------------------------------------------------------------------------
@@ -552,8 +546,8 @@ export function buildLedger() {
 		}
 
 		// A route's risk is the worst thing reachable *through this route*, not the worst thing any
-		// tool touching it can do elsewhere. A guarded refund reads GET /orders/{param} before it
-		// charges anything, and labelling that lookup "real-money" would be false: the same data is
+		// tool touching it can do elsewhere. A separate read can fetch GET /orders/{param}, and
+		// labelling that lookup "real-money" would be false: the same data is
 		// independently readable through a plain read tool. So a GET that any read tool serves is a
 		// read, and everything else takes the highest reviewed risk among its exposing tools.
 		// A write that ships on a reversibility claim carries the lane that proved it, in the
@@ -764,28 +758,6 @@ export function validateLedger(ledger, options = {}) {
 	for (const route of Object.keys(REVIEWED_ORPHAN_TOOL_ROUTES)) {
 		if (!orphanRoutes.has(route)) {
 			failures.push(`stale reviewed orphan entry: ${route} is no longer claimed by any tool`)
-		}
-	}
-
-	// Guarded execution needs a complete route list and real guard evidence.
-	const fixtureKeys = new Set(current.operations.map(key))
-	for (const tool of tools) {
-		if (safetyFor(tool, registry).execution !== 'guarded-rest') continue
-		if (tool.routes.length === 0) {
-			failures.push(`guarded tool ${tool.name} has no route list`)
-		}
-		for (const route of tool.routes) {
-			if (!fixtureKeys.has(key(route))) failures.push(`guarded tool ${tool.name} claims unserved route ${key(route)}`)
-		}
-		const guards = GUARD_EVIDENCE[tool.name]
-		if (!guards || guards.length === 0) {
-			failures.push(`guarded tool ${tool.name} has no guard evidence`)
-			continue
-		}
-		for (const guard of guards) {
-			if (!existsSync(join(PACKAGE_ROOT, guard))) {
-				failures.push(`guarded tool ${tool.name} guard evidence missing: ${guard}`)
-			}
 		}
 	}
 

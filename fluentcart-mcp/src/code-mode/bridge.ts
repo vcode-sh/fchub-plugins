@@ -12,6 +12,8 @@ export interface HostBridgeOptions {
 	onCallStart?: () => void
 	/** Invoked once a dispatch settles, aborts or fails. */
 	onCallEnd?: () => void
+	/** Cancels this execution when its owning MCP request is cancelled. */
+	signal?: AbortSignal
 }
 
 /**
@@ -28,14 +30,23 @@ export class HostBridge {
 	readonly #onCallStart: (() => void) | undefined
 	readonly #onCallEnd: (() => void) | undefined
 	readonly #controller = new AbortController()
+	readonly #externalSignal: AbortSignal | undefined
+	readonly #abortFromExternal = () => {
+		this.#cancelledByCaller = true
+		this.abort('execution cancelled by caller')
+	}
 	#callCount = 0
 	#inFlight = 0
+	#cancelledByCaller = false
 
 	constructor(index: ReadOnlyApiIndex, options: HostBridgeOptions = {}) {
 		this.#index = index
 		this.#maxCalls = options.maxCalls ?? CODE_MODE_LIMITS.maxApiCalls
 		this.#onCallStart = options.onCallStart
 		this.#onCallEnd = options.onCallEnd
+		this.#externalSignal = options.signal
+		if (this.#externalSignal?.aborted) this.#abortFromExternal()
+		else this.#externalSignal?.addEventListener('abort', this.#abortFromExternal, { once: true })
 	}
 
 	/** Number of dispatches attempted, including refused ones. Counted by the host, not the VM. */
@@ -55,9 +66,8 @@ export class HostBridge {
 	/**
 	 * Signal for in-flight REST work.
 	 *
-	 * The REST client does not accept an abort signal today, so aborting cannot cancel the
-	 * socket; what it does guarantee is that a terminated sandbox stops waiting immediately and
-	 * that no late response is ever handed back to a VM that is being torn down.
+	 * Tool handlers pass this through to the REST client, while the bridge also uses it to stop
+	 * waiting immediately and keep late responses away from a VM that is being torn down.
 	 */
 	get signal(): AbortSignal {
 		return this.#controller.signal
@@ -65,6 +75,7 @@ export class HostBridge {
 
 	/** Called when the sandbox terminates for any reason, including timeout and error paths. */
 	abort(reason = 'sandbox terminated'): void {
+		this.#externalSignal?.removeEventListener('abort', this.#abortFromExternal)
 		if (this.#controller.signal.aborted) return
 		this.#controller.abort(new Error(reason))
 	}
@@ -80,7 +91,12 @@ export class HostBridge {
 		if (this.aborted) {
 			return {
 				ok: false,
-				error: codeModeError('SANDBOX_TERMINATED', 'Sandbox already terminated.'),
+				error: codeModeError(
+					this.#cancelledByCaller ? 'EXECUTION_CANCELLED' : 'SANDBOX_TERMINATED',
+					this.#cancelledByCaller
+						? 'Execution was cancelled before dispatch.'
+						: 'Sandbox already terminated.',
+				),
 			}
 		}
 
@@ -159,9 +175,10 @@ export class HostBridge {
 	): Promise<BridgeOutcome> {
 		this.#inFlight += 1
 		this.#onCallStart?.()
+		const abort = this.#abortPromise()
 		try {
 			const result = await Promise.race([
-				this.#abortPromise(),
+				abort.promise,
 				handler(input, { signal: this.#controller.signal }),
 			])
 
@@ -169,8 +186,10 @@ export class HostBridge {
 				return {
 					ok: false,
 					error: codeModeError(
-						'SANDBOX_TERMINATED',
-						'Sandbox terminated while the call was in flight.',
+						this.#cancelledByCaller ? 'EXECUTION_CANCELLED' : 'SANDBOX_TERMINATED',
+						this.#cancelledByCaller
+							? 'Execution cancelled while the call was in flight.'
+							: 'Sandbox terminated while the call was in flight.',
 					),
 				}
 			}
@@ -189,19 +208,28 @@ export class HostBridge {
 			const message = error instanceof Error ? error.message : String(error)
 			return { ok: false, error: codeModeError('OPERATION_FAILED', message) }
 		} finally {
+			abort.cleanup()
 			this.#inFlight -= 1
 			this.#onCallEnd?.()
 		}
 	}
 
 	/** Resolves with `null` the moment the sandbox is torn down, so no call outlives its VM. */
-	#abortPromise(): Promise<null> {
-		return new Promise((resolve) => {
+	#abortPromise(): { promise: Promise<null>; cleanup: () => void } {
+		let listener: (() => void) | undefined
+		const promise = new Promise<null>((resolve) => {
 			if (this.#controller.signal.aborted) {
 				resolve(null)
 				return
 			}
-			this.#controller.signal.addEventListener('abort', () => resolve(null), { once: true })
+			listener = () => resolve(null)
+			this.#controller.signal.addEventListener('abort', listener, { once: true })
 		})
+		return {
+			promise,
+			cleanup: () => {
+				if (listener) this.#controller.signal.removeEventListener('abort', listener)
+			},
+		}
 	}
 }

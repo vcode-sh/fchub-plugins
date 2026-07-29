@@ -43,7 +43,7 @@ export function direct(
 	return { kind: 'direct', variants: [{ method, path }, ...fallbacks] }
 }
 
-/** Declare a tool that orchestrates several REST calls. List every one it may issue. */
+/** Declare every route a tool may issue across a sequence or input-selected branches. */
 export function composite(...variants: readonly EndpointVariant[]): ToolRouteMetadata {
 	return { kind: 'composite', variants }
 }
@@ -56,9 +56,10 @@ export function op(method: HttpMethod, path: string): EndpointVariant {
 /**
  * Decide whether a store can support a tool at all.
  *
- * A direct tool needs one of its variants. A composite needs all of them: it runs a sequence,
- * and discovering halfway through that the next call does not exist would leave the store in a
- * state nobody asked for. Refusing to register it is the cheaper failure.
+ * A direct tool needs one of its variants. A composite needs all of them: it either runs a
+ * sequence or selects a route from valid input. Missing a sequence leg can leave a partial write;
+ * missing an input branch advertises a valid request that can only fail. Refusing registration is
+ * the honest contract in both cases.
  */
 export function isSupported(capabilities: ApiCapabilities, routes: ToolRouteMetadata): boolean {
 	if (routes.variants.length === 0) return false

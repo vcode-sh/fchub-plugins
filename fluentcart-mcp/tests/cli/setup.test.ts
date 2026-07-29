@@ -15,6 +15,7 @@ vi.mock('@clack/prompts', () => ({
 	})),
 	log: {
 		error: vi.fn(),
+		info: vi.fn(),
 		success: vi.fn(),
 	},
 }))
@@ -75,6 +76,7 @@ describe('runSetup', () => {
 			{ encoding: 'utf-8', mode: 0o600 },
 		)
 		expect(p.outro).toHaveBeenCalled()
+		expect(p.log.info).toHaveBeenCalledWith(expect.stringMatching(/restart.*purges/i))
 	})
 
 	it('strips trailing slashes from URL before saving', async () => {

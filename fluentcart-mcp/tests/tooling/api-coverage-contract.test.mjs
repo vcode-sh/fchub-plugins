@@ -12,7 +12,6 @@ import {
 	extractTools,
 	OUTPUT_FILE,
 	REVIEWED_ORPHAN_TOOL_ROUTES,
-	safetyFor,
 	TOOL_ROUTE_OVERRIDES,
 	validateLedger,
 } from '../../scripts/build-api-coverage.mjs'
@@ -217,17 +216,13 @@ describe('risk contract', () => {
 		}
 	})
 
-	it('keeps real-money exposure to the two reviewed guarded actions', () => {
-		const guarded = new Set(['fluentcart_order_refund', 'fluentcart_subscription_cancel'])
-		for (const row of ledger.routes.filter((r) => r.routeDisposition === 'exposed')) {
-			if (row.risk !== 'real-money') continue
-			for (const exposure of row.toolExposures) {
-				assert.ok(
-					guarded.has(exposure.publicName),
-					`${key(row)} exposes real-money tool ${exposure.publicName}`,
-				)
-			}
-		}
+	it('keeps real-money routes out of the exposed ledger', () => {
+		assert.deepEqual(
+			ledger.routes.filter(
+				(row) => row.routeDisposition === 'exposed' && row.risk === 'real-money',
+			),
+			[],
+		)
 	})
 })
 
@@ -268,38 +263,6 @@ describe('tool and route integrity', () => {
 				served.has(orphan.preferred),
 				`${orphan.route} falls back with no served preferred route`,
 			)
-		}
-	})
-
-	it('requires a complete served route list and guard evidence for guarded execution', () => {
-		const registry = extractRiskRegistry()
-		const served = new Set(fixture.operations.map(key))
-		const guardedTools = tools.filter(
-			(tool) => safetyFor(tool, registry).execution === 'guarded-rest',
-		)
-
-		// 2.0.0 ships guarded execution withdrawn, so this set is legitimately empty. The rule
-		// must keep working for the release that restores it, so it is exercised against a
-		// synthetic tool as well: a validator that stops being tested the moment nothing matches
-		// is a validator that quietly rots until the day it is needed.
-		const synthetic = {
-			name: 'synthetic_guarded_probe',
-			routes: [{ method: 'POST', path: '/orders/{param}/refund' }],
-		}
-		for (const route of synthetic.routes) {
-			assert.ok(
-				served.has(key(route)),
-				`the synthetic guarded probe must claim a served route, got ${key(route)}`,
-			)
-		}
-		const unserved = { method: 'POST', path: '/orders/{param}/no-such-route' }
-		assert.equal(served.has(key(unserved)), false, 'an unserved route must not validate')
-
-		for (const tool of guardedTools) {
-			assert.ok(tool.routes.length > 0, `${tool.name} has no route list`)
-			for (const route of tool.routes) {
-				assert.ok(served.has(key(route)), `${tool.name} claims unserved route ${key(route)}`)
-			}
 		}
 	})
 })
@@ -395,50 +358,6 @@ describe('the validator actually rejects bad ledgers', () => {
 			],
 		})
 		assert.ok(failures.some((f) => f.includes('yields no REST route')))
-	})
-
-	it('rejects a guarded tool with no guard evidence', () => {
-		const registry = extractRiskRegistry()
-		registry.set('fluentcart_unguarded', {
-			risk: 'real-money',
-			idempotency: 'guard-required',
-			execution: 'guarded-rest',
-		})
-		const failures = validateLedger(ledger, {
-			registry,
-			tools: [
-				...extractTools(),
-				{
-					name: 'fluentcart_unguarded',
-					sourceFile: 'src/tools/ghost.ts',
-					readOnlyHint: false,
-					routes: [{ method: 'POST', path: '/orders/{param}/refund' }],
-				},
-			],
-		})
-		assert.ok(failures.some((f) => f.includes('no guard evidence')))
-	})
-
-	it('rejects a guarded tool claiming a route the store does not serve', () => {
-		// 2.0.0 withdraws guarded execution, so no real tool carries `guarded-rest` any more. The
-		// rule still has to work for the release that restores it, so the registry is overridden
-		// here to make refund guarded again for the duration of this assertion. Testing the rule
-		// only while a matching tool happens to exist would retire the check silently.
-		const registry = new Map(extractRiskRegistry())
-		registry.set('fluentcart_order_refund', {
-			risk: 'real-money',
-			idempotency: 'guard-required',
-			execution: 'guarded-rest',
-		})
-		const tools = extractTools().map((tool) =>
-			tool.name === 'fluentcart_order_refund'
-				? {
-						...tool,
-						routes: [...tool.routes, { method: 'POST', path: '/orders/{param}/unserved' }],
-					}
-				: tool,
-		)
-		assert.ok(validateLedger(ledger, { registry, tools }).some((f) => f.includes('unserved route')))
 	})
 })
 

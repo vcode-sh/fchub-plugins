@@ -8,9 +8,8 @@
  * file cannot contain its own hash, and the Git SHA belongs in CI metadata for the same reason.
  */
 
-import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join, posix, sep } from 'node:path'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { encode as encodeCl100k } from 'gpt-tokenizer/encoding/cl100k_base'
 import { encode as encodeO200k } from 'gpt-tokenizer/encoding/o200k_base'
@@ -21,35 +20,26 @@ import {
 	SERIALIZER,
 	TOKENIZER,
 } from './measure-tool-context.mjs'
+import {
+	computeSourceTreeDigest,
+	DIGEST_EXCLUDED,
+	DIGEST_INPUTS,
+	digestInputPaths,
+} from './release-contract-inputs.mjs'
+import { buildReleaseTruth } from './release-truth.mjs'
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 export const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
-export const WRITE_MODES = ['disabled', 'reversible', 'guarded']
-
-/**
- * Declared digest inputs. The generators are included deliberately: changing how a number is
- * produced changes what the number means. Both generated files are excluded.
- */
-export const DIGEST_INPUTS = [
-	{ file: 'package.json' },
-	{ file: 'tsconfig.json' },
-	{ file: 'scripts/measure-tool-context.mjs' },
-	{ file: 'scripts/build-release-contract.mjs' },
-	{ file: 'scripts/build-manifest.mjs' },
-	{ directory: 'src', extension: '.ts' },
-	{ directory: 'tests/fixtures/routes', extension: '.json' },
-]
-
-export const DIGEST_EXCLUDED = ['release-contract.json', 'manifest.json']
+export const WRITE_MODES = ['disabled', 'reversible']
 
 const CORE_PRO = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
 const CORE_ONLY = 'tests/fixtures/routes/fluentcart-1.5.5-core.json'
 const LEGACY_RUNTIME = 'tests/fixtures/routes/fluentcart-1.3.9-runtime.json'
-const GUARD = 'tests/fixtures/security/standalone-guard.json'
+const ABILITIES = 'tests/fixtures/abilities/fluentcart-1.5.5-wordpress-7.0.2.json'
 
-function liveRow(name, componentFixture, writeMode, guardFixture = null) {
+function liveRow(name, componentFixture, writeMode) {
 	const evidenceKind = 'live-rest-index'
-	return { name, componentFixture, guardFixture, writeMode, evidenceKind, replaces: null }
+	return { name, componentFixture, writeMode, evidenceKind, replaces: null }
 }
 
 /** The five mandatory profile rows, each measured against its own captured route fixture. */
@@ -58,43 +48,7 @@ export const PROFILES = [
 	liveRow('core-1.5.5-rest-disabled', CORE_ONLY, 'disabled'),
 	liveRow('core-1.5.5-pro-1.5.4-rest-disabled', CORE_PRO, 'disabled'),
 	liveRow('core-1.5.5-pro-1.5.4-rest-reversible', CORE_PRO, 'reversible'),
-	liveRow('core-1.5.5-pro-1.5.4-standalone-guarded', CORE_PRO, 'guarded', GUARD),
 ]
-
-function walk(directory, extension) {
-	const found = []
-	for (const entry of readdirSync(join(PACKAGE_ROOT, directory), { withFileTypes: true })) {
-		const child = posix.join(directory, entry.name)
-		if (entry.isDirectory()) found.push(...walk(child, extension))
-		else if (entry.name.endsWith(extension)) found.push(child)
-	}
-	return found
-}
-
-export function digestInputPaths() {
-	const paths = []
-	for (const input of DIGEST_INPUTS) {
-		if (input.file) paths.push(input.file)
-		else paths.push(...walk(input.directory, input.extension))
-	}
-	return paths.sort()
-}
-
-/** Hash path and content together, so a rename cannot slip past the digest. */
-export function computeSourceTreeDigest(paths = digestInputPaths()) {
-	const hash = createHash('sha256')
-	for (const path of paths) {
-		const absolute = join(PACKAGE_ROOT, path.split('/').join(sep))
-		if (!existsSync(absolute) || !statSync(absolute).isFile()) {
-			throw new Error(`Declared digest input is missing: ${path}`)
-		}
-		hash.update(path)
-		hash.update('\0')
-		hash.update(readFileSync(absolute))
-		hash.update('\0')
-	}
-	return `sha256:${hash.digest('hex')}`
-}
 
 async function importDist(...segments) {
 	return import(pathToFileURL(join(PACKAGE_ROOT, 'dist', ...segments)).href)
@@ -112,7 +66,6 @@ async function loadRegistry() {
 /** Registry-wide ceiling per write mode, with no route evidence applied. */
 async function measureWritePolicyExposure(serverModule, registry) {
 	const { canExposeTool } = await importDist('security', 'write-policy.js')
-	const guard = { persistentState: true, signingSecret: true }
 
 	// Asked of the server, not recomputed: two ways of counting one registry is one too many.
 	const exposed = {}
@@ -121,16 +74,13 @@ async function measureWritePolicyExposure(serverModule, registry) {
 		exposed[writeMode] = serverModule.resolveServerContext().tools.length
 	}
 
-	const policy = { writeMode: 'guarded', guard }
+	const policy = { writeMode: 'reversible' }
 	const fromModules = registry.filter((t) => canExposeTool(t.safety, policy)).length
-	const isGuardedRest = (t) => t.safety.risk === 'real-money' && t.safety.execution === 'guarded-rest'
-	const realMoneyExposable = registry.filter(isGuardedRest).length
 
 	return {
 		...exposed,
-		realMoneyExposable,
 		// Definitions the server composes outside the tool modules, stated rather than absorbed.
-		composedBeyondModules: exposed.guarded - fromModules,
+		composedBeyondModules: exposed.reversible - fromModules,
 		note: 'Exposure per write mode as the server composes it, independent of route evidence.',
 	}
 }
@@ -143,7 +93,7 @@ function blockerFor(profile) {
 	if (profile.evidenceKind === 'docs-contract') {
 		return { missingFixture: profile.replaces.componentFixture, reason: profile.replaces.reason }
 	}
-	for (const path of [profile.componentFixture, profile.guardFixture]) {
+	for (const path of [profile.componentFixture]) {
 		if (path && !existsSync(join(PACKAGE_ROOT, path.split('/').join(sep)))) {
 			return { missingFixture: path, reason: 'declared fixture has never been captured' }
 		}
@@ -164,8 +114,8 @@ function capabilitiesFor(path, canonicaliseRoute) {
 
 /** The outgoing `tools/list` result for one mode, against supplied capability evidence. */
 async function collectWireTools(serverModule, capabilities, mode) {
-	const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
-	const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js')
+	const { Client } = await import('@modelcontextprotocol/client')
+	const { InMemoryTransport } = await import('@modelcontextprotocol/server')
 	const context = serverModule.resolveServerContext(capabilities)
 	const server = await serverModule.createServerFromContextAsync(context, mode)
 	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
@@ -200,6 +150,41 @@ async function measureProfile(serverModule, profile, capabilities) {
 	return { exposedDefinitionCount, modes }
 }
 
+function abilityBridgeEvidence() {
+	const fixture = JSON.parse(readFileSync(join(PACKAGE_ROOT, ABILITIES), 'utf8'))
+	const support = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'compatibility-support.json'), 'utf8'))
+	const parity = support.abilityParity
+	const capturedNames = fixture.abilities.map((ability) => ability.name).sort()
+	const parityNames = parity.rows.map((row) => row.ability).sort()
+	if (JSON.stringify(capturedNames) !== JSON.stringify(parityNames)) {
+		throw new Error('ability parity ledger does not match the captured FluentCart catalogue')
+	}
+	const readCount = fixture.abilities.filter(
+		(ability) => ability.annotations.mcpReadOnlyHint === true,
+	).length
+	if (
+		fixture.abilities.length !== parity.capturedCatalogueSize ||
+		readCount !== parity.auditedReadCount
+	) {
+		throw new Error('ability parity counts do not match the captured FluentCart catalogue')
+	}
+	return {
+		status: 'MEASURED',
+		evidence: 'live-wordpress-abilities-rest',
+		fixture: ABILITIES,
+		wordpress: fixture.profile.wordpress,
+		components: Object.fromEntries(
+			fixture.profile.activeComponents.map((component) => [component.slug, component.version]),
+		),
+		capturedCatalogueSize: fixture.abilities.length,
+		auditedReadCount: readCount,
+		writeCount: fixture.abilities.length - readCount,
+		adapter: fixture.adapter,
+		executionMethod: parity.executionMethod,
+		executionMethodEvidence: parity.executionMethodEvidence,
+	}
+}
+
 export async function buildContract() {
 	const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'))
 	const paths = digestInputPaths()
@@ -228,6 +213,7 @@ export async function buildContract() {
 		serializer: SERIALIZER,
 		tokenizer: TOKENIZER,
 		packageVersion: pkg.version,
+		release: buildReleaseTruth(pkg),
 		sourceTreeDigest: computeSourceTreeDigest(paths),
 		sourceTreeInputs: { fileCount: paths.length, declared: DIGEST_INPUTS, excluded: DIGEST_EXCLUDED },
 		sourceDefinitionCount: registry.length,
@@ -242,6 +228,7 @@ export async function buildContract() {
 			appliedToToolRegistry: true,
 			note: 'Discovered routes prune the registry before registration: a direct tool needs one declared variant served, a composite needs every route it may call, and a tool with no supported route is not registered at all. Each profile row below is measured under its own fixture, so the counts differ by store.',
 		},
+		abilitiesBridge: abilityBridgeEvidence(),
 		legacyRuntimeSupport: {
 			status: 'ROUTE-SURFACE-CAPTURED',
 			evidence: 'live-rest-index',

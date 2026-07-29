@@ -7,9 +7,9 @@ import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Separator } from '@/components/ui/separator';
 
-FluentCart's admin panel is fine if you enjoy clicking through seventeen screens to find out what last week actually earned. For everyone else, there's this — an MCP server that connects your AI assistant to your store's REST API. Claude, Cursor, Copilot, ChatGPT, Codex, anything that speaks MCP.
+FluentCart's admin panel is fine if you enjoy clicking through seventeen screens to find out what last week actually earned. For everyone else, there's this — an MCP server that connects an MCP client to your store's REST API. It supports protocol `2025-11-25` and `2026-07-28`; certification requires candidate-bound handshakes from the five unattended client cells.
 
-Out of the box it reads. Orders, products, customers, subscriptions, reports, settings. Changing anything is a separate decision you have to make on purpose, and the tools that touch money are hidden until you have configured the machinery that makes them safe to expose.
+Out of the box it reads. Orders, products, customers, subscriptions, reports, settings. Reversible admin work is a separate decision you have to make on purpose. Money-moving, destructive and bulk actions are not part of this release.
 
 Open source. On [npm](https://www.npmjs.com/package/fluentcart-mcp). On [GitHub](https://github.com/vcode-sh/fchub-plugins).
 
@@ -21,7 +21,9 @@ You don't need to understand how MCP works. If you can double-click a file or pa
 
 **Claude Desktop — one click:**
 
-Download <McpbDownload />, double-click, enter your WordPress credentials. Done. No Node.js, no JSON, no terminal.
+Install Node.js 24+, download <McpbDownload />, double-click, then enter your WordPress
+credentials. The extension avoids JSON editing and terminal configuration; it does not bundle a
+Node runtime.
 
 **Everyone else:**
 
@@ -60,7 +62,7 @@ Those work on a default install. Anything that changes data — a new product, a
     Profiles, addresses, lifetime value, subscription state. Creating and updating a customer needs writes enabled; ending a subscription isn't available in this release.
   </Card>
   <Card title="Reports &amp; Analytics">
-    Revenue, sales growth, top products, retention cohorts, customer insights. All read-only, all available by default.
+    Revenue, sales growth, top products, retention cohorts, customer insights. Read-only by default where the connected store and WordPress principal permit them.
   </Card>
   <Card title="Shipping, Tax &amp; Email">
     Shipping zones, tax rates, EU VAT, email templates, notification settings.
@@ -80,16 +82,11 @@ Those work on a default install. Anything that changes data — a new product, a
 |---|---|---|
 | `disabled` *(default)* | Reads only | You want answers, not edits |
 | `reversible` | Reads plus the writes that can be undone — creating and updating products, variants, coupons, customers, shipping, tax rules, attributes and order bumps | You want the AI to do the boring admin |
-| `guarded` | The same set as `reversible` in 2.0.0 — see below | Nothing yet. It's the mode the money tools will return to |
 
 Filtering happens before registration, not at call time. A tool the policy excludes is not disabled — it is absent, and cannot be listed, searched, described or called by name.
 
 <Callout type="warn" title="Refunds and cancellations are not available in 2.0.0">
-`fluentcart_order_refund` and `fluentcart_subscription_cancel` are **not available in any write mode**, including a fully configured `guarded` one. If you are here to automate refunds, this release will not do it and you should know that before you install rather than after.
-
-The guard itself is finished — signed previews pinned to the exact payload, a durable single-writer ledger, replay and conflict detection, crash handling that never silently retries. What is missing is acceptance evidence, and for something that moves customer money that distinction is the whole argument. Proving a refund end to end needs an order created, refunded and then removed within one run, and FluentCart 1.5.5 offers no way to finish that: transactions have no DELETE route, deleting an order leaves them behind, and no draft product can stand in because unpublished products can't be purchased. Every candidate fixture leaves residue the API cannot clean up.
-
-The rule we set ourselves was that a guarded capability either passes both acceptance lanes or ships unavailable. It could not, so it does not. The ceremony is built; the proof is not, so it is not switched on.
+`fluentcart_order_refund` and `fluentcart_subscription_cancel` are not product tools in this release. No write mode or environment variable enables them. Use FluentCart's own admin or official operator tooling when you need to move money or end a subscription.
 </Callout>
 
 Deletion, bulk operations, order status changes and marking an order paid are also absent, for the same reason in a milder form: FluentCart offers no supported way to undo them, so they are not classed as reversible.
@@ -104,10 +101,11 @@ Deletion, bulk operations, order status changes and marking an order paid are al
 4. **FluentCart** does the work and returns the data
 5. **The AI** tells you what happened, in plain English
 
-No API calls. No JSON. Just a conversation.
+No API calls or JSON for you to assemble. Just a conversation.
 
 <Callout type="warn" title="Your Store, Your Data">
-The MCP server connects directly to **your** WordPress site. Nothing passes through third-party servers. Your data stays between your AI client and your WordPress installation.
+FluentCart MCP has no hosted relay. It connects directly to **your** WordPress site, and store data
+travels only through the AI client, MCP server, and network infrastructure you choose.
 </Callout>
 
 ## What You Need
@@ -116,26 +114,31 @@ The MCP server connects directly to **your** WordPress site. Nothing passes thro
 |-------------|---------|
 | **WordPress** | 7.0.2 with [FluentCart](https://fluentcart.com) 1.5.5 and FluentCart Pro 1.5.4 — the combination this release is verified against |
 | **Application Password** | Generated in WordPress admin (Users → Profile) |
-| **Node.js 24+** | [Download](https://nodejs.org) — *not needed for the Claude Desktop Extension* |
+| **Node.js 24+** | [Download](https://nodejs.org) — required for local clients and the Claude Desktop Extension; Docker supplies its own runtime |
 
 Older FluentCart builds are a different question. The route surface of an older 1.3.9 install has been captured from a real runtime, so there is hard evidence of which endpoints that build serves — but evidence about a store is not the same as proof these tools work against it, and support for it isn't claimed.
 
 What does happen on any store, old or new: the server reads your REST index at startup and registers only the tools your routes can serve. An older build gets a smaller tool list rather than a full one that fails halfway through.
 
-## Supported AI Clients
+## Client configuration recipes
+
+These are setup recipes, not certification claims. Claude Desktop, Cursor, VS Code, Windsurf and
+Codex CLI need their documented configuration in the user's own profile. Candidate checks exercise
+MCP Inspector and Claude Code over stdio and HTTP, plus the Docker HTTP image. ChatGPT remains
+deployment guidance.
 
 | Client | How Hard? |
 |--------|-----------|
-| [**Claude Desktop (Extension)**](/docs/fluentcart-mcp/setup) | Download, double-click, done |
+| [**Claude Desktop (Extension)**](/docs/fluentcart-mcp/setup) | Download, install, then verify the connection |
 | [**Claude Desktop**](/docs/fluentcart-mcp/setup) | Paste some JSON |
-| [**Claude Code**](/docs/fluentcart-mcp/setup) | One command |
+| [**Claude Code**](/docs/fluentcart-mcp/setup) | One command; unattended candidate check |
 | [**Cursor**](/docs/fluentcart-mcp/setup) | Paste some JSON |
 | [**VS Code + Copilot**](/docs/fluentcart-mcp/setup) | Add to settings |
 | [**Windsurf**](/docs/fluentcart-mcp/setup) | Paste some JSON |
 | [**Codex CLI**](/docs/fluentcart-mcp/setup) | Config file |
-| [**ChatGPT / Docker**](/docs/fluentcart-mcp/setup) | Docker one-liner |
+| [**ChatGPT / Docker**](/docs/fluentcart-mcp/setup) | Deployment guidance / Docker recipe |
 
-Anything that speaks MCP will work. The config is the same everywhere.
+Follow the client’s own MCP documentation as well as these recipes; supported transports and account settings vary by client.
 
 <Separator className="my-8" />
 
@@ -149,7 +152,7 @@ Anything that speaks MCP will work. The config is the same everywhere.
     What to ask and how to phrase it. Dozens of example prompts by category.
   </Card>
   <Card title="Tool Reference" href="/docs/fluentcart-mcp/tools">
-    Every tool definition in this release, by module — and which ones your configuration actually exposes.
+    The small surface your client sees, the optional reversible work, and what deliberately stays absent.
   </Card>
   <Card title="Troubleshooting" href="/docs/fluentcart-mcp/troubleshooting">
     Something broken? Every failure mode is covered.

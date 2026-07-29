@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { after, describe, it } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { assertAllowedLiveTarget, fetchTargetIdentity } from '../../scripts/live-target-policy.mjs'
+
+const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 describe('assertAllowedLiveTarget', () => {
 	it('accepts loopback hostnames without any opt-in', () => {
@@ -125,6 +130,15 @@ const validRoot = {
 }
 
 describe('fetchTargetIdentity', () => {
+	it('documents the exact copyable fingerprint format emitted by the launcher', () => {
+		const example = readFileSync(join(PACKAGE_ROOT, '.env.test.local.example'), 'utf8')
+		const placeholder = example.match(
+			/^# FLUENTCART_INTEGRATION_TARGET_FINGERPRINT="([^"]+)"$/m,
+		)?.[1]
+		assert.equal(placeholder, '<64 lowercase hexadecimal characters>')
+		assert.doesNotMatch(example, /TARGET_FINGERPRINT="sha256:/)
+	})
+
 	it('produces a stable canonical document and lowercase sha-256 fingerprint', async () => {
 		stubFetch(async () => jsonResponse(validRoot))
 		const first = await fetchTargetIdentity('http://localhost:9081')

@@ -22,9 +22,10 @@ import {
 	createOwnedAttributeGroup,
 	createOwnedCustomer,
 	createOwnedProduct,
-	NAMED_BLOCKERS,
 } from './support/acceptance-fixture.js'
+import { captureActivityBoundary, cleanupRunActivities } from './support/activity-cleanup.js'
 import { CleanupLedger } from './support/cleanup-ledger.js'
+import { getLiveClient } from './support/live-client.js'
 import { getLiveRun } from './support/live-run.js'
 
 const run = getLiveRun()
@@ -39,14 +40,21 @@ const HIGH_IMPACT = [
 	'fluentcart_settings_save_permissions',
 	'fluentcart_file_upload',
 	'fluentcart_role_create',
+	'fluentcart_order_refund',
+	'fluentcart_subscription_cancel',
+	'fluentcart_product_pricing_update',
+	'fluentcart_label_create',
+	'fluentcart_customer_address_make_primary',
 ]
 
 let ctx: Awaited<ReturnType<typeof acceptanceContext>>
 let group: OwnedAttributeGroup
 let customer: OwnedCustomer
 let product: OwnedProduct
+let activityBoundary: number
 
 beforeAll(async () => {
+	activityBoundary = await captureActivityBoundary()
 	ctx = await acceptanceContext('reversible')
 	group = await createOwnedAttributeGroup(ledger)
 	customer = await createOwnedCustomer(ledger)
@@ -55,8 +63,21 @@ beforeAll(async () => {
 }, 120_000)
 
 afterAll(async () => {
-	// Deliberately unguarded: a cleanup failure must fail this suite.
-	await ledger.cleanup()
+	const failures: unknown[] = []
+	try {
+		await ledger.cleanup()
+	} catch (error) {
+		failures.push(error)
+	}
+	try {
+		await cleanupRunActivities(getLiveClient(), activityBoundary, run.prefix)
+	} catch (error) {
+		failures.push(error)
+	}
+	if (failures.length === 1) throw failures[0]
+	if (failures.length > 1) {
+		throw new AggregateError(failures, 'entity and collateral activity cleanup both failed')
+	}
 })
 
 const exposed = () => new Set(ctx.tools.map((tool) => tool.name))
@@ -239,29 +260,6 @@ describe('product lifecycle', () => {
 	it('leaves the product reversible by removal, with the ledger holding its exact id', () => {
 		expect(product.id).toBeGreaterThan(0)
 		expect(ledger.size).toBeGreaterThanOrEqual(3)
-	})
-
-	// BLOCKED — see NAMED_BLOCKERS.productPricing. The pricing route is a whole-product save, so
-	// WordPress records a revision that FluentCart REST cannot delete afterwards. Running it would
-	// guarantee one unremovable wp_posts row per acceptance run.
-	it.skip(`saves product pricing (BLOCKED: ${NAMED_BLOCKERS.productPricing})`, () => {
-		throw new Error('unreachable while blocked')
-	})
-})
-
-// BLOCKED — see NAMED_BLOCKERS.label. No route deletes a label, so a created label could never be
-// registered with a verifiable cleanup handler.
-describe.skip(`label lifecycle (BLOCKED: ${NAMED_BLOCKERS.label})`, () => {
-	it('creates a label', () => {
-		throw new Error('unreachable while blocked')
-	})
-})
-
-// BLOCKED — see NAMED_BLOCKERS.customerAddress. The first address is primary, primary addresses
-// cannot be deleted, and deleting the owning customer does not cascade to the address row.
-describe.skip(`customer address lifecycle (BLOCKED: ${NAMED_BLOCKERS.customerAddress})`, () => {
-	it('creates a billing address', () => {
-		throw new Error('unreachable while blocked')
 	})
 })
 

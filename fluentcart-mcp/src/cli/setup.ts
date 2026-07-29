@@ -90,6 +90,9 @@ export async function runSetup(): Promise<void> {
 	}
 
 	p.log.success(`Config written to ${configPath} (0600)`)
+	p.log.info(
+		'Restart any running fluentcart-mcp process after rotating credentials; restart purges authorised responses immediately.',
+	)
 
 	p.outro("You're all set. Run fluentcart-mcp to start the server.")
 }

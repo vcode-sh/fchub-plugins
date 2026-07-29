@@ -28,16 +28,20 @@ const liveStep = (id, testFile, extra = {}) =>
 		...extra,
 	})
 
-const GUARDED_WRITES = 'tests/integration/acceptance-guarded-writes.test.ts'
 // The route index is public, so this lane needs a reachable store but no credential file, and an
 // unreachable store is a failure naming its origin rather than a statically missing prerequisite.
 const LIVE_TARGET = { acceptsFixture: true }
-const DOCKER_IMAGE_ARGS = [
-	'--context',
-	'dist-packages/fluentcart-mcp-docker-context.tar.gz',
-	'--checksums',
-	'dist-packages/SHA256SUMS.json',
-]
+const candidatePreflight = () =>
+	nodeStep('candidate-preflight', 'scripts/verify-acceptance-candidate.mjs', [], {
+		requiresEnvironment: [
+			'FLUENTCART_ACCEPTANCE_IMAGE',
+			'FLUENTCART_ACCEPTANCE_IMAGE_ID',
+			'FLUENTCART_ACCEPTANCE_IMAGE_DIGEST',
+		],
+		prerequisiteLabel: 'candidate prerequisite',
+		blockedExitCodes: [2],
+		blocksLane: true,
+	})
 
 // Ordered exactly as plan 08 Task 1 Step 1 specifies. `npm ci` is opt-in: running it by default
 // would delete dependencies that concurrent work is relying on, so it is skipped and recorded as
@@ -92,6 +96,61 @@ export const LANES = {
 			liveStep('permissions', 'tests/integration/acceptance-permissions.test.ts'),
 		],
 	},
+	protocol: {
+		description:
+			'Built stdio, HTTP and synthetic production registries over the 2025 and 2026 protocol eras',
+		steps: [
+			testStep('stdio-dual-era', ['tests/protocol/stdio-dual-era.test.mjs'], {
+				requiresFiles: ['dist/index.js'],
+				requiresModules: ['@modelcontextprotocol/client', '@modelcontextprotocol/client/stdio'],
+			}),
+			testStep('http-dual-era', ['tests/protocol/http-dual-era.test.mjs'], {
+				requiresFiles: ['dist/index.js'],
+				requiresModules: ['@modelcontextprotocol/client'],
+			}),
+			testStep('production-surface', ['tests/protocol/production-surface.test.mjs'], {
+				requiresFiles: ['dist/index.js'],
+				requiresModules: ['@modelcontextprotocol/client'],
+			}),
+		],
+	},
+	proxy: {
+		description:
+			'Digest-pinned nginx TLS, forwarding, streaming, cancellation, reconnect and enforced limits',
+		steps: [
+			candidatePreflight(),
+			testStep('proxy-smoke', ['tests/acceptance/proxy.test.mjs'], {
+				requiresFiles: [
+					'tests/fixtures/proxy/docker-compose.yml',
+					'tests/fixtures/proxy/nginx.conf',
+					'scripts/proxy-smoke.mjs',
+				],
+				proves: ['certifies actual candidate proxy behaviours'],
+			}),
+		],
+	},
+	soak: {
+		description:
+			'Six-minute read-only candidate stability smoke with latency, error, descriptor and RSS gates',
+		steps: [
+			candidatePreflight(),
+			testStep('soak-policy', ['tests/acceptance/soak-contract.test.mjs']),
+			nodeStep('soak-http', 'scripts/soak-http.mjs', [], {
+				acceptsSourceSha: true,
+			}),
+		],
+	},
+	clients: {
+		description:
+			'Exact named-client versions, transports, negotiated eras and isolated configuration roots',
+		steps: [
+			candidatePreflight(),
+			nodeStep('certify-clients', 'scripts/certify-clients.mjs'),
+			testStep('client-evidence', ['tests/acceptance/client-evidence.test.mjs'], {
+				proves: ['certifies named client matrix'],
+			}),
+		],
+	},
 	tokens: {
 		description: 'Built wire definition sizes and progressive-disclosure budgets',
 		steps: [testStep('token-budget', ['tests/acceptance/token-budget.test.mjs'])],
@@ -115,43 +174,15 @@ export const LANES = {
 		description: 'Reversible lifecycles with independently verified cleanup',
 		steps: [liveStep('reversible-live', 'tests/integration/acceptance-reversible.test.ts')],
 	},
-	'guarded-preview': {
-		description: 'Signed, state-pinned, mutation-free refund and cancellation previews',
-		steps: [
-			liveStep('guarded-preview', GUARDED_WRITES, {
-				env: { FLUENTCART_ACCEPTANCE_GUARD_PHASE: 'preview' },
-				// Plan 08 Task 7: a documented guarded capability requires this lane to PASS. Skip the
-				// preview and the capability is unproven, however many neighbouring tests are green.
-				proves: ['previews a guarded refund'],
-			}),
-		],
-	},
-	'guarded-execute-test': {
-		description: 'Durable claim behaviour and test-mode-only guarded execution',
-		steps: [
-			testStep('guard-state', ['tests/acceptance/guard-state.test.mjs']),
-			liveStep('guarded-execute', GUARDED_WRITES, {
-				env: { FLUENTCART_ACCEPTANCE_GUARD_PHASE: 'execute' },
-				proves: [
-					'executes one approved test-mode refund',
-					'executes one approved test-mode cancellation',
-				],
-			}),
-		],
-	},
 	archives: {
-		description: 'One checksum-bound release build, inspected and smoked without rebuilding',
+		description: 'Supplied checksum-bound candidate archives and image inspected without rebuilding',
 		steps: [
-			npmStep('pack-release', 'pack:release'),
+			candidatePreflight(),
 			nodeStep('inspect-npm-pack', 'scripts/inspect-npm-pack.mjs', [], {
 				dynamicArgument: { dir: 'dist-packages', prefix: 'fluentcart-mcp-', suffix: '.tgz' },
 			}),
 			nodeStep('inspect-mcpb', 'scripts/inspect-mcpb.mjs', ['dist-packages/fluentcart-mcp.mcpb'], {
 				requiresFiles: ['dist-packages/fluentcart-mcp.mcpb'],
-			}),
-			nodeStep('docker-image', 'scripts/build-validated-docker-image.mjs', DOCKER_IMAGE_ARGS, {
-				requiresFiles: ['dist-packages/SHA256SUMS.json'],
-				acceptsSourceSha: true,
 			}),
 			testStep('docker-smoke', ['tests/acceptance/docker.test.mjs']),
 		],
