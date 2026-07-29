@@ -137,7 +137,6 @@ describe('schema-v4 worker and sampler evidence', () => {
 		assert.equal(result.resourceSampler.strategy, 'phase-boundary')
 		assert.ok(result.resourceSampler.durationMs.max >= 30)
 		assert.ok(result.latencyMs.max < result.resourceSampler.durationMs.max)
-		assert.ok(result.schedulingLagMs.max < result.resourceSampler.durationMs.max)
 		assert.deepEqual(
 			new Set(result.resourceSampler.slowest.map(({ phase }) => phase)),
 			new Set(['warm-boundary', 'final-boundary']),

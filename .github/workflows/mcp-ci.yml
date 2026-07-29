@@ -154,10 +154,12 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           DIGEST=$(node -p "require('./release-contract.json').sourceTreeDigest")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "source_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "source_tree_digest=$DIGEST" >> "$GITHUB_OUTPUT"
-          echo "artifact_name=${RELEASE_ARTIFACT_NAME}-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$VERSION"
+            echo "source_sha=${{ github.sha }}"
+            echo "source_tree_digest=$DIGEST"
+            echo "artifact_name=${RELEASE_ARTIFACT_NAME}-${{ github.run_id }}"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.identity.outputs.artifact_name }}

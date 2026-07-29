@@ -44,7 +44,11 @@ const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
  * descriptions; that is the trade, and it is the right way round.
  */
 const ACCEPTED = {
-	dynamic: { toolCount: 4, cl100kTokens: 662, o200kTokens: 673 },
+	// 662 / 673 → 674 / 685 on 2026-07-29: both read-only discovery tools now state
+	// `destructiveHint: false` explicitly. That closes an annotation ambiguity for clients which
+	// render or enforce tool risk metadata; twelve definition tokens in each encoding are the
+	// measured cost.
+	dynamic: { toolCount: 4, cl100kTokens: 674, o200kTokens: 685 },
 	// 4,146 → 4,182 on 2026-07-28: `dashboard_overview` now states that its figures cover a fixed
 	// 30-day window. It read as all-time before, which is the kind of description that produces a
 	// confidently wrong answer rather than a missing one. 36 tokens is a fair price for that.

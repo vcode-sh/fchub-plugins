@@ -358,7 +358,10 @@ describe('client-first documentation contracts', () => {
 	const compactDeployment = deployment.replace(/\s+/g, ' ')
 
 	it('keeps the Claude extension runtime separate from the MCPB archive contents', () => {
-		assert.match(compactOnboarding, /Claude Desktop supplies (?:its own |a built-in )?Node(?:\.js)? runtime/i)
+		assert.match(
+			compactOnboarding,
+			/Claude Desktop supplies (?:its own |a built-in )?Node(?:\.js)? runtime/i,
+		)
 		assert.match(compactOnboarding, /MCPB[^.]{0,160}(?:contains|includes)[^.]{0,80}JavaScript/i)
 		assert.match(compactOnboarding, /(?:not|does not)[^.]{0,80}(?:Node executable|Node runtime)/i)
 		assert.doesNotMatch(
@@ -369,8 +372,14 @@ describe('client-first documentation contracts', () => {
 
 	it('explains local npx installation behaviour and the shared OpenAI desktop configuration', () => {
 		assert.match(compactOnboarding, /npx -y[^.]{0,100}downloads?[^.]{0,60}on demand/i)
-		assert.match(compactOnboarding, /npx -y[^.]{0,140}(?:does not|doesn't)[^.]{0,40}install[^.]{0,30}globally/i)
-		assert.match(compactSetup, /ChatGPT Desktop[^.]{0,120}Codex CLI[^.]{0,120}Codex IDE extension[^.]{0,160}share/i)
+		assert.match(
+			compactOnboarding,
+			/npx -y[^.]{0,140}(?:does not|doesn't)[^.]{0,40}install[^.]{0,30}globally/i,
+		)
+		assert.match(
+			compactSetup,
+			/ChatGPT Desktop[^.]{0,120}Codex CLI[^.]{0,120}Codex IDE extension[^.]{0,160}share/i,
+		)
 		assert.match(compactSetup, /~\/\.codex\/config\.toml/)
 		assert.match(compactSetup, /Settings\s*→\s*MCP servers\s*→\s*Add server/)
 	})
@@ -379,8 +388,14 @@ describe('client-first documentation contracts', () => {
 		assert.match(compactSetup, /codex plugin marketplace add vcode-sh\/fchub-plugins --ref main/)
 		assert.match(compactSetup, /codex plugin marketplace list/)
 		assert.match(compactSetup, /restart ChatGPT Desktop/i)
-		assert.match(compactSetup, /Plugins Directory[^.]{0,180}fchub-plugins[^.]{0,180}fluentcart-mcp/i)
-		assert.match(compactSetup, /(?:separate from|not listed in)[^.]{0,100}(?:universal )?public directory/i)
+		assert.match(
+			compactSetup,
+			/Plugins Directory[^.]{0,180}fchub-plugins[^.]{0,180}fluentcart-mcp/i,
+		)
+		assert.match(
+			compactSetup,
+			/(?:separate from|not listed in)[^.]{0,100}(?:universal )?public directory/i,
+		)
 	})
 
 	it('represents every generated configuration target with its current client shape', () => {
@@ -403,7 +418,10 @@ describe('client-first documentation contracts', () => {
 		assert.match(compactSetup, /Devin Settings\s*→\s*Cascade\s*→\s*MCP Servers/)
 		assert.match(compactSetup, /~\/\.codeium\/windsurf\/mcp_config\.json/)
 		assert.doesNotMatch(compactSetup, /Open MCP Config/)
-		assert.doesNotMatch(setup, /must be in \*\*Agent\*\* mode|Regular Chat (?:mode )?(?:doesn't|does not) use MCP/i)
+		assert.doesNotMatch(
+			setup,
+			/must be in \*\*Agent\*\* mode|Regular Chat (?:mode )?(?:doesn't|does not) use MCP/i,
+		)
 	})
 
 	it('documents ChatGPT web as a separately authorised Secure MCP Tunnel connection', () => {
@@ -417,11 +435,17 @@ describe('client-first documentation contracts', () => {
 		assert.match(compactDeployment, /tunnel-client run/)
 		assert.match(compactDeployment, /ChatGPT Plugins/)
 		assert.match(compactDeployment, /Tunnel under Connection/)
-		assert.match(compactDeployment, /(?:separate|different)[^.]{0,100}(?:permission|authori[sz]ation)/i)
+		assert.match(
+			compactDeployment,
+			/(?:separate|different)[^.]{0,100}(?:permission|authori[sz]ation)/i,
+		)
 		assert.match(
 			compactDeployment,
 			/FLUENTCART_MCP_API_KEY[^.]{0,160}(?:is not|isn't)[^.]{0,80}ChatGPT[^.]{0,80}auth/i,
 		)
-		assert.match(compactDeployment, /public[^.]{0,100}(?:directory|submission)[^.]{0,160}FluentCart[^.]{0,80}authori[sz]ation/i)
+		assert.match(
+			compactDeployment,
+			/public[^.]{0,100}(?:directory|submission)[^.]{0,160}FluentCart[^.]{0,80}authori[sz]ation/i,
+		)
 	})
 })
