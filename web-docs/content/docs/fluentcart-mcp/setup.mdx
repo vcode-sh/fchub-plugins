@@ -135,9 +135,18 @@ ChatGPT Desktop, Codex CLI and the Codex IDE extension share MCP configuration o
 3. Save, select **Restart**, then type `/mcp` in a chat to confirm `fluentcart` is connected.
 4. Ask *"Show me the FluentCart dashboard stats."*
 
-This direct **Add server** route is the shortest OpenAI setup. The optional local FluentCart plugin
-is available for workspaces that prefer plugin-managed enable and disable controls; it starts the
-same server and is not required.
+This direct **Add server** route is the shortest OpenAI setup. If you prefer plugin-managed enable
+and disable controls, add the repository marketplace:
+
+```bash
+codex plugin marketplace add vcode-sh/fchub-plugins --ref main
+codex plugin marketplace list
+```
+
+Restart ChatGPT Desktop, open **Plugins Directory**, choose the `fchub-plugins` marketplace, and
+install `fluentcart-mcp`. The plugin starts the same server and is optional. A repository
+marketplace is separate from the universal public directory, so this route does not claim a public
+directory listing.
 
 ### Codex CLI
 
@@ -228,7 +237,8 @@ not require a special Agent-only mode.
 </Tab>
 <Tab value="Windsurf">
 
-Open the Command Palette and choose **Open MCP Config**, then add this to `mcp_config.json`:
+Open the **MCPs icon** in the Cascade panel, or go to **Devin Settings → Cascade → MCP Servers**.
+For manual configuration, edit `~/.codeium/windsurf/mcp_config.json` and add:
 
 ```json
 {
@@ -241,7 +251,7 @@ Open the Command Palette and choose **Open MCP Config**, then add this to `mcp_c
 }
 ```
 
-Save the file, confirm `fluentcart` is enabled in Windsurf's MCP settings, and ask the verification
+Save the file, return to **MCP Servers**, confirm `fluentcart` is enabled, and ask the verification
 question.
 
 </Tab>

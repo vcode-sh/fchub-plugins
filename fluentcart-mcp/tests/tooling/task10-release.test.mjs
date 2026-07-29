@@ -375,6 +375,14 @@ describe('client-first documentation contracts', () => {
 		assert.match(compactSetup, /Settings\s*→\s*MCP servers\s*→\s*Add server/)
 	})
 
+	it('provides an actionable repository marketplace route for the optional OpenAI plugin', () => {
+		assert.match(compactSetup, /codex plugin marketplace add vcode-sh\/fchub-plugins --ref main/)
+		assert.match(compactSetup, /codex plugin marketplace list/)
+		assert.match(compactSetup, /restart ChatGPT Desktop/i)
+		assert.match(compactSetup, /Plugins Directory[^.]{0,180}fchub-plugins[^.]{0,180}fluentcart-mcp/i)
+		assert.match(compactSetup, /(?:separate from|not listed in)[^.]{0,100}(?:universal )?public directory/i)
+	})
+
 	it('represents every generated configuration target with its current client shape', () => {
 		for (const client of [
 			'ChatGPT Desktop',
@@ -391,6 +399,10 @@ describe('client-first documentation contracts', () => {
 		assert.match(setup, /"servers"\s*:\s*\{[\s\S]{0,180}"type"\s*:\s*"stdio"/)
 		assert.match(setup, /Cursor[\s\S]{0,500}"mcpServers"/)
 		assert.match(setup, /Windsurf[\s\S]{0,500}"mcpServers"/)
+		assert.match(compactSetup, /MCPs icon/)
+		assert.match(compactSetup, /Devin Settings\s*→\s*Cascade\s*→\s*MCP Servers/)
+		assert.match(compactSetup, /~\/\.codeium\/windsurf\/mcp_config\.json/)
+		assert.doesNotMatch(compactSetup, /Open MCP Config/)
 		assert.doesNotMatch(setup, /must be in \*\*Agent\*\* mode|Regular Chat (?:mode )?(?:doesn't|does not) use MCP/i)
 	})
 

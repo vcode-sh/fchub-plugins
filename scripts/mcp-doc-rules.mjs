@@ -153,33 +153,46 @@ export const RULES = [
 	},
 	{
 		id: 'claude-extension-node-prerequisite',
+		multiline: true,
 		message: 'Claude Desktop supplies Node for MCPB extensions; extension users do not install Node',
-		test: (line) =>
-			/\bClaude Desktop\b[^.\n]{0,100}\b(extension|MCPB)\b[^.\n]{0,100}\b(Node(?:\.js)?(?:\s+24\+)?\s+(?:is\s+)?(?:required|prerequisite)|install Node)\b/i.test(
-				line,
-			) ||
-			/\bNode(?:\.js)?(?:\s+24\+)?.{0,180}\b(?:required|prerequisite)\b.{0,140}\bClaude Desktop\b.{0,60}\b(extension|MCPB)\b/i.test(
-				line,
-			),
+		test: (line) => {
+			if (/\b(?:do|does|need) not\b[^.]{0,60}\binstall Node/i.test(line)) return false
+			return (
+				/\bClaude Desktop\b[^.]{0,100}\b(extension|MCPB)\b[^.]{0,100}\b(Node(?:\.js)?(?:\s+24\+)?\s+(?:is\s+)?(?:required|prerequisite)|install Node)\b/i.test(
+					line,
+				) ||
+				/\bNode(?:\.js)?(?:\s+24\+)?.{0,180}\b(?:required|prerequisite)\b.{0,140}\bClaude Desktop\b.{0,60}\b(extension|MCPB)\b/i.test(
+					line,
+				)
+			)
+		},
 	},
 	{
 		id: 'mcpb-bundles-node-runtime',
+		multiline: true,
 		message: 'the MCPB contains JavaScript and dependencies, not a Node executable or runtime',
-		test: (line) =>
-			/\b(MCPB|archive|extension)\b[^.\n]{0,100}\b(contains?|includes?|bundles?|ships?)\b[^.\n]{0,60}\bNode(?:\.js)?\s+(runtime|executable|binary)\b/i.test(
+		test: (line) => {
+			if (/\b(?:does|do) not\b[^.]{0,80}\b(?:contain|include|bundle|ship)\b[^.]{0,60}\bNode/i.test(line)) {
+				return false
+			}
+			return /\b(MCPB|archive|extension)\b[^.]{0,100}\b(contains?|includes?|bundles?|ships?)\b[^.]{0,60}\bNode(?:\.js)?\s+(runtime|executable|binary)\b/i.test(
 				line,
-			),
+			)
+		},
 	},
 	{
 		id: 'chatgpt-static-bearer-auth',
+		multiline: true,
 		message: 'a FluentCart bearer key is not ChatGPT plugin authentication',
 		test: (line) => {
-			if (/\b(is not|isn'?t|never present)\b[^.\n]{0,100}\bChatGPT\b/i.test(line)) return false
+			if (/\b(is not|isn'?t|never present|separate from)\b[^.]{0,100}\bChatGPT\b/i.test(line)) {
+				return false
+			}
 			return (
-				/\bChatGPT\b[^.\n]{0,140}\b(bearer|FLUENTCART_MCP_API_KEY)\b[^.\n]{0,80}\b(auth|token|key|setting)\b/i.test(
+				/\bChatGPT\b[^.]{0,140}\b(bearer|FLUENTCART_MCP_API_KEY)\b[^.]{0,80}\b(authentication|auth|token|key|setting)\b/i.test(
 					line,
 				) ||
-				/\b(bearer|FLUENTCART_MCP_API_KEY)\b[^.\n]{0,100}\bChatGPT\b[^.\n]{0,80}\b(auth|token|key|setting)\b/i.test(
+				/\b(bearer|FLUENTCART_MCP_API_KEY)\b[^.]{0,100}\bChatGPT\b[^.]{0,80}\b(authentication|auth|token|key|setting)\b/i.test(
 					line,
 				)
 			)

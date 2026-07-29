@@ -92,13 +92,40 @@ export function activeRules(truth = groundTruth()) {
 function scanFile(path, rules, truth) {
 	const lines = readFileSync(path, 'utf8').split('\n')
 	const findings = []
+	const wrappedBlocks = []
+	let block = null
+
+	const flushBlock = () => {
+		if (!block) return
+		wrappedBlocks.push({ ...block, text: block.text.join(' ') })
+		block = null
+	}
 
 	lines.forEach((line, index) => {
-		for (const rule of rules) {
+		const text = line.trim()
+		if (text === '' || text.startsWith('|')) {
+			flushBlock()
+			if (text.startsWith('|')) wrappedBlocks.push({ line: index + 1, text })
+			return
+		}
+		if (!block) block = { line: index + 1, text: [] }
+		block.text.push(text)
+	})
+	flushBlock()
+
+	lines.forEach((line, index) => {
+		for (const rule of rules.filter(({ multiline }) => !multiline)) {
 			if (!ruleMatchesLine(rule, line, truth)) continue
 			findings.push({ rule: rule.id, line: index + 1, text: line.trim(), message: rule.message })
 		}
 	})
+
+	for (const { line, text } of wrappedBlocks) {
+		for (const rule of rules.filter(({ multiline }) => multiline)) {
+			if (!ruleMatchesLine(rule, text, truth)) continue
+			findings.push({ rule: rule.id, line, text, message: rule.message })
+		}
+	}
 
 	return [...findings, ...findNonLoopbackExposure(lines)].sort((a, b) => a.line - b.line)
 }

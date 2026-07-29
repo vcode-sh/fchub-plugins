@@ -91,4 +91,42 @@ describe('FluentCart MCP documentation truth gate', () => {
 		assert.deepEqual(byFile['legacy-token-flow.md'], ['obsolete-npm-release-flow'])
 		assert.deepEqual(byFile['broad-certification.md'], ['broad-client-certification'])
 	})
+
+	it('rejects wrapped runtime and ChatGPT authentication claims without flagging supported negations', () => {
+		const claims = {
+			'wrapped-claude-runtime.md': [
+				'Claude Desktop MCPB extension users must',
+				'install Node.js 24 before setup.',
+			].join('\n'),
+			'wrapped-mcpb-runtime.md': [
+				'The MCPB archive contains a',
+				'Node runtime.',
+			].join('\n'),
+			'wrapped-chatgpt-auth.md': [
+				'For ChatGPT web, add',
+				'FLUENTCART_MCP_API_KEY as bearer authentication.',
+			].join('\n'),
+			'supported-negations.md': [
+				'Claude Desktop supplies its own Node runtime. Extension users do not',
+				'install Node separately.',
+				'',
+				'The MCPB contains JavaScript. It does not contain',
+				'a Node executable.',
+				'',
+				'FLUENTCART_MCP_API_KEY is not',
+				'ChatGPT plugin authentication.',
+			].join('\n'),
+		}
+		const files = Object.entries(claims).map(([name, text]) => fixture(name, text))
+		const truth = groundTruth()
+		const findings = checkMcpDocs(files, activeRules(truth), truth)
+		const byFile = Object.fromEntries(
+			findings.map(({ path, findings: fileFindings }) => [path.split('/').at(-1), fileFindings.map(({ rule }) => rule)]),
+		)
+
+		assert.deepEqual(byFile['wrapped-claude-runtime.md'], ['claude-extension-node-prerequisite'])
+		assert.deepEqual(byFile['wrapped-mcpb-runtime.md'], ['mcpb-bundles-node-runtime'])
+		assert.deepEqual(byFile['wrapped-chatgpt-auth.md'], ['chatgpt-static-bearer-auth'])
+		assert.deepEqual(byFile['supported-negations.md'], [])
+	})
 })
