@@ -120,10 +120,10 @@ export default function FluentCartMcpPage() {
           <Button
             variant="default"
             size="lg"
-            render={<Link href="/docs/fluentcart-mcp/setup" />}
+            render={<Link href="/docs/fluentcart-mcp" />}
           >
             <BookOpen />
-            Setup guide
+            Choose your app
           </Button>
           <Button
             variant="outline"
@@ -379,9 +379,9 @@ export default function FluentCartMcpPage() {
           <Button
             variant="default"
             size="lg"
-            render={<Link href="/docs/fluentcart-mcp/setup" />}
+            render={<Link href="/docs/fluentcart-mcp" />}
           >
-            Get started
+            Choose your app
             <ArrowRight />
           </Button>
           <Button

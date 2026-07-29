@@ -10,7 +10,6 @@ import {
   CardDescription,
   CardTitle,
 } from "@/components/ui/card";
-import { mcpCategoryCount, mcpSourceDefinitionCount } from "@/lib/versions";
 import {
   containerVariants,
   FLUENTCART_API_URL,
@@ -33,8 +32,8 @@ export function HomeResourceLinks() {
               <div className="flex-1">
                 <CardTitle className="text-sm">FluentCart MCP Server</CardTitle>
                 <CardDescription className="text-xs">
-                  {mcpSourceDefinitionCount} source tool definitions across{" "}
-                  {mcpCategoryCount} categories. Store availability depends on
+                  Read store data by default, then opt in only to reviewed
+                  reversible administration. Store availability depends on
                   served routes and user permissions.
                 </CardDescription>
               </div>

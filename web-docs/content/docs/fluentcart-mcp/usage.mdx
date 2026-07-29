@@ -208,7 +208,11 @@ Deleting a zone, method or class isn't exposed, and neither is reordering zones.
 - "What are the current tax settings?"
 - "Show me tax records for January"
 
-Deleting rates, saving global tax settings, changing the EU VAT configuration and marking records as filed are not exposed.
+**Global tax settings** *(needs `FLUENTCART_WRITE_MODE=reversible`)* are a reviewed reversible
+change: the server reads the complete settings document, merges only the named fields, writes it,
+then reads it back before reporting what changed. Changing the EU VAT configuration and marking
+records as filed are not exposed. Enabling tax for the first time can create a Standard tax class,
+which restoring settings cannot remove, so check that consequence before delegating it.
 
 </Accordion>
 <Accordion title="Email Notifications">
@@ -253,8 +257,10 @@ Creating and editing roles is not exposed. Permission changes are exactly the so
 
 **Files & templates:**
 - "Show me the print templates for invoices"
-- "Upload a file to the store"
 - "List all uploaded files"
+
+File uploads are not available through this server. FluentCart expects multipart file data for them,
+which this JSON MCP surface deliberately does not send.
 
 </Accordion>
 <Accordion title="Everything Else">
@@ -327,7 +333,7 @@ Plenty, and deliberately so:
 | Can't Do | Why |
 |----------|-----|
 | **Change anything by default** | The default write mode is `disabled`. Reads work; nothing else is exposed until you say so. |
-| **Refund or cancel** | Not in FluentCart MCP 2.0.0. Use FluentCart's admin or official operator tooling. |
+| **Refund or cancel** | Not available through this server. Use FluentCart's admin or official operator tooling. |
 | **Delete anything** | No deletion is exposed. FluentCart offers no supported restore, so none of it qualifies as reversible. |
 | **Change order statuses or mark orders paid** | Same reasoning. Orders are read-only in this release. |
 | **Charge credit cards** | Payments need customer interaction — redirects, card forms. Taking money was never on the table. |

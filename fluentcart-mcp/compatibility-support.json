@@ -9,7 +9,7 @@
     "configurationRecipes": "DOCUMENTED_NOT_CERTIFIED"
   },
   "legacyRuntime": "tested",
-  "legacyClaimPolicy": "FluentCart 1.3.9 booted and served its REST index on the isolated matrix below, so runtime support may now be claimed. Any claim must cite the 324-operation runtime fixture, never the 342-operation specification: the specification documents 27 operations that 1.3.9 does not serve.",
+  "legacyClaimPolicy": "The FluentCart 1.3.9 isolated capture is route surface evidence only: it records the REST index observed in that matrix. It does not prove tool compatibility or supported operation. Any historical route claim must cite the 324-operation runtime fixture, never the 342-operation specification: the specification documents 27 operations that 1.3.9 does not serve.",
   "legacyClaimScan": {
     "files": ["package.json", "manifest.json", "README.md"],
     "version": "1.3.9"

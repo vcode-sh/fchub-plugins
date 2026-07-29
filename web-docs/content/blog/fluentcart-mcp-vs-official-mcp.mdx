@@ -17,7 +17,7 @@ Running a shop means opening six admin screens to answer one question. Which ord
 
 MCP gives an AI client a way to ask the store. There are now two routes: the [official FluentCart MCP](https://docs.fluentcart.com/guide/settings-configuration/mcp) and the independent [FluentCart MCP](/docs/fluentcart-mcp). Their names are similar. Their boundaries are not.
 
-FluentCart MCP is an independent project; it is not the official server, an adapter for it, or a claim about FluentCart's roadmap. The useful question is not which logo wins a cage match. It is which boundary fits the work in front of you.
+FluentCart MCP is an independent project; it is not the official server, an adapter for it, or a claim about FluentCart's roadmap. The independent server is optional and not required to use FluentCart or the official MCP. The useful question is not which logo wins a cage match. It is which boundary fits the work in front of you.
 
 <Callout type="info" title="The short version">
   Start with the official MCP when you want the native FluentCart workflow. Choose the independent server when you need route-aware read and analysis work, or explicitly enabled reversible administration. They can sit beside each other, provided you give them clear names and do not ask either one to pretend it is the other.
@@ -35,7 +35,7 @@ FluentCart MCP is an independent project; it is not the official server, an adap
 
 | | Official FluentCart MCP | Independent FluentCart MCP |
 |---|---|---|
-| **Where it lives** | In the FluentCart and WordPress ecosystem | Beside the shop as a separately configured MCP service |
+| **Where it lives** | Built into FluentCart as an optional feature | Beside the shop as a separately configured MCP service |
 | **Best fit** | Native, prepared FluentCart workflows | Route-aware store investigation, analysis, and reversible administration |
 | **Permissions** | The connected WordPress principal and FluentCart's native workflow | The configured WordPress principal, discovered routes, and the independent write policy |
 | **Tool surface** | FluentCart's own curated capability set | A profile-dependent surface; the server discovers what the connected store can actually serve |
@@ -48,11 +48,11 @@ The table is deliberately not a scorecard. An official tool count, a source-regi
 
 The independent server keeps its release facts in the generated `release-contract.json`. That record ties a package candidate to the tested protocol eras, compatibility profiles, and measured client surfaces. It is a better source than a sentence copied into an article and left here to fossilise.
 
-For the current measured Core plus Pro profiles, the default dynamic surface has **three** read-only tools: search, describe, and execute a permitted read. The corresponding reversible profile has **four**: it adds the reversible executor. Those are profile measurements, not a promise that every store, role, or configuration sees the same thing.
+The measured profiles record the client surface for each store fixture and write policy. Dynamic mode starts with a small discovery surface for reads; explicitly enabled reversible mode adds only its reviewed executor. Those are measured profiles, not a promise that every store, role, or configuration sees the same thing.
 
 The source registry is broader than either profile. It is an implementation inventory used to build and prune the available surface; it is not a product claim and it is not dumped into a model's context by default. Route discovery and the WordPress principal decide what survives at startup.
 
-The candidate record is similarly specific: it requires five automated, candidate-bound handshakes. Other-client recipes merely document setup; they produce no release evidence. A recipe is a recipe. A passing release gate is a passing release gate. The distinction should not need a chaperone, but here we are.
+The candidate record is similarly specific: candidate-bound automated handshakes are release evidence. Other-client recipes merely document setup; they produce no release evidence. A recipe is a recipe. A passing release gate is a passing release gate. The distinction should not need a chaperone, but here we are.
 
 ## The Official Server Lives With the Shop
 
@@ -124,7 +124,7 @@ The server can find the customer, inspect related orders, and compare transactio
 
 > **Shop owner:** “Create coupon SUMMER25 for 25% off and make it expire on 31 August.”
 
-In reversible mode, the server can handle the routine changes that meet its policy. That mode is off by default. The [setup guide](/docs/fluentcart-mcp/setup) explains the configuration; the release contract records the exact measured profile behind the claim.
+In reversible mode, the server can handle the routine changes that meet its policy. That mode is off by default. The [setup guide](/docs/fluentcart-mcp/setup) gets a connection working, while [advanced configuration](/docs/fluentcart-mcp/configuration) explains the switch; the release contract records the exact measured profile behind the claim.
 
 ## Context Is a Choice, Not a Marketing Number
 
@@ -156,4 +156,4 @@ Use **FluentCart MCP** if you want:
 - explicitly enabled reversible administration;
 - a release record that separates source inventory, measured profiles, and client certification.
 
-You can use both. Give them different server names and let each keep its own promises. Two MCP servers become confusing only when someone insists they are the same product. They are not, and that is rather the point.
+Start with the [client chooser](/docs/fluentcart-mcp) for the independent server. You can use both. Give them different server names and let each keep its own promises. Two MCP servers become confusing only when someone insists they are the same product. They are not, and that is rather the point.
