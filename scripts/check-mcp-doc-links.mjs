@@ -53,10 +53,51 @@ function headingText(markdown) {
 		.trim()
 }
 
+function withoutInlineCode(source) {
+	let output = ''
+	let cursor = 0
+
+	while (cursor < source.length) {
+		if (source[cursor] !== '`') {
+			output += source[cursor]
+			cursor += 1
+			continue
+		}
+
+		let markerLength = 1
+		while (source[cursor + markerLength] === '`') markerLength += 1
+		const marker = '`'.repeat(markerLength)
+		const closing = source.indexOf(marker, cursor + markerLength)
+		if (closing === -1) {
+			output += marker
+			cursor += markerLength
+			continue
+		}
+
+		const end = closing + markerLength
+		output += source
+			.slice(cursor, end)
+			.replace(/[^\n]/g, ' ')
+		cursor = end
+	}
+
+	return output
+}
+
+function uniqueGithubAnchor(base, occurrences) {
+	let anchor = base
+	while (occurrences.has(anchor)) {
+		occurrences.set(base, (occurrences.get(base) ?? 0) + 1)
+		anchor = `${base}-${occurrences.get(base)}`
+	}
+	occurrences.set(anchor, 0)
+	return anchor
+}
+
 /**
  * Fumadocs uses GitHub-style heading IDs. These docs use plain Latin headings, so the relevant
- * contract is lowercase text, punctuation removed, spaces changed to hyphens, and duplicate IDs
- * numbered in source order.
+ * contract is lowercase text, punctuation removed, spaces changed to hyphens, and IDs made unique
+ * with the same collision loop as github-slugger.
  */
 export function headingAnchors(source) {
 	const anchors = new Set()
@@ -70,10 +111,7 @@ export function headingAnchors(source) {
 			.replace(/[^\p{L}\p{M}\p{N}\s-]/gu, '')
 			.replace(/ /g, '-')
 		if (!base) continue
-		const count = occurrences.get(base) ?? 0
-		const anchor = count === 0 ? base : `${base}-${count}`
-		occurrences.set(base, count + 1)
-		anchors.add(anchor)
+		anchors.add(uniqueGithubAnchor(base, occurrences))
 	}
 
 	return anchors
@@ -108,17 +146,25 @@ export function docsRouteMap({
 
 export function documentationLinks(source) {
 	const links = []
-	const visibleSource = withoutFencedCode(source)
-	for (const [index, line] of visibleSource.split('\n').entries()) {
-		const targets = [
-			...[...line.matchAll(/!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g)].map(
-				(match) => match[1],
-			),
-			...[...line.matchAll(/\bhref\s*=\s*["']([^"']+)["']/g)].map((match) => match[1]),
-		]
-		for (const target of targets) links.push({ line: index + 1, target })
+	const visibleSource = withoutInlineCode(withoutFencedCode(source))
+	const patterns = [
+		/!?\[(?:\\.|[^\]\\])*\]\(\s*<?([^)\s>]+)>?(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)/gs,
+		/\bhref\s*=\s*["']([^"']+)["']/g,
+	]
+
+	for (const pattern of patterns) {
+		for (const match of visibleSource.matchAll(pattern)) {
+			links.push({
+				offset: match.index,
+				line: visibleSource.slice(0, match.index).split('\n').length,
+				target: match[1],
+			})
+		}
 	}
+
 	return links
+		.sort((left, right) => left.offset - right.offset)
+		.map(({ line, target }) => ({ line, target }))
 }
 
 function internalMcpTarget(target) {

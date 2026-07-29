@@ -48,6 +48,7 @@ describe('FluentCart MCP documentation links', () => {
 			'## 1. Credential setup failed',
 			'## Repeated heading',
 			'## Repeated heading',
+			'## Repeated heading-1',
 			'```bash',
 			'# Windows',
 			'```',
@@ -55,15 +56,26 @@ describe('FluentCart MCP documentation links', () => {
 
 		assert.deepEqual(
 			[...anchors],
-			['1-credential-setup-failed', 'repeated-heading', 'repeated-heading-1'],
+			[
+				'1-credential-setup-failed',
+				'repeated-heading',
+				'repeated-heading-1',
+				'repeated-heading-1-1',
+			],
 		)
 	})
 
-	it('extracts Markdown, absolute and JSX links but ignores fenced examples', () => {
+	it('extracts multiline Markdown, absolute and JSX links but ignores code examples', () => {
 		const links = documentationLinks([
 			'[Local](/docs/fluentcart-mcp/setup#choose)',
 			'[Absolute](https://fchub.co/docs/fluentcart-mcp/tools)',
+			'[Multiline label',
+			'](/docs/fluentcart-mcp/troubleshooting#credential-setup-failed)',
+			'[Multiline destination](',
+			'  /docs/fluentcart-mcp/configuration#presentation-modes',
+			')',
 			'<Card href="/docs/fluentcart-mcp/usage">Use</Card>',
+			'`[Inline example](/docs/fluentcart-mcp/not-a-route)`',
 			'```md',
 			'[Example](/docs/fluentcart-mcp/missing)',
 			'```',
@@ -74,6 +86,8 @@ describe('FluentCart MCP documentation links', () => {
 			[
 				'/docs/fluentcart-mcp/setup#choose',
 				'https://fchub.co/docs/fluentcart-mcp/tools',
+				'/docs/fluentcart-mcp/troubleshooting#credential-setup-failed',
+				'/docs/fluentcart-mcp/configuration#presentation-modes',
 				'/docs/fluentcart-mcp/usage',
 			],
 		)
