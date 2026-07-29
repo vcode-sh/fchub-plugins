@@ -35,6 +35,60 @@ const beginnerPages = {
 	'Other clients': 'web-docs/content/docs/fluentcart-mcp/other-clients.mdx',
 }
 
+function hasSentenceWithConcepts(page, patterns) {
+	return page
+		.split(/(?<=[.!?])\s+/)
+		.some((sentence) => sentence.length <= 360 && patterns.every((pattern) => pattern.test(sentence)))
+}
+
+function assertBeginnerAccountDataBoundary(page, relativePath) {
+	assert.match(
+		page,
+		/\bdedicated\b[\s\S]{0,100}\blow[- ]privilege\b[\s\S]{0,100}\b(?:WordPress\s+)?account\b/i,
+		`${relativePath} must require a dedicated low-privilege account`,
+	)
+	assert.ok(
+		hasSentenceWithConcepts(page, [
+			/\b(?:WordPress|account(?:'s)?)\s+permissions?\b/i,
+			/\b(?:decide|determine|control|bound|limit|govern)\w*\b/i,
+			/\b(?:FluentCart(?:\s+MCP)?|store)\s+data\b/i,
+			/\b(?:read|access|see)\w*\b/i,
+		]),
+		`${relativePath} must explain permission-limited readable data`,
+	)
+	assert.ok(
+		hasSentenceWithConcepts(page, [
+			/\bread[- ]only\b/i,
+			/\b(?:block|prevent|stop|disable|prohibit|restrict)\w*\b/i,
+			/\bMCP\b/i,
+			/\b(?:write|change|modify|update)\w*\b/i,
+		]),
+		`${relativePath} must explain the read-only MCP write block`,
+	)
+	assert.ok(
+		hasSentenceWithConcepts(page, [
+			/\b(?:chosen|selected|configured|the|your)\s+(?:AI|assistant)\s+client\b/i,
+			/\b(?:returned|response)\b/i,
+			/\b(?:customer|order)\b[\s\S]{0,20}\bdata\b/i,
+			/\b(?:see|read|receive|access|process)\w*\b|(?:does not|do not|cannot)\b[\s\S]{0,100}\b(?:private|hidden|secret)\b[\s\S]{0,100}\b(?:AI|assistant)\s+client\b/i,
+		]),
+		`${relativePath} must explain AI client data visibility`,
+	)
+}
+
+function assertNoUnsupportedWordPressAccessPrescription(page, relativePath) {
+	assert.doesNotMatch(
+		page,
+		/\b(?:use|create|choose|select|set up|make|sign in as)\b[^.\n]{0,120}\b(?:an?\s+)?(?:administrator|shop manager|admin(?:istrator)? account)\b/i,
+		`${relativePath} must not prescribe an unsupported exact WordPress role`,
+	)
+	assert.doesNotMatch(
+		page,
+		/\b(?:manage|read|edit|delete|publish|create|install|activate|update)_[a-z0-9_]+\b/i,
+		`${relativePath} must not prescribe an unsupported named WordPress capability`,
+	)
+}
+
 const chatgptWebPage = 'web-docs/content/docs/fluentcart-mcp/chatgpt-web.mdx'
 const requiredDocsCiPaths = [
 	'scripts/mcp-doc-rules.mjs',
@@ -155,21 +209,7 @@ describe('beginner client journeys', () => {
 		for (const relativePath of Object.values(beginnerPages)) {
 			const page = readRequired(relativePath)
 
-			assert.match(
-				page,
-				/dedicated, low-privilege WordPress account/i,
-				`${relativePath} must require a dedicated low-privilege account`,
-			)
-			assert.match(
-				page,
-				/WordPress permissions decide what store data FluentCart MCP can read/i,
-				`${relativePath} must explain that WordPress permissions control readable store data`,
-			)
-			assert.match(
-				page,
-				/read-only mode prevents MCP writes,\s*but it does not make returned customer or order data private from\s*the AI client/i,
-				`${relativePath} must explain the read-only data boundary`,
-			)
+			assertBeginnerAccountDataBoundary(page, relativePath)
 
 			for (const [label, route] of [
 				['Usage', '/docs/fluentcart-mcp/usage'],
@@ -182,6 +222,42 @@ describe('beginner client journeys', () => {
 					`${relativePath} must link directly to ${label}`,
 				)
 			}
+		}
+	})
+
+	it('fails semantic data-boundary checks when any required concept is removed', () => {
+		for (const relativePath of Object.values(beginnerPages)) {
+			const page = readRequired(relativePath)
+			const mutations = [
+				['dedicated low-privilege account', page.replace('dedicated, low-privilege WordPress account', 'a WordPress account')],
+				['permission-limited readable data', page.replace('permissions decide', 'permissions describe')],
+				['read-only MCP write block', page.replace('prevents MCP writes', 'allows MCP writes')],
+				['AI client data visibility', page.replace('the AI client', 'another service')],
+			]
+
+			for (const [concept, mutatedPage] of mutations) {
+				assert.throws(
+					() => assertBeginnerAccountDataBoundary(mutatedPage, relativePath),
+					new RegExp(concept),
+					`${relativePath} must reject a missing ${concept} concept`,
+				)
+			}
+		}
+	})
+
+	it('does not prescribe unsupported WordPress roles or capability identifiers', () => {
+		for (const relativePath of Object.values(beginnerPages)) {
+			const page = readRequired(relativePath)
+
+			assertNoUnsupportedWordPressAccessPrescription(page, relativePath)
+			assert.throws(
+				() => assertNoUnsupportedWordPressAccessPrescription(`${page}\n\nUse an Administrator account.`, relativePath),
+				/unsupported exact WordPress role/i,
+			)
+			assert.throws(
+				() => assertNoUnsupportedWordPressAccessPrescription(`${page}\n\nGrant manage_woocommerce.`, relativePath),
+				/unsupported named WordPress capability/i,
+			)
 		}
 	})
 
