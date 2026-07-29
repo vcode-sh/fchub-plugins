@@ -5,8 +5,8 @@ description: Connect ChatGPT Desktop to FluentCart with a local STDIO server.
 
 ## What you need
 
-You need ChatGPT Desktop, Node.js 24 or newer, a Terminal, and a WordPress user that can read the
-FluentCart data you need.
+You need ChatGPT Desktop, Node.js 24 or newer, a Terminal, a WordPress site with FluentCart installed
+and active, an HTTPS store URL, and a WordPress user that can read the FluentCart data you need.
 
 ## Create safe store access
 
@@ -16,7 +16,10 @@ Read-only mode prevents MCP writes, but it does not make returned customer or or
 the selected AI client.
 
 Sign in as that account and open **Users → Profile**. Under **Application Passwords**, create one
-named `FluentCart MCP` and copy it immediately. The setup wizard asks for these three fields:
+named `FluentCart MCP` and copy it immediately. An Application Password is different from the
+normal WordPress login password: use the new value WordPress displays only for this connection.
+
+The setup wizard asks for these three fields:
 
 | Field | Value |
 |---|---|
@@ -52,6 +55,20 @@ Arguments: -y fluentcart-mcp
 Save and restart the server if ChatGPT Desktop requests it. ChatGPT Desktop, Codex CLI, and the
 Codex IDE extension share the local `~/.codex/config.toml` configuration on the same computer.
 
+If ChatGPT Desktop says it cannot find `npx`, run one of these commands in Terminal:
+
+```bash
+# macOS or Linux
+which npx
+
+# Windows
+where npx
+```
+
+Replace `npx` in the **Command** field with the returned absolute path. On Windows, use the path
+ending in `npx.cmd`. This is a GUI field, so paste the path as returned rather than adding JSON
+quotes or doubled backslashes.
+
 ## Confirm it works
 
 Open a new chat and ask: **Show me the FluentCart dashboard stats.** A reply with store data means
@@ -59,12 +76,16 @@ the connection is live.
 
 ## If it does not work
 
-Confirm that `node --version` reports Node.js 24 or newer, then run the setup wizard again and
-check the WordPress URL, username, and Application Password. If the server is connected but cannot
-read store data, check that the WordPress user has the required FluentCart permissions. See
-[Troubleshooting](/docs/fluentcart-mcp/troubleshooting) for the usual culprits.
+If ChatGPT Desktop cannot start the command, confirm that `node --version` reports Node.js 24 or
+newer, use the absolute path above, then follow
+[the client-start stage](/docs/fluentcart-mcp/troubleshooting#2-the-client-cannot-start-the-server).
+If the setup wizard rejects the URL or credentials, use
+[the credential stage](/docs/fluentcart-mcp/troubleshooting#1-credential-setup-failed). If the
+server connects but cannot read store data, check the WordPress user's FluentCart permissions and
+use
+[the store-connection stage](/docs/fluentcart-mcp/troubleshooting#3-the-store-connection-or-startup-discovery-failed).
 
 ## Optional next steps
 
-Continue with [Usage](/docs/fluentcart-mcp/usage), [Troubleshooting](/docs/fluentcart-mcp/troubleshooting),
-or [Advanced configuration](/docs/fluentcart-mcp/configuration).
+Continue with [Usage](/docs/fluentcart-mcp/usage) or
+[Advanced configuration](/docs/fluentcart-mcp/configuration).

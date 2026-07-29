@@ -17,6 +17,8 @@ on:
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
       - 'scripts/mcp-doc-rules.mjs'
+      - 'scripts/check-mcp-doc-links.mjs'
+      - 'scripts/check-mcp-doc-links.test.mjs'
       - 'scripts/check-mcp-docs.test.mjs'
       - 'scripts/check-mcp-docs-experience.test.mjs'
       - 'fluentcart-mcp/package.json'
@@ -49,6 +51,8 @@ on:
       - 'scripts/sync-fchub-catalog.mjs'
       - 'scripts/count-mcp-tools.mjs'
       - 'scripts/mcp-doc-rules.mjs'
+      - 'scripts/check-mcp-doc-links.mjs'
+      - 'scripts/check-mcp-doc-links.test.mjs'
       - 'scripts/check-mcp-docs.test.mjs'
       - 'scripts/check-mcp-docs-experience.test.mjs'
       - 'fluentcart-mcp/package.json'
@@ -118,6 +122,12 @@ jobs:
       # is release-contract.json, so this cannot drift from the measurement that produced it.
       - name: Verify MCP documentation claims
         run: node scripts/check-mcp-docs.mjs
+
+      - name: Verify MCP documentation links
+        run: node scripts/check-mcp-doc-links.mjs
+
+      - name: Test MCP documentation link contracts
+        run: node --test scripts/check-mcp-doc-links.test.mjs
 
       - name: Test FluentCart MCP documentation contracts
         run: node --test scripts/check-mcp-docs.test.mjs scripts/check-mcp-docs-experience.test.mjs

@@ -62,7 +62,7 @@ enable the extension, then ask the verification question above.
 ### ChatGPT web
 
 ChatGPT web does not read local Codex configuration. Use the
-[OpenAI Secure MCP Tunnel recipe](https://fchub.co/docs/fluentcart-mcp/deployment#chatgpt-web-with-secure-mcp-tunnel)
+[OpenAI Secure MCP Tunnel recipe](https://fchub.co/docs/fluentcart-mcp/chatgpt-web)
 for a private, outbound-only connection. The FluentCart HTTP bearer key is not ChatGPT plugin
 authentication.
 
@@ -75,7 +75,9 @@ Uses **WordPress Application Passwords** (built into WordPress 5.6+). No extra p
 3. Enter a name, click **Add New Application Password**
 4. Copy the password (WordPress shows it once)
 
-Pick a role that carries the FluentCart REST capabilities you actually intend to use. An admin account works, but it is not the only option: the server discovers what your role can reach and exposes nothing beyond it, so a narrower account is the safer choice.
+Create a dedicated account such as `fluentcart-reader` and give it only the FluentCart REST
+capabilities you actually intend to use. Its WordPress permissions decide what the server can read;
+read-only mode separately prevents MCP writes.
 
 The server keeps some authorised configuration and reference reads in memory for at most 60 seconds. Restart the MCP process after rotating or revoking its Application Password to purge those responses immediately; credentials are loaded once at startup and are never hot-reloaded.
 
@@ -87,8 +89,8 @@ Three options, checked in this order:
 
 ```bash
 FLUENTCART_URL=https://your-store.com
-FLUENTCART_USERNAME=admin
-FLUENTCART_APP_PASSWORD=aBcD eFgH iJkL mNoP qRsT uVwX
+FLUENTCART_USERNAME=fluentcart-reader
+FLUENTCART_APP_PASSWORD="paste the generated Application Password here"
 ```
 
 FluentCart 1.5.4+ also supplies native WordPress Abilities for richer analytics and advanced
@@ -96,8 +98,8 @@ queries. They are an explicit, read-only opt-in:
 
 ```bash
 FLUENTCART_ABILITIES_MODE=enabled
-FLUENTCART_ABILITIES_USERNAME=ability-reader
-FLUENTCART_ABILITIES_APP_PASSWORD=aBcD eFgH iJkL mNoP qRsT uVwX
+FLUENTCART_ABILITIES_USERNAME=fluentcart-abilities-reader
+FLUENTCART_ABILITIES_APP_PASSWORD="paste its separate Application Password here"
 ```
 
 Use a separate Application Password for that principal. The bridge never reuses
@@ -112,13 +114,14 @@ to “probably read-only”, the traditional prelude to a very long afternoon.
 
 ### 2. Config File
 
+Save this as `~/.config/fluentcart-mcp/config.json` on macOS/Linux or
+`%APPDATA%\fluentcart-mcp\config.json` on Windows:
+
 ```json
-// ~/.config/fluentcart-mcp/config.json (macOS/Linux)
-// %APPDATA%\fluentcart-mcp\config.json (Windows)
 {
   "url": "https://your-store.com",
-  "username": "admin",
-  "appPassword": "aBcD eFgH iJkL mNoP qRsT uVwX"
+  "username": "fluentcart-reader",
+  "appPassword": "paste the generated Application Password here"
 }
 ```
 

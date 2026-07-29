@@ -327,7 +327,7 @@ git commit -m "Create simple MCP client guides"
 - Create: `web-docs/content/docs/fluentcart-mcp/chatgpt-web.mdx`
 - Modify: `web-docs/content/docs/fluentcart-mcp/deployment.mdx`
 - Modify: `web-docs/content/docs/fluentcart-mcp/troubleshooting.mdx`
-- Modify: `docs/developer-manual.md`
+- Modify: `AGENTS.md`
 - Test: `scripts/check-mcp-docs-experience.test.mjs`
 
 **Interfaces:**
@@ -390,7 +390,8 @@ For same-host reverse-proxy/tunnel examples use:
 ```
 
 Retain bearer-key, Host, Origin, static-principal, Dokploy, Cloudflare Tunnel, Compose, health, and
-HTTP client details. Move release recovery into `docs/developer-manual.md`.
+HTTP client details. Keep release recovery in the monorepo's tracked `AGENTS.md`; the similarly
+named developer manual belongs to the sibling playground repository and is outside this plan.
 
 - [ ] **Step 5: Rewrite troubleshooting around failure stages**
 
@@ -435,7 +436,7 @@ git add web-docs/content/docs/fluentcart-mcp/configuration.mdx \
   web-docs/content/docs/fluentcart-mcp/chatgpt-web.mdx \
   web-docs/content/docs/fluentcart-mcp/deployment.mdx \
   web-docs/content/docs/fluentcart-mcp/troubleshooting.mdx \
-  docs/developer-manual.md scripts/check-mcp-docs-experience.test.mjs
+  AGENTS.md scripts/check-mcp-docs-experience.test.mjs
 git commit -m "Separate advanced MCP guidance"
 ```
 
@@ -627,7 +628,9 @@ git commit -m "Synchronise MCP documentation guidance"
 - [ ] **Step 1: Run every focused documentation contract**
 
 ```bash
+node --test scripts/check-mcp-doc-links.test.mjs
 node --test scripts/check-mcp-docs.test.mjs scripts/check-mcp-docs-experience.test.mjs
+node scripts/check-mcp-doc-links.mjs
 node scripts/check-mcp-docs.mjs
 node scripts/count-mcp-tools.mjs --check
 ```

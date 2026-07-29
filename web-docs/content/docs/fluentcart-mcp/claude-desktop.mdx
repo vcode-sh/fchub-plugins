@@ -5,9 +5,10 @@ description: Connect Claude Desktop to FluentCart without a Terminal.
 
 ## What you need
 
-You need Claude Desktop, a WordPress user allowed to read the FluentCart data you need, and your
-store URL. No Terminal or separate Node.js installation is required because Claude Desktop extension
-users do not install Node for its MCPB extension.
+You need Claude Desktop, a WordPress site with FluentCart installed and active, an HTTPS store URL,
+and a WordPress user allowed to read the FluentCart data you need. No Terminal or separate Node.js
+installation is required because Claude Desktop extension users do not install Node for its MCPB
+extension.
 
 ## Create safe store access
 
@@ -18,6 +19,8 @@ the selected AI client.
 
 Sign in as that account, open **Users → Profile**, find **Application Passwords**, enter a name such
 as `FluentCart MCP`, and select **Add New Application Password**. Copy it before leaving the page.
+An Application Password is different from the normal WordPress login password: use the new value
+WordPress displays only for this connection.
 
 Have these three fields ready:
 
@@ -45,11 +48,16 @@ proof; an attractive status light has never processed an order.
 
 ## If it does not work
 
-Check that the extension is enabled, the URL is the site root (not `/wp-admin/`), and the username
-and Application Password are the values you created. Make sure that WordPress user can read the
-needed FluentCart data, then see [Troubleshooting](/docs/fluentcart-mcp/troubleshooting).
+If the extension will not start, use
+[the client-start stage](/docs/fluentcart-mcp/troubleshooting#2-the-client-cannot-start-the-server).
+If it starts but cannot authenticate, check the HTTPS site-root URL, username, and Application
+Password, then use
+[the credential stage](/docs/fluentcart-mcp/troubleshooting#1-credential-setup-failed). If it
+connects but returns no store data, make sure the WordPress user can read the needed FluentCart data
+and use
+[the store-connection stage](/docs/fluentcart-mcp/troubleshooting#3-the-store-connection-or-startup-discovery-failed).
 
 ## Optional next steps
 
-Continue with [Usage](/docs/fluentcart-mcp/usage), [Troubleshooting](/docs/fluentcart-mcp/troubleshooting),
-or [Advanced configuration](/docs/fluentcart-mcp/configuration).
+Continue with [Usage](/docs/fluentcart-mcp/usage) or
+[Advanced configuration](/docs/fluentcart-mcp/configuration).

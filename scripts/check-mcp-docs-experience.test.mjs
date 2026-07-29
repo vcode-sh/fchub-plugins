@@ -79,6 +79,43 @@ function assertBeginnerAccountDataBoundary(page, relativePath) {
 	)
 }
 
+function assertBeginnerPrerequisites(page, relativePath) {
+	assert.match(
+		page,
+		/WordPress[\s\S]{0,80}FluentCart[\s\S]{0,60}(?:installed and )?active/i,
+		`${relativePath} must require an active FluentCart installation`,
+	)
+	assert.match(
+		page,
+		/\bHTTPS\b[\s\S]{0,30}\b(?:store )?URL\b/i,
+		`${relativePath} must require an HTTPS store URL`,
+	)
+	assert.match(
+		page,
+		/Application Password[\s\S]{0,100}(?:different from|not)[\s\S]{0,60}(?:normal\s+)?WordPress\s+login\s+password/i,
+		`${relativePath} must distinguish an Application Password from the normal login password`,
+	)
+}
+
+function assertLocalGuiPathRecovery(page, relativePath) {
+	assert.match(
+		page,
+		/(?:macOS or Linux[\s\S]{0,100}which npx|which npx[\s\S]{0,100}macOS or Linux)/is,
+		`${relativePath} must show which npx`,
+	)
+	assert.match(
+		page,
+		/(?:Windows[\s\S]{0,100}where npx|where npx[\s\S]{0,100}Windows)/is,
+		`${relativePath} must show where npx`,
+	)
+	assert.match(
+		page,
+		/(?:replace|use)[\s\S]{0,100}(?:command|npx)[\s\S]{0,100}absolute path/i,
+		`${relativePath} must tell GUI users to use the absolute command path`,
+	)
+	assert.match(page, /\bnpx\.cmd\b/i, `${relativePath} must name the Windows npx.cmd executable`)
+}
+
 function hasPrescriptiveWordPressAccessInstruction(page, target) {
 	const prescriptiveVerb = /\b(?:use|assign|choose|set|give|grant|recommend|require|create|select|sign\s+in\s+as)\b/gi
 	const targetAfterVerb = new RegExp(
@@ -123,6 +160,8 @@ function assertNoUnsupportedWordPressAccessPrescription(page, relativePath) {
 const chatgptWebPage = 'web-docs/content/docs/fluentcart-mcp/chatgpt-web.mdx'
 const requiredDocsCiPaths = [
 	'scripts/mcp-doc-rules.mjs',
+	'scripts/check-mcp-doc-links.mjs',
+	'scripts/check-mcp-doc-links.test.mjs',
 	'scripts/check-mcp-docs.test.mjs',
 	'scripts/check-mcp-docs-experience.test.mjs',
 	'fluentcart-mcp/compatibility-support.json',
@@ -135,10 +174,12 @@ const requiredDocsCiPaths = [
 
 function assertDocsCiWorkflowContract(workflow) {
 	assert.match(workflow, /node scripts\/check-mcp-docs\.mjs/)
+	assert.match(workflow, /node scripts\/check-mcp-doc-links\.mjs/)
 	assert.match(
 		workflow,
 		/node --test scripts\/check-mcp-docs\.test\.mjs scripts\/check-mcp-docs-experience\.test\.mjs/,
 	)
+	assert.match(workflow, /node --test scripts\/check-mcp-doc-links\.test\.mjs/)
 
 	for (const event of ['push', 'pull_request']) {
 		const paths = eventPaths(workflow, event)
@@ -240,17 +281,29 @@ describe('beginner client journeys', () => {
 		for (const relativePath of Object.values(beginnerPages)) {
 			const page = readRequired(relativePath)
 
+			assertBeginnerPrerequisites(page, relativePath)
 			assertBeginnerAccountDataBoundary(page, relativePath)
 
 			for (const [label, route] of [
 				['Usage', '/docs/fluentcart-mcp/usage'],
-				['Troubleshooting', '/docs/fluentcart-mcp/troubleshooting'],
 				['Advanced configuration', '/docs/fluentcart-mcp/configuration'],
 			]) {
 				assert.match(
 					page,
 					new RegExp(`\\[${label}\\]\\(${route.replaceAll('/', '\\/')}\\)`),
 					`${relativePath} must link directly to ${label}`,
+				)
+			}
+
+			for (const anchor of [
+				'1-credential-setup-failed',
+				'2-the-client-cannot-start-the-server',
+				'3-the-store-connection-or-startup-discovery-failed',
+			]) {
+				assert.match(
+					page,
+					new RegExp(`/docs/fluentcart-mcp/troubleshooting#${anchor}`),
+					`${relativePath} must link directly to troubleshooting stage ${anchor}`,
 				)
 			}
 		}
@@ -342,7 +395,7 @@ describe('beginner client journeys', () => {
 	it('keeps Claude no-Node and each local client Node and npx guidance distinct', () => {
 		const claude = readRequired(beginnerPages['Claude Desktop'])
 
-		assert.match(claude, /no Terminal or separate Node\.js installation is required/i)
+		assert.match(claude, /no Terminal or separate Node\.js\s+installation is required/i)
 		for (const relativePath of [
 			beginnerPages['ChatGPT Desktop'],
 			beginnerPages.Cursor,
@@ -355,6 +408,7 @@ describe('beginner client journeys', () => {
 				/npx -y[\s\S]{0,200}does not install[^.]*globally/i,
 				`${relativePath} must tie no-global-install guidance to npx`,
 			)
+			assertLocalGuiPathRecovery(page, relativePath)
 		}
 	})
 
@@ -380,6 +434,7 @@ describe('beginner client journeys', () => {
 		assert.ok(windowsJson, 'Other clients must show a complete Windows JSON example')
 		assert.equal(JSON.parse(windowsJson).mcpServers.fluentcart.command, 'C:\\Program Files\\nodejs\\npx.cmd')
 	})
+
 })
 
 describe('advanced client boundaries', () => {
@@ -423,6 +478,10 @@ describe('safe diagnostics', () => {
 		assert.match(
 			troubleshooting,
 			/NODE_TLS_REJECT_UNAUTHORIZED[\s\S]{0,400}(?:final temporary local diagnostic|remove it immediately)/i,
+		)
+		assert.match(
+			troubleshooting,
+			/remove it immediately[\s\S]{0,240}restart the affected MCP server or client/i,
 		)
 	})
 })

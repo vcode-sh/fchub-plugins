@@ -5,8 +5,9 @@ description: Connect Claude Code, Codex, VS Code with Copilot, or Windsurf to Fl
 
 ## What you need
 
-You need Node.js 24 or newer, a Terminal, and a WordPress user that can read the FluentCart data
-you need. These are configuration recipes, not client certification.
+You need Node.js 24 or newer, a Terminal, a WordPress site with FluentCart installed and active, an
+HTTPS store URL, and a WordPress user that can read the FluentCart data you need. These are
+configuration recipes, not client certification.
 
 ## Create safe store access
 
@@ -18,6 +19,8 @@ the selected AI client.
 Sign in as that account, open **Users → Profile**, create an **Application Password** named
 `FluentCart MCP`, and copy it immediately. The setup wizard needs your WordPress URL, username, and
 that Application Password.
+An Application Password is different from the normal WordPress login password: use the new value
+WordPress displays only for this connection.
 
 ## Add your client
 
@@ -99,7 +102,7 @@ Enable `fluentcart`, then ask: **Show me the FluentCart dashboard stats.**
 
 ### If the app cannot find `npx`
 
-If VS Code or Windsurf reports that the command cannot be found, run:
+If any GUI client reports that the command cannot be found, run:
 
 ```bash
 # macOS or Linux
@@ -109,8 +112,9 @@ which npx
 where npx
 ```
 
-Replace the client command with the returned absolute path. In either JSON file on Windows, double
-every backslash, or replace the backslashes with forward slashes. This is a complete valid example:
+Replace the GUI's client command with the returned absolute path. On Windows, use the path ending in
+`npx.cmd`. In a JSON file, double every backslash or replace the backslashes with forward slashes.
+This is a complete valid example:
 
 ```json
 {
@@ -135,11 +139,15 @@ store data means the connection is live.
 
 ## If it does not work
 
-Check that Node.js is 24 or newer and rerun the setup wizard. Then recheck the WordPress URL,
-username, Application Password, and the selected app's server list. A connected server without
-store access usually means the WordPress role lacks the required FluentCart permissions.
+If the selected app cannot start the command, check Node.js and the absolute `npx` path, then use
+[the client-start stage](/docs/fluentcart-mcp/troubleshooting#2-the-client-cannot-start-the-server).
+If the setup wizard rejects the URL or credentials, use
+[the credential stage](/docs/fluentcart-mcp/troubleshooting#1-credential-setup-failed). If the
+server connects but cannot read store data, check the WordPress user's FluentCart permissions and
+use
+[the store-connection stage](/docs/fluentcart-mcp/troubleshooting#3-the-store-connection-or-startup-discovery-failed).
 
 ## Optional next steps
 
-Continue with [Usage](/docs/fluentcart-mcp/usage), [Troubleshooting](/docs/fluentcart-mcp/troubleshooting),
-or [Advanced configuration](/docs/fluentcart-mcp/configuration).
+Continue with [Usage](/docs/fluentcart-mcp/usage) or
+[Advanced configuration](/docs/fluentcart-mcp/configuration).

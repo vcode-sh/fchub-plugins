@@ -5,8 +5,8 @@ description: Connect Cursor to FluentCart with one global MCP entry.
 
 ## What you need
 
-You need Cursor, Node.js 24 or newer, and a WordPress user that can read the FluentCart data you
-need.
+You need Cursor, Node.js 24 or newer, a WordPress site with FluentCart installed and active, an
+HTTPS store URL, and a WordPress user that can read the FluentCart data you need.
 
 ## Create safe store access
 
@@ -16,7 +16,10 @@ Read-only mode prevents MCP writes, but it does not make returned customer or or
 the selected AI client.
 
 Sign in as that account and open **Users → Profile**. Create and copy an **Application Password**
-named `FluentCart MCP`. The setup wizard needs these three fields:
+named `FluentCart MCP`. An Application Password is different from the normal WordPress login
+password: use the new value WordPress displays only for this connection.
+
+The setup wizard needs these three fields:
 
 | Field | Value |
 |---|---|
@@ -81,11 +84,16 @@ Save the file, check that `fluentcart` is enabled in **Settings → MCP**, then 
 
 ## If it does not work
 
-Run the setup wizard again and check the WordPress URL, username, and Application Password. If
-Cursor still reports command-not-found, use the absolute `npx` path above. If the server cannot
-read store data, make sure the WordPress user has the required FluentCart permissions.
+If Cursor reports command-not-found or rejects `mcp.json`, use the absolute `npx` path above, then
+follow
+[the client-start stage](/docs/fluentcart-mcp/troubleshooting#2-the-client-cannot-start-the-server).
+If the setup wizard rejects the URL or credentials, use
+[the credential stage](/docs/fluentcart-mcp/troubleshooting#1-credential-setup-failed). If the
+server connects but cannot read store data, check the WordPress user's FluentCart permissions and
+use
+[the store-connection stage](/docs/fluentcart-mcp/troubleshooting#3-the-store-connection-or-startup-discovery-failed).
 
 ## Optional next steps
 
-Continue with [Usage](/docs/fluentcart-mcp/usage), [Troubleshooting](/docs/fluentcart-mcp/troubleshooting),
-or [Advanced configuration](/docs/fluentcart-mcp/configuration).
+Continue with [Usage](/docs/fluentcart-mcp/usage) or
+[Advanced configuration](/docs/fluentcart-mcp/configuration).

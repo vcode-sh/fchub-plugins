@@ -48,8 +48,9 @@ owner performs publication.
 - Current-facing truth includes all FluentCart MCP documentation, the public
   MCP marketing layout and components, and the comparison blog. Preserve the
   historical changelog as history rather than current product copy. From the
-  repository root, run `node scripts/check-mcp-docs.mjs` and
-  `node --test scripts/check-mcp-docs.test.mjs scripts/check-mcp-docs-experience.test.mjs`
+  repository root, run `node scripts/check-mcp-docs.mjs`,
+  `node scripts/check-mcp-doc-links.mjs`, and
+  `node --test scripts/check-mcp-doc-links.test.mjs scripts/check-mcp-docs.test.mjs scripts/check-mcp-docs-experience.test.mjs`
   whenever a documentation truth input changes.
 - Local checks from `fluentcart-mcp/` include `npm run test:tooling`,
   `npm run test:conformance`, `npm run check:contract`,

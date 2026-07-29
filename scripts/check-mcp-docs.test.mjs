@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { after, describe, it } from 'node:test'
@@ -272,5 +272,45 @@ describe('FluentCart MCP documentation truth gate', () => {
 		assert.deepEqual(byFile['contradictory-mcpb-runtime.md'], ['mcpb-bundles-node-runtime'])
 		assert.deepEqual(byFile['contradictory-chatgpt-auth.md'], ['chatgpt-static-bearer-auth'])
 		assert.deepEqual(byFile['supported-negations.md'], [])
+	})
+})
+
+describe('FluentCart MCP repository guidance', () => {
+	const read = (path) => readFileSync(join(process.cwd(), path), 'utf8')
+
+	it('keeps package examples least-privilege, shell-valid, and valid JSON', () => {
+		const readme = read('fluentcart-mcp/README.md')
+		assert.doesNotMatch(readme, /FLUENTCART_(?:USERNAME|ABILITIES_USERNAME)=admin\b/)
+		assert.doesNotMatch(readme, /"username":\s*"admin"/)
+		assert.doesNotMatch(readme, /\bAn admin account works\b/i)
+		assert.match(readme, /FLUENTCART_USERNAME=fluentcart-reader/)
+		assert.match(readme, /FLUENTCART_APP_PASSWORD="[^"\n]+"/)
+		assert.match(readme, /FLUENTCART_ABILITIES_APP_PASSWORD="[^"\n]+"/)
+
+		const configBlock = readme.match(
+			/### 2\. Config File[\s\S]*?```json\n([\s\S]*?)\n```/,
+		)?.[1]
+		assert.ok(configBlock, 'package README must contain the config-file JSON example')
+		assert.equal(JSON.parse(configBlock).username, 'fluentcart-reader')
+	})
+
+	it('uses tracked AGENTS.md as the canonical release-recovery source', () => {
+		const agents = read('AGENTS.md')
+		const design = read(
+			'docs/superpowers/specs/2026-07-29-fluentcart-mcp-simple-documentation-design.md',
+		)
+		const plan = read(
+			'docs/superpowers/plans/2026-07-29-fluentcart-mcp-simple-documentation.md',
+		)
+
+		assert.ok(!existsSync(join(process.cwd(), 'docs/developer-manual.md')))
+		assert.match(agents, /If a staged or promoted release needs correcting/i)
+		assert.match(agents, /deprecate the faulty\s+publication/i)
+		assert.match(agents, /never reuse a released version or\s+tag/i)
+		assert.match(agents, /new patch version with fresh evidence/i)
+		assert.match(design, /tracked `AGENTS\.md`/)
+		assert.match(plan, /tracked `AGENTS\.md`/)
+		assert.doesNotMatch(design, /release recovery belongs in the internal developer manual/i)
+		assert.doesNotMatch(plan, /Move release recovery into `docs\/developer-manual\.md`/)
 	})
 })

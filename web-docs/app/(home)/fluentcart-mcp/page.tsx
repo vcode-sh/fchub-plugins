@@ -181,12 +181,12 @@ export default function FluentCartMcpPage() {
                 <code>npx -y</code> downloads on demand and does not install the
                 package globally. The{" "}
                 <Link
-                  href="/docs/fluentcart-mcp/setup"
+                  href="/docs/fluentcart-mcp"
                   className="underline underline-offset-4 transition-colors hover:text-foreground"
                 >
-                  setup guide
+                  client chooser
                 </Link>{" "}
-                shows how to point your MCP client at the server.
+                sends you to the standalone guide for your app.
               </p>
             </CardContent>
           </Card>

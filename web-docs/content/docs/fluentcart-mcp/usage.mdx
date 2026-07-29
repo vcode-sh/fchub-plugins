@@ -13,7 +13,7 @@ You're connected. Now what?
 You just... talk. No special syntax. No commands to memorise. No tool names to remember. The descriptions are rich enough that any halfway decent AI can work out which tool to reach for from plain English. Describe what you want and let it sort out the rest.
 
 <Callout type="warn" title="Read what this release can't do before you plan around it">
-A default install reads and nothing else. Setting `FLUENTCART_WRITE_MODE=reversible` adds one specific family of writes: **creating and updating** products, variants, coupons, customers, shipping rules, tax rules, attribute groups and terms, order bumps and upgrade paths. [Setup covers the switch](/docs/fluentcart-mcp/setup#decide-what-it-can-see).
+A default install reads and nothing else. Setting `FLUENTCART_WRITE_MODE=reversible` adds one specific family of writes: **creating and updating** products, variants, coupons, customers, shipping rules, tax rules, attribute groups and terms, order bumps and upgrade paths. [Advanced configuration explains the switch](/docs/fluentcart-mcp/configuration#wordpress-scope-and-write-mode-are-different-controls).
 
 Not exposed in any mode: refunds, subscription cancellation, deletions, bulk actions, order status
 changes, marking an order paid, and dispute handling. Ask for one and the AI will not find a tool,
@@ -362,6 +362,6 @@ The AI usually converts these when presenting results to you. But if you see num
     The default read surface, optional reversible work, and deliberately absent actions.
   </Card>
   <Card title="Troubleshooting" href="/docs/fluentcart-mcp/troubleshooting">
-    Something not working? Every failure mode is covered. Start here.
+    Something not working? Common failure modes are covered. Start here.
   </Card>
 </Cards>

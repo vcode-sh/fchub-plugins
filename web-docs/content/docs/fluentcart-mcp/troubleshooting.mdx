@@ -127,7 +127,9 @@ making certificate verification someone else’s problem.
 
 `NODE_TLS_REJECT_UNAUTHORIZED=0` is only a final temporary local diagnostic after those checks. If
 you use it to isolate a local CA issue, remove it immediately after the test and restore normal
-verification before connecting to any non-local store. Never leave it in a deployment environment.
+verification before connecting to any non-local store. Restart the affected MCP server or client
+after removing the bypass so the restored setting takes effect. Never leave it in a deployment
+environment.
 
 ## 11. The AI does not use FluentCart tools
 

@@ -99,8 +99,9 @@ Use flat, stable documentation routes to avoid unverified nested-route behaviour
 
 - `changelog.mdx` and `_changelog/*` — current index and immutable historical entries.
 
-Release recovery belongs in the internal developer manual and agent guidance, not in the public
-merchant deployment journey.
+Release recovery belongs in this monorepo's tracked `AGENTS.md`, not in the public merchant
+deployment journey. The similarly named developer manual belongs to the sibling playground
+repository; this plan neither duplicates nor edits it.
 
 ## Beginner Landing Page
 
