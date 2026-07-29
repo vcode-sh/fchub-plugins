@@ -32,18 +32,27 @@ describe('FluentCart MCP documentation truth gate', () => {
 		}
 	})
 
-	it('discovers nested tracked AGENTS, optional local CLAUDE files and no historical changelog', () => {
+	it('discovers every current FluentCart MCP page, including new MDX files', () => {
 		assert.equal(typeof checker.currentFacingFiles, 'function')
 		if (typeof checker.currentFacingFiles !== 'function') return
 
 		const coverageRoot = mkdtempSync(join(tmpdir(), 'fluentcart-mcp-doc-coverage-'))
 		after(() => rmSync(coverageRoot, { force: true, recursive: true }))
 		for (const name of [
+			'README.md',
 			'AGENTS.md',
 			'operations/AGENTS.md',
+			'fluentcart-mcp/README.md',
 			'CLAUDE.md',
 			'fluentcart-mcp/CLAUDE.md',
-			'web-docs/content/docs/fluentcart-mcp/_changelog/2026-03.mdx',
+			'web-docs/app/(home)/fluentcart-mcp/layout.tsx',
+			'web-docs/app/(home)/fluentcart-mcp/page.tsx',
+			'web-docs/app/(home)/home-resource-links.tsx',
+			'web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx',
+			'web-docs/content/docs/fluentcart-mcp/index.mdx',
+			'web-docs/content/docs/fluentcart-mcp/proof.mdx',
+			'web-docs/content/docs/fluentcart-mcp/new-client.mdx',
+			'web-docs/content/docs/fluentcart-mcp/_changelog/2026-07.mdx',
 		]) {
 			const path = join(coverageRoot, name)
 			mkdirSync(dirname(path), { recursive: true })
@@ -53,10 +62,38 @@ describe('FluentCart MCP documentation truth gate', () => {
 		const files = checker.currentFacingFiles({
 			exists: existsSync,
 			repoRoot: coverageRoot,
-			trackedFiles: ['AGENTS.md', 'operations/AGENTS.md'],
+			trackedFiles: [
+				'AGENTS.md',
+				'operations/AGENTS.md',
+				'web-docs/content/docs/fluentcart-mcp/index.mdx',
+				'web-docs/content/docs/fluentcart-mcp/proof.mdx',
+				'web-docs/content/docs/fluentcart-mcp/new-client.mdx',
+				'web-docs/content/docs/fluentcart-mcp/_changelog/2026-07.mdx',
+			],
 		})
 		const relativePaths = files.map((path) => path.replace(`${coverageRoot}/`, ''))
-		assert.deepEqual(relativePaths, ['AGENTS.md', 'operations/AGENTS.md', 'CLAUDE.md', 'fluentcart-mcp/CLAUDE.md'])
+
+		assert.ok(relativePaths.includes('web-docs/content/docs/fluentcart-mcp/proof.mdx'))
+		assert.ok(relativePaths.includes('web-docs/content/docs/fluentcart-mcp/new-client.mdx'))
+		assert.ok(!relativePaths.includes('web-docs/content/docs/fluentcart-mcp/_changelog/2026-07.mdx'))
+
+		for (const path of [
+			'README.md',
+			'AGENTS.md',
+			'operations/AGENTS.md',
+			'fluentcart-mcp/README.md',
+			'CLAUDE.md',
+			'fluentcart-mcp/CLAUDE.md',
+			'web-docs/app/(home)/fluentcart-mcp/layout.tsx',
+			'web-docs/app/(home)/fluentcart-mcp/page.tsx',
+			'web-docs/app/(home)/home-resource-links.tsx',
+			'web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx',
+			'web-docs/content/docs/fluentcart-mcp/index.mdx',
+			'web-docs/content/docs/fluentcart-mcp/proof.mdx',
+			'web-docs/content/docs/fluentcart-mcp/new-client.mdx',
+		]) {
+			assert.ok(relativePaths.includes(path), `${path} is not audited`)
+		}
 	})
 
 	it('rejects claims that contradict generated release truth', () => {

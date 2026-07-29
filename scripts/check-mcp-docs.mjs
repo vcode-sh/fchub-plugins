@@ -14,7 +14,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { RULES, ruleMatchesLine } from './mcp-doc-rules.mjs'
+import { CURRENT_FACING_MARKETING_FILES, RULES, ruleMatchesLine } from './mcp-doc-rules.mjs'
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -33,18 +33,20 @@ export function currentFacingFiles({
 	trackedFiles = trackedFilesAt(repoRoot),
 	exists = existsSync,
 } = {}) {
-	const docsRoot = join(repoRoot, 'web-docs', 'content', 'docs', 'fluentcart-mcp')
+	const currentMcpDocs = trackedFiles
+		.filter((path) => path.startsWith('web-docs/content/docs/fluentcart-mcp/'))
+		.filter((path) => path.endsWith('.mdx'))
+		.filter((path) => !path.includes('/_changelog/'))
+		.map((path) => join(repoRoot, path))
+
 	return [
 		join(repoRoot, 'README.md'),
 		join(repoRoot, 'fluentcart-mcp', 'README.md'),
 		...trackedFiles.filter((path) => /(^|\/)AGENTS\.md$/.test(path)).map((path) => join(repoRoot, path)),
 		join(repoRoot, 'CLAUDE.md'),
 		join(repoRoot, 'fluentcart-mcp', 'CLAUDE.md'),
-		join(repoRoot, 'web-docs', 'app', '(home)', 'fluentcart-mcp', 'page.tsx'),
-		join(repoRoot, 'web-docs', 'content', 'blog', 'fluentcart-mcp-vs-official-mcp.mdx'),
-		...['index.mdx', 'setup.mdx', 'usage.mdx', 'tools.mdx', 'deployment.mdx', 'troubleshooting.mdx', 'changelog.mdx'].map(
-			(name) => join(docsRoot, name),
-		),
+		...CURRENT_FACING_MARKETING_FILES.map((path) => join(repoRoot, path)),
+		...currentMcpDocs,
 	].filter((path, index, paths) => exists(path) && paths.indexOf(path) === index)
 }
 

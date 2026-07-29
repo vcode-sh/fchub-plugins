@@ -46,6 +46,14 @@ const RESERVED_MARKER =
 const NEGATED =
 	/\b(not|no longer|never|isn'?t|aren'?t|doesn'?t|don'?t)\s+(a\s+|an\s+|the\s+)?(required|necessary|mandatory|cached|the default|enabled|available)\b/i
 
+/** Current public marketing and layout surfaces that are not FluentCart MCP MDX pages. */
+export const CURRENT_FACING_MARKETING_FILES = [
+	'web-docs/app/(home)/fluentcart-mcp/layout.tsx',
+	'web-docs/app/(home)/fluentcart-mcp/page.tsx',
+	'web-docs/app/(home)/home-resource-links.tsx',
+	'web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx',
+]
+
 const NUMBER_WORDS = new Map([
 	['zero', 0],
 	['one', 1],
