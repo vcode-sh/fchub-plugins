@@ -186,7 +186,7 @@ describe('owner evidence-bound promotion', () => {
 		assert.match(body, /staging identity mismatch/)
 		assert.match(body, /npm view "fluentcart-mcp@\$\{VERSION\}" dist\.integrity/)
 		assert.match(body, /npm view fluentcart-mcp dist-tags\.latest/)
-		assert.equal((body.match(/imagetools inspect/g) ?? []).length, 2)
+		assert.equal((body.match(/imagetools inspect/g) ?? []).length, 4)
 	})
 
 	it('verifies every staged byte and both inspectors before mutable container tags', () => {
@@ -217,6 +217,9 @@ describe('owner evidence-bound promotion', () => {
 		assert.match(body, /test "\$SCHEMA_VERSION" = "2"/)
 		assert.match(body, /cp "\$SMOKE" clean\/smoke-public-stdio\.mjs/)
 		assert.equal((body.match(/imagetools create/g) ?? []).length, 2)
+		assert.equal((body.match(/--prefer-index=false/g) ?? []).length, 2)
+		assert.match(body, /test "\$GHCR_LATEST" = "\$GHCR_DIGEST"/)
+		assert.match(body, /test "\$DOCKERHUB_LATEST" = "\$DOCKERHUB_DIGEST"/)
 		assert.match(body, /gh release create/)
 		assert.doesNotMatch(body, /npm dist-tag/)
 		assert.doesNotMatch(body, /\bnpm ci\b|\bnpm run build\b|\bdocker build\b|\bpack:release\b/)

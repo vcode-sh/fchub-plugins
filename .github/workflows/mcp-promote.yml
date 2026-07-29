@@ -117,8 +117,14 @@ jobs:
         run: |
           GHCR_DIGEST=$(node -p "require('./staging-state.json').dockerDigests['ghcr.io']")
           DOCKERHUB_DIGEST=$(node -p "require('./staging-state.json').dockerDigests['docker.io']")
-          docker buildx imagetools create --tag "${GHCR_IMAGE}:latest" "${GHCR_IMAGE}@${GHCR_DIGEST}"
-          docker buildx imagetools create --tag "${DOCKERHUB_IMAGE}:latest" "${DOCKERHUB_IMAGE}@${DOCKERHUB_DIGEST}"
+          docker buildx imagetools create --prefer-index=false \
+            --tag "${GHCR_IMAGE}:latest" "${GHCR_IMAGE}@${GHCR_DIGEST}"
+          docker buildx imagetools create --prefer-index=false \
+            --tag "${DOCKERHUB_IMAGE}:latest" "${DOCKERHUB_IMAGE}@${DOCKERHUB_DIGEST}"
+          GHCR_LATEST=$(docker buildx imagetools inspect "${GHCR_IMAGE}:latest" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          DOCKERHUB_LATEST=$(docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:latest" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          test "$GHCR_LATEST" = "$GHCR_DIGEST"
+          test "$DOCKERHUB_LATEST" = "$DOCKERHUB_DIGEST"
       - name: Publish GitHub Release from staged bytes
         env:
           GH_TOKEN: ${{ github.token }}
