@@ -132,11 +132,21 @@ describe('FluentCart MCP documentation truth gate', () => {
 	it('rejects unavailable high-impact writes when documentation presents them as usable', () => {
 		const claims = {
 			'delete-order.md': 'FluentCart MCP lets you delete an order.',
+			'remove-customer.md': 'FluentCart MCP lets you remove a customer.',
 			'bulk-products.md': 'Use bulk actions to update products.',
 			'order-status.md': 'You can change an order status through FluentCart MCP.',
+			'order-transition.md': 'Move an order to completed from the chat.',
 			'mark-paid.md': 'Mark an order paid from the chat.',
 			'charge-card.md': 'FluentCart MCP can charge a credit card.',
-			'policy.md': 'Deletion, bulk operations, order status changes, marking an order paid and money-moving actions are not exposed.',
+			'collect-payment.md': 'Collect a payment from the customer.',
+			'take-payment.md': 'Take payment for the order.',
+			'debit-card.md': 'Debit a card for the invoice.',
+			'capture-payment.md': 'Capture a payment for order #42.',
+			'policy.md': [
+				'Deletion, bulk operations, order status changes, marking an order paid and money-moving actions are not exposed.',
+				'Do not move an order to completed.',
+				'No mode can collect payments.',
+			].join('\n'),
 		}
 		const files = Object.entries(claims).map(([name, text]) => fixture(name, text))
 		const truth = groundTruth()
@@ -145,10 +155,48 @@ describe('FluentCart MCP documentation truth gate', () => {
 			findings.map(({ path, findings: fileFindings }) => [path.split('/').at(-1), fileFindings.map(({ rule }) => rule)]),
 		)
 
-		for (const name of ['delete-order.md', 'bulk-products.md', 'order-status.md', 'mark-paid.md', 'charge-card.md']) {
+		for (const name of [
+			'delete-order.md',
+			'remove-customer.md',
+			'bulk-products.md',
+			'order-status.md',
+			'order-transition.md',
+			'mark-paid.md',
+			'charge-card.md',
+			'collect-payment.md',
+			'take-payment.md',
+			'debit-card.md',
+			'capture-payment.md',
+		]) {
 			assert.deepEqual(byFile[name], ['unavailable-high-impact-write-presented-as-available'])
 		}
 		assert.deepEqual(byFile['policy.md'], [])
+	})
+
+	it('requires numeric tool counts to name the right current truth concept', () => {
+		const truth = groundTruth()
+		const claims = {
+			'bare-tools.md': 'tools: 289',
+			'scattered-terms.md': '289 tools. Source definitions, measured profiles and client-visible tools are distinct.',
+			'stale-source.md': `Source definitions: ${truth.sourceDefinitionCount + 1}`,
+			'current-source.md': `Source definitions: ${truth.sourceDefinitionCount}`,
+			'stale-profile.md': `The dynamic profile exposes ${truth.defaultDynamicToolCount + 1} tools.`,
+			'current-profile.md': `The dynamic profile exposes ${truth.defaultDynamicToolCount} tools.`,
+			'client-visible.md': 'This connected store reports 12 client-visible tools in tools/list.',
+			'evergreen.md': 'Open-source MCP server for reading and safely administering a FluentCart store from supported AI clients.',
+		}
+		const files = Object.entries(claims).map(([name, text]) => fixture(name, text))
+		const findings = checkMcpDocs(files, activeRules(truth), truth)
+		const byFile = Object.fromEntries(
+			findings.map(({ path, findings: fileFindings }) => [path.split('/').at(-1), fileFindings.map(({ rule }) => rule)]),
+		)
+
+		for (const name of ['bare-tools.md', 'scattered-terms.md', 'stale-source.md', 'stale-profile.md']) {
+			assert.deepEqual(byFile[name], ['unqualified-tool-count'])
+		}
+		for (const name of ['current-source.md', 'current-profile.md', 'client-visible.md', 'evergreen.md']) {
+			assert.deepEqual(byFile[name], [])
+		}
 	})
 
 	it('rejects wrapped runtime and ChatGPT authentication claims without flagging supported negations', () => {

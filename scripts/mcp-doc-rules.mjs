@@ -38,7 +38,9 @@ const UNAVAILABLE_MARKER = new RegExp(
 const REAL_MONEY_SUBJECT =
 	/fluentcart_order_refund|fluentcart_subscription_cancel|\brefunds?\b|\brefunding\b|subscription cancellation|\bcancellations?\b|\breal-money\b/i
 const HIGH_IMPACT_WRITE_SUBJECT =
-	/\bdelet(?:e|es|ed|ing|ion|ions)\b|\bbulk(?:[- ](?:action|actions|edit|edits|update|updates|mutation|mutations))?\b|\b(?:change|set|update)\b[^.]{0,40}\border status\b|\bmark(?:ing)?\b[^.]{0,24}\border paid\b|\b(?:charge|capture)\b[^.]{0,40}\b(?:card|payment)\b|\bmoney-moving\b/i
+	/\bdelet(?:e|es|ed|ing|ion|ions)\b|\bremov(?:e|es|ed|ing|al)\b[^.]{0,40}\b(?:order|product|customer|coupon|subscription|card|payment)\b|\bbulk(?:[- ](?:action|actions|edit|edits|update|updates|mutation|mutations))?\b|\b(?:change|set|update|move|transition)\b[^.]{0,60}\border(?:\s*#\d+)?\b[^.]{0,40}\b(?:status|state|completed|processing|fulfilled|paid|cancelled)\b|\bmark(?:ing)?\b[^.]{0,24}\border paid\b|\b(?:collect|take|debit|capture|charge)\b[^.]{0,40}\b(?:card|payment)\b|\bmoney-moving\b/i
+const HIGH_IMPACT_IMPERATIVE =
+	/\b(?:delete|remove)\b|\b(?:move|transition)\s+(?:an?\s+)?order\b|\bmark\s+an?\s+order\s+paid\b|\b(?:collect|take|debit|capture|charge)\b[^.]{0,40}\b(?:card|payment)\b/i
 const OFFICIAL_MCP_CONTEXT = /\bofficial\s+(?:FluentCart\s+)?(?:MCP|server)\b/i
 const CERTIFICATION_NEGATION = /\b(not|no)\b[^.]{0,80}\b(certified|certification)\b/i
 const GUARD_MECHANICS =
@@ -77,6 +79,33 @@ function claimedCount(line, subject) {
 	return NUMBER_WORDS.get(match[1].toLowerCase()) ?? Number(match[1])
 }
 
+function claimedToolCount(line) {
+	const labelled = line.match(/\b(?:tools?|source(?:\s+tool)?\s+definitions?)\s*:\s*(\d+)\b/i)
+	if (labelled) return Number(labelled[1])
+
+	const sourceDefinitions = line.match(/\b(\d+)\s+(?:source\s+)?(?:tool\s+)?definitions?\b/i)
+	if (sourceDefinitions) return Number(sourceDefinitions[1])
+
+	const tools = line.match(/\b(\d+)\s+tools?\b/i)
+	return tools ? Number(tools[1]) : null
+}
+
+function hasCurrentToolCountContext(line, count, truth) {
+	if (/\bsource(?:\s+tool)?\s+definitions?\b/i.test(line)) {
+		return count === truth.sourceDefinitionCount
+	}
+
+	const profile = line.match(/\b(dynamic|curated|code|full)\b/i)?.[1]?.toLowerCase()
+	if (profile && /\b(?:profile|surface|mode)\b/i.test(line)) {
+		return truth.profileToolCounts?.[profile] === count
+	}
+
+	return (
+		/\bclient-visible\s+tools?\b/i.test(line) &&
+		/\b(?:this|the)\s+connected\s+store\b|\btools\/list\b/i.test(line)
+	)
+}
+
 function clauses(line) {
 	const parts = line.split(/;|(?<=[\w)`"'*_~\]])[.!?]\s+/).filter((part) => part.trim() !== '')
 	return parts.length > 0 ? parts : [line]
@@ -96,6 +125,15 @@ export const RULES = [
 		id: 'stale-token-claim',
 		message: 'stale context-size claim; use the measured budgets from release-contract.json',
 		test: (line) => /~?\b30K\b/i.test(line) || /~?\b30,000\s+tokens\b/i.test(line),
+	},
+	{
+		id: 'unqualified-tool-count',
+		message:
+			'a displayed tool count must be a current source-definition or measured-profile count, or a clearly store-specific client-visible count',
+		test: (line, truth) => {
+			const count = claimedToolCount(line)
+			return count !== null && !hasCurrentToolCountContext(line, count, truth)
+		},
 	},
 	{
 		id: 'stale-dynamic-tool-count',
@@ -293,15 +331,18 @@ export const RULES = [
 		message:
 			'deletion, bulk work, order-state changes, marking paid and money-moving actions are unavailable in every mode',
 		test: (line) =>
+			!/\bno\s+(?:deletion|bulk(?:\s+\w+)?|order(?:\s+status)?|money-moving\s+actions?)[^.]{0,80}\b(?:exposed|available|supported|permitted)\b/i.test(
+				line,
+			) &&
 			line
 				.split('|')
 				.some(
 					(part) =>
 						HIGH_IMPACT_WRITE_SUBJECT.test(part) &&
-						(AVAILABILITY_VERB.test(part) || /\b(?:can|may)\b/i.test(part) || /\bmark\s+an\s+order\s+paid\b/i.test(part)) &&
+						(AVAILABILITY_VERB.test(part) || /\b(?:can|may)\b/i.test(part) || HIGH_IMPACT_IMPERATIVE.test(part)) &&
 						!UNAVAILABLE_MARKER.test(part) &&
 						!/\b(?:does|do|is|are|can|could)\s+not\b/i.test(part) &&
-						!/\b(?:in|at)\s+no\s+mode\b/i.test(part),
+						!/\b(?:in|at)\s+no\s+mode\b|\bno\s+mode\b/i.test(part),
 				),
 	},
 	{

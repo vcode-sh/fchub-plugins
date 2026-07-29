@@ -173,7 +173,11 @@ describe('marketing and blog truth', () => {
 		for (const relativePath of CURRENT_FACING_MARKETING_FILES) {
 			const marketing = read(relativePath)
 			assert.doesNotMatch(marketing, /mcpToolCount|mcpSourceDefinitionCount/i, `${relativePath} exposes a source count`)
-			assert.doesNotMatch(marketing, /\b\d+\s+(?:source\s+)?tools?\b/i, `${relativePath} presents an unqualified tool count`)
+			assert.doesNotMatch(
+				marketing,
+				/\b(?:\d+\s+(?:source\s+)?(?:tool\s+)?definitions?|\d+\s+tools?|tools?\s*:\s*\d+)\b/i,
+				`${relativePath} presents an unqualified tool count`,
+			)
 		}
 
 		const comparison = read('web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx')

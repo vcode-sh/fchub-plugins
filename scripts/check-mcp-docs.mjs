@@ -160,6 +160,9 @@ export function groundTruth() {
 		modes: Object.keys(measured?.modes ?? {}),
 		defaultWriteMode: measured?.writeMode ?? null,
 		defaultDynamicToolCount: measured?.modes?.dynamic?.toolCount ?? null,
+		profileToolCounts: Object.fromEntries(
+			Object.entries(measured?.modes ?? {}).map(([mode, profile]) => [mode, profile.toolCount]),
+		),
 		sourceDefinitionCount: contract.sourceDefinitionCount,
 		defaultExposedCount: contract.writePolicyExposure?.disabled,
 		realMoneyExposable: manifest.tools.filter(({ name }) =>
