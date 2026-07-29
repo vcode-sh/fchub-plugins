@@ -291,7 +291,7 @@ describe('marketing and blog truth', () => {
 		const layoutPath = 'web-docs/app/(home)/fluentcart-mcp/layout.tsx'
 		const layout = read(layoutPath)
 		assert.match(
-			layout,
+			layout.replace(/\s+/g, ' '),
 			/description: "Open-source MCP server for reading and safely administering a FluentCart store from supported AI clients\."/,
 		)
 		assert.doesNotMatch(layout, /mcpToolCount|mcpSourceDefinitionCount/)

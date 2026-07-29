@@ -187,7 +187,10 @@ describe('compatibility support gate', () => {
 	it('records the legacy capture as route-surface-only evidence', () => {
 		assert.equal(support.legacyRuntime, 'route-surface-captured')
 		assert.match(support.legacyClaimPolicy, /route surface evidence only/i)
-		assert.match(support.legacyClaimPolicy, /does not prove tool compatibility or supported operation/i)
+		assert.match(
+			support.legacyClaimPolicy,
+			/does not prove tool compatibility or supported operation/i,
+		)
 	})
 
 	it('always judges the docs contract, core-only, core+Pro and all-active profiles', () => {

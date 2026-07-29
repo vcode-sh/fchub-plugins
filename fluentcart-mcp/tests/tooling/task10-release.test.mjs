@@ -356,7 +356,14 @@ describe('client-first documentation contracts', () => {
 	const otherClients = read('web-docs/content/docs/fluentcart-mcp/other-clients.mdx')
 	const configuration = read('web-docs/content/docs/fluentcart-mcp/configuration.mdx')
 	const chatgptWeb = read('web-docs/content/docs/fluentcart-mcp/chatgpt-web.mdx')
-	const onboarding = [packageReadme, index, chatgptDesktop, claudeDesktop, cursor, otherClients].join('\n')
+	const onboarding = [
+		packageReadme,
+		index,
+		chatgptDesktop,
+		claudeDesktop,
+		cursor,
+		otherClients,
+	].join('\n')
 	const clientGuides = [chatgptDesktop, claudeDesktop, cursor, otherClients, chatgptWeb].join('\n')
 	const compactOnboarding = onboarding.replace(/\s+/g, ' ')
 	const compactChatgptDesktop = chatgptDesktop.replace(/\s+/g, ' ')
@@ -392,14 +399,17 @@ describe('client-first documentation contracts', () => {
 	})
 
 	it('provides an actionable repository marketplace route for the optional OpenAI plugin', () => {
-		assert.match(compactConfiguration, /codex plugin marketplace add vcode-sh\/fchub-plugins --ref main/)
-		assert.match(compactConfiguration, /codex plugin marketplace list/)
-		assert.match(compactConfiguration, /restart(?:ing)? ChatGPT Desktop/i)
-		assert.match(compactConfiguration, /Install[^.]{0,80}fluentcart-mcp[^.]{0,100}from[^.]{0,80}fchub-plugins/i)
 		assert.match(
 			compactConfiguration,
-			/not a claim[^.]{0,100}(?:universal )?public directory/i,
+			/codex plugin marketplace add vcode-sh\/fchub-plugins --ref main/,
 		)
+		assert.match(compactConfiguration, /codex plugin marketplace list/)
+		assert.match(compactConfiguration, /restart(?:ing)? ChatGPT Desktop/i)
+		assert.match(
+			compactConfiguration,
+			/Install[^.]{0,80}fluentcart-mcp[^.]{0,100}from[^.]{0,80}fchub-plugins/i,
+		)
+		assert.match(compactConfiguration, /not a claim[^.]{0,100}(?:universal )?public directory/i)
 	})
 
 	it('represents every generated configuration target with its current client shape', () => {
