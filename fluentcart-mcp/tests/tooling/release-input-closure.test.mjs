@@ -16,6 +16,7 @@ after(() => rmSync(scratch, { recursive: true, force: true }))
 function walk(relative) {
 	const found = []
 	for (const entry of readdirSync(join(PACKAGE_ROOT, relative), { withFileTypes: true })) {
+		if (entry.name === '.DS_Store') continue
 		const child = posix.join(relative, entry.name)
 		if (entry.isDirectory()) found.push(...walk(child))
 		else if (entry.isFile()) found.push(child)
@@ -50,6 +51,13 @@ describe('release digest input closure', () => {
 		assert.deepEqual(paths, [...new Set(paths)].sort())
 		assert.ok(!paths.includes('release-contract.json'))
 		assert.ok(!paths.includes('manifest.json'))
+	})
+
+	it('excludes macOS metadata that is absent from clean release checkouts', () => {
+		assert.equal(
+			digestInputPaths().some((path) => path.endsWith('/.DS_Store')),
+			false,
+		)
 	})
 
 	for (const path of ['package-lock.json', 'scripts/manifest-config.mjs', 'README.md', 'LICENSE']) {

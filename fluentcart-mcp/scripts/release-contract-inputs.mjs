@@ -27,6 +27,7 @@ export const DIGEST_EXCLUDED = ['release-contract.json', 'manifest.json']
 function walk(root, directory) {
 	const found = []
 	for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+		if (entry.name === '.DS_Store') continue
 		const child = posix.join(directory, entry.name)
 		if (entry.isDirectory()) found.push(...walk(root, child))
 		else if (entry.isFile()) found.push(child)
