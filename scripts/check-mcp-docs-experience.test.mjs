@@ -36,33 +36,88 @@ const beginnerPages = {
 }
 
 const chatgptWebPage = 'web-docs/content/docs/fluentcart-mcp/chatgpt-web.mdx'
+const requiredDocsCiPaths = [
+	'scripts/mcp-doc-rules.mjs',
+	'scripts/check-mcp-docs.test.mjs',
+	'scripts/check-mcp-docs-experience.test.mjs',
+	'fluentcart-mcp/compatibility-support.json',
+	'AGENTS.md',
+	'CLAUDE.md',
+	'web-docs/content/docs/fluentcart-mcp/**',
+	'web-docs/app/(home)/fluentcart-mcp/**',
+	'web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx',
+]
+
+function assertDocsCiWorkflowContract(workflow) {
+	assert.match(workflow, /node scripts\/check-mcp-docs\.mjs/)
+	assert.match(
+		workflow,
+		/node --test scripts\/check-mcp-docs\.test\.mjs scripts\/check-mcp-docs-experience\.test\.mjs/,
+	)
+
+	for (const event of ['push', 'pull_request']) {
+		const paths = eventPaths(workflow, event)
+
+		for (const path of requiredDocsCiPaths) {
+			assert.ok(paths.has(path), `Docs CI ${event} paths does not watch ${path}`)
+		}
+	}
+}
+
+function eventPaths(workflow, event) {
+	const { block: eventBlock } = workflowEventBlock(workflow, event)
+	const pathsBlock = eventBlock.match(/^    paths:\n((?:      - .+\n)*)/m)?.[1]
+	assert.ok(pathsBlock, `Docs CI ${event} trigger has no paths list`)
+
+	return new Set(
+		[...pathsBlock.matchAll(/^      - ['\"]?([^'"\n]+)['\"]?$/gm)].map(([, path]) => path),
+	)
+}
+
+function workflowEventBlock(workflow, event) {
+	const eventStart = workflow.indexOf(`  ${event}:\n`)
+	assert.notEqual(eventStart, -1, `Docs CI does not define the ${event} trigger`)
+	const followingWorkflow = workflow.slice(eventStart + 1)
+	const nextEventOffset = followingWorkflow.search(/\n  [^\s]/)
+	const nextSectionOffset = followingWorkflow.search(/\n\n[^\s]/)
+	const eventEnd = eventStart + 1 + Math.min(
+		...[nextEventOffset, nextSectionOffset].filter((offset) => offset !== -1),
+		followingWorkflow.length,
+	)
+
+	return { start: eventStart, end: eventEnd, block: workflow.slice(eventStart, eventEnd) }
+}
+
+function removePathFromEvent(workflow, event, path) {
+	const { start, end, block } = workflowEventBlock(workflow, event)
+
+	return `${workflow.slice(0, start)}${block.replace(`      - '${path}'\n`, '')}${workflow.slice(end)}`
+}
 
 describe('Docs CI workflow contract', () => {
 	it('Docs CI runs every MCP documentation gate', () => {
 		const workflow = read('.github/workflows/docs-ci.yml')
 
-		assert.match(workflow, /node scripts\/check-mcp-docs\.mjs/)
-		assert.match(
+		assertDocsCiWorkflowContract(workflow)
+	})
+
+	it('fails when either trigger loses a required documentation truth input', () => {
+		const workflow = read('.github/workflows/docs-ci.yml')
+		const missingPushPath = removePathFromEvent(workflow, 'push', 'scripts/mcp-doc-rules.mjs')
+		const missingPullRequestPath = removePathFromEvent(
 			workflow,
-			/node --test scripts\/check-mcp-docs\.test\.mjs scripts\/check-mcp-docs-experience\.test\.mjs/,
+			'pull_request',
+			'scripts/mcp-doc-rules.mjs',
 		)
 
-		for (const path of [
-			'scripts/mcp-doc-rules.mjs',
-			'scripts/check-mcp-docs.test.mjs',
-			'scripts/check-mcp-docs-experience.test.mjs',
-			'fluentcart-mcp/compatibility-support.json',
-			'AGENTS.md',
-			'CLAUDE.md',
-			'web-docs/content/docs/fluentcart-mcp/**',
-			'web-docs/app/(home)/fluentcart-mcp/**',
-			'web-docs/content/blog/fluentcart-mcp-vs-official-mcp.mdx',
-		]) {
-			assert.ok(
-				workflow.includes(`'${path}'`) || workflow.includes(`"${path}"`),
-				`Docs CI does not watch ${path}`,
-			)
-		}
+		assert.throws(
+			() => assertDocsCiWorkflowContract(missingPushPath),
+			/push paths does not watch scripts\/mcp-doc-rules\.mjs/,
+		)
+		assert.throws(
+			() => assertDocsCiWorkflowContract(missingPullRequestPath),
+			/pull_request paths does not watch scripts\/mcp-doc-rules\.mjs/,
+		)
 	})
 })
 
