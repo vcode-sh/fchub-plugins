@@ -80,11 +80,17 @@ function assertBeginnerAccountDataBoundary(page, relativePath) {
 }
 
 function hasPrescriptiveWordPressAccessInstruction(page, target) {
+	const prescriptiveInstruction = new RegExp(
+		`\\b(?:use|assign|choose|set|give|grant|recommend|require|create|select|sign in as)\\b[^.\\n]{0,120}\\b(?:an?\\s+|the\\s+)?${target}`,
+		'i',
+	)
+
 	return page
-		.split(/(?<=[.!?])\s+/)
+		.split(/(?<=[.;!?])\s+|\s+\b(?:but|however)\b[,:]?\s*/i)
 		.some((sentence) => (
-			!/\b(?:do|should|must|can|will)?\s*not\s+(?:use|assign|choose|set|give|grant|recommend|require)\b|\b(?:never|avoid|not prescribed|not recommended|not required)\b/i.test(sentence)
-			&& new RegExp(`\\b(?:use|assign|choose|set|give|grant|recommend|require)\\b[^.\\n]{0,120}\\b(?:an?\\s+|the\\s+)?${target}`, 'i').test(sentence)
+			sentence.length <= 240
+			&& !/^\s*(?:(?:you\s+)?(?:do|should|must|can|will)?\s*not\s+(?:use|assign|choose|set|give|grant|recommend|require|create|select|sign in as)|never|avoid)\b|\b(?:is|are)\s+not\s+(?:prescribed|recommended|required)\b/i.test(sentence)
+			&& prescriptiveInstruction.test(sentence)
 		))
 }
 
@@ -269,6 +275,7 @@ describe('beginner client journeys', () => {
 			'Do not use an Administrator account for this connection.',
 			'You should not use a Shop Manager role for this connection.',
 			'An admin account is not recommended for this connection.',
+			'Administrator is not required for this connection.',
 			'manage_woocommerce is not prescribed here.',
 		]) {
 			assert.doesNotThrow(() => assertNoUnsupportedWordPressAccessPrescription(allowedVariant, 'allowed variant'))
@@ -277,6 +284,12 @@ describe('beginner client journeys', () => {
 			['role', 'Use an Administrator account for this connection.'],
 			['role', 'Assign the Shop Manager role.'],
 			['role', 'Choose an admin account.'],
+			['role', 'Create an Administrator account.'],
+			['role', 'Select the Shop Manager role.'],
+			['role', 'Sign in as an Administrator.'],
+			['role', 'Do not use a low-privilege account; choose an Administrator account.'],
+			['role', 'Do not use an Administrator account, but select the Shop Manager role.'],
+			['role', 'Do not use an Administrator account; however, choose a Shop Manager role.'],
 			['capability', 'Set the account to manage_woocommerce.'],
 			['capability', 'Give the user manage_woocommerce.'],
 			['capability', 'Grant manage_woocommerce.'],
