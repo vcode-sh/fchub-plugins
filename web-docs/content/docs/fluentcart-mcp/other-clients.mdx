@@ -10,9 +10,14 @@ you need. These are configuration recipes, not client certification.
 
 ## Create safe store access
 
-In WordPress, open **Users → Profile**, create an **Application Password** named `FluentCart MCP`,
-and copy it immediately. The setup wizard needs your WordPress URL, username, and that Application
-Password. Use a limited WordPress role where practical; the default connection is read-only.
+Before creating its Application Password, create or use a dedicated, low-privilege WordPress account
+for FluentCart. That account's WordPress permissions decide what store data FluentCart MCP can read.
+Read-only mode prevents MCP writes, but it does not make returned customer or order data private from
+the AI client.
+
+Sign in as that account, open **Users → Profile**, create an **Application Password** named
+`FluentCart MCP`, and copy it immediately. The setup wizard needs your WordPress URL, username, and
+that Application Password.
 
 ## Add your client
 
@@ -92,6 +97,35 @@ MCP Servers**. For manual setup, add this to `~/.codeium/windsurf/mcp_config.jso
 
 Enable `fluentcart`, then ask: **Show me the FluentCart dashboard stats.**
 
+### If the app cannot find `npx`
+
+If VS Code or Windsurf reports that the command cannot be found, run:
+
+```bash
+# macOS or Linux
+which npx
+
+# Windows
+where npx
+```
+
+Replace the client command with the returned absolute path. In either JSON file on Windows, double
+every backslash, or replace the backslashes with forward slashes. This is a complete valid example:
+
+```json
+{
+  "mcpServers": {
+    "fluentcart": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": ["-y", "fluentcart-mcp"]
+    }
+  }
+}
+```
+
+The doubled backslashes keep the Windows path valid JSON. You can instead use
+`C:/Program Files/nodejs/npx.cmd`.
+
 Docker and [ChatGPT web](/docs/fluentcart-mcp/chatgpt-web) are advanced routes, not local clients.
 
 ## Confirm it works
@@ -107,5 +141,5 @@ store access usually means the WordPress role lacks the required FluentCart perm
 
 ## Optional next steps
 
-See [usage examples](/docs/fluentcart-mcp/usage) for safe questions, or the
-[advanced reference](/docs/fluentcart-mcp/tools) for capability details.
+Continue with [Usage](/docs/fluentcart-mcp/usage), [Troubleshooting](/docs/fluentcart-mcp/troubleshooting),
+or [Advanced configuration](/docs/fluentcart-mcp/configuration).

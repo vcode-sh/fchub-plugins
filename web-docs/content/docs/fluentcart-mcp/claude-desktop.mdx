@@ -11,8 +11,13 @@ users do not install Node for its MCPB extension.
 
 ## Create safe store access
 
-In WordPress, open **Users → Profile**, find **Application Passwords**, enter a name such as
-`FluentCart MCP`, and select **Add New Application Password**. Copy it before leaving the page.
+Before creating its Application Password, create or use a dedicated, low-privilege WordPress account
+for FluentCart. That account's WordPress permissions decide what store data FluentCart MCP can read.
+Read-only mode prevents MCP writes, but it does not make returned customer or order data private from
+the AI client.
+
+Sign in as that account, open **Users → Profile**, find **Application Passwords**, enter a name such
+as `FluentCart MCP`, and select **Add New Application Password**. Copy it before leaving the page.
 
 Have these three fields ready:
 
@@ -21,9 +26,6 @@ Have these three fields ready:
 | **WordPress URL** | Your site root, such as `https://your-store.com` |
 | **Username** | The WordPress login name |
 | **Application Password** | The password WordPress just displayed |
-
-Use a WordPress role with only the FluentCart permissions the person needs. Keep write mode
-**disabled** for the default read-only connection.
 
 ## Install the Claude extension
 
@@ -49,5 +51,5 @@ needed FluentCart data, then see [Troubleshooting](/docs/fluentcart-mcp/troubles
 
 ## Optional next steps
 
-Read [usage examples](/docs/fluentcart-mcp/usage) for safe questions, or consult the
-[advanced reference](/docs/fluentcart-mcp/tools) before changing any server policy.
+Continue with [Usage](/docs/fluentcart-mcp/usage), [Troubleshooting](/docs/fluentcart-mcp/troubleshooting),
+or [Advanced configuration](/docs/fluentcart-mcp/configuration).

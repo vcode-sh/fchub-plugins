@@ -151,6 +151,40 @@ describe('beginner client journeys', () => {
 		}
 	})
 
+	it('keeps dedicated-account data boundaries and direct next steps on every beginner route', () => {
+		for (const relativePath of Object.values(beginnerPages)) {
+			const page = readRequired(relativePath)
+
+			assert.match(
+				page,
+				/dedicated, low-privilege WordPress account/i,
+				`${relativePath} must require a dedicated low-privilege account`,
+			)
+			assert.match(
+				page,
+				/WordPress permissions decide what store data FluentCart MCP can read/i,
+				`${relativePath} must explain that WordPress permissions control readable store data`,
+			)
+			assert.match(
+				page,
+				/read-only mode prevents MCP writes,\s*but it does not make returned customer or order data private from\s*the AI client/i,
+				`${relativePath} must explain the read-only data boundary`,
+			)
+
+			for (const [label, route] of [
+				['Usage', '/docs/fluentcart-mcp/usage'],
+				['Troubleshooting', '/docs/fluentcart-mcp/troubleshooting'],
+				['Advanced configuration', '/docs/fluentcart-mcp/configuration'],
+			]) {
+				assert.match(
+					page,
+					new RegExp(`\\[${label}\\]\\(${route.replaceAll('/', '\\/')}\\)`),
+					`${relativePath} must link directly to ${label}`,
+				)
+			}
+		}
+	})
+
 	it('keeps Claude no-Node and each local client Node and npx guidance distinct', () => {
 		const claude = readRequired(beginnerPages['Claude Desktop'])
 
@@ -178,6 +212,18 @@ describe('beginner client journeys', () => {
 		assert.match(cursor, /"command": "C:\\\\Program Files\\\\nodejs\\\\npx\.cmd"/)
 		assert.match(cursor, /double backslashes|forward slashes/i)
 		assert.ok(windowsJson, 'Cursor must show a complete Windows JSON example')
+		assert.equal(JSON.parse(windowsJson).mcpServers.fluentcart.command, 'C:\\Program Files\\nodejs\\npx.cmd')
+	})
+
+	it('gives Other clients GUI PATH recovery and valid Windows JSON', () => {
+		const otherClients = readRequired(beginnerPages['Other clients'])
+		const windowsJson = otherClients.match(/complete valid example:\n\n```json\n([\s\S]*?)\n```/)?.[1]
+
+		assert.match(otherClients, /macOS or Linux[\s\S]{0,80}which npx/is)
+		assert.match(otherClients, /Windows[\s\S]{0,80}where npx/is)
+		assert.match(otherClients, /replace[^.]*client command[^.]*absolute path/i)
+		assert.match(otherClients, /double[^.]*backslashes|forward slashes/i)
+		assert.ok(windowsJson, 'Other clients must show a complete Windows JSON example')
 		assert.equal(JSON.parse(windowsJson).mcpServers.fluentcart.command, 'C:\\Program Files\\nodejs\\npx.cmd')
 	})
 })
