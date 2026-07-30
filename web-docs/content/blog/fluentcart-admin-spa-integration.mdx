@@ -14,7 +14,7 @@ import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 
 You've built a FluentCart extension. You've got your REST API endpoints humming along, your data models are clean, your PHP is immaculate. Now you just need a page in FluentCart's admin panel to actually *show* all that lovely data. How hard can it be?
 
-Harder than it should be, as it turns out. But not impossible — once you understand the architecture, the boot sequence, and the one place where FluentCart actively sabotages your work (we'll get to that).
+Harder than it should be, as it turns out. But not impossible — once you understand the architecture, the boot sequence, and the one place where FluentCart actively sabotages your work (I'll get to that).
 
 Everything in this guide is battle-tested with [fchub-wishlist](https://github.com/vcode-sh/fchub-plugins). Not theoretical. Not "should work in principle." Actually works in production, dark mode included.
 
@@ -224,7 +224,7 @@ Understanding the exact order things happen is the difference between "it works"
 
     No second filter after the reset. No hook point between the reset and the render. Your server-side options are precisely zero.
 
-    **The solution: client-side DOM injection.** The menu is server-rendered HTML, so we wait for it to appear in the DOM and surgically append our item:
+    **The solution: client-side DOM injection.** The menu is server-rendered HTML, so I wait for it to appear in the DOM and surgically append my item:
 
     ```js
     function injectMoreMenuItem() {
@@ -395,7 +395,7 @@ The standard HTML pattern that matches FluentCart's own pages. Use this and your
     `fluent_cart/global_admin_menu_items` fires, you add your item to the `more.children` array, and then FluentCart hard-resets the entire `more` key. Your additions vanish. There's no hook after the reset. Client-side DOM injection is the only viable path. Yes, it feels wrong. It works.
   </Accordion>
   <Accordion title="Cache busting with filemtime() is essential">
-    Use `filemtime()` as the version parameter for `wp_enqueue_script`, not your plugin's version constant. The version constant doesn't change between file edits during development, which means the browser (and Cloudflare, if you're using a tunnel) serves stale JavaScript while you stare at unchanged behaviour wondering what's gone wrong. Ask how we know.
+    Use `filemtime()` as the version parameter for `wp_enqueue_script`, not your plugin's version constant. The version constant doesn't change between file edits during development, which means the browser (and Cloudflare, if you're using a tunnel) serves stale JavaScript while you stare at unchanged behaviour wondering what's gone wrong. Ask how I know.
   </Accordion>
   <Accordion title="Dark mode works automatically">
     FluentCart's CSS classes handle dark mode via Tailwind's `dark:` variants. If you stick to the semantic classes (`.fct-card`, `.page-heading-wrap`, etc.), dark mode just works. For custom CSS, use CSS custom properties or `@media (prefers-color-scheme: dark)`. Don't fight the system.

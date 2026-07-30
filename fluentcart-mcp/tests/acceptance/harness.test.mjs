@@ -190,6 +190,7 @@ describe('lane registry', () => {
 
 	it('keeps protocol proof distinct and requires every built over-the-wire client', () => {
 		assert.deepEqual(LANES.protocol.steps.map(describeStep), [
+			['node', '--test', 'tests/protocol/modern-wire-contract.test.mjs'],
 			['node', '--test', 'tests/protocol/stdio-dual-era.test.mjs'],
 			['node', '--test', 'tests/protocol/http-dual-era.test.mjs'],
 			['node', '--test', 'tests/protocol/production-surface.test.mjs'],
@@ -199,11 +200,11 @@ describe('lane registry', () => {
 			assert.ok(step.requiresFiles.includes('dist/index.js'))
 			assert.equal(step.optIn, undefined, `${step.id} must never be skippable`)
 		}
-		assert.deepEqual(LANES.protocol.steps[0].requiresModules, [
+		assert.deepEqual(LANES.protocol.steps[1].requiresModules, [
 			'@modelcontextprotocol/client',
 			'@modelcontextprotocol/client/stdio',
 		])
-		assert.deepEqual(LANES.protocol.steps[1].requiresModules, ['@modelcontextprotocol/client'])
+		assert.deepEqual(LANES.protocol.steps[2].requiresModules, ['@modelcontextprotocol/client'])
 	})
 
 	it('preflights one supplied candidate before every candidate consumer and never builds in all', () => {
@@ -220,7 +221,9 @@ describe('lane registry', () => {
 	})
 
 	it('places Node reporter flags before test files so executed counts are captured', () => {
-		const resolved = resolveStep(LANES.protocol.steps[0], {
+		const stdioStep = LANES.protocol.steps.find(({ id }) => id === 'stdio-dual-era')
+		assert.ok(stdioStep)
+		const resolved = resolveStep(stdioStep, {
 			reportPath: '/tmp/fluentcart-mcp-protocol-junit.xml',
 		})
 		assert.equal(resolved.status, 'READY')

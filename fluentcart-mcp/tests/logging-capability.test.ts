@@ -30,6 +30,11 @@ describe('MCP capabilities', () => {
 			try {
 				const capabilities = client.getServerCapabilities()
 				expect(capabilities?.logging).toBeUndefined()
+				for (const absent of ['extensions', 'tasks', 'roots', 'sampling']) {
+					expect(Object.hasOwn(capabilities ?? {}, absent), `${mode} advertised ${absent}`).toBe(
+						false,
+					)
+				}
 				expect(capabilities?.tools?.listChanged).toBe(false)
 				expect(capabilities?.resources?.listChanged).toBe(false)
 				expect(capabilities?.prompts?.listChanged).toBe(false)

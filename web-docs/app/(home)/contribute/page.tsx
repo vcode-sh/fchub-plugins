@@ -53,7 +53,7 @@ const heroVariants = {
 };
 
 const monorepoChecks = [
-  "Extends FluentCart or FluentCommunity — no generic WordPress plugins, we're not wp.org",
+  "Extends FluentCart or FluentCommunity — no generic WordPress plugins, I'm not wp.org",
   "GPL-compatible licence (GPLv2 or later preferred)",
   "Follows the repo code style — PSR-12, strict types, no unnecessary abstractions",
   "Has tests if the plugin does anything non-trivial (if it touches money, it has tests)",
@@ -131,9 +131,9 @@ export default function ContributePage() {
               </div>
               <p className="text-sm text-muted-foreground text-balance">
                 Keep it in your own repo, on your own terms. FCHub lists it on
-                the site as a community plugin — you stay in control, we give
-                you visibility. For people who want the audience without the
-                code reviews.
+                the site as a community plugin — you stay in control, I give you
+                visibility. For people who want the audience without the code
+                reviews.
               </p>
             </div>
           </div>
@@ -294,7 +294,7 @@ export default function ContributePage() {
             <p className="text-sm text-muted-foreground text-balance">
               Polish is at ~96% because someone had to do it. Other languages
               are at a round 0%. If you speak something other than English and
-              fancy translating payment gateway strings for fun, we&apos;d love
+              fancy translating payment gateway strings for fun, I&apos;d love
               the help. No coding required — just language skills and patience.
             </p>
             <div className="pt-2">
@@ -343,7 +343,7 @@ export default function ContributePage() {
           <p className="text-xs text-muted-foreground">
             Open source &middot; GPLv2 &middot; Built by{" "}
             <a
-              href="https://x.com/vcode_sh"
+              href="https://vcode.sh"
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-4 hover:text-foreground transition-colors"

@@ -6,6 +6,7 @@ import { writeJsonAtomic } from './acceptance/evidence-writer.mjs'
 import { verifyCandidateImageIdentity } from './proxy-candidate-contract.mjs'
 import { sampleContainerResources } from './soak-resource-sampler.mjs'
 import { runSoak } from './soak-runner.mjs'
+import { MODERN_PROTOCOL } from './protocol-wire.mjs'
 
 function verifyIdentity({ expected, imageInspect, containerInspect }) {
 	const identity = verifyCandidateImageIdentity(imageInspect, expected)
@@ -17,16 +18,35 @@ function verifyIdentity({ expected, imageInspect, containerInspect }) {
 	return identity
 }
 
-async function createMcpSession(url, apiKey, host) {
-	const client = new Client(
+export async function createMcpConnection(
+	url,
+	apiKey,
+	host,
+	{ ClientClass = Client, TransportClass = StreamableHTTPClientTransport } = {},
+) {
+	const client = new ClientClass(
 		{ name: 'fluentcart-release-soak', version: '1.0.0' },
-		{ capabilities: {} },
+		{
+			capabilities: {},
+			supportedProtocolVersions: [MODERN_PROTOCOL],
+			versionNegotiation: { mode: { pin: MODERN_PROTOCOL } },
+		},
 	)
-	const transport = new StreamableHTTPClientTransport(new URL(url), {
+	const transport = new TransportClass(new URL(url), {
 		authProvider: { token: async () => apiKey },
 		requestInit: { headers: { Host: host, Origin: `https://${host}` } },
 	})
-	await client.connect(transport)
+	try {
+		await client.connect(transport)
+		assert.equal(
+			client.getNegotiatedProtocolVersion(),
+			MODERN_PROTOCOL,
+			`candidate soak negotiated ${client.getNegotiatedProtocolVersion()} instead of ${MODERN_PROTOCOL}`,
+		)
+	} catch (error) {
+		await client.close()
+		throw error
+	}
 	return {
 		close: () => client.close(),
 		read: async () => {
@@ -82,15 +102,15 @@ export async function runSoakWorker(policy) {
 		imageInspect: dockerInspect(image),
 		containerInspect: dockerInspect(container),
 	})
-	const session = await createMcpSession(url, apiKey, host)
+	const connection = await createMcpConnection(url, apiKey, host)
 	let summary
 	try {
 		summary = await runSoak(policy, {
-			read: session.read,
+			read: connection.read,
 			sampleResources: () => sampleContainerResources(container),
 		})
 	} finally {
-		await session.close()
+		await connection.close()
 	}
 	writeJsonAtomic(resultPath, {
 		candidate,

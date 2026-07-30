@@ -184,6 +184,22 @@ describe('ordered HTTP composition', () => {
 })
 
 describe('HTTP request guards', () => {
+	it('does not revive the removed authenticated GET event stream', async () => {
+		const app = await listen(PRIVATE)
+		const response = await fetch(`${app.url}/mcp`, {
+			method: 'GET',
+			headers: {
+				Host: 'mcp.internal',
+				Authorization: `Bearer ${KEY}`,
+				Accept: 'text/event-stream',
+			},
+		})
+
+		expect(response.status).not.toBe(200)
+		expect(response.headers.get('content-type')).not.toMatch(/text\/event-stream/)
+		await response.body?.cancel()
+	})
+
 	it('rejects an invalid Host before the JSON parser sees malformed input', async () => {
 		const order: HttpMiddlewareStage[] = []
 		const app = await listen(PRIVATE, { onStage: (stage) => order.push(stage) })

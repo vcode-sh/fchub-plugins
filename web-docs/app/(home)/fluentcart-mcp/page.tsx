@@ -141,7 +141,15 @@ export default function FluentCartMcpPage() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          MIT licence · npm: fluentcart-mcp · Built by Vibe Code
+          MIT licence · npm: fluentcart-mcp · Built by{" "}
+          <a
+            href="https://vcode.sh"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-4 hover:text-foreground transition-colors"
+          >
+            Vibe Code
+          </a>
         </p>
       </motion.div>
 
@@ -411,7 +419,15 @@ export default function FluentCartMcpPage() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Open source · MIT · Built by Vibe Code
+          Open source · MIT · Built by{" "}
+          <a
+            href="https://vcode.sh"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-4 hover:text-foreground transition-colors"
+          >
+            Vibe Code
+          </a>
         </p>
       </motion.div>
     </div>

@@ -8,9 +8,9 @@ import { Callout } from 'fumadocs-ui/components/callout';
 import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Separator } from '@/components/ui/separator';
 
-Every MCP server's documentation says it works. Ours used to say that too, and it was wrong in eleven interesting ways.
+Every MCP server's documentation says it works. Mine used to say that too, and it was wrong in eleven interesting ways.
 
-So we stopped claiming and started measuring. 93 questions a merchant would actually ask, run against a live FluentCart store, with every number checked against MySQL rather than against another endpoint — because two endpoints agreeing proves only that they agree. Seven of FluentCart's report routes returned three different totals for the same store, and every one of them answered HTTP 200.
+So I stopped claiming and started measuring. 93 questions a merchant would actually ask, run against a live FluentCart store, with every number checked against MySQL rather than against another endpoint — because two endpoints agreeing proves only that they agree. Seven of FluentCart's report routes returned three different totals for the same store, and every one of them answered HTTP 200.
 
 ## What "works" has to mean
 
@@ -36,7 +36,7 @@ Not typos. Every one of these returned a plausible answer that was wrong, which 
 
 | What it looked like | What was actually happening |
 |---|---|
-| "Find repeat customers" returned nobody | The report could **never** return a row, on any store. FluentCart filters the underlying orders by `order_status` unconditionally, so with none supplied the predicate is `status IN (NULL)`. Our tool did not expose the key — and even if it had, the parameter allowlist held `orderStatus` in camelCase while the route reads snake_case. Three faults stacked. |
+| "Find repeat customers" returned nobody | The report could **never** return a row, on any store. FluentCart filters the underlying orders by `order_status` unconditionally, so with none supplied the predicate is `status IN (NULL)`. My tool did not expose the key — and even if it had, the parameter allowlist held `orderStatus` in camelCase while the route reads snake_case. Three faults stacked. |
 | Store revenue reported as 4,962.70 | The store took **4,738.69**. The query joins order items grouped by `(order_id, object_id)` and then sums the order-level total, so an order is counted once per variation it contains, and an order with no line items is dropped entirely. The overstatement grows with every multi-line order you take. |
 | "What tax do I charge in Poland?" → a tidy 23/8/0 | Read from a **static file bundled inside the plugin**, not from the store. The store's actual Polish rates pointed at tax classes that had been deleted. |
 | State-level shipping: "your country has no states" | The tool sent `country`; the route reads `country_code`. Every country on earth came back empty. The US has 54. |
@@ -49,7 +49,7 @@ Not typos. Every one of these returned a plausible answer that was wrong, which 
 | Asking for a subscription that does not exist | Cost 573 characters to say four words, printed the body twice, and shipped `env: "dev"` plus your full store URL on every 404. |
 
 <Callout type="warn" title="Some of these are upstream">
-Several live in FluentCart itself, not in this server. We cannot fix those from here — so the tools say so, in the description, in the words that matter. A tool that knows it is lying and admits it beats a tool that does not know.
+Several live in FluentCart itself, not in this server. I cannot fix those from here — so the tools say so, in the description, in the words that matter. A tool that knows it is lying and admits it beats a tool that does not know.
 </Callout>
 
 <Separator className="my-8" />
@@ -248,7 +248,7 @@ Mostly repetition. One order carried its two addresses **three times over**, eac
 
 **"What are my total sales?"** costs zero characters and makes zero calls. A store taking EUR and PLN has no single total, so the tool **refuses** rather than adding them together. A number that means nothing is worse than a question you have to ask more precisely.
 
-**"Which customers have bought more than once?"** costs four calls, because FluentCart takes one order status at a time. The scenario says so in its output, and points out that the plain customer list answers the same question in one call for less. We would rather write that down than hide it behind a tidier number.
+**"Which customers have bought more than once?"** costs four calls, because FluentCart takes one order status at a time. The scenario says so in its output, and points out that the plain customer list answers the same question in one call for less. I would rather write that down than hide it behind a tidier number.
 
 **"How many t-shirts do I have left in each colour?"** is two calls and 1,493 characters. It used to be a coin toss: 27 of the store's 76 variants reported `in-stock` beside `total_stock: 0`, because the projection returned an inert counter and dropped the flag explaining it. Both readings — "in stock" and "none left" — were available, and one of them was wrong.
 
@@ -267,5 +267,5 @@ Because a proof page that only lists wins is a brochure.
   connected store produces a smaller registry, not a tool that fails after registration.
 
 <Callout type="info" title="Run it yourself">
-Everything above is reproducible: `npm run test:integration:local` against your own store. If your numbers differ from ours, we would genuinely like to know — [open an issue](https://github.com/vcode-sh/fchub-plugins/issues).
+Everything above is reproducible: `npm run test:integration:local` against your own store. If your numbers differ from mine, I would genuinely like to know — [open an issue](https://github.com/vcode-sh/fchub-plugins/issues).
 </Callout>

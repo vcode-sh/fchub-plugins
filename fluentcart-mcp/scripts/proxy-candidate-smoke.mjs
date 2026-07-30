@@ -16,28 +16,17 @@ import {
 	observation,
 	openRequest as openRequestRuntime,
 	reservePort,
-	rpc,
 	topology,
 	waitForProxy,
 	within,
 } from './proxy-candidate-runtime.mjs'
+import { modernHeaders, modernRequest } from './protocol-wire.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const COMPOSE_FILE = join(PACKAGE_ROOT, 'tests/fixtures/proxy/docker-compose.yml')
 const SERVER_NAME = 'mcp.fixture.test'
 const API_KEY = `proxy-candidate-${randomBytes(24).toString('hex')}`
 const CLIENT_INFO = { name: 'proxy-candidate-smoke', version: '1.0.0' }
-const MODERN_META = {
-	'io.modelcontextprotocol/protocolVersion': '2026-07-28',
-	'io.modelcontextprotocol/clientInfo': CLIENT_INFO,
-	'io.modelcontextprotocol/clientCapabilities': {},
-}
-const JSON_HEADERS = {
-	Accept: 'application/json, text/event-stream',
-	'Content-Type': 'application/json',
-	'Mcp-Protocol-Version': '2026-07-28',
-}
-
 function compose(project, env, args) {
 	return composeRuntime(PACKAGE_ROOT, COMPOSE_FILE, project, env, args)
 }
@@ -52,12 +41,16 @@ function request(port, cert, path, options) {
 
 export function modernProxyRequest(id, method, params = {}) {
 	return {
-		headers: {
-			...JSON_HEADERS,
-			'Mcp-Method': method,
-			...(method === 'tools/call' && params.name ? { 'Mcp-Name': params.name } : {}),
-		},
-		body: rpc(id, method, { _meta: MODERN_META, ...params }),
+		headers: modernHeaders({
+			method,
+			name:
+				method === 'resources/read'
+					? params.uri
+					: method === 'tools/call' || method === 'prompts/get'
+						? params.name
+						: undefined,
+		}),
+		body: JSON.stringify(modernRequest({ id, method, params, clientInfo: CLIENT_INFO })),
 	}
 }
 

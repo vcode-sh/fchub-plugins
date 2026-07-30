@@ -4,7 +4,8 @@
  *
  * Measures the real `tools/list` result the *built* server hands to its transport, not the source
  * tool objects: only the wire shape costs a caller context, and only the built server proves what
- * that shape is. A genuine in-memory MCP session runs and the outgoing JSON-RPC message is
+ * that shape is. A deliberate 2025 compatibility connection runs in memory and the outgoing
+ * JSON-RPC message is
  * recorded verbatim. No network call is made; the client points at an unresolvable fixture host.
  */
 

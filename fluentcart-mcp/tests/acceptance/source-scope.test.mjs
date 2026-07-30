@@ -65,6 +65,11 @@ const SIMPLIFIED_PATHS = [
 
 const MANDATED_DELETIONS = [
 	{
+		path: 'fluentcart-mcp/test-tool.sh',
+		mandate: 'plan 03 task 6 — replace the shell helper with the SDK v2 client helper',
+		replacedBy: 'scripts/call-tool.mjs',
+	},
+	{
 		path: 'fluentcart-mcp/scripts/generate-manifest-tools.ts',
 		mandate: 'plan 07 task 2 — "Delete: fluentcart-mcp/scripts/generate-manifest-tools.ts"',
 		replacedBy: 'scripts/build-manifest.mjs',

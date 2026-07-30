@@ -1,4 +1,4 @@
-import { McpServer, type McpServerFactory } from '@modelcontextprotocol/server'
+import { type CacheHint, McpServer, type McpServerFactory } from '@modelcontextprotocol/server'
 import { registerPrompts } from './prompts.js'
 import { registerResources } from './resources.js'
 import { type RuntimeContext, resolveServerContext, type ServerContext } from './server-context.js'
@@ -32,15 +32,33 @@ export function parseToolsetMode(value: string | undefined): ToolsetMode {
 /**
  * What a client is told about this server before it lists a single tool.
  *
- * The SDK returns this in the initialize result and clients prepend it to a model's context on
- * every session, so it is kept to the handful of things a caller demonstrably gets wrong without
- * being told and no longer.
+ * The SDK returns this during legacy initialise and modern discovery. Clients may prepend it to
+ * a model's context, so it is kept to the handful of things a caller demonstrably gets wrong
+ * without being told and no longer.
  */
 const SERVER_INSTRUCTIONS = [
 	'FluentCart store administration over the WordPress REST API.',
 	'Writes are absent unless FLUENTCART_WRITE_MODE exposes them; do not retry a missing tool. Dynamic mode: search, describe, then use its risk-matched executor.',
 	'Sales reports require from, to and currency. Timezone is optional and echoed only as a label; FluentCart filters in its store timezone. Read warnings before quoting figures. Entity money uses integer minor units; sales reports use decimals. Never sum currencies.',
 ].join('\n\n')
+
+const PRIVATE_NO_CACHE = { ttlMs: 0, cacheScope: 'private' } as const
+
+/**
+ * Every cacheable 2026 result is deliberately private and immediately stale.
+ *
+ * The SDK currently uses these values as its defaults. Keeping the complete closed set here
+ * prevents a future SDK default from becoming an accidental public freshness claim before the
+ * server has invalidation semantics worth claiming.
+ */
+export const SERVER_CACHE_HINTS = {
+	'tools/list': PRIVATE_NO_CACHE,
+	'prompts/list': PRIVATE_NO_CACHE,
+	'resources/list': PRIVATE_NO_CACHE,
+	'resources/templates/list': PRIVATE_NO_CACHE,
+	'resources/read': PRIVATE_NO_CACHE,
+	'server/discover': PRIVATE_NO_CACHE,
+} as const satisfies Record<string, CacheHint>
 
 const SERVER_OPTIONS = {
 	capabilities: {
@@ -49,6 +67,7 @@ const SERVER_OPTIONS = {
 		prompts: { listChanged: false },
 	},
 	instructions: SERVER_INSTRUCTIONS,
+	cacheHints: SERVER_CACHE_HINTS,
 } as const
 
 /** Fixture-only Code Mode preparation, single-flight per compatibility context. */

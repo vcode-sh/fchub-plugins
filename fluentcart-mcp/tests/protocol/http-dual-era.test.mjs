@@ -4,15 +4,16 @@ import { dirname, join, resolve } from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
+import {
+	LEGACY_PROTOCOL,
+	MODERN_PROTOCOL,
+	modernHeaders,
+	modernRequest,
+} from '../../scripts/protocol-wire.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const CLIENT_INFO = { name: 'http-dual-era', version: '1.0.0' }
 const EXPECTED_TOOLS = ['fluentcart_app_init', 'fluentcart_get_store_context']
-const MODERN_META = {
-	'io.modelcontextprotocol/protocolVersion': '2026-07-28',
-	'io.modelcontextprotocol/clientInfo': CLIENT_INFO,
-	'io.modelcontextprotocol/clientCapabilities': {},
-}
 const REST_INDEX = {
 	namespaces: ['fluent-cart/v2'],
 	routes: {
@@ -50,7 +51,7 @@ async function officialClient(protocol) {
 		capabilities: {},
 		supportedProtocolVersions: [protocol],
 		versionNegotiation: {
-			mode: protocol === '2026-07-28' ? { pin: protocol } : 'legacy',
+			mode: protocol === MODERN_PROTOCOL ? { pin: protocol } : 'legacy',
 		},
 	})
 	const transport = new StreamableHTTPClientTransport(new URL(`${service.url}/mcp`))
@@ -105,7 +106,7 @@ after(async () => {
 
 describe('built HTTP serving entry', () => {
 	it('serves the same fixture tools to official 2025 and 2026 clients', async () => {
-		for (const protocol of ['2025-11-25', '2026-07-28']) {
+		for (const protocol of [LEGACY_PROTOCOL, MODERN_PROTOCOL]) {
 			const client = await officialClient(protocol)
 			try {
 				assert.equal(client.getNegotiatedProtocolVersion(), protocol)
@@ -126,30 +127,32 @@ describe('built HTTP serving entry', () => {
 			id: 1,
 			method: 'initialize',
 			params: {
-				protocolVersion: '2025-11-25',
+				protocolVersion: LEGACY_PROTOCOL,
 				capabilities: {},
 				clientInfo: CLIENT_INFO,
 			},
 		})
-		const modern = await rpc(
-			{
-				jsonrpc: '2.0',
-				id: 2,
-				method: 'server/discover',
-				params: { _meta: MODERN_META },
-			},
-			{ 'Mcp-Method': 'server/discover' },
-		)
+		const modernRequestBody = modernRequest({
+			id: 2,
+			method: 'server/discover',
+			clientInfo: CLIENT_INFO,
+		})
+		const modern = await rpc(modernRequestBody, modernHeaders({ method: modernRequestBody.method }))
 
 		assert.equal(legacy.response.status, 200)
-		assert.equal(legacy.body.result.protocolVersion, '2025-11-25')
+		assert.equal(legacy.body.result.protocolVersion, LEGACY_PROTOCOL)
 		assert.equal(legacy.body.result.serverInfo.name, 'fluentcart-mcp')
 		assert.equal(modern.response.status, 200)
-		assert.deepEqual(modern.body.result.supportedVersions, ['2026-07-28'])
+		assert.deepEqual(modern.body.result.supportedVersions, [MODERN_PROTOCOL])
+		assert.equal(modern.body.result.resultType, 'complete')
+		assert.equal(modern.body.result.ttlMs, 0)
+		assert.equal(modern.body.result.cacheScope, 'private')
 		assert.equal(
 			modern.body.result._meta['io.modelcontextprotocol/serverInfo'].name,
 			'fluentcart-mcp',
 		)
+		assert.equal(legacy.response.headers.get('mcp-session-id'), null)
+		assert.equal(modern.response.headers.get('mcp-session-id'), null)
 		assert.equal(legacy.response.headers.get('cache-control'), 'no-store')
 		assert.equal(modern.response.headers.get('cache-control'), 'no-store')
 		assert.equal(capabilityRequests, 1, 'runtime discovery must run once for both HTTP eras')

@@ -75,6 +75,13 @@ export const VERSION_COMMANDS = {
 }
 
 const ERAS = new Set(['2025-11-25', '2026-07-28'])
+const HANDSHAKE_KEYS = [
+	'candidateImageId',
+	'era',
+	'negotiationMethod',
+	'observedAt',
+	'protocolVersion',
+]
 const OUTCOMES = new Set(['PASS', 'UNSUPPORTED', 'BLOCKED', 'CONFIGURATION_TARGET'])
 const ENTRY_KEYS = [
 	'capabilitySource',
@@ -181,7 +188,21 @@ function validateEntry(entry, evidence, context) {
 	if (entry.outcome === 'PASS') {
 		assert.equal(entry.reason, null)
 		assert.equal(entry.capabilitySource, null)
+		exactKeys(entry.observedHandshake, HANDSHAKE_KEYS, 'observed handshake')
 		assert.ok(ERAS.has(entry.observedHandshake?.protocolVersion), 'PASS requires observed era')
+		assert.equal(
+			entry.observedHandshake.candidateImageId,
+			evidence.candidate.imageId,
+			'PASS handshake is not bound to the candidate image ID',
+		)
+		if (entry.observedHandshake.era === 'modern') {
+			assert.equal(entry.observedHandshake.protocolVersion, '2026-07-28')
+			assert.equal(entry.observedHandshake.negotiationMethod, 'server/discover')
+		} else {
+			assert.equal(entry.observedHandshake.era, 'legacy', 'PASS handshake has an unknown era')
+			assert.equal(entry.observedHandshake.protocolVersion, '2025-11-25')
+			assert.equal(entry.observedHandshake.negotiationMethod, 'initialize')
+		}
 		time(entry.observedHandshake.observedAt, 'handshake time', context.now)
 		return
 	}
@@ -203,7 +224,7 @@ export function validateClientEvidence(evidence, context) {
 		['candidate', 'clients', 'producedAt', 'producer', 'runRoot', 'schemaVersion'],
 		'named-client evidence',
 	)
-	assert.equal(evidence.schemaVersion, 3)
+	assert.equal(evidence.schemaVersion, 4)
 	assert.equal(evidence.producer, 'scripts/certify-clients.mjs')
 	time(evidence.producedAt, 'producedAt', context.now)
 	assert.equal(evidence.runRoot, join(context.runDirectory, 'client-config'))
@@ -224,5 +245,7 @@ export function validateClientEvidence(evidence, context) {
 export function certificationState(evidence) {
 	const automated = evidence.clients.filter((cell) => !isConfigurationTarget(cell))
 	assert.equal(automated.length, AUTOMATED_CLIENT_CELLS.length, 'automated client cells differ')
-	return automated.every(({ outcome }) => outcome === 'PASS') ? 'PASS' : 'BLOCKED'
+	if (!automated.every(({ outcome }) => outcome === 'PASS')) return 'BLOCKED'
+	const docker = automated.find(({ client }) => client === 'Docker smoke')
+	return docker?.observedHandshake?.era === 'modern' ? 'PASS' : 'BLOCKED'
 }

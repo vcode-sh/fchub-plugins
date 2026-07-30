@@ -11,6 +11,7 @@ import { createHandshakeRelay } from './client-http-observer.mjs'
 import { stopClientProcess } from './client-process.mjs'
 import { removeDockerContainer } from './docker-container-cleanup.mjs'
 import { configurationTargetFor, isConfigurationTarget } from './client-evidence-contract.mjs'
+import { decodeJsonRpc, modernHeaders, modernRequest } from './protocol-wire.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BRIDGE = join(PACKAGE_ROOT, 'scripts/client-stdio-observer.mjs')
@@ -135,8 +136,13 @@ function inspectorStdioConfig(receipt, env) {
 function readReceipt(path, imageId) {
 	if (!existsSync(path)) return null
 	const receipt = JSON.parse(readFileSync(path, 'utf8'))
+	assert.deepEqual(
+		Object.keys(receipt).sort(),
+		['candidateImageId', 'era', 'negotiationMethod', 'observedAt', 'protocolVersion'],
+		'stdio receipt fields drifted',
+	)
 	assert.equal(receipt.candidateImageId, imageId, 'stdio receipt is not candidate-bound')
-	return receipt.protocolVersion
+	return receipt
 }
 export class ClientAdapters {
 	constructor(candidate, dependencies = {}) {
@@ -271,9 +277,9 @@ export class ClientAdapters {
 	}
 
 	commandObservation(result, receipt) {
-		const protocolVersion = readReceipt(receipt, this.candidate.imageId)
-		return protocolVersion
-			? { outcome: 'PASS', protocolVersion }
+		const observation = readReceipt(receipt, this.candidate.imageId)
+		return observation
+			? { outcome: 'PASS', ...observation }
 			: {
 					outcome: 'BLOCKED',
 					reason: safeReason('named client did not complete a candidate handshake', result.detail),
@@ -281,17 +287,44 @@ export class ClientAdapters {
 	}
 
 	async http(cell) {
-		const observed = await createHandshakeRelay(this.httpPort, this.clientKey)
+		const observed = await createHandshakeRelay(
+			this.httpPort,
+			this.clientKey,
+			this.candidate.imageId,
+		)
 		try {
 			if (cell.client === 'Docker smoke') {
-				await fetch(observed.url, {
-					method: 'POST',
-					headers: { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						jsonrpc: '2.0', id: 1, method: 'initialize',
-						params: { protocolVersion: '2026-07-28', capabilities: {}, clientInfo: { name: 'docker-smoke', version: '2.0.0' } },
-					}),
+				const discovery = modernRequest({
+					id: 1,
+					method: 'server/discover',
+					clientInfo: { name: 'docker-smoke', version: '2.0.0' },
 				})
+				const discoveryResponse = await fetch(observed.url, {
+					method: 'POST',
+					headers: modernHeaders({ method: discovery.method }),
+					body: JSON.stringify(discovery),
+				})
+				assert.equal(discoveryResponse.status, 200, 'Docker smoke discovery failed')
+				decodeJsonRpc(
+					await discoveryResponse.text(),
+					discoveryResponse.headers.get('content-type') ?? '',
+				)
+				const list = modernRequest({
+					id: 2,
+					method: 'tools/list',
+					clientInfo: { name: 'docker-smoke', version: '2.0.0' },
+				})
+				const listResponse = await fetch(observed.url, {
+					method: 'POST',
+					headers: modernHeaders({ method: list.method }),
+					body: JSON.stringify(list),
+				})
+				assert.equal(listResponse.status, 200, 'Docker smoke tools/list failed')
+				const listed = decodeJsonRpc(
+					await listResponse.text(),
+					listResponse.headers.get('content-type') ?? '',
+				)
+				assert.ok(Array.isArray(listed.result?.tools), 'Docker smoke tools/list omitted tools')
 			} else if (cell.client === 'MCP Inspector') {
 				await runClientCommand('npx', [
 					'--yes', '@modelcontextprotocol/inspector@2.0.0', '--cli', observed.url,
@@ -311,10 +344,15 @@ export class ClientAdapters {
 			} else {
 				return { outcome: 'BLOCKED', reason: `unsupported automated HTTP client ${cell.client}` }
 			}
-			const protocolVersion = await waitFor(() => observed.protocol(), 2_000)
-			return protocolVersion
-				? { outcome: 'PASS', protocolVersion }
-				: { outcome: 'BLOCKED', reason: 'named client completed without an observed candidate HTTP handshake' }
+			await waitFor(() => observed.observation() ?? observed.rejection(), 2_000)
+			const observation = observed.observation()
+			if (observation) return { outcome: 'PASS', ...observation }
+			return {
+				outcome: 'BLOCKED',
+				reason: observed.rejection()
+					? `candidate HTTP handshake was rejected: ${observed.rejection()}`
+					: 'named client completed without an observed candidate HTTP handshake',
+			}
 		} finally {
 			await observed.close()
 		}

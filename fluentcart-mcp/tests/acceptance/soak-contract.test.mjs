@@ -14,6 +14,7 @@ import {
 	summariseSoak,
 	verifySoakCandidateIdentity,
 } from '../../scripts/soak-http.mjs'
+import { createMcpConnection } from '../../scripts/soak-worker.mjs'
 
 const MiB = 1024 * 1024
 const IMAGE_A = `sha256:${'a'.repeat(64)}`
@@ -58,6 +59,63 @@ describe('soak acceptance lane', () => {
 })
 
 describe('release soak policy', () => {
+	it('pins the candidate connection to modern and rejects legacy fallback', async () => {
+		let receivedOptions
+		let closed = false
+		class LegacyClient {
+			constructor(_info, options) {
+				receivedOptions = options
+			}
+			async connect() {
+				return undefined
+			}
+			getNegotiatedProtocolVersion() {
+				return '2025-11-25'
+			}
+			async close() {
+				closed = true
+			}
+		}
+		class Transport {}
+
+		await assert.rejects(
+			() =>
+				createMcpConnection('https://mcp.fixture.test/mcp', 'fixture-key', 'mcp.fixture.test', {
+					ClientClass: LegacyClient,
+					TransportClass: Transport,
+				}),
+			/negotiated 2025-11-25 instead of 2026-07-28/,
+		)
+		assert.deepEqual(receivedOptions.versionNegotiation, {
+			mode: { pin: '2026-07-28' },
+		})
+		assert.deepEqual(receivedOptions.supportedProtocolVersions, ['2026-07-28'])
+		assert.equal(closed, true)
+	})
+
+	it('fails closed when the candidate rejects modern negotiation', async () => {
+		let closed = false
+		class UnsupportedClient {
+			async connect() {
+				throw new Error('unsupported protocol version')
+			}
+			async close() {
+				closed = true
+			}
+		}
+		class Transport {}
+
+		await assert.rejects(
+			() =>
+				createMcpConnection('https://mcp.fixture.test/mcp', 'fixture-key', 'mcp.fixture.test', {
+					ClientClass: UnsupportedClient,
+					TransportClass: Transport,
+				}),
+			/unsupported protocol version/,
+		)
+		assert.equal(closed, true)
+	})
+
 	it('binds the run-managed sampled container to the inspected candidate', () => {
 		assert.deepEqual(verifySoakCandidateIdentity(soakIdentityFixture()), {
 			imageId: IMAGE_A,

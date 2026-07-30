@@ -78,6 +78,25 @@ jobs:
       - name: Acceptance contracts
         run: npm run test:acceptance
 
+  sdk-current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: fluentcart-mcp/package-lock.json
+      - run: npm ci
+      - name: Verify current MCP SDK and conformance packages
+        run: node scripts/verify-mcp-sdk-current.mjs --live --json > "${RUNNER_TEMP}/mcp-sdk-current.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-sdk-current-ci-${{ github.run_id }}
+          path: ${{ runner.temp }}/mcp-sdk-current.json
+          if-no-files-found: error
+          retention-days: 30
+
   conformance:
     runs-on: ubuntu-latest
     needs: [quality, test]
@@ -111,13 +130,14 @@ jobs:
       - run: npm run build
       - name: Dual-era stdio and HTTP production surfaces
         run: |
+          node --test tests/protocol/modern-wire-contract.test.mjs
           node --test tests/protocol/stdio-dual-era.test.mjs
           node --test tests/protocol/http-dual-era.test.mjs
           node --test tests/protocol/production-surface.test.mjs
 
   package:
     runs-on: ubuntu-latest
-    needs: [conformance, protocol]
+    needs: [conformance, protocol, sdk-current]
     outputs:
       version: ${{ steps.identity.outputs.version }}
       source_sha: ${{ steps.identity.outputs.source_sha }}

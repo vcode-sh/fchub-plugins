@@ -1,10 +1,10 @@
 // What the server tells a client about itself before any tool is listed.
 //
-// Two things live here. The first is the `instructions` string, which the SDK returns in the
-// initialize result and clients prepend to a model's context: it is the only place to say that a
-// missing write tool is policy rather than an error, and that report money and record money are
-// not in the same units. The second is the `listChanged` question: all three registries are
-// complete at construction, so the server declares the flags false and never sends a change.
+// Two things live here. The first is the `instructions` string, which the SDK returns during
+// legacy initialise and modern discovery: it is the only place to say that a missing write tool
+// is policy rather than an error, and that report money and record money are not in the same
+// units. The second is the `listChanged` question: all three registries are complete at
+// construction, so the server declares the flags false and never sends a change.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
 	createServerFromContextAsync,
 	resolveServerContext,
+	SERVER_CACHE_HINTS,
 	TOOLSET_MODES,
 	type ToolsetMode,
 } from '../src/server.js'
@@ -23,7 +24,7 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ENV_KEYS = ['FLUENTCART_URL', 'FLUENTCART_USERNAME', 'FLUENTCART_APP_PASSWORD']
 const original: Record<string, string | undefined> = {}
 
-/** Instructions ride on every session, so their length is a per-session cost, not a one-off. */
+/** Instructions ride on each legacy initialise or modern discovery, so keep the wire cost small. */
 const INSTRUCTIONS_BUDGET = 600
 
 beforeEach(() => {
@@ -40,12 +41,12 @@ afterEach(() => {
 	}
 })
 
-interface Session {
+interface Connection {
 	client: Client
 	close: () => Promise<void>
 }
 
-async function connect(mode: ToolsetMode): Promise<Session> {
+async function connect(mode: ToolsetMode): Promise<Connection> {
 	const server = await createServerFromContextAsync(resolveServerContext(), mode)
 	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
 	const client = new Client({ name: 'protocol-surface-test', version: '1' }, { capabilities: {} })
@@ -72,23 +73,23 @@ function sourceFiles(directory = join(PACKAGE_ROOT, 'src')): string[] {
 }
 
 describe('server instructions', () => {
-	it('is delivered in the initialize result of every mode', async () => {
+	it('is delivered in the legacy initialise result of every mode', async () => {
 		for (const mode of TOOLSET_MODES) {
-			const session = await connect(mode)
+			const connection = await connect(mode)
 			try {
-				const instructions = session.client.getInstructions()
+				const instructions = connection.client.getInstructions()
 				expect(instructions, `${mode} delivered no instructions`).toBeTruthy()
 				expect(instructions!.length).toBeLessThanOrEqual(INSTRUCTIONS_BUDGET)
 			} finally {
-				await session.close()
+				await connection.close()
 			}
 		}
 	}, 30_000)
 
 	it('states the things a caller gets wrong without being told', async () => {
-		const session = await connect('dynamic')
+		const connection = await connect('dynamic')
 		try {
-			const instructions = session.client.getInstructions() ?? ''
+			const instructions = connection.client.getInstructions() ?? ''
 
 			// Exposure: a hidden write tool is policy, so an agent must not treat its absence as a
 			// transient failure and retry. The variable is named so the operator can act on it.
@@ -107,9 +108,22 @@ describe('server instructions', () => {
 			expect(instructions).toMatch(/minor units/i)
 			expect(instructions).toMatch(/decimals/i)
 		} finally {
-			await session.close()
+			await connection.close()
 		}
 	}, 30_000)
+})
+
+describe('modern cache policy', () => {
+	it('explicitly keeps every SDK-cacheable operation private and immediately stale', () => {
+		expect(SERVER_CACHE_HINTS).toEqual({
+			'tools/list': { ttlMs: 0, cacheScope: 'private' },
+			'prompts/list': { ttlMs: 0, cacheScope: 'private' },
+			'resources/list': { ttlMs: 0, cacheScope: 'private' },
+			'resources/templates/list': { ttlMs: 0, cacheScope: 'private' },
+			'resources/read': { ttlMs: 0, cacheScope: 'private' },
+			'server/discover': { ttlMs: 0, cacheScope: 'private' },
+		})
+	})
 })
 
 describe('list-changed notifications', () => {
@@ -126,15 +140,15 @@ describe('list-changed notifications', () => {
 
 	it('advertises immutable lists and no client-directed logging in every mode', async () => {
 		for (const mode of TOOLSET_MODES) {
-			const session = await connect(mode)
+			const connection = await connect(mode)
 			try {
-				const capabilities = session.client.getServerCapabilities()
+				const capabilities = connection.client.getServerCapabilities()
 				expect(capabilities?.logging, mode).toBeUndefined()
 				expect(capabilities?.tools?.listChanged, mode).toBe(false)
 				expect(capabilities?.resources?.listChanged, mode).toBe(false)
 				expect(capabilities?.prompts?.listChanged, mode).toBe(false)
 			} finally {
-				await session.close()
+				await connection.close()
 			}
 		}
 	}, 30_000)

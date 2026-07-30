@@ -16,7 +16,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 
-Every e-commerce store needs a wishlist. It's one of those features that sounds so simple you'd assume every platform has one built in. FluentCart doesn't. So here we are.
+Every e-commerce store needs a wishlist. It's one of those features that sounds so simple you'd assume every platform has one built in. FluentCart doesn't. So I built it.
 
 I built [FCHub Wishlist](/docs/fchub-wishlist) — a proper wishlist system for FluentCart with guest support, FluentCRM automation, auto-remove on purchase, and GDPR export. Because apparently a heart icon next to a product card is never just a heart icon. It's a database table, a cookie, a merge strategy, a cron job, and a compliance checkbox.
 
@@ -51,7 +51,7 @@ And when a guest finally logs in or registers? Their guest wishlist needs to mer
 
 ## The Merge-on-Login Problem
 
-Guest wishlists live in the database identified by a session hash stored in an httpOnly cookie. When the user logs in, we need to move their guest items into their real wishlist. Sounds like a simple UPDATE query. It isn't.
+Guest wishlists live in the database identified by a session hash stored in an httpOnly cookie. When the user logs in, I need to move their guest items into their real wishlist. Sounds like a simple UPDATE query. It isn't.
 
 Two users could theoretically log in at the same time on the same session (shared computer, kiosk scenario). Or a user could have multiple tabs open. Or WordPress could fire `set_logged_in_cookie` before `wp_login` in some authentication flows — because of course it does.
 
@@ -92,7 +92,7 @@ $wpdb->query('COMMIT');
 
 Three queries inside a transaction: lock both rows, delete duplicates with a self-join, move the rest. If anything fails, rollback. No partial merges, no orphaned items, no race conditions. The kind of code that's boring to read and terrifying to get wrong.
 
-We also hook into three WordPress events — `wp_login`, `user_register`, *and* `set_logged_in_cookie` — because WordPress doesn't guarantee which one fires first in every auth flow. Belt, braces, and a third backup system. The `set_logged_in_cookie` handler checks if `wp_login` already ran to avoid double-merging. Defensive programming at its finest.
+I also hook into three WordPress events — `wp_login`, `user_register`, *and* `set_logged_in_cookie` — because WordPress doesn't guarantee which one fires first in every auth flow. Belt, braces, and a third backup system. The `set_logged_in_cookie` handler checks if `wp_login` already ran to avoid double-merging. Defensive programming at its finest.
 
 ## FluentCRM: Because a Wishlist Is Marketing Data
 
@@ -140,7 +140,7 @@ if (document.readyState === "loading") {
 }
 ```
 
-Check `readyState`. If we're still loading, register the listener. If we're past it, call `boot()` immediately. Four lines that took an embarrassingly long time to debug because the symptom was "it works everywhere except the customer portal" and the cause was "a timing assumption baked into every JavaScript tutorial since 2010."
+Check `readyState`. If the document is still loading, register the listener. If loading has finished, call `boot()` immediately. Four lines that took an embarrassingly long time to debug because the symptom was "it works everywhere except the customer portal" and the cause was "a timing assumption baked into every JavaScript tutorial since 2010."
 
 <video
   autoPlay

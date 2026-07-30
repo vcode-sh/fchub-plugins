@@ -176,7 +176,7 @@ describe('private proxy acceptance lane', () => {
 		assert.equal(LANES.proxy.steps[1].reporter, 'node-test')
 		assert.deepEqual(LANES.proxy.steps[1].requiresFiles, REQUIRED_FILES)
 		assert.ok(LANES.proxy.steps[1].proves.includes('certifies actual candidate proxy behaviours'))
-		assert.equal(LANES.protocol.steps.length, 3)
+		assert.equal(LANES.protocol.steps.length, 4)
 	})
 })
 
@@ -196,7 +196,7 @@ describe('candidate proxy release proof', () => {
 		assert.deepEqual(discovery.headers, {
 			Accept: 'application/json, text/event-stream',
 			'Content-Type': 'application/json',
-			'Mcp-Protocol-Version': '2026-07-28',
+			'MCP-Protocol-Version': '2026-07-28',
 			'Mcp-Method': 'server/discover',
 		})
 	})

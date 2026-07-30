@@ -36,10 +36,17 @@ function job(workflow, name) {
 
 describe('single-build candidate graph', () => {
 	it('gates package on independent conformance and protocol jobs', () => {
-		assert.deepEqual(jobs(ci), ['quality', 'test', 'conformance', 'protocol', 'package'])
+		assert.deepEqual(jobs(ci), [
+			'quality',
+			'test',
+			'sdk-current',
+			'conformance',
+			'protocol',
+			'package',
+		])
 		assert.match(job(ci, 'conformance'), /needs:\s*\[quality,\s*test\]/)
 		assert.match(job(ci, 'protocol'), /needs:\s*\[quality,\s*test\]/)
-		assert.match(job(ci, 'package'), /needs:\s*\[conformance,\s*protocol\]/)
+		assert.match(job(ci, 'package'), /needs:\s*\[conformance,\s*protocol,\s*sdk-current\]/)
 	})
 
 	it('runs named quality, unit, tooling, acceptance, conformance and dual-era lanes', () => {
@@ -70,7 +77,13 @@ describe('single-build candidate graph', () => {
 
 describe('tag-triggered staging', () => {
 	it('stages only after candidate Docker succeeds', () => {
-		assert.deepEqual(jobs(stage), ['validate', 'version-gate', 'docker', 'stage-npm'])
+		assert.deepEqual(jobs(stage), [
+			'validate',
+			'sdk-current',
+			'version-gate',
+			'docker',
+			'stage-npm',
+		])
 		assert.match(job(stage, 'stage-npm'), /needs:\s*\[validate,\s*version-gate,\s*docker\]/)
 		assert.match(job(stage, 'stage-npm'), /TARBALL="\.\/dist-packages\//)
 		assert.match(
@@ -115,6 +128,13 @@ describe('tag-triggered staging', () => {
 })
 
 describe('versioned Docker candidate', () => {
+	it('requires the authenticated dual-era candidate smoke before image acceptance', () => {
+		const verify = job(docker, 'verify')
+		assert.match(verify, /Private candidate speaks authenticated dual-era MCP/)
+		assert.match(verify, /scripts\/smoke-mcp-http\.mjs/)
+		assert.match(verify, /FLUENTCART_ACCEPTANCE_REQUIRED:\s*'yes'/)
+	})
+
 	it('checks out before downloading the validated handoff so checkout cannot delete it', () => {
 		const verify = job(docker, 'verify')
 		const checkout = verify.indexOf('actions/checkout@v4')

@@ -71,7 +71,18 @@ export default async function BlogPostPage({
               </span>
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <User size={14} />
-                {author}
+                {author === "Vibe Code" ? (
+                  <a
+                    href="https://vcode.sh"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-4 hover:text-foreground transition-colors"
+                  >
+                    {author}
+                  </a>
+                ) : (
+                  author
+                )}
               </span>
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Clock size={14} />

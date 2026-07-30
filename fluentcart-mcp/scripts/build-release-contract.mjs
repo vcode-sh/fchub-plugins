@@ -192,6 +192,7 @@ function abilityBridgeEvidence() {
 
 export async function buildContract() {
 	const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'))
+	const packageLock = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package-lock.json'), 'utf8'))
 	const paths = digestInputPaths()
 
 	const serverModule = await loadServerModule()
@@ -200,6 +201,7 @@ export async function buildContract() {
 	const { CATEGORIES } = await importDist('tools', 'dynamic-search.js')
 	const { CURATED_TOOL_NAMES } = await importDist('tools', 'curated.js')
 	const registryNames = new Set(registry.map((tool) => tool.name))
+	const release = buildReleaseTruth(pkg, null, packageLock)
 
 	const profiles = []
 	for (const head of PROFILES) {
@@ -218,7 +220,7 @@ export async function buildContract() {
 		serializer: SERIALIZER,
 		tokenizer: TOKENIZER,
 		packageVersion: pkg.version,
-		release: buildReleaseTruth(pkg),
+		release,
 		sourceTreeDigest: computeSourceTreeDigest(paths),
 		sourceTreeInputs: { fileCount: paths.length, declared: DIGEST_INPUTS, excluded: DIGEST_EXCLUDED },
 		sourceDefinitionCount: registry.length,

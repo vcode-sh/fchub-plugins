@@ -109,7 +109,7 @@ jobs:
           done
           mkdir -p smoke-config
           node -e "require('fs').writeFileSync('smoke-config/config.json', JSON.stringify({url:'http://host.docker.internal:39082',username:'fixture',appPassword:'fixture'}))"
-      - name: Private candidate speaks authenticated MCP
+      - name: Private candidate speaks authenticated dual-era MCP
         env:
           VERSION: ${{ steps.build.outputs.version }}
         run: |

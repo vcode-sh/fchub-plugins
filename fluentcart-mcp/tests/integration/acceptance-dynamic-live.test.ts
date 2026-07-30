@@ -5,7 +5,7 @@ import { Client, InMemoryTransport } from '@modelcontextprotocol/client'
 // Dynamic mode's whole argument is that a caller pays for a handful of meta-tools instead of a
 // hundred and fifty definitions, and then pays again, in small amounts, only for what it asks about.
 // That argument is only true if the disclosure steps stay small, so this lane measures the real
-// wire payloads of a real session rather than trusting the design.
+// wire payloads of a real connection rather than trusting the design.
 import { encode as encodeCl100k } from 'gpt-tokenizer/encoding/cl100k_base'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createServerFromContextAsync } from '../../src/server.js'

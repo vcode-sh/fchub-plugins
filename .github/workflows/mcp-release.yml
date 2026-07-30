@@ -11,9 +11,31 @@ jobs:
   validate:
     uses: ./.github/workflows/mcp-ci.yml
 
+  sdk-current:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fluentcart-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: fluentcart-mcp/package-lock.json
+      - run: npm ci
+      - name: Reverify current MCP SDK at the release boundary
+        run: node scripts/verify-mcp-sdk-current.mjs --live --json > "${RUNNER_TEMP}/mcp-sdk-current.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-sdk-current-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/mcp-sdk-current.json
+          if-no-files-found: error
+          retention-days: 30
+
   version-gate:
     runs-on: ubuntu-latest
-    needs: [validate]
+    needs: [validate, sdk-current]
     steps:
       - name: Tag matches packaged version
         env:

@@ -8,7 +8,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { buildReleaseTruth, validateReleaseState } from '../../scripts/release-truth.mjs'
+import { clientOptionsForProtocol, parseCallToolArgs } from '../../scripts/call-tool.mjs'
+import {
+	buildReleaseTruth,
+	PROTOCOL_COMPLIANCE_ROWS,
+	validateProtocolCompliance,
+	validateReleaseState,
+} from '../../scripts/release-truth.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const REPO_ROOT = resolve(PACKAGE_ROOT, '..')
@@ -19,7 +25,13 @@ const expectedTruth = {
 	version: '2.1.0',
 	protocols: ['2025-11-25', '2026-07-28'],
 	httpProfiles: ['local', 'private'],
-	sdk: { server: '2.0.0', node: '2.0.0', express: '2.0.0' },
+	sdk: {
+		server: '2.0.0',
+		node: '2.0.0',
+		express: '2.0.0',
+		client: '2.0.0',
+		core: '2.0.0',
+	},
 	conformance: { package: '0.2.0-alpha.10', expectedFailures: [] },
 }
 
@@ -108,6 +120,99 @@ const expectedRecipes = [
 ]
 
 describe('generated release truth', () => {
+	it('rejects incomplete or dishonest protocol applicability matrices', () => {
+		assert.throws(
+			() => validateProtocolCompliance(PROTOCOL_COMPLIANCE_ROWS.slice(1)),
+			/missing protocol compliance row/,
+		)
+		const unknown = structuredClone(PROTOCOL_COMPLIANCE_ROWS)
+		unknown[0].state = 'looks-fine-from-here'
+		assert.throws(() => validateProtocolCompliance(unknown), /unknown protocol compliance state/)
+
+		const missingProof = structuredClone(PROTOCOL_COMPLIANCE_ROWS)
+		missingProof[0].proofs = [
+			{ path: 'tests/protocol/definitely-absent.test.mjs', assertion: 'Imaginary proof.' },
+		]
+		assert.throws(() => validateProtocolCompliance(missingProof), /proof path does not exist/)
+
+		const advertisedNotApplicable = structuredClone(PROTOCOL_COMPLIANCE_ROWS)
+		advertisedNotApplicable[0].advertised = true
+		advertisedNotApplicable[0].state = 'not-applicable'
+		assert.throws(
+			() => validateProtocolCompliance(advertisedNotApplicable),
+			/advertised feature cannot be not-applicable/,
+		)
+	})
+
+	it('publishes the reviewed July 28 matrix as generated release truth', () => {
+		const contract = readJson('fluentcart-mcp/release-contract.json')
+		assert.deepEqual(contract.release.protocolCompliance, PROTOCOL_COMPLIANCE_ROWS)
+		assert.deepEqual(
+			contract.release.protocolCompliance.map(({ id }) => id),
+			[
+				'stateless-requests',
+				'server-discovery',
+				'subscriptions',
+				'removed-methods',
+				'tasks-extension',
+				'multi-round-trip-responses',
+				'result-types',
+				'stream-resumability',
+				'extensions',
+				'trace-context',
+				'deterministic-lists',
+				'standard-headers',
+				'cache-hints',
+				'resource-errors',
+				'oauth-issuer-dcr',
+				'json-schema-2020-12',
+				'error-allocation',
+				'deprecated-features',
+			],
+		)
+	})
+
+	it('keeps the manual tool helper modern by default with explicit legacy compatibility', () => {
+		assert.deepEqual(parseCallToolArgs(['fluentcart_search_tools', '{"query":"orders"}']), {
+			toolName: 'fluentcart_search_tools',
+			arguments: { query: 'orders' },
+			protocol: '2026-07-28',
+		})
+		assert.deepEqual(
+			parseCallToolArgs([
+				'fluentcart_search_tools',
+				'{"query":"orders"}',
+				'--protocol',
+				'2025-11-25',
+			]),
+			{
+				toolName: 'fluentcart_search_tools',
+				arguments: { query: 'orders' },
+				protocol: '2025-11-25',
+			},
+		)
+		assert.deepEqual(clientOptionsForProtocol('2026-07-28').versionNegotiation, {
+			mode: { pin: '2026-07-28' },
+		})
+		assert.equal(clientOptionsForProtocol('2025-11-25').versionNegotiation.mode, 'legacy')
+		assert.throws(
+			() => parseCallToolArgs(['fluentcart_search_tools', '{}', '--protocol', '2099-01-01']),
+			/unsupported protocol/,
+		)
+	})
+
+	it('makes live SDK freshness a required CI and release boundary', () => {
+		const ci = read('.github/workflows/mcp-ci.yml')
+		const release = read('.github/workflows/mcp-release.yml')
+
+		assert.match(ci, /^\s{2}sdk-current:\s*$/m)
+		assert.match(ci, /node scripts\/verify-mcp-sdk-current\.mjs --live --json/)
+		assert.match(ci, /needs: \[conformance, protocol, sdk-current\]/)
+		assert.match(release, /^\s{2}sdk-current:\s*$/m)
+		assert.match(release, /node scripts\/verify-mcp-sdk-current\.mjs --live --json/)
+		assert.match(release, /version-gate:[\s\S]*needs: \[validate, sdk-current\]/)
+	})
+
 	it('is concrete, current and identical in the contract and MCPB manifest', () => {
 		const contract = readJson('fluentcart-mcp/release-contract.json')
 		const manifest = readJson('fluentcart-mcp/manifest.json')
@@ -183,19 +288,32 @@ describe('generated release truth', () => {
 
 	it('keeps active protocol consumers within the generated protocol truth', () => {
 		const protocols = buildReleaseTruth(readJson('fluentcart-mcp/package.json')).protocols
+		const wire = read('fluentcart-mcp/scripts/protocol-wire.mjs')
+		const wireProtocols = Object.fromEntries(
+			[...wire.matchAll(/export const (LEGACY_PROTOCOL|MODERN_PROTOCOL) = ['"]([^'"]+)['"]/g)].map(
+				([, name, protocol]) => [name, protocol],
+			),
+		)
+		assert.deepEqual(Object.values(wireProtocols), protocols)
 		const consumers = [
-			'fluentcart-mcp/test-tool.sh',
+			'fluentcart-mcp/scripts/call-tool.mjs',
 			'fluentcart-mcp/scripts/smoke-mcp-http.mjs',
 			'fluentcart-mcp/scripts/benchmark-http-code-mode.mjs',
 			'fluentcart-mcp/tests/integration/e2e-http.test.ts',
 		]
 
 		for (const path of consumers) {
+			const source = read(path)
 			const declared = [
-				...read(path).matchAll(/["']?protocolVersion["']?\s*:\s*['"]([^'"]+)['"]/g),
+				...source.matchAll(/["']?protocolVersion["']?\s*:\s*['"]([^'"]+)['"]/g),
 			].map(([, protocol]) => protocol)
-			assert.ok(declared.length > 0, `${path} declares no MCP protocol`)
-			for (const protocol of declared) {
+			const shared = Object.entries(wireProtocols)
+				.filter(([name]) => source.includes(name))
+				.map(([, protocol]) => protocol)
+			if (source.includes('modernRequest')) shared.push(wireProtocols.MODERN_PROTOCOL)
+			const used = [...new Set([...declared, ...shared])]
+			assert.ok(used.length > 0, `${path} declares no MCP protocol`)
+			for (const protocol of used) {
 				assert.ok(protocols.includes(protocol), `${path} uses retired MCP protocol ${protocol}`)
 			}
 		}
@@ -258,6 +376,16 @@ describe('staging and promotion workflows', () => {
 		assert.doesNotMatch(stage, /gh release create/)
 		assert.doesNotMatch(docker, /:\s*latest|:latest/)
 		assert.match(docker, /docker-content-digest|imagetools inspect/)
+	})
+
+	it('keeps the Docker release gate explicitly dual-era', () => {
+		const workflow = read('.github/workflows/mcp-docker.yml')
+		const smoke = read('fluentcart-mcp/scripts/smoke-mcp-http.mjs')
+		assert.match(workflow, /Private candidate speaks authenticated dual-era MCP/)
+		assert.match(workflow, /scripts\/smoke-mcp-http\.mjs/)
+		assert.match(smoke, /MCP dual-era smoke succeeded/)
+		assert.match(smoke, /server\/discover/)
+		assert.match(smoke, /method: 'initialize'/)
 	})
 
 	it('makes promotion owner-triggered, exact, evidence-bound and build-free', () => {

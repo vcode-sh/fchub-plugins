@@ -7,6 +7,7 @@ import { after, before, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { installSignalCleanup, openCandidateStore } from '../../scripts/candidate-store.mjs'
 import { removeDockerContainer } from '../../scripts/docker-container-cleanup.mjs'
+import { validateDualEraSmoke } from '../../scripts/smoke-mcp-http.mjs'
 
 const PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 const VERSION = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8')).version
@@ -18,6 +19,95 @@ const EXTERNAL_STORE_URL = process.env.FLUENTCART_ACCEPTANCE_STORE_URL ?? null
 
 /** Long enough to satisfy the 32-character floor, and obviously disposable. */
 const STRONG_KEY = `acceptance-${randomBytes(24).toString('hex')}`
+const EXPECTED_NAMES = [
+	'fluentcart_search_tools',
+	'fluentcart_describe_tools',
+	'fluentcart_execute_read_tool',
+]
+
+function dualEraFixture() {
+	const serverInfo = { name: 'fluentcart-mcp', version: '2.1.0' }
+	const modernBase = {
+		resultType: 'complete',
+		ttlMs: 0,
+		cacheScope: 'private',
+		_meta: { 'io.modelcontextprotocol/serverInfo': serverInfo },
+	}
+	return {
+		legacy: {
+			initialize: {
+				protocolVersion: '2025-11-25',
+				serverInfo,
+				capabilities: {
+					tools: { listChanged: false },
+					resources: { listChanged: false },
+					prompts: { listChanged: false },
+				},
+			},
+			tools: { tools: EXPECTED_NAMES.map((name) => ({ name })) },
+			sessionId: null,
+		},
+		modern: {
+			discovery: {
+				...modernBase,
+				supportedVersions: ['2026-07-28'],
+				capabilities: {
+					tools: { listChanged: false },
+					resources: { listChanged: false },
+					prompts: { listChanged: false },
+				},
+			},
+			tools: {
+				...modernBase,
+				tools: EXPECTED_NAMES.map((name) => ({ name })),
+			},
+			sessionId: null,
+		},
+		expectedToolNames: EXPECTED_NAMES,
+	}
+}
+
+describe('dual-era Docker smoke validator', () => {
+	it('accepts one coherent legacy and modern candidate transcript', () => {
+		assert.deepEqual(validateDualEraSmoke(dualEraFixture()), {
+			legacyProtocol: '2025-11-25',
+			modernProtocol: '2026-07-28',
+			toolCount: 3,
+		})
+	})
+
+	it('rejects a legacy-only or modern-only transcript', () => {
+		const legacyOnly = dualEraFixture()
+		legacyOnly.modern = undefined
+		assert.throws(() => validateDualEraSmoke(legacyOnly), /modern transcript/)
+
+		const modernOnly = dualEraFixture()
+		modernOnly.legacy = undefined
+		assert.throws(() => validateDualEraSmoke(modernOnly), /legacy transcript/)
+	})
+
+	it('rejects wrong tool order or surface', () => {
+		const wrongOrder = dualEraFixture()
+		wrongOrder.modern.tools.tools.reverse()
+		assert.throws(() => validateDualEraSmoke(wrongOrder), /modern tools\/list surface/)
+
+		const wrongSurface = dualEraFixture()
+		wrongSurface.legacy.tools.tools.pop()
+		assert.throws(() => validateDualEraSmoke(wrongSurface), /legacy tools\/list surface/)
+	})
+
+	it('rejects a session header or missing modern cache/result fields', () => {
+		const session = dualEraFixture()
+		session.modern.sessionId = 'accidental-session'
+		assert.throws(() => validateDualEraSmoke(session), /Mcp-Session-Id/)
+
+		for (const field of ['resultType', 'ttlMs', 'cacheScope']) {
+			const missing = dualEraFixture()
+			delete missing.modern.discovery[field]
+			assert.throws(() => validateDualEraSmoke(missing), new RegExp(field))
+		}
+	})
+})
 
 function docker(args, options = {}) {
 	return spawnSync('docker', args, { encoding: 'utf8', timeout: 60_000, ...options })
@@ -268,7 +358,7 @@ describe('docker authenticated endpoint', () => {
 		assert.match(ports.stdout, new RegExp(`127\\.0\\.0\\.1:${port}`))
 	})
 
-	it('completes initialize, initialized notification, and tools/list', (t) => {
+	it('completes deliberate legacy and modern discovery plus tools/list', (t) => {
 		if (blocked) return t.skip(blocked)
 		const result = spawnSync(
 			process.execPath,
@@ -280,7 +370,7 @@ describe('docker authenticated endpoint', () => {
 			{ encoding: 'utf8', timeout: 30_000 },
 		)
 		assert.equal(result.status, 0, result.stderr)
-		assert.match(result.stdout, /MCP initialize and tools\/list succeeded/)
+		assert.match(result.stdout, /MCP dual-era smoke succeeded \(2025-11-25, 2026-07-28/)
 	})
 })
 

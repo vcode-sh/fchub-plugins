@@ -88,7 +88,7 @@ export const LANES = {
 	},
 	transport: {
 		description:
-			'Startup, bearer, session and shutdown boundaries against the built server, plus live principal boundaries',
+			'Startup, bearer, stateless transport and shutdown boundaries against the built server, plus live principal boundaries',
 		steps: [
 			testStep('transport', ['tests/acceptance/transport.test.mjs']),
 			// Proves the server preserves an upstream refusal instead of answering it emptily. Live,
@@ -100,6 +100,9 @@ export const LANES = {
 		description:
 			'Built stdio, HTTP and synthetic production registries over the 2025 and 2026 protocol eras',
 		steps: [
+			testStep('modern-wire-contract', ['tests/protocol/modern-wire-contract.test.mjs'], {
+				requiresFiles: ['dist/index.js'],
+			}),
 			testStep('stdio-dual-era', ['tests/protocol/stdio-dual-era.test.mjs'], {
 				requiresFiles: ['dist/index.js'],
 				requiresModules: ['@modelcontextprotocol/client', '@modelcontextprotocol/client/stdio'],

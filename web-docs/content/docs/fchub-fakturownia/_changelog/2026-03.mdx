@@ -2,11 +2,11 @@
 
 *Released 14 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.1)
 
-The audit that wouldn't end. We ran 206 unit tests, found 50+ bugs across five audit rounds (including a security audit, Fakturownia API spec review, and a full frontend wiring teardown), and discovered the settings page was completely blank the whole time. Nobody complained. We're choosing to find that encouraging.
+The audit that wouldn't end. I ran 206 unit tests, found 50+ bugs across five audit rounds (including a security audit, Fakturownia API spec review, and a full frontend wiring teardown), and discovered the settings page was completely blank the whole time. Nobody complained. I'm choosing to find that encouraging.
 
 #### Fixed: settings page was entirely broken
 
-The Fakturownia settings page at **Integrations > Fakturownia** showed absolutely nothing. A white void. No fields, no buttons, no error. Just the quiet despair of a misconfigured REST response wrapper. FluentCart's Vue expected `response.data.integration` but got raw JSON with no `data` key. Every integration that uses FluentCart's `getGlobalSettingsData()` has this problem — we just happened to be the first to notice.
+The Fakturownia settings page at **Integrations > Fakturownia** showed absolutely nothing. A white void. No fields, no buttons, no error. Just the quiet despair of a misconfigured REST response wrapper. FluentCart's Vue expected `response.data.integration` but got raw JSON with no `data` key. Every integration that uses FluentCart's `getGlobalSettingsData()` has this problem — I just happened to be the first to notice.
 
 The page now loads, renders all 8 fields, shows a green **"Connected to your-domain.fakturownia.pl"** status, and the Save button actually tells you whether it worked.
 
@@ -16,7 +16,7 @@ On the Integrations page, every other plugin had install/configure buttons. Fakt
 
 #### Fixed: NIP validation never actually ran
 
-The NIP checksum validation at checkout was wired to the wrong data path. FluentCart passes `{data: formData, cart: cart}` but we read `formData.billing_nip` directly — one level too shallow. Every NIP was accepted. `0000000000`? Sure. `ABCDEFGHIJ`? Why not. Fixed with a proper nested lookup and a fallback for backwards compatibility.
+The NIP checksum validation at checkout was wired to the wrong data path. FluentCart passes `{data: formData, cart: cart}` but I read `formData.billing_nip` directly — one level too shallow. Every NIP was accepted. `0000000000`? Sure. `ABCDEFGHIJ`? Why not. Fixed with a proper nested lookup and a fallback for backwards compatibility.
 
 #### Fixed: invoices sent without currency
 

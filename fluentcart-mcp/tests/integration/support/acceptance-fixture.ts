@@ -78,7 +78,7 @@ const contexts = new Map<string, Promise<ServerContext>>()
  * A production-shaped server context for one write mode.
  *
  * Deliberately the asynchronous constructor: it discovers the store's real routes first, so the
- * registry these lanes assert on is the route-pruned one a real session would get, not the
+ * registry these lanes assert on is the route-pruned one a real connection would get, not the
  * unpruned registry a unit test sees.
  */
 export function acceptanceContext(writeMode: WriteMode): Promise<ServerContext> {

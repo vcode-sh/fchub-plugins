@@ -27,7 +27,7 @@ export const blogPosts = defineCollections({
   type: "doc",
   dir: "content/blog",
   schema: frontmatterSchema.extend({
-    author: z.string().default("Vibe Code"),
+    author: z.string().default("I"),
     date: z.string().date().or(z.date()),
     category: z
       .enum(["fluentcart", "fluentcommunity", "general"])

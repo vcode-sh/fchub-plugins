@@ -56,7 +56,15 @@ export function HomeHero() {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Open source · GPLv2 · Built by Vibe Code
+        Open source · GPLv2 · Built by{" "}
+        <a
+          href="https://vcode.sh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-4 hover:text-foreground transition-colors"
+        >
+          Vibe Code
+        </a>
       </p>
     </motion.div>
   );

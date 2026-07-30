@@ -106,7 +106,8 @@ function prepareClientRoots(runDirectory) {
 }
 
 export async function certifyClients(options, dependencies = {}) {
-	const now = options.now ?? new Date().toISOString()
+	const currentTime = dependencies.currentTime ?? (() => new Date().toISOString())
+	const evidenceTime = options.now ?? currentTime()
 	const resolveCurrentCandidate = dependencies.resolveCandidate ?? resolveCandidate
 	const captureCurrentVersions = dependencies.captureVersions ?? captureVersions
 	const { runRoot, roots } = prepareClientRoots(options.runDirectory)
@@ -136,7 +137,7 @@ export async function certifyClients(options, dependencies = {}) {
 					version,
 					versionCommand: versionCommandFor(cell.client, candidate),
 					configurationRoot,
-					evidenceTime: now,
+					evidenceTime,
 					outcome: 'CONFIGURATION_TARGET',
 					reason: null,
 					prerequisite: target.prerequisite,
@@ -164,7 +165,7 @@ export async function certifyClients(options, dependencies = {}) {
 				version,
 				versionCommand: versionCommandFor(cell.client, candidate),
 				configurationRoot,
-				evidenceTime: now,
+				evidenceTime,
 				outcome: observation.outcome,
 				reason: observation.outcome === 'PASS' ? null : observation.reason,
 				prerequisite: null,
@@ -172,24 +173,31 @@ export async function certifyClients(options, dependencies = {}) {
 					observation.outcome === 'UNSUPPORTED' ? observation.capabilitySource : null,
 				observedHandshake:
 					observation.outcome === 'PASS'
-						? { protocolVersion: observation.protocolVersion, observedAt: now }
+						? {
+								era: observation.era,
+								protocolVersion: observation.protocolVersion,
+								negotiationMethod: observation.negotiationMethod,
+								observedAt: observation.observedAt,
+								candidateImageId: observation.candidateImageId,
+							}
 						: null,
 			})
 		}
 	} finally {
 		await adapters?.close()
 	}
+	const producedAt = options.now ?? currentTime()
 	const evidence = {
-		schemaVersion: 3,
+		schemaVersion: 4,
 		producer: 'scripts/certify-clients.mjs',
-		producedAt: now,
+		producedAt,
 		runRoot,
 		candidate,
 		clients,
 	}
 	validateClientEvidence(evidence, {
 		runDirectory: options.runDirectory,
-		now,
+		now: producedAt,
 		candidate,
 		currentVersions,
 	})

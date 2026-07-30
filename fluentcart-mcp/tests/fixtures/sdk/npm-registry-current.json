@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "packageJson": {
+      "dependencies": {
+        "@modelcontextprotocol/express": "2.0.0",
+        "@modelcontextprotocol/node": "2.0.0",
+        "@modelcontextprotocol/server": "2.0.0"
+      },
+      "devDependencies": {
+        "@modelcontextprotocol/client": "2.0.0",
+        "@modelcontextprotocol/conformance": "0.2.0-alpha.10"
+      }
+    },
+    "lockPackages": {
+      "@modelcontextprotocol/client": {
+        "version": "2.0.0",
+        "integrity": "sha512-8f1OghQ2rjzIOfqgUCP+8GiUWqRs89njoWLNqAe8kWmDePv3s1fZXseej+QXemssEuuOvLLmLO/kqM3IQHtISw=="
+      },
+      "@modelcontextprotocol/core": {
+        "version": "2.0.0",
+        "integrity": "sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA=="
+      },
+      "@modelcontextprotocol/express": {
+        "version": "2.0.0",
+        "integrity": "sha512-Snlr8j9FR9LcVvEJPF7qJ7d5zTL4Bes2dk7RcacN9eSZ7OLohwxqhEvWu1+UxELyScgLbLLOdeVEGdwKI1iwVQ=="
+      },
+      "@modelcontextprotocol/node": {
+        "version": "2.0.0",
+        "integrity": "sha512-Y4hAC2XdGDUdDOCbLDOCA4+aL3NUldjsOWlDL/YwpAxrPhRm1xHd7lZ+mLacvZ9t3PaH28wgNoaLQGrIk1P2pg=="
+      },
+      "@modelcontextprotocol/server": {
+        "version": "2.0.0",
+        "integrity": "sha512-YhHWdHfpFMQfd0prsEnxKeS3Qz3ytIGmsS0sth4KDjnacIT7hxk6hXHkJ9KysxlkvTM+WZAtQbbcUhdoP4Hvtw=="
+      },
+      "@modelcontextprotocol/conformance": {
+        "version": "0.2.0-alpha.10",
+        "integrity": "sha512-0V/HZDdWHcg6j0zVBzBsXcPZ571IVi6umKgTpnBhtTx/jm/LONmGF6cIWL2k4Xjyps0OiHV6B37nj2s0pUg0nQ=="
+      }
+    },
+    "installedVersions": {
+      "@modelcontextprotocol/client": ["2.0.0"],
+      "@modelcontextprotocol/core": ["2.0.0"],
+      "@modelcontextprotocol/express": ["2.0.0"],
+      "@modelcontextprotocol/node": ["2.0.0"],
+      "@modelcontextprotocol/server": ["2.0.0"],
+      "@modelcontextprotocol/conformance": ["0.2.0-alpha.10"]
+    }
+  },
+  "registry": {
+    "@modelcontextprotocol/client": {
+      "distTags": {
+        "latest": "2.0.0"
+      },
+      "versions": {
+        "2.0.0": {
+          "integrity": "sha512-8f1OghQ2rjzIOfqgUCP+8GiUWqRs89njoWLNqAe8kWmDePv3s1fZXseej+QXemssEuuOvLLmLO/kqM3IQHtISw==",
+          "repository": "https://github.com/modelcontextprotocol/typescript-sdk.git"
+        }
+      }
+    },
+    "@modelcontextprotocol/core": {
+      "distTags": {
+        "latest": "2.0.0"
+      },
+      "versions": {
+        "2.0.0": {
+          "integrity": "sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==",
+          "repository": "https://github.com/modelcontextprotocol/typescript-sdk.git"
+        }
+      }
+    },
+    "@modelcontextprotocol/express": {
+      "distTags": {
+        "latest": "2.0.0"
+      },
+      "versions": {
+        "2.0.0": {
+          "integrity": "sha512-Snlr8j9FR9LcVvEJPF7qJ7d5zTL4Bes2dk7RcacN9eSZ7OLohwxqhEvWu1+UxELyScgLbLLOdeVEGdwKI1iwVQ==",
+          "repository": "https://github.com/modelcontextprotocol/typescript-sdk.git"
+        }
+      }
+    },
+    "@modelcontextprotocol/node": {
+      "distTags": {
+        "latest": "2.0.0"
+      },
+      "versions": {
+        "2.0.0": {
+          "integrity": "sha512-Y4hAC2XdGDUdDOCbLDOCA4+aL3NUldjsOWlDL/YwpAxrPhRm1xHd7lZ+mLacvZ9t3PaH28wgNoaLQGrIk1P2pg==",
+          "repository": "https://github.com/modelcontextprotocol/typescript-sdk.git"
+        }
+      }
+    },
+    "@modelcontextprotocol/server": {
+      "distTags": {
+        "latest": "2.0.0"
+      },
+      "versions": {
+        "2.0.0": {
+          "integrity": "sha512-YhHWdHfpFMQfd0prsEnxKeS3Qz3ytIGmsS0sth4KDjnacIT7hxk6hXHkJ9KysxlkvTM+WZAtQbbcUhdoP4Hvtw==",
+          "repository": "https://github.com/modelcontextprotocol/typescript-sdk.git"
+        }
+      }
+    },
+    "@modelcontextprotocol/conformance": {
+      "distTags": {
+        "alpha": "0.2.0-alpha.10",
+        "latest": "0.1.16"
+      },
+      "versions": {
+        "0.1.16": {
+          "integrity": "sha512-legacy-fixture",
+          "repository": "https://github.com/modelcontextprotocol/conformance.git",
+          "scenarios": ["server-initialize", "server-tools-list"]
+        },
+        "0.2.0-alpha.10": {
+          "integrity": "sha512-0V/HZDdWHcg6j0zVBzBsXcPZ571IVi6umKgTpnBhtTx/jm/LONmGF6cIWL2k4Xjyps0OiHV6B37nj2s0pUg0nQ==",
+          "repository": "https://github.com/modelcontextprotocol/conformance.git",
+          "scenarios": [
+            "server-stateless",
+            "tools-list",
+            "tools-call-simple-text",
+            "json-schema-2020-12",
+            "resources-list",
+            "resources-read-text",
+            "prompts-list",
+            "prompts-get-simple",
+            "prompts-get-with-args",
+            "dns-rebinding-protection",
+            "http-header-validation"
+          ]
+        }
+      }
+    }
+  }
+}

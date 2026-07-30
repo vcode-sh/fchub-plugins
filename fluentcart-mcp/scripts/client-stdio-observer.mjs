@@ -6,6 +6,7 @@ import { Transform } from 'node:stream'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { writeJsonAtomic } from './acceptance/evidence-writer.mjs'
+import { assessHandshakeExchange } from './client-http-observer.mjs'
 
 const receipt = process.argv[2]
 assert.ok(receipt, 'stdio observer requires a receipt path')
@@ -32,25 +33,33 @@ function parser(direction, destination) {
 	})
 }
 
-let initializeId = null
+const requests = new Map()
 let recorded = false
 function observe(direction, line) {
 	try {
 		const message = JSON.parse(line)
-		if (direction === 'client' && message.method === 'initialize') initializeId = message.id
+		if (
+			direction === 'client' &&
+			(message.method === 'initialize' || message.method === 'server/discover')
+		) {
+			requests.set(message.id, message)
+		}
 		if (
 			direction === 'server' &&
-			initializeId !== null &&
-			message.id === initializeId &&
-			typeof message.result?.protocolVersion === 'string' &&
+			requests.has(message.id) &&
 			!recorded
 		) {
-			recorded = true
-			writeJsonAtomic(receipt, {
-				protocolVersion: message.result.protocolVersion,
-				observedAt: new Date().toISOString(),
+			const observation = assessHandshakeExchange({
+				request: requests.get(message.id),
+				requestHeaders: {},
+				response: message,
 				candidateImageId: imageId,
+				observedAt: new Date().toISOString(),
+				transport: 'stdio',
 			})
+			if (!observation) return
+			recorded = true
+			writeJsonAtomic(receipt, observation)
 		}
 	} catch {}
 }

@@ -1,46 +1,80 @@
+### v2.2.0
+
+[npm](https://www.npmjs.com/package/fluentcart-mcp) · [Latest release](https://github.com/vcode-sh/fchub-plugins/releases/latest)
+
+<ImageZoom
+  src="/fluentcart-mcp/fluentcart-mcp-sdk-v2-protocol-orbit.webp"
+  alt="Connected MCP tools, resources, prompts, clients, and transports orbiting one protocol artefact"
+  width={1672}
+  height={941}
+  className="rounded-xl border my-6"
+/>
+
+**MCP TypeScript SDK v2 is here.** I upgraded the server, the wire, and every piece of evidence
+that stops “works on my machine” from becoming a release strategy.
+
+- **SDK v2, properly** — I pinned every official TypeScript SDK package to `2.0.0` and added a live
+  registry gate that fails when “latest” moves. Dependency drift has lost its improv licence.
+- **Two protocol eras, one server** — I give modern clients the 2026 protocol, `server/discover`,
+  cache hints, and the complete wire contract; I keep a deliberate compatibility path for existing
+  2025 clients instead of launching them into the sun for dramatic effect.
+- **Evidence from real handshakes** — I made client certification record the protocol actually
+  negotiated over HTTP and STDIO. I verify the exact candidate through Inspector, Claude Code,
+  Docker, proxy, archive, and soak lanes rather than testing a suspiciously similar cousin.
+- **The v1 ghosts are gone** — I removed stale helpers and active leftovers, then added a scanner
+  so they cannot wander back in wearing a new filename.
+
+I passed the official conformance suite across both supported protocol versions, then ran a
+six-minute candidate soak without errors, leaks, or interpretive networking. New protocol. Same
+store. Considerably less wishful thinking.
+
+<Separator className="my-8" />
+
 ### v2.1.0
 
 [npm](https://www.npmjs.com/package/fluentcart-mcp) · [Latest release](https://github.com/vcode-sh/fchub-plugins/releases/latest)
 
-FluentCart 1.6+ subscription support, minus the traditional rush to wire every shiny endpoint to a
-chat box and call it innovation.
+I added FluentCart 1.6+ subscription support, minus the traditional rush to wire every shiny
+endpoint to a chat box and call it innovation.
 
 #### Renewals are first-class reads
 
-`fluentcart_renewal_list` and `fluentcart_renewal_get` let an assistant list renewal records and
-open one renewal in detail. The subscription projection also retains the useful FluentCart 1.6
-context, including collection method and pending-skip state when the store returns it.
+I added `fluentcart_renewal_list` and `fluentcart_renewal_get` so an assistant can list renewal
+records and open one renewal in detail. I also retained the useful FluentCart 1.6 context in the
+subscription projection, including collection method and pending-skip state when the store returns
+it.
 
 #### Subscription detail changes are guarded
 
-Reversible mode now includes a narrowly reviewed update for `bill_times`, the subscription's total
-billing-cycle limit. It checks fresh `bill_times` and `bill_count` as a best-effort preflight,
-rejects an already stale or end-of-term change, and reads the record back before reporting success.
+I added a narrowly reviewed `bill_times` update to reversible mode for changing a subscription's
+total billing-cycle limit. I check fresh `bill_times` and `bill_count` as a best-effort preflight,
+reject an already stale or end-of-term change, and read the record back before reporting success.
 FluentCart 1.6 has no atomic version precondition, so an ambiguous failure says the mutation may
-have applied and requires a fresh read instead of a blind retry. It applies only to store-billed
-`manual` or `system` subscriptions; gateway-billed `automatic` subscriptions fail closed before a
-write. Subscriptions with linked FluentCart Pro licences also fail closed because the upstream
-update event can change licence state. This is not a back door to billing control: charges, renewal creation, skipping, voiding, resending,
-transaction synchronisation, refunds, and subscription cancellation remain absent.
+have applied and requires a fresh read instead of a blind retry. I allow this only for store-billed
+`manual` or `system` subscriptions; I fail closed before writing to gateway-billed `automatic`
+subscriptions. I also fail closed when a subscription has linked FluentCart Pro licences because
+the upstream update event can change licence state. I did not build a back door to billing control:
+charges, renewal creation, skipping, voiding, resending, transaction synchronisation, refunds, and
+subscription cancellation remain absent.
 
-Pause, resume, and reactivate remain absent too. FluentCart 1.6 can change scheduled charges and
-related renewal state through those lifecycle routes, and this release cannot prove a supported
-restoration. An endpoint existing is not the same thing as an undo button. Remarkable, but useful.
+I left pause, resume, and reactivate absent too. FluentCart 1.6 can change scheduled charges and
+related renewal state through those lifecycle routes, and I cannot prove a supported restoration.
+An endpoint existing is not the same thing as an undo button. Remarkable, but useful.
 
-`fluentcart_subscription_fetch` is absent as well. It was previously classed as a read, but
+I also removed `fluentcart_subscription_fetch`. I previously classed it as a read, but
 FluentCart 1.6 uses it to resynchronise with the payment gateway and can mutate local subscription
-state. That belongs in the admin, not behind a deceptively calm tool description.
+state. I am leaving that in the admin, not behind a deceptively calm tool description.
 
-The generic store-settings write also rejects `subscription_management_mode` and
-`subscription_system_charge`. They are store-wide billing controls and now need a dedicated guard,
-rather than slipping through a generic settings form in a fake moustache.
+I also made the generic store-settings write reject `subscription_management_mode` and
+`subscription_system_charge`. They are store-wide billing controls, so I require a dedicated guard
+instead of letting them slip through a generic settings form in a fake moustache.
 
 #### FluentCart 1.6 compatibility refresh
 
-The 2.1.0 evidence refresh verified WordPress 7.0.2 with FluentCart Core 1.6.0 and FluentCart Pro
-1.6.0. “FluentCart 1.6+” identifies the compatibility work in this release; it does not claim every
-future FluentCart version has been tested. Route discovery also removes the legacy tax-country
-delete operation: it was a nonfunctional ghost route, not a missing feature to mourn.
+I verified 2.1.0 with WordPress 7.0.2, FluentCart Core 1.6.0, and FluentCart Pro 1.6.0.
+“FluentCart 1.6+” identifies the compatibility work in this release; I am not claiming that I
+tested every future FluentCart version. I also removed the legacy tax-country delete operation
+from route discovery: it was a nonfunctional ghost route, not a missing feature to mourn.
 
 ---
 
@@ -48,35 +82,35 @@ delete operation: it was a nonfunctional ghost route, not a missing feature to m
 
 [npm](https://www.npmjs.com/package/fluentcart-mcp) · [Latest release](https://github.com/vcode-sh/fchub-plugins/releases/latest)
 
-The client-first release. Pick the app you already use, follow its exact recipe, and verify one
-store read. Revolutionary stuff, assuming one ignores the decade software spent making setup pages
-start with architecture diagrams.
+I made this the client-first release. Pick the app you already use, follow its exact recipe, and
+verify one store read. Revolutionary stuff, assuming one ignores the decade software spent making
+setup pages start with architecture diagrams.
 
 #### Eight clear connection paths
 
-ChatGPT Desktop, Codex CLI, Codex IDE extension, Claude Desktop, Cursor, VS Code with GitHub
-Copilot, Windsurf, and ChatGPT web now sit together in one chooser. Each has its current
-configuration surface and a useful verification step.
+I put ChatGPT Desktop, Codex CLI, Codex IDE extension, Claude Desktop, Cursor, VS Code with GitHub
+Copilot, Windsurf, and ChatGPT web together in one chooser. I gave each its current configuration
+surface and a useful verification step.
 
 #### Claude Desktop supplies Node
 
-The MCPB extension no longer asks Claude Desktop users to install Node.js. Claude Desktop supplies
-the runtime; the archive contains FluentCart MCP's JavaScript and production dependencies, not a
+I stopped asking Claude Desktop users to install Node.js for the MCPB extension. Claude Desktop
+supplies the runtime; I package FluentCart MCP's JavaScript and production dependencies, not a
 secret Node executable wearing a trench coat.
 
 #### No global npm install
 
-Local recipes now explain that `npx -y fluentcart-mcp` downloads the package on demand and reuses
-the package-manager cache. It does not install FluentCart MCP globally.
+I corrected the local recipes: `npx -y fluentcart-mcp` downloads the package on demand and reuses
+the package-manager cache. I do not install FluentCart MCP globally.
 
 #### OpenAI desktop and web are no longer muddled together
 
-ChatGPT Desktop shares `~/.codex/config.toml` with Codex CLI and the Codex IDE extension, with
+I documented that ChatGPT Desktop shares `~/.codex/config.toml` with Codex CLI and the Codex IDE extension, with
 **Settings → MCP servers → Add server** as the shortest route. ChatGPT web uses OpenAI Secure MCP
 Tunnel, separate Platform and Developer mode permissions, and an outbound-only private connection.
-The FluentCart HTTP bearer key is not passed off as ChatGPT authentication.
+I no longer pass the FluentCart HTTP bearer key off as ChatGPT authentication.
 
 The public ChatGPT Plugins Directory still requires FluentCart authorisation. A patch release may
-improve onboarding; it does not acquire somebody else's trademark permission by sheer optimism.
+improve onboarding; I cannot acquire somebody else's trademark permission by sheer optimism.
 
 ---

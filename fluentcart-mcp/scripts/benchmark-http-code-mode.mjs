@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 
+import assert from 'node:assert/strict'
 import { performance } from 'node:perf_hooks'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { resolveServerContext } from '../dist/server.js'
 import { createAppFromContext } from '../dist/transport/http.js'
+import {
+	decodeJsonRpc,
+	MODERN_PROTOCOL,
+	modernHeaders,
+	modernRequest,
+} from './protocol-wire.mjs'
 
 const MODES = ['dynamic', 'curated', 'code']
 const WARM_SAMPLES = Number(process.env.FLUENTCART_BENCHMARK_SAMPLES ?? 7)
@@ -39,37 +48,54 @@ function close(server) {
 	})
 }
 
-async function initialise(url, id) {
+export function validateModernDiscoveryResult(payload) {
+	assert.equal(payload?.jsonrpc, '2.0', 'benchmark response is not JSON-RPC 2.0')
+	assert.ok(!payload.error, `benchmark discovery returned ${JSON.stringify(payload.error)}`)
+	const result = payload.result
+	assert.ok(
+		Array.isArray(result?.supportedVersions) &&
+			result.supportedVersions.includes(MODERN_PROTOCOL) &&
+			result.protocolVersion === undefined,
+		'benchmark response is not a modern server/discover result',
+	)
+	assert.equal(result.resultType, 'complete', 'benchmark discovery omitted resultType')
+	assert.equal(result.ttlMs, 0, 'benchmark discovery omitted conservative ttlMs')
+	assert.equal(result.cacheScope, 'private', 'benchmark discovery omitted private cacheScope')
+	assert.equal(
+		result._meta?.['io.modelcontextprotocol/serverInfo']?.name,
+		'fluentcart-mcp',
+		'benchmark discovery returned the wrong server identity',
+	)
+	return result
+}
+
+export async function discoverModern(url, id) {
 	const startedAt = performance.now()
+	const request = modernRequest({
+		id,
+		method: 'server/discover',
+		clientInfo: { name: 'http-code-mode-benchmark', version: '1' },
+	})
 	const response = await fetch(url, {
 		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Accept: 'application/json, text/event-stream',
-		},
-		body: JSON.stringify({
-			jsonrpc: '2.0',
-			id,
-			method: 'initialize',
-			params: {
-				protocolVersion: '2026-07-28',
-				capabilities: {},
-				clientInfo: { name: 'http-code-mode-benchmark', version: '1' },
-			},
-		}),
+		headers: modernHeaders({ method: request.method }),
+		body: JSON.stringify(request),
 	})
-	await response.text()
-	if (!response.ok) throw new Error(`initialize returned HTTP ${response.status}`)
+	const text = await response.text()
+	if (!response.ok) throw new Error(`server/discover returned HTTP ${response.status}`)
+	const payload = decodeJsonRpc(text, response.headers.get('content-type') ?? '')
+	assert.equal(payload.id, id, 'benchmark discovery response ID mismatch')
+	validateModernDiscoveryResult(payload)
 	return performance.now() - startedAt
 }
 
 async function measure(mode, context) {
 	const { server, url } = await listen(createAppFromContext('127.0.0.1', context, mode))
 	try {
-		const coldMs = await initialise(url, 1)
+		const coldMs = await discoverModern(url, 1)
 		const warm = []
 		for (let index = 0; index < WARM_SAMPLES; index += 1) {
-			warm.push(await initialise(url, index + 2))
+			warm.push(await discoverModern(url, index + 2))
 		}
 		return {
 			mode,
@@ -85,24 +111,36 @@ async function measure(mode, context) {
 	}
 }
 
-process.env.FLUENTCART_URL = 'https://benchmark.invalid'
-process.env.FLUENTCART_USERNAME = 'benchmark'
-process.env.FLUENTCART_APP_PASSWORD = 'benchmark'
-process.env.FLUENTCART_WRITE_MODE = 'disabled'
+async function main() {
+	process.env.FLUENTCART_URL = 'https://benchmark.invalid'
+	process.env.FLUENTCART_USERNAME = 'benchmark'
+	process.env.FLUENTCART_APP_PASSWORD = 'benchmark'
+	process.env.FLUENTCART_WRITE_MODE = 'disabled'
 
-const context = resolveServerContext()
-const results = []
-for (const mode of MODES) results.push(await measure(mode, context))
-const failures = results.flatMap((result) => {
-	const budget = BUDGETS[result.mode]
-	const exceeded = []
-	if (result.coldMs > budget.coldMs) exceeded.push(`cold ${result.coldMs} > ${budget.coldMs} ms`)
-	if (result.warmP95Ms > budget.warmP95Ms) {
-		exceeded.push(`warm p95 ${result.warmP95Ms} > ${budget.warmP95Ms} ms`)
-	}
-	return exceeded.map((failure) => `${result.mode}: ${failure}`)
-})
-process.stdout.write(
-	`${JSON.stringify({ samples: WARM_SAMPLES, budgets: BUDGETS, results, failures }, null, 2)}\n`,
-)
-if (process.argv.includes('--assert') && failures.length > 0) process.exitCode = 1
+	const context = resolveServerContext()
+	const results = []
+	for (const mode of MODES) results.push(await measure(mode, context))
+	const failures = results.flatMap((result) => {
+		const budget = BUDGETS[result.mode]
+		const exceeded = []
+		if (result.coldMs > budget.coldMs) {
+			exceeded.push(`cold ${result.coldMs} > ${budget.coldMs} ms`)
+		}
+		if (result.warmP95Ms > budget.warmP95Ms) {
+			exceeded.push(`warm p95 ${result.warmP95Ms} > ${budget.warmP95Ms} ms`)
+		}
+		return exceeded.map((failure) => `${result.mode}: ${failure}`)
+	})
+	process.stdout.write(
+		`${JSON.stringify({ samples: WARM_SAMPLES, budgets: BUDGETS, results, failures }, null, 2)}\n`,
+	)
+	if (process.argv.includes('--assert') && failures.length > 0) process.exitCode = 1
+}
+
+const direct = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (direct) {
+	main().catch((error) => {
+		process.stderr.write(`${error.message}\n`)
+		process.exitCode = 1
+	})
+}

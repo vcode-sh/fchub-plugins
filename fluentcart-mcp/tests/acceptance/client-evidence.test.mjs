@@ -66,6 +66,17 @@ function capabilitySource(client) {
 	return 'https://docs.anthropic.com/en/docs/agents-and-tools/mcp'
 }
 
+function handshake(overrides = {}) {
+	return {
+		era: 'modern',
+		protocolVersion: '2026-07-28',
+		negotiationMethod: 'server/discover',
+		observedAt: NOW,
+		candidateImageId: IMAGE_ID,
+		...overrides,
+	}
+}
+
 function entry(
 	{ client, transport },
 	outcome = ['Claude Desktop', 'Cursor'].includes(client) ? 'CONFIGURATION_TARGET' : 'PASS',
@@ -83,14 +94,13 @@ function entry(
 		reason: outcome === 'PASS' || target ? null : `${client}/${transport} fixture reason`,
 		prerequisite: target ? 'Install the client and apply its documented configuration.' : null,
 		capabilitySource: outcome === 'UNSUPPORTED' || target ? capabilitySource(client) : null,
-		observedHandshake:
-			outcome === 'PASS' ? { protocolVersion: '2026-07-28', observedAt: NOW } : null,
+		observedHandshake: outcome === 'PASS' ? handshake() : null,
 	}
 }
 
 function evidence(overrides = {}) {
 	return {
-		schemaVersion: 3,
+		schemaVersion: 4,
 		producer: 'scripts/certify-clients.mjs',
 		producedAt: NOW,
 		runRoot: configRoot,
@@ -193,6 +203,15 @@ describe('producer-owned named-client evidence', () => {
 		assert.throws(() => validateClientEvidence(mismatch, context()), /candidate identity/)
 	})
 
+	it('rejects a PASS handshake bound to a different candidate image ID', () => {
+		const mismatch = evidence()
+		mismatch.clients[0].observedHandshake.candidateImageId = `sha256:${'f'.repeat(64)}`
+		assert.throws(
+			() => validateClientEvidence(mismatch, context()),
+			/not bound to the candidate image ID/,
+		)
+	})
+
 	it('rejects a tenth cell instead of ignoring it', () => {
 		const extra = evidence()
 		extra.clients.push({
@@ -231,6 +250,26 @@ describe('producer-owned named-client evidence', () => {
 		assert.equal(certificationState(validateClientEvidence(recordedTargets, context())), 'PASS')
 	})
 
+	it('records legacy connectivity without turning it into modern candidate certification', () => {
+		const mixed = evidence()
+		mixed.clients[0].observedHandshake = handshake({
+			era: 'legacy',
+			protocolVersion: '2025-11-25',
+			negotiationMethod: 'initialize',
+		})
+		assert.equal(certificationState(validateClientEvidence(mixed, context())), 'PASS')
+
+		const legacyOnly = evidence()
+		for (const cell of legacyOnly.clients.filter(({ outcome }) => outcome === 'PASS')) {
+			cell.observedHandshake = handshake({
+				era: 'legacy',
+				protocolVersion: '2025-11-25',
+				negotiationMethod: 'initialize',
+			})
+		}
+		assert.equal(certificationState(validateClientEvidence(legacyOnly, context())), 'BLOCKED')
+	})
+
 	it('overwrites fabricated input and creates its own run roots and observations', async () => {
 		const producerRun = join(outputRoot, 'producer-run')
 		mkdirSync(producerRun)
@@ -245,7 +284,7 @@ describe('producer-owned named-client evidence', () => {
 				captureVersions: () => VERSIONS,
 				observeCell: async (cell) =>
 					cell.client === 'MCP Inspector'
-						? { outcome: 'PASS', protocolVersion: '2026-07-28' }
+						? { outcome: 'PASS', ...handshake() }
 						: { outcome: 'BLOCKED', reason: 'test client unavailable' },
 			},
 		)
@@ -257,6 +296,28 @@ describe('producer-owned named-client evidence', () => {
 			JSON.parse(readFileSync(join(producerRun, 'named-clients.json'), 'utf8')),
 			produced,
 		)
+	})
+
+	it('validates handshake timestamps against completion time, not producer start time', async () => {
+		const producerRun = join(outputRoot, 'producer-clock-boundary')
+		mkdirSync(producerRun)
+		const startedAt = '2026-07-28T12:00:00.000Z'
+		const completedAt = '2026-07-28T12:00:10.000Z'
+		const times = [startedAt, completedAt]
+		const produced = await certifyClients(
+			{ runDirectory: producerRun },
+			{
+				currentTime: () => times.shift(),
+				resolveCandidate: () => candidate(),
+				captureVersions: () => VERSIONS,
+				observeCell: async (cell) =>
+					cell.client === 'MCP Inspector'
+						? { outcome: 'PASS', ...handshake({ observedAt: completedAt }) }
+						: { outcome: 'BLOCKED', reason: 'test client unavailable' },
+			},
+		)
+		assert.equal(produced.clients[0].evidenceTime, startedAt)
+		assert.equal(produced.producedAt, completedAt)
 	})
 
 	it('rejects a symlinked client-config root before resolving or launching anything', async () => {
@@ -276,7 +337,7 @@ describe('producer-owned named-client evidence', () => {
 							return candidate()
 						},
 						captureVersions: () => VERSIONS,
-						observeCell: async () => ({ outcome: 'PASS', protocolVersion: '2026-07-28' }),
+						observeCell: async () => ({ outcome: 'PASS', ...handshake() }),
 					},
 				),
 			/client-config.*symlink/,
@@ -303,7 +364,7 @@ describe('producer-owned named-client evidence', () => {
 							return candidate()
 						},
 						captureVersions: () => VERSIONS,
-						observeCell: async () => ({ outcome: 'PASS', protocolVersion: '2026-07-28' }),
+						observeCell: async () => ({ outcome: 'PASS', ...handshake() }),
 					},
 				),
 			/mcp-inspector.*symlink/,
@@ -328,7 +389,7 @@ if (configIndex < 0 || serverIndex < 0) process.exit(41)
 const config = JSON.parse(readFileSync(args[configIndex + 1], 'utf8'))
 const server = config.mcpServers[args[serverIndex + 1]]
 if (!server || server.env.FCMCP_CLIENT_IMAGE_ID !== process.env.FCMCP_CLIENT_IMAGE_ID || server.env.FCMCP_CLIENT_STORE_URL !== process.env.FCMCP_CLIENT_STORE_URL) process.exit(42)
-writeFileSync(server.args[1], JSON.stringify({ protocolVersion: '2026-07-28', observedAt: '${NOW}', candidateImageId: process.env.FCMCP_CLIENT_IMAGE_ID }))
+writeFileSync(server.args[1], JSON.stringify({ era: 'modern', protocolVersion: '2026-07-28', negotiationMethod: 'server/discover', observedAt: '${NOW}', candidateImageId: process.env.FCMCP_CLIENT_IMAGE_ID }))
 `,
 			async () => {
 				const observed = await adapterForStdio().stdio({
@@ -336,7 +397,7 @@ writeFileSync(server.args[1], JSON.stringify({ protocolVersion: '2026-07-28', ob
 					transport: 'stdio',
 					configurationRoot: root,
 				})
-				assert.deepEqual(observed, { outcome: 'PASS', protocolVersion: '2026-07-28' })
+				assert.deepEqual(observed, { outcome: 'PASS', ...handshake() })
 				assert.ok(existsSync(receipt))
 			},
 		)
@@ -364,7 +425,7 @@ fetch(process.env.FCMCP_CLIENT_STORE_URL.replace('host.docker.internal', '127.0.
 })
   .then((response) => {
     if (!response.ok) process.exit(76)
-    writeFileSync(server.args[1], JSON.stringify({ protocolVersion: '2026-07-28', observedAt: '${NOW}', candidateImageId: process.env.FCMCP_CLIENT_IMAGE_ID }))
+    writeFileSync(server.args[1], JSON.stringify({ era: 'modern', protocolVersion: '2026-07-28', negotiationMethod: 'server/discover', observedAt: '${NOW}', candidateImageId: process.env.FCMCP_CLIENT_IMAGE_ID }))
   })
   .catch(() => process.exit(77))
 `,
@@ -374,7 +435,7 @@ fetch(process.env.FCMCP_CLIENT_STORE_URL.replace('host.docker.internal', '127.0.
 						transport: 'stdio',
 						configurationRoot: root,
 					})
-					assert.deepEqual(observed, { outcome: 'PASS', protocolVersion: '2026-07-28' })
+					assert.deepEqual(observed, { outcome: 'PASS', ...handshake() })
 					assert.ok(existsSync(receipt))
 				},
 			)
@@ -407,7 +468,7 @@ if (!existsSync(statePath)) process.exit(53)
 const state = JSON.parse(readFileSync(statePath, 'utf8'))
 if (args[1] === 'list') process.exit(0)
 if (args[1] === 'get' && args[2] === 'fluentcartCandidate') {
-  writeFileSync(state.receipt, JSON.stringify({ protocolVersion: '2026-07-28', observedAt: '${NOW}', candidateImageId: state.image }))
+  writeFileSync(state.receipt, JSON.stringify({ era: 'modern', protocolVersion: '2026-07-28', negotiationMethod: 'server/discover', observedAt: '${NOW}', candidateImageId: state.image }))
   process.exit(0)
 }
 process.exit(54)
@@ -418,7 +479,7 @@ process.exit(54)
 					transport: 'stdio',
 					configurationRoot: root,
 				})
-				assert.deepEqual(observed, { outcome: 'PASS', protocolVersion: '2026-07-28' })
+				assert.deepEqual(observed, { outcome: 'PASS', ...handshake() })
 				assert.ok(existsSync(receipt))
 			},
 		)

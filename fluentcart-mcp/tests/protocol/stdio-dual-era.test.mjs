@@ -5,6 +5,7 @@ import { after, before, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
+import { LEGACY_PROTOCOL, MODERN_PROTOCOL } from '../../scripts/protocol-wire.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const ENTRYPOINT = join(PACKAGE_ROOT, 'dist', 'index.js')
@@ -46,7 +47,7 @@ function optionsFor(protocol) {
 		capabilities: {},
 		supportedProtocolVersions: [protocol],
 		versionNegotiation: {
-			mode: protocol === '2026-07-28' ? { pin: protocol } : 'legacy',
+			mode: protocol === MODERN_PROTOCOL ? { pin: protocol } : 'legacy',
 		},
 	}
 }
@@ -83,7 +84,7 @@ async function listTools(protocol) {
 	}
 
 	assert.equal(stderr, '')
-	const expectedProcesses = protocol === '2026-07-28' ? 2 : 1
+	const expectedProcesses = protocol === MODERN_PROTOCOL ? 2 : 1
 	assert.equal(
 		capabilityRequests - requestsBefore,
 		expectedProcesses,
@@ -93,7 +94,7 @@ async function listTools(protocol) {
 
 describe('built stdio entrypoint', () => {
 	it('serves the same fixture tools to official 2025 and 2026 clients', async () => {
-		await listTools('2025-11-25')
-		await listTools('2026-07-28')
+		await listTools(LEGACY_PROTOCOL)
+		await listTools(MODERN_PROTOCOL)
 	})
 })

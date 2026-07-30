@@ -3,7 +3,8 @@
  * Generate `manifest.json` for the MCPB bundle.
  *
  * The advertised inventory is read off the wire, not off the source: for every MEASURED profile in
- * `release-contract.json` a real in-memory MCP session is run and the `tools/list` result recorded,
+ * `release-contract.json` a deliberate 2025 compatibility connection is run in memory and its
+ * `tools/list` result recorded,
  * so a name can only be advertised if some proven configuration actually lists it. A curated name
  * that no configuration resolves is dropped rather than promised. The MCPB v0.3 schema forbids
  * extra keys inside `tools[]`, so per-tool provenance and checksums live under `_meta`.

@@ -213,7 +213,7 @@
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
       "packageVersion": "2.1.0",
-      "sourceTreeDigest": "sha256:f2483f2c861fd7e96b5d12f6fee384f0e45f9e8fa24dd4df6ca9f226bb0e8a0b",
+      "sourceTreeDigest": "sha256:476474f28b30d76c607f61d3c6d9ee256eba34ea5511fa127ce72ab521164a77",
       "release": {
         "version": "2.1.0",
         "protocols": [
@@ -227,12 +227,250 @@
         "sdk": {
           "server": "2.0.0",
           "node": "2.0.0",
-          "express": "2.0.0"
+          "express": "2.0.0",
+          "client": "2.0.0",
+          "core": "2.0.0"
         },
         "conformance": {
           "package": "0.2.0-alpha.10",
           "expectedFailures": []
         },
+        "protocolCompliance": [
+          {
+            "id": "stateless-requests",
+            "requirement": "Modern HTTP requests work without MCP session state.",
+            "state": "sdk-served",
+            "advertised": true,
+            "rationale": "The v2 Streamable HTTP transport accepts independent discovery and tool requests.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Raw modern HTTP requests complete without an MCP-Session-Id request or response header."
+              }
+            ]
+          },
+          {
+            "id": "server-discovery",
+            "requirement": "The server exposes the 2026-07-28 discovery operation.",
+            "state": "sdk-served",
+            "advertised": true,
+            "rationale": "The official v2 SDK serves server discovery for the modern protocol.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Raw HTTP and STDIO discovery responses report the selected protocol and supported versions."
+              }
+            ]
+          },
+          {
+            "id": "subscriptions",
+            "requirement": "Subscription capabilities are declared only when implemented.",
+            "state": "not-advertised",
+            "advertised": false,
+            "rationale": "The server provides request-response tools and does not expose subscription capabilities.",
+            "proofs": [
+              {
+                "path": "tests/server-protocol-surface.test.ts",
+                "assertion": "The server capability surface omits resource, prompt and tool-list subscriptions."
+              }
+            ]
+          },
+          {
+            "id": "removed-methods",
+            "requirement": "Methods removed from the modern protocol are not exposed.",
+            "state": "not-advertised",
+            "advertised": false,
+            "rationale": "The modern surface contains discovery and tool operations, not removed legacy methods.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "The raw modern contract rejects or omits methods outside the declared surface."
+              }
+            ]
+          },
+          {
+            "id": "tasks-extension",
+            "requirement": "Task capabilities are declared only when implemented.",
+            "state": "not-advertised",
+            "advertised": false,
+            "rationale": "Long-running MCP tasks are outside this synchronous FluentCart tool server.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Discovery and capabilities contain no tasks extension."
+              }
+            ]
+          },
+          {
+            "id": "multi-round-trip-responses",
+            "requirement": "Multi-round-trip responses are declared only when implemented.",
+            "state": "not-advertised",
+            "advertised": false,
+            "rationale": "Every exposed operation completes as a single request-response exchange.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "The advertised modern surface contains no multi-round-trip response capability."
+              }
+            ]
+          },
+          {
+            "id": "result-types",
+            "requirement": "Modern discovery and tool results carry SDK-defined result type metadata.",
+            "state": "sdk-served",
+            "advertised": true,
+            "rationale": "The v2 SDK emits standard result-type metadata for modern responses.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Discovery, list and tool response metadata is asserted on the raw wire."
+              }
+            ]
+          },
+          {
+            "id": "stream-resumability",
+            "requirement": "Stream resumability is declared only when implemented.",
+            "state": "not-advertised",
+            "advertised": false,
+            "rationale": "The server intentionally has no SSE stream, event store or resumption token.",
+            "proofs": [
+              {
+                "path": "tests/transport/http.test.ts",
+                "assertion": "HTTP GET does not open an SSE stream and the transport creates no resumable session."
+              }
+            ]
+          },
+          {
+            "id": "extensions",
+            "requirement": "Protocol extensions are declared only when implemented.",
+            "state": "not-advertised",
+            "advertised": false,
+            "rationale": "No custom protocol extension namespace is exposed.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Discovery contains no extensions declaration."
+              }
+            ]
+          },
+          {
+            "id": "trace-context",
+            "requirement": "Trace-context propagation is declared only when implemented.",
+            "state": "not-advertised",
+            "advertised": false,
+            "rationale": "The server emits structured operational logs but does not advertise trace propagation.",
+            "proofs": [
+              {
+                "path": "tests/logging-capability.test.ts",
+                "assertion": "Logging remains an internal stderr concern and is not exposed as an MCP capability."
+              }
+            ]
+          },
+          {
+            "id": "deterministic-lists",
+            "requirement": "Repeated list operations return a deterministic order.",
+            "state": "implemented",
+            "advertised": true,
+            "rationale": "The server owns and tests the stable order of its exposed tool registry.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Repeated raw tools/list calls return the same ordered names."
+              }
+            ]
+          },
+          {
+            "id": "standard-headers",
+            "requirement": "Modern HTTP responses use the protocol standard headers.",
+            "state": "sdk-served",
+            "advertised": true,
+            "rationale": "The official v2 HTTP transport supplies the selected protocol and metadata headers.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Raw responses assert the modern protocol and content-type header contract."
+              }
+            ]
+          },
+          {
+            "id": "cache-hints",
+            "requirement": "Cacheable operations expose explicit cache metadata.",
+            "state": "implemented",
+            "advertised": true,
+            "rationale": "The server defines private zero-TTL hints for every cache-aware operation.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "The six cache-aware operation families return exact private zero-TTL hints."
+              }
+            ]
+          },
+          {
+            "id": "resource-errors",
+            "requirement": "Resource and request failures use modern structured JSON-RPC errors.",
+            "state": "sdk-served",
+            "advertised": true,
+            "rationale": "The v2 SDK maps invalid input and server policy failures to structured error responses.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Raw requests assert -32602, -32020 and -32022 error allocations."
+              }
+            ]
+          },
+          {
+            "id": "oauth-issuer-dcr",
+            "requirement": "OAuth issuer and dynamic client registration requirements are applied when relevant.",
+            "state": "not-applicable",
+            "advertised": false,
+            "rationale": "This private server authenticates with a static Bearer token and is neither an OAuth client nor an authorisation server.",
+            "proofs": [
+              {
+                "path": "tests/transport/http.test.ts",
+                "assertion": "Private HTTP authentication is a configured Bearer token boundary with no OAuth endpoints."
+              }
+            ]
+          },
+          {
+            "id": "json-schema-2020-12",
+            "requirement": "Tool schemas use the SDK modern JSON Schema dialect contract.",
+            "state": "sdk-served",
+            "advertised": true,
+            "rationale": "Tool schemas are registered and serialised by the official v2 SDK.",
+            "proofs": [
+              {
+                "path": "tests/tooling/sdk-v2-contract.test.mjs",
+                "assertion": "The SDK v2 registration and generated schema contract is pinned by executable tests."
+              }
+            ]
+          },
+          {
+            "id": "error-allocation",
+            "requirement": "Protocol and application errors occupy their allocated JSON-RPC ranges.",
+            "state": "sdk-served",
+            "advertised": true,
+            "rationale": "Protocol validation and server policy failures use distinct standard and server ranges.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "Raw negative cases assert the exact standard and server error codes."
+              }
+            ]
+          },
+          {
+            "id": "deprecated-features",
+            "requirement": "Deprecated transports and optional capability aliases are absent.",
+            "state": "not-advertised",
+            "advertised": false,
+            "rationale": "The server exposes STDIO and stateless Streamable HTTP without Roots, Sampling, MCP Logging, resumability or legacy HTTP+SSE.",
+            "proofs": [
+              {
+                "path": "tests/protocol/modern-wire-contract.test.mjs",
+                "assertion": "The raw modern surface omits Roots, Sampling, MCP Logging and deprecated HTTP+SSE."
+              }
+            ]
+          }
+        ],
         "promotion": {
           "npmPublishing": "trusted-staged",
           "npmStageTag": "latest",

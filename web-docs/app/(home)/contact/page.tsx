@@ -185,7 +185,7 @@ export default function ContactPage() {
           <p className="text-xs text-muted-foreground">
             Open source &middot; GPLv2 &middot; Built by{" "}
             <a
-              href={X_URL}
+              href="https://vcode.sh"
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-4 hover:text-foreground transition-colors"

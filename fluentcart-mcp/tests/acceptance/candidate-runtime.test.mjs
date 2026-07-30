@@ -6,7 +6,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
 import { ClientAdapters, runClientCommand } from '../../scripts/client-adapters.mjs'
-import { createHandshakeRelay } from '../../scripts/client-http-observer.mjs'
+import {
+	assessHandshakeExchange,
+	createHandshakeRelay,
+} from '../../scripts/client-http-observer.mjs'
+import {
+	LEGACY_PROTOCOL,
+	MODERN_PROTOCOL,
+	modernHeaders,
+	modernRequest,
+} from '../../scripts/protocol-wire.mjs'
 
 const IMAGE_ID = `sha256:${'a'.repeat(64)}`
 const CANDIDATE_STORE_MODULE = new URL('../../scripts/candidate-store.mjs', import.meta.url).href
@@ -84,6 +93,147 @@ async function assertDockerContainerAbsent(containerId) {
 }
 
 describe('named-client candidate authentication', () => {
+	it('accepts a complete modern discovery exchange and records its candidate identity', () => {
+		const request = modernRequest({
+			id: 1,
+			method: 'server/discover',
+			clientInfo: { name: 'candidate-runtime-test', version: '1' },
+		})
+		assert.deepEqual(
+			assessHandshakeExchange({
+				request,
+				requestHeaders: modernHeaders({ method: request.method }),
+				response: {
+					jsonrpc: '2.0',
+					id: 1,
+					result: { supportedVersions: [MODERN_PROTOCOL] },
+				},
+				candidateImageId: IMAGE_ID,
+				observedAt: '2026-07-30T12:00:00.000Z',
+			}),
+			{
+				era: 'modern',
+				protocolVersion: MODERN_PROTOCOL,
+				negotiationMethod: 'server/discover',
+				observedAt: '2026-07-30T12:00:00.000Z',
+				candidateImageId: IMAGE_ID,
+			},
+		)
+	})
+
+	it('accepts a correlated deliberate legacy initialise exchange', () => {
+		assert.deepEqual(
+			assessHandshakeExchange({
+				request: {
+					jsonrpc: '2.0',
+					id: 7,
+					method: 'initialize',
+					params: {
+						protocolVersion: LEGACY_PROTOCOL,
+						capabilities: {},
+						clientInfo: { name: 'legacy-client', version: '1' },
+					},
+				},
+				requestHeaders: {},
+				response: {
+					jsonrpc: '2.0',
+					id: 7,
+					result: { protocolVersion: LEGACY_PROTOCOL },
+				},
+				candidateImageId: IMAGE_ID,
+				observedAt: '2026-07-30T12:00:00.000Z',
+			}),
+			{
+				era: 'legacy',
+				protocolVersion: LEGACY_PROTOCOL,
+				negotiationMethod: 'initialize',
+				observedAt: '2026-07-30T12:00:00.000Z',
+				candidateImageId: IMAGE_ID,
+			},
+		)
+	})
+
+	it('rejects a 2026-labelled legacy initialise and cross-era response', () => {
+		assert.throws(
+			() =>
+				assessHandshakeExchange({
+					request: {
+						jsonrpc: '2.0',
+						id: 1,
+						method: 'initialize',
+						params: {
+							protocolVersion: MODERN_PROTOCOL,
+							capabilities: {},
+							clientInfo: { name: 'false-modern', version: '1' },
+						},
+					},
+					requestHeaders: {},
+					response: {
+						jsonrpc: '2.0',
+						id: 1,
+						result: { protocolVersion: LEGACY_PROTOCOL },
+					},
+					candidateImageId: IMAGE_ID,
+					observedAt: '2026-07-30T12:00:00.000Z',
+				}),
+			/initialize cannot certify 2026-07-28/,
+		)
+		const request = modernRequest({
+			id: 9,
+			method: 'server/discover',
+			clientInfo: { name: 'cross-era', version: '1' },
+		})
+		assert.throws(
+			() =>
+				assessHandshakeExchange({
+					request,
+					requestHeaders: modernHeaders({ method: request.method }),
+					response: {
+						jsonrpc: '2.0',
+						id: 9,
+						result: { supportedVersions: [LEGACY_PROTOCOL] },
+					},
+					candidateImageId: IMAGE_ID,
+					observedAt: '2026-07-30T12:00:00.000Z',
+				}),
+			/different era/,
+		)
+	})
+
+	it('rejects discovery without required headers or supportedVersions', () => {
+		const request = modernRequest({
+			id: 2,
+			method: 'server/discover',
+			clientInfo: { name: 'candidate-runtime-test', version: '1' },
+		})
+		assert.throws(
+			() =>
+				assessHandshakeExchange({
+					request,
+					requestHeaders: {},
+					response: {
+						jsonrpc: '2.0',
+						id: 2,
+						result: { supportedVersions: [MODERN_PROTOCOL] },
+					},
+					candidateImageId: IMAGE_ID,
+					observedAt: '2026-07-30T12:00:00.000Z',
+				}),
+			/MCP-Protocol-Version/,
+		)
+		assert.throws(
+			() =>
+				assessHandshakeExchange({
+					request,
+					requestHeaders: modernHeaders({ method: request.method }),
+					response: { jsonrpc: '2.0', id: 2, result: {} },
+					candidateImageId: IMAGE_ID,
+					observedAt: '2026-07-30T12:00:00.000Z',
+				}),
+			/supportedVersions/,
+		)
+	})
+
 	it('creates a disposable private-profile key with at least 32 UTF-8 bytes', () => {
 		const first = new ClientAdapters({ imageId: IMAGE_ID })
 		const second = new ClientAdapters({ imageId: IMAGE_ID })

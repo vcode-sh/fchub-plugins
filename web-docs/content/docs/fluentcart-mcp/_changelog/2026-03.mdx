@@ -2,21 +2,36 @@
 
 *Released 4 March 2026* — [npm](https://www.npmjs.com/package/fluentcart-mcp/v/1.1.0) · [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fluentcart-mcp/v1.1.0)
 
-The "full audit" release. Every single tool was tested against live FluentCart 1.3.13, the backend PHP source was read line-by-line, and every schema, response shape, and undocumented quirk was hunted down. 41 bug fixes, 30 quality improvements, 14 new upstream issues filed. The tool count dropped from 279 to 274 — five tools were removed because their backend endpoints are genuinely broken with no workaround.
+I made this the "full audit" release. I tested every tool against live FluentCart 1.3.13, read the
+backend PHP source line by line, and hunted down every schema, response shape, and undocumented
+quirk. I shipped 41 bug fixes and 30 quality improvements, and filed 14 new upstream issues. I
+dropped the tool count from 279 to 274 because five backend endpoints are genuinely broken with no
+workaround.
 
 **274 total tools** (was 279).
 
 #### What changed
 
-**Response transforms** — List endpoints now return trimmed payloads. `product_list` includes `product_type` and `fulfillment_type`. `customer_list` includes `purchase_value`, `ltv`, and `purchase_count`. `subscription_list` and `subscription_get` strip bloat via `transformSubscription()`. `variant_list` and `variant_list_all` trim variants to essential fields via `trimVariant()`.
+**Response transforms** — I made list endpoints return trimmed payloads. I added `product_type` and
+`fulfillment_type` to `product_list`, and `purchase_value`, `ltv`, and `purchase_count` to
+`customer_list`. I strip subscription bloat with `transformSubscription()` and trim variants to
+essential fields with `trimVariant()`.
 
-**Fetch-merge pattern** — Write tools that were silently nuking unspecified fields now fetch the current state first, merge your changes, and send the complete object. Applied to: `coupon_update`, `customer_update`, `variant_update`, `product_update_detail`, `settings_save_store`.
+**Fetch-merge pattern** — I made write tools fetch current state, merge your changes, and send the
+complete object instead of silently nuking unspecified fields. I applied the pattern to
+`coupon_update`, `customer_update`, `variant_update`, `product_update_detail`, and
+`settings_save_store`.
 
-**Cache invalidation** — Write tools now declare which cache keys to invalidate on success via `invalidates` in the factory. 17 write tools wired: tax classes, tax settings, shipping zones, shipping classes, and roles. No more stale cached data after mutations.
+**Cache invalidation** — I made write tools declare which cache keys to invalidate through
+`invalidates` in the factory. I wired 17 write tools across tax classes, tax settings, shipping
+zones, shipping classes, and roles. No more stale cached data after mutations.
 
-**Schema corrections from PHP source** — `bundle_save` was sending `bundle_items` (wrong) instead of `bundle_child_ids`. `pricing_update` had invalid enum values `variable`/`subscription` — corrected to `simple_variations`/`advanced_variations`. `tax_eu_vat_save` was missing the required `action: 'euCrossBorderSettings'` discriminator and `eu_vat_settings` wrapper.
+**Schema corrections from PHP source** — I changed `bundle_save` from the wrong `bundle_items` to
+`bundle_child_ids`. I corrected the invalid `pricing_update` enum values to `simple_variations` and
+`advanced_variations`. I also added the missing `action: 'euCrossBorderSettings'` discriminator
+and `eu_vat_settings` wrapper to `tax_eu_vat_save`.
 
-**Timing-safe auth** — HTTP transport Bearer token comparison now uses `crypto.timingSafeEqual` instead of string equality.
+**Timing-safe auth** — I replaced HTTP Bearer token string equality with `crypto.timingSafeEqual`.
 
 #### Bug fixes (41)
 
@@ -66,12 +81,13 @@ The "full audit" release. Every single tool was tested against live FluentCart 1
 
 #### Infrastructure improvements (30 P2 fixes)
 
-- `truncateResponse` refactored with `sliceToFit` helper and while-loop safety cap for high-variance arrays
-- `server.ts` imports `DYNAMIC_TOOL_COUNT` constant instead of hardcoded `3`
-- `parseSuccessBody` extracted from `request()` to reduce cognitive complexity
-- `executeStatusOperations` extracted from order status handler
-- Biome config updated to exclude test utility scripts from linting
-- 22 stale debug/scenario test files removed (6,813 lines)
+- I refactored `truncateResponse` with a `sliceToFit` helper and a while-loop safety cap for
+  high-variance arrays.
+- I made `server.ts` import `DYNAMIC_TOOL_COUNT` instead of hardcoding `3`.
+- I extracted `parseSuccessBody` from `request()` to reduce cognitive complexity.
+- I extracted `executeStatusOperations` from the order status handler.
+- I updated the Biome config to exclude test utility scripts from linting.
+- I removed 22 stale debug and scenario test files: 6,813 lines of archaeology.
 
 #### Upstream FluentCart bugs filed
 
@@ -102,7 +118,9 @@ Previously filed (v1.0.1): [#9](https://github.com/fluent-cart/fluent-cart/issue
 
 *Released 3 March 2026* — [npm](https://www.npmjs.com/package/fluentcart-mcp/v/1.0.1) · [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fluentcart-mcp/v1.0.1)
 
-The "we actually tested it against a real store" release. Everything that v1.0.0 got wrong with product tools — fixed. Every tool was tested live against FluentCart 1.3.13 and the ones that didn't work were hunted down, root-caused, and either fixed or filed as upstream bugs.
+I made this the "I actually tested it against a real store" release. I fixed everything v1.0.0
+got wrong with product tools. I tested every tool live against FluentCart 1.3.13, hunted down the
+ones that failed, found their root causes, and either fixed them or filed upstream bugs.
 
 #### New tools (3)
 
@@ -116,7 +134,9 @@ The "we actually tested it against a real store" release. Everything that v1.0.0
 
 #### Subscription pricing support
 
-The big feature gap in v1.0.0: you could *read* subscription data but couldn't *write* it. Now `product_pricing_update`, `variant_create`, and `variant_update` all support the full subscription billing schema:
+I closed the big feature gap in v1.0.0: you could *read* subscription data but could not *write*
+it. I added the full subscription billing schema to `product_pricing_update`, `variant_create`, and
+`variant_update`:
 
 - `payment_type` — `onetime` or `subscription`
 - `repeat_interval` — `daily`, `weekly`, `monthly`, `quarterly`, `half_yearly`, `yearly`
@@ -129,29 +149,46 @@ The big feature gap in v1.0.0: you could *read* subscription data but couldn't *
 
 #### Bug fixes
 
-**Price corruption** — The centrepiece disaster of v1.0.0. The API expects prices in currency units (e.g. `400` for 400 PLN) and multiplies by 100 internally. The MCP tools were sending values that were *already* in cents, producing prices 100x too high. A 400 PLN product became 40,000 PLN. Now every write tool sends currency units and every read tool documents that responses are in cents.
+**Price corruption** — The centrepiece disaster of v1.0.0. I sent values that were already in
+cents to an API that expects currency units and multiplies by 100 internally. A 400 PLN product
+became 40,000 PLN. I now send currency units from every write tool and document cents on every read
+tool.
 
-**Cascading variant corruption** — `product_pricing_update` would silently nuke all existing variants when you only wanted to change the product title. It now fetches the full product state first, converts existing variant prices from cents back to currency units, and merges your changes before sending. Your variants survive a title update.
+**Cascading variant corruption** — I made `product_pricing_update` fetch the full product state,
+convert existing variant prices from cents back to currency units, and merge your changes before
+sending. It no longer silently nukes every variant because you changed a product title.
 
-**`product_create` nested schema** — The Zod schema had `detail: { fulfillment_type }` nested, which MCP hosts flattened into unusable parameters. Converted to flat `fulfillment_type` at schema level with the handler building the nesting internally.
+**`product_create` nested schema** — I flattened `detail: { fulfillment_type }` to
+`fulfillment_type` at schema level and moved the nesting into the handler, because MCP hosts turned
+the original shape into unusable parameters.
 
-**`variant_list` always 500** — FluentCart's `ProductVariationController::index()` crashes when query params are null. The tool now always sends explicit `page` and `per_page` params.
+**`variant_list` always 500** — I now send explicit `page` and `per_page` values because
+FluentCart's `ProductVariationController::index()` crashes when query parameters are null.
 
-**`variant_create` and `variant_update` broken** — Both had schema/handler mismatches from the MCP flattening issue. Rewritten with proper `createTool` handlers. `variant_update` now does fetch-then-merge so it doesn't destroy fields you didn't touch.
+**`variant_create` and `variant_update` broken** — I rewrote both with proper `createTool` handlers
+after MCP flattening exposed schema and handler mismatches. I also made `variant_update`
+fetch-then-merge so it does not destroy fields you did not touch.
 
-**`variant_fetch_by_ids` empty results** — Array params weren't serialised correctly. Fixed.
+**`variant_fetch_by_ids` empty results** — I fixed incorrect array-parameter serialisation.
 
-**`product_fetch_by_ids` empty results** — Same issue, same fix.
+**`product_fetch_by_ids` empty results** — I fixed the same issue there too. Variety is overrated.
 
-**`product_taxonomy_sync` wrong param name** — Was sending `term_ids`, FluentCart expects `terms`. One letter away from working.
+**`product_taxonomy_sync` wrong param name** — I changed `term_ids` to FluentCart's expected
+`terms`. One letter away from working.
 
-**`product_taxonomy_delete` wrong param type** — Was sending `term_ids` as an array. FluentCart's `deleteTaxonomyTermFromProduct()` expects a single `term` integer. Changed accordingly.
+**`product_taxonomy_delete` wrong param type** — I replaced the `term_ids` array with the single
+`term` integer expected by FluentCart's `deleteTaxonomyTermFromProduct()`.
 
-**`attribute_group_update` fails without slug** — FluentCart's API requires `slug` on every update, even for title-only changes. The tool now auto-fetches the current group to grab the existing slug when you don't provide one.
+**`attribute_group_update` fails without slug** — I now fetch the current group to retain its slug
+when you do not provide one, because FluentCart requires `slug` even for title-only changes.
 
-**`product_list` filter_type param removed** — `filter_type` controls FluentCart's internal filter mode (simple vs advanced), not product type. Product type filtering is done via `active_view`. Removed the misleading param and updated `active_view` to document all valid values: `publish`, `draft`, `subscribable`, `not_subscribable`, `physical`, `digital`, `bundle`, `non_bundle`.
+**`product_list` filter_type param removed** — I removed the misleading `filter_type` parameter;
+it controls FluentCart's internal filter mode, not product type. I documented all valid
+`active_view` values instead: `publish`, `draft`, `subscribable`, `not_subscribable`, `physical`,
+`digital`, `bundle`, and `non_bundle`.
 
-**`post_content` stripped from product GET** — The response transform was removing long descriptions. Now only `integrations` and `pricing_table` are stripped.
+**`post_content` stripped from product GET** — I stopped removing long descriptions. I now strip
+only `integrations` and `pricing_table`.
 
 #### Upstream FluentCart bugs filed
 
@@ -175,7 +212,8 @@ Previously filed (v1.0.0):
 
 *Released 3 March 2026* — [npm](https://www.npmjs.com/package/fluentcart-mcp/v/1.0.0) · [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fluentcart-mcp/v1.0.0)
 
-The stable release. From 200 tools to 276. Docker support. HTTP transport. Claude Desktop extension. Caching. Prompts. Resources. Dynamic mode. The works.
+I made this the stable release and took the surface from 200 tools to 276. I added Docker support,
+HTTP transport, a Claude Desktop extension, caching, prompts, resources, dynamic mode—the works.
 
 #### New tool modules (5)
 
@@ -197,28 +235,40 @@ The stable release. From 200 tools to 276. Docker support. HTTP transport. Claud
 
 #### Features
 
-**Docker support** — Multi-stage Node 22 Alpine build. Published to Docker Hub (`vcodesh/fluentcart-mcp`) and GHCR. One-liner deployment for remote servers and ChatGPT integration.
+**Docker support** — I added a multi-stage Node 22 Alpine build and published it to Docker Hub
+(`vcodesh/fluentcart-mcp`) and GHCR, with a one-line deployment for remote servers and ChatGPT
+integration.
 
-**HTTP transport** — `--transport http` starts an Express server with `/mcp` (SSE) and `/health` endpoints. Optional Bearer token auth via `FLUENTCART_MCP_API_KEY`. Stateless — no session affinity needed.
+**HTTP transport** — I made `--transport http` start an Express server with `/mcp` (SSE) and
+`/health` endpoints, plus optional Bearer token authentication through `FLUENTCART_MCP_API_KEY`. I
+kept it stateless, so session affinity can remain somebody else's hobby.
 
-**Dynamic toolset mode** — `--mode dynamic` registers 3 meta-tools instead of 276. The AI searches, discovers, and executes tools on demand. Token cost drops from ~30K to ~1.5K for the initial tool list. Built for MCP hosts with tool count limits.
+**Dynamic toolset mode** — I made `--mode dynamic` register 3 meta-tools instead of 276. The AI
+searches, discovers, and executes tools on demand, dropping the initial tool list from roughly 30K
+tokens to 1.5K for MCP hosts with tool-count limits.
 
-**In-memory TTL cache** — Three tiers: SHORT (2 min), MEDIUM (10 min), LONG (1 hour). Applied to stable reference data: countries, tax settings, shipping zones, email shortcodes, roles. Stops redundant API calls when the AI asks the same question twice in a conversation.
+**In-memory TTL cache** — I added three tiers: SHORT (2 minutes), MEDIUM (10 minutes), and LONG
+(1 hour). I apply them to stable reference data so the AI does not repeat API calls when it asks the
+same question twice in one conversation.
 
-**MCP Prompts** — 5 workflow prompts that structure common tasks:
+**MCP Prompts** — I added 5 workflow prompts that structure common tasks:
 `analyze-store-performance`, `investigate-order`, `customer-overview`, `catalog-summary`, `subscription-health`
 
-**MCP Resources** — 4 read-only resources: store config, countries, payment methods, filter options. Available via `resource://` URIs.
+**MCP Resources** — I added 4 read-only resources for store config, countries, payment methods, and
+filter options through `resource://` URIs.
 
-**Claude Desktop Extension** — `.mcpb` bundle attached to every GitHub Release. Download, double-click, enter credentials. No Node.js, no terminal, no JSON.
+**Claude Desktop Extension** — I attached an `.mcpb` bundle to every GitHub Release. Download,
+double-click, enter credentials. No Node.js, terminal, or JSON.
 
-**Interactive setup wizard** — `npx fluentcart-mcp setup` walks through URL, username, and Application Password with live connection testing and auto-retry.
+**Interactive setup wizard** — I made `npx fluentcart-mcp setup` walk through URL, username, and
+Application Password with live connection testing and automatic retry.
 
-**Response size limits** — Responses capped at 80,000 characters with intelligent array slicing. No more MCP protocol overflows on large product catalogues.
+**Response size limits** — I capped responses at 80,000 characters with intelligent array slicing.
+No more MCP protocol overflows on large product catalogues.
 
-**Request tracing** — Every API call includes an `X-Request-Id` UUID header.
+**Request tracing** — I added an `X-Request-Id` UUID header to every API call.
 
-**Structured logging** — MCP-native logging with debug/info/warn/error levels.
+**Structured logging** — I added MCP-native logging with debug, info, warn, and error levels.
 
 #### Bug fixes and schema corrections
 
@@ -233,7 +283,7 @@ The stable release. From 200 tools to 276. Docker support. HTTP transport. Claud
 
 #### Response transforms
 
-List and detail endpoints now return slimmed responses to stay within context windows:
+I made list and detail endpoints return slimmer responses to stay within context windows:
 
 - `product_list` — ID, title, status, slug, date only
 - `product_get` — strips `integrations` and variant `pricing_table`
@@ -257,14 +307,21 @@ If you built anything against v0.9.0 (you probably didn't — it was out for 12 
 
 *Released 2 March 2026* — Feature-complete pre-release.
 
-200 tools across 22 modules. The first version that actually did things. Everything from orders to subscriptions to product management to reports. Stdio transport only, no Docker, no caching, no resources, no prompts.
+I shipped 200 tools across 22 modules: the first version that actually did things. I covered
+everything from orders and subscriptions to product management and reports. I supported STDIO
+only, with no Docker, caching, resources, or prompts.
 
-Modules: orders, order transactions, customers, coupons, subscriptions, products (core, pricing, variants, catalog), product options, integrations, reports (core, insights), settings, order bumps, activity, application, dashboard, labels, notes, misc, public.
+I included orders, order transactions, customers, coupons, subscriptions, products, product
+options, integrations, reports, settings, order bumps, activity, application, dashboard, labels,
+notes, miscellaneous, and public modules.
 
-CI pipeline: typecheck, lint, test, build, smoke test, npm publish, GitHub Release.
+I wired the CI pipeline for typecheck, lint, test, build, smoke test, npm publishing, and GitHub
+Release.
 
 <Separator className="my-8" />
 
 ### v0.1.0
 
-*Released 2 March 2026* — Initial scaffolding. Package structure, CLI skeleton, API client, tool factory. Zero functional tools. Existed on npm for approximately 2 hours before v0.9.0 replaced it.
+*Released 2 March 2026* — I shipped the initial package structure, CLI skeleton, API client, and
+tool factory with zero functional tools. I left it on npm for approximately two hours before
+v0.9.0 replaced it. A distinguished career.

@@ -70,11 +70,11 @@ The Gutenberg glow-up. The shortcode still works, but now it has a proper block-
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.4)
 
-Turns out many managed WordPress hosts (Rocket.net, Cloudways, GridPane, etc.) block HTTP requests to any path containing `/vendor/` — a blanket security rule to prevent direct access to Composer dependencies. Reasonable policy, collateral damage on our third-party library. Moved SortableJS out of `admin/vendor/` to `admin/lib/` so it stops getting caught in the crossfire.
+Turns out many managed WordPress hosts (Rocket.net, Cloudways, GridPane, etc.) block HTTP requests to any path containing `/vendor/` — a blanket security rule to prevent direct access to Composer dependencies. Reasonable policy, collateral damage to my third-party library. Moved SortableJS out of `admin/vendor/` to `admin/lib/` so it stops getting caught in the crossfire.
 
 #### Fixed
 
-- **SortableJS blocked by server-level `/vendor/` path rules** — managed hosting platforms commonly deny requests to any URL containing `/vendor/` to prevent exposure of Composer packages. Our vendored `Sortable.min.js` lived at `admin/vendor/Sortable.min.js` — a perfectly innocent path that looked guilty by association. The server returned a 403 HTML page instead of JavaScript, which the browser parsed as `Unexpected token '<'`. Relocated to `admin/lib/Sortable.min.js` where no security rule will touch it.
+- **SortableJS blocked by server-level `/vendor/` path rules** — managed hosting platforms commonly deny requests to any URL containing `/vendor/` to prevent exposure of Composer packages. My vendored `Sortable.min.js` lived at `admin/vendor/Sortable.min.js` — a perfectly innocent path that looked guilty by association. The server returned a 403 HTML page instead of JavaScript, which the browser parsed as `Unexpected token '<'`. Relocated to `admin/lib/Sortable.min.js` where no security rule will touch it.
 
 <Separator className="my-8" />
 
@@ -94,11 +94,11 @@ Improved SortableJS asset delivery for environments where v1.2.2's handle fix wa
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.2)
 
-Turns out the drag-and-drop currency reordering was silently broken for some users and we couldn't reproduce it. The SortableJS script handle was registered as `sortablejs` — a name generic enough that any other plugin registering the same handle first would silently hijack ours. WordPress doesn't throw, doesn't warn, just uses whoever registered first and moves on. The grab cursor worked (pure CSS), but the actual drag library never loaded. Classic WordPress script handle collision — the kind of bug that works perfectly on every dev machine and breaks in production.
+Turns out the drag-and-drop currency reordering was silently broken for some users and I couldn't reproduce it. The SortableJS script handle was registered as `sortablejs` — a name generic enough that any other plugin registering the same handle first would silently take over the handle I had registered. WordPress doesn't throw, doesn't warn, just uses whoever registered first and moves on. The grab cursor worked (pure CSS), but the actual drag library never loaded. Classic WordPress script handle collision — the kind of bug that works perfectly on every dev machine and breaks in production.
 
 #### Fixed
 
-- **Drag-and-drop currency reordering broken on some installs** — the `sortablejs` script handle could collide with other plugins registering the same handle. WordPress silently drops duplicate `wp_register_script` calls, so our `Sortable.min.js` never loaded while the CSS `cursor: grab` kept pretending everything was fine. Renamed to `fchub-mc-sortablejs` so it can't be stolen. Also added a console warning when SortableJS fails to load, because silent failure is not a debugging strategy.
+- **Drag-and-drop currency reordering broken on some installs** — the `sortablejs` script handle could collide with other plugins registering the same handle. WordPress silently drops duplicate `wp_register_script` calls, so my `Sortable.min.js` never loaded while the CSS `cursor: grab` kept pretending everything was fine. Renamed to `fchub-mc-sortablejs` so it can't be stolen. Also added a console warning when SortableJS fails to load, because silent failure is not a debugging strategy.
 
 <video
   autoPlay
@@ -127,7 +127,7 @@ One bug, one symptom: every price in the checkout order summary rendered 50% lar
 
 *Released 7 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.2.0)
 
-A deep audit found things hiding in the codebase that no single pair of eyes would have caught. This is the "we actually read every line" release. A second pass found the P1 we missed — order snapshots were reading the ambient request context instead of the customer's. Which means admin-completed orders, webhook payments, and guest checkouts could all get the wrong currency. Lovely.
+A deep audit found things hiding in the codebase that no single pair of eyes would have caught. This is the "I actually read every line" release. A second pass found the P1 I missed — order snapshots were reading the ambient request context instead of the customer's. Which means admin-completed orders, webhook payments, and guest checkouts could all get the wrong currency. Lovely.
 
 #### Critical
 
@@ -178,7 +178,7 @@ A deep audit found things hiding in the codebase that no single pair of eyes wou
 
 *Released 6 March 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.1.6)
 
-Three bugs walked into the price projection engine. One was our fault, two were always there.
+Three bugs walked into the price projection engine. One was my fault, two were always there.
 
 #### Regression
 
