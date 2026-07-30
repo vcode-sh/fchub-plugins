@@ -35,7 +35,7 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24.13.0'
       - name: Verify reviewed release toolchain
@@ -43,7 +43,7 @@ jobs:
           test "$(node --version)" = "v24.13.0"
           test "$(npm --version)" = "11.6.2"
       - name: Download exact staging evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: fluentcart-mcp-staging-${{ inputs.version }}
           run-id: ${{ inputs.staging_run_id }}
@@ -102,12 +102,12 @@ jobs:
           DOCKERHUB_ACTUAL=$(docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:${VERSION}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           test "$GHCR_ACTUAL" = "$GHCR_EXPECTED"
           test "$DOCKERHUB_ACTUAL" = "$DOCKERHUB_EXPECTED"
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4.5.2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4.5.2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

@@ -17,8 +17,8 @@ jobs:
       run:
         working-directory: fluentcart-mcp
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -26,7 +26,7 @@ jobs:
       - run: npm ci
       - name: Reverify current MCP SDK at the release boundary
         run: node scripts/verify-mcp-sdk-current.mjs --live --json > "${RUNNER_TEMP}/mcp-sdk-current.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mcp-sdk-current-release-${{ github.run_id }}
           path: ${{ runner.temp }}/mcp-sdk-current.json
@@ -64,10 +64,10 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.validate.outputs.artifact_name }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24.13.0'
       - name: Install the reviewed staged-publishing CLI
@@ -95,7 +95,7 @@ jobs:
         run: node dist-packages/verification/scripts/write-staging-state.mjs
       - name: Reinspect the exact staging handoff
         run: node dist-packages/verification/scripts/verify-staged-release.mjs --root dist-packages
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fluentcart-mcp-staging-${{ needs.validate.outputs.version }}
           path: dist-packages/

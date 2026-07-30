@@ -51,8 +51,8 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -64,8 +64,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -81,8 +81,8 @@ jobs:
   sdk-current:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -90,7 +90,7 @@ jobs:
       - run: npm ci
       - name: Verify current MCP SDK and conformance packages
         run: node scripts/verify-mcp-sdk-current.mjs --live --json > "${RUNNER_TEMP}/mcp-sdk-current.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mcp-sdk-current-ci-${{ github.run_id }}
           path: ${{ runner.temp }}/mcp-sdk-current.json
@@ -101,8 +101,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [quality, test]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -110,7 +110,7 @@ jobs:
       - run: npm ci
       - run: npm run test:conformance
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mcp-conformance-${{ github.run_id }}
           path: fluentcart-mcp/test-results/conformance/failure-metadata.json
@@ -120,8 +120,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [quality, test]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -144,8 +144,8 @@ jobs:
       source_tree_digest: ${{ steps.identity.outputs.source_tree_digest }}
       artifact_name: ${{ steps.identity.outputs.artifact_name }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -180,7 +180,7 @@ jobs:
             echo "source_tree_digest=$DIGEST"
             echo "artifact_name=${RELEASE_ARTIFACT_NAME}-${{ github.run_id }}"
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.identity.outputs.artifact_name }}
           path: |
