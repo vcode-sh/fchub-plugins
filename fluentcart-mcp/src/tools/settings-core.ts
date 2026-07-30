@@ -62,6 +62,15 @@ export function settingsCoreTools(client: FluentCartClient): ToolDefinition[] {
 			}),
 			handler: async (c, input) => {
 				const settings = (input.settings ?? {}) as Record<string, unknown>
+				const protectedSubscriptionSettings = [
+					'subscription_management_mode',
+					'subscription_system_charge',
+				]
+				if (protectedSubscriptionSettings.some((key) => Object.hasOwn(settings, key))) {
+					throw new Error(
+						'Subscription management and system-charge settings require a dedicated guarded flow and cannot be changed through the generic store-settings tool.',
+					)
+				}
 				const resp = await c.post('/settings/store', settings)
 				return resp.data
 			},

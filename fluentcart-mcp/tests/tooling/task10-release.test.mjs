@@ -16,7 +16,7 @@ const read = (path) => readFileSync(join(REPO_ROOT, path), 'utf8')
 const readJson = (path) => JSON.parse(read(path))
 
 const expectedTruth = {
-	version: '2.0.1',
+	version: '2.1.0',
 	protocols: ['2025-11-25', '2026-07-28'],
 	httpProfiles: ['local', 'private'],
 	sdk: { server: '2.0.0', node: '2.0.0', express: '2.0.0' },
@@ -154,7 +154,7 @@ describe('generated release truth', () => {
 	it('separates five automated handshakes from documented configuration recipes', () => {
 		const support = readJson('fluentcart-mcp/compatibility-support.json')
 		assert.deepEqual(support.releaseEvidence, {
-			version: '2.0.1',
+			version: '2.1.0',
 			protocols: ['2025-11-25', '2026-07-28'],
 			httpProfiles: ['local', 'private'],
 			finalCandidate: 'AUTOMATED_CLIENT_CERTIFICATION_REQUIRED',
@@ -203,21 +203,21 @@ describe('generated release truth', () => {
 
 	it('rejects missing, mutable, unknown and already-current capture inputs', () => {
 		const good = readJson('fluentcart-mcp/tests/fixtures/releases/previous-release-state.json')
-		assert.throws(() => validateReleaseState({}, '2.0.1'), /schema version 1/)
+		assert.throws(() => validateReleaseState({}, '2.1.0'), /schema version 1/)
 		assert.throws(
 			() =>
-				validateReleaseState({ ...good, npm: { ...good.npm, previousLatest: '2.0.1' } }, '2.0.1'),
+				validateReleaseState({ ...good, npm: { ...good.npm, previousLatest: '2.1.0' } }, '2.1.0'),
 			/already equals npm latest/,
 		)
 		const mutable = structuredClone(good)
 		mutable.docker.previousLatestDigests['ghcr.io'] = 'ghcr.io/vcode-sh/fluentcart-mcp:latest'
-		assert.throws(() => validateReleaseState(mutable, '2.0.1'), /not an immutable digest/)
+		assert.throws(() => validateReleaseState(mutable, '2.1.0'), /not an immutable digest/)
 		const unknown = structuredClone(good)
 		unknown.docker.previousLatestDigests = {
 			'ghcr.io': unknown.docker.previousLatestDigests['ghcr.io'],
 			'example.invalid': unknown.docker.previousLatestDigests['docker.io'],
 		}
-		assert.throws(() => validateReleaseState(unknown, '2.0.1'), /unknown Docker registry/)
+		assert.throws(() => validateReleaseState(unknown, '2.1.0'), /unknown Docker registry/)
 	})
 })
 
@@ -293,7 +293,7 @@ describe('public recovery contract', () => {
 			'one configured WordPress principal',
 			'no OAuth',
 			'fail-closed',
-			'1.5.5',
+			'1.6.0',
 			'fluentcart-mcp@1',
 		]) {
 			assert.match(docs.toLowerCase(), new RegExp(phrase.toLowerCase()))

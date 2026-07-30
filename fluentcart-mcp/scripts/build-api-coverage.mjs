@@ -18,8 +18,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 
-export const CURRENT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
-export const CORE_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core.json'
+export const CURRENT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'
+export const CORE_FIXTURE = 'tests/fixtures/routes/fluentcart-1.6.0-core.json'
 export const LEGACY_FIXTURE = 'tests/fixtures/routes/fluentcart-1.3.9.json'
 export const OUTPUT_FILE = 'api-coverage.json'
 
@@ -27,8 +27,8 @@ const TOOLS_DIR = 'src/tools'
 const CLIENT_MODULE = 'src/api/client.ts'
 const FACTORY_MODULE = 'src/tools/_factory.ts'
 
-const CORE_COMPONENT = { slug: 'fluent-cart', version: '1.5.5' }
-const PRO_COMPONENT = { slug: 'fluent-cart-pro', version: '1.5.4' }
+const CORE_COMPONENT = { slug: 'fluent-cart', version: '1.6.0' }
+const PRO_COMPONENT = { slug: 'fluent-cart-pro', version: '1.6.0' }
 
 const read = (relative) => readFileSync(join(PACKAGE_ROOT, relative), 'utf8')
 const readJson = (relative) => JSON.parse(read(relative))
@@ -71,6 +71,14 @@ const EXCLUDED_INTERNAL = {
 	'POST /customer-profile/subscriptions/{param}/initiate-early-payment': ['real-money', 'Customer-session route. Acts as the logged-in shopper and initiates an early payment against their subscription.'],
 }
 
+/** Read routes reviewed live but unsuitable for the contract their tempting tool would promise. */
+const EXCLUDED_INCOMPATIBLE_READS = {
+	'GET /products/variants': [
+		'read',
+		'Reviewed against FluentCart 1.6: the route ignores product_id and only reads nested variant_ids params, so it can return HTTP 200 with an empty list for a product that has variants. Per-product reads use GET /products/{param} with the variants relation instead.',
+	],
+}
+
 /**
  * High-impact operations that stay excluded from the public server.
  *
@@ -78,6 +86,8 @@ const EXCLUDED_INTERNAL = {
  * `POST /shipping/packages` is destructive precisely because the runtime serves no delete for it.
  */
 const HIGH_IMPACT = {
+	'POST /customer-profile/subscriptions/{param}/pause': ['destructive-write', 'Customer-session lifecycle action. The shared pause service voids open renewal invoices and can delegate a pause to the payment gateway; neither state has a complete restore contract.'],
+	'POST /customer-profile/subscriptions/{param}/resume': ['external-side-effect', 'Customer-session lifecycle action. The shared resume service restores scheduled charges for store-billed subscriptions or delegates resumption to the payment gateway.'],
 	'POST /email-notification/digest-settings': ['control-plane', 'Changes which digests the store sends to staff. Alters outbound behaviour with no read-back of the previous schedule.'],
 	'POST /email-notification/digest-settings/send-test': ['external-side-effect', 'Delivers a real email. Cannot be recalled once sent.'],
 	'POST /email-notification/preview': ['external-side-effect', 'Renders a notification through the mail pipeline; the controller is not available here to prove it never dispatches.'],
@@ -85,13 +95,19 @@ const HIGH_IMPACT = {
 	'POST /email-notification/send-manual-reminder': ['external-side-effect', 'Delivers a real email to a customer. Cannot be recalled once sent.'],
 	'POST /options/attr/groups/reorder': ['destructive-write', 'Overwrites attribute group ordering in bulk with no restore of the previous order.'],
 	'POST /orders/calculate-tax': ['destructive-write', 'Treated as an order mutation: the FluentCart controller is not available in this environment to prove the call is preview-only.'],
+	'POST /orders/{param}/subscriptions/{param}/charge-now': ['real-money', 'Runs an immediate off-session payment attempt against the open renewal invoice.'],
+	'POST /orders/{param}/subscriptions/{param}/create-renewal': ['real-money', 'Creates a renewal invoice and immediately charges it for system subscriptions; manual subscriptions receive a payable invoice and email.'],
 	'POST /orders/{param}/subscriptions/{param}/early-payment-link': ['real-money', 'Payment-adjacent. Generates a link that lets a customer be charged ahead of schedule.'],
+	'POST /orders/{param}/subscriptions/{param}/skip-renewal': ['destructive-write', 'Skips the next billing period and advances its billing date; the previous period cannot be restored through the runtime.'],
+	'POST /orders/{param}/transactions/{param}/sync': ['external-side-effect', 'Synchronises a pending transaction with its payment gateway and can update local payment state from the remote result.'],
 	'POST /products/bulk-insert': ['destructive-write', 'Bulk catalogue change with no per-record read-back and no supported bulk undo.'],
 	'POST /products/bulk-update': ['destructive-write', 'Bulk catalogue change with no per-record read-back and no supported bulk undo.'],
 	'POST /products/variants/bulk-update': ['destructive-write', 'Bulk variation change with no per-record read-back and no supported bulk undo.'],
 	'POST /products/variants/group-bulk-update': ['destructive-write', 'Bulk variation-group change with no per-record read-back and no supported bulk undo.'],
 	'POST /products/variants/{param}/tax-exempt': ['destructive-write', 'Overwrites a variation’s tax treatment with no restore of the previous value.'],
 	'POST /products/{param}/tax-exempt': ['destructive-write', 'Overwrites a product’s tax treatment with no restore of the previous value.'],
+	'POST /renewals/{param}/resend': ['external-side-effect', 'Triggers the renewal-created notification flow and sends a real customer email that cannot be recalled.'],
+	'POST /renewals/{param}/void': ['destructive-write', 'Cancels the renewal invoice, fails pending transactions and advances the subscription past that billing period without a restore path.'],
 	'PUT /saved-views/{param}': ['reversible-write', 'Updating a saved view overwrites it in place, and no read-back of the pre-update record has been captured, so the previous state cannot be restored. No tool reaches this route; an update tool needs that read-back first.'],
 	'DELETE /saved-views/{param}': ['destructive-write', 'Removes a saved view with no supported restore.'],
 	'POST /settings/pdf-templates/create': ['reversible-write', 'Reversible in principle — the runtime serves DELETE /settings/pdf-templates/delete/{param} — but restore proof belongs to plan 06 Task 3.'],
@@ -109,6 +125,9 @@ const HIGH_IMPACT = {
 	'POST /tax/country-status/{param}': ['destructive-write', 'Changes whether a country is taxed, altering charges on subsequent orders with no captured previous state.'],
 	'POST /tax/product-overrides': ['reversible-write', 'Reversible in principle — the runtime serves DELETE /tax/product-overrides/{param} — but restore proof belongs to plan 06 Task 3.'],
 	'DELETE /tax/product-overrides/{param}': ['destructive-write', 'Removes a product tax override with no supported restore.'],
+	'PUT /orders/{param}/subscriptions/{param}/pause': ['destructive-write', 'Pauses a subscription through the shared lifecycle service, which voids open renewal invoices or delegates a pause to the payment gateway.'],
+	'PUT /orders/{param}/subscriptions/{param}/reactivate': ['destructive-write', 'Reactivation voids pending renewal invoices and transactions, then can advance the next billing date. The old invoice and schedule cannot be restored.'],
+	'PUT /orders/{param}/subscriptions/{param}/resume': ['external-side-effect', 'Resumes a subscription through the shared lifecycle service, restoring scheduled charges locally or delegating resumption to the payment gateway.'],
 }
 
 /**
@@ -189,7 +208,7 @@ const TOOL_ROUTE_OVERRIDES = {
  * Tool routes the current runtime does not serve.
  *
  * Two different things end up here. A `compatibility-fallback` is deliberate: plan 03 keeps the
- * pre-1.5.5 path as a second variant so the tool still works against an older store, and the
+ * legacy path as a second variant so the tool still works against an older store, and the
  * preferred variant is served here. A `removed-route-defect` is a real bug — the tool has only
  * the removed path, so it fails against this store. An orphan absent from this map fails the
  * build rather than being quietly tolerated.
@@ -218,6 +237,23 @@ const REVERSIBILITY_PROOF = {
 	'POST /saved-views': {
 		evidence: 'tests/integration/current-reversible-writes.test.ts',
 		note: 'Reversibility is demonstrated live: the created id is registered for removal before anything else can fail, read back independently rather than echoed from the request, then deleted and confirmed gone, with every pre-existing view unchanged.',
+	},
+}
+
+/**
+ * Narrow tools whose reversibility depends on a smaller payload than their upstream route allows.
+ *
+ * These proofs are keyed by tool and route. The FluentCart subscription endpoint also accepts
+ * amount, schedule and status fields, so route-wide proof would incorrectly bless mutations the
+ * public tool deliberately omits.
+ */
+const REQUIRED_REVERSIBILITY_PROOF_TOOLS = new Set(['fluentcart_subscription_update'])
+const TOOL_ROUTE_REVERSIBILITY_PROOF = {
+	'fluentcart_subscription_update::PUT /orders/{param}/subscriptions/{param}/update': {
+		evidence:
+			'tests/fixtures/releases/fluentcart-1.6.0-subscription-bill-times-restore.json',
+		note:
+			'The bounded bill_times payload was demonstrated live on a run-owned FluentCart 1.6 fixture: 5 to 6 with independent read-back, then 6 to 5 with final read-back and unchanged bill_count, status and collection method. The evidence explicitly records that FluentCart offers no atomic version precondition.',
 	},
 }
 
@@ -428,7 +464,7 @@ export function extractRiskRegistry() {
 }
 
 /**
- * Tools plan 03 withdrew because FluentCart 1.5.5 does not serve their route.
+ * Tools plan 03 withdrew because the current FluentCart runtime does not serve their route.
  *
  * They are still declared in source but wrapped in a capability guard, so against this store
  * they are never registered. The reviewed list lives in the regression suite rather than here:
@@ -532,13 +568,17 @@ export function buildLedger() {
 		})
 
 		if (EXCLUDED_INTERNAL[id]) return excludedAs(...EXCLUDED_INTERNAL[id])
+		if (EXCLUDED_INCOMPATIBLE_READS[id]) {
+			return excludedAs(...EXCLUDED_INCOMPATIBLE_READS[id])
+		}
 		if (HIGH_IMPACT[id]) {
 			const [risk, reason] = HIGH_IMPACT[id]
 			return excludedAs(risk, `High-impact operation. ${reason}`)
 		}
 		if (exposed.length === 0) {
+			const suppressedRisks = suppressed.map((tool) => safetyFor(tool, registry).risk)
 			return excludedAs(
-				'read',
+				suppressedRisks.sort((a, b) => (a === 'read' ? 1 : b === 'read' ? -1 : 0))[0] ?? 'read',
 				suppressed.length > 0
 					? `Served only by ${suppressed.map((t) => t.name).join(', ')}, whose reviewed risk makes it non-executable, so no caller can reach this route.`
 					: 'No tool reaches this route and no reviewed candidate claims it. It remains unowned pending plan 06 Tasks 2 and 3.',
@@ -553,8 +593,14 @@ export function buildLedger() {
 		// A write that ships on a reversibility claim carries the lane that proved it, in the
 		// response evidence rather than only in prose.
 		const proof = REVERSIBILITY_PROOF[id]
+		const toolProofs = exposed
+			.map((tool) => TOOL_ROUTE_REVERSIBILITY_PROOF[`${tool.name}::${id}`])
+			.filter(Boolean)
 		const evidence = evidenceFor(id, exposed, evidenceFixture)
 		if (proof) evidence.responseEvidence = [...evidence.responseEvidence, proof.evidence].sort()
+		for (const toolProof of toolProofs) {
+			evidence.responseEvidence = [...evidence.responseEvidence, toolProof.evidence].sort()
+		}
 
 		const risks = exposed.map((tool) => safetyFor(tool, registry).risk)
 		const worst =
@@ -571,7 +617,7 @@ export function buildLedger() {
 					disposition: curated.has(tool.name) ? 'curated' : 'dynamic',
 				}))
 				.sort((a, b) => compareStrings(a.publicName, b.publicName)),
-			reason: `Reached by ${exposed.map((t) => t.name).sort(compareStrings).join(', ')}.${proof ? ` ${proof.note}` : ''}`,
+			reason: `Reached by ${exposed.map((t) => t.name).sort(compareStrings).join(', ')}.${proof ? ` ${proof.note}` : ''}${toolProofs.length > 0 ? ` ${toolProofs.map((entry) => entry.note).join(' ')}` : ''}`,
 			risk: worst,
 			...evidence,
 			suppressedTools: suppressed.map((t) => t.name).sort(),
@@ -600,7 +646,7 @@ export function buildLedger() {
 		generator: 'scripts/build-api-coverage.mjs',
 		fixtures: { current: CURRENT_FIXTURE, core: CORE_FIXTURE, legacy: LEGACY_FIXTURE },
 		attribution:
-			'Isolated captures prove 355 operations with FluentCart Core 1.5.5 alone and 386 with FluentCart Pro 1.5.4 added. The exact 31-operation set difference is attributed to Pro; the shared 355-operation set is attributed to Core.',
+			'Isolated captures prove 365 operations with FluentCart Core 1.6.0 alone and 396 with FluentCart Pro 1.6.0 added. The exact 31-operation set difference is attributed to Pro; the shared 365-operation set is attributed to Core.',
 		counts: {
 			routes: rows.length,
 			coreRoutes: rows.filter((r) => r.component.slug === 'fluent-cart').length,
@@ -736,6 +782,25 @@ export function validateLedger(ledger, options = {}) {
 		}
 	}
 
+	// A tool whose safe public payload is narrower than its upstream route must carry its own
+	// live restore proof. Source files and mocked responses are useful tests, but they are not the
+	// evidence that the real FluentCart runtime accepted and restored the bounded mutation.
+	for (const row of ledger.routes) {
+		for (const exposure of row.toolExposures) {
+			if (!REQUIRED_REVERSIBILITY_PROOF_TOOLS.has(exposure.publicName)) continue
+			if (row.method === 'GET') continue
+			const proofKey = `${exposure.publicName}::${row.method} ${row.path}`
+			const proof = TOOL_ROUTE_REVERSIBILITY_PROOF[proofKey]
+			if (!proof) {
+				failures.push(`${proofKey}: missing required tool-and-route reversibility proof`)
+				continue
+			}
+			if (!row.responseEvidence.includes(proof.evidence)) {
+				failures.push(`${proofKey}: missing required reversibility proof evidence ${proof.evidence}`)
+			}
+		}
+	}
+
 	// An override the extractor no longer needs is a hand-maintained claim nobody is checking.
 	if (tools.usedOverrides) {
 		for (const name of Object.keys(TOOL_ROUTE_OVERRIDES)) {
@@ -769,7 +834,9 @@ export {
 	EXCLUDED_INTERNAL,
 	REVIEWED_ORPHAN_TOOL_ROUTES,
 	REVIEWED_UNREGISTERED_READS,
+	REQUIRED_REVERSIBILITY_PROOF_TOOLS,
 	TOOL_ROUTE_OVERRIDES,
+	TOOL_ROUTE_REVERSIBILITY_PROOF,
 	safetyFor,
 }
 

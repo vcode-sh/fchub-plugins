@@ -80,11 +80,11 @@ describe('every kind names an exact route contract', () => {
 		expect(descriptor.candidates.label.length).toBeGreaterThan(0)
 		expect(descriptor.maxPerPage).toBeGreaterThan(0)
 		expect(descriptor.defaultPerPage).toBeLessThanOrEqual(descriptor.maxPerPage)
-		expect(descriptor.evidence).toContain('fluentcart-1.5.5')
+		expect(descriptor.evidence).toContain('fluentcart-1.6.0')
 	})
 
 	it('binds every route to one the captured runtime actually serves', async () => {
-		const fixture = await import('../fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json', {
+		const fixture = await import('../fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json', {
 			with: { type: 'json' },
 		})
 		const served = new Set(

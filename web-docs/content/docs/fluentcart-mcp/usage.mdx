@@ -13,7 +13,10 @@ You're connected. Now what?
 You just... talk. No special syntax. No commands to memorise. No tool names to remember. The descriptions are rich enough that any halfway decent AI can work out which tool to reach for from plain English. Describe what you want and let it sort out the rest.
 
 <Callout type="warn" title="Read what this release can't do before you plan around it">
-A default install reads and nothing else. Setting `FLUENTCART_WRITE_MODE=reversible` adds one specific family of writes: **creating and updating** products, variants, coupons, customers, shipping rules, tax rules, attribute groups and terms, order bumps and upgrade paths. [Advanced configuration explains the switch](/docs/fluentcart-mcp/configuration#wordpress-scope-and-write-mode-are-different-controls).
+A default install reads and nothing else. Setting `FLUENTCART_WRITE_MODE=reversible` adds one
+specific family of writes: **creating and updating** products, variants, coupons, customers,
+shipping rules, tax rules, attribute groups and terms, order bumps, upgrade paths, and a narrowly
+guarded subscription billing-cycle limit. [Advanced configuration explains the switch](/docs/fluentcart-mcp/configuration#wordpress-scope-and-write-mode-are-different-controls).
 
 Not exposed in any mode: refunds, subscription cancellation, deletions, bulk actions, order status
 changes, marking an order paid, and dispute handling. Ask for one and the AI will not find a tool,
@@ -116,9 +119,21 @@ Adding, editing and deleting addresses, and bulk customer operations, are not ex
 - "Show subscription #42"
 - "What subscriptions does customer #15 have?"
 - "Which subscriptions renew in the next two weeks?"
-- "Re-read subscription #42 from the payment gateway"
+- "List renewals due next week"
+- "Show renewal #42 and the subscription it belongs to"
+- "Which subscriptions have a pending skipped period?"
 
-Subscriptions are read-only here. Pausing, resuming and reactivating aren't exposed as tools, and ending one isn't either — see below. All four still work in the FluentCart admin.
+**Changing the billing-cycle limit** *(needs `FLUENTCART_WRITE_MODE=reversible`)*:
+- "Show me subscription #42 first, then change its total number of billing cycles to 12"
+
+The server reads the subscription first, checks that the current `bill_times` and `bill_count` still
+match the values it was given, and reads it again before it reports success. `0` means unlimited
+billing cycles; a finite limit cannot be at or below the cycles already billed. The update applies
+only to store-billed `manual` or `system` subscriptions. Gateway-billed `automatic` subscriptions
+fail closed before a write. It does not pause, resume, reactivate, cancel, charge, create, skip,
+void, resend, synchronise a renewal, or re-sync a subscription with its payment gateway. Those
+lifecycle and money-adjacent actions remain in the FluentCart admin because 1.6 can change
+scheduled charges and renewal state in ways this server cannot prove it can restore.
 
 </Accordion>
 <Accordion title="Coupons & Promotions">
@@ -323,8 +338,8 @@ Shipping zones and tax rates sound intimidating, but the AI handles the complexi
 
 ## Why Refunds Aren't Here
 
-This server is for reading, analysis and reversible admin work. It does not move money or end
-subscriptions. Use FluentCart's admin or official operator tooling for those jobs.
+This server is for reading, analysis and reversible admin work. It does not move money, manipulate
+renewals, or end subscriptions. Use FluentCart's admin or official operator tooling for those jobs.
 
 ## What It Can't Do
 
@@ -337,13 +352,18 @@ Plenty, and deliberately so:
 | **Delete anything** | No deletion is exposed. FluentCart offers no supported restore, so none of it qualifies as reversible. |
 | **Change order statuses or mark orders paid** | Same reasoning. Orders are read-only in this release. |
 | **Charge credit cards** | Payments need customer interaction — redirects, card forms. Taking money was never on the table. |
-| **Pause or resume subscriptions** | Those endpoints aren't exposed as tools. The FluentCart admin still does it. |
+| **Pause, resume or reactivate a subscription** | FluentCart 1.6 lifecycle calls can alter scheduled charges or renewal state. The server cannot prove a supported restoration, so they are intentionally absent. |
+| **Create, skip, void or resend a renewal** | These actions can change future billing or customer communication. They are not exposed. |
+| **Re-sync a subscription with its payment gateway** | FluentCart 1.6 can contact the gateway and mutate local subscription state. This was previously misclassified as a read; it is now absent. |
 | **Send arbitrary emails** | It reads templates and notification settings. Composing a one-off message to a customer isn't what the API offers, and editing a template that goes to customers isn't exposed either. |
 | **Edit checkout pages** | Frontend work. HTML, CSS, JavaScript. Not API territory. |
 | **Touch other WordPress data** | It talks to FluentCart endpoints only. Your blog posts, other plugins and WordPress users are none of its business. |
 | **Quietly truncate a huge response** | An oversized payload fails with `RESPONSE_TOO_LARGE` and tells you how to narrow it. Silently trimmed data that looks complete is worse than an error. |
 
-What it does do, with writes enabled, is create and update: products, variants, coupons, customers, shipping zones, methods and classes, tax classes and rates, attribute groups and terms, order bumps and upgrade paths. That is a real amount of tedious admin, and all of it can be put back by hand if the AI gets it wrong.
+What it does do, with writes enabled, is create and update: products, variants, coupons, customers,
+shipping zones, methods and classes, tax classes and rates, attribute groups and terms, order bumps,
+upgrade paths, and a guarded subscription billing-cycle limit. That is a real amount of tedious
+admin, and the release admits it only where it can prove a read-back and supported restoration path.
 
 ## A Note About Money
 

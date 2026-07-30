@@ -32,22 +32,27 @@ const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 export const CONTRACT_PATH = join(PACKAGE_ROOT, 'release-contract.json')
 export const WRITE_MODES = ['disabled', 'reversible']
 
-const CORE_PRO = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
-const CORE_ONLY = 'tests/fixtures/routes/fluentcart-1.5.5-core.json'
+const CURRENT_CORE_PRO = 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'
+const CURRENT_CORE_ONLY = 'tests/fixtures/routes/fluentcart-1.6.0-core.json'
+const PREVIOUS_CORE_PRO = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
+const PREVIOUS_CORE_ONLY = 'tests/fixtures/routes/fluentcart-1.5.5-core.json'
 const LEGACY_RUNTIME = 'tests/fixtures/routes/fluentcart-1.3.9-runtime.json'
-const ABILITIES = 'tests/fixtures/abilities/fluentcart-1.5.5-wordpress-7.0.2.json'
+const ABILITIES = 'tests/fixtures/abilities/fluentcart-1.6.0-wordpress-7.0.2.json'
 
 function liveRow(name, componentFixture, writeMode) {
 	const evidenceKind = 'live-rest-index'
 	return { name, componentFixture, writeMode, evidenceKind, replaces: null }
 }
 
-/** The five mandatory profile rows, each measured against its own captured route fixture. */
+/** Current release rows plus the captured legacy surfaces, each measured against its own fixture. */
 export const PROFILES = [
 	liveRow('legacy-1.3.9-runtime-rest-disabled', LEGACY_RUNTIME, 'disabled'),
-	liveRow('core-1.5.5-rest-disabled', CORE_ONLY, 'disabled'),
-	liveRow('core-1.5.5-pro-1.5.4-rest-disabled', CORE_PRO, 'disabled'),
-	liveRow('core-1.5.5-pro-1.5.4-rest-reversible', CORE_PRO, 'reversible'),
+	liveRow('core-1.5.5-rest-disabled', PREVIOUS_CORE_ONLY, 'disabled'),
+	liveRow('core-1.5.5-pro-1.5.4-rest-disabled', PREVIOUS_CORE_PRO, 'disabled'),
+	liveRow('core-1.5.5-pro-1.5.4-rest-reversible', PREVIOUS_CORE_PRO, 'reversible'),
+	liveRow('core-1.6.0-rest-disabled', CURRENT_CORE_ONLY, 'disabled'),
+	liveRow('core-1.6.0-pro-1.6.0-rest-disabled', CURRENT_CORE_PRO, 'disabled'),
+	liveRow('core-1.6.0-pro-1.6.0-rest-reversible', CURRENT_CORE_PRO, 'reversible'),
 ]
 
 async function importDist(...segments) {

@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url'
 import { PACKAGE_ROOT, resolveFixture } from '../../scripts/acceptance/evidence-writer.mjs'
 import { assertAllowedLiveTarget } from '../../scripts/live-target-policy.mjs'
 
-const DEFAULT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
+const DEFAULT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'
 const FIXTURE_PATH = resolveFixture(process.env.FLUENTCART_ACCEPTANCE_FIXTURE ?? DEFAULT_FIXTURE)
 const FETCH_TIMEOUT_MS = 15_000
 
@@ -134,25 +134,25 @@ describe('checked fixture counts', () => {
 		assert.equal(FIXTURE_PATH, expected)
 	})
 
-	it('records 329 paths and 388 exact pairs including the namespace root', () => {
-		assert.equal(fixture.counts.prefixedPathsInclusive, 329)
-		assert.equal(fixture.counts.exactPairsInclusive, 388)
+	it('records 339 paths and 398 exact pairs including the namespace root', () => {
+		assert.equal(fixture.counts.prefixedPathsInclusive, 339)
+		assert.equal(fixture.counts.exactPairsInclusive, 398)
 	})
 
-	it('records 328 application paths and 387 exact application pairs', () => {
-		assert.equal(fixture.counts.applicationPaths, 328)
-		assert.equal(fixture.counts.applicationExactPairs, 387)
+	it('records 338 application paths and 397 exact application pairs', () => {
+		assert.equal(fixture.counts.applicationPaths, 338)
+		assert.equal(fixture.counts.applicationExactPairs, 397)
 	})
 
 	/**
-	 * The plan's prose says 387 canonical pairs. It cannot: the store registers the customer
+	 * The previous fixture's planning prose says 387 canonical pairs. It cannot: the store registers the customer
 	 * detail route under both a numeric and a catch-all pattern, and the same plan mandates that
-	 * both canonicalise to one operation. One collapse turns 387 exact pairs into 386 canonical
+	 * both canonicalise to one operation. One collapse turns 397 exact pairs into 396 canonical
 	 * ones, and the fixture names that collapse rather than adjusting a number to fit.
 	 */
-	it('records 386 canonical pairs, reconciled by exactly one mandated collapse', () => {
-		assert.equal(fixture.counts.applicationCanonicalPairs, 386)
-		assert.equal(fixture.operations.length, 386)
+	it('records 396 canonical pairs, reconciled by exactly one mandated collapse', () => {
+		assert.equal(fixture.counts.applicationCanonicalPairs, 396)
+		assert.equal(fixture.operations.length, 396)
 		assert.equal(fixture.canonicalCollapses.length, 1)
 		assert.equal(fixture.canonicalCollapses[0].canonical, 'GET /customers/{param}')
 		assert.deepEqual(fixture.canonicalCollapses[0].exact, [
@@ -170,8 +170,8 @@ describe('checked fixture counts', () => {
 			fixture.profile.activeComponents.map((component) => [component.slug, component.version]),
 		)
 		assert.equal(fixture.profile.wordpress, '7.0.2')
-		assert.equal(versions.get('fluent-cart'), '1.5.5')
-		assert.equal(versions.get('fluent-cart-pro'), '1.5.4')
+		assert.equal(versions.get('fluent-cart'), '1.6.0')
+		assert.equal(versions.get('fluent-cart-pro'), '1.6.0')
 		assert.equal(fixture.evidenceKind, 'live-rest-index')
 	})
 })

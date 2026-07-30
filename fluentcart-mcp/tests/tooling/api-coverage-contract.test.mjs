@@ -11,8 +11,10 @@ import {
 	extractRiskRegistry,
 	extractTools,
 	OUTPUT_FILE,
+	REQUIRED_REVERSIBILITY_PROOF_TOOLS,
 	REVIEWED_ORPHAN_TOOL_ROUTES,
 	TOOL_ROUTE_OVERRIDES,
+	TOOL_ROUTE_REVERSIBILITY_PROOF,
 	validateLedger,
 } from '../../scripts/build-api-coverage.mjs'
 
@@ -50,11 +52,11 @@ describe('ledger completeness', () => {
 
 	it('records the canonical operation count the fixture claims', () => {
 		assert.equal(ledger.routes.length, fixture.counts.applicationCanonicalPairs)
-		assert.equal(ledger.routes.length, 386)
+		assert.equal(ledger.routes.length, 396)
 	})
 
-	it('attributes the isolated 355-operation Core set and 31-operation Pro delta', () => {
-		assert.equal(ledger.routes.filter((row) => row.component.slug === 'fluent-cart').length, 355)
+	it('attributes the isolated 365-operation Core set and 31-operation Pro delta', () => {
+		assert.equal(ledger.routes.filter((row) => row.component.slug === 'fluent-cart').length, 365)
 		assert.equal(ledger.routes.filter((row) => row.component.slug === 'fluent-cart-pro').length, 31)
 		for (const row of ledger.routes) {
 			assert.equal(
@@ -66,7 +68,7 @@ describe('ledger completeness', () => {
 	})
 
 	it('states the isolated fixture-delta attribution', () => {
-		assert.match(ledger.attribution, /355/)
+		assert.match(ledger.attribution, /365/)
 		assert.match(ledger.attribution, /31/)
 		assert.doesNotMatch(ledger.attribution, /NOT evidenced/)
 	})
@@ -74,7 +76,7 @@ describe('ledger completeness', () => {
 	it('separates the 1.3.9 contract from the current-runtime delta', () => {
 		const origins = new Set(ledger.routes.map((row) => row.contractOrigin))
 		assert.deepEqual([...origins].sort(), ['current-runtime', 'legacy-docs'])
-		assert.equal(ledger.counts.deltaSince139, 61)
+		assert.equal(ledger.counts.deltaSince139, 72)
 	})
 
 	it('is sorted by component, then path, then method', () => {
@@ -129,6 +131,100 @@ describe('disposition contract', () => {
 				assert.ok(['curated', 'dynamic'].includes(exposure.disposition))
 			}
 		}
+	})
+
+	it('records the successful-but-unfiltered product variants route as reviewed and excluded', () => {
+		const row = ledger.routes.find(
+			(candidate) => candidate.method === 'GET' && candidate.path === '/products/variants',
+		)
+		assert.ok(row)
+		assert.equal(row.routeDisposition, 'excluded')
+		assert.equal(row.risk, 'read')
+		assert.match(row.reason, /ignores product_id/)
+		assert.doesNotMatch(row.reason, /pending plan/)
+	})
+
+	it('reviews every FluentCart 1.6 subscription and renewal delta without a stale planning placeholder', () => {
+		const expected = new Map([
+			['GET /renewals', { disposition: 'exposed', tool: 'fluentcart_renewal_list' }],
+			['GET /renewals/{param}', { disposition: 'exposed', tool: 'fluentcart_renewal_get' }],
+			[
+				'POST /customer-profile/subscriptions/{param}/pause',
+				{ disposition: 'excluded', risk: 'destructive-write' },
+			],
+			[
+				'POST /customer-profile/subscriptions/{param}/resume',
+				{ disposition: 'excluded', risk: 'external-side-effect' },
+			],
+			[
+				'POST /orders/{param}/subscriptions/{param}/charge-now',
+				{ disposition: 'excluded', risk: 'real-money' },
+			],
+			[
+				'POST /orders/{param}/subscriptions/{param}/create-renewal',
+				{ disposition: 'excluded', risk: 'real-money' },
+			],
+			[
+				'POST /orders/{param}/subscriptions/{param}/skip-renewal',
+				{ disposition: 'excluded', risk: 'destructive-write' },
+			],
+			[
+				'POST /orders/{param}/transactions/{param}/sync',
+				{ disposition: 'excluded', risk: 'external-side-effect' },
+			],
+			[
+				'PUT /orders/{param}/subscriptions/{param}/update',
+				{ disposition: 'exposed', tool: 'fluentcart_subscription_update' },
+			],
+			['POST /renewals/{param}/resend', { disposition: 'excluded', risk: 'external-side-effect' }],
+			['POST /renewals/{param}/void', { disposition: 'excluded', risk: 'destructive-write' }],
+		])
+
+		for (const [route, expectedRow] of expected) {
+			const row = ledger.routes.find((candidate) => key(candidate) === route)
+			assert.ok(row, `${route} is missing from the 1.6 ledger`)
+			assert.equal(
+				row.routeDisposition,
+				expectedRow.disposition,
+				`${route} has the wrong disposition`,
+			)
+			assert.doesNotMatch(
+				row.reason,
+				/pending plan 06/i,
+				`${route} still has an unreviewed placeholder`,
+			)
+			if (expectedRow.risk)
+				assert.equal(row.risk, expectedRow.risk, `${route} has the wrong reviewed risk`)
+			if (expectedRow.tool) {
+				assert.ok(
+					row.toolExposures.some((exposure) => exposure.publicName === expectedRow.tool),
+					`${route} must be reached by ${expectedRow.tool}`,
+				)
+			}
+		}
+	})
+
+	it('requires tool-scoped live restore evidence for the bounded subscription update', () => {
+		const route = 'PUT /orders/{param}/subscriptions/{param}/update'
+		const proofKey = `fluentcart_subscription_update::${route}`
+		const proof = TOOL_ROUTE_REVERSIBILITY_PROOF[proofKey]
+		assert.ok(REQUIRED_REVERSIBILITY_PROOF_TOOLS.has('fluentcart_subscription_update'))
+		assert.ok(proof, `${proofKey} has no required proof mapping`)
+		assert.ok(existsSync(join(PACKAGE_ROOT, proof.evidence)), proof.evidence)
+
+		const row = ledger.routes.find((candidate) => key(candidate) === route)
+		assert.ok(row)
+		assert.ok(row.responseEvidence.includes(proof.evidence))
+
+		const invalid = clone(ledger)
+		const invalidRow = invalid.routes.find((candidate) => key(candidate) === route)
+		invalidRow.responseEvidence = invalidRow.responseEvidence.filter(
+			(entry) => entry !== proof.evidence,
+		)
+		assert.match(
+			validateLedger(invalid).join('\n'),
+			/missing required reversibility proof evidence/,
+		)
 	})
 })
 
@@ -223,6 +319,17 @@ describe('risk contract', () => {
 			),
 			[],
 		)
+	})
+
+	it('records subscription fetch as a non-executable external gateway resync, not a read', () => {
+		const row = ledger.routes.find(
+			(candidate) => key(candidate) === 'PUT /orders/{param}/subscriptions/{param}/fetch',
+		)
+		assert.ok(row)
+		assert.equal(row.routeDisposition, 'excluded')
+		assert.equal(row.risk, 'external-side-effect')
+		assert.deepEqual(row.toolExposures, [])
+		assert.deepEqual(row.suppressedTools, ['fluentcart_subscription_fetch'])
 	})
 })
 

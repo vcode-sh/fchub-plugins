@@ -268,7 +268,7 @@ describe('regression against the verified dynamic baseline', () => {
 		const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'))
 		const widest = contract.profiles.find(
 			(profile) =>
-				profile.name === 'core-1.5.5-pro-1.5.4-rest-reversible' && profile.status === 'MEASURED',
+				profile.name === 'core-1.6.0-pro-1.6.0-rest-reversible' && profile.status === 'MEASURED',
 		)
 
 		assert.ok(widest, 'the widest measured profile is absent from the release contract')
@@ -300,7 +300,7 @@ describe('release contract agreement', () => {
 		// Only the gated modes are compared: full mode is reported, not published as a budget, and
 		// `scripts/build-release-contract.mjs --check` owns whole-contract freshness.
 		const profile = contract.profiles.find(
-			(entry) => entry.name === 'core-1.5.5-pro-1.5.4-rest-reversible',
+			(entry) => entry.name === 'core-1.6.0-pro-1.6.0-rest-reversible',
 		)
 		assert.ok(profile, 'the reversible profile row must exist')
 		assert.equal(profile.status, 'MEASURED')

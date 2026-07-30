@@ -13,7 +13,7 @@ import {
 import { assertAllowedLiveTarget } from './live-target-policy.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const OUTPUT = 'tests/fixtures/abilities/fluentcart-1.5.5-wordpress-7.0.2.json'
+const OUTPUT = 'tests/fixtures/abilities/fluentcart-1.6.0-wordpress-7.0.2.json'
 const REQUEST_TIMEOUT_MS = 15_000
 
 function fail(message) {

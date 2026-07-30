@@ -14,7 +14,7 @@
 // to null at a customer's.
 import { describe, expect, it } from 'vitest'
 import { acceptedReports } from '../../src/commerce/report-contracts.js'
-import fixture from '../fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json' with {
+import fixture from '../fixtures/rest/fluentcart-1.6.0-all-active-read-contracts.json' with {
 	type: 'json',
 }
 

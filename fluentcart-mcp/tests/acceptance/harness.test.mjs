@@ -236,7 +236,7 @@ describe('lane registry', () => {
 	it('passes a route fixture to Node tests through the environment, never as a Node option', () => {
 		const fixture = resolve(
 			PACKAGE_ROOT,
-			'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+			'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 		)
 		const resolved = resolveStep(LANES['route-drift'].steps[0], {
 			fixture,
@@ -405,7 +405,7 @@ describe('end-to-end run', () => {
 	it('ignores an ambient fixture when the coordinator was given no fixture', async () => {
 		const checkedFixture = JSON.parse(
 			readFileSync(
-				resolve(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'),
+				resolve(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'),
 				'utf8',
 			),
 		)
@@ -475,7 +475,7 @@ describe('end-to-end run', () => {
 	it('executes route-drift with the exact supplied fixture and reports test counts', async () => {
 		const checkedFixture = JSON.parse(
 			readFileSync(
-				resolve(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'),
+				resolve(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'),
 				'utf8',
 			),
 		)

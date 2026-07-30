@@ -29,7 +29,7 @@ describe('test lane contract', () => {
 		expect(pkg.scripts['test:acceptance']).toBe('node --test tests/acceptance/*.test.mjs')
 		expect(pkg.scripts['typecheck:tests']).toBe('tsc --project tsconfig.tests.json')
 		expect(pkg.scripts['check:routes']).toBe(
-			'node scripts/check-tool-routes.mjs --fixture tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+			'node scripts/check-tool-routes.mjs --fixture tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 		)
 	})
 

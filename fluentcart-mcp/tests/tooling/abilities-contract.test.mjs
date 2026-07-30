@@ -10,10 +10,16 @@ import {
 } from '../../dist/abilities/compatibility.js'
 
 const fixtureText = readFileSync(
-	new URL('../fixtures/abilities/fluentcart-1.5.5-wordpress-7.0.2.json', import.meta.url),
+	new URL('../fixtures/abilities/fluentcart-1.6.0-wordpress-7.0.2.json', import.meta.url),
 	'utf8',
 )
 const fixture = JSON.parse(fixtureText)
+const legacyFixture = JSON.parse(
+	readFileSync(
+		new URL('../fixtures/abilities/fluentcart-1.5.5-wordpress-7.0.2.json', import.meta.url),
+		'utf8',
+	),
+)
 const support = JSON.parse(
 	readFileSync(new URL('../../compatibility-support.json', import.meta.url), 'utf8'),
 )
@@ -28,8 +34,8 @@ function runCaptureFault(scenario) {
 		JSON.stringify({
 			wordpress: '7.0.2',
 			activeComponents: [
-				{ slug: 'fluent-cart', version: '1.5.5' },
-				{ slug: 'fluent-cart-pro', version: '1.5.4' },
+				{ slug: 'fluent-cart', version: '1.6.0' },
+				{ slug: 'fluent-cart-pro', version: '1.6.0' },
 			],
 		}),
 	)
@@ -116,17 +122,17 @@ process.on('exit', () => {
 }
 
 describe('FluentCart WordPress Abilities evidence', () => {
-	it('contains the exact 33-name 1.5.5 catalogue without host or credential material', () => {
+	it('contains the exact 1.6.0 catalogue without host or credential material', () => {
 		assert.equal(fixture.schemaVersion, 2)
 		assert.equal(fixture.profile.wordpress, '7.0.2')
 		assert.equal(fixture.profile.source, 'wp-cli')
 		assert.equal(
 			fixture.profile.activeComponents.find((entry) => entry.slug === 'fluent-cart')?.version,
-			'1.5.5',
+			'1.6.0',
 		)
 		assert.equal(
 			fixture.profile.activeComponents.find((entry) => entry.slug === 'fluent-cart-pro')?.version,
-			'1.5.4',
+			'1.6.0',
 		)
 		assert.equal(fixture.abilities.length, 33)
 		assert.equal(new Set(fixture.abilities.map((row) => row.name)).size, 33)
@@ -180,9 +186,13 @@ describe('FluentCart WordPress Abilities evidence', () => {
 			new Set(fixture.fallbackFingerprints.map((entry) => entry.fingerprint)).size,
 			fixture.fallbackFingerprints.length,
 		)
+		const auditedFingerprints = new Set([
+			...legacyFixture.fallbackFingerprints.map((entry) => entry.fingerprint),
+			...expected.map((entry) => entry.fingerprint),
+		])
 		assert.deepEqual(
 			[...APPROVED_FALLBACK_FINGERPRINTS].toSorted(),
-			expected.map((entry) => entry.fingerprint).toSorted(),
+			[...auditedFingerprints].toSorted(),
 		)
 	})
 

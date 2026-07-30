@@ -44,6 +44,15 @@ FluentCart MCP is an independent project; it is not the official server, an adap
 
 The table is deliberately not a scorecard. An official tool count, a source-registry count, and a client-visible count are three different things. Treating them as one number is how a comparison turns into a brochure with a calculator problem.
 
+<Callout type="info" title="New in 2.1.0: FluentCart 1.6+ subscription support">
+  The independent server now reads renewal lists and individual renewal records, retains richer
+  FluentCart 1.6 subscription context, and offers a narrowly guarded `bill_times` update only
+  through its reversible policy. It does not expose renewal charges, creation, skipping,
+  voiding, resending, cancellation, lifecycle shortcuts, or gateway resync. The exact verified
+  runtime is WordPress 7.0.2 with FluentCart Core 1.6.0 and Pro 1.6.0; “1.6+” is a release theme,
+  not a claim about untested future versions.
+</Callout>
+
 ## What the Independent Release Actually Claims
 
 The independent server keeps its release facts in the generated `release-contract.json`. That record ties a package candidate to the tested protocol eras, compatibility profiles, and measured client surfaces. It is a better source than a sentence copied into an article and left here to fossilise.

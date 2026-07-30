@@ -136,7 +136,7 @@ describe('live composition', () => {
 			}
 		`)
 
-		expect(isError).toBe(false)
+		expect(isError, text).toBe(false)
 		const envelope = raw as { result: Record<string, unknown>; api_calls: number }
 		// Two calls, one round trip. That is the entire economic argument for code mode.
 		expect(envelope.api_calls).toBe(2)
@@ -146,12 +146,13 @@ describe('live composition', () => {
 	})
 
 	it('counts calls host-side, so sandboxed code cannot under-report them', async () => {
-		const { raw } = await execute(`
+		const { raw, isError, text } = await execute(`
 			await fluentcart.call('fluentcart_product_list', { page: 1, per_page: 1 })
 			await fluentcart.call('fluentcart_product_list', { page: 1, per_page: 1 })
 			await fluentcart.call('fluentcart_product_list', { page: 1, per_page: 1 })
 			return { claimed: 0 }
 		`)
+		expect(isError, text).toBe(false)
 		const envelope = raw as { result: { claimed: number }; api_calls: number }
 		expect(envelope.result.claimed).toBe(0)
 		expect(envelope.api_calls).toBe(3)

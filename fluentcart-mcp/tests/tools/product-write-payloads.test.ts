@@ -125,26 +125,39 @@ describe('buildVariantFromExisting is a merge, not a reset', () => {
 	})
 })
 
-describe('variant_list falls back to a payload that contains variants', () => {
-	it('asks for the variants relation when the upstream route is broken', async () => {
-		const get = vi
-			.fn()
-			.mockRejectedValueOnce(
-				new Error(
-					'ProductVariationResource::get(): Argument #1 ($params) must be of type array, null given',
-				),
-			)
-			.mockResolvedValueOnce({ data: { product: { variants: [{ id: 9 }] } }, status: 200 })
+describe('variant_list reads the product relation that actually filters by product', () => {
+	it('does not accept the successful but unfiltered variants route as an empty product', async () => {
+		const get = vi.fn().mockImplementation(async (path: string) => {
+			if (path === '/products/variants') {
+				return { data: { variants: [] }, status: 200 }
+			}
+			return {
+				data: {
+					product: {
+						variants: [{ id: 9, post_id: 1, variation_title: 'Only variant' }],
+					},
+				},
+				status: 200,
+			}
+		})
 		const client = { get } as unknown as FluentCartClient
 
 		const result = (await toolNamed(client, 'fluentcart_variant_list').handler(
 			{ product_id: 1 } as never,
 			{} as never,
 		)) as { content: { text: string }[] }
+		const body = JSON.parse(result.content[0]?.text ?? '{}')
 
-		// The fallback used to read a bare /products/{id}, which never carries variants, and then
-		// report total 0 for a product that has them.
-		expect(get.mock.calls[1]?.[1]).toMatchObject({ 'with[]': 'variants' })
-		expect(JSON.parse(result.content[0]?.text ?? '{}').total).toBe(1)
+		// FluentCart 1.6 changed /products/variants from a type error into HTTP 200, but it still
+		// ignores product_id and reads only its nested params shape. Treating that response as the
+		// answer made every product look empty. Product detail is the route that really owns the
+		// relation and works on both 1.5 and 1.6.
+		expect(body.total).toBe(1)
+		expect(body.variants).toEqual([
+			expect.objectContaining({ id: 9, post_id: 1, variation_title: 'Only variant' }),
+		])
+		expect(get).toHaveBeenCalledTimes(1)
+		expect(get.mock.calls[0]?.[0]).toBe('/products/1')
+		expect(get.mock.calls[0]?.[1]).toMatchObject({ 'with[]': 'variants' })
 	})
 })

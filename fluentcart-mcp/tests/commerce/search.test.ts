@@ -16,7 +16,7 @@ import {
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const fixture = JSON.parse(
 	readFileSync(
-		resolve(packageRoot, 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'),
+		resolve(packageRoot, 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'),
 		'utf8',
 	),
 )

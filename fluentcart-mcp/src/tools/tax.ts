@@ -132,16 +132,6 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/tax/country/rate/:rate_id',
 		}),
 
-		deleteTool(client, {
-			name: 'fluentcart_tax_country_delete_all',
-			title: 'Delete All Country Tax Rates',
-			description: 'Delete all tax rates for a country. This action cannot be undone.',
-			schema: z.object({
-				country_code: z.string().describe('ISO country code'),
-			}),
-			endpoint: '/tax/country/:country_code',
-		}),
-
 		// ── Country Tax ID ─────────────────────────────────────
 
 		getTool(client, {
@@ -218,10 +208,11 @@ export function taxTools(client: FluentCartClient): ToolDefinition[] {
 			description:
 				'Create default tax rates for countries that do not have any yet. This ADDS ONLY: a ' +
 				'country that already has rates is skipped, and nothing is ever removed, so it cannot ' +
-				'be used to restrict where tax is charged or to replace an existing list — edit or ' +
-				'delete individual rates for that. Passing an empty array seeds EVERY country in the ' +
+				'be used to restrict where tax is charged or to replace an existing list — edit ' +
+				'individual rates for that. Passing an empty array seeds EVERY country in the ' +
 				'ISO list, which is how a store ends up with 250 of them. To stop charging tax ' +
-				"somewhere, delete that country's rates with fluentcart_tax_country_delete_all.",
+				'for a country, FluentCart 1.6 provides no country-wide delete route; remove its ' +
+				'individual rates deliberately instead.',
 			schema: z.object({
 				countries: z
 					.array(z.string())

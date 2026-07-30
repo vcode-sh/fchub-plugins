@@ -13,7 +13,7 @@ import {
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const FIXTURE_PATH = join(
 	PACKAGE_ROOT,
-	'tests/fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json',
+	'tests/fixtures/rest/fluentcart-1.6.0-all-active-read-contracts.json',
 )
 
 const raw = readFileSync(FIXTURE_PATH, 'utf8')
@@ -48,7 +48,7 @@ describe('read contract fixture provenance', () => {
 		assert.equal(fixture.schemaVersion, 1)
 		assert.equal(fixture.generatedBy, 'scripts/capture-read-contracts.mjs')
 		assert.equal(fixture.evidenceScope, 'all-active-compatibility')
-		assert.equal(fixture.routeFixture, 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json')
+		assert.equal(fixture.routeFixture, 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json')
 		assert.ok(existsSync(join(PACKAGE_ROOT, fixture.routeFixture.split('/').join(sep))))
 	})
 
@@ -64,8 +64,8 @@ describe('read contract fixture provenance', () => {
 		const versions = new Map(
 			fixture.profile.activeComponents.map((component) => [component.slug, component.version]),
 		)
-		assert.equal(versions.get('fluent-cart'), '1.5.5')
-		assert.equal(versions.get('fluent-cart-pro'), '1.5.4')
+		assert.equal(versions.get('fluent-cart'), '1.6.0')
+		assert.equal(versions.get('fluent-cart-pro'), '1.6.0')
 	})
 
 	it('keeps Core, Core plus Pro, and all-active evidence scopes distinct', () => {

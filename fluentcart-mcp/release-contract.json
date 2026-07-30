@@ -2,9 +2,9 @@
   "generatedBy": "scripts/build-release-contract.mjs",
   "serializer": "mcp-tools-list-v1",
   "tokenizer": "gpt-tokenizer@3.4.0",
-  "packageVersion": "2.0.1",
+  "packageVersion": "2.1.0",
   "release": {
-    "version": "2.0.1",
+    "version": "2.1.0",
     "protocols": [
       "2025-11-25",
       "2026-07-28"
@@ -27,10 +27,10 @@
       "npmStageTag": "latest",
       "npmApproval": "interactive-2fa",
       "npmPromotionWrite": false,
-      "previousLatest": "2.0.0",
+      "previousLatest": "2.0.1",
       "previousDockerDigests": {
-        "ghcr.io": "sha256:c38a54db74f07da03be544539b8bb36f502ae36987f00567293e48a985574174",
-        "docker.io": "sha256:c38a54db74f07da03be544539b8bb36f502ae36987f00567293e48a985574174"
+        "ghcr.io": "sha256:28f79e77822f843e32cc2d19b86fb52a2321f215e32c5260dd0b56722fa9d65e",
+        "docker.io": "sha256:28f79e77822f843e32cc2d19b86fb52a2321f215e32c5260dd0b56722fa9d65e"
       }
     },
     "clients": {
@@ -120,19 +120,21 @@
     },
     "evidence": {
       "live": [
-        "FluentCart 1.5.5 REST index",
+        "FluentCart Core 1.6.0 and FluentCart Pro 1.6.0 REST index",
         "WordPress 7.0.2 Abilities catalogue"
       ],
       "fixtures": [
         "legacy 1.3.9 route surface",
+        "isolated FluentCart 1.6.0 Core route surface",
+        "isolated FluentCart 1.6.0 Core and Pro route surface",
         "deterministic protocol and capability lanes"
       ],
       "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED"
     }
   },
-  "sourceTreeDigest": "sha256:824483c82b6e48a09db4c3a11c8be8731a85976d3432c93e102e0563c44b43ed",
+  "sourceTreeDigest": "sha256:f2483f2c861fd7e96b5d12f6fee384f0e45f9e8fa24dd4df6ca9f226bb0e8a0b",
   "sourceTreeInputs": {
-    "fileCount": 194,
+    "fileCount": 201,
     "declared": [
       {
         "file": "package.json"
@@ -182,11 +184,11 @@
       "manifest.json"
     ]
   },
-  "sourceDefinitionCount": 289,
+  "sourceDefinitionCount": 291,
   "categoryCount": 20,
   "writePolicyExposure": {
-    "disabled": 162,
-    "reversible": 194,
+    "disabled": 163,
+    "reversible": 196,
     "composedBeyondModules": 2,
     "note": "Exposure per write mode as the server composes it, independent of route evidence."
   },
@@ -202,18 +204,18 @@
   "abilitiesBridge": {
     "status": "MEASURED",
     "evidence": "live-wordpress-abilities-rest",
-    "fixture": "tests/fixtures/abilities/fluentcart-1.5.5-wordpress-7.0.2.json",
+    "fixture": "tests/fixtures/abilities/fluentcart-1.6.0-wordpress-7.0.2.json",
     "wordpress": "7.0.2",
     "components": {
       "fchub": "1.0.1",
       "fchub-memberships": "1.4.1",
       "fchub-payment-plans": "0.1.0",
       "fchub-redsys": "0.1.0",
-      "fluent-cart": "1.5.5",
-      "fluent-cart-pro": "1.5.4",
+      "fluent-cart": "1.6.0",
+      "fluent-cart-pro": "1.6.0",
       "fluent-community": "2.7.5",
       "fluent-community-pro": "2.7.5",
-      "fluent-crm": "3.1.8",
+      "fluent-crm": "3.1.10",
       "fluent-smtp": "2.2.95",
       "plugin-check": "2.0.0"
     },
@@ -228,7 +230,7 @@
     "executionMethod": "POST",
     "executionMethodEvidence": {
       "wordpress": "7.0.2",
-      "fluentCart": "1.5.5",
+      "fluentCart": "1.6.0",
       "ability": "fluent-cart/get-store-context",
       "getStatus": 405,
       "getCode": "rest_ability_invalid_method",
@@ -254,7 +256,7 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 140,
+      "exposedDefinitionCount": 139,
       "modes": {
         "dynamic": {
           "toolCount": 3,
@@ -275,10 +277,10 @@
           "o200kTokens": 528
         },
         "full": {
-          "toolCount": 140,
-          "characters": 109358,
-          "cl100kTokens": 24573,
-          "o200kTokens": 25070
+          "toolCount": 139,
+          "characters": 108828,
+          "cl100kTokens": 24457,
+          "o200kTokens": 24952
         }
       }
     },
@@ -291,7 +293,7 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 151,
+      "exposedDefinitionCount": 150,
       "modes": {
         "dynamic": {
           "toolCount": 3,
@@ -312,10 +314,10 @@
           "o200kTokens": 528
         },
         "full": {
-          "toolCount": 151,
-          "characters": 115561,
-          "cl100kTokens": 25965,
-          "o200kTokens": 26477
+          "toolCount": 150,
+          "characters": 115031,
+          "cl100kTokens": 25849,
+          "o200kTokens": 26359
         }
       }
     },
@@ -328,7 +330,7 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 162,
+      "exposedDefinitionCount": 161,
       "modes": {
         "dynamic": {
           "toolCount": 3,
@@ -349,10 +351,10 @@
           "o200kTokens": 528
         },
         "full": {
-          "toolCount": 162,
-          "characters": 122857,
-          "cl100kTokens": 27632,
-          "o200kTokens": 28171
+          "toolCount": 161,
+          "characters": 122327,
+          "cl100kTokens": 27516,
+          "o200kTokens": 28053
         }
       }
     },
@@ -365,7 +367,7 @@
       "status": "MEASURED",
       "missingFixture": null,
       "reason": null,
-      "exposedDefinitionCount": 194,
+      "exposedDefinitionCount": 193,
       "modes": {
         "dynamic": {
           "toolCount": 4,
@@ -386,10 +388,121 @@
           "o200kTokens": 528
         },
         "full": {
-          "toolCount": 194,
-          "characters": 160621,
-          "cl100kTokens": 35843,
-          "o200kTokens": 36622
+          "toolCount": 193,
+          "characters": 160091,
+          "cl100kTokens": 35727,
+          "o200kTokens": 36504
+        }
+      }
+    },
+    {
+      "name": "core-1.6.0-rest-disabled",
+      "componentFixture": "tests/fixtures/routes/fluentcart-1.6.0-core.json",
+      "writeMode": "disabled",
+      "evidenceKind": "live-rest-index",
+      "replaces": null,
+      "status": "MEASURED",
+      "missingFixture": null,
+      "reason": null,
+      "exposedDefinitionCount": 152,
+      "modes": {
+        "dynamic": {
+          "toolCount": 3,
+          "characters": 2302,
+          "cl100kTokens": 506,
+          "o200kTokens": 514
+        },
+        "curated": {
+          "toolCount": 17,
+          "characters": 17633,
+          "cl100kTokens": 4012,
+          "o200kTokens": 4075
+        },
+        "code": {
+          "toolCount": 2,
+          "characters": 2357,
+          "cl100kTokens": 520,
+          "o200kTokens": 528
+        },
+        "full": {
+          "toolCount": 152,
+          "characters": 116692,
+          "cl100kTokens": 26243,
+          "o200kTokens": 26754
+        }
+      }
+    },
+    {
+      "name": "core-1.6.0-pro-1.6.0-rest-disabled",
+      "componentFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+      "writeMode": "disabled",
+      "evidenceKind": "live-rest-index",
+      "replaces": null,
+      "status": "MEASURED",
+      "missingFixture": null,
+      "reason": null,
+      "exposedDefinitionCount": 163,
+      "modes": {
+        "dynamic": {
+          "toolCount": 3,
+          "characters": 2302,
+          "cl100kTokens": 506,
+          "o200kTokens": 514
+        },
+        "curated": {
+          "toolCount": 17,
+          "characters": 17633,
+          "cl100kTokens": 4012,
+          "o200kTokens": 4075
+        },
+        "code": {
+          "toolCount": 2,
+          "characters": 2357,
+          "cl100kTokens": 520,
+          "o200kTokens": 528
+        },
+        "full": {
+          "toolCount": 163,
+          "characters": 123988,
+          "cl100kTokens": 27910,
+          "o200kTokens": 28448
+        }
+      }
+    },
+    {
+      "name": "core-1.6.0-pro-1.6.0-rest-reversible",
+      "componentFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+      "writeMode": "reversible",
+      "evidenceKind": "live-rest-index",
+      "replaces": null,
+      "status": "MEASURED",
+      "missingFixture": null,
+      "reason": null,
+      "exposedDefinitionCount": 196,
+      "modes": {
+        "dynamic": {
+          "toolCount": 4,
+          "characters": 3069,
+          "cl100kTokens": 674,
+          "o200kTokens": 685
+        },
+        "curated": {
+          "toolCount": 19,
+          "characters": 21403,
+          "cl100kTokens": 4832,
+          "o200kTokens": 4930
+        },
+        "code": {
+          "toolCount": 2,
+          "characters": 2357,
+          "cl100kTokens": 520,
+          "o200kTokens": 528
+        },
+        "full": {
+          "toolCount": 196,
+          "characters": 163503,
+          "cl100kTokens": 36487,
+          "o200kTokens": 37272
         }
       }
     }

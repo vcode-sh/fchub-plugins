@@ -253,7 +253,7 @@ describe('gitignore contract', () => {
 			'manifest.json',
 			'scripts/acceptance/run-acceptance.mjs',
 			'tests/acceptance/evidence-contract.test.mjs',
-			'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+			'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 			'artifacts/keep-me.json',
 		]
 		for (const path of paths) {

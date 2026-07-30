@@ -55,7 +55,7 @@ const focusAreas = [
     icon: ShoppingCart,
     title: "Read the shop",
     description:
-      "Ask about orders, products, customers, subscriptions, settings, and the details behind them.",
+      "Ask about orders, products, customers, subscriptions, renewals, settings, and the details behind them.",
   },
   {
     icon: TrendingUp,
@@ -75,6 +75,7 @@ const prompts = [
   "Summarise orders that need attention today",
   "Which products sold best this month, and why?",
   "Find the customer behind this order and show their history",
+  "Which renewals need attention next week?",
   "Create a coupon for the weekend sale (reversible mode only)",
 ];
 
@@ -199,6 +200,21 @@ export default function FluentCartMcpPage() {
         variants={containerVariants}
         className="mb-16 w-full max-w-4xl"
       >
+        <motion.div variants={itemVariants} className="mb-6">
+          <Card className="gap-0 border-primary/20 bg-fd-card py-0">
+            <CardContent className="p-5 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">
+                New in 2.1.0:{" "}
+              </span>
+              FluentCart 1.6+ subscription support adds direct renewal reads,
+              richer subscription context, and a narrowly guarded billing-cycle
+              limit update. Charges, cancellation, and renewal lifecycle actions
+              remain out of scope. Verified exactly with WordPress 7.0.2,
+              FluentCart Core 1.6.0, and FluentCart Pro 1.6.0 — not every future
+              version wearing a plus sign.
+            </CardContent>
+          </Card>
+        </motion.div>
         <motion.div variants={itemVariants} className="mb-6">
           <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
             Built for useful shop work

@@ -18,6 +18,62 @@ const PREVIEW_VARIANTS: readonly { method: HttpMethod; path: string }[] = [
 	{ method: 'POST', path: '/email-notification/get-template' },
 ]
 
+const REMINDER_SETTING_KEYS = [
+	'reminders_enabled',
+	'yearly_renewal_reminders_enabled',
+	'yearly_renewal_reminder_days',
+	'trial_end_reminders_enabled',
+	'trial_end_reminder_days',
+	'monthly_renewal_reminders_enabled',
+	'monthly_renewal_reminder_days',
+	'quarterly_renewal_reminders_enabled',
+	'quarterly_renewal_reminder_days',
+	'half_yearly_renewal_reminders_enabled',
+	'half_yearly_renewal_reminder_days',
+	'renewal_reminders_enabled',
+	'renewal_reminder_overdue_days',
+] as const
+
+function asRecord(value: unknown): Record<string, unknown> {
+	return value && typeof value === 'object' && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: {}
+}
+
+function projectEmailNotifications(value: unknown): Record<string, unknown> {
+	const rows = asRecord(asRecord(value).data)
+	const data: Record<string, unknown> = {}
+
+	for (const [name, value] of Object.entries(rows)) {
+		const row = asRecord(value)
+		const settings = asRecord(row.settings)
+		data[name] = {
+			title: row.title,
+			group: row.group,
+			recipient: row.recipient,
+			event: row.event,
+			template_path: row.template_path,
+			settings: {
+				active: settings.active,
+				subject: settings.subject,
+			},
+		}
+	}
+
+	return { data }
+}
+
+function projectReminderSettings(value: unknown): Record<string, unknown> {
+	const source = asRecord(asRecord(value).settings)
+	const settings: Record<string, unknown> = {}
+
+	for (const key of REMINDER_SETTING_KEYS) {
+		if (Object.hasOwn(source, key)) settings[key] = source[key]
+	}
+
+	return { settings }
+}
+
 function selectPath(
 	capabilities: ApiCapabilities | undefined,
 	variants: readonly { method: HttpMethod; path: string }[],
@@ -33,14 +89,21 @@ export function emailNotificationTools(
 	const previewPath = selectPath(capabilities, PREVIEW_VARIANTS)
 
 	return [
-		getTool(client, {
+		createTool(client, {
 			name: 'fluentcart_email_list',
+			routes: direct('GET', '/email-notification'),
 			title: 'List Email Notifications',
 			description:
-				'List all email notification templates with status. ' +
-				'Response is an object keyed by notification name, not a paginated array.',
+				'List every email notification as a compact status summary. The response is an object ' +
+				'keyed by notification name, not a paginated array. Each row keeps the title, group, ' +
+				'recipient, event, template path, active state and subject; use fluentcart_email_get ' +
+				'for the full template body and editing fields.',
 			schema: z.object({}),
-			endpoint: '/email-notification',
+			annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+			handler: async (c) => {
+				const response = await c.get('/email-notification')
+				return projectEmailNotifications(response.data)
+			},
 		}),
 
 		getTool(client, {
@@ -166,8 +229,7 @@ export function emailNotificationTools(
 			routes: direct('GET', '/email-notification/reminders'),
 			handler: async (c) => {
 				const response = await c.get('/email-notification/reminders')
-				const record = (response.data ?? {}) as Record<string, unknown>
-				return { settings: record.settings ?? null }
+				return projectReminderSettings(response.data)
 			},
 		}),
 

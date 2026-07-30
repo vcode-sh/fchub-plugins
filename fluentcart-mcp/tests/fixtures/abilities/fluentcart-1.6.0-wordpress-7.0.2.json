@@ -1,0 +1,3226 @@
+{
+  "schemaVersion": 2,
+  "generatedBy": "scripts/capture-abilities-contract.mjs",
+  "evidenceScope": "all-active-compatibility",
+  "capturedAt": "2026-07-30T07:16:22.926Z",
+  "profile": {
+    "wordpress": "7.0.2",
+    "activeComponents": [
+      {
+        "slug": "fchub",
+        "version": "1.0.1"
+      },
+      {
+        "slug": "fchub-memberships",
+        "version": "1.4.1"
+      },
+      {
+        "slug": "fchub-payment-plans",
+        "version": "0.1.0"
+      },
+      {
+        "slug": "fchub-redsys",
+        "version": "0.1.0"
+      },
+      {
+        "slug": "fluent-cart",
+        "version": "1.6.0"
+      },
+      {
+        "slug": "fluent-cart-pro",
+        "version": "1.6.0"
+      },
+      {
+        "slug": "fluent-community",
+        "version": "2.7.5"
+      },
+      {
+        "slug": "fluent-community-pro",
+        "version": "2.7.5"
+      },
+      {
+        "slug": "fluent-crm",
+        "version": "3.1.10"
+      },
+      {
+        "slug": "fluent-smtp",
+        "version": "2.2.95"
+      },
+      {
+        "slug": "plugin-check",
+        "version": "2.0.0"
+      }
+    ],
+    "capturedAt": "2026-07-30T07:16:02.464Z",
+    "source": "wp-cli"
+  },
+  "profileDigest": "sha256:0cd09d79d5f12df5e17ff09ba8faf80723eb97afeb7cd6f7a2422083d24b1cac",
+  "authentication": {
+    "scheme": "wordpress-application-password-basic",
+    "unauthenticatedDiscoveryStatus": 401,
+    "authenticatedDiscoveryStatus": 200
+  },
+  "adapter": {
+    "status": "BLOCKED",
+    "reason": "The runtime reports no available MCP adapter. No adapter was activated for this audit.",
+    "endpoint": "/fluent-cart/mcp"
+  },
+  "abilities": [
+    {
+      "name": "fluent-cart/add-order-note",
+      "label": "Add Order Note",
+      "description": "Add an internal note to an order activity log. Visible to staff, not the customer.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string",
+            "description": "Note text. Plain text or simple HTML."
+          }
+        },
+        "required": ["order_id", "note"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": false,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/add-order-note",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/add-order-note/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/apply-labels",
+      "label": "Apply Labels",
+      "description": "Add or remove labels on an order, customer, or subscription. Pass add_label_ids and/or remove_label_ids; use list-reference-data with kind=labels to find label ids. Returns the resulting label set so you can confirm.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "enum": ["order", "customer", "subscription"]
+          },
+          "entity_id": {
+            "type": "integer"
+          },
+          "add_label_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "remove_label_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": ["entity_type", "entity_id"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": false,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": true,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/apply-labels",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/apply-labels/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/change-order-status",
+      "label": "Change Order Status",
+      "description": "Change an order status or shipping status. Pass order_id and at least one of order_status or shipping_status. A no-op is returned if the order is already in that status. To refund, use refund-order instead.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "integer"
+          },
+          "order_status": {
+            "type": "string",
+            "enum": ["on-hold", "processing", "completed", "canceled"],
+            "description": "New order lifecycle status. Only these are manually settable; refunded/partial-refund come from the refund flow, draft/pending/failed from payment."
+          },
+          "shipping_status": {
+            "type": "string",
+            "enum": ["unshipped", "shipped", "delivered", "unshippable"],
+            "description": "New shipping status. Setting shipped/delivered marks items fulfilled."
+          }
+        },
+        "required": ["order_id"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": false,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": true,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/change-order-status",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/change-order-status/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/change-subscription-status",
+      "label": "Change Subscription Status",
+      "description": "Cancel a subscription through its gateway — destructive. Call dry_run:true first to preview and get a confirm_token, then call again with that confirm_token plus an idempotency_key to execute. Cancellation is immediate. The preview reports payment_mode and live_gateway_action; a LIVE cancellation requires operator opt-in, and test-mode always works.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription_id": {
+            "type": "integer"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["cancel"],
+            "description": "Only cancel is supported. Pause/resume are not available."
+          },
+          "when": {
+            "type": "string",
+            "enum": ["immediately"],
+            "default": "immediately",
+            "description": "Cancellation is immediate. Deferred (period-end) cancellation is not yet supported."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Preview without cancelling. Returns a confirm_token. Do this first."
+          },
+          "confirm_token": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": ["subscription_id", "action"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": false,
+        "mcpDestructiveHint": true,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/change-subscription-status",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/change-subscription-status/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-customer",
+      "label": "Get Customer",
+      "description": "Full profile + metrics for one customer. Identify by customer_id OR email. Add include[] for any of: orders, subscriptions, addresses, labels, notes, crm_contact (orders carry their line items: product id, title, quantity; subscriptions carry plan_type so installment plans are distinguishable from recurring ones). Use with_orders_limit to bound order history.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "orders",
+                "subscriptions",
+                "addresses",
+                "labels",
+                "notes",
+                "crm_contact"
+              ]
+            },
+            "description": "Optional sections. Profile + metrics are always returned."
+          },
+          "with_orders_limit": {
+            "type": "integer",
+            "default": 10,
+            "description": "Cap on orders when include has orders. Max 50."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-customer",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-customer/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-inventory",
+      "label": "Get Inventory Status",
+      "description": "Stock-managed variations that need attention: out-of-stock, or at/below a threshold. Answers \"what do I need to restock?\" — this is inventory health, not sales. Shows available vs committed vs on-hold.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "threshold": {
+            "type": "integer",
+            "default": 5,
+            "description": "Flag variations with available stock at or below this."
+          },
+          "only_out_of_stock": {
+            "type": "boolean",
+            "default": false
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 25,
+            "description": "Max 100."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-inventory",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-inventory/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-order",
+      "label": "Get Order",
+      "description": "Full detail for one order: money breakdown, line items, and customer by default. Add include[] for any of: transactions, refunds, addresses, coupons, subscriptions, crm_contact. Identify the order by order_id (numeric, from list-orders) OR uuid OR invoice_no.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "description": "Numeric order id as returned by list-orders."
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "invoice_no": {
+            "type": "string"
+          },
+          "include": {
+            "type": "array",
+            "description": "Optional heavier sections. items + customer are always included.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "transactions",
+                "refunds",
+                "addresses",
+                "coupons",
+                "subscriptions",
+                "crm_contact"
+              ]
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional: return only these top-level keys to shrink the payload (order_id is always kept). e.g. status, payment_status, totals, items, customer. Applies after include[]. Omit for the full record."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-order",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-order/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-order-activity",
+      "label": "Get Order Activity",
+      "description": "Audit timeline for one order — status changes, payments, refunds, notes, emails sent: who did what and when. Refund and payment rows carry the amount (backfilled onto activity rows from the matching transaction), so you need not cross-reference. Use after get-order when you need history, not just current state.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 30,
+            "description": "Max 100."
+          }
+        },
+        "required": ["order_id"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-order-activity",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-order-activity/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-product",
+      "label": "Get Product",
+      "description": "Full detail for one product: description, variations with SKU/price/stock/subscription terms, categories and tags. Add include[] for sales (lifetime units + revenue) and downloads. Identify by product_id.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "integer"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["sales", "downloads"]
+            },
+            "description": "Optional sections. detail + variations + taxonomy are always returned."
+          }
+        },
+        "required": ["product_id"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-product",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-product/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-product-financials",
+      "label": "Get Product Financials",
+      "description": "One product's complete financials in a call: one-time revenue, finite split-pay commitments (bill_times > 0), and perpetual run-rate (MRR/ARR) with a forward payment_schedule. Never sums across currencies. KEY: the time window (range/date_from/date_to + date_basis) applies ONLY to the one_time block — subscriptions.*, payment_schedule and totals are point-in-time as of as_of (lifetime-to-date or forward), so \"revenue in the last 30 days\" must read one_time.* only and never folds in contract value or MRR. For a windowed time series use get-sales-trend; for renewal cash in a period use query-products with order_type=renewal. totals.total_contracted is null while any perpetual subscription is active — read recurring.mrr/arr and payment_schedule instead, and meta.notes says why. Single currency: store default, other currencies for the product listed in meta.other_currencies. Money is {amount, amount_cents, currency, display}.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "integer",
+            "description": "Product to report on."
+          },
+          "variation_id": {
+            "type": "integer",
+            "description": "Restrict to one variation."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency for the (single-currency) report. Defaults to store currency."
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "all_time",
+              "since_launch"
+            ],
+            "default": "all_time",
+            "description": "Window for the one_time block only. Resolved in UTC. all_time (alias: since_launch) spans all data."
+          },
+          "date_from": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC. Overrides range."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC. Overrides range."
+          },
+          "date_basis": {
+            "type": "string",
+            "enum": ["created_at", "paid_at"],
+            "default": "paid_at",
+            "description": "One-time window basis: paid_at = order completed_at (cash received); created_at = order placed. Does not affect forward fields."
+          },
+          "as_of": {
+            "type": "string",
+            "description": "ISO 8601, UTC. Point-in-time for forward metrics. Default now."
+          },
+          "horizon": {
+            "type": "string",
+            "enum": ["3m", "6m", "12m"],
+            "default": "12m",
+            "description": "How far to project payment_schedule."
+          },
+          "schedule_bucket": {
+            "type": "string",
+            "enum": ["month", "week"],
+            "default": "month",
+            "description": "Calendar granularity of payment_schedule."
+          },
+          "subscription_status": {
+            "type": "array",
+            "description": "Which statuses feed forward metrics (scheduled_remaining, mrr, next_*_scheduled, payment_schedule). Default [active]. Use [all] to include every status. status_breakdown is always the full picture regardless.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "active",
+                "trialing",
+                "past_due",
+                "paused",
+                "canceled",
+                "all"
+              ]
+            }
+          },
+          "include": {
+            "type": "array",
+            "description": "Opt-in sections. schedule = the full payment_schedule[] (can be long; next_30d/next_90d scalars are always returned).",
+            "items": {
+              "type": "string",
+              "enum": ["schedule"]
+            }
+          }
+        },
+        "required": ["product_id"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-product-financials",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-product-financials/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-refund-report",
+      "label": "Get Refund Report",
+      "description": "Refund metrics for a period: refunded order count, refund rate as a share of paid orders, total and average refunded amount. Counts every order refunded in the window from its total_refund, including orders that were fully refunded and then canceled (not just partial refunds on still-paid orders). Scoped to one currency.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative window, resolved in UTC to match the store reports. today = midnight UTC to now; since_launch (alias: all_time) = the store's first paid order to now. Or pass start_date + end_date (dates), date_from + date_to (ISO 8601 datetimes), or since (delta)."
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window start; overrides range. A time of day is honored (e.g. launch hour)."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Delta mode: only records after this instant, up to now — answers \"what changed since my last check\". Overrides range/date_from/date_to."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test", "all"],
+            "default": "all",
+            "description": "Order mode. all (default) counts both live and test orders; pass live to exclude test-mode orders. Echoed as meta.mode."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-refund-report",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-refund-report/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-sales-report",
+      "label": "Get Sales Report",
+      "description": "Revenue overview for a period with comparison to the prior equal period: gross, net, paid, refunded, tax, shipping, fees, order count, AOV, unique customers, and percent change. The refunded metric covers all refunds in the window including fully refunded orders (which net to zero in net_revenue). Scoped to one currency, the store default unless a currency is given.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative window, resolved in UTC to match the store reports. today = midnight UTC to now; since_launch (alias: all_time) = the store's first paid order to now. Or pass start_date + end_date (dates), date_from + date_to (ISO 8601 datetimes), or since (delta)."
+          },
+          "start_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD, UTC. Overrides range."
+          },
+          "end_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD, UTC. Overrides range."
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window start; overrides range. A time of day is honored (e.g. launch hour)."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Delta mode: only records after this instant, up to now — answers \"what changed since my last check\". Overrides range/date_from/date_to."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency. Defaults to the store currency."
+          },
+          "compare": {
+            "type": "boolean",
+            "default": true,
+            "description": "Include prior-period comparison."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test", "all"],
+            "default": "all",
+            "description": "Order mode. all (default) counts both live and test orders; pass live to exclude test-mode orders. Echoed as meta.mode."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line, human-readable answer — quotable verbatim."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "range": {
+                "type": "object",
+                "description": "Resolved UTC window: start, end, label, currency."
+              },
+              "metrics": {
+                "type": "object",
+                "description": "order_count and unique_customers are integers; every other key (gross_revenue, net_revenue, paid, refunded, tax, shipping, fees, aov) is a money object.",
+                "properties": {
+                  "order_count": {
+                    "type": "integer"
+                  },
+                  "unique_customers": {
+                    "type": "integer"
+                  }
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "description": "Money: amount (decimal), amount_cents (integer, smallest unit), currency (ISO 4217), display (formatted string, e.g. \"$19.99\").",
+                  "properties": {
+                    "amount": {
+                      "type": "number"
+                    },
+                    "amount_cents": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "display": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "definitions": {
+                "type": "object",
+                "description": "Human-readable metric definitions."
+              },
+              "comparison": {
+                "type": "object",
+                "description": "Prior-period metrics and percent change (present when compare=true)."
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Envelope metadata: schema version, currency, plus per-tool keys (date_basis, mode, page, warnings).",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "generated_at": {
+                "type": "string",
+                "description": "ISO-8601 UTC timestamp."
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO 4217 store currency for reference."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Non-fatal notes, e.g. an ignored parameter."
+              },
+              "date_basis": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": ["summary", "data", "meta"]
+      },
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-sales-report",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-sales-report/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-sales-trend",
+      "label": "Get Sales Trend",
+      "description": "Time series of revenue and order count bucketed by day, week, or month over a period. Scoped to one currency. Use to see growth and seasonality.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative window, resolved in UTC to match the store reports. today = midnight UTC to now; since_launch (alias: all_time) = the store's first paid order to now. Or pass start_date + end_date (dates), date_from + date_to (ISO 8601 datetimes), or since (delta)."
+          },
+          "start_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD, UTC."
+          },
+          "end_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD, UTC."
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window start; overrides range. A time of day is honored (e.g. launch hour)."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Delta mode: only records after this instant, up to now — answers \"what changed since my last check\". Overrides range/date_from/date_to."
+          },
+          "interval": {
+            "type": "string",
+            "enum": ["hour", "day", "week", "month"],
+            "default": "day",
+            "description": "Bucket size. hour is for intraday launch monitoring (capped at 180 buckets per call). Alias: granularity."
+          },
+          "granularity": {
+            "type": "string",
+            "enum": ["hour", "day", "week", "month"],
+            "description": "Alias for interval."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test", "all"],
+            "default": "all",
+            "description": "Order mode. all (default) counts both live and test orders; pass live to exclude test-mode orders. Echoed as meta.mode."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-sales-trend",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-sales-trend/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-search-schema",
+      "label": "Get Advanced Search Schema",
+      "description": "The reference for the advanced_filters parameter — the same condition-group search the admin \"advanced filter\" UI offers. Returns every filterable property of one entity (operators, value types, enum options), the payload format, and a worked example. Call this once before passing advanced_filters to a list tool. Entities: orders, customers, products, subscriptions. Requires FluentCart Pro.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "enum": ["orders", "customers", "products", "subscriptions"],
+            "description": "The entity whose search schema to return."
+          }
+        },
+        "required": ["entity"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-search-schema",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-search-schema/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-store-context",
+      "label": "Get Store Context",
+      "description": "START HERE — call once per session. Returns who you are and your permissions, the store currency/timezone conventions, headline stats, every valid enum value (order/payment/shipping/subscription statuses, intervals, types), and usage guidelines. Use this before any other tool so you never guess a status string or money format.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-store-context",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-store-context/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-subscription",
+      "label": "Get Subscription",
+      "description": "Full detail for one subscription: lifecycle dates, billing schedule, signup/trial, parent order, gateway ids. Add include[] for transactions (renewal history) and labels. Identify by subscription_id.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription_id": {
+            "type": "integer"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["transactions", "labels"]
+            }
+          }
+        },
+        "required": ["subscription_id"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-subscription",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-subscription/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-top-products",
+      "label": "Get Top Products",
+      "description": "Best-selling products over a period, ranked by revenue or units sold. Scoped to one currency.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative window, resolved in UTC to match the store reports. today = midnight UTC to now; since_launch (alias: all_time) = the store's first paid order to now. Or pass start_date + end_date (dates), date_from + date_to (ISO 8601 datetimes), or since (delta)."
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window start; overrides range. A time of day is honored (e.g. launch hour)."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Delta mode: only records after this instant, up to now — answers \"what changed since my last check\". Overrides range/date_from/date_to."
+          },
+          "metric": {
+            "type": "string",
+            "enum": ["revenue", "units"],
+            "default": "revenue"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 10,
+            "description": "Max 50."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test", "all"],
+            "default": "all",
+            "description": "Order mode. all (default) counts both live and test orders; pass live to exclude test-mode orders. Echoed as meta.mode."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-top-products",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-top-products/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/get-upcoming-payments",
+      "label": "Get Upcoming Payments",
+      "description": "Forward view of expected subscription billings grouped by date, split into finite_installments (split-pay, bill_times > 0) vs recurring_renewals (open-ended), plus an at_risk figure from past_due subscriptions discounted by the store's historical renewal success rate. Anchors on next_billing_date, steps by each plan's interval, stops finite plans at their remaining bills. Optional product_id/variation_id scope to one product. Single currency: store default, others in meta.other_currencies. date_from/date_to default to now..+90 days. Money is {amount, amount_cents, currency, display}.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "integer",
+            "description": "Limit to subscriptions for one product. Omit for the whole store."
+          },
+          "variation_id": {
+            "type": "integer",
+            "description": "Limit to one variation."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency for the (single-currency) report. Defaults to store currency."
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 or YYYY-MM-DD, UTC. Window start. Default now."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 or YYYY-MM-DD, UTC. Window end. Default 90 days out."
+          },
+          "bucket": {
+            "type": "string",
+            "enum": ["day", "month"],
+            "default": "day",
+            "description": "Calendar granularity of the schedule."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/get-upcoming-payments",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/get-upcoming-payments/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/list-coupons",
+      "label": "List Coupons",
+      "description": "Find and filter coupons with usage counts (times_used) and validity windows. Filter by status, by code substring, or by type; paginate with page/per_page. Interpret amount via type: percentage means a percent (10 = 10 percent), fixed means a currency value. Use active_now to get only coupons usable today (status active and within the start/end window — i.e. not expired). status inactive means disabled.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Matches coupon code or title."
+          },
+          "code": {
+            "type": "string",
+            "description": "Matches the coupon code only (substring). Narrower than search."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive"],
+            "description": "inactive = disabled. For \"expired\", use active_now=false / read valid_now on each row."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["fixed", "percentage"]
+          },
+          "active_now": {
+            "type": "boolean",
+            "description": "Only coupons that are active and within their start/end window right now."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": ["id", "use_count", "priority", "end_date"],
+            "default": "id"
+          },
+          "sort_type": {
+            "type": "string",
+            "enum": ["ASC", "DESC"],
+            "default": "DESC"
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 25,
+            "description": "Max 100."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/list-coupons",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/list-coupons/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/list-customers",
+      "label": "List Customers",
+      "description": "Find and filter customers. Compact rows with LTV, order count, AOV, and location. For one customer's full history use get-customer. min_ltv is in store currency (e.g. 500), not cents. For conditions these flat filters cannot express (OR groups, buyers of a specific product/variation, relative purchase-date windows, labels) pass advanced_filters — call get-search-schema entity=customers first (Pro).",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Matches name or email."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "archived"]
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO-2 country code. Matches the customer PROFILE country, which is captured once when the customer record is created and never refreshed — it can differ from the billing address (see location_source on each row). For geography taken from the address on the order, filter list-orders by country instead."
+          },
+          "state": {
+            "type": "string",
+            "description": "Customer profile state — same caveat as country."
+          },
+          "city": {
+            "type": "string",
+            "description": "Customer profile city — same caveat as country."
+          },
+          "min_ltv": {
+            "type": "number",
+            "description": "Minimum lifetime value in store currency."
+          },
+          "min_purchase_count": {
+            "type": "integer"
+          },
+          "first_purchase_after": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC."
+          },
+          "last_purchase_after": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC."
+          },
+          "last_purchase_before": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC."
+          },
+          "advanced_filters": {
+            "type": "array",
+            "items": {
+              "type": ["object", "array"]
+            },
+            "description": "Pro: condition groups {property, operator, value} — outer array = OR groups, inner = AND. Call get-search-schema entity=customers FIRST for properties/operators/format. AND-combines with the other filters here. An empty array means no advanced filter."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "id",
+              "ltv",
+              "purchase_count",
+              "last_purchase_date",
+              "created_at"
+            ],
+            "default": "ltv"
+          },
+          "sort_type": {
+            "type": "string",
+            "enum": ["ASC", "DESC"],
+            "default": "DESC"
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 15,
+            "description": "Max 100."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/list-customers",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/list-customers/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/list-orders",
+      "label": "List Orders",
+      "description": "Find and filter orders. Returns compact rows (id, number, customer, total, statuses, date, plus an items list: each line item's product, title and quantity) — call get-order for the full money/refund breakdown. All filters optional; combine freely. For one customer's orders, pass customer_email or customer_id here. Money filters are in store currency (e.g. 49.99), not cents. For conditions these flat filters cannot express (OR groups, relative dates, transaction/UTM/label/license properties) pass advanced_filters — call get-search-schema entity=orders first (Pro).",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "completed",
+              "on-hold",
+              "canceled",
+              "failed",
+              "draft",
+              "pending",
+              "refunded"
+            ],
+            "description": "Order fulfillment/lifecycle status. To find refunded orders use payment_status (refunded / partially_refunded), NOT this field: refunds are recorded as payment state, and status=refunded only ever appears on stores migrated from WooCommerce. pending here means an unpaid store-managed renewal invoice, which is not the same as payment_status=pending; a COD order sits at status=on-hold with payment_status=pending."
+          },
+          "payment_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paid",
+              "partially_paid",
+              "failed",
+              "refunded",
+              "partially_refunded",
+              "authorized",
+              "payment_scheduled"
+            ],
+            "description": "Money state of the order — this is where refunded, partially_refunded, authorized and payment_scheduled live."
+          },
+          "shipping_status": {
+            "type": "string",
+            "enum": ["none", "unshipped", "shipped", "delivered", "unshippable"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["payment", "renewal", "subscription"],
+            "description": "payment = first purchase, renewal = subscription renewal."
+          },
+          "customer_id": {
+            "type": "integer"
+          },
+          "customer_email": {
+            "type": "string",
+            "description": "Exact email — the most reliable customer filter."
+          },
+          "product_id": {
+            "type": "integer",
+            "description": "Orders containing this product."
+          },
+          "coupon_code": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO-2 country code on the billing address."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code."
+          },
+          "min_total": {
+            "type": "number",
+            "description": "Minimum order total in store currency."
+          },
+          "max_total": {
+            "type": "number",
+            "description": "Maximum order total in store currency."
+          },
+          "created_after": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC."
+          },
+          "created_before": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test"],
+            "description": "Defaults to all modes."
+          },
+          "search": {
+            "type": "string",
+            "description": "Matches invoice/receipt number, order uuid, and customer name/email."
+          },
+          "advanced_filters": {
+            "type": "array",
+            "items": {
+              "type": ["object", "array"]
+            },
+            "description": "Pro: condition groups {property, operator, value} — outer array = OR groups, inner = AND. Call get-search-schema entity=orders FIRST for properties/operators/format. AND-combines with the other filters here. An empty array means no advanced filter."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": ["id", "created_at", "completed_at", "total_amount"],
+            "default": "id"
+          },
+          "sort_type": {
+            "type": "string",
+            "enum": ["ASC", "DESC"],
+            "default": "DESC"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional: return only these row keys to shrink the payload (order_id is always kept). Available: number, label, status, payment_status, shipping_status, type, total, customer, items, created_at. Omit for the full row."
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 15,
+            "description": "Max 100."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/list-orders",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/list-orders/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/list-products",
+      "label": "List Products",
+      "description": "Find and filter products. Compact rows: title, status, price range, variation count, fulfillment, stock status. Use get-product for full detail and per-variation stock. Price filters are in store currency, not cents. For conditions these flat filters cannot express (OR groups, order/variation counts, available stock quantity, taxonomy terms) pass advanced_filters — call get-search-schema entity=products first (Pro).",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Matches product title."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["publish", "draft", "private", "pending"],
+            "description": "WordPress post status."
+          },
+          "fulfillment_type": {
+            "type": "string",
+            "enum": ["physical", "digital"]
+          },
+          "variation_type": {
+            "type": "string",
+            "enum": ["simple", "simple_variations", "advanced_variations"]
+          },
+          "stock_status": {
+            "type": "string",
+            "enum": ["in-stock", "out-of-stock"]
+          },
+          "category": {
+            "type": "string",
+            "description": "Category term slug."
+          },
+          "min_price": {
+            "type": "number",
+            "description": "Minimum price in store currency."
+          },
+          "max_price": {
+            "type": "number",
+            "description": "Maximum price in store currency."
+          },
+          "advanced_filters": {
+            "type": "array",
+            "items": {
+              "type": ["object", "array"]
+            },
+            "description": "Pro: condition groups {property, operator, value} — outer array = OR groups, inner = AND. Call get-search-schema entity=products FIRST for properties/operators/format. AND-combines with the other filters here. An empty array means no advanced filter."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": ["id", "title", "date"],
+            "default": "date"
+          },
+          "sort_type": {
+            "type": "string",
+            "enum": ["ASC", "DESC"],
+            "default": "DESC"
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 15,
+            "description": "Max 100."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/list-products",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/list-products/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/list-reference-data",
+      "label": "List Reference Data",
+      "description": "On-demand lookup lists kept out of get-store-context to keep it lean: coupons, labels, gateways, tax_classes, shipping_zones, product_categories. Pass kinds[] with only what you need. Kinds your role cannot see are reported in meta.warnings, not dropped silently. The coupons kind is a capped snapshot (newest 200, each with times_used) — to filter by status/code, paginate, or find usable-now coupons, use list-coupons instead.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kinds": {
+            "type": "array",
+            "description": "Which reference lists to return.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "coupons",
+                "labels",
+                "gateways",
+                "tax_classes",
+                "shipping_zones",
+                "product_categories"
+              ]
+            }
+          }
+        },
+        "required": ["kinds"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/list-reference-data",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/list-reference-data/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/list-subscriptions",
+      "label": "List Subscriptions",
+      "description": "Find and filter subscriptions. Compact rows carry customer, plan, status, recurring_total, interval, next/created/canceled dates, and installment fields: is_installment, installments_paid, installments_remaining, total_contract_value = recurring_total x bill_times (the full committed price). Use plan_type to split fixed-term installment/split-pay from open-ended recurring plans; next_billing_before for upcoming renewals; created_*/canceled_* ranges for cohorts and churn — a completed installment is paid-in-full, not churn. summary_only=true returns just the aggregates (count by status, committed recurring total, remaining installments). min_recurring is in store currency, not cents. For conditions these flat filters cannot express (OR groups, vendor/transaction ids, payment method, license properties, labels) pass advanced_filters — call get-search-schema entity=subscriptions first (Pro).",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "active",
+              "failing",
+              "paused",
+              "expired",
+              "expiring",
+              "canceled",
+              "trialing",
+              "intended",
+              "past_due",
+              "completed"
+            ]
+          },
+          "plan_type": {
+            "type": "string",
+            "enum": ["installment", "recurring", "all"],
+            "default": "all",
+            "description": "installment = fixed-term split-pay such as a lifetime license paid in N installments where bill_times > 0; recurring = open-ended subscription where bill_times = 0; all = both."
+          },
+          "customer_id": {
+            "type": "integer"
+          },
+          "product_id": {
+            "type": "integer"
+          },
+          "billing_interval": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "quarterly",
+              "half_yearly",
+              "yearly"
+            ]
+          },
+          "next_billing_after": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC."
+          },
+          "next_billing_before": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC. Use to find upcoming renewals."
+          },
+          "created_after": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC. Subscriptions started on or after this date."
+          },
+          "created_before": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC. Subscriptions started on or before this date."
+          },
+          "canceled_after": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC. Subscriptions canceled on or after this date. Pair with status=canceled to measure churn in a window."
+          },
+          "canceled_before": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC. Subscriptions canceled on or before this date."
+          },
+          "min_recurring": {
+            "type": "number",
+            "description": "Minimum recurring total in store currency."
+          },
+          "advanced_filters": {
+            "type": "array",
+            "items": {
+              "type": ["object", "array"]
+            },
+            "description": "Pro: condition groups {property, operator, value} — outer array = OR groups, inner = AND. Call get-search-schema entity=subscriptions FIRST for properties/operators/format. AND-combines with the other filters here (summary_only included). An empty array means no advanced filter."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "id",
+              "next_billing_date",
+              "created_at",
+              "canceled_at",
+              "recurring_total"
+            ],
+            "default": "id"
+          },
+          "sort_type": {
+            "type": "string",
+            "enum": ["ASC", "DESC"],
+            "default": "DESC"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional: return only these row keys to shrink the payload (subscription_id is always kept). Available: status, item_name, customer, recurring_total, billing_interval, next_billing_date, created_at, canceled_at, bill_count, bill_times, plan_type, is_installment, installments_paid, installments_remaining, total_contract_value, currency, label. Omit for the full row."
+          },
+          "summary_only": {
+            "type": "boolean",
+            "description": "When true, return ONLY aggregates across all matching subscriptions — count_by_status, summed recurring_total, and total remaining installments — with no per-record array. Answers \"how many active subs and how much is committed\" with a tiny payload. Honors all the filters above."
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 15,
+            "description": "Max 200."
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/list-subscriptions",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/list-subscriptions/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/list-transactions",
+      "label": "List Transactions",
+      "description": "The payment ledger across every order and subscription — charges, refunds, disputes, signup fees. Filter by type, status, order_id, subscription_id, customer_id, payment_method, currency, mode or a date window, then paginate. Answers cross-record questions the per-order and per-subscription views cannot: \"all refunds last week\", failed renewal charges for dunning, one customer's payment history. Money is summed PER currency in summary.amount_by_currency, never across. summary_only:true returns just the counts and totals with no rows.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["charge", "refund", "dispute", "signup_fee"],
+            "description": "charge = a payment taken; refund = money returned; dispute = chargeback; signup_fee = subscription signup fee."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "succeeded",
+              "authorized",
+              "pending",
+              "refunded",
+              "failed",
+              "dispute_lost"
+            ],
+            "description": "succeeded, failed = use for dunning / failed renewals, pending, authorized, refunded, dispute_lost."
+          },
+          "order_id": {
+            "type": "integer",
+            "description": "Transactions for one order."
+          },
+          "subscription_id": {
+            "type": "integer",
+            "description": "Transactions for one subscription — its renewal charges, signup fee, refunds."
+          },
+          "customer_id": {
+            "type": "integer",
+            "description": "All transactions for one customer, matched via the parent order."
+          },
+          "payment_method": {
+            "type": "string",
+            "description": "Gateway slug, e.g. stripe, paypal, mollie."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency filter. Omit to include all currencies; totals stay split per currency."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test", "all"],
+            "default": "all",
+            "description": "Payment mode. all (default) includes both; pass live to exclude test transactions. Echoed as meta.mode."
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative date window on created_at, resolved in UTC using the same range vocabulary as the reports. Defaults to last_30_days. Or pass date_from/date_to, or since."
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Window start; overrides range."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Only transactions after this instant — \"what settled since my last check\"."
+          },
+          "summary_only": {
+            "type": "boolean",
+            "description": "Return ONLY the aggregate summary — matching_count, per-type and per-status counts, amount_by_currency — with no per-transaction rows. Answers \"how much did we refund\" cheaply."
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 25,
+            "description": "Max 100."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": ["created_at", "total", "id"],
+            "default": "created_at",
+            "description": "created_at is newest-first by default; total ranks by amount."
+          },
+          "sort_type": {
+            "type": "string",
+            "enum": ["ASC", "DESC"],
+            "default": "DESC"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line, human-readable answer — quotable verbatim."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "transactions": {
+                "type": "array",
+                "description": "One page of matching transactions (absent when summary_only is set).",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "order_id": {
+                      "type": "integer"
+                    },
+                    "subscription_id": {
+                      "description": "Subscription id, or null for one-off charges."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": ["charge", "refund", "dispute", "signup_fee"]
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "payment_method": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "description": "live or test."
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "Compact decimal in the row currency."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO 4217; per-row, since a result can span currencies."
+                    },
+                    "card_brand": {
+                      "description": "Card brand, or null."
+                    },
+                    "card_last_4": {
+                      "description": "Last 4 digits, or null."
+                    },
+                    "vendor_charge_id": {
+                      "type": "string"
+                    },
+                    "customer": {
+                      "description": "id, name, email resolved via the parent order; null if unresolved."
+                    },
+                    "created_at": {
+                      "description": "ISO-8601 UTC, or null."
+                    }
+                  }
+                }
+              },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "matching_count": {
+                    "type": "integer"
+                  },
+                  "by_type": {
+                    "type": "object",
+                    "description": "Count keyed by transaction type."
+                  },
+                  "by_status": {
+                    "type": "object",
+                    "description": "Count keyed by status."
+                  },
+                  "amount_by_currency": {
+                    "type": "array",
+                    "description": "One total per currency — money is never summed across currencies.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "currency": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "object",
+                          "description": "Money: amount (decimal), amount_cents (integer, smallest unit), currency (ISO 4217), display (formatted string, e.g. \"$19.99\").",
+                          "properties": {
+                            "amount": {
+                              "type": "number"
+                            },
+                            "amount_cents": {
+                              "type": "integer"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "display": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Envelope metadata: schema version, currency, plus per-tool keys (date_basis, mode, page, warnings).",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "generated_at": {
+                "type": "string",
+                "description": "ISO-8601 UTC timestamp."
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO 4217 store currency for reference."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Non-fatal notes, e.g. an ignored parameter."
+              },
+              "date_basis": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "page": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "required": ["summary", "data", "meta"]
+      },
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/list-transactions",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/list-transactions/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/manage-coupon",
+      "label": "Manage Coupon",
+      "description": "Create, update, or deactivate a coupon. action=create needs code, type, and amount. action=update and action=deactivate need coupon_id. Deactivate sets status to inactive rather than deleting. Interpret amount by type: percentage is a percent, fixed is a currency value.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["create", "update", "deactivate"]
+          },
+          "coupon_id": {
+            "type": "integer",
+            "description": "Required for update and deactivate."
+          },
+          "code": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["fixed", "percentage"]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive"]
+          },
+          "stackable": {
+            "type": "string",
+            "enum": ["yes", "no"]
+          },
+          "start_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC."
+          },
+          "end_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD or ISO 8601, UTC."
+          }
+        },
+        "required": ["action"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": false,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/manage-coupon",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/manage-coupon/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/query-customers",
+      "label": "Query Customers (flexible aggregate)",
+      "description": "Flexible customer analytics: pick metrics and group by country, state, status, or first/last purchase month, with optional filters. LTV is in store currency. Returns up to 200 rows. country/state resolve from the customer's primary billing address, falling back to their profile location, then \"unknown\" — this is where a customer is REGISTERED, captured at their first purchase and not refreshed since. To attribute revenue to where each order was actually billed, group query-orders by country instead.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "description": "Defaults to customer_count and total_ltv.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "customer_count",
+                "total_ltv",
+                "avg_ltv",
+                "avg_purchase_count",
+                "repeat_customers"
+              ]
+            }
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "country",
+                "state",
+                "status",
+                "first_purchase_month",
+                "last_purchase_month"
+              ]
+            }
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO-2 code, matched against the customer profile country (same caveat as the country dimension)."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "archived"],
+            "description": "Not every customer has one set — customers with no status appear under the status dimension as \"unknown\" and are excluded by this filter. Omit it to count all customers."
+          },
+          "min_ltv": {
+            "type": "number",
+            "description": "Minimum LTV in store currency."
+          },
+          "min_purchase_count": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "description": "1-based page over the grouped rows. Use with meta.page.has_more to page past the per_page cap."
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 200,
+            "description": "Grouped rows per page. Max 200."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line, human-readable answer — quotable verbatim."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "metrics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The metrics that were computed."
+              },
+              "dimensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The group-by dimensions."
+              },
+              "range": {
+                "type": "object",
+                "description": "Resolved UTC window (absent on query-customers, which is not date-scoped)."
+              },
+              "rows": {
+                "type": "array",
+                "description": "One object per group. Keys are the requested dimensions plus one key per metric; money metrics are compact decimals in meta.currency, counts are integers.",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Envelope metadata: schema version, currency, plus per-tool keys (date_basis, mode, page, warnings).",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "generated_at": {
+                "type": "string",
+                "description": "ISO-8601 UTC timestamp."
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO 4217 store currency for reference."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Non-fatal notes, e.g. an ignored parameter."
+              },
+              "date_basis": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "page": {
+                "type": "object"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": ["summary", "data", "meta"]
+      },
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/query-customers",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/query-customers/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/query-orders",
+      "label": "Query Orders (flexible aggregate)",
+      "description": "Flexible order analytics: pick metrics, group by dimensions with filters, when a fixed report does not fit — e.g. revenue by payment_status, orders by month, revenue by order_type (one-time payment vs new subscription vs renewal), or revenue by country. product_id or variation_id limits to orders containing that product. This is the tool for revenue BY GEOGRAPHY: group by country/state, which read each order's own billing address, falling back to the buyer's primary billing address. One currency; window filters on created_at, echoed as meta.date_basis.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "description": "One or more. Defaults to order_count and gross_revenue.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "order_count",
+                "gross_revenue",
+                "paid_revenue",
+                "refunded_amount",
+                "aov",
+                "unique_customers"
+              ]
+            }
+          },
+          "dimensions": {
+            "type": "array",
+            "description": "Group by these. Empty means a single total row. order_type splits sales by payment (one-time purchase), subscription (first subscription order) and renewal (recurring charge); combine with a time dimension for e.g. order_type x month. country/state come from each order's own billing address, falling back to the buyer's primary billing address when the order has no address row of its own (common for digital goods) — this is the right basis for revenue by geography. Orders neither source can place land in an explicit \"unknown\" bucket so the rows still sum to total revenue; see meta.geo_source.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "status",
+                "payment_status",
+                "order_type",
+                "country",
+                "state"
+              ]
+            }
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO-2 code. Limit to orders billed to this country, resolved the same way as the country dimension (order address, then the buyer's primary billing address)."
+          },
+          "product_id": {
+            "type": "integer",
+            "description": "Limit to orders CONTAINING this product. Order-level metrics (revenue, count) reflect the whole order, not just this product's lines — for per-product line revenue use query-products."
+          },
+          "variation_id": {
+            "type": "integer",
+            "description": "Limit to orders containing this variation."
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative window, resolved in UTC to match the store reports. today = midnight UTC to now; since_launch (alias: all_time) = the store's first paid order to now. Or pass start_date + end_date (dates), date_from + date_to (ISO 8601 datetimes), or since (delta)."
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window start; overrides range. A time of day is honored (e.g. launch hour)."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Delta mode: only records after this instant, up to now — answers \"what changed since my last check\". Overrides range/date_from/date_to."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "sort_desc": {
+            "type": "boolean",
+            "default": true,
+            "description": "Sort by the first metric descending. When grouping by a time dimension (day/week/month), rows default to chronological order unless you set this explicitly."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test", "all"],
+            "default": "all",
+            "description": "Order mode. all (default) counts both live and test orders; pass live to exclude test-mode orders. Echoed as meta.mode."
+          },
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "description": "1-based page over the grouped rows. Use with meta.page.has_more to page past the per_page cap."
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 200,
+            "description": "Grouped rows per page. Max 200."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line, human-readable answer — quotable verbatim."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "metrics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The metrics that were computed."
+              },
+              "dimensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The group-by dimensions."
+              },
+              "range": {
+                "type": "object",
+                "description": "Resolved UTC window (absent on query-customers, which is not date-scoped)."
+              },
+              "rows": {
+                "type": "array",
+                "description": "One object per group. Keys are the requested dimensions plus one key per metric; money metrics are compact decimals in meta.currency, counts are integers.",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Envelope metadata: schema version, currency, plus per-tool keys (date_basis, mode, page, warnings).",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "generated_at": {
+                "type": "string",
+                "description": "ISO-8601 UTC timestamp."
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO 4217 store currency for reference."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Non-fatal notes, e.g. an ignored parameter."
+              },
+              "date_basis": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "page": {
+                "type": "object"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": ["summary", "data", "meta"]
+      },
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/query-orders",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/query-orders/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/query-products",
+      "label": "Query Products (flexible aggregate)",
+      "description": "Flexible product-line analytics over sold items: pick metrics, group by product or variation, optionally split by order_type (one-time payment vs new subscription vs renewal), within a period and one currency. Rows self-describe: product_name always, plus variation_label when grouped by variation, so no follow-up lookup. For a time series use get-sales-trend. Window filters on the parent order created_at, echoed as meta.date_basis.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "description": "Defaults to units_sold and line_revenue. list_price_sum = units x list price before any discount; discount_amount = list_price_sum minus line_revenue (coupon + manual discount) — pick both with line_revenue to see margin leakage directly; net_revenue = line_revenue minus refunds.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "units_sold",
+                "line_revenue",
+                "list_price_sum",
+                "discount_amount",
+                "net_revenue",
+                "order_count",
+                "avg_unit_price",
+                "refund_amount"
+              ]
+            }
+          },
+          "dimensions": {
+            "type": "array",
+            "description": "Group by these. order_type splits a product's sales by the parent order type: payment (one-time purchase), subscription (first subscription order) and renewal (recurring charge). Combine with product/variation, e.g. product x order_type.",
+            "items": {
+              "type": "string",
+              "enum": ["product", "variation", "order_type"]
+            }
+          },
+          "product_id": {
+            "type": "integer",
+            "description": "Limit to one product (by product/post id). Combine with dimensions=[variation] to break that single product down by variation."
+          },
+          "variation_id": {
+            "type": "integer",
+            "description": "Limit to one variation of the product."
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative window, resolved in UTC to match the store reports. today = midnight UTC to now; since_launch (alias: all_time) = the store's first paid order to now. Or pass start_date + end_date (dates), date_from + date_to (ISO 8601 datetimes), or since (delta)."
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window start; overrides range. A time of day is honored (e.g. launch hour)."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Delta mode: only records after this instant, up to now — answers \"what changed since my last check\". Overrides range/date_from/date_to."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test", "all"],
+            "default": "all",
+            "description": "Order mode. all (default) counts both live and test orders; pass live to exclude test-mode orders. Echoed as meta.mode."
+          },
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "description": "1-based page over the grouped rows. Use with meta.page.has_more to page past the per_page cap."
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 200,
+            "description": "Grouped rows per page. Max 200."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line, human-readable answer — quotable verbatim."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "metrics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The metrics that were computed."
+              },
+              "dimensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The group-by dimensions."
+              },
+              "range": {
+                "type": "object",
+                "description": "Resolved UTC window (absent on query-customers, which is not date-scoped)."
+              },
+              "rows": {
+                "type": "array",
+                "description": "One object per group. Keys are the requested dimensions plus one key per metric; money metrics are compact decimals in meta.currency, counts are integers.",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Envelope metadata: schema version, currency, plus per-tool keys (date_basis, mode, page, warnings).",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "generated_at": {
+                "type": "string",
+                "description": "ISO-8601 UTC timestamp."
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO 4217 store currency for reference."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Non-fatal notes, e.g. an ignored parameter."
+              },
+              "date_basis": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "page": {
+                "type": "object"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": ["summary", "data", "meta"]
+      },
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/query-products",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/query-products/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/query-sources",
+      "label": "Query Sources (UTM attribution)",
+      "description": "Flexible UTM attribution: pick metrics and group by any UTM fields — source, medium, campaign, term, content, id — over a period, with optional source/medium/campaign filters to drill down. Pass product_id (or variation_id) to attribute only orders containing that product. Scoped to one currency, paid orders. Orders with no UTM fall under a none bucket. Returns up to 200 rows ranked by the first metric.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "description": "Defaults to orders and gross_revenue.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "orders",
+                "gross_revenue",
+                "net_revenue",
+                "aov",
+                "unique_customers",
+                "refunded_amount"
+              ]
+            }
+          },
+          "dimensions": {
+            "type": "array",
+            "description": "Group by these UTM fields. Defaults to utm_source, utm_medium, utm_campaign.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "utm_source",
+                "utm_medium",
+                "utm_campaign",
+                "utm_term",
+                "utm_content",
+                "utm_id"
+              ]
+            }
+          },
+          "utm_source": {
+            "type": "string",
+            "description": "Filter to one source, exact match."
+          },
+          "utm_medium": {
+            "type": "string",
+            "description": "Filter to one medium, exact match."
+          },
+          "utm_campaign": {
+            "type": "string",
+            "description": "Filter to one campaign, exact match."
+          },
+          "product_id": {
+            "type": "integer",
+            "description": "Limit attribution to orders containing this product (e.g. one product on a multi-product store)."
+          },
+          "variation_id": {
+            "type": "integer",
+            "description": "Limit attribution to orders containing this variation."
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative window, resolved in UTC to match the store reports. today = midnight UTC to now; since_launch (alias: all_time) = the store's first paid order to now. Or pass start_date + end_date (dates), date_from + date_to (ISO 8601 datetimes), or since (delta)."
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window start; overrides range. A time of day is honored (e.g. launch hour)."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Delta mode: only records after this instant, up to now — answers \"what changed since my last check\". Overrides range/date_from/date_to."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 50,
+            "description": "Max 200."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["live", "test", "all"],
+            "default": "all",
+            "description": "Order mode. all (default) counts both live and test orders; pass live to exclude test-mode orders. Echoed as meta.mode."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line, human-readable answer — quotable verbatim."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "metrics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The metrics that were computed."
+              },
+              "dimensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The group-by dimensions."
+              },
+              "range": {
+                "type": "object",
+                "description": "Resolved UTC window (absent on query-customers, which is not date-scoped)."
+              },
+              "rows": {
+                "type": "array",
+                "description": "One object per group. Keys are the requested dimensions plus one key per metric; money metrics are compact decimals in meta.currency, counts are integers.",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Envelope metadata: schema version, currency, plus per-tool keys (date_basis, mode, page, warnings).",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "generated_at": {
+                "type": "string",
+                "description": "ISO-8601 UTC timestamp."
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO 4217 store currency for reference."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Non-fatal notes, e.g. an ignored parameter."
+              },
+              "date_basis": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "page": {
+                "type": "object"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": ["summary", "data", "meta"]
+      },
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/query-sources",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/query-sources/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/query-subscriptions",
+      "label": "Query Subscriptions (flexible aggregate)",
+      "description": "Flexible subscription analytics: pick metrics, group by month/plan_type/status/billing_interval over a date window. plan_type splits fixed-term installment/split-pay from open-ended recurring plans. contract_value books installments at their full committed price, recurring_total x bill_times — a split-pay deal counts once at signup, not per charge. date_basis=created_at for booking cohorts, canceled_at for churn — a completed installment is paid-in-full, never churn. Not currency-scoped; money is store currency.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "description": "Defaults to subscription_count and contract_value. contract_value = full committed price of installments, recurring_total x bill_times, and 0 for open-ended plans; recurring_value = one-cycle total.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "subscription_count",
+                "contract_value",
+                "recurring_value"
+              ]
+            }
+          },
+          "dimensions": {
+            "type": "array",
+            "description": "Group by these. Empty means a single total row. plan_type splits installment vs recurring; status keeps completed installments separate from canceled/expired churn.",
+            "items": {
+              "type": "string",
+              "enum": ["month", "plan_type", "status", "billing_interval"]
+            }
+          },
+          "date_basis": {
+            "type": "string",
+            "enum": ["created_at", "canceled_at", "next_billing_date"],
+            "default": "created_at",
+            "description": "Which date the range and the month dimension use: created_at for booking cohorts, canceled_at for churn, next_billing_date for upcoming renewals."
+          },
+          "plan_type": {
+            "type": "string",
+            "enum": ["installment", "recurring", "all"],
+            "default": "all",
+            "description": "Filter to installment (bill_times > 0) or recurring (bill_times = 0) plans."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "active",
+              "failing",
+              "paused",
+              "expired",
+              "expiring",
+              "canceled",
+              "trialing",
+              "intended",
+              "past_due",
+              "completed"
+            ]
+          },
+          "product_id": {
+            "type": "integer",
+            "description": "Limit to subscriptions for one product."
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "last_30_days",
+              "this_month",
+              "last_month",
+              "mtd",
+              "qtd",
+              "ytd",
+              "last_quarter",
+              "last_year",
+              "since_launch",
+              "all_time"
+            ],
+            "description": "Relative window, resolved in UTC to match the store reports. today = midnight UTC to now; since_launch (alias: all_time) = the store's first paid order to now. Or pass start_date + end_date (dates), date_from + date_to (ISO 8601 datetimes), or since (delta)."
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "date_from": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window start; overrides range. A time of day is honored (e.g. launch hour)."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "ISO 8601 datetime or YYYY-MM-DD, UTC. Time-precise custom window end; overrides range."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO 8601 datetime, UTC. Delta mode: only records after this instant, up to now — answers \"what changed since my last check\". Overrides range/date_from/date_to."
+          },
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "description": "1-based page over the grouped rows. Use with meta.page.has_more to page past the per_page cap."
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 200,
+            "description": "Grouped rows per page. Max 200."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line, human-readable answer — quotable verbatim."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "metrics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The metrics that were computed."
+              },
+              "dimensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The group-by dimensions."
+              },
+              "range": {
+                "type": "object",
+                "description": "Resolved UTC window (absent on query-customers, which is not date-scoped)."
+              },
+              "rows": {
+                "type": "array",
+                "description": "One object per group. Keys are the requested dimensions plus one key per metric; money metrics are compact decimals in meta.currency, counts are integers.",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Envelope metadata: schema version, currency, plus per-tool keys (date_basis, mode, page, warnings).",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "generated_at": {
+                "type": "string",
+                "description": "ISO-8601 UTC timestamp."
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO 4217 store currency for reference."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Non-fatal notes, e.g. an ignored parameter."
+              },
+              "date_basis": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "page": {
+                "type": "object"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": ["summary", "data", "meta"]
+      },
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": true,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/query-subscriptions",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/query-subscriptions/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/refund-order",
+      "label": "Refund Order",
+      "description": "Refund an order through its gateway. ALWAYS call dry_run:true first to preview the refundable amount and get a confirm_token, then call again with that confirm_token plus an idempotency_key to execute — without the key a repeated execute could double-refund. amount is in store currency; omit for the full remaining balance. The preview reports payment_mode and live_gateway_action; a LIVE refund requires operator opt-in, and test-mode always works.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount to refund in store currency. Omit for the full remaining balance."
+          },
+          "transaction_id": {
+            "type": "integer",
+            "description": "Charge transaction to refund against. Omit to use the latest successful charge."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Preview without refunding. Returns a confirm_token. Do this first."
+          },
+          "confirm_token": {
+            "type": "string",
+            "description": "From a prior dry_run. Required to execute."
+          },
+          "idempotency_key": {
+            "type": "string",
+            "description": "A unique string for this refund. Prevents double-refund on retry."
+          }
+        },
+        "required": ["order_id"]
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": false,
+        "mcpDestructiveHint": true,
+        "mcpIdempotentHint": null,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/refund-order",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/refund-order/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    },
+    {
+      "name": "fluent-cart/upsert-customer",
+      "label": "Create or Update Customer",
+      "description": "Create a customer or update an existing one. Identify by customer_id to update, or email to create or match. On create, email is required. Only the fields you pass change. Set status to archived to deactivate; there is no hard delete. Use new_email to rename. if_exists handles a matched email: merge updates, skip leaves it, error returns a conflict.",
+      "category": "fluent-cart",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string",
+            "description": "Required to create; used to match on update."
+          },
+          "new_email": {
+            "type": "string",
+            "description": "Rename an existing customer in place."
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "archived"]
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO-2 country code."
+          },
+          "postcode": {
+            "type": "string"
+          },
+          "if_exists": {
+            "type": "string",
+            "enum": ["merge", "skip", "error"],
+            "default": "merge"
+          }
+        }
+      },
+      "outputSchema": [],
+      "annotations": {
+        "abilitiesReadonly": null,
+        "abilitiesDestructive": null,
+        "abilitiesIdempotent": null,
+        "mcpReadOnlyHint": false,
+        "mcpDestructiveHint": false,
+        "mcpIdempotentHint": true,
+        "mcpOpenWorldHint": null
+      },
+      "rest": {
+        "discoveryPath": "/wp-abilities/v1/abilities/fluent-cart/upsert-customer",
+        "runPath": "/wp-abilities/v1/abilities/fluent-cart/upsert-customer/run",
+        "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"]
+      }
+    }
+  ],
+  "fallbackFingerprints": [
+    {
+      "ability": "fluent-cart/get-customer",
+      "fingerprint": "sha256:85951d0b4c5f77293b71a1c6606bd3787e76fb5199e836eca9372528593dac2e"
+    },
+    {
+      "ability": "fluent-cart/get-inventory",
+      "fingerprint": "sha256:ea6ea1c9f873acfbc07d594205f41c59c8bc478e235b4618c163755823f1cb31"
+    },
+    {
+      "ability": "fluent-cart/get-order",
+      "fingerprint": "sha256:5124d86a2a91bdd9c90b131ceee733bc30c2ff81a6ab4b492e7ef935ebe8ce9a"
+    },
+    {
+      "ability": "fluent-cart/get-order-activity",
+      "fingerprint": "sha256:cd028b1cf48c10bc4da065abbfdd86ef244be166a20c20d64242abd2db4bca0f"
+    },
+    {
+      "ability": "fluent-cart/get-product",
+      "fingerprint": "sha256:a27d1009e9f87164348289a81aff7376835a210b7f437beb493572464f6e8b52"
+    },
+    {
+      "ability": "fluent-cart/get-product-financials",
+      "fingerprint": "sha256:193386897289557c87741ab6d07ca70caecd8f138c423340cd61af9b4a6443a8"
+    },
+    {
+      "ability": "fluent-cart/get-refund-report",
+      "fingerprint": "sha256:9c0a81f7d8eeac31ad39b9c3940bedae4ce8413286457db9d596e5fe3228d43d"
+    },
+    {
+      "ability": "fluent-cart/get-sales-report",
+      "fingerprint": "sha256:08929de45b351d8400f4ebc31c6782bc9d31e704fc0ac84d1715abf8455e418b"
+    },
+    {
+      "ability": "fluent-cart/get-sales-trend",
+      "fingerprint": "sha256:ad1d57f0f25798084a259a4108d583a0b0654602fdd2904fa3204c92c90a9e76"
+    },
+    {
+      "ability": "fluent-cart/get-search-schema",
+      "fingerprint": "sha256:d3a710b4d3b28b0709f1bc446571cfcf92ccbd8f117011b980ee366a1b6b4616"
+    },
+    {
+      "ability": "fluent-cart/get-store-context",
+      "fingerprint": "sha256:1bd792c89fcc7373bb959c970bb00d2ad7ea03c8f61ae56de3a6859e82159be6"
+    },
+    {
+      "ability": "fluent-cart/get-subscription",
+      "fingerprint": "sha256:03663649262c5abc7856eceba356549bcd28a8ce79a318b5ffcf42b815136670"
+    },
+    {
+      "ability": "fluent-cart/get-top-products",
+      "fingerprint": "sha256:f2e1f60401c5ab446681f66eae09fa079e8aac36ae69fb137e924bfc0b36c01b"
+    },
+    {
+      "ability": "fluent-cart/get-upcoming-payments",
+      "fingerprint": "sha256:3bc0c25cd780064e44a87dd6ddc61ec2c401e039ee10391f28b33e0a9476045a"
+    },
+    {
+      "ability": "fluent-cart/list-coupons",
+      "fingerprint": "sha256:5749a69ad9c474eb5d607d806eac3026bc4a33fdfbbac0da8d0ea224592c7d1e"
+    },
+    {
+      "ability": "fluent-cart/list-customers",
+      "fingerprint": "sha256:cec5436057c3be4dc2748d1b2eb543a165339d5777318f8e036f040b9441e2cb"
+    },
+    {
+      "ability": "fluent-cart/list-orders",
+      "fingerprint": "sha256:2f069edf53ffbf322877897840a0764a15f19ae37007a7735b4b5d6ad33d1aeb"
+    },
+    {
+      "ability": "fluent-cart/list-products",
+      "fingerprint": "sha256:ff302f5468b2025a0ab90a068b5aaabdf67d3d90813f592b55bfceb4087e7b7d"
+    },
+    {
+      "ability": "fluent-cart/list-reference-data",
+      "fingerprint": "sha256:00a44a4f6e0c22f81529f161c76e602c6926996cb8ff23548518ea0c29155898"
+    },
+    {
+      "ability": "fluent-cart/list-subscriptions",
+      "fingerprint": "sha256:9bc54cca14afffa1f5fbcaaebeabb917e97d014656492f378251a4301f8ddcc5"
+    },
+    {
+      "ability": "fluent-cart/list-transactions",
+      "fingerprint": "sha256:bb9f68f81e04cb1c84c0d0db68b65e09a58b770530588d36144486b8a9f9b627"
+    },
+    {
+      "ability": "fluent-cart/query-customers",
+      "fingerprint": "sha256:6231cfb5e9dbcd021a31f2c3fc8e3de147ac08325fb274cade0ea3245ef9e7a3"
+    },
+    {
+      "ability": "fluent-cart/query-orders",
+      "fingerprint": "sha256:90883e801a99130151b2d312227c1ad27faba80fc32030102c57dfeb690ed077"
+    },
+    {
+      "ability": "fluent-cart/query-products",
+      "fingerprint": "sha256:22a6c5c35dd41a030fab54627ed801db89240ec9e10598304ae325491066e52e"
+    },
+    {
+      "ability": "fluent-cart/query-sources",
+      "fingerprint": "sha256:d9da5d48a75c4ad9a81d89fe681dd03f00c289b5f4476d83f4bab6affdde324c"
+    },
+    {
+      "ability": "fluent-cart/query-subscriptions",
+      "fingerprint": "sha256:6083e5b54bc1abf613c063d04cd0125798c9b85d39da0b962e822bd7956ce78a"
+    }
+  ],
+  "compatibility": {
+    "representativeAbility": "fluent-cart/get-store-context",
+    "getStatus": 405,
+    "getCode": "rest_ability_invalid_method",
+    "postStatus": 200,
+    "responseBodiesPersisted": false
+  },
+  "contractDigest": "sha256:24f54a24569339b138ce731f0674254d7a930a6c9f83929580396aa41851709e"
+}

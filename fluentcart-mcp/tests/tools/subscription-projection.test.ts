@@ -91,4 +91,39 @@ describe('subscription list projects its rows', () => {
 		expect(out.data.data[0].currency).toBeUndefined()
 		expect(out.data.data[0].id).toBe(4)
 	})
+
+	it('keeps the FluentCart 1.6 collection method in list rows', async () => {
+		const out = await listWith({
+			data: { data: [{ ...RAW_ROW, collection_method: 'system' }] },
+		})
+		expect(out.data.data[0].collection_method).toBe('system')
+	})
+
+	it('keeps FluentCart 1.6 skip state in a subscription detail without exposing its meta', async () => {
+		const get = vi.fn().mockResolvedValue({
+			data: {
+				subscription: {
+					...RAW_ROW,
+					collection_method: 'manual',
+					has_pending_skip: true,
+					last_skipped_period: '2026-08-01 00:00:00',
+					meta: [{ meta_key: 'pending_skip_until', meta_value: 'internal-only' }],
+				},
+			},
+			status: 200,
+		})
+		const client = { get } as unknown as FluentCartClient
+		const tool = createAllTools(client, {}).find(
+			(candidate) => candidate.name === 'fluentcart_subscription_get',
+		)
+		if (!tool) throw new Error('fluentcart_subscription_get is not registered')
+
+		const result = await tool.handler({ subscription_id: 4 })
+		const out = JSON.parse(result.content[0]?.text ?? '{}')
+
+		expect(out.subscription.collection_method).toBe('manual')
+		expect(out.subscription.has_pending_skip).toBe(true)
+		expect(out.subscription.last_skipped_period).toBe('2026-08-01 00:00:00')
+		expect(out.subscription.meta).toBeUndefined()
+	})
 })

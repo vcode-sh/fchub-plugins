@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "fluentcart-mcp",
   "display_name": "FluentCart",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Curated and capability-discovered tools for a FluentCart store — orders, products, customers, subscriptions, coupons and reports. Read-only unless you opt in to writes.",
   "long_description": "Connects an MCP client to the FluentCart REST API of your own WordPress site.\n\nDynamic mode is the default: a handful of meta-tools let the agent search the catalogue, read a tool definition and execute it, which keeps the definition payload small no matter how large the store API grows. Curated mode advertises a small reviewed set directly, code mode exposes a sandboxed scripting pair, and full mode lists everything the current policy permits.\n\nExposure is decided before anything is listed. Writes are hidden entirely until write mode is raised, and what you actually get depends on what your store and your role support. FluentCart native abilities are a separate read-only opt-in with their own credentials; discovery admits only the audited read allowlist.",
   "author": {
@@ -212,10 +212,10 @@
   "_meta": {
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
-      "packageVersion": "2.0.1",
-      "sourceTreeDigest": "sha256:824483c82b6e48a09db4c3a11c8be8731a85976d3432c93e102e0563c44b43ed",
+      "packageVersion": "2.1.0",
+      "sourceTreeDigest": "sha256:f2483f2c861fd7e96b5d12f6fee384f0e45f9e8fa24dd4df6ca9f226bb0e8a0b",
       "release": {
-        "version": "2.0.1",
+        "version": "2.1.0",
         "protocols": [
           "2025-11-25",
           "2026-07-28"
@@ -238,10 +238,10 @@
           "npmStageTag": "latest",
           "npmApproval": "interactive-2fa",
           "npmPromotionWrite": false,
-          "previousLatest": "2.0.0",
+          "previousLatest": "2.0.1",
           "previousDockerDigests": {
-            "ghcr.io": "sha256:c38a54db74f07da03be544539b8bb36f502ae36987f00567293e48a985574174",
-            "docker.io": "sha256:c38a54db74f07da03be544539b8bb36f502ae36987f00567293e48a985574174"
+            "ghcr.io": "sha256:28f79e77822f843e32cc2d19b86fb52a2321f215e32c5260dd0b56722fa9d65e",
+            "docker.io": "sha256:28f79e77822f843e32cc2d19b86fb52a2321f215e32c5260dd0b56722fa9d65e"
           }
         },
         "clients": {
@@ -331,11 +331,13 @@
         },
         "evidence": {
           "live": [
-            "FluentCart 1.5.5 REST index",
+            "FluentCart Core 1.6.0 and FluentCart Pro 1.6.0 REST index",
             "WordPress 7.0.2 Abilities catalogue"
           ],
           "fixtures": [
             "legacy 1.3.9 route surface",
+            "isolated FluentCart 1.6.0 Core route surface",
+            "isolated FluentCart 1.6.0 Core and Pro route surface",
             "deterministic protocol and capability lanes"
           ],
           "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED"
@@ -381,6 +383,27 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "curated",
@@ -397,6 +420,13 @@
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
               "modes": [
                 "curated",
                 "full"
@@ -426,6 +456,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"
@@ -468,6 +519,27 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "curated",
@@ -484,6 +556,13 @@
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
               "modes": [
                 "curated",
                 "full"
@@ -513,6 +592,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"
@@ -555,6 +655,27 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "curated",
@@ -585,6 +706,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"
@@ -624,6 +766,24 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "dynamic"
@@ -651,6 +811,24 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "code"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "code"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "code"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "code"
               ]
@@ -688,6 +866,24 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "dynamic"
@@ -703,6 +899,12 @@
           "exposedBy": [
             {
               "profile": "core-1.5.5-pro-1.5.4-rest-reversible",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
               "modes": [
                 "dynamic"
               ]
@@ -731,6 +933,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"
@@ -773,6 +996,27 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "curated",
@@ -803,6 +1047,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"
@@ -845,6 +1110,27 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "curated",
@@ -875,6 +1161,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"
@@ -917,6 +1224,27 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "curated",
@@ -947,6 +1275,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"
@@ -989,6 +1338,27 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "curated",
@@ -1019,6 +1389,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"
@@ -1058,6 +1449,24 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "code"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "code"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "code"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "code"
@@ -1085,6 +1494,24 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "dynamic"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "dynamic"
               ]
@@ -1125,6 +1552,27 @@
               ]
             },
             {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
               "profile": "legacy-1.3.9-runtime-rest-disabled",
               "modes": [
                 "curated",
@@ -1155,6 +1603,27 @@
             },
             {
               "profile": "core-1.5.5-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-disabled",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-pro-1.6.0-rest-reversible",
+              "modes": [
+                "curated",
+                "full"
+              ]
+            },
+            {
+              "profile": "core-1.6.0-rest-disabled",
               "modes": [
                 "curated",
                 "full"

@@ -9,6 +9,22 @@ Connect your AI app to your FluentCart store for safe, read-only answers about i
 subscription cancellation, deletion, and bulk actions are unavailable in every mode. Order-status
 changes, marking an order paid, and other money-moving work are also unavailable.
 
+## New in 2.1.0: FluentCart 1.6 subscriptions, without the drama
+
+You can now list renewals and open an individual renewal directly, then see the richer subscription
+context FluentCart 1.6 returns. Reversible mode also has a narrowly guarded update for a
+store-billed subscription's billing-cycle limit (`bill_times`), with a just-in-time preflight and
+read-back. It accepts only `manual` or `system` collection methods; gateway-billed
+`automatic` subscriptions are not edited.
+
+The server cannot charge a card, create, skip, void, resend, or cancel a renewal. Those buttons
+are still where they belong: behind a deliberate human decision.
+
+**Compatibility note:** “FluentCart 1.6+” is this release's compatibility theme, not a promise
+about untested future versions. The exact verified combination is WordPress 7.0.2, FluentCart Core
+1.6.0, and FluentCart Pro 1.6.0. FluentCart Pro is optional; route discovery simply shows fewer
+Pro-backed tools when it is not installed.
+
 ## Choose your app
 
 <Cards>
@@ -41,6 +57,8 @@ register to a chat box.
 > "Show me all orders from the last 7 days."
 
 > "Which products sold best this month?"
+
+> "What renewals are due next week, and which subscriptions are paused?"
 
 ## Next
 

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const fixturePath = resolve(
 	packageRoot,
-	'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+	'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 )
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'))
 const serialised = JSON.stringify(fixture)
@@ -32,8 +32,8 @@ describe('route fixture provenance', () => {
 		const versions = new Map(
 			fixture.profile.activeComponents.map((component) => [component.slug, component.version]),
 		)
-		assert.equal(versions.get('fluent-cart'), '1.5.5')
-		assert.equal(versions.get('fluent-cart-pro'), '1.5.4')
+		assert.equal(versions.get('fluent-cart'), '1.6.0')
+		assert.equal(versions.get('fluent-cart-pro'), '1.6.0')
 	})
 
 	it('records every active component with a version, and none twice', () => {
@@ -70,21 +70,21 @@ describe('route fixture provenance', () => {
 describe('route fixture headline counts', () => {
 	// Measured directly from the live REST index of the captured runtime. These are captured
 	// evidence: if a recapture moves them, the store changed and the delta needs explaining.
-	it('counts 329 FluentCart paths including the namespace root', () => {
-		assert.equal(fixture.counts.prefixedPathsInclusive, 329)
+	it('counts 339 FluentCart paths including the namespace root', () => {
+		assert.equal(fixture.counts.prefixedPathsInclusive, 339)
 	})
 
-	it('counts 388 exact method/path pairs including the namespace root', () => {
-		assert.equal(fixture.counts.exactPairsInclusive, 388)
+	it('counts 398 exact method/path pairs including the namespace root', () => {
+		assert.equal(fixture.counts.exactPairsInclusive, 398)
 	})
 
-	it('counts 328 application paths once the namespace root is excluded', () => {
-		assert.equal(fixture.counts.applicationPaths, 328)
+	it('counts 338 application paths once the namespace root is excluded', () => {
+		assert.equal(fixture.counts.applicationPaths, 338)
 		assert.equal(fixture.counts.prefixedPathsInclusive - fixture.counts.applicationPaths, 1)
 	})
 
-	it('counts 387 exact application pairs', () => {
-		assert.equal(fixture.counts.applicationExactPairs, 387)
+	it('counts 397 exact application pairs', () => {
+		assert.equal(fixture.counts.applicationExactPairs, 397)
 		assert.equal(fixture.counts.exactPairsInclusive - fixture.counts.applicationExactPairs, 1)
 	})
 
@@ -93,14 +93,14 @@ describe('route fixture headline counts', () => {
 	 * hold at the same time as the deduplication rule the same document mandates: the store
 	 * registers `customers/(?P<customerId>[0-9]+)` and `customers/(?P<customerId>[^\s(?!/)]+)`
 	 * as two patterns, and both must canonicalise to one `GET /customers/{param}` operation.
-	 * One collapse, so 387 exact pairs necessarily yield 386 canonical ones.
+	 * One collapse, so 397 exact pairs necessarily yield 396 canonical ones.
 	 *
 	 * The next test pins the identity of that single collapse, so this number is evidence
 	 * rather than an adjustment made to get a passing run.
 	 */
-	it('counts 386 canonical application pairs after the mandated deduplication', () => {
-		assert.equal(fixture.counts.applicationCanonicalPairs, 386)
-		assert.equal(fixture.operations.length, 386)
+	it('counts 396 canonical application pairs after the mandated deduplication', () => {
+		assert.equal(fixture.counts.applicationCanonicalPairs, 396)
+		assert.equal(fixture.operations.length, 396)
 	})
 
 	it('collapses exactly one pair, and it is the documented customers pair', () => {

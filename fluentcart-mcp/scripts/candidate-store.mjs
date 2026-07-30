@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const ROUTES = join(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json')
+const ROUTES = join(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json')
 
 function deferred() {
 	let resolvePromise

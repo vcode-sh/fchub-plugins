@@ -111,7 +111,7 @@ const REQUIRED_FILES = [
 	'scripts/acceptance/run-acceptance.mjs',
 	'scripts/acceptance/lanes.mjs',
 	'scripts/acceptance/evidence-writer.mjs',
-	'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+	'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 ]
 
 /**
@@ -239,7 +239,7 @@ describe('programme scope', () => {
 	})
 
 	it('keeps the checked route fixture present and readable', () => {
-		const fixture = join(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json')
+		const fixture = join(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json')
 		const parsed = JSON.parse(readFileSync(fixture, 'utf8'))
 		assert.equal(parsed.schemaVersion, 1)
 		assert.ok(Array.isArray(parsed.operations) && parsed.operations.length > 0)

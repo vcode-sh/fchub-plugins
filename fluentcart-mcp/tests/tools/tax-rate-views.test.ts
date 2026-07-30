@@ -226,6 +226,15 @@ describe('seeding countries is described as the addition it is', () => {
 	})
 })
 
+describe('obsolete country-wide tax deletion is not advertised', () => {
+	it('omits the removed FluentCart endpoint rather than offering a tool that cannot run', () => {
+		const client = { get: vi.fn() } as unknown as FluentCartClient
+		const names = createAllTools(client, {}).map((tool) => tool.name)
+
+		expect(names).not.toContain('fluentcart_tax_country_delete_all')
+	})
+})
+
 describe('the summary degrades rather than lying', () => {
 	it('reports nothing for a payload it does not recognise', () => {
 		expect(taxOverview({ unexpected: true }, 'n').total_countries).toBe(0)

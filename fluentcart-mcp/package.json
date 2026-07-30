@@ -1,6 +1,6 @@
 {
   "name": "fluentcart-mcp",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "MCP server for the FluentCart REST API — AI-agent-friendly tools for managing orders, products, customers, subscriptions, and more.",
   "type": "module",
   "exports": {
@@ -38,7 +38,7 @@
     "check:contract": "node scripts/build-release-contract.mjs --check",
     "check:manifest": "node scripts/build-manifest.mjs --check",
     "capture:read-contracts": "node scripts/capture-read-contracts.mjs",
-    "check:routes": "node scripts/check-tool-routes.mjs --fixture tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json",
+    "check:routes": "node scripts/check-tool-routes.mjs --fixture tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
     "measure:context": "node scripts/measure-tool-context.mjs",
     "check:compatibility": "node scripts/check-tool-routes.mjs --compatibility",
     "prepublishOnly": "npm run build",

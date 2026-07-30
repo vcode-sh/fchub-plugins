@@ -16,21 +16,21 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..'
 
 const routeFixture = JSON.parse(
 	readFileSync(
-		join(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'),
+		join(PACKAGE_ROOT, 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'),
 		'utf8',
 	),
 ) as { profile: RuntimeProfile; operations: { method: string; path: string }[] }
 
 const readContracts = JSON.parse(
 	readFileSync(
-		join(PACKAGE_ROOT, 'tests/fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json'),
+		join(PACKAGE_ROOT, 'tests/fixtures/rest/fluentcart-1.6.0-all-active-read-contracts.json'),
 		'utf8',
 	),
 ) as { profileDigest: string; profile: RuntimeProfile }
 
 const CORE_ONLY: RuntimeProfile = {
 	wordpress: '7.0.2',
-	activeComponents: [{ slug: 'fluent-cart', version: '1.5.5' }],
+	activeComponents: [{ slug: 'fluent-cart', version: '1.6.0' }],
 }
 
 const SHOP = { store_name: 'Vibe Goods', currency: 'PLN', timezone: 'Europe/Warsaw' }
@@ -71,8 +71,8 @@ describe('store context from a complete current runtime', () => {
 
 	it('reports the runtime proven by the route fixture', () => {
 		expect(context.runtime.wordpress).toBe('7.0.2')
-		expect(context.runtime.fluentcartCore).toBe('1.5.5')
-		expect(context.runtime.fluentcartPro).toBe('1.5.4')
+		expect(context.runtime.fluentcartCore).toBe('1.6.0')
+		expect(context.runtime.fluentcartPro).toBe('1.6.0')
 	})
 
 	it('warns about nothing when nothing is missing', () => {
@@ -125,7 +125,7 @@ describe('core-only store without FluentCart Pro', () => {
 	const context = buildCommerceContext(input({ profile: CORE_ONLY, operations: null }))
 
 	it('reports Pro as absent rather than guessing a version', () => {
-		expect(context.runtime.fluentcartCore).toBe('1.5.5')
+		expect(context.runtime.fluentcartCore).toBe('1.6.0')
 		expect(context.runtime.fluentcartPro).toBeNull()
 	})
 
@@ -238,7 +238,7 @@ describe('route profile drift', () => {
 	 * So each fixture states its own runtime, and the digest binds the read contracts to the exact
 	 * route set they were validated against. That still stops a fixture from another store passing
 	 * review — its profile or its route set would differ, and either changes the digest — and it
-	 * additionally proves the two independently captured runtimes agree on all 386 operations.
+	 * additionally proves the two independently captured runtimes agree on all 396 operations.
 	 */
 	it('ties the read contracts to this route set through their own runtime profile', () => {
 		expect(routeProfileDigest(readContracts.profile, routeFixture.operations)).toBe(

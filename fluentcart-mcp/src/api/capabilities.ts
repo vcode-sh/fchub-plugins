@@ -72,9 +72,9 @@ const restRootSchema = z.object({
  * The namespace index, not the whole WordPress REST index.
  *
  * `/wp-json/` describes every namespace a site registers, and this server routes on exactly
- * one. Measured on the development store: the root index is 527,327 characters across 987
- * routes, of which 386 operations survive the FluentCart filter; `/wp-json/fluent-cart/v2` is
- * 117,444 characters and yields the identical 386 operations. Verified by diffing the derived
+ * one. Measured on the development store: the root index is 531,388 characters across 998
+ * routes, of which 396 operations survive the FluentCart filter; `/wp-json/fluent-cart/v2` is
+ * 121,333 characters and yields the identical 396 operations. Verified by diffing the derived
  * operation sets rather than by counting routes — same set, nothing only in one, nothing only
  * in the other. Every startup paid 4.5x for bytes that were then thrown away.
  *

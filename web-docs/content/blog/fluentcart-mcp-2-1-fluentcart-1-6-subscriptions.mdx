@@ -1,0 +1,75 @@
+---
+title: "FluentCart MCP 2.1: Renewals In, Billing Chaos Out"
+description: "FluentCart MCP 2.1 adds source-verified FluentCart 1.6 subscription and renewal support without turning every billing endpoint into a chat command."
+author: "Vibe Code"
+date: "2026-07-30"
+category: "fluentcart"
+tags: ["fluentcart", "mcp", "subscriptions", "renewals", "wordpress"]
+image: "/fluentcart-mcp/independent-fluentcart-mcp-shop-owner-conversation.webp"
+---
+
+FluentCart 1.6 arrived with more subscription routes. Naturally, the tempting response was to plug
+all of them into an AI chat box and see what happens. We chose the less theatrical option.
+
+**FluentCart MCP 2.1 is the FluentCart 1.6+ compatibility release.** It gives a shop owner the
+renewal information they actually need, plus a small, guarded way to change a subscription's
+billing-cycle limit.
+It does not turn a conversational typo into a charge, a cancelled renewal, or an apologetic email.
+Small surface. Proper understanding. Slightly fewer emergency tabs at 6pm.
+
+## What changed
+
+Two new read tools make renewals straightforward:
+
+- `fluentcart_renewal_list` lists renewal records with the filters the store serves;
+- `fluentcart_renewal_get` opens one renewal so an assistant can explain what it belongs to and
+  what needs attention.
+
+The subscription view also keeps the helpful FluentCart 1.6 context, including the collection
+method and pending-skip state when FluentCart returns them. You can ask one clear question instead
+of reconstructing a billing story from four admin screens. An unusually humane use of software.
+
+## One guarded update, not a billing free-for-all
+
+With `FLUENTCART_WRITE_MODE=reversible`, 2.1 adds a narrowly reviewed update for `bill_times`: the
+total number of billing cycles on a subscription, where `0` means unlimited. It reads the current
+record, checks both `bill_times` and `bill_count` as a best-effort preflight, rejects an already
+stale or end-of-term change, and reads it back before saying the change worked. FluentCart 1.6 has
+no atomic record-version precondition, so an ambiguous failure says the mutation may have applied
+and tells the caller to re-fetch instead of retrying blindly. This applies only to store-billed
+`manual` or `system` subscriptions; gateway-billed `automatic` subscriptions fail closed before a
+write. Subscriptions with linked FluentCart Pro licences also fail closed because the upstream
+update event can change licence state. Default mode remains read-only.
+
+That is intentionally not the same as lifecycle control. FluentCart 1.6 exposes pause, resume, and
+reactivate routes, but those can alter scheduled charges or related renewal state without a
+restoration path the server can prove. So FluentCart MCP leaves them out. It also leaves out
+charge-now, renewal creation, skip, void, resend, transaction sync, gateway resync, refunds, and
+cancellation. Gateway resync looks like a read only until it contacts the provider and changes local
+subscription state. Names are not safety proofs. Naturally.
+
+The rule is painfully simple: a REST route is something to investigate, not an obligation to ship.
+The same goes for FluentCart 1.6's store-wide `subscription_management_mode` and
+`subscription_system_charge` settings: the generic settings write rejects both until a dedicated
+guard can make their consequences explicit.
+
+## What “FluentCart 1.6+” means here
+
+This release was verified with **WordPress 7.0.2, FluentCart Core 1.6.0, and FluentCart Pro 1.6.0**.
+That is the evidence. “1.6+” describes the compatibility work and release direction; it does not
+pretend that every future version has been tested by a particularly confident adjective.
+
+Route discovery still checks the store you actually connect. A core-only installation can work with
+a smaller surface; Pro-backed routes appear only when the store serves them. The refresh also
+removed a legacy tax-country delete operation that never worked in the captured runtime. Losing a
+ghost button is not a feature regression. It is housekeeping with better timing.
+
+## Start with a real question
+
+After [connecting your client](/docs/fluentcart-mcp), ask:
+
+> What renewals are due next week, and which subscriptions need attention first?
+
+Then use the [usage guide](/docs/fluentcart-mcp/usage) for plain-English examples or the [tool
+guide](/docs/fluentcart-mcp/tools) for the advanced boundary. The first route is for getting useful
+answers. The second is for checking exactly why a tempting action is not there.

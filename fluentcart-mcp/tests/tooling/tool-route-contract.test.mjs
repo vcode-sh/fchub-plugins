@@ -13,7 +13,7 @@ import {
 	validateLegacyEvidence,
 } from '../../scripts/check-tool-routes.mjs'
 
-const CURRENT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
+const CURRENT_FIXTURE = 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'
 
 /** A minimal fixture index: two paths, one of which is served by GET only. */
 const INDEX = {
@@ -156,7 +156,7 @@ describe('registry route report', () => {
 	it('names the fixture it judged the registry against', () => {
 		assert.equal(report.fixture, CURRENT_FIXTURE)
 		assert.equal(report.evidenceKind, 'live-rest-index')
-		assert.equal(report.fixtureOperations, 386)
+		assert.equal(report.fixtureOperations, 396)
 	})
 
 	/**
@@ -193,25 +193,40 @@ describe('compatibility support gate', () => {
 		)
 	})
 
-	it('always judges the docs contract, core-only, core+Pro and all-active profiles', () => {
+	it('always judges the docs contract and independently captured Core profiles', () => {
 		const judged = result.profiles
 			.filter((profile) => profile.status !== 'SKIPPED')
 			.map((profile) => profile.id)
 
 		for (const id of [
 			'docs-contract-1.3.9',
-			'current-core-only-1.5.5',
-			'isolated-core-pro-1.5.5-1.5.4',
-			'all-active-local',
+			'current-core-only-1.6.0',
+			'isolated-core-pro-1.6.0',
 		]) {
 			assert.ok(judged.includes(id), `${id} was not judged`)
 		}
+
+		assert.equal(
+			support.profiles.some((profile) => profile.id === 'all-active-local'),
+			false,
+			'all-active response samples must not be promoted to a full route profile without a distinct route capture',
+		)
 	})
 
 	it('keeps the legacy fixture out of tool/runtime support claims', () => {
 		const legacy = result.profiles.find((profile) => profile.id === 'legacy-runtime-1.3.9')
 		assert.equal(legacy.status, 'ROUTE-SURFACE-CAPTURED')
 		assert.deepEqual(result.legacyClaims, [], 'legacy runtime support is claimed but never proven')
+	})
+
+	it('retains the previous combined runtime as route-surface evidence only', () => {
+		const profile = support.profiles.find((entry) => entry.id === 'legacy-core-pro-1.5.5-1.5.4')
+		const resultProfile = result.profiles.find(
+			(entry) => entry.id === 'legacy-core-pro-1.5.5-1.5.4',
+		)
+
+		assert.equal(profile?.evidenceScope, 'route-surface-only')
+		assert.equal(resultProfile?.status, 'ROUTE-SURFACE-CAPTURED')
 	})
 
 	it('rejects a legacy status that would imply tool or runtime support', () => {
@@ -235,9 +250,9 @@ describe('compatibility support gate', () => {
 
 	it('recomputes the specification delta rather than trusting the recorded numbers', () => {
 		assert.equal(result.specificationDelta.status, 'MEASURED')
-		assert.equal(result.specificationDelta.retained, 325)
-		assert.equal(result.specificationDelta.stale, 17)
-		assert.equal(result.specificationDelta.currentAbsentFromSpecification, 61)
+		assert.equal(result.specificationDelta.retained, 324)
+		assert.equal(result.specificationDelta.stale, 18)
+		assert.equal(result.specificationDelta.currentAbsentFromSpecification, 72)
 		assert.deepEqual(result.specificationDelta.problems, [])
 	})
 })

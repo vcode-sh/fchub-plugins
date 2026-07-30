@@ -6,6 +6,20 @@
 
 An MCP server that connects AI assistants to your [FluentCart](https://fluentcart.com) store — orders, products, customers, subscriptions, coupons, reports, shipping, tax, email notifications, and more. Read-only until you deliberately say otherwise. Open source, MIT licensed.
 
+**New in 2.1.0:** FluentCart 1.6+ is the release theme. It adds direct renewal list and detail
+reads, a narrowly guarded subscription billing-cycle-limit update, and richer subscription context without
+opening the door to charges, cancellation, or renewal manipulation. The exact verified runtime is
+WordPress 7.0.2 with FluentCart Core 1.6.0 and FluentCart Pro 1.6.0; “1.6+” does not pretend we
+have tested every future release, because that would be a rather efficient way to turn a version
+label into fiction.
+
+The guarded update applies only to store-billed subscriptions whose collection method is `manual`
+or `system`. Gateway-billed `automatic` subscriptions fail closed before any write. FluentCart 1.6
+does not provide an atomic version precondition: the tool performs a just-in-time preflight and
+read-back, returns the previous limit on success, and tells the caller to re-fetch rather than
+blindly retry when the outcome cannot be verified. Subscriptions with linked FluentCart Pro
+licences fail closed because the upstream update event can change licence state.
+
 The server speaks MCP `2025-11-25` and `2026-07-28`. The recipes below are setup guidance, not
 client certification. Candidate certification requires a candidate-bound handshake from MCP Inspector
 (stdio and HTTP), Claude Code (stdio and HTTP), and Docker HTTP.
@@ -93,8 +107,8 @@ FLUENTCART_USERNAME=fluentcart-reader
 FLUENTCART_APP_PASSWORD="paste the generated Application Password here"
 ```
 
-FluentCart 1.5.4+ also supplies native WordPress Abilities for richer analytics and advanced
-queries. They are an explicit, read-only opt-in:
+FluentCart supplies native WordPress Abilities for richer analytics and advanced queries. They are
+an explicit, read-only opt-in; this release refreshes the audited target against FluentCart 1.6.0:
 
 ```bash
 FLUENTCART_ABILITIES_MODE=enabled
@@ -104,13 +118,13 @@ FLUENTCART_ABILITIES_APP_PASSWORD="paste its separate Application Password here"
 
 Use a separate Application Password for that principal. The bridge never reuses
 `FLUENTCART_USERNAME` or `FLUENTCART_APP_PASSWORD`, discovers the live catalogue at startup, and
-intersects it with the read names audited against FluentCart 1.5.5. Unknown abilities and native
-writes stay absent. The external FluentCart MCP adapter is not required.
+intersects it with the audited read names. Unknown abilities and native writes stay absent. The
+external FluentCart MCP adapter is not required.
 
-FluentCart 1.5.5 omits the WordPress read-only annotation on some reads. The compatibility
-workaround admits one only when its canonical name, input schema and execution metadata match the
-captured fingerprint. Any drift is fail-closed: the Ability stays absent instead of being promoted
-to “probably read-only”, the traditional prelude to a very long afternoon.
+Some captured FluentCart releases omit the WordPress read-only annotation on otherwise-safe reads.
+The compatibility workaround admits one only when its canonical name, input schema and execution
+metadata match the captured fingerprint. Any drift is fail-closed: the Ability stays absent instead
+of being promoted to “probably read-only”, the traditional prelude to a very long afternoon.
 
 ### 2. Config File
 
@@ -195,7 +209,7 @@ the routes your store serves and the configured WordPress role. The generated
 | **Orders** | — | Read orders, transactions, addresses and activity |
 | **Products** | — | Read products and pricing; reversibly create or update products and variants |
 | **Customers** | — | Read profiles and history; reversibly create or update customers |
-| **Subscriptions** | — | List and inspect subscriptions. Pause, resume, reactivate and cancellation are not shipped actions. |
+| **Subscriptions & renewals** | — | List and inspect subscriptions, inspect individual renewals, and update only a subscription's guarded billing-cycle limit when reversible mode permits it. |
 | **Coupons** | — | Read coupons; reversibly create or update them |
 | **Reports** | — | Revenue, sales, growth, retention, cohorts and customer insights |
 | **Shipping** | — | Read and reversibly manage zones, methods and classes |
@@ -204,6 +218,10 @@ the routes your store serves and the configured WordPress role. The generated
 
 The server also ships resources and prompts for common store-analysis workflows. Check the built
 manifest for the exact packaged surface.
+
+Subscription gateway resync is deliberately absent. In FluentCart 1.6 it can contact the payment
+gateway and change local subscription state, so it is not a read and does not meet the reversible
+write contract. Use the FluentCart admin for that job.
 
 ## Example Prompts
 
@@ -214,6 +232,7 @@ Once connected, just talk. The read-only examples work out of the box; the ones 
 - "Create a 20% off coupon that expires Friday"
 - "Find customer john@example.com and show their order history"
 - "Show subscriptions that are currently paused"
+- "Show the renewals due next week and open the details for the ones that need attention"
 - "Which products sold the most this week?"
 - "Show me the transactions on order #1234"
 - "Set up 23% VAT for Poland"
@@ -224,8 +243,9 @@ Once connected, just talk. The read-only examples work out of the box; the ones 
 
 - **Node.js** >= 24.0.0 (for npx/stdio mode)
 - **Docker** (for HTTP/container mode — no Node.js needed)
-- **WordPress** with [FluentCart](https://fluentcart.com) installed; the verified release
-  combination is WordPress 7.0.2, FluentCart 1.5.5 and FluentCart Pro 1.5.4
+- **WordPress** with [FluentCart](https://fluentcart.com) installed. The verified 2.1.0 release
+  combination is WordPress 7.0.2, FluentCart Core 1.6.0 and FluentCart Pro 1.6.0. Pro is optional
+  for normal connection; it adds only the Pro-backed routes your store serves.
 - A **WordPress account** with an Application Password and the FluentCart REST capabilities you plan to use
 
 ## Upgrading to 2.0

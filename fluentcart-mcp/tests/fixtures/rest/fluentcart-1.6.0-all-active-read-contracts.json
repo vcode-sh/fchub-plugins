@@ -1,0 +1,2671 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/capture-read-contracts.mjs",
+  "evidenceScope": "all-active-compatibility",
+  "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+  "profile": {
+    "wordpress": "7.0.2",
+    "activeComponents": [
+      {
+        "slug": "fchub",
+        "version": "1.0.1"
+      },
+      {
+        "slug": "fchub-memberships",
+        "version": "1.4.1"
+      },
+      {
+        "slug": "fchub-payment-plans",
+        "version": "0.1.0"
+      },
+      {
+        "slug": "fchub-redsys",
+        "version": "0.1.0"
+      },
+      {
+        "slug": "fluent-cart",
+        "version": "1.6.0"
+      },
+      {
+        "slug": "fluent-cart-pro",
+        "version": "1.6.0"
+      },
+      {
+        "slug": "fluent-community",
+        "version": "2.7.5"
+      },
+      {
+        "slug": "fluent-community-pro",
+        "version": "2.7.5"
+      },
+      {
+        "slug": "fluent-crm",
+        "version": "3.1.10"
+      },
+      {
+        "slug": "fluent-smtp",
+        "version": "2.2.95"
+      },
+      {
+        "slug": "plugin-check",
+        "version": "2.0.0"
+      }
+    ],
+    "capturedAt": "2026-07-30T07:24:34.202Z",
+    "source": "wp-cli"
+  },
+  "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+  "compatibilityScopes": [
+    {
+      "scope": "core",
+      "status": "BLOCKED",
+      "reason": "No isolated FluentCart Core-only response-shape capture was taken. The all-active response evidence is not promoted to this scope."
+    },
+    {
+      "scope": "core-pro",
+      "status": "BLOCKED",
+      "reason": "No isolated FluentCart Core plus Pro response-shape capture was taken. The all-active response evidence is not promoted to this scope."
+    },
+    {
+      "scope": "all-active",
+      "status": "CAPTURED",
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "fixture": "tests/fixtures/rest/fluentcart-1.6.0-all-active-read-contracts.json"
+    }
+  ],
+  "contracts": [
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/address-info/countries",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "array": {
+              "object": {
+                "name": "string",
+                "value": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/AddressInfoController.php",
+        "controllerMethod": "countriesOption",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/dashboard/stats",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "stats": {
+            "array": {
+              "object": {
+                "current_count": "string",
+                "has_currency": "boolean",
+                "icon": "string",
+                "title": "string",
+                "url": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/DashboardController.php",
+        "controllerMethod": "getDashboardStats",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/integration/addons",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "addons": {
+            "object": {
+              "fluent-community": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "description": "string",
+                  "enabled": "boolean",
+                  "installable": "string",
+                  "logo": "string",
+                  "title": "string"
+                }
+              },
+              "fluent-crm": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "description": "string",
+                  "enabled": "boolean",
+                  "installable": "string",
+                  "logo": "string",
+                  "title": "string"
+                }
+              },
+              "fluent-security": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "description": "string",
+                  "enabled": "boolean",
+                  "installable": "string",
+                  "logo": "string",
+                  "title": "string"
+                }
+              },
+              "fluent-smtp": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "description": "string",
+                  "enabled": "boolean",
+                  "installable": "string",
+                  "logo": "string",
+                  "title": "string"
+                }
+              },
+              "fluent-support": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "description": "string",
+                  "enabled": "boolean",
+                  "installable": "string",
+                  "logo": "string",
+                  "title": "string"
+                }
+              },
+              "fluentform": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "description": "string",
+                  "enabled": "boolean",
+                  "installable": "string",
+                  "logo": "string",
+                  "title": "string"
+                }
+              },
+              "memberships": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "config_url": "string",
+                  "description": "string",
+                  "enabled": "boolean",
+                  "logo": "string",
+                  "title": "string"
+                }
+              },
+              "webhook": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "description": "string",
+                  "enabled": "boolean",
+                  "is_pro": "boolean",
+                  "is_pro_active": "boolean",
+                  "logo": "string",
+                  "title": "string"
+                }
+              },
+              "wp_user": {
+                "object": {
+                  "categories": {
+                    "array": "string"
+                  },
+                  "description": "string",
+                  "enabled": "boolean",
+                  "is_pro": "boolean",
+                  "is_pro_active": "boolean",
+                  "logo": "string",
+                  "title": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/AddonsController.php",
+        "controllerMethod": "getAddons",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/labels",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "labels": {
+            "array": {
+              "object": {
+                "created_at": "string",
+                "id": "number",
+                "updated_at": "string",
+                "value": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/LabelController.php",
+        "controllerMethod": "index",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      },
+      "pagination": {
+        "requestFields": [],
+        "responseFields": [],
+        "observedDefault": null,
+        "observedMaximum": null
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/products",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "products": {
+            "object": {
+              "current_page": "number",
+              "data": {
+                "array": {
+                  "object": {
+                    "ID": "number",
+                    "comment_status": "string",
+                    "detail": {
+                      "object": {
+                        "created_at": "string",
+                        "default_media": "null",
+                        "default_variation_id": "string",
+                        "featured_media": {
+                          "object": {
+                            "id": "number",
+                            "name": "string",
+                            "url": "string"
+                          }
+                        },
+                        "formatted_max_price": "string",
+                        "formatted_min_price": "string",
+                        "fulfillment_type": "string",
+                        "gallery_image": {
+                          "object": {
+                            "meta_id": "string",
+                            "meta_key": "string",
+                            "meta_value": {
+                              "array": {
+                                "object": {
+                                  "id": "number",
+                                  "name": "string",
+                                  "url": "string"
+                                }
+                              }
+                            },
+                            "post_id": "number"
+                          }
+                        },
+                        "id": "number",
+                        "manage_downloadable": "string",
+                        "manage_stock": "string",
+                        "max_price": "string",
+                        "min_price": "string",
+                        "other_info": {
+                          "object": {
+                            "active_editor": "string",
+                            "group_pricing_by": "string",
+                            "is_bundle_product": "string",
+                            "sold_individually": "string"
+                          }
+                        },
+                        "post_id": "number",
+                        "stock_availability": "string",
+                        "updated_at": "string",
+                        "variation_type": "string"
+                      }
+                    },
+                    "edit_url": "string",
+                    "guid": "string",
+                    "ping_status": "string",
+                    "post_content": "string",
+                    "post_date": "string",
+                    "post_date_gmt": "string",
+                    "post_excerpt": "string",
+                    "post_modified": "string",
+                    "post_modified_gmt": "string",
+                    "post_name": "string",
+                    "post_status": "string",
+                    "post_title": "string",
+                    "post_type": "string",
+                    "view_url": "string"
+                  }
+                }
+              },
+              "first_page_url": "string",
+              "from": "number",
+              "last_page": "number",
+              "last_page_url": "string",
+              "links": {
+                "array": {
+                  "object": {
+                    "active": "boolean",
+                    "label": "string",
+                    "url": "string"
+                  }
+                }
+              },
+              "next_page_url": "string",
+              "path": "string",
+              "per_page": "number",
+              "prev_page_url": "null",
+              "to": "number",
+              "total": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/ProductController.php",
+        "controllerMethod": "index",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      },
+      "pagination": {
+        "requestFields": ["page", "per_page"],
+        "responseFields": [
+          "current_page",
+          "data",
+          "first_page_url",
+          "from",
+          "last_page",
+          "last_page_url",
+          "links",
+          "next_page_url",
+          "path",
+          "per_page",
+          "prev_page_url",
+          "to",
+          "total"
+        ],
+        "observedDefault": 10,
+        "observedMaximum": 10
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/products/bulk-edit-data",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "page": "number",
+          "per_page": "number",
+          "products": {
+            "array": {
+              "object": {
+                "ID": "number",
+                "categories": {
+                  "array": "string"
+                },
+                "category_terms": {
+                  "array": {
+                    "object": {
+                      "name": "string",
+                      "parent": "number",
+                      "slug": "string",
+                      "term_id": "number"
+                    }
+                  }
+                },
+                "detail": {
+                  "object": {
+                    "fulfillment_type": "string",
+                    "manage_stock": "number",
+                    "variation_type": "string"
+                  }
+                },
+                "gallery": {
+                  "array": {
+                    "object": {
+                      "id": "number",
+                      "name": "string",
+                      "url": "string"
+                    }
+                  }
+                },
+                "post_content": "string",
+                "post_excerpt": "string",
+                "post_status": "string",
+                "post_title": "string",
+                "variants": {
+                  "array": {
+                    "object": {
+                      "available": "number",
+                      "compare_price": "number",
+                      "fulfillment_type": "string",
+                      "id": "number",
+                      "item_price": "number",
+                      "manage_stock": "number",
+                      "media": {
+                        "array": "empty"
+                      },
+                      "other_info": {
+                        "object": {
+                          "billing_summary": "string",
+                          "bundle_child_ids": {
+                            "array": "empty"
+                          },
+                          "description": "string",
+                          "height": "null",
+                          "installment": "string",
+                          "is_bundle_product": "string",
+                          "length": "null",
+                          "manage_setup_fee": "string",
+                          "package_slug": "string",
+                          "payment_type": "string",
+                          "repeat_interval": "string",
+                          "setup_fee_per_item": "string",
+                          "signup_fee": "mixed",
+                          "signup_fee_name": "string",
+                          "times": "string",
+                          "trial_days": "string",
+                          "weight": "null",
+                          "weight_unit": "string",
+                          "width": "null"
+                        }
+                      },
+                      "payment_type": "string",
+                      "post_id": "number",
+                      "serial_index": "number",
+                      "sku": "string",
+                      "stock_status": "string",
+                      "total_stock": "number",
+                      "variation_title": "string"
+                    }
+                  }
+                },
+                "view_url": "string"
+              }
+            }
+          },
+          "total": "number"
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/ProductController.php",
+        "controllerMethod": "bulkEditFetch",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/products/fetch-term",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "taxonomies": {
+            "object": {
+              "product-brands": {
+                "object": {
+                  "label": "string",
+                  "name": "string",
+                  "terms": {
+                    "array": "empty"
+                  }
+                }
+              },
+              "product-categories": {
+                "object": {
+                  "label": "string",
+                  "name": "string",
+                  "terms": {
+                    "array": {
+                      "object": {
+                        "children": {
+                          "array": {
+                            "object": {
+                              "children": {
+                                "array": "empty"
+                              },
+                              "label": "string",
+                              "parent": "string",
+                              "value": "string"
+                            }
+                          }
+                        },
+                        "label": "string",
+                        "parent": "string",
+                        "value": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/ProductController.php",
+        "controllerMethod": "getProductTermsList",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/products/findSubscriptionVariants",
+      "status": 200,
+      "responseShape": {
+        "array": {
+          "object": {
+            "id": "number",
+            "title": "string"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/ProductController.php",
+        "controllerMethod": "findSubscriptionVariants",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/products/get-max-excerpt-word-count",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "count": "number"
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/ProductController.php",
+        "controllerMethod": "getMaxExcerptWordCount",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/country-heat-map",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "countryHeatMap": {
+            "array": {
+              "object": {
+                "name": "string",
+                "value": "number"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/ReportingController.php",
+        "controllerMethod": "getCountryHeatMap",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/daily-signups",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "signups": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/SubscriptionReportController.php",
+        "controllerMethod": "getDailySignups",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/dashboard-stats",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "dashBoardStats": {
+            "object": {
+              "paid_orders": {
+                "object": {
+                  "compare_count": "number",
+                  "current_count": "number",
+                  "icon": "string",
+                  "title": "string"
+                }
+              },
+              "total_orders": {
+                "object": {
+                  "compare_count": "number",
+                  "current_count": "number",
+                  "icon": "string",
+                  "title": "string"
+                }
+              },
+              "total_paid_amounts": {
+                "object": {
+                  "compare_count": "number",
+                  "current_count": "number",
+                  "icon": "string",
+                  "is_cents": "boolean",
+                  "title": "string"
+                }
+              },
+              "total_paid_order_items": {
+                "object": {
+                  "compare_count": "number",
+                  "current_count": "number",
+                  "icon": "string",
+                  "title": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/ReportingController.php",
+        "controllerMethod": "getDashboardStats",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/fetch-order-by-group",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/OrderReportController.php",
+        "controllerMethod": "getOrderByGroup",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/fetch-report-by-day-and-hour",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "grossSaleByDay": {
+            "array": {
+              "object": {
+                "day": "number",
+                "gross_sale": "number",
+                "order_count": "number"
+              }
+            }
+          },
+          "grossSaleByHour": {
+            "array": {
+              "object": {
+                "gross_sale": "number",
+                "hour": "string",
+                "order_count": "number"
+              }
+            }
+          },
+          "orderByDayAndHour": {
+            "array": {
+              "object": {
+                "Friday": "number",
+                "Monday": "number",
+                "Saturday": "number",
+                "Sunday": "number",
+                "Thursday": "number",
+                "Tuesday": "number",
+                "Wednesday": "number",
+                "hour": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/OrderReportController.php",
+        "controllerMethod": "getReportByDayAndHour",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/fetch-report-meta",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "currencies": {
+            "object": {
+              "EUR": "string"
+            }
+          },
+          "first_order_date": "string",
+          "min_date": "string",
+          "storeMode": "string"
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/ReportingController.php",
+        "controllerMethod": "getReportMeta",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/fetch-top-sold-products",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "topSoldProducts": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/DefaultReportController.php",
+        "controllerMethod": "getTopSoldProducts",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/fetch-top-sold-variants",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "topSoldVariants": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/DefaultReportController.php",
+        "controllerMethod": "getTopSoldVariants",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/get-dashboard-summary",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "summaryData": {
+            "object": {
+              "active_coupons": "number",
+              "draft_products": "number",
+              "expired_coupons": "number",
+              "total_products": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/ReportingController.php",
+        "controllerMethod": "getDashBoardSummary",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/item-count-distribution",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/OrderReportController.php",
+        "controllerMethod": "getItemCountDistribution",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/order-chart",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "fluctuations": {
+            "array": "empty"
+          },
+          "orderChartData": {
+            "array": {
+              "object": {
+                "average_gross": "number",
+                "average_net": "number",
+                "average_order_items_count": "number",
+                "gross_sale": "number",
+                "group": "string",
+                "net_revenue": "number",
+                "order_count": "number",
+                "shipping_total": "number",
+                "tax_total": "number",
+                "total_item_count": "number",
+                "total_refund": "number",
+                "year": "string"
+              }
+            }
+          },
+          "previousSummary": {
+            "array": "empty"
+          },
+          "summary": {
+            "object": {
+              "average_gross": "number",
+              "average_net": "number",
+              "average_order_items_count": "number",
+              "gross_sale": "number",
+              "net_revenue": "number",
+              "order_count": "number",
+              "shipping_total": "number",
+              "tax_total": "number",
+              "total_item_count": "number",
+              "total_refund": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/OrderReportController.php",
+        "controllerMethod": "getOrderChart",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/order-completion-time",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/OrderReportController.php",
+        "controllerMethod": "getOrderCompletionTime",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/order-value-distribution",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "object": {
+              "0-100": "null",
+              "100-200": "null",
+              "1000+": "null",
+              "200-300": "null",
+              "300-400": "null",
+              "400-500": "null",
+              "500-600": "null",
+              "600-700": "null",
+              "700-800": "null",
+              "800-900": "null",
+              "900-1000": "null"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/OrderReportController.php",
+        "controllerMethod": "getOrderValueDistribution",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/overview",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "object": {
+              "gross_revenue": {
+                "object": {
+                  "2025-08": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2025-09": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2025-10": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2025-11": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2025-12": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-01": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-02": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-03": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-04": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-05": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-06": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-07": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  }
+                }
+              },
+              "gross_revenue_quarterly": {
+                "object": {
+                  "Q1-2026": {
+                    "object": {
+                      "current": "number",
+                      "prev_year": "number",
+                      "yy_growth": "null"
+                    }
+                  },
+                  "Q2-2026": {
+                    "object": {
+                      "current": "number",
+                      "prev_year": "number",
+                      "yy_growth": "null"
+                    }
+                  },
+                  "Q3-2026": {
+                    "object": {
+                      "current": "number",
+                      "prev_year": "number",
+                      "yy_growth": "null"
+                    }
+                  },
+                  "Q4-2025": {
+                    "object": {
+                      "current": "number",
+                      "prev_year": "number",
+                      "yy_growth": "null"
+                    }
+                  }
+                }
+              },
+              "gross_summary": {
+                "object": {
+                  "total": "number",
+                  "total_prev": "number",
+                  "yoy_growth": "number"
+                }
+              },
+              "net_revenue": {
+                "object": {
+                  "2025-08": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2025-09": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2025-10": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2025-11": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2025-12": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-01": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-02": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-03": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-04": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-05": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-06": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  },
+                  "2026-07": {
+                    "object": {
+                      "current": "number",
+                      "prev": "number",
+                      "yoy_growth": "null"
+                    }
+                  }
+                }
+              },
+              "net_revenue_quarterly": {
+                "object": {
+                  "Q1-2026": {
+                    "object": {
+                      "current": "number",
+                      "prev_year": "number",
+                      "yy_growth": "null"
+                    }
+                  },
+                  "Q2-2026": {
+                    "object": {
+                      "current": "number",
+                      "prev_year": "number",
+                      "yy_growth": "null"
+                    }
+                  },
+                  "Q3-2026": {
+                    "object": {
+                      "current": "number",
+                      "prev_year": "number",
+                      "yy_growth": "null"
+                    }
+                  },
+                  "Q4-2025": {
+                    "object": {
+                      "current": "number",
+                      "prev_year": "number",
+                      "yy_growth": "null"
+                    }
+                  }
+                }
+              },
+              "net_summary": {
+                "object": {
+                  "total": "number",
+                  "total_prev": "number",
+                  "yoy_growth": "number"
+                }
+              },
+              "top_country_gross": {
+                "object": {
+                  "by_countries": {
+                    "object": {
+                      "ES": "number",
+                      "PL": "number"
+                    }
+                  },
+                  "by_month": {
+                    "object": {
+                      "2025-08": {
+                        "array": "empty"
+                      },
+                      "2025-09": {
+                        "array": "empty"
+                      },
+                      "2025-10": {
+                        "array": "empty"
+                      },
+                      "2025-11": {
+                        "array": "empty"
+                      },
+                      "2025-12": {
+                        "array": "empty"
+                      },
+                      "2026-01": {
+                        "array": "empty"
+                      },
+                      "2026-02": {
+                        "array": "empty"
+                      },
+                      "2026-03": {
+                        "array": "empty"
+                      },
+                      "2026-04": {
+                        "object": {
+                          "PL": "number"
+                        }
+                      },
+                      "2026-05": {
+                        "object": {
+                          "ES": "number",
+                          "PL": "number"
+                        }
+                      },
+                      "2026-06": {
+                        "array": "empty"
+                      },
+                      "2026-07": {
+                        "array": "empty"
+                      }
+                    }
+                  }
+                }
+              },
+              "top_country_net": {
+                "object": {
+                  "by_countries": {
+                    "object": {
+                      "ES": "number",
+                      "PL": "number"
+                    }
+                  },
+                  "by_month": {
+                    "object": {
+                      "2025-08": {
+                        "array": "empty"
+                      },
+                      "2025-09": {
+                        "array": "empty"
+                      },
+                      "2025-10": {
+                        "array": "empty"
+                      },
+                      "2025-11": {
+                        "array": "empty"
+                      },
+                      "2025-12": {
+                        "array": "empty"
+                      },
+                      "2026-01": {
+                        "array": "empty"
+                      },
+                      "2026-02": {
+                        "array": "empty"
+                      },
+                      "2026-03": {
+                        "array": "empty"
+                      },
+                      "2026-04": {
+                        "object": {
+                          "PL": "number"
+                        }
+                      },
+                      "2026-05": {
+                        "object": {
+                          "ES": "number",
+                          "PL": "number"
+                        }
+                      },
+                      "2026-06": {
+                        "array": "empty"
+                      },
+                      "2026-07": {
+                        "array": "empty"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/OverviewReportController.php",
+        "controllerMethod": "getOverview",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/product-performance",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "productPerformance": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/ProductReportController.php",
+        "controllerMethod": "getProductPerformance",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/quick-order-stats",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "from_date": "string",
+          "stats": {
+            "object": {
+              "paid_orders": {
+                "object": {
+                  "compare_count": "number",
+                  "current_count": "string",
+                  "title": "string"
+                }
+              },
+              "total_orders": {
+                "object": {
+                  "compare_count": "number",
+                  "current_count": "number",
+                  "title": "string"
+                }
+              },
+              "total_paid_amounts": {
+                "object": {
+                  "compare_count": "number",
+                  "current_count": "null",
+                  "is_cents": "boolean",
+                  "title": "string"
+                }
+              },
+              "total_paid_order_items": {
+                "object": {
+                  "compare_count": "number",
+                  "current_count": "string",
+                  "title": "string"
+                }
+              }
+            }
+          },
+          "to_date": "string"
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/ReportingController.php",
+        "controllerMethod": "getOrderQuickStats",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/refund-chart",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "chartData": {
+            "array": "empty"
+          },
+          "fluctuations": {
+            "array": "empty"
+          },
+          "previousMetrics": {
+            "array": "empty"
+          },
+          "previousSummary": {
+            "array": "empty"
+          },
+          "summary": {
+            "object": {
+              "average_refunded_amount": "number",
+              "refund_count": "number",
+              "refund_rate": "number",
+              "refunded_amount": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/RefundReportController.php",
+        "controllerMethod": "getRefundChart",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/refund-data-by-group",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/RefundReportController.php",
+        "controllerMethod": "getRefundDataByGroup",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/report-overview",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "_deprecated": "string",
+          "data": {
+            "object": {
+              "average_order_value": "string",
+              "customer_order_count": "string",
+              "net_sales": "string",
+              "total_discounts": "string",
+              "total_sales": "string",
+              "total_shipping_tax": "string"
+            }
+          },
+          "orders_by_payment_method": {
+            "array": {
+              "object": {
+                "order_count": "string",
+                "payment_method": "string",
+                "transactions": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/ReportingController.php",
+        "controllerMethod": "getReportOverview",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/retention-chart",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "chartData": {
+            "object": {
+              "day_15": "null",
+              "day_180": "null",
+              "day_30": "null",
+              "day_365": "null",
+              "day_7": "null",
+              "day_90": "null",
+              "more_than_year": "null"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/SubscriptionReportController.php",
+        "controllerMethod": "getRetentionChart",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/revenue",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "appliedGroupKey": "string",
+          "fluctuations": {
+            "array": "empty"
+          },
+          "previousMetrics": {
+            "array": "empty"
+          },
+          "previousSummary": {
+            "array": "empty"
+          },
+          "revenueReport": {
+            "array": {
+              "object": {
+                "group": "string",
+                "net_revenue": "number",
+                "order_count": "number",
+                "refunded_orders": "number",
+                "shipping_total": "number",
+                "total_refunds": "number",
+                "total_sales": "number",
+                "total_tax": "number",
+                "year": "string"
+              }
+            }
+          },
+          "summary": {
+            "object": {
+              "gross_sale": "number",
+              "net_revenue": "number",
+              "order_count": "number",
+              "refunded_orders": "number",
+              "shipping_total": "number",
+              "tax_total": "number",
+              "total_refunded_amount": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/RevenueReportController.php",
+        "controllerMethod": "getRevenue",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/sales-growth-chart",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "salesGrowthChart": {
+            "array": {
+              "object": {
+                "group": "string",
+                "net_revenue": "number",
+                "orders": "number",
+                "year": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/ReportingController.php",
+        "controllerMethod": "getSalesGrowthChart",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/sales-report",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "fluctuations": {
+            "array": "empty"
+          },
+          "graphs": {
+            "object": {
+              "grossSaleGraph": {
+                "array": "empty"
+              },
+              "itemsSoldGraph": {
+                "array": "empty"
+              },
+              "netRevenueGraph": {
+                "array": "empty"
+              },
+              "orderGraph": {
+                "array": "empty"
+              },
+              "refundCountGraph": {
+                "array": "empty"
+              },
+              "refundsGraph": {
+                "array": "empty"
+              },
+              "subscriptionRenewalGraph": {
+                "array": "empty"
+              },
+              "subscriptionRevenueGraph": {
+                "array": "empty"
+              }
+            }
+          },
+          "previousSummary": {
+            "array": "empty"
+          },
+          "summaryData": {
+            "object": {
+              "average_customer_ltv": "number",
+              "average_customer_orders": "number",
+              "average_order_items": "number",
+              "average_order_net": "number",
+              "gross_sale": "number",
+              "net_revenue": "number",
+              "onetime_count": "number",
+              "onetime_gross": "number",
+              "onetime_net": "number",
+              "order_count": "number",
+              "renewal_count": "number",
+              "renewal_gross": "number",
+              "renewal_net": "number",
+              "subscription_count": "number",
+              "subscription_gross": "number",
+              "subscription_net": "number",
+              "subscription_renewal_count": "number",
+              "total_item_count": "number",
+              "total_refunded": "number",
+              "total_refunded_amount": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/DefaultReportController.php",
+        "controllerMethod": "getSalesReport",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/sources",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "fluctuations": {
+            "array": "empty"
+          },
+          "sourceReportData": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/SourceReportController.php",
+        "controllerMethod": "index",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/subscription-chart",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "compareMetrics": "null",
+          "currentMetrics": {
+            "array": {
+              "object": {
+                "count": "number",
+                "group": "string",
+                "year": "string"
+              }
+            }
+          },
+          "fluctuations": {
+            "array": "empty"
+          },
+          "summary": {
+            "object": {
+              "future_installments": "null",
+              "total_subscriptions": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/SubscriptionReportController.php",
+        "controllerMethod": "getSubscriptionChart",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/subscription-cohorts",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "cohorts": {
+            "array": "empty"
+          },
+          "group_by": "string",
+          "max_periods": "number",
+          "metric": "string",
+          "weighted_averages": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/SubscriptionReportController.php",
+        "controllerMethod": "getCohortData",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/subscription-retention",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "retention_data": {
+            "array": {
+              "object": {
+                "active_free_subscriptions": "string",
+                "active_paid_subscriptions": "string",
+                "active_subscriptions": "string",
+                "churned_subscriptions": "number",
+                "churned_subscriptions_mrr": "number",
+                "day": "string",
+                "group": "string",
+                "mrr": "string",
+                "new_subscriptions": "number",
+                "new_subscriptions_mrr": "number",
+                "period_gross": "number",
+                "period_subscriptions": "number",
+                "retention_rate": "number",
+                "retention_rate_money": "number",
+                "week": "string",
+                "year": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/SubscriptionReportController.php",
+        "controllerMethod": "getRetentionData",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/reports/weeks-between-refund",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/Reports/RefundReportController.php",
+        "controllerMethod": "getWeeksBetweenRefund",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/shipping/classes",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "shipping_classes": {
+            "object": {
+              "current_page": "number",
+              "data": {
+                "array": "empty"
+              },
+              "first_page_url": "string",
+              "from": "null",
+              "last_page": "number",
+              "last_page_url": "string",
+              "links": {
+                "array": {
+                  "object": {
+                    "active": "boolean",
+                    "label": "string",
+                    "url": "string"
+                  }
+                }
+              },
+              "next_page_url": "null",
+              "path": "string",
+              "per_page": "number",
+              "prev_page_url": "null",
+              "to": "null",
+              "total": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Modules/Shipping/Http/Controllers/ShippingClassController.php",
+        "controllerMethod": "index",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/shipping/packages",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "packages": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Modules/Shipping/Http/Controllers/ShippingClassController.php",
+        "controllerMethod": "getPackages",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/shipping/zone/countries",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "continents": {
+            "array": {
+              "object": {
+                "code": "string",
+                "countries": {
+                  "array": {
+                    "object": {
+                      "code": "string",
+                      "name": "string"
+                    }
+                  }
+                },
+                "name": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Modules/Shipping/Http/Controllers/ShippingZoneController.php",
+        "controllerMethod": "getCountriesByContinent",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/shipping/zone/states",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "data": {
+            "object": {
+              "address_locale": {
+                "array": "empty"
+              },
+              "country_code": "string",
+              "states": {
+                "array": "empty"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Modules/Shipping/Http/Controllers/ShippingZoneController.php",
+        "controllerMethod": "getZoneStates",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/shipping/zones",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "shipping_zones": {
+            "object": {
+              "current_page": "number",
+              "data": {
+                "array": {
+                  "object": {
+                    "created_at": "string",
+                    "formatted_region": "string",
+                    "id": "number",
+                    "meta": {
+                      "array": "empty"
+                    },
+                    "name": "string",
+                    "order": "string",
+                    "region": "string",
+                    "shipping_class_id": "null",
+                    "updated_at": "string"
+                  }
+                }
+              },
+              "first_page_url": "string",
+              "from": "number",
+              "last_page": "number",
+              "last_page_url": "string",
+              "links": {
+                "array": {
+                  "object": {
+                    "active": "boolean",
+                    "label": "string",
+                    "url": "string"
+                  }
+                }
+              },
+              "next_page_url": "null",
+              "path": "string",
+              "per_page": "number",
+              "prev_page_url": "null",
+              "to": "number",
+              "total": "number"
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Modules/Shipping/Http/Controllers/ShippingZoneController.php",
+        "controllerMethod": "index",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/tax/classes",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "classes": {
+            "array": {
+              "object": {
+                "created_at": "string",
+                "description": "string",
+                "id": "number",
+                "meta": {
+                  "object": {
+                    "categories": {
+                      "array": "empty"
+                    },
+                    "priority": "number"
+                  }
+                },
+                "slug": "string",
+                "title": "string",
+                "updated_at": "string"
+              }
+            }
+          },
+          "max_classes": "number",
+          "next_builtin": "null"
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/TaxRateController.php",
+        "controllerMethod": "getClasses",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/tax/configuration/rates",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "tax_rates": {
+            "object": {
+              "AF": {
+                "object": {
+                  "countries": {
+                    "array": {
+                      "object": {
+                        "country_code": "string",
+                        "country_name": "string",
+                        "rates": {
+                          "array": {
+                            "object": {
+                              "compound": "boolean",
+                              "name": "string",
+                              "rate": "number",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "total_rates": "number"
+                      }
+                    }
+                  },
+                  "group_code": "string",
+                  "group_name": "string",
+                  "total_countries": "number"
+                }
+              },
+              "AS": {
+                "object": {
+                  "countries": {
+                    "array": {
+                      "object": {
+                        "country_code": "string",
+                        "country_name": "string",
+                        "rates": {
+                          "array": {
+                            "object": {
+                              "compound": "boolean",
+                              "name": "string",
+                              "rate": "number",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "total_rates": "number"
+                      }
+                    }
+                  },
+                  "group_code": "string",
+                  "group_name": "string",
+                  "total_countries": "number"
+                }
+              },
+              "EU": {
+                "object": {
+                  "countries": {
+                    "array": {
+                      "object": {
+                        "country_code": "string",
+                        "country_name": "string",
+                        "rates": {
+                          "array": {
+                            "object": {
+                              "compound": "boolean",
+                              "name": "string",
+                              "rate": "number",
+                              "state": "string",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "total_rates": "number"
+                      }
+                    }
+                  },
+                  "group_code": "string",
+                  "group_name": "string",
+                  "total_countries": "number"
+                }
+              },
+              "NA": {
+                "object": {
+                  "countries": {
+                    "array": {
+                      "object": {
+                        "country_code": "string",
+                        "country_name": "string",
+                        "rates": {
+                          "array": {
+                            "object": {
+                              "compound": "boolean",
+                              "name": "string",
+                              "rate": "number",
+                              "state": "string",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "total_rates": "number"
+                      }
+                    }
+                  },
+                  "group_code": "string",
+                  "group_name": "string",
+                  "total_countries": "number"
+                }
+              },
+              "OC": {
+                "object": {
+                  "countries": {
+                    "array": {
+                      "object": {
+                        "country_code": "string",
+                        "country_name": "string",
+                        "rates": {
+                          "array": {
+                            "object": {
+                              "compound": "boolean",
+                              "name": "string",
+                              "rate": "number",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "total_rates": "number"
+                      }
+                    }
+                  },
+                  "group_code": "string",
+                  "group_name": "string",
+                  "total_countries": "number"
+                }
+              },
+              "REST": {
+                "object": {
+                  "countries": {
+                    "array": {
+                      "object": {
+                        "country_code": "string",
+                        "country_name": "string",
+                        "rates": {
+                          "array": {
+                            "object": {
+                              "compound": "boolean",
+                              "rate": "number",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "total_rates": "number"
+                      }
+                    }
+                  },
+                  "group_code": "string",
+                  "group_name": "string",
+                  "total_countries": "number"
+                }
+              },
+              "SA": {
+                "object": {
+                  "countries": {
+                    "array": {
+                      "object": {
+                        "country_code": "string",
+                        "country_name": "string",
+                        "rates": {
+                          "array": {
+                            "object": {
+                              "compound": "boolean",
+                              "name": "string",
+                              "rate": "number",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "total_rates": "number"
+                      }
+                    }
+                  },
+                  "group_code": "string",
+                  "group_name": "string",
+                  "total_countries": "number"
+                }
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/TaxConfigurationController.php",
+        "controllerMethod": "getTaxRates",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/tax/configuration/settings/eu-vat/oss-rates",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "classes": {
+            "array": {
+              "object": {
+                "id": "number",
+                "slug": "string",
+                "title": "string"
+              }
+            }
+          },
+          "rates": {
+            "array": {
+              "object": {
+                "class_rates": {
+                  "object": {
+                    "r4-tax-class-1772581041258": {
+                      "object": {
+                        "default_rate": "number",
+                        "has_custom": "boolean",
+                        "label": "string",
+                        "rate": "number"
+                      }
+                    },
+                    "reduced": {
+                      "object": {
+                        "default_rate": "number",
+                        "has_custom": "boolean",
+                        "label": "string",
+                        "rate": "number"
+                      }
+                    },
+                    "standard": {
+                      "object": {
+                        "default_rate": "number",
+                        "has_custom": "boolean",
+                        "label": "string",
+                        "rate": "number"
+                      }
+                    },
+                    "zero": {
+                      "object": {
+                        "default_rate": "number",
+                        "has_custom": "boolean",
+                        "label": "string",
+                        "rate": "number"
+                      }
+                    }
+                  }
+                },
+                "country": "string",
+                "default_rate": "number",
+                "has_custom": "boolean",
+                "label": "string",
+                "rate": "number",
+                "tax_label": "string"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/TaxEUController.php",
+        "controllerMethod": "getOssCountryRates",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/tax/configuration/settings/eu-vat/product-overrides",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "overrides": {
+            "array": "empty"
+          },
+          "shipping_overrides": {
+            "array": "empty"
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/TaxEUController.php",
+        "controllerMethod": "getEuProductOverrides",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    },
+    {
+      "profileDigest": "sha256:0924af0f096eeaaadbb92521655fec1a89e37d3fd378c03c4c382f0540a515c7",
+      "method": "GET",
+      "canonicalPath": "/tax/rates",
+      "status": 200,
+      "responseShape": {
+        "object": {
+          "country_enabled_map": {
+            "object": {
+              "AD": "boolean",
+              "AE": "boolean",
+              "AF": "boolean",
+              "AG": "boolean",
+              "AI": "boolean",
+              "AL": "boolean",
+              "AM": "boolean",
+              "AO": "boolean",
+              "AQ": "boolean",
+              "AR": "boolean",
+              "AS": "boolean",
+              "AT": "boolean",
+              "AU": "boolean",
+              "AW": "boolean",
+              "AX": "boolean",
+              "AZ": "boolean",
+              "BA": "boolean",
+              "BB": "boolean",
+              "BD": "boolean",
+              "BE": "boolean",
+              "BF": "boolean",
+              "BG": "boolean",
+              "BH": "boolean",
+              "BI": "boolean",
+              "BJ": "boolean",
+              "BL": "boolean",
+              "BM": "boolean",
+              "BN": "boolean",
+              "BO": "boolean",
+              "BQ": "boolean",
+              "BR": "boolean",
+              "BS": "boolean",
+              "BT": "boolean",
+              "BV": "boolean",
+              "BW": "boolean",
+              "BY": "boolean",
+              "BZ": "boolean",
+              "CA": "boolean",
+              "CC": "boolean",
+              "CD": "boolean",
+              "CF": "boolean",
+              "CG": "boolean",
+              "CH": "boolean",
+              "CI": "boolean",
+              "CK": "boolean",
+              "CL": "boolean",
+              "CM": "boolean",
+              "CN": "boolean",
+              "CO": "boolean",
+              "CR": "boolean",
+              "CU": "boolean",
+              "CV": "boolean",
+              "CW": "boolean",
+              "CX": "boolean",
+              "CY": "boolean",
+              "CZ": "boolean",
+              "DE": "boolean",
+              "DJ": "boolean",
+              "DK": "boolean",
+              "DM": "boolean",
+              "DO": "boolean",
+              "DZ": "boolean",
+              "EC": "boolean",
+              "EE": "boolean",
+              "EG": "boolean",
+              "EH": "boolean",
+              "ER": "boolean",
+              "ES": "boolean",
+              "ET": "boolean",
+              "EU": "boolean",
+              "FI": "boolean",
+              "FJ": "boolean",
+              "FK": "boolean",
+              "FM": "boolean",
+              "FO": "boolean",
+              "FR": "boolean",
+              "GA": "boolean",
+              "GB": "boolean",
+              "GD": "boolean",
+              "GE": "boolean",
+              "GF": "boolean",
+              "GG": "boolean",
+              "GH": "boolean",
+              "GI": "boolean",
+              "GL": "boolean",
+              "GM": "boolean",
+              "GN": "boolean",
+              "GP": "boolean",
+              "GQ": "boolean",
+              "GR": "boolean",
+              "GS": "boolean",
+              "GT": "boolean",
+              "GU": "boolean",
+              "GW": "boolean",
+              "GY": "boolean",
+              "HK": "boolean",
+              "HM": "boolean",
+              "HN": "boolean",
+              "HR": "boolean",
+              "HT": "boolean",
+              "HU": "boolean",
+              "ID": "boolean",
+              "IE": "boolean",
+              "IL": "boolean",
+              "IM": "boolean",
+              "IN": "boolean",
+              "IO": "boolean",
+              "IQ": "boolean",
+              "IR": "boolean",
+              "IS": "boolean",
+              "IT": "boolean",
+              "JE": "boolean",
+              "JM": "boolean",
+              "JO": "boolean",
+              "JP": "boolean",
+              "KE": "boolean",
+              "KG": "boolean",
+              "KH": "boolean",
+              "KI": "boolean",
+              "KM": "boolean",
+              "KN": "boolean",
+              "KP": "boolean",
+              "KR": "boolean",
+              "KW": "boolean",
+              "KY": "boolean",
+              "KZ": "boolean",
+              "LA": "boolean",
+              "LB": "boolean",
+              "LC": "boolean",
+              "LI": "boolean",
+              "LK": "boolean",
+              "LR": "boolean",
+              "LS": "boolean",
+              "LT": "boolean",
+              "LU": "boolean",
+              "LV": "boolean",
+              "LY": "boolean",
+              "MA": "boolean",
+              "MC": "boolean",
+              "MD": "boolean",
+              "ME": "boolean",
+              "MF": "boolean",
+              "MG": "boolean",
+              "MH": "boolean",
+              "MK": "boolean",
+              "ML": "boolean",
+              "MM": "boolean",
+              "MN": "boolean",
+              "MO": "boolean",
+              "MP": "boolean",
+              "MQ": "boolean",
+              "MR": "boolean",
+              "MS": "boolean",
+              "MT": "boolean",
+              "MU": "boolean",
+              "MV": "boolean",
+              "MW": "boolean",
+              "MX": "boolean",
+              "MY": "boolean",
+              "MZ": "boolean",
+              "NA": "boolean",
+              "NC": "boolean",
+              "NE": "boolean",
+              "NF": "boolean",
+              "NG": "boolean",
+              "NI": "boolean",
+              "NL": "boolean",
+              "NO": "boolean",
+              "NP": "boolean",
+              "NR": "boolean",
+              "NU": "boolean",
+              "NZ": "boolean",
+              "OM": "boolean",
+              "PA": "boolean",
+              "PE": "boolean",
+              "PF": "boolean",
+              "PG": "boolean",
+              "PH": "boolean",
+              "PK": "boolean",
+              "PL": "boolean",
+              "PM": "boolean",
+              "PN": "boolean",
+              "PR": "boolean",
+              "PS": "boolean",
+              "PT": "boolean",
+              "PW": "boolean",
+              "PY": "boolean",
+              "QA": "boolean",
+              "RE": "boolean",
+              "RO": "boolean",
+              "RS": "boolean",
+              "RU": "boolean",
+              "RW": "boolean",
+              "SA": "boolean",
+              "SB": "boolean",
+              "SC": "boolean",
+              "SD": "boolean",
+              "SE": "boolean",
+              "SG": "boolean",
+              "SH": "boolean",
+              "SI": "boolean",
+              "SJ": "boolean",
+              "SK": "boolean",
+              "SL": "boolean",
+              "SM": "boolean",
+              "SN": "boolean",
+              "SO": "boolean",
+              "SR": "boolean",
+              "SS": "boolean",
+              "ST": "boolean",
+              "SV": "boolean",
+              "SX": "boolean",
+              "SY": "boolean",
+              "SZ": "boolean",
+              "TC": "boolean",
+              "TD": "boolean",
+              "TF": "boolean",
+              "TG": "boolean",
+              "TH": "boolean",
+              "TJ": "boolean",
+              "TK": "boolean",
+              "TL": "boolean",
+              "TM": "boolean",
+              "TN": "boolean",
+              "TO": "boolean",
+              "TR": "boolean",
+              "TT": "boolean",
+              "TV": "boolean",
+              "TW": "boolean",
+              "TZ": "boolean",
+              "UA": "boolean",
+              "UG": "boolean",
+              "UM": "boolean",
+              "US": "boolean",
+              "UY": "boolean",
+              "UZ": "boolean",
+              "VA": "boolean",
+              "VC": "boolean",
+              "VE": "boolean",
+              "VG": "boolean",
+              "VI": "boolean",
+              "VN": "boolean",
+              "VU": "boolean",
+              "WF": "boolean",
+              "WS": "boolean",
+              "XI": "boolean",
+              "YE": "boolean",
+              "YT": "boolean",
+              "ZA": "boolean",
+              "ZM": "boolean",
+              "ZW": "boolean"
+            }
+          },
+          "tax_rates": {
+            "array": {
+              "object": {
+                "countries": {
+                  "array": {
+                    "object": {
+                      "country_code": "string",
+                      "country_name": "string",
+                      "rates": {
+                        "array": {
+                          "object": {
+                            "class_id": "string",
+                            "for_shipping": "null",
+                            "name": "string",
+                            "rate": "string"
+                          }
+                        }
+                      },
+                      "total_rates": "number"
+                    }
+                  }
+                },
+                "group_code": "string",
+                "group_name": "string",
+                "total_countries": "number"
+              }
+            }
+          }
+        }
+      },
+      "evidence": {
+        "routeFixture": "tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json",
+        "controllerFile": "app/Http/Controllers/TaxRateController.php",
+        "controllerMethod": "index",
+        "capturedAt": "2026-07-30T07:24:50.351Z"
+      }
+    }
+  ]
+}

@@ -174,8 +174,16 @@ export function buildReleaseTruth(pkg, releaseState = null) {
 			],
 		),
 		evidence: {
-			live: ['FluentCart 1.5.5 REST index', 'WordPress 7.0.2 Abilities catalogue'],
-			fixtures: ['legacy 1.3.9 route surface', 'deterministic protocol and capability lanes'],
+			live: [
+				'FluentCart Core 1.6.0 and FluentCart Pro 1.6.0 REST index',
+				'WordPress 7.0.2 Abilities catalogue',
+			],
+			fixtures: [
+				'legacy 1.3.9 route surface',
+				'isolated FluentCart 1.6.0 Core route surface',
+				'isolated FluentCart 1.6.0 Core and Pro route surface',
+				'deterministic protocol and capability lanes',
+			],
 			finalCandidate: 'AUTOMATED_CLIENT_CERTIFICATION_REQUIRED',
 		},
 	}

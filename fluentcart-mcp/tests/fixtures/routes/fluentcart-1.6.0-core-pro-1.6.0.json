@@ -1,0 +1,1621 @@
+{
+  "schemaVersion": 1,
+  "profile": {
+    "wordpress": "7.0.2",
+    "activeComponents": [
+      {
+        "slug": "fluent-cart",
+        "version": "1.6.0"
+      },
+      {
+        "slug": "fluent-cart-pro",
+        "version": "1.6.0"
+      }
+    ]
+  },
+  "capturedAt": "2026-07-30T07:16:06.341Z",
+  "evidenceKind": "live-rest-index",
+  "source": "sanitised-local-runtime",
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/activity"
+    },
+    {
+      "method": "DELETE",
+      "path": "/activity/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/activity/{param}/mark-read"
+    },
+    {
+      "method": "GET",
+      "path": "/address-info/countries"
+    },
+    {
+      "method": "GET",
+      "path": "/address-info/get-country-info"
+    },
+    {
+      "method": "GET",
+      "path": "/advance_filter/get-filter-options"
+    },
+    {
+      "method": "GET",
+      "path": "/app/attachments"
+    },
+    {
+      "method": "GET",
+      "path": "/app/init"
+    },
+    {
+      "method": "POST",
+      "path": "/app/upload-attachments"
+    },
+    {
+      "method": "GET",
+      "path": "/checkout-fields/get-fields"
+    },
+    {
+      "method": "POST",
+      "path": "/checkout-fields/save-fields"
+    },
+    {
+      "method": "GET",
+      "path": "/checkout/get-available-shipping-methods"
+    },
+    {
+      "method": "GET",
+      "path": "/checkout/get-checkout-summary-view"
+    },
+    {
+      "method": "GET",
+      "path": "/checkout/get-country-info"
+    },
+    {
+      "method": "GET",
+      "path": "/checkout/get-order-info"
+    },
+    {
+      "method": "GET",
+      "path": "/checkout/get-shipping-methods-list-view"
+    },
+    {
+      "method": "POST",
+      "path": "/checkout/place-order"
+    },
+    {
+      "method": "GET",
+      "path": "/coupons"
+    },
+    {
+      "method": "POST",
+      "path": "/coupons"
+    },
+    {
+      "method": "POST",
+      "path": "/coupons/apply"
+    },
+    {
+      "method": "POST",
+      "path": "/coupons/cancel"
+    },
+    {
+      "method": "POST",
+      "path": "/coupons/checkProductEligibility"
+    },
+    {
+      "method": "GET",
+      "path": "/coupons/getSettings"
+    },
+    {
+      "method": "GET",
+      "path": "/coupons/listCoupons"
+    },
+    {
+      "method": "POST",
+      "path": "/coupons/re-apply"
+    },
+    {
+      "method": "POST",
+      "path": "/coupons/storeCouponSettings"
+    },
+    {
+      "method": "DELETE",
+      "path": "/coupons/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/coupons/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/coupons/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/create-address"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/delete-address"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/downloads"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/edit-address"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/make-primary-address"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/orders"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/orders/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/orders/{param}/billing-address"
+    },
+    {
+      "method": "PUT",
+      "path": "/customer-profile/orders/{param}/billing-address"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/orders/{param}/upgrade-paths"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/profile"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/subscriptions"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/subscriptions/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/subscriptions/{param}/cancel-auto-renew"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/subscriptions/{param}/confirm-subscription-switch"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/subscriptions/{param}/get-or-create-plan"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/subscriptions/{param}/initiate-early-payment"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/subscriptions/{param}/pause"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/subscriptions/{param}/resume"
+    },
+    {
+      "method": "GET",
+      "path": "/customer-profile/subscriptions/{param}/setup-intent-attempts"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/subscriptions/{param}/switch-payment-method"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/subscriptions/{param}/update-payment-method"
+    },
+    {
+      "method": "POST",
+      "path": "/customer-profile/update"
+    },
+    {
+      "method": "GET",
+      "path": "/customers"
+    },
+    {
+      "method": "POST",
+      "path": "/customers"
+    },
+    {
+      "method": "POST",
+      "path": "/customers/add-address"
+    },
+    {
+      "method": "GET",
+      "path": "/customers/attachable-user"
+    },
+    {
+      "method": "POST",
+      "path": "/customers/do-bulk-action"
+    },
+    {
+      "method": "GET",
+      "path": "/customers/get-stats/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/customers/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/customers/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/customers/{param}/additional-info"
+    },
+    {
+      "method": "DELETE",
+      "path": "/customers/{param}/address"
+    },
+    {
+      "method": "GET",
+      "path": "/customers/{param}/address"
+    },
+    {
+      "method": "POST",
+      "path": "/customers/{param}/address"
+    },
+    {
+      "method": "PUT",
+      "path": "/customers/{param}/address"
+    },
+    {
+      "method": "POST",
+      "path": "/customers/{param}/address/make-primary"
+    },
+    {
+      "method": "POST",
+      "path": "/customers/{param}/attachable-user"
+    },
+    {
+      "method": "POST",
+      "path": "/customers/{param}/detach-user"
+    },
+    {
+      "method": "GET",
+      "path": "/customers/{param}/order"
+    },
+    {
+      "method": "GET",
+      "path": "/customers/{param}/orders"
+    },
+    {
+      "method": "POST",
+      "path": "/customers/{param}/recalculate-ltv"
+    },
+    {
+      "method": "GET",
+      "path": "/customers/{param}/update-address-select"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/stats"
+    },
+    {
+      "method": "POST",
+      "path": "/data-backfills/run"
+    },
+    {
+      "method": "GET",
+      "path": "/email-notification"
+    },
+    {
+      "method": "GET",
+      "path": "/email-notification/digest-settings"
+    },
+    {
+      "method": "POST",
+      "path": "/email-notification/digest-settings"
+    },
+    {
+      "method": "POST",
+      "path": "/email-notification/digest-settings/send-test"
+    },
+    {
+      "method": "POST",
+      "path": "/email-notification/enable-notification/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/email-notification/get-settings"
+    },
+    {
+      "method": "GET",
+      "path": "/email-notification/get-short-codes"
+    },
+    {
+      "method": "POST",
+      "path": "/email-notification/preview"
+    },
+    {
+      "method": "POST",
+      "path": "/email-notification/preview-default-template"
+    },
+    {
+      "method": "GET",
+      "path": "/email-notification/reminders"
+    },
+    {
+      "method": "POST",
+      "path": "/email-notification/reminders"
+    },
+    {
+      "method": "POST",
+      "path": "/email-notification/save-settings"
+    },
+    {
+      "method": "POST",
+      "path": "/email-notification/send-manual-reminder"
+    },
+    {
+      "method": "GET",
+      "path": "/email-notification/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/email-notification/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/files"
+    },
+    {
+      "method": "GET",
+      "path": "/files/bucket-list"
+    },
+    {
+      "method": "DELETE",
+      "path": "/files/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/files/upload"
+    },
+    {
+      "method": "GET",
+      "path": "/forms/search_options"
+    },
+    {
+      "method": "GET",
+      "path": "/integration/addons"
+    },
+    {
+      "method": "POST",
+      "path": "/integration/feed/chained"
+    },
+    {
+      "method": "GET",
+      "path": "/integration/feed/dynamic_options"
+    },
+    {
+      "method": "POST",
+      "path": "/integration/feed/install-plugin"
+    },
+    {
+      "method": "GET",
+      "path": "/integration/feed/lists"
+    },
+    {
+      "method": "GET",
+      "path": "/integration/global-feeds"
+    },
+    {
+      "method": "POST",
+      "path": "/integration/global-feeds/change-status/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/integration/global-feeds/settings"
+    },
+    {
+      "method": "POST",
+      "path": "/integration/global-feeds/settings"
+    },
+    {
+      "method": "DELETE",
+      "path": "/integration/global-feeds/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/integration/global-settings"
+    },
+    {
+      "method": "POST",
+      "path": "/integration/global-settings"
+    },
+    {
+      "method": "GET",
+      "path": "/labels"
+    },
+    {
+      "method": "POST",
+      "path": "/labels"
+    },
+    {
+      "method": "POST",
+      "path": "/labels/update-label-selections"
+    },
+    {
+      "method": "POST",
+      "path": "/notes/attach"
+    },
+    {
+      "method": "GET",
+      "path": "/onboarding"
+    },
+    {
+      "method": "POST",
+      "path": "/onboarding"
+    },
+    {
+      "method": "POST",
+      "path": "/onboarding/create-page"
+    },
+    {
+      "method": "POST",
+      "path": "/onboarding/create-pages"
+    },
+    {
+      "method": "POST",
+      "path": "/onboarding/save-tax"
+    },
+    {
+      "method": "POST",
+      "path": "/options/attr/group"
+    },
+    {
+      "method": "DELETE",
+      "path": "/options/attr/group/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/options/attr/group/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/options/attr/group/{param}"
+    },
+    {
+      "method": "DELETE",
+      "path": "/options/attr/group/{param}/term/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/options/attr/group/{param}/term/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/options/attr/group/{param}/terms"
+    },
+    {
+      "method": "POST",
+      "path": "/options/attr/group/{param}/terms"
+    },
+    {
+      "method": "POST",
+      "path": "/options/attr/group/{param}/terms/reorder"
+    },
+    {
+      "method": "GET",
+      "path": "/options/attr/groups"
+    },
+    {
+      "method": "GET",
+      "path": "/options/attr/groups/library"
+    },
+    {
+      "method": "POST",
+      "path": "/options/attr/groups/reorder"
+    },
+    {
+      "method": "GET",
+      "path": "/order_bump"
+    },
+    {
+      "method": "POST",
+      "path": "/order_bump"
+    },
+    {
+      "method": "DELETE",
+      "path": "/order_bump/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/order_bump/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/order_bump/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/orders"
+    },
+    {
+      "method": "POST",
+      "path": "/orders"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/calculate-shipping"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/calculate-tax"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/do-bulk-action"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/shipping_methods"
+    },
+    {
+      "method": "DELETE",
+      "path": "/orders/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/address/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/change-customer"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/create-and-change-customer"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/create-custom"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/generate-missing-licenses"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/mark-as-paid"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/refund"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/statuses"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/subscriptions/{param}/cancel"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/subscriptions/{param}/charge-now"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/subscriptions/{param}/create-renewal"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/subscriptions/{param}/early-payment-link"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/subscriptions/{param}/fetch"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/subscriptions/{param}/pause"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/subscriptions/{param}/reactivate"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/subscriptions/{param}/resume"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/subscriptions/{param}/skip-renewal"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/subscriptions/{param}/update"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/sync-statuses"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/{param}/transactions"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/{param}/transactions/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/transactions/{param}/accept-dispute"
+    },
+    {
+      "method": "PUT",
+      "path": "/orders/{param}/transactions/{param}/status"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/transactions/{param}/sync"
+    },
+    {
+      "method": "POST",
+      "path": "/orders/{param}/update-address-id"
+    },
+    {
+      "method": "GET",
+      "path": "/products"
+    },
+    {
+      "method": "POST",
+      "path": "/products"
+    },
+    {
+      "method": "POST",
+      "path": "/products/add-product-terms"
+    },
+    {
+      "method": "GET",
+      "path": "/products/bulk-edit-data"
+    },
+    {
+      "method": "POST",
+      "path": "/products/bulk-insert"
+    },
+    {
+      "method": "POST",
+      "path": "/products/bulk-update"
+    },
+    {
+      "method": "POST",
+      "path": "/products/create-dummy"
+    },
+    {
+      "method": "POST",
+      "path": "/products/delete-taxonomy-term/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/products/detail/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/products/do-bulk-action"
+    },
+    {
+      "method": "GET",
+      "path": "/products/fetch-term"
+    },
+    {
+      "method": "POST",
+      "path": "/products/fetch-term-by-parent"
+    },
+    {
+      "method": "GET",
+      "path": "/products/fetchProductsByIds"
+    },
+    {
+      "method": "GET",
+      "path": "/products/fetchVariationsByIds"
+    },
+    {
+      "method": "GET",
+      "path": "/products/findSubscriptionVariants"
+    },
+    {
+      "method": "GET",
+      "path": "/products/get-bundle-info/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/products/get-max-excerpt-word-count"
+    },
+    {
+      "method": "GET",
+      "path": "/products/getDownloadableUrl/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/products/save-bundle-info/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/products/search-product-variant-options"
+    },
+    {
+      "method": "GET",
+      "path": "/products/searchProductByName"
+    },
+    {
+      "method": "GET",
+      "path": "/products/searchVariantByName"
+    },
+    {
+      "method": "GET",
+      "path": "/products/suggest-sku"
+    },
+    {
+      "method": "POST",
+      "path": "/products/sync-taxonomy-term/{param}"
+    },
+    {
+      "method": "DELETE",
+      "path": "/products/upgrade-path/{param}/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/products/upgrade-path/{param}/update"
+    },
+    {
+      "method": "GET",
+      "path": "/products/variants"
+    },
+    {
+      "method": "POST",
+      "path": "/products/variants"
+    },
+    {
+      "method": "POST",
+      "path": "/products/variants/bulk-update"
+    },
+    {
+      "method": "POST",
+      "path": "/products/variants/group-bulk-update"
+    },
+    {
+      "method": "DELETE",
+      "path": "/products/variants/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/products/variants/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/products/variants/{param}/pricing-table"
+    },
+    {
+      "method": "POST",
+      "path": "/products/variants/{param}/setMedia"
+    },
+    {
+      "method": "POST",
+      "path": "/products/variants/{param}/tax-exempt"
+    },
+    {
+      "method": "GET",
+      "path": "/products/variation/{param}/upgrade-paths"
+    },
+    {
+      "method": "DELETE",
+      "path": "/products/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/products/{param}"
+    },
+    {
+      "method": "DELETE",
+      "path": "/products/{param}/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/duplicate"
+    },
+    {
+      "method": "GET",
+      "path": "/products/{param}/integrations"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/integrations"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/integrations/feed/change-status"
+    },
+    {
+      "method": "DELETE",
+      "path": "/products/{param}/integrations/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/products/{param}/integrations/{param}/settings"
+    },
+    {
+      "method": "GET",
+      "path": "/products/{param}/pricing"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/pricing"
+    },
+    {
+      "method": "GET",
+      "path": "/products/{param}/pricing-widgets"
+    },
+    {
+      "method": "GET",
+      "path": "/products/{param}/related-products"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/shipping-class"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/shipping-class/remove"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/sync-downloadable-files"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/tax-class"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/tax-class/remove"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/tax-exempt"
+    },
+    {
+      "method": "PUT",
+      "path": "/products/{param}/update"
+    },
+    {
+      "method": "PUT",
+      "path": "/products/{param}/update-inventory/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/update-long-desc-editor-mode"
+    },
+    {
+      "method": "PUT",
+      "path": "/products/{param}/update-manage-stock"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/update-variant-option"
+    },
+    {
+      "method": "POST",
+      "path": "/products/{param}/upgrade-path"
+    },
+    {
+      "method": "GET",
+      "path": "/products/{param}/upgrade-paths"
+    },
+    {
+      "method": "GET",
+      "path": "/public/product-search"
+    },
+    {
+      "method": "GET",
+      "path": "/public/product-views"
+    },
+    {
+      "method": "GET",
+      "path": "/public/products"
+    },
+    {
+      "method": "GET",
+      "path": "/renewals"
+    },
+    {
+      "method": "GET",
+      "path": "/renewals/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/renewals/{param}/resend"
+    },
+    {
+      "method": "POST",
+      "path": "/renewals/{param}/void"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/country-heat-map"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/customer-report"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/daily-signups"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/dashboard-stats"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/fetch-new-vs-returning-customer"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/fetch-order-by-group"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/fetch-report-by-day-and-hour"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/fetch-report-meta"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/fetch-top-sold-products"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/fetch-top-sold-variants"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/future-renewals"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/get-dashboard-summary"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/get-recent-activities"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/get-recent-orders"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/item-count-distribution"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/license-chart"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/license-pie-chart"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/license-summary"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/order-chart"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/order-completion-time"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/order-value-distribution"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/overview"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/product-performance"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/product-report"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/quick-order-stats"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/refund-chart"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/refund-data-by-group"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/report-overview"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/retention-chart"
+    },
+    {
+      "method": "POST",
+      "path": "/reports/retention-snapshots/generate"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/retention-snapshots/status"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/revenue"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/revenue-by-group"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/sales-growth"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/sales-growth-chart"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/sales-report"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/search-repeat-customer"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/sources"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/subscription-chart"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/subscription-cohorts"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/subscription-retention"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/top-products-sold"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/weeks-between-refund"
+    },
+    {
+      "method": "GET",
+      "path": "/roles"
+    },
+    {
+      "method": "POST",
+      "path": "/roles"
+    },
+    {
+      "method": "GET",
+      "path": "/roles/managers"
+    },
+    {
+      "method": "GET",
+      "path": "/roles/user-list"
+    },
+    {
+      "method": "DELETE",
+      "path": "/roles/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/roles/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/roles/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/saved-views"
+    },
+    {
+      "method": "POST",
+      "path": "/saved-views"
+    },
+    {
+      "method": "DELETE",
+      "path": "/saved-views/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/saved-views/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/confirmation"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/confirmation/shortcode"
+    },
+    {
+      "method": "DELETE",
+      "path": "/settings/license"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/license"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/license"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/mcp"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/mcp/config-snippets"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/mcp/install-adapter"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/mcp/toggle"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/modules"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/modules"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/modules/plugin-addons"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/modules/plugin-addons/activate"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/modules/plugin-addons/install"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/modules/turnstile/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/payment-methods"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/payment-methods"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/payment-methods/activate-addon"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/payment-methods/all"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/payment-methods/connect/info"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/payment-methods/design"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/payment-methods/disconnect"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/payment-methods/install-addon"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/payment-methods/paypal/seller-auth-token"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/payment-methods/paypal/webhook/check"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/payment-methods/paypal/webhook/setup"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/payment-methods/reorder"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/pdf-templates/create"
+    },
+    {
+      "method": "DELETE",
+      "path": "/settings/pdf-templates/delete/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/pdf-templates/download"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/pdf-templates/factory-default"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/pdf-templates/receipt"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/pdf-templates/receipt/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/pdf-templates/receipt/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/pdf-templates/saved"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/pdf-templates/seller-details"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/pdf-templates/seller-details"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/pdf-templates/status"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/permissions"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/permissions"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/storage-drivers"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/storage-drivers"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/storage-drivers/active-drivers"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/storage-drivers/bucket-list"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/storage-drivers/change-status"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/storage-drivers/create-bucket"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/storage-drivers/reset"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/storage-drivers/verify-info"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/storage-drivers/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/store"
+    },
+    {
+      "method": "POST",
+      "path": "/settings/store"
+    },
+    {
+      "method": "GET",
+      "path": "/shipping/classes"
+    },
+    {
+      "method": "POST",
+      "path": "/shipping/classes"
+    },
+    {
+      "method": "DELETE",
+      "path": "/shipping/classes/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/shipping/classes/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/shipping/classes/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/shipping/classes/{param}/profile"
+    },
+    {
+      "method": "POST",
+      "path": "/shipping/methods"
+    },
+    {
+      "method": "PUT",
+      "path": "/shipping/methods"
+    },
+    {
+      "method": "DELETE",
+      "path": "/shipping/methods/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/shipping/packages"
+    },
+    {
+      "method": "POST",
+      "path": "/shipping/packages"
+    },
+    {
+      "method": "GET",
+      "path": "/shipping/zone/countries"
+    },
+    {
+      "method": "GET",
+      "path": "/shipping/zone/states"
+    },
+    {
+      "method": "GET",
+      "path": "/shipping/zones"
+    },
+    {
+      "method": "POST",
+      "path": "/shipping/zones"
+    },
+    {
+      "method": "POST",
+      "path": "/shipping/zones/update-order"
+    },
+    {
+      "method": "DELETE",
+      "path": "/shipping/zones/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/shipping/zones/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/shipping/zones/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/subscriptions"
+    },
+    {
+      "method": "GET",
+      "path": "/subscriptions/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/classes"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/classes"
+    },
+    {
+      "method": "DELETE",
+      "path": "/tax/classes/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/configuration/countries"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/configuration/rates"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/configuration/settings"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/configuration/settings"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/configuration/settings/eu-vat"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/configuration/settings/eu-vat/oss-rates"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/configuration/settings/eu-vat/oss-rates"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/configuration/settings/eu-vat/product-overrides"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/configuration/settings/eu-vat/reset-rates"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/country-status/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/country-tax-id/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/country-tax-id/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/country/rate"
+    },
+    {
+      "method": "DELETE",
+      "path": "/tax/country/rate/{param}"
+    },
+    {
+      "method": "PUT",
+      "path": "/tax/country/rate/{param}"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/product-overrides"
+    },
+    {
+      "method": "DELETE",
+      "path": "/tax/product-overrides/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/product-overrides/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/rates"
+    },
+    {
+      "method": "POST",
+      "path": "/tax/rates/country/override"
+    },
+    {
+      "method": "DELETE",
+      "path": "/tax/rates/country/override/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/tax/rates/country/rates/{param}"
+    },
+    {
+      "method": "GET",
+      "path": "/taxes"
+    },
+    {
+      "method": "POST",
+      "path": "/taxes"
+    },
+    {
+      "method": "GET",
+      "path": "/templates/print-templates"
+    },
+    {
+      "method": "PUT",
+      "path": "/templates/print-templates"
+    },
+    {
+      "method": "POST",
+      "path": "/upload-editor-file"
+    },
+    {
+      "method": "POST",
+      "path": "/user/login"
+    },
+    {
+      "method": "GET",
+      "path": "/variants"
+    },
+    {
+      "method": "GET",
+      "path": "/widgets"
+    }
+  ],
+  "counts": {
+    "prefixedPathsInclusive": 339,
+    "exactPairsInclusive": 398,
+    "applicationPaths": 338,
+    "applicationExactPairs": 397,
+    "applicationCanonicalPairs": 396
+  },
+  "canonicalCollapses": [
+    {
+      "canonical": "GET /customers/{param}",
+      "exact": [
+        "GET /fluent-cart/v2/customers/(?P<customerId>[0-9]+)",
+        "GET /fluent-cart/v2/customers/(?P<customerId>[^\\s(?!/)]+)"
+      ]
+    }
+  ]
+}

@@ -21,8 +21,8 @@ import { routeProfileDigest } from '../dist/commerce/context.js'
 import { assertAllowedLiveTarget } from './live-target-policy.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const ROUTE_FIXTURE = 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json'
-const OUTPUT = 'tests/fixtures/rest/fluentcart-1.5.5-all-active-read-contracts.json'
+const ROUTE_FIXTURE = 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json'
+const OUTPUT = 'tests/fixtures/rest/fluentcart-1.6.0-all-active-read-contracts.json'
 const REQUEST_TIMEOUT_MS = 15_000
 const PAGINATION_PROBE = 500
 const PAGINATION_PROBE_SMALL = 3
@@ -396,13 +396,13 @@ async function captureAll() {
 				scope: 'core',
 				status: 'BLOCKED',
 				reason:
-					'No isolated FluentCart Core-only live runtime was available. The all-active response evidence is not promoted to this scope.',
+					'No isolated FluentCart Core-only response-shape capture was taken. The all-active response evidence is not promoted to this scope.',
 			},
 			{
 				scope: 'core-pro',
 				status: 'BLOCKED',
 				reason:
-					'No isolated FluentCart Core plus Pro live runtime was available. The all-active response evidence is not promoted to this scope.',
+					'No isolated FluentCart Core plus Pro response-shape capture was taken. The all-active response evidence is not promoted to this scope.',
 			},
 			{
 				scope: 'all-active',

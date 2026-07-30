@@ -71,9 +71,9 @@ describe('discoverApiCapabilities', () => {
 		await discoverApiCapabilities(STORE)
 
 		expect(root).toHaveLength(1)
-		// The whole-site index answers the same question at 4.5x the bytes: 527,327 characters
-		// and 987 routes on the development store against 117,444 for the one namespace, for the
-		// identical 386 operations.
+		// The whole-site index answers the same question at 4.5x the bytes: 531,388 characters
+		// and 998 routes on the development store against 121,333 for the one namespace, for the
+		// identical 396 operations.
 		expect(root[0]?.url).toBe('http://store.test/wp-json/fluent-cart/v2')
 
 		const subdirectory = stubFetch(() => jsonResponse(REST_INDEX))

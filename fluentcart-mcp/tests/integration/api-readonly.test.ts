@@ -615,11 +615,15 @@ describe('Integration: Read-only API endpoints', { timeout: 30_000 }, () => {
 			expect(res.data).toBeDefined()
 		})
 
-		// BUG: FluentCart server 500 — array_intersect_key(): Argument #1 ($array) must be of type array, null given
-		it.fails('GET /reports/top-products-sold — top products sold (SERVER BUG)', async () => {
+		// FluentCart 1.6 normalises the missing params object before the deprecated resource query,
+		// so the route now returns its deprecation envelope instead of the 1.5.5 server error.
+		it('GET /reports/top-products-sold — deprecated top products response', async () => {
 			const res = await client.get('/reports/top-products-sold')
 			expect(res.status).toBe(200)
-			expect(res.data).toBeDefined()
+			expect(res.data).toMatchObject({
+				_deprecated: expect.stringContaining('/reports/fetch-top-sold-products'),
+				top_products_sold: expect.any(Array),
+			})
 		})
 
 		it('GET /reports/fetch-top-sold-products — top sold products', async () => {

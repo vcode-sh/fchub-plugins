@@ -47,8 +47,14 @@ supported configuration, not a degraded one.
 
 `FLUENTCART_WRITE_MODE` is separate product policy. It defaults to `disabled`, so writes cannot be
 listed, searched, described, or called. `reversible` adds only reviewed creates and updates with
-read-back and a supported undo. It does not grant WordPress permissions, and a broad role does not
-switch writes on by itself.
+read-back and a supported undo. This includes a narrow `bill_times` update for a subscription's
+billing-cycle limit when its collection method is `manual` or `system`, not subscription lifecycle
+control. Gateway-billed `automatic` subscriptions fail closed before a write. FluentCart 1.6 does
+not expose an atomic record-version precondition, so this tool uses a best-effort preflight plus
+read-back. If a PUT or read-back fails ambiguously, fetch the subscription again before deciding
+what to do; never retry the write blindly. Subscriptions with linked FluentCart Pro licences fail
+closed because the upstream update event can change licence state. The mode does not grant
+WordPress permissions, and a broad role does not switch writes on by itself.
 
 ```json
 {
@@ -62,6 +68,16 @@ Refunds, subscription cancellation, deletion, bulk mutations, order-status chang
 order paid, dispute handling, role or permission changes, plugin installation, integration
 credential changes, uploads, email, login actions, and other external side effects remain absent.
 No presentation mode or environment variable enables them.
+
+FluentCart 1.6 also exposes pause, resume, reactivate, charge-now, renewal creation, skip, void,
+resend, transaction-sync, and subscription gateway-resync routes. FluentCart MCP deliberately does
+not expose them: they can change future billing, renewal state, local subscription state, or customer
+communication without a restoration path this release can verify. A REST route is evidence to
+inspect, not a command to ship.
+
+The generic store-settings tool also rejects FluentCart 1.6's `subscription_management_mode` and
+`subscription_system_charge` settings. They are store-wide billing controls, not harmless config
+toggles, and require a dedicated guarded flow before they could be exposed.
 
 ## Presentation modes
 

@@ -15,8 +15,8 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..'
 const PROTOCOLS = ['2025-11-25', '2026-07-28']
 const MODES = ['dynamic', 'curated', 'code', 'full']
 const PROFILE_FILES = {
-	core: 'tests/fixtures/routes/fluentcart-1.5.5-core.json',
-	'core-pro': 'tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+	core: 'tests/fixtures/routes/fluentcart-1.6.0-core.json',
+	'core-pro': 'tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 }
 const PRO_ONLY_TOOL = 'fluentcart_pdf_template_list'
 const CODE_NAMES = ['fluentcart_execute_code', 'fluentcart_search_api']

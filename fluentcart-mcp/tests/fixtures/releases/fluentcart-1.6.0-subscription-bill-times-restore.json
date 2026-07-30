@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "live-reversible-write",
+  "capturedOn": "2026-07-30",
+  "runtime": {
+    "wordpress": "7.0.2",
+    "fluentCart": "1.6.0",
+    "fluentCartPro": "1.6.0"
+  },
+  "tool": "fluentcart_subscription_update",
+  "mutatingRoute": "PUT /orders/{param}/subscriptions/{param}/update",
+  "fixture": {
+    "ownership": "run-owned",
+    "subscriptionId": 7,
+    "renewalId": 98,
+    "collectionMethod": "manual",
+    "linkedLicenceCount": 0
+  },
+  "roundTrip": {
+    "before": {
+      "bill_times": 5,
+      "status": "active",
+      "collection_method": "manual"
+    },
+    "changed": {
+      "bill_times": 6,
+      "status": "active",
+      "collection_method": "manual"
+    },
+    "restored": {
+      "bill_times": 5,
+      "status": "active",
+      "collection_method": "manual"
+    }
+  },
+  "assertions": {
+    "changedReadBack": true,
+    "restoredReadBack": true,
+    "billCountUnchanged": true,
+    "statusUnchanged": true,
+    "collectionMethodUnchanged": true,
+    "fixtureCleanupVerified": true
+  },
+  "sourceSafetyReview": {
+    "automaticGatewaySubscriptionsRejected": true,
+    "linkedLicenceSubscriptionsRejected": true,
+    "finiteCeilingMustExceedCurrentBillCount": true,
+    "priceScheduleAndStatusFieldsAbsent": true
+  },
+  "limitations": {
+    "atomicVersionPrecondition": false,
+    "concurrentUpdateGuarantee": false,
+    "statement": "FluentCart 1.6 exposes no compare-and-swap or ETag precondition. This evidence proves a quiescent update-readback-restore round trip, not atomic stale-write prevention. Ambiguous PUT or read-back failures must be re-read and never blindly retried."
+  }
+}

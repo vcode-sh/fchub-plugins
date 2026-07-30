@@ -3,7 +3,8 @@ import { canonicalJson, type DiscoveredAbility } from './schema.js'
 
 export type AbilityMethod = 'GET' | 'POST'
 
-// Generated from the status-only fixture by scripts/capture-abilities-contract.mjs.
+// Generated from the audited 1.5.5 and 1.6.0 status-only fixtures. Keeping both exact
+// fingerprints preserves the older verified bridge without weakening fail-closed discovery.
 export const APPROVED_FALLBACK_FINGERPRINTS: ReadonlySet<string> = new Set([
 	'sha256:6ea128e10b59b249c9aa1bae1e0e7ae159f6750b25c8a3d0a4d8ec4a80109f21',
 	'sha256:ea6ea1c9f873acfbc07d594205f41c59c8bc478e235b4618c163755823f1cb31',
@@ -31,6 +32,14 @@ export const APPROVED_FALLBACK_FINGERPRINTS: ReadonlySet<string> = new Set([
 	'sha256:22a6c5c35dd41a030fab54627ed801db89240ec9e10598304ae325491066e52e',
 	'sha256:d9da5d48a75c4ad9a81d89fe681dd03f00c289b5f4476d83f4bab6affdde324c',
 	'sha256:744772f4c4918046239bcdf7820011b5969dd09e2750ab6c01436868f6bf5532',
+	'sha256:85951d0b4c5f77293b71a1c6606bd3787e76fb5199e836eca9372528593dac2e',
+	'sha256:5124d86a2a91bdd9c90b131ceee733bc30c2ff81a6ab4b492e7ef935ebe8ce9a',
+	'sha256:cec5436057c3be4dc2748d1b2eb543a165339d5777318f8e036f040b9441e2cb',
+	'sha256:2f069edf53ffbf322877897840a0764a15f19ae37007a7735b4b5d6ad33d1aeb',
+	'sha256:9bc54cca14afffa1f5fbcaaebeabb917e97d014656492f378251a4301f8ddcc5',
+	'sha256:6231cfb5e9dbcd021a31f2c3fc8e3de147ac08325fb274cade0ea3245ef9e7a3',
+	'sha256:90883e801a99130151b2d312227c1ad27faba80fc32030102c57dfeb690ed077',
+	'sha256:6083e5b54bc1abf613c063d04cd0125798c9b85d39da0b962e822bd7956ce78a',
 ])
 
 export function fingerprintAbility(ability: DiscoveredAbility): `sha256:${string}` {

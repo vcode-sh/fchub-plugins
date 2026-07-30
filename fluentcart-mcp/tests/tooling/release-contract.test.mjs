@@ -19,12 +19,15 @@ const MODE_KEYS = ['toolCount', 'characters', 'cl100kTokens', 'o200kTokens']
 const WRITE_MODES = ['disabled', 'reversible']
 const LEGACY_RUNTIME_FIXTURE = 'tests/fixtures/routes/fluentcart-1.3.9-runtime.json'
 
-/** The four mandatory rows, in order. */
+/** Current release rows plus the captured legacy surfaces, in deterministic order. */
 const MANDATORY_PROFILES = [
 	'legacy-1.3.9-runtime-rest-disabled',
 	'core-1.5.5-rest-disabled',
 	'core-1.5.5-pro-1.5.4-rest-disabled',
 	'core-1.5.5-pro-1.5.4-rest-reversible',
+	'core-1.6.0-rest-disabled',
+	'core-1.6.0-pro-1.6.0-rest-disabled',
+	'core-1.6.0-pro-1.6.0-rest-reversible',
 ]
 
 /**
@@ -109,7 +112,7 @@ describe('release contract source digest', () => {
 })
 
 describe('optional native abilities evidence', () => {
-	it('records the measured 1.5.5 catalogue and read-only admission boundary', () => {
+	it('records the measured 1.6.0 catalogue and read-only admission boundary', () => {
 		const bridge = contract.abilitiesBridge
 		assert.equal(bridge.status, 'MEASURED')
 		assert.equal(bridge.capturedCatalogueSize, 33)
@@ -195,9 +198,9 @@ describe('blocked profiles', () => {
 describe('measured profiles', () => {
 	const measured = () => contract.profiles.filter((profile) => profile.status === 'MEASURED')
 
-	it('measures at least the current core plus Pro runtime, and nothing unmandated', () => {
+	it('measures the current core plus Pro runtime and nothing unmandated', () => {
 		const names = measured().map((profile) => profile.name)
-		assert.ok(names.includes('core-1.5.5-pro-1.5.4-rest-disabled'))
+		assert.ok(names.includes('core-1.6.0-pro-1.6.0-rest-disabled'))
 		for (const name of names) assert.ok(MANDATORY_PROFILES.includes(name), name)
 		for (const profile of measured()) {
 			assert.ok(fixturesPresent(profile), profile.name)
@@ -243,13 +246,28 @@ describe('measured profiles', () => {
 			'legacy-1.3.9-runtime-rest-disabled',
 			'core-1.5.5-rest-disabled',
 			'core-1.5.5-pro-1.5.4-rest-disabled',
+			'core-1.6.0-rest-disabled',
+			'core-1.6.0-pro-1.6.0-rest-disabled',
 		]
 		const counts = order.map((name) => profileNamed(name)?.exposedDefinitionCount)
 		if (counts.some((count) => typeof count !== 'number')) return
 
-		assert.notEqual(new Set(counts).size, 1, 'all three disabled rows report the same count')
-		for (let i = 1; i < counts.length; i += 1) {
-			assert.ok(counts[i - 1] <= counts[i], `${order[i]} exposes fewer tools than ${order[i - 1]}`)
+		assert.notEqual(new Set(counts).size, 1, 'all disabled profiles report the same count')
+		for (const [older, newer] of [
+			[order[0], order[1]],
+			[order[1], order[2]],
+			[order[1], order[3]],
+			[order[2], order[4]],
+			[order[3], order[4]],
+		]) {
+			const olderCount = profileNamed(older)?.exposedDefinitionCount
+			const newerCount = profileNamed(newer)?.exposedDefinitionCount
+			assert.ok(
+				typeof olderCount === 'number' &&
+					typeof newerCount === 'number' &&
+					olderCount <= newerCount,
+				`${newer} exposes fewer tools than its ${older} comparison`,
+			)
 		}
 	})
 })

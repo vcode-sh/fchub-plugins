@@ -4,7 +4,7 @@ import { READ_SAFETY, UNREVIEWED_WRITE_SAFETY } from './risk.js'
 /**
  * Reviewed business-risk rows for every write this server can name.
  *
- * A write is `reversible-write` only when FluentCart 1.5.5 offers BOTH an exact read-back and
+ * A write is `reversible-write` only when a supported FluentCart runtime offers BOTH an exact read-back and
  * a supported way to delete or restore the record. Two verified counter-examples keep that bar
  * honest: `/labels` has no DELETE route at all, and a customer's first address is primary and
  * cannot be deleted, so neither creation is reversible however ordinary it looks.
@@ -23,7 +23,6 @@ const POST_SHAPED_READS = [
 	'fluentcart_order_bump_list',
 	'fluentcart_order_calculate_shipping',
 	'fluentcart_product_bundle_info',
-	'fluentcart_subscription_fetch',
 ]
 
 /** Create/update pairs with a verified delete (or restore) and a verified read-back. */
@@ -94,6 +93,12 @@ const REVERSIBLE_UPDATES = [
 	'fluentcart_product_manage_stock_update',
 	'fluentcart_product_taxonomy_delete',
 	'fluentcart_product_taxonomy_sync',
+	// FluentCart 1.6 subscription detail updates are only exposed for bill_times. The handler reads
+	// the current row as a best-effort, non-atomic preflight and writes the retained status inside
+	// `{data: ...}`. Ambiguous PUT or read-back failures warn that the mutation may have applied.
+	// It deliberately excludes price, schedule and status edits because they can mutate invoices
+	// or scheduled charges without a complete restore contract.
+	'fluentcart_subscription_update',
 ]
 
 /**
@@ -137,7 +142,6 @@ const DESTRUCTIVE_WRITES = [
 	'fluentcart_shipping_method_delete',
 	'fluentcart_shipping_zone_delete',
 	'fluentcart_tax_class_delete',
-	'fluentcart_tax_country_delete_all',
 	'fluentcart_tax_rate_delete',
 	'fluentcart_tax_shipping_override_delete',
 	'fluentcart_variant_delete',
@@ -216,6 +220,9 @@ const INFRASTRUCTURE_WRITES = [
 
 /** Leaves the store: email delivery, cart-session mutation, third-party calls. */
 const EXTERNAL_SIDE_EFFECT_WRITES = [
+	// FluentCart 1.6 `reSyncFromRemote()` updates local subscription state and may call the payment
+	// gateway. It is a PUT route despite its old read-like name, and there is no complete restore.
+	'fluentcart_subscription_fetch',
 	'fluentcart_coupon_apply',
 	'fluentcart_coupon_cancel',
 	'fluentcart_coupon_reapply',

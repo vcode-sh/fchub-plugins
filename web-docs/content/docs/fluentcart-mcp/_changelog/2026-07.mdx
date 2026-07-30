@@ -1,3 +1,49 @@
+### v2.1.0
+
+[npm](https://www.npmjs.com/package/fluentcart-mcp) · [Latest release](https://github.com/vcode-sh/fchub-plugins/releases/latest)
+
+FluentCart 1.6+ subscription support, minus the traditional rush to wire every shiny endpoint to a
+chat box and call it innovation.
+
+#### Renewals are first-class reads
+
+`fluentcart_renewal_list` and `fluentcart_renewal_get` let an assistant list renewal records and
+open one renewal in detail. The subscription projection also retains the useful FluentCart 1.6
+context, including collection method and pending-skip state when the store returns it.
+
+#### Subscription detail changes are guarded
+
+Reversible mode now includes a narrowly reviewed update for `bill_times`, the subscription's total
+billing-cycle limit. It checks fresh `bill_times` and `bill_count` as a best-effort preflight,
+rejects an already stale or end-of-term change, and reads the record back before reporting success.
+FluentCart 1.6 has no atomic version precondition, so an ambiguous failure says the mutation may
+have applied and requires a fresh read instead of a blind retry. It applies only to store-billed
+`manual` or `system` subscriptions; gateway-billed `automatic` subscriptions fail closed before a
+write. Subscriptions with linked FluentCart Pro licences also fail closed because the upstream
+update event can change licence state. This is not a back door to billing control: charges, renewal creation, skipping, voiding, resending,
+transaction synchronisation, refunds, and subscription cancellation remain absent.
+
+Pause, resume, and reactivate remain absent too. FluentCart 1.6 can change scheduled charges and
+related renewal state through those lifecycle routes, and this release cannot prove a supported
+restoration. An endpoint existing is not the same thing as an undo button. Remarkable, but useful.
+
+`fluentcart_subscription_fetch` is absent as well. It was previously classed as a read, but
+FluentCart 1.6 uses it to resynchronise with the payment gateway and can mutate local subscription
+state. That belongs in the admin, not behind a deceptively calm tool description.
+
+The generic store-settings write also rejects `subscription_management_mode` and
+`subscription_system_charge`. They are store-wide billing controls and now need a dedicated guard,
+rather than slipping through a generic settings form in a fake moustache.
+
+#### FluentCart 1.6 compatibility refresh
+
+The 2.1.0 evidence refresh verified WordPress 7.0.2 with FluentCart Core 1.6.0 and FluentCart Pro
+1.6.0. “FluentCart 1.6+” identifies the compatibility work in this release; it does not claim every
+future FluentCart version has been tested. Route discovery also removes the legacy tax-country
+delete operation: it was a nonfunctional ghost route, not a missing feature to mourn.
+
+---
+
 ### v2.0.1
 
 [npm](https://www.npmjs.com/package/fluentcart-mcp) · [Latest release](https://github.com/vcode-sh/fchub-plugins/releases/latest)

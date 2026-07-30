@@ -72,6 +72,7 @@ function transformSubscription(item: Record<string, unknown>): Record<string, un
 		expire_at: item.expire_at,
 		canceled_at: item.canceled_at,
 		current_payment_method: item.current_payment_method,
+		collection_method: item.collection_method,
 		parent_order_id: item.parent_order_id,
 		product_id: item.product_id,
 		variation_id: item.variation_id,
@@ -169,6 +170,8 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 						vendor_customer_id: sub.vendor_customer_id,
 						vendor_plan_id: sub.vendor_plan_id,
 						collection_method: sub.collection_method,
+						has_pending_skip: sub.has_pending_skip,
+						last_skipped_period: sub.last_skipped_period,
 						restored_at: sub.restored_at,
 						original_plan: sub.original_plan,
 						payment_info: sub.payment_info,
@@ -197,24 +200,9 @@ export function subscriptionTools(client: FluentCartClient): ToolDefinition[] {
 			endpoint: '/orders/:order_id/subscriptions/:subscription_id/fetch',
 		}),
 
-		// NOTE: subscription_pause, subscription_resume and subscription_reactivate are deliberately
-		// absent, and this is not an oversight to be corrected by anyone reading the route table.
-		//
-		// All three routes ARE registered — `PUT /orders/{order}/subscriptions/{subscription}/pause`
-		// and siblings, in app/Modules/Subscriptions/Http/subscriptions-api.php lines 31-37 — so any
-		// audit that reads route registrations will report them as available and recommend adding
-		// them. One did. But every controller is a stub:
-		//
-		//   public function pauseSubscription(Request $request, Order $order, Subscription $subscription)
-		//   {
-		//       return $this->sendError(['message' => __('Not available yet', 'fluent-cart')]);
-		//   }
-		//
-		// Verified in FluentCart 1.5.5 at
-		// app/Modules/Subscriptions/Http/Controllers/SubscriptionController.php — pauseSubscription,
-		// resumeSubscription and reactivateSubscription are identical three-line stubs. Exposing them
-		// would add three tools that can only ever fail, which is worse than the gap.
-		//
-		// Re-check the controller bodies, not the route file, before adding them.
+		// FluentCart 1.6 implements pause, resume and reactivation, but they remain intentionally
+		// absent: pause voids renewal invoices, resume can restore scheduled charges, and reactivation
+		// voids invoices/transactions then advances billing dates. The disabled/reversible policy has
+		// no complete restore contract for those side effects.
 	]
 }

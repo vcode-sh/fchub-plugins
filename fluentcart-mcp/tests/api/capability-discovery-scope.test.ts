@@ -1,8 +1,8 @@
 // Discovery reads one namespace, not the whole site, and still fails closed.
 //
-// Measured on the development store: `/wp-json/` is 527,327 characters over 987 routes, of which
-// 386 operations survive the FluentCart filter; `/wp-json/fluent-cart/v2` is 117,444 characters
-// and yields the identical 386 operations — same set, nothing only in one, nothing only in the
+// Measured on the development store: `/wp-json/` is 531,388 characters over 998 routes, of which
+// 396 operations survive the FluentCart filter; `/wp-json/fluent-cart/v2` is 121,333 characters
+// and yields the identical 396 operations — same set, nothing only in one, nothing only in the
 // other. Every startup was moving 4.5x the bytes it kept.
 //
 // The narrower URL changes one failure mode, which is what most of this file is about: a store

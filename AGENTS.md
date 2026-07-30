@@ -15,7 +15,7 @@ owner performs publication.
 - The private FCHub product-centre source belongs in the sibling
   `fchub-playground/wp-content/plugins/fchub/`; do not add it to this monorepo.
 
-## FluentCart MCP 2.0
+## FluentCart MCP 2.1
 
 - Generated release truth lives in `fluentcart-mcp/release-contract.json`, with
   matching MCPB metadata in `manifest.json` and compatibility evidence in
@@ -24,6 +24,12 @@ owner performs publication.
 - The default is `dynamic` with writes disabled: three read-only meta-tools.
   Reversible mode exposes a fourth executor only for proven reversible writes.
   Refunds, subscription cancellation, deletion and bulk actions remain absent.
+- FluentCart MCP 2.1 is verified against WordPress 7.0.2 with FluentCart Core
+  1.6.0 and FluentCart Pro 1.6.0. It adds renewal list/detail reads and one
+  guarded subscription update: changing `bill_times` for store-billed
+  `manual` or `system` subscriptions without linked licences. Automatic
+  gateway billing, licensed subscriptions, and lifecycle actions remain absent
+  because they can create external or non-restorable effects.
 - MCP Inspector, Claude Code and Docker smoke are candidate-bound automated
   handshakes. The documented configuration-recipe matrix is ChatGPT Desktop,
   Codex CLI, Codex IDE extension, Claude Desktop, Cursor, VS Code with GitHub

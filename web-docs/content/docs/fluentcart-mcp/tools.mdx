@@ -48,7 +48,7 @@ The exact names depend on the routes your store serves, but the reviewed surface
 | Orders | Orders, line items, transactions, addresses, activity and fulfilment state |
 | Products | Catalogue, variants, pricing, stock, downloads, licences, taxonomy and bundles |
 | Customers | Profiles, addresses, order history, subscriptions and lifetime-value context |
-| Subscriptions | Billing relationships, renewal state, transactions and upcoming payments |
+| Subscriptions & renewals | Billing relationships, individual renewal records, renewal state, transactions and upcoming payments |
 | Reports | Revenue, trends, top products, customers, refunds, retention and attribution |
 | Coupons | Coupon definitions, eligibility and usage |
 | Shipping | Zones, methods, classes, packages and destination calculations |
@@ -63,6 +63,10 @@ Show me unpaid orders from the last seven days.
 Which products are below their stock threshold?
 What renews next week in PLN?
 ```
+
+On FluentCart 1.6, the server can also list renewal records and open one renewal in detail. The
+subscription projection keeps the useful 1.6 context, including the collection method and pending
+skip state where the store returns them. It does not invent an outcome for an absent field.
 
 ### Two field semantics worth knowing
 
@@ -81,6 +85,25 @@ Reversible mode is for routine admin work that can be read back and restored or 
 - create or update order bumps and upgrade paths;
 - update product stock and taxonomy assignments;
 - update the reviewed tax settings document.
+- update only a subscription's total billing-cycle limit (`bill_times`) through a narrow, guarded
+  path. It performs a best-effort preflight against fresh `bill_times` and `bill_count`, then
+  verifies the result before it reports success. FluentCart 1.6 has no atomic version precondition;
+  an ambiguous failure reports that the mutation may have applied and tells the caller to re-fetch
+  instead of retrying blindly. `0` means unlimited billing cycles; a finite limit cannot move to or
+  below the number of cycles already billed. Only store-billed `manual` or `system` subscriptions
+  qualify; gateway-billed `automatic` subscriptions and subscriptions with linked FluentCart Pro
+  licences fail closed before a write.
+
+Subscription lifecycle endpoints remain out of scope. In FluentCart 1.6, pausing, resuming, or
+reactivating can change scheduled charges or related renewal state in ways the server cannot prove
+it can restore. The fact that an endpoint exists is not an undo button. Charges, renewal creation,
+skipping, voiding, resending, transaction synchronisation, refunds, and cancellation stay absent.
+The generic store-settings tool also rejects `subscription_management_mode` and
+`subscription_system_charge`; store-wide billing controls need their own dedicated guard.
+
+Subscription gateway resync (`fluentcart_subscription_fetch`) is absent too. FluentCart 1.6 uses
+it to contact the gateway and can update local subscription state, which makes the old “read” label
+wrong. Use the FluentCart admin when a gateway resync is genuinely needed.
 
 Create operations are not advertised as idempotent when FluentCart would create a duplicate on
 retry. Update operations are marked idempotent only when writing the same state twice has the same
@@ -130,8 +153,9 @@ into this page.
 
 ## Optional native FluentCart abilities
 
-FluentCart 1.5.4+ supplies native WordPress Abilities for several advanced reads. The bridge is off
-by default and requires its own WordPress Application Password:
+FluentCart supplies native WordPress Abilities for several advanced reads. The bridge is off by
+default and requires its own WordPress Application Password. The 2.1.0 evidence refresh audits the
+target runtime at FluentCart Core 1.6.0 and Pro 1.6.0:
 
 ```bash
 FLUENTCART_ABILITIES_MODE=enabled
@@ -170,6 +194,16 @@ overrides policy.
 - `manifest.json` — packaged MCP metadata and advertised public tools
 - `compatibility-support.json` — captured FluentCart route and Ability evidence
 - your client's `tools/list` response — the actual surface for that store and principal
+
+## FluentCart 1.6+ compatibility
+
+Version 2.1.0 is the FluentCart 1.6+ compatibility release: route discovery was refreshed and the
+nonfunctional legacy tax-country delete definition is absent. It represented an endpoint that could
+not execute, not a missing feature to restore.
+
+The new renewal read surface is included. “1.6+” identifies the FluentCart family this work targets.
+The exact runtime verified for this release is WordPress 7.0.2 with FluentCart Core 1.6.0 and
+FluentCart Pro 1.6.0; it is not a blank cheque for a release that has not been tested yet.
 
 <Cards>
   <Card title="Client chooser" href="/docs/fluentcart-mcp/setup">

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { FluentCartClient } from '../api/client.js'
 import { createTool, getTool, type ToolDefinition } from './_factory.js'
-import { composite, direct, op } from './endpoints.js'
+import { direct } from './endpoints.js'
 import {
 	describeStockFilter,
 	matchesSku,
@@ -112,14 +112,14 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 
 		createTool(client, {
 			name: 'fluentcart_variant_list',
-			routes: composite(op('GET', '/products/variants'), op('GET', '/products/{param}')),
+			routes: direct('GET', '/products/{param}'),
 			title: 'List Variations',
 			description:
 				"List one product's variations with their prices, SKUs and stock levels. " +
 				'For stock across the whole store — what is low, what is out — use ' +
 				'fluentcart_variant_list_all, which filters on stock. ' +
-				'`product_id` is required because the backend route is unstable without it. ' +
-				'If upstream `/products/variants` fails with a known runtime bug, this tool falls back to `/products/:id` and returns variants from product detail.',
+				'Reads the product detail relation because FluentCart `/products/variants` does not ' +
+				'filter by product_id.',
 			schema: z.object({
 				product_id: z.number().describe('Parent product ID'),
 				page: z.number().optional().describe('Page number (default: 1)'),
@@ -130,48 +130,26 @@ export function productVariantTools(client: FluentCartClient): ToolDefinition[] 
 				const productId = input.product_id as number
 				const page = (input.page as number) ?? 1
 				const perPage = (input.per_page as number) ?? 15
-				const params: Record<string, unknown> = {
-					product_id: productId,
-					page,
-					per_page: perPage,
-				}
-
 				const trimVariants = (arr: unknown[]) =>
 					arr.map((v) => trimVariant(v as Record<string, unknown>))
 
-				try {
-					const response = await client.get('/products/variants', params)
-					const resp = response.data as Record<string, unknown>
-					if (resp && Array.isArray(resp.variants)) {
-						resp.variants = trimVariants(resp.variants)
-					}
-					return resp
-				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error)
-					const isKnownUpstreamBug =
-						message.includes('ProductVariationResource::get()') && message.includes('null given')
-					if (!isKnownUpstreamBug) throw error
+				// Relations are opt-in: ProductController::find eager-loads only what `with` names.
+				// FluentCart 1.5 threw when /products/variants received no nested params; 1.6 fixed
+				// the throw but still ignores product_id and returns an empty list. Product detail is
+				// the stable route that actually binds the variants to this product in both versions.
+				const response = await client.get(`/products/${productId}`, { 'with[]': 'variants' })
+				const wrapper = response.data as Record<string, unknown>
+				const product = (wrapper.product ?? wrapper) as Record<string, unknown>
+				const variantsRaw = Array.isArray(product.variants) ? (product.variants as unknown[]) : []
+				const from = Math.max(0, (page - 1) * perPage)
+				const to = from + perPage
+				const variants = trimVariants(variantsRaw.slice(from, to))
 
-					// Relations are opt-in: ProductController::find eager-loads only what `with` names,
-					// so the previous fallback — a bare GET /products/{id} — read a payload that never
-					// contains variants and returned `total: 0` for a product that has them, reporting
-					// success. Verified live against a product with one variant.
-					const fallback = await client.get(`/products/${productId}`, { 'with[]': 'variants' })
-					const wrapper = fallback.data as Record<string, unknown>
-					const product = (wrapper.product ?? wrapper) as Record<string, unknown>
-					const variantsRaw = Array.isArray(product.variants) ? (product.variants as unknown[]) : []
-					const from = Math.max(0, (page - 1) * perPage)
-					const to = from + perPage
-					const variants = trimVariants(variantsRaw.slice(from, to))
-
-					return {
-						variants,
-						page,
-						per_page: perPage,
-						total: variantsRaw.length,
-						source: 'fallback_product_get',
-						note: 'Upstream /products/variants route failed; served from product detail variants.',
-					}
+				return {
+					variants,
+					page,
+					per_page: perPage,
+					total: variantsRaw.length,
 				}
 			},
 		}),

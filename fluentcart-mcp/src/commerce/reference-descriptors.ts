@@ -72,7 +72,7 @@ export const REFERENCE_DESCRIPTORS: Readonly<Record<ReferenceKind, ReferenceDesc
 		maxPerPage: 100,
 		defaultPerPage: 50,
 		evidence:
-			'GET /settings/payment-methods/all in tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+			'GET /settings/payment-methods/all in tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 	},
 	tax_classes: {
 		kind: 'tax_classes',
@@ -88,7 +88,7 @@ export const REFERENCE_DESCRIPTORS: Readonly<Record<ReferenceKind, ReferenceDesc
 		},
 		maxPerPage: 100,
 		defaultPerPage: 50,
-		evidence: 'GET /tax/classes in tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+		evidence: 'GET /tax/classes in tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 	},
 	shipping_zones: {
 		kind: 'shipping_zones',
@@ -104,7 +104,7 @@ export const REFERENCE_DESCRIPTORS: Readonly<Record<ReferenceKind, ReferenceDesc
 		},
 		maxPerPage: 100,
 		defaultPerPage: 50,
-		evidence: 'GET /shipping/zones in tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+		evidence: 'GET /shipping/zones in tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 	},
 	countries: {
 		kind: 'countries',
@@ -121,7 +121,7 @@ export const REFERENCE_DESCRIPTORS: Readonly<Record<ReferenceKind, ReferenceDesc
 		maxPerPage: 100,
 		defaultPerPage: 50,
 		evidence:
-			'GET /address-info/countries in tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+			'GET /address-info/countries in tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 	},
 	labels: {
 		kind: 'labels',
@@ -137,7 +137,7 @@ export const REFERENCE_DESCRIPTORS: Readonly<Record<ReferenceKind, ReferenceDesc
 		},
 		maxPerPage: 100,
 		defaultPerPage: 50,
-		evidence: 'GET /labels in tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+		evidence: 'GET /labels in tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 	},
 	product_categories: {
 		kind: 'product_categories',
@@ -154,7 +154,7 @@ export const REFERENCE_DESCRIPTORS: Readonly<Record<ReferenceKind, ReferenceDesc
 		maxPerPage: 100,
 		defaultPerPage: 50,
 		evidence:
-			'GET /products/fetch-term in tests/fixtures/routes/fluentcart-1.5.5-core-pro-1.5.4.json',
+			'GET /products/fetch-term in tests/fixtures/routes/fluentcart-1.6.0-core-pro-1.6.0.json',
 	},
 }
 
