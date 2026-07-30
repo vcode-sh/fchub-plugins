@@ -9,21 +9,19 @@ Connect your AI app to your FluentCart store for safe, read-only answers about i
 subscription cancellation, deletion, and bulk actions are unavailable in every mode. Order-status
 changes, marking an order paid, and other money-moving work are also unavailable.
 
-## New in 2.1.0: FluentCart 1.6 subscriptions, without the drama
+## New in 2.2.0: MCP SDK v2, without the interpretive networking
 
-You can now list renewals and open an individual renewal directly, then see the richer subscription
-context FluentCart 1.6 returns. Reversible mode also has a narrowly guarded update for a
-store-billed subscription's billing-cycle limit (`bill_times`), with a just-in-time preflight and
-read-back. It accepts only `manual` or `system` collection methods; gateway-billed
-`automatic` subscriptions are not edited.
+I rebuilt the protocol layer on the official MCP TypeScript SDK v2 packages and pinned each one to
+`2.0.0`. I support both MCP `2025-11-25` and `2026-07-28`, including modern `server/discover`,
+cache hints, and real negotiated-handshake evidence over HTTP and STDIO.
 
-The server cannot charge a card, create, skip, void, resend, or cancel a renewal. Those buttons
-are still where they belong: behind a deliberate human decision.
+I also added a live registry gate, official conformance coverage across both protocol versions,
+and exact-candidate client, Docker, proxy, archive, and soak evidence. Dependency drift may still
+have ambitions. I no longer give it a release strategy.
 
-**Compatibility note:** “FluentCart 1.6+” is this release's compatibility theme, not a promise
-about untested future versions. The exact verified combination is WordPress 7.0.2, FluentCart Core
-1.6.0, and FluentCart Pro 1.6.0. FluentCart Pro is optional; route discovery simply shows fewer
-Pro-backed tools when it is not installed.
+I retained the FluentCart 1.6 subscription support from 2.1.0. I still cannot charge a card,
+create, skip, void, resend, or cancel a renewal. Those buttons remain where they belong: behind a
+deliberate human decision.
 
 ## Choose your app
 

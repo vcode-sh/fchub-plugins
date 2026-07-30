@@ -68,7 +68,7 @@ describe('single-build candidate graph', () => {
 	it('packages once with the explicit captured state and uploads the exact handoff', () => {
 		assert.equal((ci.match(/npm run pack:release/g) ?? []).length, 1)
 		assert.match(ci, /--release-state tests\/fixtures\/releases\/previous-release-state\.json/)
-		assert.match(ci, /actions\/upload-artifact@v4/)
+		assert.match(ci, /actions\/upload-artifact@v7/)
 		assert.match(ci, /source_tree_digest:/)
 		assert.match(ci, /smoke-public-stdio\.mjs/)
 		assert.match(artifactBuilder, /'scripts\/smoke-public-stdio\.mjs'/)
@@ -101,7 +101,7 @@ describe('tag-triggered staging', () => {
 	it('records the native npm stage and local candidate integrity before evidence upload', () => {
 		const body = job(stage, 'stage-npm')
 		assert.match(body, /write-staging-state\.mjs/)
-		assert.match(body, /actions\/upload-artifact@v4/)
+		assert.match(body, /actions\/upload-artifact@v7/)
 		assert.doesNotMatch(body, /npm view|npm pack "fluentcart-mcp@/)
 		assert.match(stageState, /stageId/)
 		assert.match(stageState, /expectedIntegrity/)
@@ -137,8 +137,8 @@ describe('versioned Docker candidate', () => {
 
 	it('checks out before downloading the validated handoff so checkout cannot delete it', () => {
 		const verify = job(docker, 'verify')
-		const checkout = verify.indexOf('actions/checkout@v4')
-		const download = verify.indexOf('actions/download-artifact@v4')
+		const checkout = verify.indexOf('actions/checkout@v7')
+		const download = verify.indexOf('actions/download-artifact@v8')
 		const build = verify.indexOf('Build candidate from validated context')
 		assert.ok(checkout < download)
 		assert.ok(download < build)

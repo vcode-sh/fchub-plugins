@@ -6,19 +6,15 @@
 
 An MCP server that connects AI assistants to your [FluentCart](https://fluentcart.com) store — orders, products, customers, subscriptions, coupons, reports, shipping, tax, email notifications, and more. Read-only until you deliberately say otherwise. Open source, MIT licensed.
 
-**New in 2.1.0:** FluentCart 1.6+ is the release theme. It adds direct renewal list and detail
-reads, a narrowly guarded subscription billing-cycle-limit update, and richer subscription context without
-opening the door to charges, cancellation, or renewal manipulation. The exact verified runtime is
-WordPress 7.0.2 with FluentCart Core 1.6.0 and FluentCart Pro 1.6.0; “1.6+” does not pretend we
-have tested every future release, because that would be a rather efficient way to turn a version
-label into fiction.
+**New in 2.2.0:** I rebuilt the protocol layer on the official MCP TypeScript SDK v2 packages,
+pinned every package to `2.0.0`, and added a live registry gate so “latest” cannot quietly become a
+historical anecdote. I support both MCP `2025-11-25` and `2026-07-28`, including modern
+`server/discover`, cache hints, and candidate-bound handshake evidence over HTTP and STDIO.
 
-The guarded update applies only to store-billed subscriptions whose collection method is `manual`
-or `system`. Gateway-billed `automatic` subscriptions fail closed before any write. FluentCart 1.6
-does not provide an atomic version precondition: the tool performs a just-in-time preflight and
-read-back, returns the previous limit on success, and tells the caller to re-fetch rather than
-blindly retry when the outcome cannot be verified. Subscriptions with linked FluentCart Pro
-licences fail closed because the upstream update event can change licence state.
+I retained the FluentCart 1.6 support introduced in 2.1.0: renewal reads, richer subscription
+context, and a narrowly guarded billing-cycle-limit update for store-billed subscriptions. I still
+fail closed for gateway-billed subscriptions, linked FluentCart Pro licences, charges,
+cancellation, and renewal manipulation.
 
 The server speaks MCP `2025-11-25` and `2026-07-28`. The recipes below are setup guidance, not
 client certification. Candidate certification requires a candidate-bound handshake from MCP Inspector
@@ -243,7 +239,7 @@ Once connected, just talk. The read-only examples work out of the box; the ones 
 
 - **Node.js** >= 24.0.0 (for npx/stdio mode)
 - **Docker** (for HTTP/container mode — no Node.js needed)
-- **WordPress** with [FluentCart](https://fluentcart.com) installed. The verified 2.1.0 release
+- **WordPress** with [FluentCart](https://fluentcart.com) installed. The verified 2.2.0 release
   combination is WordPress 7.0.2, FluentCart Core 1.6.0 and FluentCart Pro 1.6.0. Pro is optional
   for normal connection; it adds only the Pro-backed routes your store serves.
 - A **WordPress account** with an Application Password and the FluentCart REST capabilities you plan to use

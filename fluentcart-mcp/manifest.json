@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "fluentcart-mcp",
   "display_name": "FluentCart",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Curated and capability-discovered tools for a FluentCart store — orders, products, customers, subscriptions, coupons and reports. Read-only unless you opt in to writes.",
   "long_description": "Connects an MCP client to the FluentCart REST API of your own WordPress site.\n\nDynamic mode is the default: a handful of meta-tools let the agent search the catalogue, read a tool definition and execute it, which keeps the definition payload small no matter how large the store API grows. Curated mode advertises a small reviewed set directly, code mode exposes a sandboxed scripting pair, and full mode lists everything the current policy permits.\n\nExposure is decided before anything is listed. Writes are hidden entirely until write mode is raised, and what you actually get depends on what your store and your role support. FluentCart native abilities are a separate read-only opt-in with their own credentials; discovery admits only the audited read allowlist.",
   "author": {
@@ -212,10 +212,10 @@
   "_meta": {
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
-      "packageVersion": "2.1.0",
-      "sourceTreeDigest": "sha256:476474f28b30d76c607f61d3c6d9ee256eba34ea5511fa127ce72ab521164a77",
+      "packageVersion": "2.2.0",
+      "sourceTreeDigest": "sha256:3b545b80c2c63002df98bb8fac30aeac687df796bcf7ac9db86a085373f696ea",
       "release": {
-        "version": "2.1.0",
+        "version": "2.2.0",
         "protocols": [
           "2025-11-25",
           "2026-07-28"
@@ -476,10 +476,10 @@
           "npmStageTag": "latest",
           "npmApproval": "interactive-2fa",
           "npmPromotionWrite": false,
-          "previousLatest": "2.0.1",
+          "previousLatest": "2.1.0",
           "previousDockerDigests": {
-            "ghcr.io": "sha256:28f79e77822f843e32cc2d19b86fb52a2321f215e32c5260dd0b56722fa9d65e",
-            "docker.io": "sha256:28f79e77822f843e32cc2d19b86fb52a2321f215e32c5260dd0b56722fa9d65e"
+            "ghcr.io": "sha256:ea3bea2062b969d65079d354e4d14e554637e9a03669bf820608a88d1275fc6c",
+            "docker.io": "sha256:ea3bea2062b969d65079d354e4d14e554637e9a03669bf820608a88d1275fc6c"
           }
         },
         "clients": {

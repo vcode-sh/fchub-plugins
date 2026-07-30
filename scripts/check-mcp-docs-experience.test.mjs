@@ -488,9 +488,15 @@ describe('safe diagnostics', () => {
 
 describe('current release parity', () => {
 	it('keeps current-facing package versions out of non-historical content', () => {
+		const stalePackageVersion =
+			/(?:^|\n)#{1,6}\s+v?2\.0\.0\b|\b(?:new in|fluentcart-mcp@|release(?:d|s)?(?:\s+version)?|package\s+version|current\s+version)\s+[`'"]?v?2\.0\.0\b/i
 		for (const path of currentFacingFiles()) {
 			if (path.endsWith('/changelog.mdx')) continue
-			assert.doesNotMatch(readFileSync(path, 'utf8'), /\b2\.0\.0\b/, `${path} presents a stale release version`)
+			assert.doesNotMatch(
+				readFileSync(path, 'utf8'),
+				stalePackageVersion,
+				`${path} presents a stale release version`,
+			)
 		}
 	})
 

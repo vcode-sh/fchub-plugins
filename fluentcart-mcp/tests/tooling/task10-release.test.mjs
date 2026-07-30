@@ -22,7 +22,7 @@ const read = (path) => readFileSync(join(REPO_ROOT, path), 'utf8')
 const readJson = (path) => JSON.parse(read(path))
 
 const expectedTruth = {
-	version: '2.1.0',
+	version: '2.2.0',
 	protocols: ['2025-11-25', '2026-07-28'],
 	httpProfiles: ['local', 'private'],
 	sdk: {
@@ -259,7 +259,7 @@ describe('generated release truth', () => {
 	it('separates five automated handshakes from documented configuration recipes', () => {
 		const support = readJson('fluentcart-mcp/compatibility-support.json')
 		assert.deepEqual(support.releaseEvidence, {
-			version: '2.1.0',
+			version: '2.2.0',
 			protocols: ['2025-11-25', '2026-07-28'],
 			httpProfiles: ['local', 'private'],
 			finalCandidate: 'AUTOMATED_CLIENT_CERTIFICATION_REQUIRED',
@@ -321,21 +321,21 @@ describe('generated release truth', () => {
 
 	it('rejects missing, mutable, unknown and already-current capture inputs', () => {
 		const good = readJson('fluentcart-mcp/tests/fixtures/releases/previous-release-state.json')
-		assert.throws(() => validateReleaseState({}, '2.1.0'), /schema version 1/)
+		assert.throws(() => validateReleaseState({}, '2.2.0'), /schema version 1/)
 		assert.throws(
 			() =>
-				validateReleaseState({ ...good, npm: { ...good.npm, previousLatest: '2.1.0' } }, '2.1.0'),
+				validateReleaseState({ ...good, npm: { ...good.npm, previousLatest: '2.2.0' } }, '2.2.0'),
 			/already equals npm latest/,
 		)
 		const mutable = structuredClone(good)
 		mutable.docker.previousLatestDigests['ghcr.io'] = 'ghcr.io/vcode-sh/fluentcart-mcp:latest'
-		assert.throws(() => validateReleaseState(mutable, '2.1.0'), /not an immutable digest/)
+		assert.throws(() => validateReleaseState(mutable, '2.2.0'), /not an immutable digest/)
 		const unknown = structuredClone(good)
 		unknown.docker.previousLatestDigests = {
 			'ghcr.io': unknown.docker.previousLatestDigests['ghcr.io'],
 			'example.invalid': unknown.docker.previousLatestDigests['docker.io'],
 		}
-		assert.throws(() => validateReleaseState(unknown, '2.1.0'), /unknown Docker registry/)
+		assert.throws(() => validateReleaseState(unknown, '2.2.0'), /unknown Docker registry/)
 	})
 })
 

@@ -212,14 +212,14 @@ export default function FluentCartMcpPage() {
           <Card className="gap-0 border-primary/20 bg-fd-card py-0">
             <CardContent className="p-5 text-sm text-muted-foreground">
               <span className="font-medium text-foreground">
-                New in 2.1.0:{" "}
+                New in 2.2.0:{" "}
               </span>
-              FluentCart 1.6+ subscription support adds direct renewal reads,
-              richer subscription context, and a narrowly guarded billing-cycle
-              limit update. Charges, cancellation, and renewal lifecycle actions
-              remain out of scope. Verified exactly with WordPress 7.0.2,
-              FluentCart Core 1.6.0, and FluentCart Pro 1.6.0 — not every future
-              version wearing a plus sign.
+              I rebuilt the protocol layer on MCP TypeScript SDK v2, retained
+              both supported protocol eras, and made client certification record
+              the handshake it actually negotiated. I also added live SDK
+              freshness, conformance, archive, proxy, Docker, and soak gates.
+              Apparently “works on my machine” needed a stricter retirement
+              plan.
             </CardContent>
           </Card>
         </motion.div>

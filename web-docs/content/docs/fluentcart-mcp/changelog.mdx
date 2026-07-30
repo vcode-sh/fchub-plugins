@@ -43,8 +43,8 @@ I use `disabled` to expose reads. I use `reversible` to add work that can be und
 products, variants, coupons, customers, shipping rules, tax rules, attributes, order bumps and
 upgrade paths.
 
-I expose deletion, bulk operations, order status changes, marking an order paid, and dispute
-handling in no mode. FluentCart provides no supported way to reverse any of them, so I do not
+I make deletion, bulk operations, order status changes, marking an order paid, and dispute handling
+unavailable in every mode. FluentCart provides no supported way to reverse any of them, so I do not
 classify any as a reversible write. I made this narrower than 1.x on purpose.
 
 #### Refunding and cancellation are not available
@@ -100,15 +100,16 @@ pairing one with the default read-only write mode.
 
 I verified this release against WordPress 7.0.2 with FluentCart 1.5.5 and FluentCart Pro 1.5.4.
 
-I also captured the route surface of an older 1.3.9 install from a real runtime. That records which
-endpoints the build serves; I do not claim that these tools work against it, and I do not claim
-support until a tool-level compatibility check passes. I treat a smaller tool list on an older
-store as evidence that route pruning works, not that I exercised the surviving tools there.
+I also captured the route surface of an older 1.3.9 install from a real runtime, but support is not claimed
+by that route evidence. It records which endpoints the build serves; I do not claim that
+these tools work against it, and I do not claim support until a tool-level compatibility check
+passes. I treat a smaller tool list on an older store as evidence that route pruning works, not that
+I exercised the surviving tools there.
 
 #### Also
 
 - I no longer expose subscription pause, resume, or reactivate as tools.
-- I removed the customer address dropdown helper and the duplicate address-add tool.
+- I no longer include the customer address dropdown helper or the duplicate address-add tool.
 - I make MCP Resources read through to your store on every read; I keep no resource-layer cache,
   and I no longer imply otherwise in the documentation.
 - I generate published counts from the release contract instead of retyping one number across six

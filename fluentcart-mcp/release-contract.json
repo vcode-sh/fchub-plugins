@@ -2,9 +2,9 @@
   "generatedBy": "scripts/build-release-contract.mjs",
   "serializer": "mcp-tools-list-v1",
   "tokenizer": "gpt-tokenizer@3.4.0",
-  "packageVersion": "2.1.0",
+  "packageVersion": "2.2.0",
   "release": {
-    "version": "2.1.0",
+    "version": "2.2.0",
     "protocols": [
       "2025-11-25",
       "2026-07-28"
@@ -265,10 +265,10 @@
       "npmStageTag": "latest",
       "npmApproval": "interactive-2fa",
       "npmPromotionWrite": false,
-      "previousLatest": "2.0.1",
+      "previousLatest": "2.1.0",
       "previousDockerDigests": {
-        "ghcr.io": "sha256:28f79e77822f843e32cc2d19b86fb52a2321f215e32c5260dd0b56722fa9d65e",
-        "docker.io": "sha256:28f79e77822f843e32cc2d19b86fb52a2321f215e32c5260dd0b56722fa9d65e"
+        "ghcr.io": "sha256:ea3bea2062b969d65079d354e4d14e554637e9a03669bf820608a88d1275fc6c",
+        "docker.io": "sha256:ea3bea2062b969d65079d354e4d14e554637e9a03669bf820608a88d1275fc6c"
       }
     },
     "clients": {
@@ -370,7 +370,7 @@
       "finalCandidate": "AUTOMATED_CLIENT_CERTIFICATION_REQUIRED"
     }
   },
-  "sourceTreeDigest": "sha256:476474f28b30d76c607f61d3c6d9ee256eba34ea5511fa127ce72ab521164a77",
+  "sourceTreeDigest": "sha256:3b545b80c2c63002df98bb8fac30aeac687df796bcf7ac9db86a085373f696ea",
   "sourceTreeInputs": {
     "fileCount": 205,
     "declared": [
