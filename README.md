@@ -88,10 +88,10 @@ git tag fchub-p24/v1.0.1
 git push origin fchub-p24/v1.0.1
 ```
 
-MCP server: tag `fluentcart-mcp/v<package-version>` → validate, create a native npm staged publish
-through Trusted Publishing, and publish immutable versioned Docker images. The owner approves the
-npm stage with interactive 2FA. A separate npm-credential-free promotion verifies public npm
-`latest`, updates Docker `latest`, and creates the GitHub Release; promotion never rebuilds.
+MCP server: tag `fluentcart-mcp/v<package-version>` → validate, publish the inspected npm tarball
+under `latest` through token-free OIDC Trusted Publishing, and publish immutable versioned Docker
+images. The same run performs npm-credential-free promotion: it verifies the public npm bytes,
+updates Docker `latest`, and creates or byte-verifies the GitHub Release. Promotion never rebuilds.
 
 **Tests:**
 ```bash

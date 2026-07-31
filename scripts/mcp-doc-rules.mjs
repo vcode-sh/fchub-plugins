@@ -169,17 +169,19 @@ export const RULES = [
 		},
 	},
 	{
-		id: 'direct-publication-claim',
-		message: 'release truth uses native npm staging, interactive 2FA approval and separate promotion',
+		id: 'staged-publication-claim',
+		message: 'release truth uses automatic npm Trusted Publishing and evidence-bound promotion',
 		test: (line, truth) =>
-			truth.promotion?.npmPublishing === 'trusted-staged' &&
-			/\b(tag|push)\b[^.]{0,120}\b(npm\s+publish|publish\s+(?:to\s+)?npm|GitHub Release|Docker)\b/i.test(line),
+			truth.promotion?.npmPublishing === 'trusted-oidc' &&
+			/\b(?:npm\s+stage|staged\s+publish|interactive\s+2fa|approve\s+(?:the\s+)?npm\s+stage)\b/i.test(
+				line,
+			),
 	},
 	{
 		id: 'obsolete-npm-release-flow',
 		message: 'npm release flow has no next tag or stored npm token',
 		test: (line, truth) =>
-			truth.promotion?.npmPublishing === 'trusted-staged' &&
+			truth.promotion?.npmPublishing === 'trusted-oidc' &&
 			(/\bnpm\b[^.\n]{0,80}\bnext\b/i.test(line) ||
 				/\b(?:NPM_PROMOTION_TOKEN|NPM_TOKEN|NODE_AUTH_TOKEN)\b/.test(line)),
 	},

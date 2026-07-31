@@ -1,6 +1,6 @@
-# A release tag stages immutable npm bytes through Trusted Publishing and publishes immutable
-# versioned containers. Human 2FA approval is deliberately separate from mutable promotion.
-name: MCP Stage
+# A release tag publishes the inspected npm tarball through Trusted Publishing, publishes immutable
+# versioned containers, then promotes the same evidence to mutable tags and a GitHub Release.
+name: MCP Release
 
 on:
   push:
@@ -57,7 +57,7 @@ jobs:
       source_tree_digest: ${{ needs.validate.outputs.source_tree_digest }}
     secrets: inherit
 
-  stage-npm:
+  publish-npm:
     runs-on: ubuntu-latest
     needs: [validate, version-gate, docker]
     permissions:
@@ -70,30 +70,29 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24.13.0'
-      - name: Install the reviewed staged-publishing CLI
+      - name: Install the reviewed publishing CLI
         run: npm install --global npm@11.15.0
       - name: Verify reviewed release toolchain
         run: |
           test "$(node --version)" = "v24.13.0"
           test "$(npm --version)" = "11.15.0"
-      - name: Stage inspected candidate for interactive latest approval
+      - name: Publish inspected candidate through Trusted Publishing
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           TARBALL="./dist-packages/fluentcart-mcp-${VERSION}.tgz"
-          npm stage publish "$TARBALL" --provenance --access public --tag latest --json \
-            --registry https://registry.npmjs.org \
-            > "$RUNNER_TEMP/npm-stage.json"
-      - name: Bind native stage and immutable candidates into evidence
+          npm publish "$TARBALL" --provenance --access public --tag latest \
+            --registry https://registry.npmjs.org
+      - name: Bind published npm and immutable containers into evidence
         env:
+          PUBLISH_MODE: direct
           VERSION: ${{ needs.validate.outputs.version }}
           SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
           SOURCE_TREE_DIGEST: ${{ needs.validate.outputs.source_tree_digest }}
           GHCR_DIGEST: ${{ needs.docker.outputs.ghcr_digest }}
           DOCKERHUB_DIGEST: ${{ needs.docker.outputs.dockerhub_digest }}
-          STAGE_RESULT: ${{ runner.temp }}/npm-stage.json
         run: node dist-packages/verification/scripts/write-staging-state.mjs
-      - name: Reinspect the exact staging handoff
+      - name: Reinspect the exact release handoff
         run: node dist-packages/verification/scripts/verify-staged-release.mjs --root dist-packages
       - uses: actions/upload-artifact@v7
         with:
@@ -101,3 +100,16 @@ jobs:
           path: dist-packages/
           if-no-files-found: error
           retention-days: 30
+
+  promote:
+    needs: [validate, publish-npm]
+    permissions:
+      actions: read
+      contents: write
+      packages: write
+    uses: ./.github/workflows/mcp-promote.yml
+    with:
+      version: ${{ needs.validate.outputs.version }}
+      source_sha: ${{ needs.validate.outputs.source_sha }}
+      staging_run_id: ${{ github.run_id }}
+    secrets: inherit

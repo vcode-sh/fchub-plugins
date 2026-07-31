@@ -57,8 +57,8 @@ export function verifyStagingChecksums(root) {
 	const checksumsRaw = readFileSync(checksumsPath)
 	const checksums = JSON.parse(checksumsRaw.toString('utf8'))
 
-	if (![2, 3].includes(state.schemaVersion)) {
-		throw new Error('staging-state.json must use schema version 2 or 3')
+	if (![2, 3, 4].includes(state.schemaVersion)) {
+		throw new Error('staging-state.json must use schema version 2, 3 or 4')
 	}
 	if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(state.version ?? '')) {
 		throw new Error('staging-state.json has an invalid version')
@@ -71,12 +71,25 @@ export function verifyStagingChecksums(root) {
 		if (typeof state.npmIntegrity !== 'string' || !state.npmIntegrity.startsWith('sha512-')) {
 			throw new Error('staging-state.json has an invalid npmIntegrity')
 		}
-	} else {
+	} else if (state.schemaVersion === 3) {
 		if (!UUID.test(state.npm?.stageId ?? '')) {
 			throw new Error('staging-state.json has an invalid npm stageId')
 		}
 		if (state.npm?.tag !== 'latest') {
 			throw new Error('staging-state.json npm stage must target latest')
+		}
+		if (
+			typeof state.npm?.expectedIntegrity !== 'string' ||
+			!state.npm.expectedIntegrity.startsWith('sha512-')
+		) {
+			throw new Error('staging-state.json has an invalid expected npm integrity')
+		}
+	} else {
+		if (state.npm?.mode !== 'direct') {
+			throw new Error('staging-state.json direct publication mode is invalid')
+		}
+		if (state.npm?.tag !== 'latest') {
+			throw new Error('staging-state.json direct publication must target latest')
 		}
 		if (
 			typeof state.npm?.expectedIntegrity !== 'string' ||

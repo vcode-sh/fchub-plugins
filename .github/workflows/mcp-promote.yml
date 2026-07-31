@@ -1,20 +1,34 @@
-# Owner-only release promotion after npm's separate interactive 2FA approval. This workflow has no
-# npm credential or npm write; it only verifies public npm bytes and promotes matching containers.
+# Automatic release promotion after Trusted Publishing, with an exact manual recovery entry point.
+# This workflow has no npm credential or npm write; it verifies public bytes before mutable promotion.
 name: MCP Promote
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       version:
-        description: 'Exact staged version.'
+        description: 'Exact published version.'
         required: true
         type: string
       source_sha:
-        description: 'Exact committed source SHA from staging.'
+        description: 'Exact committed source SHA.'
         required: true
         type: string
       staging_run_id:
-        description: 'Run containing immutable staging evidence.'
+        description: 'Run containing immutable release evidence.'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact published version.'
+        required: true
+        type: string
+      source_sha:
+        description: 'Exact committed source SHA.'
+        required: true
+        type: string
+      staging_run_id:
+        description: 'Run containing immutable release evidence.'
         required: true
         type: string
 
@@ -57,18 +71,27 @@ jobs:
           test -f verification/scripts/inspect-npm-pack.mjs
           test -f verification/scripts/inspect-mcpb.mjs
           node verification/scripts/verify-staged-release.mjs --root .
-      - name: Verify approved npm latest, public bytes and both protocol eras
+      - name: Verify npm latest, public bytes and both protocol eras
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           VERSION: ${{ inputs.version }}
         run: |
           EXPECTED=$(node -p "const s=require('./staging-state.json'); s.npm?.expectedIntegrity ?? s.npmIntegrity")
-          ACTUAL=$(npm view "fluentcart-mcp@${VERSION}" dist.integrity --json \
-            --registry https://registry.npmjs.org | tr -d '"')
+          ACTUAL=""
+          LATEST=""
+          for _ in {1..12}; do
+            ACTUAL=$(npm view "fluentcart-mcp@${VERSION}" dist.integrity --json \
+              --registry https://registry.npmjs.org 2>/dev/null | tr -d '"' || true)
+            LATEST=$(npm view fluentcart-mcp dist-tags.latest --json \
+              --registry https://registry.npmjs.org 2>/dev/null | tr -d '"' || true)
+            if [ "$ACTUAL" = "$EXPECTED" ] && [ "$LATEST" = "$VERSION" ]; then
+              break
+            fi
+            sleep 5
+          done
           test "$ACTUAL" = "$EXPECTED"
-          test "$(npm view fluentcart-mcp dist-tags.latest --json \
-            --registry https://registry.npmjs.org | tr -d '"')" = "$VERSION"
+          test "$LATEST" = "$VERSION"
           SMOKE="$PWD/verification/scripts/smoke-public-stdio.mjs"
           if [ ! -f "$SMOKE" ]; then
             SCHEMA_VERSION=$(node -p "require('./staging-state.json').schemaVersion")

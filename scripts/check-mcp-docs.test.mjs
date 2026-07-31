@@ -104,7 +104,7 @@ describe('FluentCart MCP documentation truth gate', () => {
 			'mixed-official-claim.md': 'The official FluentCart MCP and FluentCart MCP expose refunds.',
 			'obsolete-protocol.md': 'The server speaks MCP protocol 2024-11-05.',
 			'stale-red-gates.md': 'Two red gates remain before certification.',
-			'direct-publication.md': 'Tag fluentcart-mcp/v<package-version> to publish npm and create a GitHub Release.',
+			'staged-publication.md': 'The tag creates an npm stage for interactive 2FA approval.',
 			'legacy-next-flow.md': 'The release workflow publishes npm under `next` before promotion.',
 			'legacy-token-flow.md': 'Configure NPM_PROMOTION_TOKEN for the promotion workflow.',
 			'broad-certification.md': 'All MCP clients are certified for FluentCart MCP 2.0.0.',
@@ -123,7 +123,7 @@ describe('FluentCart MCP documentation truth gate', () => {
 		assert.deepEqual(byFile['mixed-official-claim.md'], ['unavailable-write-presented-as-available'])
 		assert.deepEqual(byFile['obsolete-protocol.md'], ['obsolete-protocol'])
 		assert.deepEqual(byFile['stale-red-gates.md'], ['stale-red-gate-count'])
-		assert.deepEqual(byFile['direct-publication.md'], ['direct-publication-claim'])
+		assert.deepEqual(byFile['staged-publication.md'], ['staged-publication-claim'])
 		assert.deepEqual(byFile['legacy-next-flow.md'], ['obsolete-npm-release-flow'])
 		assert.deepEqual(byFile['legacy-token-flow.md'], ['obsolete-npm-release-flow'])
 		assert.deepEqual(byFile['broad-certification.md'], ['broad-client-certification'])
@@ -304,7 +304,7 @@ describe('FluentCart MCP repository guidance', () => {
 		)
 
 		assert.ok(!existsSync(join(process.cwd(), 'docs/developer-manual.md')))
-		assert.match(agents, /If a staged or promoted release needs correcting/i)
+		assert.match(agents, /If a published release needs correcting/i)
 		assert.match(agents, /deprecate the faulty\s+publication/i)
 		assert.match(agents, /never reuse a released version or\s+tag/i)
 		assert.match(agents, /new patch version with fresh evidence/i)

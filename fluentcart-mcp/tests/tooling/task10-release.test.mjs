@@ -247,9 +247,9 @@ describe('generated release truth', () => {
 			assert.match(digest, /^sha256:[a-f0-9]{64}$/)
 		}
 		assert.deepEqual(promotion, {
-			npmPublishing: 'trusted-staged',
-			npmStageTag: 'latest',
-			npmApproval: 'interactive-2fa',
+			npmPublishing: 'trusted-oidc',
+			npmTag: 'latest',
+			npmApproval: 'automatic',
 			npmPromotionWrite: false,
 			previousLatest: fixture.npm.previousLatest,
 			previousDockerDigests: fixture.docker.previousLatestDigests,
@@ -370,10 +370,10 @@ describe('staging and promotion workflows', () => {
 	const docker = read('.github/workflows/mcp-docker.yml')
 	const promote = read('.github/workflows/mcp-promote.yml')
 
-	it('stages npm for interactive latest approval and publishes Docker by immutable version only', () => {
-		assert.match(stage, /npm stage publish "\$TARBALL".*--tag latest/)
-		assert.doesNotMatch(stage, /npm publish|npm dist-tag/)
-		assert.doesNotMatch(stage, /gh release create/)
+	it('publishes npm through OIDC and automatically promotes immutable release evidence', () => {
+		assert.match(stage, /npm publish "\$TARBALL".*--tag latest/)
+		assert.doesNotMatch(stage, /npm stage publish|npm dist-tag/)
+		assert.match(stage, /uses:\s*\.\/\.github\/workflows\/mcp-promote\.yml/)
 		assert.doesNotMatch(docker, /:\s*latest|:latest/)
 		assert.match(docker, /docker-content-digest|imagetools inspect/)
 	})
@@ -388,7 +388,8 @@ describe('staging and promotion workflows', () => {
 		assert.match(smoke, /method: 'initialize'/)
 	})
 
-	it('makes promotion owner-triggered, exact, evidence-bound and build-free', () => {
+	it('makes promotion callable automatically and manually, exact, evidence-bound and build-free', () => {
+		assert.match(promote, /workflow_call:/)
 		assert.match(promote, /workflow_dispatch:/)
 		for (const input of ['version', 'source_sha', 'staging_run_id']) {
 			assert.match(promote, new RegExp(`${input}:\\n[\\s\\S]*?required: true`))
@@ -428,11 +429,11 @@ describe('public recovery contract', () => {
 		}
 	})
 
-	it('documents staged promotion and safe recovery without pretending versions are reusable', () => {
+	it('documents trusted publication and safe recovery without pretending versions are reusable', () => {
 		for (const pattern of [
 			/trusted publishing/,
-			/staged\s+publish/,
-			/interactive 2fa/,
+			/automatic/,
+			/oidc/,
 			/deprecate/,
 			/never reuse/,
 			/new patch version/,

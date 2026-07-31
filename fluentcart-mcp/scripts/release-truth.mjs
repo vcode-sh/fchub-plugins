@@ -475,9 +475,9 @@ export function buildReleaseTruth(pkg, releaseState = null, packageLock = null) 
 		},
 		protocolCompliance: validateProtocolCompliance(PROTOCOL_COMPLIANCE_ROWS),
 		promotion: {
-			npmPublishing: 'trusted-staged',
-			npmStageTag: 'latest',
-			npmApproval: 'interactive-2fa',
+			npmPublishing: 'trusted-oidc',
+			npmTag: 'latest',
+			npmApproval: 'automatic',
 			npmPromotionWrite: false,
 			previousLatest: state.npm.previousLatest,
 			previousDockerDigests: state.docker.previousLatestDigests,

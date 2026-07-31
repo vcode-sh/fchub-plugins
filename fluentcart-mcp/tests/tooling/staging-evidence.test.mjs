@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, describe, it } from 'node:test'
 import { verifyStagingChecksums } from '../../scripts/verify-staged-release.mjs'
-import { buildStagingState, parseNativeStageResult } from '../../scripts/write-staging-state.mjs'
+import {
+	buildDirectPublishingState,
+	buildStagingState,
+	parseNativeStageResult,
+} from '../../scripts/write-staging-state.mjs'
 
 const scratch = mkdtempSync(join(tmpdir(), 'staging-evidence-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
@@ -42,13 +46,21 @@ function writeGoodEvidence(schemaVersion = 3) {
 				checksumsSha256: sha256(checksums),
 				...(schemaVersion === 2
 					? { npmIntegrity: 'sha512-legacy-public' }
-					: {
-							npm: {
-								stageId: '123e4567-e89b-42d3-a456-426614174000',
-								tag: 'latest',
-								expectedIntegrity: 'sha512-native-stage',
-							},
-						}),
+					: schemaVersion === 4
+						? {
+								npm: {
+									mode: 'direct',
+									tag: 'latest',
+									expectedIntegrity: 'sha512-trusted-publishing',
+								},
+							}
+						: {
+								npm: {
+									stageId: '123e4567-e89b-42d3-a456-426614174000',
+									tag: 'latest',
+									expectedIntegrity: 'sha512-native-stage',
+								},
+							}),
 				dockerDigests: {
 					'ghcr.io': `sha256:${'3'.repeat(64)}`,
 					'docker.io': `sha256:${'4'.repeat(64)}`,
@@ -68,6 +80,11 @@ describe('downloaded staging evidence', () => {
 
 	it('accepts schema 2 evidence for the one-time 2.0.0 recovery', () => {
 		writeGoodEvidence(2)
+		assert.doesNotThrow(() => verifyStagingChecksums(scratch))
+	})
+
+	it('accepts direct Trusted Publishing evidence', () => {
+		writeGoodEvidence(4)
 		assert.doesNotThrow(() => verifyStagingChecksums(scratch))
 	})
 
@@ -165,5 +182,25 @@ describe('native npm stage result', () => {
 			() => parseNativeStageResult(changed, 'fluentcart-mcp', VERSION, integrity),
 			/integrity does not match/,
 		)
+	})
+})
+
+describe('direct npm Trusted Publishing evidence', () => {
+	it('binds local npm integrity without a stage identifier', () => {
+		const tarball = Buffer.from('reviewed npm tarball')
+		const state = buildDirectPublishingState({
+			tarballBytes: tarball,
+			checksumsBytes: Buffer.from('checksums'),
+			version: VERSION,
+			sourceSha: '1'.repeat(40),
+			sourceTreeDigest: `sha256:${'2'.repeat(64)}`,
+			ghcrDigest: `sha256:${'3'.repeat(64)}`,
+			dockerhubDigest: `sha256:${'4'.repeat(64)}`,
+		})
+		assert.deepEqual(state.npm, {
+			mode: 'direct',
+			tag: 'latest',
+			expectedIntegrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
+		})
 	})
 })

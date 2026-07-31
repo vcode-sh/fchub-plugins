@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Convert npm's native staged-publish result into checksum-bound release evidence. */
+/** Bind npm publication mode and immutable candidate bytes into checksum-bound release evidence. */
 
 import { createHash } from 'node:crypto'
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
@@ -64,6 +64,30 @@ export function buildStagingState({
 	}
 }
 
+export function buildDirectPublishingState({
+	tarballBytes,
+	checksumsBytes,
+	version,
+	sourceSha,
+	sourceTreeDigest,
+	ghcrDigest,
+	dockerhubDigest,
+}) {
+	const expectedIntegrity = `sha512-${sha(tarballBytes, 'sha512', 'base64')}`
+	return {
+		schemaVersion: 4,
+		version,
+		sourceSha,
+		sourceTreeDigest,
+		checksumsSha256: sha(checksumsBytes, 'sha256', 'hex'),
+		npm: { mode: 'direct', tag: 'latest', expectedIntegrity },
+		dockerDigests: {
+			'ghcr.io': ghcrDigest,
+			'docker.io': dockerhubDigest,
+		},
+	}
+}
+
 function required(name) {
 	const value = process.env[name]
 	if (!value) throw new Error(`${name} is required`)
@@ -72,8 +96,7 @@ function required(name) {
 
 function main() {
 	const version = required('VERSION')
-	const state = buildStagingState({
-		stageResult: readFileSync(required('STAGE_RESULT'), 'utf8'),
+	const common = {
 		tarballBytes: readFileSync(`dist-packages/fluentcart-mcp-${version}.tgz`),
 		checksumsBytes: readFileSync('dist-packages/SHA256SUMS.json'),
 		version,
@@ -81,13 +104,21 @@ function main() {
 		sourceTreeDigest: required('SOURCE_TREE_DIGEST'),
 		ghcrDigest: required('GHCR_DIGEST'),
 		dockerhubDigest: required('DOCKERHUB_DIGEST'),
-	})
+	}
+	const state =
+		process.env.PUBLISH_MODE === 'direct'
+			? buildDirectPublishingState(common)
+			: buildStagingState({
+					...common,
+					stageResult: readFileSync(required('STAGE_RESULT'), 'utf8'),
+				})
 	writeFileSync('dist-packages/staging-state.json', `${JSON.stringify(state, null, 2)}\n`)
 	if (process.env.GITHUB_STEP_SUMMARY) {
-		appendFileSync(
-			process.env.GITHUB_STEP_SUMMARY,
-			`npm stage ID: \`${state.npm.stageId}\`\n`,
-		)
+		const summary =
+			state.schemaVersion === 4
+				? `npm publication: Trusted Publishing to \`${state.npm.tag}\`\n`
+				: `npm stage ID: \`${state.npm.stageId}\`\n`
+		appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary)
 	}
 }
 

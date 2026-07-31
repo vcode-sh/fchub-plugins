@@ -66,17 +66,16 @@ owner performs publication.
 
 ## MCP release boundary
 
-A `fluentcart-mcp/v*` tag uses npm Trusted Publishing to create a native staged
-publish with the immutable `latest` tag. It also publishes versioned Docker
-images and evidence, but does not make npm public, create mutable Docker tags or
-create a GitHub Release. The owner reviews and approves the npm stage with
-interactive 2FA, then dispatches `mcp-promote.yml` with the exact version,
-committed source SHA and staging run ID. Promotion has no npm credential or npm
-write: it verifies that npm `latest` is the approved version, rechecks the public
-bytes and versioned images, updates Docker `latest`, and creates the GitHub
-Release.
+A `fluentcart-mcp/v*` tag runs the complete release automatically. GitHub Actions
+uses npm Trusted Publishing with OIDC to publish the inspected tarball directly
+under `latest`, without a stored npm token. It also publishes immutable versioned
+Docker images and checksum-bound evidence, then calls `mcp-promote.yml` with the
+exact version, committed source SHA and release run ID. Promotion has no npm
+credential or npm write: it verifies npm `latest`, byte-compares the public
+tarball, rechecks both versioned image digests, updates Docker `latest`, and
+creates or byte-verifies the GitHub Release.
 
-If a staged or promoted release needs correcting, deprecate the faulty
+If a published release needs correcting, deprecate the faulty
 publication where the registry permits it, never reuse a released version or
 tag, and ship a new patch version with fresh evidence. Old release identifiers
 are recovery records, not templates for another attempt.
