@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.3 - In development
+
+- Add every eligible Space from a FluentCommunity Space Group to a plan in one action.
+- Show linked FluentCart products as soon as an existing plan opens.
+- Prevent duplicate product connections and keep the list accurate after changes.
+- Provide clear retry actions when linked products or plan members cannot be loaded.
+- Improve delayed-access previews and give content-rule controls more breathing room.
+
 ## 1.4.2 - 2026-08-06
 
 - Fixed automatic plan slugs for Polish accents and other international scripts.
