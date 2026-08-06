@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { mount } from '@vue/test-utils'
 import { ElMessage } from 'element-plus'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -9,6 +10,12 @@ import {
   stepCopy,
 } from '@/components/content/contentProtectionWizardUi.js'
 import { useContentProtectionWizard } from '@/composables/content/useContentProtectionWizard.js'
+import ContentProtectionWizard from '@/components/content/ContentProtectionWizard.vue'
+import ContentProtectionWizardProgress from '@/components/content/wizard/ContentProtectionWizardProgress.vue'
+import ContentProtectionWizardCategoryStep from '@/components/content/wizard/ContentProtectionWizardCategoryStep.vue'
+import ContentProtectionWizardResourceStep from '@/components/content/wizard/ContentProtectionWizardResourceStep.vue'
+import ContentProtectionWizardAccessStep from '@/components/content/wizard/ContentProtectionWizardAccessStep.vue'
+import ContentProtectionWizardReviewStep from '@/components/content/wizard/ContentProtectionWizardReviewStep.vue'
 
 function deferred() {
   let resolve
@@ -50,6 +57,55 @@ function createWizard(contentApi = {}) {
 }
 
 describe('content protection wizard UI policy', () => {
+  it('composes the guided journey from isolated step components', () => {
+    const mountWizard = (step) => mount(ContentProtectionWizard, {
+      props: {
+        visible: true,
+        step,
+        form: {
+          categoryKey: '',
+          categoryLabel: '',
+          resource_type: '',
+          resource_type_label: '',
+          resource_id: '',
+          plan_ids: [],
+          show_teaser: 'no',
+          restriction_message: '',
+          redirect_url: '',
+          commentMode: 'all',
+        },
+        categoryCards: [],
+        categoryTypes: [],
+        resourceLoading: false,
+        resourceError: '',
+        resourceOptions: [],
+        planOptionsLoading: false,
+        planOptions: [],
+        planOptionsMap: {},
+        resourceDisplayName: '',
+        canAdvance: false,
+        saving: false,
+        searchResources: () => undefined,
+      },
+      global: {
+        stubs: {
+          ElDialog: { template: '<section><slot /><slot name="footer" /></section>' },
+        },
+      },
+    })
+
+    const category = mountWizard(0)
+    const resource = mountWizard(1)
+    const access = mountWizard(2)
+    const review = mountWizard(3)
+
+    expect(category.findComponent(ContentProtectionWizardProgress).exists()).toBe(true)
+    expect(category.findComponent(ContentProtectionWizardCategoryStep).exists()).toBe(true)
+    expect(resource.findComponent(ContentProtectionWizardResourceStep).exists()).toBe(true)
+    expect(access.findComponent(ContentProtectionWizardAccessStep).exists()).toBe(true)
+    expect(review.findComponent(ContentProtectionWizardReviewStep).exists()).toBe(true)
+  })
+
   it('defines four task-first steps', () => {
     expect(CONTENT_PROTECTION_STEPS.map(({ label }) => label)).toEqual([
       'Choose content',
