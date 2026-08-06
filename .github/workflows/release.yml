@@ -1,6 +1,7 @@
 name: Release Plugin
 
 on:
+  workflow_dispatch:
   push:
     # fchub-stream is deliberately absent. It is discontinued, and publishing a
     # plugin nobody maintains should take more than pushing a tag out of habit.
