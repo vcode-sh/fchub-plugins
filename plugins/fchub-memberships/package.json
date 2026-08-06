@@ -12,26 +12,26 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
-    "@lucide/vue": "^1.25.0",
-    "@tiptap/extension-link": "^3.28.0",
-    "@tiptap/extension-placeholder": "^3.28.0",
-    "@tiptap/extension-underline": "^3.28.0",
-    "@tiptap/starter-kit": "^3.28.0",
-    "@tiptap/vue-3": "^3.28.0",
+    "@lucide/vue": "^1.28.0",
+    "@tiptap/extension-link": "^3.29.2",
+    "@tiptap/extension-placeholder": "^3.29.2",
+    "@tiptap/extension-underline": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2",
+    "@tiptap/vue-3": "^3.29.2",
     "chart.js": "^4.5.1",
-    "element-plus": "^2.13.5",
-    "vue": "^3.5.30",
-    "vue-chartjs": "^5.3.3",
-    "vue-router": "^5.0.3"
+    "element-plus": "^2.14.3",
+    "vue": "^3.5.40",
+    "vue-chartjs": "^5.3.4",
+    "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.55.1",
-    "@vitejs/plugin-vue": "6.0.5",
-    "@vue/test-utils": "2.4.6",
-    "jsdom": "26.1.0",
-    "unplugin-vue-components": "31.0.0",
-    "vite": "8.0.16",
-    "vitest": "3.2.7"
+    "@playwright/test": "1.62.1",
+    "@vitejs/plugin-vue": "6.0.8",
+    "@vue/test-utils": "2.4.11",
+    "jsdom": "30.0.1",
+    "unplugin-vue-components": "32.1.0",
+    "vite": "8.2.0",
+    "vitest": "4.1.10"
   },
   "overrides": {
     "brace-expansion": "5.0.9",
