@@ -39,6 +39,8 @@ window.__fchubSmokeFailResourceSearch = false
 window.__fchubSmokeWebhookHistoryReads = 0
 window.__fchubSmokeHoldCredentials = false
 window.__fchubSmokeReleaseCredential = null
+window.__fchubSmokeLinkedProductsReads = 0
+window.__fchubSmokePlanMembersReads = 0
 
 let smokeWebhookUrls = 'https://127.0.0.1/webhook'
 let smokeWebhookDestinationsConfigured = false
@@ -46,6 +48,21 @@ let smokeWebhookRetried = false
 let smokeWebhookCancelled = false
 let smokeWebhookEndpointSequence = 0
 let smokeWebhookEndpoints = []
+let smokeLinkedProductsFailures = Number(new URLSearchParams(window.location.search).get('linkedProductsFailures') || 0)
+let smokeLinkProductFailures = Number(new URLSearchParams(window.location.search).get('linkProductFailures') || 0)
+let smokeUnlinkProductFailures = Number(new URLSearchParams(window.location.search).get('unlinkProductFailures') || 0)
+let smokePlanMembersFailures = Number(new URLSearchParams(window.location.search).get('planMembersFailures') || 0)
+let smokeLinkedProducts = [{
+  feed_id: 70,
+  product_id: 200,
+  product_title: 'Membership Product',
+  feed_title: 'Gold Plan - Membership Product',
+  triggers: ['order_paid_done'],
+  status: 'active',
+  price: 4900,
+  billing_period: 'subscription',
+  variations: [{ title: 'Monthly', price: 4900, payment_type: 'subscription' }],
+}]
 let smokeAccessApi = {
   configured: true,
   prefix: 'fchub_abc123',
@@ -199,10 +216,99 @@ window.fetch = async (input, init = {}) => {
     }) }
   }
   if (url.includes('/admin/plans/search-products')) {
-    return { ok: true, status: 200, json: async () => ({ data: [] }) }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          {
+            id: 200,
+            title: 'Membership Product',
+            price: 4900,
+            payment_type: 'subscription',
+            variations: [{ title: 'Monthly', price: 4900, payment_type: 'subscription' }],
+          },
+          {
+            id: 201,
+            title: 'Workshop Product',
+            price: 9900,
+            payment_type: 'onetime',
+            variations: [{ title: 'Standard', price: 9900, payment_type: 'onetime' }],
+          },
+        ],
+      }),
+    }
+  }
+  if (url.includes('/admin/plans/5/link-product') && method === 'POST') {
+    if (smokeLinkProductFailures > 0) {
+      smokeLinkProductFailures -= 1
+      return {
+        ok: false,
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        json: async () => ({ message: 'This product is already linked to this plan.' }),
+      }
+    }
+
+    if (Number(requestBody?.product_id) === 200) {
+      return {
+        ok: false,
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        json: async () => ({ message: 'This product is already linked to this plan.' }),
+      }
+    }
+
+    if (Number(requestBody?.product_id) === 201 && !smokeLinkedProducts.some(({ product_id: id }) => id === 201)) {
+      smokeLinkedProducts.push({
+        feed_id: 71,
+        product_id: 201,
+        product_title: 'Workshop Product',
+        feed_title: 'Gold Plan - Workshop Product',
+        triggers: ['order_paid_done'],
+        status: 'active',
+        price: 9900,
+        billing_period: 'onetime',
+        variations: [{ title: 'Standard', price: 9900, payment_type: 'onetime' }],
+      })
+    }
+
+    return { ok: true, status: 201, json: async () => ({ data: { feed_id: 71 } }) }
+  }
+  if (url.includes('/admin/plans/5/unlink-product/') && method === 'DELETE') {
+    if (smokeUnlinkProductFailures > 0) {
+      smokeUnlinkProductFailures -= 1
+      return {
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        json: async () => ({ message: 'The product could not be unlinked.' }),
+      }
+    }
+
+    const feedId = Number(url.split('/').pop())
+    smokeLinkedProducts = smokeLinkedProducts.filter(({ feed_id: id }) => id !== feedId)
+    return { ok: true, status: 200, json: async () => ({ message: 'Product unlinked successfully.' }) }
   }
   if (url.includes('/admin/plans/5/linked-products')) {
-    return { ok: true, status: 200, json: async () => ({ data: [] }) }
+    window.__fchubSmokeLinkedProductsReads += 1
+    if (smokeLinkedProductsFailures > 0) {
+      smokeLinkedProductsFailures -= 1
+      return {
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        json: async () => ({ message: 'Linked products are temporarily unavailable.' }),
+      }
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: smokeLinkedProducts.map((product) => ({ ...product })),
+      }),
+    }
   }
   if (url.endsWith('/admin/plans/5') && method === 'PUT') {
     return { ok: true, status: 200, json: async () => ({ data: { id: 5, ...JSON.parse(init.body || '{}') } }) }
@@ -281,6 +387,18 @@ window.fetch = async (input, init = {}) => {
       ? users.filter((user) => `${user.display_name} ${user.email}`.toLowerCase().includes(query))
       : users
     return { ok: true, status: 200, json: async () => ({ data: matches, total: matches.length }) }
+  }
+  if (url.includes('/admin/members') && new URL(url).searchParams.get('plan_id')) {
+    window.__fchubSmokePlanMembersReads += 1
+    if (smokePlanMembersFailures > 0) {
+      smokePlanMembersFailures -= 1
+      return {
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        json: async () => ({ message: 'Plan members are temporarily unavailable.' }),
+      }
+    }
   }
   if (url.includes('/admin/members')) {
     return { ok: true, status: 200, json: async () => ({

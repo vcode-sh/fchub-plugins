@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   PLAN_BUILDER_STEPS,
+  appendCommunitySpaceRules,
   buildPlanSummary,
   hasAdvancedPlanSettings,
   isOfferStepComplete,
@@ -33,6 +34,33 @@ function defaultForm(overrides = {}) {
 }
 
 describe('plan editor UI policy', () => {
+  it('appends unique community Space rules from a selected Space Group', () => {
+    const existingRules = [
+      { resource_type: 'fc_space', resource_id: '2', resource_label: 'Start Here' },
+      { resource_type: 'post', resource_id: '55' },
+    ]
+
+    expect(appendCommunitySpaceRules(existingRules, [
+      { id: '2', label: 'Start Here' },
+      { id: 3, label: 'Say Hello' },
+      { id: '3', label: 'Say Hello' },
+      { id: 0, label: 'Invalid' },
+    ])).toEqual({
+      added: ['3'],
+      rules: [
+        ...existingRules,
+        {
+          resource_type: 'fc_space',
+          resource_id: '3',
+          resource_label: 'Say Hello',
+          drip_type: 'immediate',
+          drip_delay_days: null,
+          drip_date: null,
+        },
+      ],
+    })
+  })
+
   it('keeps advanced settings collapsed for plan defaults', () => {
     expect(hasAdvancedPlanSettings(defaultForm())).toBe(false)
   })

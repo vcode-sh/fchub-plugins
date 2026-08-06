@@ -7,6 +7,7 @@ defined('ABSPATH') || exit;
 use FChubMemberships\Adapters\FluentCommunityAdapter;
 use FChubMemberships\Domain\Plan\PlanService;
 use FChubMemberships\Domain\Reconciliation\ProviderReconciliationService;
+use FChubMemberships\Integration\Community\FluentCommunitySpaceGroupResolver;
 use FChubMemberships\Support\ResourceTypeRegistry;
 
 class DynamicOptionsController
@@ -42,6 +43,12 @@ class DynamicOptionsController
         register_rest_route($ns, '/admin/fc-spaces', [
             'methods'             => 'GET',
             'callback'            => [self::class, 'fcSpaces'],
+            'permission_callback' => [self::class, 'adminPermission'],
+        ]);
+
+        register_rest_route($ns, '/admin/fc-space-groups', [
+            'methods'             => 'GET',
+            'callback'            => [self::class, 'fcSpaceGroups'],
             'permission_callback' => [self::class, 'adminPermission'],
         ]);
 
@@ -126,6 +133,24 @@ class DynamicOptionsController
         );
 
         return new \WP_REST_Response(['data' => $spaces]);
+    }
+
+    public static function fcSpaceGroups(
+        \WP_REST_Request $request,
+        ?FluentCommunitySpaceGroupResolver $resolver = null
+    ): \WP_REST_Response {
+        if (!defined('FLUENT_COMMUNITY_PLUGIN_VERSION')) {
+            return new \WP_REST_Response(['data' => []]);
+        }
+
+        $resolver ??= new FluentCommunitySpaceGroupResolver();
+
+        return new \WP_REST_Response([
+            'data' => $resolver->search(
+                sanitize_text_field((string) ($request->get_param('search') ?: '')),
+                50
+            ),
+        ]);
     }
 
     public static function fcBadges(

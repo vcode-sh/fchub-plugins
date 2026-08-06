@@ -87,6 +87,28 @@ test.describe('Guided Plan Builder', () => {
     expect(mutations[0].body).not.toHaveProperty('summary')
   })
 
+  test('keeps content rule controls clear of every card edge', async ({ page }) => {
+    await completeOffer(page)
+    await page.getByRole('button', { name: 'Add content access' }).click()
+
+    const insets = await page.locator('.rule-row').first().evaluate((card) => {
+      const cardRect = card.getBoundingClientRect()
+      const fields = Array.from(card.querySelectorAll('.rule-fields .el-form-item'))
+        .filter((field) => field.getBoundingClientRect().width > 0)
+        .map((field) => field.getBoundingClientRect())
+
+      return {
+        left: Math.min(...fields.map((field) => field.left)) - cardRect.left,
+        right: cardRect.right - Math.max(...fields.map((field) => field.right)),
+        bottom: cardRect.bottom - Math.max(...fields.map((field) => field.bottom)),
+      }
+    })
+
+    expect(insets.left).toBeGreaterThanOrEqual(16)
+    expect(insets.right).toBeGreaterThanOrEqual(16)
+    expect(insets.bottom).toBeGreaterThanOrEqual(16)
+  })
+
   test('allows a plan without content rules and warns before creation', async ({ page }) => {
     await completeOffer(page)
     await page.getByRole('button', { name: 'Review plan' }).click()
@@ -116,6 +138,18 @@ test.describe('Guided Plan Builder', () => {
     await expect(page.getByRole('button', { name: /Content access/ })).toHaveAttribute('aria-current', 'step')
     await expect(page.getByLabel('Delay (days)')).toBeFocused()
     await expect(page.getByText('Enter the delay')).toBeVisible()
+  })
+
+  test('opens the drip preview for delayed access while creating a plan', async ({ page }) => {
+    await completeOffer(page)
+    await page.getByRole('button', { name: 'Add content access' }).click()
+    await page.locator('.el-form-item', { hasText: 'Access begins' }).locator('.el-select__wrapper').click()
+    await page.getByRole('option', { name: 'After a delay' }).click()
+
+    await expect(page.getByRole('tab', { name: 'Drip Preview' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByText('Day 1 after enrollment')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Preview scheduled access' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Linked Products' })).toHaveCount(0)
   })
 
   test('blocks Enter from starting a second save while the first request is pending', async ({ page }) => {
@@ -196,6 +230,104 @@ test.describe('Guided Plan Builder', () => {
     await expect(page.getByLabel('Level')).toHaveValue('1')
     await expect(page.getByRole('tab', { name: 'Linked Products' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Members' })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await expect(page.getByText('No FluentCart products linked to this plan yet.')).toHaveCount(0)
+  })
+
+  test('keeps a failed linked-products load honest and retries it', async ({ page }) => {
+    await page.goto('/smoke/index.html?linkedProductsFailures=1#/plans/5/edit')
+
+    await expect(page.getByText('Linked products could not be loaded.')).toBeVisible()
+    await expect(page.getByText('Linked products are temporarily unavailable.')).toBeVisible()
+    await expect(page.getByText('No FluentCart products linked to this plan yet.')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Retry linked products' }).click()
+
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    expect(await page.evaluate(() => window.__fchubSmokeLinkedProductsReads)).toBe(2)
+  })
+
+  test('keeps a failed plan-members load honest and retries it', async ({ page }) => {
+    await page.goto('/smoke/index.html?planMembersFailures=1#/plans/5/edit')
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await page.getByRole('tab', { name: 'Members' }).click()
+
+    await expect(page.getByText('Plan members could not be loaded.')).toBeVisible()
+    await expect(page.getByText('Plan members are temporarily unavailable.')).toBeVisible()
+    await expect(page.getByText('No members have been granted this plan yet.')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Retry plan members' }).click()
+
+    await expect(page.getByRole('cell', { name: 'alice@example.com', exact: true })).toBeVisible()
+    expect(await page.evaluate(() => window.__fchubSmokePlanMembersReads)).toBe(2)
+  })
+
+  test('shows an existing product as already linked instead of offering a duplicate mutation', async ({ page }) => {
+    await page.goto('/smoke/index.html#/plans/5/edit')
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Link Product' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Link Product' })
+    const linkedProduct = dialog.getByRole('button', { name: /Membership Product.*Already linked/ })
+    await expect(linkedProduct).toBeDisabled()
+    await expect(dialog.getByText('Already linked')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Next' })).toBeDisabled()
+    expect(await page.evaluate(() => window.__fchubSmokeRequests)).toHaveLength(0)
+  })
+
+  test('links an available product and refreshes the management table', async ({ page }) => {
+    await page.goto('/smoke/index.html#/plans/5/edit')
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Link Product' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Link Product' })
+    await dialog.getByRole('button', { name: /Workshop Product/ }).click()
+    await dialog.getByRole('button', { name: 'Next' }).click()
+    await dialog.getByRole('button', { name: 'Link Product' }).click()
+
+    await expect(page.getByRole('cell', { name: 'Workshop Product', exact: true })).toBeVisible()
+    const linkRequest = await page.evaluate(() => window.__fchubSmokeRequests.find(({ url }) => url.endsWith('/admin/plans/5/link-product')))
+    expect(linkRequest).toMatchObject({ method: 'POST', body: { product_id: 201 } })
+    expect(await page.evaluate(() => window.__fchubSmokeLinkedProductsReads)).toBe(2)
+  })
+
+  test('unlinks the selected feed and refreshes to the truthful empty state', async ({ page }) => {
+    await page.goto('/smoke/index.html#/plans/5/edit')
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Unlink Membership Product' }).click()
+    await page.getByRole('button', { name: 'Unlink', exact: true }).click()
+
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toHaveCount(0)
+    await expect(page.getByText('No FluentCart products linked to this plan yet.')).toBeVisible()
+    const unlinkRequest = await page.evaluate(() => window.__fchubSmokeRequests.find(({ url }) => url.endsWith('/admin/plans/5/unlink-product/70')))
+    expect(unlinkRequest).toMatchObject({ method: 'DELETE' })
+    expect(await page.evaluate(() => window.__fchubSmokeLinkedProductsReads)).toBe(2)
+  })
+
+  test('keeps the linked product visible when unlinking fails', async ({ page }) => {
+    await page.goto('/smoke/index.html?unlinkProductFailures=1#/plans/5/edit')
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Unlink Membership Product' }).click()
+    await page.getByRole('button', { name: 'Unlink', exact: true }).click()
+
+    await expect(page.getByText('The product could not be unlinked.')).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await expect(page.getByText('No FluentCart products linked to this plan yet.')).toHaveCount(0)
+    expect(await page.evaluate(() => window.__fchubSmokeLinkedProductsReads)).toBe(1)
+  })
+
+  test('keeps the dialog and existing table recoverable when the server detects a concurrent duplicate', async ({ page }) => {
+    await page.goto('/smoke/index.html?linkProductFailures=1#/plans/5/edit')
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Link Product' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Link Product' })
+    await dialog.getByRole('button', { name: /Workshop Product/ }).click()
+    await dialog.getByRole('button', { name: 'Next' }).click()
+    await dialog.getByRole('button', { name: 'Link Product' }).click()
+
+    await expect(page.getByText('This product is already linked to this plan.')).toBeVisible()
+    await expect(dialog).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Membership Product', exact: true })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Workshop Product', exact: true })).toHaveCount(0)
   })
 
   test('step buttons are keyboard-operable and never submit the form', async ({ page }) => {

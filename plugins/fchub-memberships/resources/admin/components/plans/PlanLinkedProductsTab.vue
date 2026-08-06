@@ -2,12 +2,22 @@
   <div v-loading="loading">
     <div class="tab-header-row">
       <p class="tab-description">FluentCart products and integration feeds linked to this plan.</p>
-      <el-button size="small" type="primary" plain @click="$emit('link')">
+      <el-button size="small" type="primary" plain :disabled="loading || Boolean(error)" @click="$emit('link')">
         <el-icon><Plus /></el-icon>
         Link Product
       </el-button>
     </div>
-    <el-table v-if="products.length > 0" :data="products" stripe>
+    <div v-if="error" class="load-error">
+      <el-alert
+        title="Linked products could not be loaded."
+        :description="error"
+        type="error"
+        :closable="false"
+        show-icon
+      />
+      <el-button aria-label="Retry linked products" @click="$emit('retry')">Retry</el-button>
+    </div>
+    <el-table v-else-if="products.length > 0" :data="products" stripe>
       <el-table-column prop="product_title" label="Product" min-width="200" />
       <el-table-column prop="feed_title" label="Feed" min-width="160" />
       <el-table-column label="Pricing" min-width="200">
@@ -38,7 +48,12 @@
             @confirm="$emit('unlink', row)"
           >
             <template #reference>
-              <el-button type="danger" text size="small">
+              <el-button
+                type="danger"
+                text
+                size="small"
+                :aria-label="'Unlink ' + (row.product_title || `product ${row.product_id}`)"
+              >
                 <el-icon><Delete /></el-icon>
               </el-button>
             </template>
@@ -46,7 +61,7 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-empty v-else description="No FluentCart products linked to this plan yet." :image-size="60">
+    <el-empty v-else-if="!loading" description="No FluentCart products linked to this plan yet." :image-size="60">
       <template #description>
         <p>No FluentCart products linked to this plan yet.</p>
         <p style="font-size: 12px; color: #909399">Click "Link Product" to create an integration feed.</p>
@@ -68,9 +83,13 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  error: {
+    type: String,
+    default: '',
+  },
 })
 
-defineEmits(['link', 'unlink'])
+defineEmits(['link', 'retry', 'unlink'])
 </script>
 
 <style scoped>
@@ -105,5 +124,11 @@ defineEmits(['link', 'unlink'])
 
 .variation-price {
   font-weight: 500;
+}
+
+.load-error {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
 }
 </style>

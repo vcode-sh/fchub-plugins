@@ -6,7 +6,17 @@
         <el-button size="small" text type="primary">View All →</el-button>
       </router-link>
     </div>
-    <el-table v-if="members.length > 0" :data="members" stripe>
+    <div v-if="error" class="load-error">
+      <el-alert
+        title="Plan members could not be loaded."
+        :description="error"
+        type="error"
+        :closable="false"
+        show-icon
+      />
+      <el-button aria-label="Retry plan members" @click="$emit('retry')">Retry</el-button>
+    </div>
+    <el-table v-else-if="members.length > 0" :data="members" stripe>
       <el-table-column prop="user_email" label="Member" min-width="200" />
       <el-table-column prop="status" label="Status" width="100">
         <template #default="{ row }">
@@ -26,9 +36,9 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-empty v-else description="No members have been granted this plan yet." :image-size="60" />
+    <el-empty v-else-if="!loading" description="No members have been granted this plan yet." :image-size="60" />
     <el-pagination
-      v-if="total > perPage"
+      v-if="!error && total > perPage"
       :current-page="page"
       :page-size="perPage"
       :total="total"
@@ -48,6 +58,10 @@ defineProps({
   members: {
     type: Array,
     default: () => [],
+  },
+  error: {
+    type: String,
+    default: '',
   },
   total: {
     type: Number,
@@ -71,7 +85,7 @@ defineProps({
   },
 })
 
-defineEmits(['page-change'])
+defineEmits(['page-change', 'retry'])
 </script>
 
 <style scoped>
@@ -90,5 +104,11 @@ defineEmits(['page-change'])
 
 .tab-header-row .tab-description {
   margin-bottom: 0;
+}
+
+.load-error {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
 }
 </style>

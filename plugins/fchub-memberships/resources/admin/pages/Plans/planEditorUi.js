@@ -22,6 +22,35 @@ const VALID_DURATION_TYPES = new Set([
   'fixed_anchor',
 ])
 
+export function appendCommunitySpaceRules(existingRules = [], spaces = []) {
+  const rules = Array.isArray(existingRules) ? [...existingRules] : []
+  const existingSpaceIds = new Set(
+    rules
+      .filter((rule) => rule?.resource_type === 'fc_space')
+      .map((rule) => String(rule.resource_id ?? '').trim())
+      .filter((id) => /^[1-9]\d*$/.test(id)),
+  )
+  const added = []
+
+  for (const space of Array.isArray(spaces) ? spaces : []) {
+    const id = String(space?.id ?? '').trim()
+    if (!/^[1-9]\d*$/.test(id) || existingSpaceIds.has(id)) continue
+
+    existingSpaceIds.add(id)
+    added.push(id)
+    rules.push({
+      resource_type: 'fc_space',
+      resource_id: id,
+      resource_label: String(space?.label ?? `Space #${id}`),
+      drip_type: 'immediate',
+      drip_delay_days: null,
+      drip_date: null,
+    })
+  }
+
+  return { rules, added }
+}
+
 export function normaliseBuilderStep(step) {
   return BUILDER_STEP_IDS.includes(step) ? step : 'offer'
 }

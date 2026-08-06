@@ -4,6 +4,7 @@ export const content = {
   list: (params) => apiClient.get('admin/content', params),
   resourceTypes: () => apiClient.get('admin/content/resource-types'),
   searchResources: (params) => apiClient.get('admin/content/search-resources', params),
+  spaceGroups: (params) => apiClient.get('admin/fc-space-groups', params),
   protect: (data) => apiClient.post('admin/content/protect', data),
   unprotect: (id) => apiClient.del(`admin/content/${id}`),
   unprotectByResource: (data) => apiClient.post('admin/content/unprotect', data),

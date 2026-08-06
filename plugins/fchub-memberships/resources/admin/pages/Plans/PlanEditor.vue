@@ -252,10 +252,30 @@
                 <h2 id="access-step-heading">Choose content access</h2>
                 <p>Define what members unlock now or later. You can safely skip this step.</p>
               </div>
-              <el-button v-if="form.rules.length" :disabled="hasReadOnlyRules" @click="addRule">
-                <el-icon><Plus /></el-icon>
-                Add content access
-              </el-button>
+              <div class="access-rules-actions">
+                <el-select
+                  v-if="hasFcSpaceResourceType && !hasReadOnlyRules"
+                  v-model="selectedSpaceGroupId"
+                  class="space-group-selector"
+                  clearable
+                  filterable
+                  :loading="spaceGroupsLoading"
+                  placeholder="Add Spaces from group"
+                  @change="addSelectedSpaceGroup"
+                >
+                  <el-option
+                    v-for="group in spaceGroups"
+                    :key="group.id"
+                    :label="`${group.label} (${group.spaces.length})`"
+                    :value="group.id"
+                    :disabled="group.spaces.length === 0"
+                  />
+                </el-select>
+                <el-button v-if="form.rules.length" :disabled="hasReadOnlyRules" @click="addRule">
+                  <el-icon><Plus /></el-icon>
+                  Add content access
+                </el-button>
+              </div>
             </div>
 
             <el-alert
@@ -455,8 +475,12 @@
 
       <section v-if="!isNew || dripPreviewRules.length > 0" class="plan-management" aria-labelledby="plan-management-heading">
         <div class="plan-management-heading">
-          <h2 id="plan-management-heading">Manage existing plan</h2>
-          <p>Related tools stay available without cluttering the creation flow.</p>
+          <h2 id="plan-management-heading">{{ isNew ? 'Preview scheduled access' : 'Manage existing plan' }}</h2>
+          <p>
+            {{ isNew
+              ? 'Check when scheduled content becomes available.'
+              : 'Related tools stay available without cluttering the creation flow.' }}
+          </p>
         </div>
         <el-tabs v-model="activeTab">
           <el-tab-pane v-if="dripPreviewRules.length > 0" label="Drip Preview" name="drip">
@@ -476,7 +500,9 @@
             <PlanLinkedProductsTab
               :loading="productsLoading"
               :products="linkedProducts"
+              :error="linkedProductsError"
               @link="showLinkProductDialog"
+              @retry="loadLinkedProducts"
               @unlink="confirmUnlinkProduct"
             />
           </el-tab-pane>
@@ -484,12 +510,14 @@
             <PlanMembersTab
               :loading="planMembersLoading"
               :members="planMembers"
+              :error="planMembersError"
               :total="planMembersTotal"
               :page="planMembersPage"
               :per-page="planMembersPerPage"
               :format-date="formatWpDate"
               :members-link="`/members?plan_id=${route.params.id}`"
               @page-change="onMembersPageChange"
+              @retry="loadPlanMembers(planMembersPage)"
             />
           </el-tab-pane>
         </el-tabs>
@@ -539,6 +567,7 @@ import PlanBuilderSummary from '@/components/plans/PlanBuilderSummary.vue'
 import WorkspacePageHeader from '@/components/workspace/WorkspacePageHeader.vue'
 import {
   PLAN_BUILDER_STEPS,
+  appendCommunitySpaceRules,
   buildPlanSummary,
   hasAdvancedPlanSettings,
   isOfferStepComplete,
@@ -565,7 +594,7 @@ const slugPreviewLoading = ref(false)
 const slugPreviewError = ref('')
 const slugAvailable = ref(true)
 const planOptions = ref([])
-const activeTab = ref('products')
+const activeTab = ref(props.isNew ? 'drip' : 'products')
 const activeStep = ref('offer')
 const advancedOpen = ref(false)
 const mobileSummaryOpen = ref(false)
@@ -574,6 +603,7 @@ const mobileSummaryOpen = ref(false)
 const linkedProducts = ref([])
 const productsLoading = ref(false)
 const productsLoaded = ref(false)
+const linkedProductsError = ref('')
 
 // T15: Link Product dialog state
 const linkProductVisible = ref(false)
@@ -601,10 +631,16 @@ const ruleResourceOptions = reactive({})
 const ruleResourceLoading = reactive({})
 let ruleSearchTimers = {}
 
+// FluentCommunity Space Group quick-add state
+const spaceGroups = ref([])
+const spaceGroupsLoading = ref(false)
+const selectedSpaceGroupId = ref('')
+
 // Members tab state
 const planMembers = ref([])
 const planMembersLoading = ref(false)
 const planMembersLoaded = ref(false)
+const planMembersError = ref('')
 const planMembersPage = ref(1)
 const planMembersPerPage = 10
 const planMembersTotal = ref(0)
@@ -662,6 +698,10 @@ const completedSteps = computed(() => [
 
 const planSummary = computed(() => buildPlanSummary(form, form.rules.length))
 const hasReadOnlyRules = computed(() => hasReadOnlyPlanRules(form.rules))
+const linkedProductIds = computed(() => new Set(
+  linkedProducts.value.map((product) => Number(product.product_id)),
+))
+const hasFcSpaceResourceType = computed(() => Boolean(getTypeConfig('fc_space')))
 
 const primaryActionLabel = computed(() => {
   if (activeStep.value === 'offer') return 'Continue'
@@ -786,6 +826,28 @@ function getTypeConfig(resourceType) {
     if (found) return found
   }
   return null
+}
+
+function addSelectedSpaceGroup(groupId) {
+  if (!groupId || hasReadOnlyRules.value) return
+
+  const group = spaceGroups.value.find((item) => String(item.id) === String(groupId))
+  selectedSpaceGroupId.value = ''
+  if (!group) return
+
+  const previousRuleCount = form.rules.length
+  const result = appendCommunitySpaceRules(form.rules, group.spaces)
+  if (result.added.length === 0) {
+    ElMessage.info(`All Spaces from ${group.label} are already in this plan`)
+    return
+  }
+
+  form.rules.push(...result.rules.slice(previousRuleCount))
+  result.added.forEach((spaceId, offset) => {
+    const space = group.spaces.find((item) => String(item.id) === spaceId)
+    ruleResourceOptions[previousRuleCount + offset] = space ? [space] : []
+  })
+  ElMessage.success(`Added ${result.added.length} Space${result.added.length === 1 ? '' : 's'} from ${group.label}`)
 }
 
 function resourceIdRules(rule) {
@@ -928,6 +990,28 @@ async function loadResourceTypes() {
         ],
       },
     ]
+  }
+}
+
+async function loadSpaceGroups() {
+  spaceGroupsLoading.value = true
+  try {
+    const res = await content.spaceGroups({ search: '' })
+    const data = res.data ?? res
+    spaceGroups.value = (Array.isArray(data) ? data : []).map((group) => ({
+      id: String(group.id),
+      label: group.label || `Group #${group.id}`,
+      spaces: Array.isArray(group.spaces)
+        ? group.spaces.map((space) => ({
+          id: String(space.id),
+          label: space.label || `Space #${space.id}`,
+        }))
+        : [],
+    }))
+  } catch {
+    spaceGroups.value = []
+  } finally {
+    spaceGroupsLoading.value = false
   }
 }
 
@@ -1271,14 +1355,15 @@ async function savePlan() {
 async function loadLinkedProducts() {
   if (productsLoaded.value || props.isNew) return
   productsLoading.value = true
+  linkedProductsError.value = ''
   try {
     const res = await plans.linkedProducts(route.params.id)
     linkedProducts.value = res.data ?? res
-  } catch {
-    linkedProducts.value = []
+    productsLoaded.value = true
+  } catch (error) {
+    linkedProductsError.value = error.message || 'Failed to load linked products.'
   } finally {
     productsLoading.value = false
-    productsLoaded.value = true
   }
 }
 
@@ -1300,7 +1385,11 @@ async function searchProducts() {
   productSearchLoading.value = true
   try {
     const res = await plans.searchProducts({ search: productSearchQuery.value })
-    productSearchResults.value = res.data ?? res
+    const productsData = res.data ?? res
+    productSearchResults.value = (Array.isArray(productsData) ? productsData : []).map((product) => ({
+      ...product,
+      already_linked: linkedProductIds.value.has(Number(product.id)),
+    }))
   } catch {
     productSearchResults.value = []
   } finally {
@@ -1378,6 +1467,7 @@ async function clearSchedule() {
 async function loadPlanMembers(page = 1) {
   if (props.isNew) return
   planMembersLoading.value = true
+  planMembersError.value = ''
   try {
     const res = await members.list({
       plan_id: route.params.id,
@@ -1388,11 +1478,11 @@ async function loadPlanMembers(page = 1) {
     planMembers.value = Array.isArray(data) ? data : (data.data ?? [])
     planMembersTotal.value = res.total ?? data.total ?? 0
     planMembersPage.value = page
-  } catch {
-    planMembers.value = []
+    planMembersLoaded.value = true
+  } catch (error) {
+    planMembersError.value = error.message || 'Failed to load plan members.'
   } finally {
     planMembersLoading.value = false
-    planMembersLoaded.value = true
   }
 }
 
@@ -1408,11 +1498,12 @@ watch(activeTab, (tab) => {
   if (tab === 'members' && !planMembersLoaded.value) {
     loadPlanMembers()
   }
-})
+}, { immediate: true })
 
 onMounted(() => {
   loadPlanOptions()
   loadResourceTypes()
+  loadSpaceGroups()
 
   if (!props.isNew && route.params.id) {
     loadPlan(route.params.id)
@@ -1480,6 +1571,19 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
+}
+
+.access-rules-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.space-group-selector {
+  min-width: 220px;
 }
 
 .access-rules-heading {
@@ -1957,7 +2061,7 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px 16px;
-  padding: 18px 16px 2px;
+  padding: 18px 16px;
 }
 
 .rule-fields .el-form-item,
@@ -2192,7 +2296,12 @@ onMounted(() => {
     display: block;
   }
 
-  .access-rules-heading .el-button {
+  .access-rules-actions {
+    display: block;
+  }
+
+  .space-group-selector,
+  .access-rules-actions .el-button {
     width: 100%;
     margin-top: 14px;
   }

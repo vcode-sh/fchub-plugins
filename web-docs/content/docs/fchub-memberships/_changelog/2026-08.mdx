@@ -1,3 +1,44 @@
+### v1.4.3
+
+*In development*
+
+The plan editor now remembers that connected products continue to exist after
+you open the plan, and can add a whole FluentCommunity Space Group without the
+traditional ritual of selecting every Space by hand. Object permanence and
+fewer repetitive clicks: truly lavish.
+
+#### Add a FluentCommunity Space Group in one click
+
+The plan editor can now add every community Space from a FluentCommunity Space
+Group at once. Memberships expands the group into individual `fc_space` rules,
+skips Spaces already present in the plan, and deliberately ignores course
+Spaces.
+
+The added rules start with immediate access but remain editable individually,
+so each Space can still use its own drip schedule. The group is expanded as a
+snapshot when selected; later changes to the FluentCommunity group do not
+silently rewrite existing plans. Access control has enough surprises already.
+
+#### Plan management that tells the truth
+
+- **Linked products appear immediately** — opening an existing plan now loads
+  its FluentCart connections without requiring a ceremonial trip to another
+  tab and back.
+- **Duplicate links are obvious before saving** — products already connected
+  to the plan are labelled and cannot be selected again.
+- **Link and unlink actions stay in sync** — successful changes refresh the
+  table, while failed requests keep the current data and explain what went
+  wrong instead of inventing an empty state.
+- **Recovery is built in** — linked products and plan members now show a clear
+  retry action when loading fails.
+- **Delayed access previews behave during setup** — new plans open the Drip
+  Preview as soon as a scheduled content rule needs it, without exposing
+  edit-only tools.
+- **Content rules have room to breathe** — controls now keep balanced spacing
+  from every card edge instead of crowding the bottom border like rent is due.
+
+<Separator className="my-8" />
+
 ### v1.4.2 <Badge>Latest</Badge>
 
 *Released 6 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.2)

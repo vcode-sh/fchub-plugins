@@ -1,1 +1,0 @@
-import"./icon-DqXuQ14C.js";import"./admin-D30Pyvzu.js";

@@ -13,14 +13,19 @@
         @input="$emit('search')"
       />
       <div v-loading="loading" class="product-search-results">
-        <div
+        <button
           v-for="product in results"
           :key="product.id"
+          type="button"
           class="product-search-item"
           :class="{ selected: selectedProduct?.id === product.id }"
+          :disabled="product.already_linked"
           @click="$emit('select', product)"
         >
-          <div class="product-search-item-title">{{ product.title }}</div>
+          <div class="product-search-item-title">
+            <span>{{ product.title }}</span>
+            <el-tag v-if="product.already_linked" size="small" type="info">Already linked</el-tag>
+          </div>
           <div class="product-search-item-meta">
             <template v-if="product.variations && product.variations.length > 0">
               <span v-for="(v, i) in product.variations" :key="i" class="variation-tag">
@@ -30,7 +35,7 @@
             </template>
             <span v-else>{{ product.price ? formatCurrency(product.price / 100) : 'Free' }}</span>
           </div>
-        </div>
+        </button>
         <div v-if="!loading && results.length === 0 && query" class="product-search-empty">
           No products found.
         </div>
@@ -124,12 +129,28 @@ function handleClose() {
 }
 
 .product-search-item {
+  display: block;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
   padding: 10px 12px;
   border: 1px solid var(--fchub-border-color);
   border-radius: 6px;
   margin-bottom: 8px;
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s;
+}
+
+.product-search-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.product-search-item:disabled:hover {
+  border-color: var(--fchub-border-color);
+  background: transparent;
 }
 
 .product-search-item:hover {
@@ -143,6 +164,10 @@ function handleClose() {
 }
 
 .product-search-item-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-weight: 500;
   font-size: 14px;
 }
