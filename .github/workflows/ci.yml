@@ -134,6 +134,10 @@ jobs:
         working-directory: plugins/${{ matrix.plugin }}
         run: ./vendor/bin/phpunit
 
+      - name: Install pinned static analysis dependencies
+        if: steps.changes.outputs.count > 0 && matrix.php_version == '8.5' && (matrix.plugin == 'fchub-fakturownia' || matrix.plugin == 'fchub-multi-currency' || matrix.plugin == 'fchub-p24' || matrix.plugin == 'fchub-wishlist')
+        run: bash scripts/wporg/install-static-analysis-dependencies.sh "${{ matrix.plugin }}"
+
       - name: Run static quality checks
         if: steps.changes.outputs.count > 0 && matrix.php_version == '8.5' && (matrix.plugin == 'fchub-fakturownia' || matrix.plugin == 'fchub-multi-currency' || matrix.plugin == 'fchub-p24' || matrix.plugin == 'fchub-wishlist')
         working-directory: plugins/${{ matrix.plugin }}

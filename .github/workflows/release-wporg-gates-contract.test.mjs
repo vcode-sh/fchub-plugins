@@ -12,6 +12,13 @@ const sourceGates = readFileSync(
   new URL("../../scripts/wporg/run-source-gates.sh", import.meta.url),
   "utf8",
 );
+const staticAnalysisDependencies = readFileSync(
+  new URL(
+    "../../scripts/wporg/install-static-analysis-dependencies.sh",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const targetSlugs = [
   "fchub-fakturownia",
   "fchub-memberships",
@@ -121,6 +128,20 @@ test("source gates run the applicable PHP and Memberships frontend suites", () =
   assert.match(source, /composer validate --strict --no-interaction/);
   assert.match(source, /composer install --no-interaction --prefer-dist/);
   assert.match(source, /composer audit --locked --no-interaction/);
+  assert.match(source, /name: Install pinned static analysis dependencies/);
+  assert.match(
+    source,
+    /bash scripts\/wporg\/install-static-analysis-dependencies\.sh "\$\{\{\s*matrix\.plugin\s*\}\}"/,
+  );
+  assert.ok(
+    source.indexOf("install-static-analysis-dependencies.sh") <
+      source.indexOf("run-source-gates.sh"),
+    "Pinned external sources must exist before the PHP 8.5 static gate",
+  );
+  assert.match(staticAnalysisDependencies, /fluent-cart \\\n+\s+1\.6\.0 \\\n+\s+1c8463feee35527cdd344aa87558afa8cd0e9de07e1a5e14f4e1e8984784e6b4/);
+  assert.match(staticAnalysisDependencies, /fluent-crm \\\n+\s+3\.1\.10 \\\n+\s+d38ccfaf9f59cc8b40f964c4b706de1c779347f305b7ade32943681f9aec99b2/);
+  assert.match(staticAnalysisDependencies, /--proto '=https'/);
+  assert.match(staticAnalysisDependencies, /verify_checksum/);
   assert.match(
     source,
     /bash scripts\/wporg\/run-source-gates\.sh "\$\{\{\s*matrix\.plugin\s*\}\}" "\$\{\{\s*matrix\.php_version\s*\}\}"/,

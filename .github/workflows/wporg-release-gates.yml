@@ -85,6 +85,10 @@ jobs:
         working-directory: plugins/${{ matrix.plugin }}
         run: composer audit --locked --no-interaction
 
+      - name: Install pinned static analysis dependencies
+        if: matrix.php_version == '8.5' && matrix.plugin != 'fchub-memberships'
+        run: bash scripts/wporg/install-static-analysis-dependencies.sh "${{ matrix.plugin }}"
+
       - name: Run applicable PHP gates
         run: bash scripts/wporg/run-source-gates.sh "${{ matrix.plugin }}" "${{ matrix.php_version }}"
 

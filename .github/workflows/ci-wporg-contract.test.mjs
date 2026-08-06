@@ -64,6 +64,16 @@ test("PHPUnit matrix covers every target on the PHPUnit 13 PHP runtimes", () => 
 
 test("static checks run on PHP 8.5 for every target that defines them", () => {
   const phpunit = job(ci, "phpunit");
+  assert.match(phpunit, /name: Install pinned static analysis dependencies/);
+  assert.match(
+    phpunit,
+    /bash scripts\/wporg\/install-static-analysis-dependencies\.sh "\$\{\{\s*matrix\.plugin\s*\}\}"/,
+  );
+  assert.ok(
+    phpunit.indexOf("install-static-analysis-dependencies.sh") <
+      phpunit.indexOf("name: Run static quality checks"),
+    "Pinned external sources must exist before pull-request static analysis",
+  );
   const staticStep = phpunit.match(
     /- name: Run static quality checks[\s\S]*?(?=\n      - name:)/,
   )?.[0];
