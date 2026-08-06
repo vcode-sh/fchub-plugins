@@ -1,6 +1,6 @@
 # FCHub Memberships
 
-Version: `1.4.2`
+Version: `1.4.3`
 
 FCHub Memberships is a complete membership workspace for FluentCart with:
 
@@ -44,4 +44,4 @@ standard WordPress administration, as civilisation intended.
 
 ## Versioning
 
-Current plugin version: `1.4.2`
+Current plugin version: `1.4.3`

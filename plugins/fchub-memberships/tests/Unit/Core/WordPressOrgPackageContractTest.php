@@ -91,7 +91,7 @@ final class WordPressOrgPackageContractTest extends PluginTestCase
         self::assertLessThan(10_000, filesize($readmePath));
         self::assertStringContainsString('=== FCHub Memberships ===', $readme);
         self::assertStringContainsString('Contributors: vcodesh', $readme);
-        self::assertStringContainsString('Stable tag: 1.4.2', $readme);
+        self::assertStringContainsString('Stable tag: 1.4.3', $readme);
         self::assertStringContainsString('Requires PHP: 8.3', $readme);
         self::assertStringContainsString('== External services ==', $readme);
         self::assertStringContainsString('== Privacy ==', $readme);

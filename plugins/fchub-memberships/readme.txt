@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, memberships, content-restriction, subscriptions, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.2
+Stable tag: 1.4.3
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -110,6 +110,14 @@ When reporting a problem, include the WordPress, PHP, FluentCart and FCHub Membe
 4. Membership reports and provider health.
 
 == Changelog ==
+
+= 1.4.3 =
+
+* Add every eligible Space from a FluentCommunity Space Group to a plan in one action.
+* Show linked FluentCart products as soon as an existing plan opens.
+* Prevent duplicate product connections and keep the list accurate after changes.
+* Provide clear retry actions when linked products or plan members cannot be loaded.
+* Improve delayed-access previews and give content-rule controls more breathing room.
 
 = 1.4.2 =
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.4.3 - In development
+## 1.4.3 - 2026-08-06
 
 - Add every eligible Space from a FluentCommunity Space Group to a plan in one action.
 - Show linked FluentCart products as soon as an existing plan opens.

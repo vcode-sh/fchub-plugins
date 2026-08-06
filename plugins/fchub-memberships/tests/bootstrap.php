@@ -27,7 +27,7 @@ if (!defined('OBJECT')) {
 }
 
 if (!defined('FCHUB_MEMBERSHIPS_VERSION')) {
-    define('FCHUB_MEMBERSHIPS_VERSION', '1.4.2');
+    define('FCHUB_MEMBERSHIPS_VERSION', '1.4.3');
 }
 
 if (!defined('FCHUB_MEMBERSHIPS_FILE')) {
