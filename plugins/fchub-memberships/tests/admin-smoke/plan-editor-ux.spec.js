@@ -7,6 +7,7 @@ async function openCreatePlan(page) {
 
 async function completeOffer(page, { name = 'Gold Membership', durationDays } = {}) {
   await page.getByLabel('Plan name').fill(name)
+  await expect(page.getByLabel('Slug')).toHaveValue(name === 'Klub Przyjaciół Psów' ? 'klub-przyjaciol-psow' : name.toLowerCase().replaceAll(' ', '-'))
   if (durationDays) {
     await page.getByRole('button', { name: /Fixed duration/ }).click()
     await page.getByLabel('Duration (days)').fill(String(durationDays))
@@ -72,14 +73,12 @@ test.describe('Guided Plan Builder', () => {
       'level',
       'meta',
       'rules',
-      'slug',
       'status',
       'title',
       'trial_days',
     ])
     expect(mutations[0].body).toMatchObject({
       title: 'Gold Membership',
-      slug: 'gold-membership',
       duration_type: 'fixed_days',
       duration_days: 30,
       rules: [{ resource_type: 'post', resource_id: '0', drip_type: 'immediate' }],
@@ -142,14 +141,21 @@ test.describe('Guided Plan Builder', () => {
   test('routes invalid advanced data back to the revealed Offer field', async ({ page }) => {
     await page.getByLabel('Plan name').fill('Gold Membership')
     await page.getByRole('button', { name: 'Advanced settings' }).click()
-    await page.getByLabel('Slug').fill('Invalid Slug')
+    await page.getByLabel('Slug').fill('---')
+    await expect(page.getByText('The title or custom slug does not contain usable characters.').first()).toBeVisible()
     await page.getByRole('button', { name: /Review/ }).click()
     await page.getByRole('button', { name: 'Create plan' }).click()
 
     await expect(page.getByRole('button', { name: /The offer/ })).toHaveAttribute('aria-current', 'step')
     await expect(page.getByRole('button', { name: 'Advanced settings' })).toHaveAttribute('aria-expanded', 'true')
     await expect(page.getByLabel('Slug')).toBeFocused()
-    await expect(page.getByText('Use lowercase letters, numbers, and hyphens only')).toBeVisible()
+    await expect(page.getByText('The title or custom slug does not contain usable characters.').first()).toBeVisible()
+  })
+
+  test('uses the server preview for Polish plan names', async ({ page }) => {
+    await completeOffer(page, { name: 'Klub Przyjaciół Psów' })
+
+    await expect(page.getByLabel('Slug')).toHaveValue('klub-przyjaciol-psow')
   })
 
   test('uses Readiness Canvas-style progress cards without mobile page overflow', async ({ page }) => {

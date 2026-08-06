@@ -13,7 +13,8 @@ export const PLAN_BUILDER_STEPS = Object.freeze([
 ])
 
 const BUILDER_STEP_IDS = PLAN_BUILDER_STEPS.map(({ id }) => id)
-const VALID_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const VALID_SLUG_PART = String.raw`(?:[a-z0-9]|%[0-9a-f]{2})+`
+const VALID_SLUG = new RegExp(`^${VALID_SLUG_PART}(?:-${VALID_SLUG_PART})*$`)
 const VALID_DURATION_TYPES = new Set([
   'lifetime',
   'fixed_days',
@@ -60,6 +61,10 @@ export function isOfferStepComplete(form = {}) {
   }
 
   return true
+}
+
+export function isValidPlanSlug(slug) {
+  return VALID_SLUG.test(String(slug || ''))
 }
 
 function durationLabel(form) {

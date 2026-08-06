@@ -608,6 +608,20 @@ if (!function_exists('sanitize_title')) {
     }
 }
 
+if (!function_exists('utf8_uri_encode')) {
+    function utf8_uri_encode(string $utf8String, int $length = 0): string
+    {
+        $encoded = rawurlencode($utf8String);
+        if ($length < 1 || strlen($encoded) <= $length) {
+            return $encoded;
+        }
+
+        $encoded = substr($encoded, 0, $length);
+
+        return preg_replace('/%(?:[0-9A-F])?$/', '', $encoded) ?? $encoded;
+    }
+}
+
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field(string $value): string
     {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2 - 2026-08-06
+
+- Fixed automatic plan slugs for Polish accents and other international scripts.
+- Made WordPress the single authority for editor previews and persisted slugs.
+- Added collision-aware previews, empty-slug rejection and safe 100-byte bounds.
+
 ## 1.4.1 - 2026-07-26
 
 - Prepared WordPress.org identity, dependency and package metadata.

@@ -49,9 +49,17 @@ class PlanService
 
     public function create(array $data): array
     {
-        if (empty($data['slug'])) {
+        if (!array_key_exists('slug', $data) || trim((string) $data['slug']) === '') {
             $data['slug'] = $this->planRepo->generateUniqueSlug($data['title']);
-        } elseif ($this->planRepo->slugExists($data['slug'])) {
+        } else {
+            $data['slug'] = PlanSlug::canonicalize((string) $data['slug']);
+        }
+
+        if ($data['slug'] === '') {
+            return ['error' => __('Plan title or custom slug must contain usable characters.', 'fchub-memberships')];
+        }
+
+        if ($this->planRepo->slugExists($data['slug'])) {
             return ['error' => __('Plan slug already exists.', 'fchub-memberships')];
         }
 
@@ -76,7 +84,14 @@ class PlanService
             return ['error' => __('Plan not found.', 'fchub-memberships')];
         }
 
-        if (!empty($data['slug']) && $data['slug'] !== $existing['slug']) {
+        if (array_key_exists('slug', $data)) {
+            $data['slug'] = PlanSlug::canonicalize((string) $data['slug']);
+            if ($data['slug'] === '') {
+                return ['error' => __('Plan slug must contain usable characters.', 'fchub-memberships')];
+            }
+        }
+
+        if (isset($data['slug']) && $data['slug'] !== $existing['slug']) {
             if ($this->planRepo->slugExists($data['slug'], $id)) {
                 return ['error' => __('Plan slug already exists.', 'fchub-memberships')];
             }
@@ -161,6 +176,25 @@ class PlanService
         $newData['status'] = 'inactive';
 
         return $this->create($newData);
+    }
+
+    /**
+     * Return the exact slug WordPress will persist and whether it is available.
+     *
+     * @return array{slug:string, mode:string, available:bool}
+     */
+    public function previewSlug(string $title, ?string $customSlug = null, ?int $excludeId = null): array
+    {
+        $isCustom = $customSlug !== null && trim($customSlug) !== '';
+        $slug = $isCustom
+            ? PlanSlug::canonicalize($customSlug)
+            : $this->planRepo->generateUniqueSlug($title, $excludeId);
+
+        return [
+            'slug' => $slug,
+            'mode' => $isCustom ? 'custom' : 'automatic',
+            'available' => $slug !== '' && !$this->planRepo->slugExists($slug, $excludeId),
+        ];
     }
 
     /**

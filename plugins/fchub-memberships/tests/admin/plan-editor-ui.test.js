@@ -5,6 +5,7 @@ import {
   hasAdvancedPlanSettings,
   isOfferStepComplete,
   isAdvancedValidationField,
+  isValidPlanSlug,
   nextBuilderStep,
   normaliseBuilderStep,
   previousBuilderStep,
@@ -113,6 +114,17 @@ describe('plan editor UI policy', () => {
     expect(stepForValidationFields({ 'rules.0.resource_type': [{}] })).toBe('access')
     expect(stepForValidationFields({ slug: [{}] })).toBe('offer')
     expect(stepForValidationFields({})).toBe('offer')
+  })
+
+  it.each([
+    ['klub-przyjaciol-psow', true],
+    ['%e6%97%a5%e6%9c%ac%e8%aa%9e', true],
+    ['%d0%ba%d0%bb%d1%83%d0%b1-7', true],
+    ['broken%slug', false],
+    ['UPPERCASE', false],
+    ['', false],
+  ])('validates persisted WordPress slug %s', (slug, expected) => {
+    expect(isValidPlanSlug(slug)).toBe(expected)
   })
 
   it.each([

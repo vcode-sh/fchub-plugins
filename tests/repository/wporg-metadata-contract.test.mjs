@@ -7,7 +7,7 @@ const readJson = async (path) =>
   JSON.parse(await readFile(new URL(path, root), 'utf8'))
 
 const expectedVersions = {
-  'fchub-memberships': '1.4.1',
+  'fchub-memberships': '1.4.2',
   'fchub-wishlist': '1.0.2',
   'fchub-multi-currency': '1.4.1',
   'fchub-p24': '1.0.4',
@@ -16,11 +16,11 @@ const expectedVersions = {
 
 const expectedPreviousReleases = {
   'fchub-memberships': {
-    version: '1.4.0',
-    tag: 'fchub-memberships/v1.4.0',
-    commit: 'fc4b2b1036b82414f47c6593e87de4946ae994d4',
-    asset: 'fchub-memberships-1.4.0.zip',
-    sha256: '5b5bad44770ec39a5f9ea7f7b35018267dd0fbe1d9293b752458d46ade841802',
+    version: '1.4.1',
+    tag: 'fchub-memberships/v1.4.1',
+    commit: '7021de05aab6bab87f4345c09ae002db87c347f3',
+    asset: 'fchub-memberships-1.4.1.zip',
+    sha256: '45689bad1b5f690cfa209f53010753ab4857c1e478787b0f5a0b4289a54d4f94',
   },
   'fchub-wishlist': {
     version: '1.0.1',

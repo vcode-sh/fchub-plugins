@@ -34,6 +34,12 @@ final class PlanController
             'permission_callback' => [self::class, 'adminPermission'],
         ]);
 
+        register_rest_route($ns, '/admin/plans/slug-preview', [
+            'methods'             => 'GET',
+            'callback'            => [PlanWriteController::class, 'previewSlug'],
+            'permission_callback' => [self::class, 'adminPermission'],
+        ]);
+
         register_rest_route($ns, '/admin/plans/(?P<id>\d+)', [
             [
                 'methods'             => 'GET',

@@ -1,0 +1,26 @@
+### v1.4.2 <Badge>Latest</Badge>
+
+*Released 6 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.2)
+
+Plan slugs have learned that the alphabet did not stop at `z`. A modest
+achievement, admittedly, but one that matters when the plan is called
+`Klub Przyjaciół Psów` rather than `Gold Membership` for the nine-hundredth
+time.
+
+#### International plan slugs
+
+- **Polish accents are transliterated properly** — `Klub Przyjaciół Psów` now
+  becomes `klub-przyjaciol-psow`, rather than quietly losing half the letters.
+- **WordPress is the authority** — the plan editor previews the exact slug the
+  server will save, so Czech, French, Turkish, Vietnamese and non-Latin scripts
+  no longer get a separate JavaScript interpretation of reality.
+- **Native scripts remain usable** — Greek, Cyrillic, Arabic, Hebrew, Hindi,
+  Japanese and Chinese titles retain WordPress's percent-encoded slugs instead
+  of collapsing to an empty field.
+- **Canonical forms agree** — composed and combining-accent forms now produce
+  the same saved identifier.
+- **Database limits are respected** — long encoded slugs and their collision
+  suffixes stay within the 100-byte column without slicing an encoded character
+  in half. The database has suffered enough creative input for one lifetime.
+- **Empty slugs are rejected** — punctuation-only titles and custom slugs fail
+  with a useful validation message instead of persisting an unusable identifier.

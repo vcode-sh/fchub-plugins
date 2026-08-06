@@ -5,6 +5,7 @@ namespace FChubMemberships\Storage;
 defined('ABSPATH') || exit;
 
 use FChubMemberships\Domain\AccessEvaluator;
+use FChubMemberships\Domain\Plan\PlanSlug;
 use FChubMemberships\Domain\Plan\PlanRuleResolver;
 use FChubMemberships\Support\PlanStatus;
 
@@ -443,12 +444,12 @@ class PlanRepository
 
     public function generateUniqueSlug(string $title, ?int $excludeId = null): string
     {
-        $slug = sanitize_title($title);
+        $slug = PlanSlug::canonicalize($title);
         $baseSlug = $slug;
         $counter = 1;
 
-        while ($this->slugExists($slug, $excludeId)) {
-            $slug = $baseSlug . '-' . $counter;
+        while ($slug !== '' && $this->slugExists($slug, $excludeId)) {
+            $slug = PlanSlug::appendSuffix($baseSlug, $counter);
             $counter++;
         }
 

@@ -50,9 +50,8 @@ final class PlanWriteController
 
         $service = new PlanService();
         $status = PlanStatus::normalize($data['status'] ?? null, PlanStatus::ACTIVE);
-        $result = $service->create([
+        $planData = [
             'title'               => sanitize_text_field($data['title']),
-            'slug'                => sanitize_title($data['slug'] ?? ''),
             'description'         => sanitize_textarea_field($data['description'] ?? ''),
             'status'              => $status,
             'level'               => (int) ($data['level'] ?? 0),
@@ -66,7 +65,12 @@ final class PlanWriteController
             'duration_days'       => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
             'trial_days'          => (int) ($data['trial_days'] ?? 0),
             'grace_period_days'   => (int) ($data['grace_period_days'] ?? 0),
-        ]);
+        ];
+        if (array_key_exists('slug', $data)) {
+            $planData['slug'] = (string) $data['slug'];
+        }
+
+        $result = $service->create($planData);
 
         if (isset($result['error'])) {
             return new \WP_REST_Response(['message' => $result['error']], 422);
@@ -89,8 +93,8 @@ final class PlanWriteController
             }
         }
 
-        if (isset($data['slug'])) {
-            $updateData['slug'] = sanitize_title($data['slug']);
+        if (array_key_exists('slug', $data)) {
+            $updateData['slug'] = (string) $data['slug'];
         }
         if (isset($data['status'])) {
             $updateData['status'] = PlanStatus::normalize($data['status'], PlanStatus::ACTIVE);
@@ -176,5 +180,24 @@ final class PlanWriteController
         }
 
         return new \WP_REST_Response(['data' => $result], 201);
+    }
+
+    public static function previewSlug(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $customSlug = $request->get_param('slug');
+        $excludeId = $request->get_param('exclude_id');
+        $result = (new PlanService())->previewSlug(
+            (string) $request->get_param('title'),
+            $customSlug === null ? null : (string) $customSlug,
+            $excludeId === null ? null : (int) $excludeId
+        );
+
+        if ($result['slug'] === '') {
+            return new \WP_REST_Response([
+                'message' => __('The title or custom slug does not contain usable characters.', 'fchub-memberships'),
+            ], 422);
+        }
+
+        return new \WP_REST_Response(['data' => $result]);
     }
 }

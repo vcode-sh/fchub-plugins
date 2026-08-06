@@ -8,6 +8,7 @@ export const plans = {
   remove: (id) => apiClient.del(`admin/plans/${id}`),
   duplicate: (id) => apiClient.post(`admin/plans/${id}/duplicate`),
   options: () => apiClient.get('admin/plans/options'),
+  previewSlug: (params) => apiClient.get('admin/plans/slug-preview', params),
   dripSchedule: (id) => apiClient.get(`admin/plans/${id}/drip-schedule`),
   linkedProducts: (id) => apiClient.get(`admin/plans/${id}/linked-products`),
   linkProduct: (id, data) => apiClient.post(`admin/plans/${id}/link-product`, data),

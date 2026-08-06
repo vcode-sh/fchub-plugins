@@ -175,6 +175,29 @@ window.fetch = async (input, init = {}) => {
   if (url.includes('/admin/plans/options')) {
     return { ok: true, status: 200, json: async () => ({ data: [{ id: 5, title: 'Gold Plan', label: 'Gold Plan' }] }) }
   }
+  if (url.includes('/admin/plans/slug-preview')) {
+    const params = new URL(url).searchParams
+    const source = params.get('slug') || params.get('title') || ''
+    const slug = source
+      .toLowerCase()
+      .normalize('NFD')
+      .replaceAll('ł', 'l')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+
+    if (!slug) {
+      return { ok: false, status: 422, json: async () => ({ message: 'The title or custom slug does not contain usable characters.' }) }
+    }
+
+    return { ok: true, status: 200, json: async () => ({
+      data: {
+        slug,
+        mode: params.get('slug') ? 'custom' : 'automatic',
+        available: true,
+      },
+    }) }
+  }
   if (url.includes('/admin/plans/search-products')) {
     return { ok: true, status: 200, json: async () => ({ data: [] }) }
   }

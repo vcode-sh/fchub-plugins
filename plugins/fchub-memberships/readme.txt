@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, memberships, content-restriction, subscriptions, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -111,10 +111,15 @@ When reporting a problem, include the WordPress, PHP, FluentCart and FCHub Membe
 
 == Changelog ==
 
+= 1.4.2 =
+
+* Fixed automatic plan slugs for Polish accents and other international scripts.
+* Added server-authoritative slug previews, collision checks and safe 100-byte limits.
+* Rejected titles and custom slugs that WordPress cannot turn into a usable identifier.
+
 = 1.4.1 =
 
 * Prepared WordPress.org metadata and dependency declarations.
 * Replaced remote Inter loading with licensed local font subsets.
 * Removed the legacy GitHub updater.
 * Clarified opt-in webhooks, authenticated REST access, data retention and build instructions.
-
