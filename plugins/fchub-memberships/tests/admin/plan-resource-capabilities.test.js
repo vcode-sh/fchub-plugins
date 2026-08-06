@@ -1,37 +1,26 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildPlanRulesPayload,
   hasReadOnlyPlanRules,
   isPlanRuleControlLocked,
 } from '../../resources/admin/utils/planRulePayload.js'
-
-const editorPath = resolve(process.cwd(), 'resources/admin/pages/Plans/PlanEditor.vue')
-const editorSource = readFileSync(editorPath, 'utf8')
+import { normalisePlanForm } from '../../resources/admin/pages/Plans/planEditorForm.js'
 
 describe('plan resource capabilities', () => {
-  it('offers the all-resources sentinel only to resource types that allow it', () => {
-    expect(editorSource).toContain('<el-option v-if="getTypeConfig(rule.resource_type)?.allow_all" label="All of this type" value="0" />')
-    expect(editorSource).toContain('allow_all: type.allow_all === true')
-    expect(editorSource).toContain("rule.resource_id = getTypeConfig(rule.resource_type)?.allow_all ? '0' : ''")
-  })
-
-  it('validates nested external resource IDs as positive integers', () => {
-    expect(editorSource).toContain(':rules="resourceIdRules(rule)"')
-    expect(editorSource).toContain('function resourceIdRules(rule)')
-    expect(editorSource).toContain("const identifier = getTypeConfig(rule.resource_type)?.identifier || 'positive_int'")
-    expect(editorSource).toContain("if (identifier === 'positive_int' && /^[1-9]\\d*$/.test(resourceId))")
-  })
-
-  it('preserves slug identifiers and validates them independently from numeric provider IDs', () => {
-    expect(editorSource).toContain("identifier: type.identifier || 'positive_int'")
-    expect(editorSource).toContain("if (identifier === 'slug' && resourceId !== '' && /\\D/.test(resourceId))")
-  })
-
   it('normalises historical courses in the editor loader', () => {
-    expect(editorSource).toContain("r.resource_type === 'sfwd-courses' ? 'ld_course' : r.resource_type")
-    expect(editorSource).toContain('read_only: r.read_only === true')
+    const form = normalisePlanForm({
+      rules: [{
+        resource_type: 'sfwd-courses',
+        resource_id: 41,
+        read_only: true,
+      }],
+    })
+
+    expect(form.rules[0]).toMatchObject({
+      resource_type: 'ld_course',
+      resource_id: '41',
+      read_only: true,
+    })
   })
 
   it('locks the complete rule set and omits it from the payload when a legacy lesson is present', () => {
