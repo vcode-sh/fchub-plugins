@@ -135,5 +135,4 @@ final class ItemsController
             ],
         ]);
     }
-
 }
