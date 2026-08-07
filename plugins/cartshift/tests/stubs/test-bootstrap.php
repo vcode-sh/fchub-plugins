@@ -862,7 +862,18 @@ if (!class_exists('wpdb')) {
         public function get_col(string $query): array
         {
             $GLOBALS['_cartshift_test_queries'][] = ['get_col', $query];
-            return [];
+
+            // Same escape hatch get_var() and get_results() have had all along.
+            // Without it a get_col() always answered "no rows", which reads as
+            // "nothing survives" to any caller asking which of a set of ids is
+            // still there — a test could then only ever exercise the
+            // everything-is-missing branch and would pass against code that
+            // never looked.
+            if (isset($GLOBALS['_cartshift_test_get_col_callback'])) {
+                return ($GLOBALS['_cartshift_test_get_col_callback'])($query);
+            }
+
+            return $GLOBALS['_cartshift_test_get_col_return'] ?? [];
         }
 
         public function get_results(string $query, string $output = OBJECT): array

@@ -68,7 +68,12 @@ final class ScopePreview
         return [
             'scope'        => $scope->toArray(),
             'counts'       => $counts,
-            'consequences' => (new ScopeConsequences($this->resolver))->all(),
+            // Filtered by the same list the counts are: a consequence of
+            // migrating orders is not a fact about a run that migrates no
+            // orders. The caller resolves dependencies before it gets here,
+            // so ticking Orders alone still reports the product and customer
+            // consequences that run will produce.
+            'consequences' => (new ScopeConsequences($this->resolver))->all($entityTypes),
             'closure'      => $this->closure($scope),
             // Force the closure to be resolved before asking whether it
             // exceeded the limit — exceedsClosureLimit() does this itself,
