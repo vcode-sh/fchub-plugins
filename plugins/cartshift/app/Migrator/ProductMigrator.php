@@ -604,6 +604,7 @@ final class ProductMigrator extends AbstractMigrator
 
         $types = $this->getProductTypes();
         $placeholders = implode(',', array_fill(0, count($types), '%s'));
+        $selection = $this->scopeResolver()->productPredicate('p.ID');
 
         return (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*)
@@ -617,8 +618,9 @@ final class ProductMigrator extends AbstractMigrator
                    INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
                    WHERE tt.taxonomy = 'product_type'
                      AND t.slug IN ({$placeholders})
-               )",
-            ...$types,
+               )"
+            . $selection->andSql(),
+            ...[...$types, ...$selection->values()],
         ));
     }
 
@@ -744,6 +746,7 @@ final class ProductMigrator extends AbstractMigrator
 
         $types = $this->getProductTypes();
         $placeholders = implode(',', array_fill(0, count($types), '%s'));
+        $selection = $this->scopeResolver()->productPredicate('p.ID');
 
         $ids = $wpdb->get_col($wpdb->prepare(
             "SELECT p.ID
@@ -758,10 +761,11 @@ final class ProductMigrator extends AbstractMigrator
                    INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
                    WHERE tt.taxonomy = 'product_type'
                      AND t.slug IN ({$placeholders})
-               )
-             ORDER BY p.ID ASC
+               )"
+            . $selection->andSql()
+            . " ORDER BY p.ID ASC
              LIMIT %d",
-            ...[$afterId, ...$types, $limit],
+            ...[$afterId, ...$types, ...$selection->values(), $limit],
         ));
 
         return array_map(intval(...), $ids);

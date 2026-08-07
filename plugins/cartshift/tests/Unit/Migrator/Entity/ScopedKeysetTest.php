@@ -5,13 +5,19 @@ declare(strict_types=1);
 namespace CartShift\Tests\Unit\Migrator\Entity;
 
 use CartShift\Domain\Scope\MigrationScope;
+use CartShift\Migrator\CouponMigrator;
 use CartShift\Migrator\OrderMigrator;
+use CartShift\Migrator\ProductMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Tests\Unit\PluginTestCase;
 
 require_once dirname(__DIR__, 3) . '/stubs/EntityMigratorStubs.php';
+require_once dirname(__DIR__, 3) . '/stubs/ProductMigratorStubs.php';
+// wc_get_products() lives in HttpCliStubs despite the name — see
+// KeysetSourceQueryTest's header comment.
+require_once dirname(__DIR__, 3) . '/stubs/HttpCliStubs.php';
 
 /**
  * A scope predicate is an extra conjunct in the keyset query, never a filter
@@ -111,12 +117,83 @@ final class ScopedKeysetTest extends PluginTestCase
         $this->assertLessThan(20, $guard, 'The walk must terminate.');
     }
 
+    public function testTheProductIdPageQualifiesTheScopeColumnAgainstTheJoin(): void
+    {
+        $db = $this->recordingWpdb([12, 44]);
+        $migrator = $this->productMigrator(['mode' => 'explicit', 'product_ids' => [12, 44]]);
+
+        $migrator->fetchBatch(null, 5);
+
+        $this->assertStringContainsString('p.ID IN (12, 44)', $db->lastQuery);
+        $this->assertStringContainsString('ORDER BY p.ID ASC', $db->lastQuery);
+    }
+
+    public function testADateScopeLeavesTheCatalogueAlone(): void
+    {
+        // Open question 1 in the design spec, answered: "everything from a date"
+        // takes the whole catalogue. An order pointing at a product that never
+        // arrived is a worse outcome than an unused product in the catalogue.
+        $db = $this->recordingWpdb([12]);
+        $migrator = $this->productMigrator(['mode' => 'since', 'since' => '2024-03-01']);
+
+        $migrator->fetchBatch(null, 5);
+
+        $this->assertStringNotContainsString('date_created_gmt', $db->lastQuery);
+        $this->assertStringNotContainsString('p.ID IN', $db->lastQuery);
+    }
+
+    public function testTheCouponIdPageIsUnchangedUnderEveryScope(): void
+    {
+        // Coupons travel whole under every mode. The predicate is called so the
+        // rule lives in code, and it must contribute nothing to the query.
+        $db = $this->recordingWpdb([]);
+        $this->couponMigrator(['mode' => 'explicit', 'product_ids' => [12]])->fetchBatch(null, 5);
+        $scoped = $db->lastQuery;
+
+        $db = $this->recordingWpdb([]);
+        $this->couponMigrator(['mode' => 'everything'])->fetchBatch(null, 5);
+
+        $this->assertSame($scoped, $db->lastQuery);
+        $this->assertStringNotContainsString('1 = 0', $scoped);
+        $this->assertStringNotContainsString('IN (12)', $scoped);
+    }
+
     /**
      * @param array<string, mixed> $scope
      */
     private function orderMigrator(array $scope): OrderMigrator
     {
         $migrator = new OrderMigrator(
+            new IdMapRepository(),
+            new MigrationLogRepository(),
+            new MigrationState(),
+        );
+        $migrator->useScope(MigrationScope::fromArray($scope));
+
+        return $migrator;
+    }
+
+    /**
+     * @param array<string, mixed> $scope
+     */
+    private function productMigrator(array $scope): ProductMigrator
+    {
+        $migrator = new ProductMigrator(
+            new IdMapRepository(),
+            new MigrationLogRepository(),
+            new MigrationState(),
+        );
+        $migrator->useScope(MigrationScope::fromArray($scope));
+
+        return $migrator;
+    }
+
+    /**
+     * @param array<string, mixed> $scope
+     */
+    private function couponMigrator(array $scope): CouponMigrator
+    {
+        $migrator = new CouponMigrator(
             new IdMapRepository(),
             new MigrationLogRepository(),
             new MigrationState(),
