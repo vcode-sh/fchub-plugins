@@ -3,38 +3,62 @@
     "file": "chunks/_plugin-vue_export-helper-YNHJW7-q.js",
     "name": "_plugin-vue_export-helper"
   },
+  "_message-box-C5q2_fRN.js": {
+    "file": "chunks/message-box-C5q2_fRN.js",
+    "name": "message-box",
+    "imports": [
+      "_useApi-CROJJdhE-BlQVSHu_.js"
+    ]
+  },
+  "_rolldown-runtime-hePW80VL.js": {
+    "file": "chunks/rolldown-runtime-hePW80VL.js",
+    "name": "rolldown-runtime"
+  },
+  "_useApi-CROJJdhE-BlQVSHu_.js": {
+    "file": "chunks/useApi-CROJJdhE-BlQVSHu_.js",
+    "name": "useApi-CROJJdhE",
+    "imports": [
+      "_rolldown-runtime-hePW80VL.js"
+    ]
+  },
   "resources/admin/main.js": {
-    "file": "fchub-portal-extender-admin-DhrvCZqk.js",
+    "file": "fchub-portal-extender-admin-qG4W2vls.js",
     "name": "main",
     "src": "resources/admin/main.js",
     "isEntry": true,
+    "imports": [
+      "_rolldown-runtime-hePW80VL.js",
+      "_useApi-CROJJdhE-BlQVSHu_.js",
+      "_message-box-C5q2_fRN.js"
+    ],
     "dynamicImports": [
       "resources/admin/pages/EndpointList.vue",
       "resources/admin/pages/EndpointEditor.vue"
     ]
   },
   "resources/admin/pages/EndpointEditor.vue": {
-    "file": "chunks/EndpointEditor-Cvh9AyiT.js",
+    "file": "chunks/EndpointEditor-CZ8b0Tz8.js",
     "name": "EndpointEditor",
     "src": "resources/admin/pages/EndpointEditor.vue",
     "isDynamicEntry": true,
     "imports": [
-      "resources/admin/main.js",
+      "_useApi-CROJJdhE-BlQVSHu_.js",
       "__plugin-vue_export-helper-YNHJW7-q.js"
     ]
   },
   "resources/admin/pages/EndpointList.vue": {
-    "file": "chunks/EndpointList-Bbl0LkKC.js",
+    "file": "chunks/EndpointList-BsUBkjY9.js",
     "name": "EndpointList",
     "src": "resources/admin/pages/EndpointList.vue",
     "isDynamicEntry": true,
     "imports": [
-      "resources/admin/main.js",
+      "_useApi-CROJJdhE-BlQVSHu_.js",
+      "_message-box-C5q2_fRN.js",
       "__plugin-vue_export-helper-YNHJW7-q.js"
     ]
   },
   "style.css": {
-    "file": "assets/style-CgMp2fAw.css",
+    "file": "assets/style-hC4eHREP.css",
     "src": "style.css"
   }
 }
