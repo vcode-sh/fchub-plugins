@@ -227,6 +227,30 @@ final class CustomerCursorBoundaryTest extends PluginTestCase
         $this->assertStringContainsString('1 = 0', $db->lastRegisteredQuery);
     }
 
+    public function testTheRegisteredCountMemoDoesNotSurviveAScopeChange(): void
+    {
+        // The registered total is memoised, and the memo is now scope-dependent.
+        // A stale unscoped total surviving useScope() is invisible: the progress
+        // bar simply reports a size nobody asked for.
+        $this->stubSources([], []);
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): int {
+            if (!str_contains($query, 'COUNT(DISTINCT customer_id)')) {
+                return 0;
+            }
+
+            return str_contains($query, 'customer_id IN (') ? 2 : 11;
+        };
+
+        $migrator = $this->migrator();
+
+        $this->assertSame(11, $migrator->count());
+
+        $migrator->useScope(MigrationScope::fromArray(['mode' => 'explicit', 'customer_ids' => [7, 19]]));
+
+        $this->assertSame(2, $migrator->count());
+    }
+
     // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────

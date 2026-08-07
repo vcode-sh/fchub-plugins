@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use CartShift\Domain\Mapping\CustomerMapper;
 use CartShift\Domain\Migration\GuestCustomerFactory;
+use CartShift\Domain\Scope\MigrationScope;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -41,6 +42,20 @@ final class CustomerMigrator extends AbstractMigrator
         parent::__construct($idMap, $log, $migrationState, $batchSize);
         $this->customerMapper = new CustomerMapper($idMap);
         $this->guestCustomers = new GuestCustomerFactory($idMap, $this->customerMapper);
+    }
+
+    /**
+     * The registered total is scope-dependent, so the memo cannot outlive the
+     * scope that produced it. /preview asks one migrator instance for counts
+     * under more than one scope, and a stale unscoped total there reports a
+     * migration size nobody asked for.
+     */
+    #[\Override]
+    public function useScope(MigrationScope $scope): void
+    {
+        parent::useScope($scope);
+
+        $this->registeredCount = null;
     }
 
     #[\Override]
