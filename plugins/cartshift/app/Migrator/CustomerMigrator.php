@@ -7,6 +7,7 @@ namespace CartShift\Migrator;
 defined('ABSPATH') || exit;
 
 use CartShift\Domain\Mapping\CustomerMapper;
+use CartShift\Domain\Migration\GuestCustomerFactory;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -26,6 +27,8 @@ final class CustomerMigrator extends AbstractMigrator
 
     private readonly CustomerMapper $customerMapper;
 
+    private readonly GuestCustomerFactory $guestCustomers;
+
     /** @var int|null Cached registered customer count */
     private ?int $registeredCount = null;
 
@@ -37,6 +40,7 @@ final class CustomerMigrator extends AbstractMigrator
     ) {
         parent::__construct($idMap, $log, $migrationState, $batchSize);
         $this->customerMapper = new CustomerMapper($idMap);
+        $this->guestCustomers = new GuestCustomerFactory($idMap, $this->customerMapper);
     }
 
     #[\Override]
@@ -419,6 +423,11 @@ final class CustomerMigrator extends AbstractMigrator
     /**
      * Process a guest customer.
      * FIX C6: use email string as wc_id (VARCHAR), not crc32 hash.
+     *
+     * The building itself lives in GuestCustomerFactory, because OrderMigrator
+     * needs precisely this behaviour for an order whose registered customer was
+     * never migrated. What stays here is the reporting: the factory decides what
+     * happened, this decides how it reads in the log.
      */
     private function processGuest(array $guestData): int|false
     {
@@ -429,20 +438,6 @@ final class CustomerMigrator extends AbstractMigrator
             return false;
         }
 
-        // FIX C9: when mapping existing FC customer, store with created_by_migration=false.
-        $existing = Customer::query()->where('email', $email)->first();
-        if ($existing) {
-            $this->idMap->store(
-                Constants::ENTITY_GUEST_CUSTOMER,
-                $email,
-                $existing->id,
-                $this->migrationId(),
-                false,
-            );
-            $this->writeLog($email, 'skipped', 'Guest customer already exists in FluentCart.', MigrationErrorCode::AlreadyExistsInFluentCart);
-            return false;
-        }
-
         // Find the first order for this guest to build mapped data.
         $order = $this->findFirstGuestOrder($email);
         if (!$order) {
@@ -450,38 +445,30 @@ final class CustomerMigrator extends AbstractMigrator
             return false;
         }
 
-        $mapped = $this->customerMapper->mapGuest($order);
+        $built = $this->guestCustomers->fromOrder($order, $this->migrationId());
 
-        $customer = Customer::query()->create($mapped['customer']);
-        $this->idMap->store(
-            Constants::ENTITY_GUEST_CUSTOMER,
-            $email,
-            $customer->id,
-            $this->migrationId(),
-            true,
-        );
+        if ($built === null) {
+            $this->writeLog($email, 'error', 'No order found for guest email.', MigrationErrorCode::NoOrderForGuest);
+            return false;
+        }
 
-        // FIX C7: compound keys for addresses.
-        foreach ($mapped['addresses'] as $addressData) {
-            $addressData['customer_id'] = $customer->id;
-            $address = CustomerAddresses::query()->create($addressData);
-            $addressKey = "{$email}_{$addressData['type']}";
-            $this->idMap->store(
-                Constants::ENTITY_CUSTOMER_ADDRESS,
-                $addressKey,
-                $address->id,
-                $this->migrationId(),
-                true,
-            );
+        if ($built['outcome'] === GuestCustomerFactory::OUTCOME_ADOPTED) {
+            $this->writeLog($email, 'skipped', 'Guest customer already exists in FluentCart.', MigrationErrorCode::AlreadyExistsInFluentCart);
+            return false;
+        }
+
+        if ($built['outcome'] === GuestCustomerFactory::OUTCOME_ALREADY_MAPPED) {
+            $this->writeLog($email, 'skipped', 'Guest customer already migrated.', MigrationErrorCode::AlreadyMigrated);
+            return false;
         }
 
         $this->writeLog($email, 'success', sprintf(
             'Migrated guest customer "%s" (FC ID: %d).',
             $email,
-            $customer->id,
+            $built['id'],
         ));
 
-        return $customer->id;
+        return $built['id'];
     }
 
     /**

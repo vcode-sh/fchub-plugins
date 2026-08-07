@@ -7,6 +7,7 @@ namespace CartShift\Migrator;
 defined('ABSPATH') || exit;
 
 use CartShift\Domain\Mapping\OrderMapper;
+use CartShift\Domain\Migration\GuestCustomerFactory;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -25,6 +26,8 @@ final class OrderMigrator extends AbstractMigrator
 {
     private readonly OrderMapper $orderMapper;
 
+    private readonly GuestCustomerFactory $guestCustomers;
+
     /** @var int|null Highest order ID covered by the ID page fetchBatch() last read. */
     private ?int $pageEndCursor = null;
 
@@ -38,6 +41,7 @@ final class OrderMigrator extends AbstractMigrator
 
         $currency = get_woocommerce_currency();
         $this->orderMapper = new OrderMapper($idMap, $currency);
+        $this->guestCustomers = new GuestCustomerFactory($idMap);
     }
 
     #[\Override]
@@ -260,30 +264,20 @@ final class OrderMigrator extends AbstractMigrator
             return false;
         }
 
-        // FIX C4: validate customer_id FK before creating order.
-        $wcCustomerId = $wcOrder->get_customer_id();
-        if ($wcCustomerId > 0) {
-            $fcCustomerId = $this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $wcCustomerId);
-            if (!$fcCustomerId) {
-                // Try guest lookup by email.
-                $email = $wcOrder->get_billing_email();
-                $fcCustomerId = $email
-                    ? $this->idMap->getFcId(Constants::ENTITY_GUEST_CUSTOMER, $email)
-                    : null;
-
-                if (!$fcCustomerId) {
-                    $this->writeLog(
-                        $wcId,
-                        'warning',
-                        sprintf('Customer ID %d not found in ID map. Skipping order.', $wcCustomerId),
-                        MigrationErrorCode::CustomerNotFound,
-                    );
-                    return false;
-                }
-            }
-        }
+        // An order is a record of something that already happened, so it
+        // migrates whatever else is missing. Resolve the buyer — rebuilding one
+        // from the order's own billing details if the customer never came
+        // across — before mapping, so the mapper's own lookup finds it.
+        $this->resolveBuyer($wcOrder, $wcId);
 
         $mapped = $this->orderMapper->map($wcOrder);
+
+        // One entry per order, not per line item. A shop with five thousand
+        // orders full of retired products would otherwise write a log nobody can
+        // read, to say one thing five times per order.
+        foreach ($this->orderMapper->getCodedWarnings() as $warning) {
+            $this->writeLog($wcId, 'warning', $warning['message'], $warning['code']);
+        }
 
         // 1. Create the FC order.
         $fcOrder = Order::query()->create($mapped['order']);
@@ -357,6 +351,86 @@ final class OrderMigrator extends AbstractMigrator
         ));
 
         return $fcOrder->id;
+    }
+
+    /**
+     * Make sure the order has a buyer to point at, and say so when one had to be
+     * invented.
+     *
+     * Until 1.2.1 an order whose customer was not in the ID map was skipped
+     * outright, which is the worst thing on the list: revenue disappears from the
+     * migration and the only trace is one line in a log nobody reads. A past
+     * order is a record — the money has to add up, and a missing link to a
+     * customer profile does not make the order untrue.
+     *
+     * So the buyer is rebuilt from the billing details already on the order, by
+     * the same GuestCustomerFactory that handles guest checkouts, and stored
+     * under ENTITY_GUEST_CUSTOMER keyed by email. That key is what makes the
+     * buyer's second order reuse the first rebuild instead of creating a
+     * duplicate customer per order.
+     *
+     * An order with no billing email has nothing to rebuild from, and
+     * fct_orders.customer_id is nullable, so it migrates with no customer.
+     * Never a skip.
+     *
+     * @return int|null The FluentCart customer ID, if there is one.
+     */
+    private function resolveBuyer(\WC_Order $wcOrder, int $wcId): ?int
+    {
+        $wcCustomerId = $wcOrder->get_customer_id();
+
+        if ($wcCustomerId > 0) {
+            $fcCustomerId = $this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $wcCustomerId);
+
+            if ($fcCustomerId) {
+                return $fcCustomerId;
+            }
+        }
+
+        $built = $this->guestCustomers->fromOrder($wcOrder, $this->migrationId());
+
+        if ($built === null) {
+            $this->writeLog(
+                $wcId,
+                'warning',
+                $wcCustomerId > 0
+                    ? sprintf(
+                        'Customer ID %d was not migrated and the order carries no billing email to rebuild a '
+                        . 'buyer from. Migrated with no customer so the order and its revenue survive.',
+                        $wcCustomerId,
+                    )
+                    : 'The order carries no billing email, so there is no buyer to attach. Migrated with no '
+                        . 'customer so the order and its revenue survive.',
+                MigrationErrorCode::CustomerNotFound,
+            );
+
+            return null;
+        }
+
+        if ($built['outcome'] === GuestCustomerFactory::OUTCOME_ALREADY_MAPPED) {
+            return $built['id'];
+        }
+
+        $this->writeLog(
+            $wcId,
+            'warning',
+            $wcCustomerId > 0
+                ? sprintf(
+                    'Customer ID %d was not migrated. The buyer was rebuilt from the order\'s own billing '
+                    . 'details as "%s" (FC ID: %d), so the order keeps its revenue.',
+                    $wcCustomerId,
+                    $built['email'],
+                    $built['id'],
+                )
+                : sprintf(
+                    'The buyer was rebuilt from the order\'s own billing details as "%s" (FC ID: %d).',
+                    $built['email'],
+                    $built['id'],
+                ),
+            MigrationErrorCode::CustomerRebuiltFromOrder,
+        );
+
+        return $built['id'];
     }
 
     /**

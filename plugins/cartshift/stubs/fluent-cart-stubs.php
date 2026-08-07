@@ -60,6 +60,39 @@ abstract class Model
 
     public static function boot(): void {}
     public static function booted(): void {}
+
+    /**
+     * Route a static model call to a test-supplied handler, if one is installed.
+     *
+     * These stubs exist so the IDE can resolve FluentCart types without the
+     * plugin present, and every static entry point on a real model — query(),
+     * create(), where() — is a docblock @method with nothing behind it. That is
+     * fine for a suite that stops before the first model call, and useless for
+     * one that has to assert what a migrated record looks like.
+     *
+     * So a test may install a handler under `_cartshift_test_fc_model_handler`
+     * and get a working fake ORM for the duration of that test. Nothing is
+     * installed by default: with no handler this throws, which is the same
+     * "there is no FluentCart here" outcome as before, only with a better
+     * message. The handler is a `_cartshift_test_*` global, so PluginTestCase
+     * clears it between tests and no test inherits another's fake database.
+     *
+     * @param list<mixed> $arguments
+     */
+    public static function __callStatic(string $method, array $arguments): mixed
+    {
+        $handler = $GLOBALS['_cartshift_test_fc_model_handler'] ?? null;
+
+        if (is_callable($handler)) {
+            return $handler(static::class, $method, $arguments);
+        }
+
+        throw new \BadMethodCallException(sprintf(
+            '%s::%s() is an IDE stub with no implementation. FluentCart is not loaded.',
+            static::class,
+            $method,
+        ));
+    }
 }
 
 /**

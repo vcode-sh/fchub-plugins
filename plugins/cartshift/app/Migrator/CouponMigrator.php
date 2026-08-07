@@ -168,6 +168,21 @@ final class CouponMigrator extends AbstractMigrator
 
         $code = self::normalizeCode((string) ($this->couponMapper->map($coupon)['code'] ?? ''));
 
+        // Everything the mapper flagged, flushed here so the dry run reports it
+        // in the same order and under the same conditions the real run does.
+        // An unrecognised discount type is the exception: the block further down
+        // already says that in the dry run's own words. The rest — chiefly a
+        // coupon whose restrictions collapsed, which is about to arrive
+        // disabled — would otherwise only be discovered after the real run had
+        // written the row.
+        foreach ($this->couponMapper->getCodedWarnings() as $warning) {
+            if ($warning['code'] === MigrationErrorCode::UnknownCouponType) {
+                continue;
+            }
+
+            $this->writeLog($wcId, 'dry-run', 'dry-run: ' . $warning['message'], $warning['code']);
+        }
+
         if ($code === '') {
             $this->writeLog($wcId, 'dry-run', 'dry-run: coupon code is empty, would fail.', MigrationErrorCode::CouponCodeMissing);
             return false;

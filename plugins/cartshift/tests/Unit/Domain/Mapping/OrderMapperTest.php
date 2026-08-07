@@ -652,6 +652,93 @@ final class OrderMapperTest extends PluginTestCase
         );
     }
 
+    /**
+     * The Polish tax ID is not decoration. fchub-fakturownia decides business
+     * versus consumer invoice purely on whether it finds one at
+     * `other_data.nip` on the billing address (app/Handler/InvoiceHandler.php:124),
+     * and Polish B2B invoicing legally requires the number — so an order that
+     * arrives without it can never be invoiced to a company.
+     */
+    public function testTheBillingNipTravelsToTheBillingAddressMeta(): void
+    {
+        $order = $this->createOrder(['meta' => ['_billing_nip' => '5291831115']]);
+
+        $billing = $this->billingAddress($this->mapper->map($order));
+
+        $this->assertSame('5291831115', $billing['meta']['other_data']['nip']);
+    }
+
+    public function testAnOrderWithNoNipGetsNoNipKeyAtAll(): void
+    {
+        $order = $this->createOrder(['meta' => []]);
+
+        $billing = $this->billingAddress($this->mapper->map($order));
+
+        $this->assertArrayNotHasKey('nip', $billing['meta']['other_data'] ?? []);
+    }
+
+    public function testAnEmptyNipIsNotCarriedAcrossAsAnEmptyString(): void
+    {
+        $order = $this->createOrder(['meta' => ['_billing_nip' => '  ']]);
+
+        $billing = $this->billingAddress($this->mapper->map($order));
+
+        $this->assertArrayNotHasKey('nip', $billing['meta']['other_data'] ?? []);
+    }
+
+    public function testTheNipSitsAlongsidePhoneAndCompanyRatherThanReplacingThem(): void
+    {
+        $order = $this->createOrder([
+            'billing_phone'   => '+48 500 100 200',
+            'billing_company' => 'Analytical Engines sp. z o.o.',
+            'meta'            => ['_billing_nip' => '5291831115'],
+        ]);
+
+        $otherData = $this->billingAddress($this->mapper->map($order))['meta']['other_data'];
+
+        $this->assertSame('+48 500 100 200', $otherData['phone']);
+        $this->assertSame('Analytical Engines sp. z o.o.', $otherData['company_name']);
+        $this->assertSame('5291831115', $otherData['nip']);
+    }
+
+    public function testTheShippingAddressIsNotGivenANip(): void
+    {
+        $order = $this->createOrder([
+            'shipping_first_name' => 'John',
+            'shipping_address_1'  => '123 Main St',
+            'shipping_country'    => 'PL',
+            'meta'                => ['_billing_nip' => '5291831115'],
+        ]);
+
+        $shipping = null;
+        foreach ($this->mapper->map($order)['addresses'] as $address) {
+            if ($address['type'] === 'shipping') {
+                $shipping = $address;
+            }
+        }
+
+        $this->assertNotNull($shipping);
+        $this->assertArrayNotHasKey('nip', $shipping['meta']['other_data'] ?? []);
+    }
+
+    /**
+     * The billing address out of a mapped order.
+     *
+     * @param array{addresses: array<int, array<string, mixed>>} $mapped
+     *
+     * @return array<string, mixed>
+     */
+    private function billingAddress(array $mapped): array
+    {
+        foreach ($mapped['addresses'] as $address) {
+            if (($address['type'] ?? '') === 'billing') {
+                return $address;
+            }
+        }
+
+        $this->fail('The mapper produced no billing address.');
+    }
+
     private function createOrder(array $overrides = []): \WC_Order
     {
         $order = new \WC_Order();

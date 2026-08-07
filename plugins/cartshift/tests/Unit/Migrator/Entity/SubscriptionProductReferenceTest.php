@@ -13,9 +13,14 @@ use CartShift\Tests\Unit\PluginTestCase;
 require_once dirname(__DIR__, 3) . '/stubs/EntityMigratorStubs.php';
 
 /**
- * validateProductReferences() used to `break` after the first line item, so a
+ * missingProductReference() used to `break` after the first line item, so a
  * multi-product subscription could sail through validation while pointing at
  * products that were never migrated.
+ *
+ * Since 1.2.1 a missing reference no longer means "skip" — processRecord()
+ * migrates the subscription paused instead. What this file holds is the
+ * detection: every line item is examined, and the description names the item
+ * that failed so the log says which one.
  */
 final class SubscriptionProductReferenceTest extends PluginTestCase
 {
@@ -46,8 +51,8 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
         ]);
 
         $this->assertFalse(
-            $this->validate($subscription),
-            'A fully mapped subscription must not be skipped',
+            $this->hasMissingReference($subscription),
+            'A fully mapped subscription has nothing missing',
         );
     }
 
@@ -62,8 +67,8 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
         ]);
 
         $this->assertTrue(
-            $this->validate($subscription),
-            'The second line item references an unmigrated product; the subscription must be skipped',
+            $this->hasMissingReference($subscription),
+            'The second line item references an unmigrated product; that must be detected',
         );
     }
 
@@ -77,7 +82,7 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
             new \CartShiftTestOrderItem(303, 0, 'Monthly Biscuits'),
         ]);
 
-        $this->assertTrue($this->validate($subscription));
+        $this->assertTrue($this->hasMissingReference($subscription));
     }
 
     public function testUnmappedVariationOnALaterItemIsCaught(): void
@@ -90,7 +95,7 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
             new \CartShiftTestOrderItem(202, 502, 'Tea — Large'),
         ]);
 
-        $this->assertTrue($this->validate($subscription));
+        $this->assertTrue($this->hasMissingReference($subscription));
     }
 
     public function testWarningNamesTheOffendingItem(): void
@@ -102,9 +107,7 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
             new \CartShiftTestOrderItem(202, 0, 'Monthly Tea'),
         ]);
 
-        $this->validate($subscription);
-
-        $message = $this->lastLoggedMessage();
+        $message = (string) $this->describeMissing($subscription);
 
         $this->assertStringContainsString('202', $message);
         $this->assertStringContainsString('Monthly Tea', $message);
@@ -120,27 +123,35 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
             new \CartShiftTestOrderItem(202, 0, ''),
         ]);
 
-        $this->validate($subscription);
-
-        $this->assertStringContainsString('#2', $this->lastLoggedMessage());
+        $this->assertStringContainsString('#2', (string) $this->describeMissing($subscription));
     }
 
     public function testAnEmptySubscriptionPasses(): void
     {
         $subscription = new \CartShiftTestSubscription(9007, []);
 
-        $this->assertFalse($this->validate($subscription));
+        $this->assertFalse($this->hasMissingReference($subscription));
     }
 
     // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────
 
-    private function validate(object $subscription): bool
+    private function describeMissing(object $subscription): ?string
     {
-        $method = new \ReflectionMethod($this->migrator, 'validateProductReferences');
+        $method = new \ReflectionMethod($this->migrator, 'missingProductReference');
 
-        return (bool) $method->invoke($this->migrator, $subscription, $subscription->get_id());
+        $described = $method->invoke($this->migrator, $subscription);
+
+        return is_string($described) ? $described : null;
+    }
+
+    /**
+     * True when some product or variation on the subscription did not migrate.
+     */
+    private function hasMissingReference(object $subscription): bool
+    {
+        return $this->describeMissing($subscription) !== null;
     }
 
     /**
@@ -183,18 +194,5 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
 
             return $GLOBALS['_cartshift_test_id_map'][$matches[1]][$matches[2]] ?? null;
         };
-    }
-
-    private function lastLoggedMessage(): string
-    {
-        $inserts = array_values(array_filter(
-            $GLOBALS['_cartshift_test_queries'] ?? [],
-            static fn (array $entry): bool => $entry[0] === 'insert'
-                && isset($entry[2]['message']),
-        ));
-
-        $this->assertNotEmpty($inserts, 'Nothing was written to the migration log');
-
-        return (string) end($inserts)[2]['message'];
     }
 }

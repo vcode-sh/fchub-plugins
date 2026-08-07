@@ -512,6 +512,8 @@ if (!class_exists('WC_Order')) {
         protected array $items = [];
         protected array $shipping_items = [];
         protected array $fee_items = [];
+        protected array $coupon_items = [];
+        protected array $refunds = [];
         protected string $billing_first_name = '';
         protected string $billing_last_name = '';
         protected string $billing_address_1 = '';
@@ -536,6 +538,8 @@ if (!class_exists('WC_Order')) {
         protected string $transaction_id = '';
         protected string $customer_note = '';
         protected string $customer_ip_address = '';
+        protected string $shipping_phone = '';
+        protected string $order_key = '';
         protected ?object $date_created = null;
         protected ?object $date_paid = null;
         protected ?object $date_completed = null;
@@ -563,8 +567,16 @@ if (!class_exists('WC_Order')) {
             if ($type === 'fee') {
                 return $this->fee_items;
             }
+            // Coupon lines are their own collection. Falling through to the
+            // product lines made migrateAppliedCoupons() read line items as
+            // coupons, which is not a thing WooCommerce would ever do.
+            if ($type === 'coupon') {
+                return $this->coupon_items;
+            }
             return $this->items;
         }
+        /** @return list<object> */
+        public function get_refunds(): array { return $this->refunds; }
         public function get_billing_first_name(): string { return $this->billing_first_name; }
         public function get_billing_last_name(): string { return $this->billing_last_name; }
         public function get_billing_address_1(): string { return $this->billing_address_1; }
@@ -589,6 +601,8 @@ if (!class_exists('WC_Order')) {
         public function get_transaction_id(): string { return $this->transaction_id; }
         public function get_customer_note(): string { return $this->customer_note; }
         public function get_customer_ip_address(): string { return $this->customer_ip_address; }
+        public function get_shipping_phone(): string { return $this->shipping_phone; }
+        public function get_order_key(): string { return $this->order_key; }
         public function get_date_created(): ?object { return $this->date_created; }
         public function get_date_paid(): ?object { return $this->date_paid; }
         public function get_date_completed(): ?object { return $this->date_completed; }

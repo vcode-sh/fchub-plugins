@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CartShift\Tests\Unit\Migrator\Entity;
 
 use CartShift\Domain\Mapping\CouponMapper;
+use CartShift\Domain\Mapping\OrderMapper;
 use CartShift\Domain\Mapping\ProductMapper;
 use CartShift\Domain\Mapping\SubscriptionMapper;
 use CartShift\Migrator\CouponMigrator;
@@ -134,6 +135,38 @@ final class MigrationErrorCodeAttachmentTest extends PluginTestCase
         $migrator->validateRecord(new \WC_Order());
 
         $this->assertLogged(MigrationErrorCode::AlreadyMigrated);
+    }
+
+    /**
+     * The order mapper has always zeroed post_id for an item whose product was
+     * not migrated, which is the right thing to do — the name and the price stay,
+     * so the books balance. What it never did was say so, which made the one
+     * lossy thing about an otherwise perfect order invisible.
+     */
+    public function testTheOrderMapperPairsItsUnlinkedItemWarningWithACode(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): null => null;
+
+        $mapper = new OrderMapper($this->idMap, 'USD');
+
+        $order = new \WC_Order();
+        (new \ReflectionProperty(\WC_Order::class, 'id'))->setValue($order, 71);
+        (new \ReflectionProperty(\WC_Order::class, 'items'))->setValue($order, [
+            new \CartShiftTestOrderItem(202, 0, 'Retired thing'),
+            new \CartShiftTestOrderItem(303, 0, 'Discontinued thing'),
+        ]);
+
+        $mapper->map($order);
+
+        $coded = $mapper->getCodedWarnings();
+
+        $this->assertCount(1, $coded, 'One order is one countable event, whatever the item count.');
+        $this->assertSame(MigrationErrorCode::ProductLinkMissing, $coded[0]['code']);
+        $this->assertSame(
+            $mapper->getWarnings(),
+            array_column($coded, 'message'),
+            'getWarnings() must return plain sentences, as the other mappers do.',
+        );
     }
 
     // ──────────────────────────────────────────────

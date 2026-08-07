@@ -39,11 +39,45 @@ final class CouponMapper
     ];
 
     /**
+     * Restriction lists whose complete loss makes the coupon apply to MORE than
+     * it did in WooCommerce.
+     *
+     * FluentCart reads an empty restriction list as "no restriction", not as
+     * "nothing qualifies" (DiscountService::filterApplicableItems(), around
+     * :306-:345 in 1.6.0: every guard is `if ($list && ...)`). So:
+     *
+     * - `included_products` / `included_categories` emptied — the "only these 3
+     *   clearance items" guard vanishes and the coupon covers the whole shop.
+     * - `excluded_categories` emptied — the excluded category's products can
+     *   still be in FluentCart even when the term is not: migrateCategories()
+     *   skips 'uncategorized' outright and logs TermCreationFailed for any term
+     *   wp_insert_term() refuses, while the products in it migrate perfectly
+     *   happily. The exclusion is lost on goods that are on sale. That widens.
+     *
+     * `excluded_products` is deliberately absent. A product ID that resolves to
+     * nothing is a product that is not in FluentCart at all, so there is no cart
+     * item for the lost exclusion to have protected.
+     */
+    private const array WIDENING_ON_TOTAL_LOSS = [
+        'included_products',
+        'included_categories',
+        'excluded_categories',
+    ];
+
+    /**
      * Warnings collected during the last map() call, each with its code.
      *
      * @var list<array{message: string, code: MigrationErrorCode}>
      */
     private array $warnings = [];
+
+    /**
+     * What each restriction list looked like before and after the ID map, for
+     * the last map() call. Keyed by FluentCart condition key.
+     *
+     * @var array<string, array{original: list<int>, mapped: list<int>}>
+     */
+    private array $restrictionAudit = [];
 
     public function __construct(
         private readonly IdMapRepository $idMap,
@@ -56,7 +90,8 @@ final class CouponMapper
      */
     public function map(\WC_Coupon $coupon): array
     {
-        $this->warnings = [];
+        $this->warnings         = [];
+        $this->restrictionAudit = [];
 
         $wcType = $coupon->get_discount_type();
         $fcType = self::COUPON_TYPE_MAP[$wcType] ?? null;
@@ -93,6 +128,9 @@ final class CouponMapper
             $status = 'expired';
         }
 
+        $status = $this->guardAgainstWidening($coupon, $status);
+        $this->warnAboutNarrowing($coupon);
+
         $mapped = [
             'title'            => $coupon->get_code(),
             'code'             => strtoupper($coupon->get_code()),
@@ -103,7 +141,7 @@ final class CouponMapper
             'stackable'        => $coupon->get_individual_use() ? 'no' : 'yes',
             'priority'         => 10,
             'use_count'        => (int) $coupon->get_usage_count(),
-            'notes'            => $coupon->get_description() ?: '',
+            'notes'            => $this->buildNotes($coupon->get_description() ?: ''),
             'show_on_checkout' => 'no',
             // UTC. FluentCart validates these with `strtotime($startDate) > time()`
             // (DiscountService.php:586, :590); WordPress pins PHP's default timezone to UTC, so a
@@ -197,28 +235,32 @@ final class CouponMapper
             $conditions['free_shipping'] = true;
         }
 
-        // Included products: map WC product IDs to FC product IDs.
-        $wcIncludedProducts = $coupon->get_product_ids();
-        if (!empty($wcIncludedProducts)) {
-            $conditions['included_products'] = $this->mapProductIds($wcIncludedProducts);
-        }
+        // Product and category restrictions, translated through the ID map. Each
+        // list is recorded before and after so map() can tell "narrower than WC"
+        // (fine) from "no restriction at all" (a discount the shop never agreed
+        // to give). Key order is the order FluentCart's own schema lists them in.
+        $restrictions = [
+            'included_products'   => [Constants::ENTITY_PRODUCT, $coupon->get_product_ids()],
+            'excluded_products'   => [Constants::ENTITY_PRODUCT, $coupon->get_excluded_product_ids()],
+            'included_categories' => [Constants::ENTITY_CATEGORY, $coupon->get_product_categories()],
+            'excluded_categories' => [Constants::ENTITY_CATEGORY, $coupon->get_excluded_product_categories()],
+        ];
 
-        // Excluded products: map WC product IDs to FC product IDs.
-        $wcExcludedProducts = $coupon->get_excluded_product_ids();
-        if (!empty($wcExcludedProducts)) {
-            $conditions['excluded_products'] = $this->mapProductIds($wcExcludedProducts);
-        }
+        foreach ($restrictions as $key => [$entityType, $wcIds]) {
+            $wcIds = array_values(array_map(intval(...), (array) $wcIds));
 
-        // Included categories: map WC category IDs to FC category IDs.
-        $wcIncludedCategories = $coupon->get_product_categories();
-        if (!empty($wcIncludedCategories)) {
-            $conditions['included_categories'] = $this->mapCategoryIds($wcIncludedCategories);
-        }
+            if ($wcIds === []) {
+                continue;
+            }
 
-        // Excluded categories: map WC category IDs to FC category IDs.
-        $wcExcludedCategories = $coupon->get_excluded_product_categories();
-        if (!empty($wcExcludedCategories)) {
-            $conditions['excluded_categories'] = $this->mapCategoryIds($wcExcludedCategories);
+            $fcIds = $this->mapIds($entityType, $wcIds);
+
+            $this->restrictionAudit[$key] = [
+                'original' => $wcIds,
+                'mapped'   => $fcIds,
+            ];
+
+            $conditions[$key] = $fcIds;
         }
 
         // Email restrictions: comma-separated string in FC.
@@ -231,18 +273,19 @@ final class CouponMapper
     }
 
     /**
-     * Map an array of WC product IDs to FC product IDs via IdMap.
-     * Skips IDs that have no mapping (unmigrated products).
+     * Map an array of WooCommerce IDs to FluentCart IDs via the ID map.
+     * IDs with no mapping are dropped; what that costs is decided in map().
      *
-     * @param int[] $wcProductIds
-     * @return int[]
+     * @param int[] $wcIds
+     *
+     * @return list<int>
      */
-    private function mapProductIds(array $wcProductIds): array
+    private function mapIds(string $entityType, array $wcIds): array
     {
         $fcIds = [];
 
-        foreach ($wcProductIds as $wcId) {
-            $fcId = $this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcId);
+        foreach ($wcIds as $wcId) {
+            $fcId = $this->idMap->getFcId($entityType, (string) $wcId);
             if ($fcId !== null) {
                 $fcIds[] = $fcId;
             }
@@ -252,23 +295,156 @@ final class CouponMapper
     }
 
     /**
-     * Map an array of WC category IDs to FC category IDs via IdMap.
-     * Skips IDs that have no mapping (unmigrated categories).
+     * Take the coupon out of circulation if migration has turned it into a
+     * shop-wide discount.
      *
-     * @param int[] $wcCategoryIds
-     * @return int[]
+     * "20% off these three clearance items" whose three IDs all fail to resolve
+     * is "20% off everything" in FluentCart, and it is live the moment the row
+     * is written. Nothing about a status of 'disabled' is recoverable from the
+     * outside, which is the point: a human decides what the coupon should have
+     * covered, using the IDs preserved in the notes, and re-enables it.
+     *
+     * 'disabled' rather than 'expired': DiscountService ends its status check
+     * with `if ($status !== 'active')` (1.6.0, :573-:580) so any non-active
+     * value is equally unredeemable, and Coupon::scopeActive() keeps it out of
+     * active listings — but only 'disabled' states the actual reason.
      */
-    private function mapCategoryIds(array $wcCategoryIds): array
+    private function guardAgainstWidening(\WC_Coupon $coupon, string $status): string
     {
-        $fcIds = [];
+        $widened = $this->widenedRestrictions();
 
-        foreach ($wcCategoryIds as $wcId) {
-            $fcId = $this->idMap->getFcId(Constants::ENTITY_CATEGORY, (string) $wcId);
-            if ($fcId !== null) {
-                $fcIds[] = $fcId;
+        if ($widened === []) {
+            return $status;
+        }
+
+        $lost = 0;
+        foreach ($widened as $count) {
+            $lost += $count;
+        }
+
+        $this->warnings[] = [
+            'message' => sprintf(
+                'Coupon "%s" lost every ID in %s (%d WooCommerce %s unmapped), which in FluentCart '
+                . 'means no restriction at all — the coupon would have applied shop-wide. Migrated as '
+                . '"disabled"; the original WooCommerce IDs are in the coupon notes.',
+                $coupon->get_code(),
+                implode(' and ', array_keys($widened)),
+                $lost,
+                $lost === 1 ? 'ID' : 'IDs',
+            ),
+            'code' => MigrationErrorCode::CouponDisabledMissingRestrictions,
+        ];
+
+        return 'disabled';
+    }
+
+    /**
+     * Note the restrictions that came through thinner than they went in.
+     *
+     * A coupon that kept some of its IDs is narrower than it was in WooCommerce,
+     * and so is one whose excluded products are gone: the excluded product is
+     * not in FluentCart to be discounted. Wrong, worth saying out loud, but it
+     * gives nothing away — so the coupon stays exactly as active as it was.
+     */
+    private function warnAboutNarrowing(\WC_Coupon $coupon): void
+    {
+        $widened = $this->widenedRestrictions();
+        $thinned = [];
+
+        foreach ($this->restrictionAudit as $key => $audit) {
+            if (isset($widened[$key])) {
+                continue;
+            }
+
+            $missing = count($audit['original']) - count($audit['mapped']);
+            if ($missing > 0) {
+                $thinned[$key] = $missing;
             }
         }
 
-        return $fcIds;
+        if ($thinned === []) {
+            return;
+        }
+
+        $parts = [];
+        foreach ($thinned as $key => $missing) {
+            $parts[] = sprintf('%s (%d of %d)', $key, $missing, count($this->restrictionAudit[$key]['original']));
+        }
+
+        $this->warnings[] = [
+            'message' => sprintf(
+                'Coupon "%s" could not map every restriction ID: %s. The coupon is still active but '
+                . 'covers less than it did in WooCommerce. The original WooCommerce IDs are in the coupon notes.',
+                $coupon->get_code(),
+                implode(', ', $parts),
+            ),
+            'code' => MigrationErrorCode::CouponRestrictionsNarrowed,
+        ];
+    }
+
+    /**
+     * Restriction lists that had entries and resolved to none, counted by key.
+     *
+     * @return array<string, int>
+     */
+    private function widenedRestrictions(): array
+    {
+        $widened = [];
+
+        foreach (self::WIDENING_ON_TOTAL_LOSS as $key) {
+            $audit = $this->restrictionAudit[$key] ?? null;
+
+            if ($audit !== null && $audit['original'] !== [] && $audit['mapped'] === []) {
+                $widened[$key] = count($audit['original']);
+            }
+        }
+
+        return $widened;
+    }
+
+    /**
+     * The coupon description, plus an audit trail of the restriction IDs when
+     * any of them were lost.
+     *
+     * Whoever has to repair the coupon needs to know what it was restricted to,
+     * and after migration the WooCommerce IDs are the only record of that. They
+     * go in `notes` (fct_coupons.notes is LONGTEXT NOT NULL) because that is the
+     * one field on the coupon a human reads. The description keeps its place at
+     * the top; nothing already there is overwritten.
+     */
+    private function buildNotes(string $description): string
+    {
+        $anyLost = false;
+        foreach ($this->restrictionAudit as $audit) {
+            if (count($audit['mapped']) < count($audit['original'])) {
+                $anyLost = true;
+                break;
+            }
+        }
+
+        if (!$anyLost) {
+            return $description;
+        }
+
+        $lines   = [];
+        $lines[] = '[CartShift] Some WooCommerce coupon restrictions could not be mapped to FluentCart.';
+
+        if ($this->widenedRestrictions() !== []) {
+            $lines[] = 'This coupon was migrated as "disabled": with those restrictions empty, FluentCart '
+                . 'would have applied it to the entire shop. Restore the restrictions, then set it back to active.';
+        }
+
+        foreach ($this->restrictionAudit as $key => $audit) {
+            $lines[] = sprintf(
+                '%s: WooCommerce IDs [%s] -> FluentCart IDs [%s]',
+                $key,
+                implode(', ', $audit['original']),
+                $audit['mapped'] === [] ? 'none' : implode(', ', $audit['mapped']),
+            );
+        }
+
+        $audit = implode("\n", $lines);
+
+        return $description === '' ? $audit : $description . "\n\n" . $audit;
     }
 }

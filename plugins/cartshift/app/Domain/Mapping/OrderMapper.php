@@ -11,10 +11,18 @@ use CartShift\Support\Constants;
 use CartShift\Support\Enums\FcBillingInterval;
 use CartShift\Support\Enums\FcOrderStatus;
 use CartShift\Support\Enums\FcPaymentStatus;
+use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\MoneyHelper;
 
 final class OrderMapper
 {
+    /**
+     * Warnings collected during the last map() call, each with its code.
+     *
+     * @var list<array{message: string, code: MigrationErrorCode}>
+     */
+    private array $warnings = [];
+
     public function __construct(
         private readonly IdMapRepository $idMap,
         private readonly string $currency,
@@ -27,6 +35,8 @@ final class OrderMapper
      */
     public function map(\WC_Order $order): array
     {
+        $this->warnings = [];
+
         $wcStatus   = $order->get_status();
         $customerId = $this->resolveCustomerId($order);
 
@@ -99,6 +109,9 @@ final class OrderMapper
     {
         $items = [];
 
+        /** @var list<string> $unlinked Names of items whose product did not migrate. */
+        $unlinked = [];
+
         foreach ($order->get_items() as $item) {
             /** @var \WC_Order_Item_Product $item */
             if (!($item instanceof \WC_Order_Item_Product)) {
@@ -118,6 +131,17 @@ final class OrderMapper
 
             if (!$fcVariationId && $fcProductId) {
                 $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcProductId);
+            }
+
+            // The item still carries its name and its price, so the order's
+            // books balance; only the link to a product page is gone. That is
+            // the right trade for a record of something that already happened —
+            // but it has never been said out loud, which is the part that was
+            // wrong. Names are collected and reported once for the whole order.
+            if ($wcProductId > 0 && !$fcProductId) {
+                $unlinked[] = $item->get_name() !== ''
+                    ? sprintf('"%s" (WC product %d)', $item->get_name(), $wcProductId)
+                    : sprintf('WC product %d', $wcProductId);
             }
 
             $paymentType = 'onetime';
@@ -177,7 +201,46 @@ final class OrderMapper
             ];
         }
 
+        if ($unlinked !== []) {
+            $this->warnings[] = [
+                'message' => sprintf(
+                    'Order #%d contains %d item(s) whose product was not migrated: %s. The items keep their '
+                    . 'name and price, so the order total is unchanged, but they link to no product in FluentCart.',
+                    $order->get_id(),
+                    count($unlinked),
+                    implode(', ', $unlinked),
+                ),
+                'code' => MigrationErrorCode::ProductLinkMissing,
+            ];
+        }
+
         return $items;
+    }
+
+    /**
+     * Warnings collected during the last map() call.
+     *
+     * Plain sentences, because that is what every existing caller expects.
+     * getCodedWarnings() is the one to reach for when the code matters too.
+     *
+     * @return list<string>
+     */
+    public function getWarnings(): array
+    {
+        return array_map(
+            static fn (array $warning): string => $warning['message'],
+            $this->warnings,
+        );
+    }
+
+    /**
+     * The same warnings, each paired with the reason code it stands for.
+     *
+     * @return list<array{message: string, code: MigrationErrorCode}>
+     */
+    public function getCodedWarnings(): array
+    {
+        return $this->warnings;
     }
 
     /**
@@ -229,6 +292,25 @@ final class OrderMapper
     /**
      * Map billing and shipping addresses.
      */
+    /**
+     * One order meta value as a trimmed string.
+     *
+     * get_meta() hands back '' for an absent key under HPOS and false under some
+     * legacy paths, and a hand-edited row can hold anything at all. Everything
+     * that is not scalar collapses to '', so the caller's "only when non-empty"
+     * test is the only test needed.
+     */
+    private static function stringMeta(\WC_Order $order, string $key): string
+    {
+        $value = $order->get_meta($key);
+
+        if (!is_scalar($value)) {
+            return '';
+        }
+
+        return trim((string) $value);
+    }
+
     private static function mapAddresses(\WC_Order $order): array
     {
         $addresses = [];
@@ -240,6 +322,21 @@ final class OrderMapper
         }
         if ($order->get_billing_company()) {
             $billingMeta['other_data']['company_name'] = $order->get_billing_company();
+        }
+
+        // Polish tax ID. Not decoration: fchub-fakturownia decides business
+        // versus consumer invoice purely on whether this is present
+        // (app/Handler/InvoiceHandler.php:124, reading
+        // Arr::get($billingAddress->meta, 'other_data.nip')), and Polish B2B
+        // invoicing legally requires the number. Dropping it means no migrated
+        // order can ever be invoiced to a company.
+        //
+        // `_billing_nip` is what the WooCommerce-side checkout plugins store it
+        // under; get_meta() reads it through the order's own data store, so it
+        // works under HPOS and legacy post meta alike.
+        $nip = self::stringMeta($order, '_billing_nip');
+        if ($nip !== '') {
+            $billingMeta['other_data']['nip'] = $nip;
         }
 
         $addresses[] = [

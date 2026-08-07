@@ -143,7 +143,14 @@ if (!class_exists('CartShiftTestOrderItem')) {
 
 if (!class_exists('CartShiftTestSubscription')) {
     /**
-     * Minimal stand-in for WC_Subscription — only what the migrator touches.
+     * Stand-in for WC_Subscription.
+     *
+     * It started as "only what the migrator touches", which meant the ID, the
+     * customer and the line items. The gap-policy tests migrate a subscription
+     * for real, so SubscriptionMapper has to be able to read it too — hence the
+     * billing, date and gateway getters below. All of them return the inert
+     * value WooCommerce would return for a subscription with nothing set, so no
+     * existing test sees a different subscription than it did before.
      */
     class CartShiftTestSubscription
     {
@@ -152,6 +159,7 @@ if (!class_exists('CartShiftTestSubscription')) {
             private readonly int $id = 0,
             private readonly array $items = [],
             private readonly int $customerId = 1,
+            private readonly string $status = 'active',
         ) {
         }
 
@@ -163,6 +171,70 @@ if (!class_exists('CartShiftTestSubscription')) {
         public function get_customer_id(): int
         {
             return $this->customerId;
+        }
+
+        public function get_status(): string
+        {
+            return $this->status;
+        }
+
+        public function get_parent_id(): int
+        {
+            return 0;
+        }
+
+        public function get_parent(): ?object
+        {
+            return null;
+        }
+
+        public function get_currency(): string
+        {
+            return 'USD';
+        }
+
+        public function get_total(): string
+        {
+            return '10.00';
+        }
+
+        public function get_total_tax(): string
+        {
+            return '0.00';
+        }
+
+        public function get_billing_period(): string
+        {
+            return 'month';
+        }
+
+        public function get_billing_interval(): int
+        {
+            return 1;
+        }
+
+        public function get_payment_count(): int
+        {
+            return 3;
+        }
+
+        public function get_payment_method(): string
+        {
+            return '';
+        }
+
+        /**
+         * WooCommerce Subscriptions returns '' for a date that is not set, and
+         * the mapper reads that as "no date".
+         */
+        public function get_date(string $type): string
+        {
+            return $type === 'start' ? '2024-01-01 00:00:00' : '';
+        }
+
+        public function get_meta(string $key, bool $single = true): mixed
+        {
+            return '';
         }
 
         /**

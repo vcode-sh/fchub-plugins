@@ -55,9 +55,9 @@
       "mcpbFilename": null
     },
     "cartshift": {
-      "version": "1.2.0",
-      "tagName": "cartshift/v1.2.0",
-      "zipFilename": "cartshift-1.2.0.zip",
+      "version": "1.2.1",
+      "tagName": "cartshift/v1.2.1",
+      "zipFilename": "cartshift-1.2.1.zip",
       "mcpbFilename": null
     }
   },

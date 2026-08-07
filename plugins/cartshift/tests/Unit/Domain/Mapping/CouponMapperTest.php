@@ -6,6 +6,7 @@ namespace CartShift\Tests\Unit\Domain\Mapping;
 
 use CartShift\Domain\Mapping\CouponMapper;
 use CartShift\Storage\IdMapRepository;
+use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Tests\Unit\PluginTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -397,6 +398,247 @@ final class CouponMapperTest extends PluginTestCase
 
         $this->assertTrue($filterCalled, 'Filter cartshift/mapper/coupon was not called');
         $this->assertSame('MODIFIED', $result['code']);
+    }
+
+    // ──────────────────────────────────────────────
+    // Restrictions that do not survive the ID map
+    // ──────────────────────────────────────────────
+
+    /**
+     * The headline regression guard.
+     *
+     * FluentCart reads an empty `included_products` as "no restriction"
+     * (DiscountService::filterApplicableItems(), `if ($includedProducts && ...)`),
+     * so "20% off these three clearance items" whose three IDs all fail to
+     * resolve becomes "20% off the entire shop" the moment the row is written.
+     * Grouped and external products are skipped by ProductMapper on every
+     * ordinary full migration, so this is not a partial-run curiosity.
+     */
+    public function testACouponWhoseIncludedProductsAllVanishIsNotRedeemable(): void
+    {
+        $this->noMappings();
+
+        $coupon = $this->createCoupon([
+            'code' => 'CLEARANCE20',
+            'discount_type' => 'percent',
+            'amount' => 20.0,
+            'product_ids' => [100, 200, 300],
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertNotSame('active', $result['status'], 'A shop-wide discount was left redeemable.');
+        $this->assertSame('disabled', $result['status']);
+    }
+
+    public function testTheDisabledCouponWarningCarriesItsCode(): void
+    {
+        $this->noMappings();
+
+        $coupon = $this->createCoupon([
+            'code' => 'CLEARANCE20',
+            'discount_type' => 'percent',
+            'amount' => 20.0,
+            'product_ids' => [100, 200, 300],
+        ]);
+
+        $this->mapper->map($coupon);
+
+        $coded = $this->mapper->getCodedWarnings();
+
+        $this->assertCount(1, $coded);
+        $this->assertSame(MigrationErrorCode::CouponDisabledMissingRestrictions, $coded[0]['code']);
+        $this->assertStringContainsString('CLEARANCE20', $coded[0]['message']);
+        $this->assertStringContainsString('included_products', $coded[0]['message']);
+        $this->assertStringContainsString('3', $coded[0]['message']);
+    }
+
+    public function testACouponWhoseIncludedCategoriesAllVanishIsDisabled(): void
+    {
+        $this->noMappings();
+
+        $coupon = $this->createCoupon([
+            'code' => 'CATONLY',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'product_categories' => [77],
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('disabled', $result['status']);
+    }
+
+    /**
+     * An excluded category is the one exclusion that can widen. The term can be
+     * missing from FluentCart while its products are present and for sale —
+     * migrateCategories() skips 'uncategorized' outright, and logs
+     * TermCreationFailed for anything wp_insert_term() refuses — so the
+     * exclusion is lost on goods a customer can actually put in a basket.
+     */
+    public function testACouponWhoseExcludedCategoriesAllVanishIsDisabled(): void
+    {
+        $this->noMappings();
+
+        $coupon = $this->createCoupon([
+            'code' => 'NOTSALEITEMS',
+            'discount_type' => 'percent',
+            'amount' => 30.0,
+            'excluded_product_categories' => [88, 99],
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('disabled', $result['status']);
+    }
+
+    /**
+     * Some of the IDs resolving makes the coupon narrower than it was, which is
+     * wrong but costs the shop nothing. It keeps working for what is left.
+     */
+    public function testPartiallyResolvedRestrictionsStayActiveAndNarrower(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): ?string {
+            return str_contains($query, "'product'") && str_contains($query, "'100'") ? '500' : null;
+        };
+
+        $coupon = $this->createCoupon([
+            'code' => 'PARTIAL',
+            'discount_type' => 'percent',
+            'amount' => 20.0,
+            'product_ids' => [100, 200, 300],
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('active', $result['status']);
+        $this->assertSame([500], $result['conditions']['included_products']);
+
+        $coded = $this->mapper->getCodedWarnings();
+        $this->assertCount(1, $coded);
+        $this->assertSame(MigrationErrorCode::CouponRestrictionsNarrowed, $coded[0]['code']);
+    }
+
+    /**
+     * An excluded product that did not migrate is not in FluentCart to be
+     * discounted, so losing the exclusion changes nothing anyone can buy.
+     */
+    public function testLostExcludedProductsKeepTheCouponActive(): void
+    {
+        $this->noMappings();
+
+        $coupon = $this->createCoupon([
+            'code' => 'ALLBUTONE',
+            'discount_type' => 'percent',
+            'amount' => 15.0,
+            'excluded_product_ids' => [100, 200],
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('active', $result['status']);
+        $this->assertSame([], $result['conditions']['excluded_products']);
+
+        $coded = $this->mapper->getCodedWarnings();
+        $this->assertCount(1, $coded);
+        $this->assertSame(MigrationErrorCode::CouponRestrictionsNarrowed, $coded[0]['code']);
+    }
+
+    public function testACouponWithNoRestrictionsIsUntouched(): void
+    {
+        $this->noMappings();
+
+        $coupon = $this->createCoupon([
+            'code' => 'SITEWIDE',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'description' => 'Everything, on purpose.',
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('active', $result['status']);
+        $this->assertSame('Everything, on purpose.', $result['notes']);
+        $this->assertSame([], $this->mapper->getWarnings());
+    }
+
+    public function testFullyResolvedRestrictionsRaiseNothing(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): ?string => '500';
+
+        $coupon = $this->createCoupon([
+            'code' => 'RESOLVED',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'product_ids' => [100],
+            'description' => 'Untouched.',
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('active', $result['status']);
+        $this->assertSame('Untouched.', $result['notes']);
+        $this->assertSame([], $this->mapper->getWarnings());
+    }
+
+    /**
+     * Whoever repairs the coupon needs to know what it was restricted to, and
+     * after migration the WooCommerce IDs are the only record of that.
+     */
+    public function testOriginalRestrictionIdsArePreservedInTheNotes(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): ?string {
+            return str_contains($query, "'900'") ? '700' : null;
+        };
+
+        $coupon = $this->createCoupon([
+            'code' => 'AUDIT',
+            'discount_type' => 'percent',
+            'amount' => 20.0,
+            'product_ids' => [100, 200, 300],
+            'excluded_product_ids' => [900],
+            'description' => 'Clearance only.',
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertStringContainsString('Clearance only.', $result['notes']);
+        $this->assertStringContainsString('included_products: WooCommerce IDs [100, 200, 300]', $result['notes']);
+        $this->assertStringContainsString('excluded_products: WooCommerce IDs [900] -> FluentCart IDs [700]', $result['notes']);
+        $this->assertStringContainsString('disabled', $result['notes']);
+    }
+
+    public function testRestrictionAuditIsResetBetweenMapCalls(): void
+    {
+        $this->mapper->map($this->createCoupon([
+            'code' => 'FIRST',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'product_ids' => [100],
+        ]));
+
+        $result = $this->mapper->map($this->createCoupon([
+            'code' => 'SECOND',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'description' => 'Clean.',
+        ]));
+
+        $this->assertSame('active', $result['status']);
+        $this->assertSame('Clean.', $result['notes']);
+        $this->assertSame([], $this->mapper->getWarnings());
+    }
+
+    /**
+     * Make every ID map lookup miss.
+     *
+     * The stub $wpdb answers get_var() with 0 rather than null when no callback
+     * is set, and 0 is a hit as far as IdMapRepository is concerned. Tests about
+     * unmapped IDs have to say so explicitly.
+     */
+    private function noMappings(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): ?string => null;
     }
 
     private function createCoupon(array $overrides = []): \WC_Coupon

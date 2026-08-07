@@ -11,6 +11,7 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\FcSubscriptionStatus;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\WooStorage;
 use FluentCart\App\Models\Subscription;
@@ -224,31 +225,59 @@ final class SubscriptionMigrator extends AbstractMigrator
         }
 
         // FIX C4: validate customer_id before creating.
+        //
+        // The one gap a subscription does not survive. fct_subscriptions.customer_id
+        // is NOT NULL, and unlike an order there is nothing on the record to rebuild
+        // a buyer from — a subscription carries no billing address of its own. A
+        // subscription with nobody to bill is not a compromised record, it is not a
+        // record at all, so this stays a skip.
         $wcCustomerId = $subscription->get_customer_id();
-        if ($wcCustomerId > 0) {
-            $fcCustomerId = $this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $wcCustomerId);
-            if (!$fcCustomerId) {
-                $this->writeLog(
-                    $wcId,
-                    'warning',
-                    sprintf('Customer ID %d not found in ID map. Skipping subscription.', $wcCustomerId),
-                    MigrationErrorCode::CustomerNotFound,
-                );
-                return false;
-            }
-        }
+        $fcCustomerId = $wcCustomerId > 0
+            ? $this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $wcCustomerId)
+            : null;
 
-        // FIX C4: validate product_id and variation_id before creating.
-        $missingRefs = $this->validateProductReferences($subscription, $wcId);
-        if ($missingRefs) {
+        if (!$fcCustomerId) {
+            $this->writeLog(
+                $wcId,
+                'warning',
+                $wcCustomerId > 0
+                    ? sprintf(
+                        'Customer ID %d was not migrated, and a subscription has no billing details of its own '
+                        . 'to rebuild a buyer from. Skipping: FluentCart requires a customer on every subscription.',
+                        $wcCustomerId,
+                    )
+                    : 'The subscription has no customer at all. Skipping: FluentCart requires a customer on '
+                        . 'every subscription, and there is nothing here to rebuild one from.',
+                MigrationErrorCode::CustomerNotFound,
+            );
+
             return false;
         }
+
+        $missingReference = $this->missingProductReference($subscription);
 
         $mapped = $this->subscriptionMapper->map($subscription);
 
         // FIX M1/M2: flush mapper warnings to the migration log.
         foreach ($this->subscriptionMapper->getCodedWarnings() as $warning) {
             $this->writeLog($wcId, 'warning', $warning['message'], $warning['code']);
+        }
+
+        if ($missingReference !== null) {
+            $mapped = self::pause($mapped);
+
+            $this->writeLog(
+                $wcId,
+                'warning',
+                sprintf(
+                    '%s. Migrated as "paused" so nobody is charged for something that is not in the shop; '
+                    . 'the original WooCommerce status "%s" is kept in the subscription config. '
+                    . 'Migrate the product, point the subscription at it, then resume it.',
+                    $missingReference,
+                    $subscription->get_status(),
+                ),
+                MigrationErrorCode::SubscriptionPausedMissingProduct,
+            );
         }
 
         $fcSubscription = Subscription::query()->create($mapped);
@@ -271,15 +300,21 @@ final class SubscriptionMigrator extends AbstractMigrator
     }
 
     /**
-     * FIX C4: validate that product and variation references exist in the ID map.
-     * Returns true if references are missing (should skip), false if all valid.
+     * The first product or variation on the subscription that never made it into
+     * FluentCart, described in words, or null when everything resolves.
+     *
+     * FIX C4 originally used this to skip the subscription. It no longer does.
+     * Losing a paying subscriber with no trace is the worst outcome available:
+     * the shop owner finds out when the money stops. A subscription is a live
+     * instruction rather than a record, so it must not migrate active and
+     * pointing at nothing either — paused is the only safe middle, and that is
+     * what processRecord() does with this.
      *
      * Every line item is checked. Stopping after the first one let multi-product
      * subscriptions through while still pointing at products that were never
-     * migrated. Behaviour on a miss is unchanged — log a warning, skip the
-     * subscription — except that the warning now names the offending item.
+     * migrated.
      */
-    private function validateProductReferences(mixed $subscription, int $wcId): bool
+    private function missingProductReference(mixed $subscription): ?string
     {
         $position = 0;
 
@@ -292,17 +327,11 @@ final class SubscriptionMigrator extends AbstractMigrator
             $itemLabel = $this->describeItem($item, $position);
 
             if ($wcProductId > 0 && !$this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcProductId)) {
-                $this->writeLog(
-                    $wcId,
-                    'warning',
-                    sprintf(
-                        'Product ID %d for item %s not found in ID map. Skipping subscription.',
-                        $wcProductId,
-                        $itemLabel,
-                    ),
-                    MigrationErrorCode::ProductNotMapped,
+                return sprintf(
+                    'Product ID %d for item %s was not migrated',
+                    $wcProductId,
+                    $itemLabel,
                 );
-                return true;
             }
 
             if ($wcVariationId > 0) {
@@ -311,22 +340,49 @@ final class SubscriptionMigrator extends AbstractMigrator
                     $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcProductId);
                 }
                 if (!$fcVariationId) {
-                    $this->writeLog(
-                        $wcId,
-                        'warning',
-                        sprintf(
-                            'Variation ID %d for item %s not found in ID map. Skipping subscription.',
-                            $wcVariationId,
-                            $itemLabel,
-                        ),
-                        MigrationErrorCode::VariationNotMapped,
+                    return sprintf(
+                        'Variation ID %d for item %s was not migrated',
+                        $wcVariationId,
+                        $itemLabel,
                     );
-                    return true;
                 }
             }
         }
 
-        return false;
+        return null;
+    }
+
+    /**
+     * Force a mapped subscription to 'paused', keeping the status it would have
+     * had where somebody can find it again.
+     *
+     * fct_subscriptions has no notes column — the schema is
+     * database/Migrations/SubscriptionsMigrator.php in FluentCart 1.6.0 — so the
+     * audit trail goes in `config`, the JSON column SubscriptionMapper already
+     * uses for its own migration bookkeeping (`wc_subscription_id`, `migrated`,
+     * `currency`). Restoring the subscription later is then a matter of reading
+     * `cartshift_original_status` back out.
+     *
+     * `config` is defensive about its own type because 'cartshift/mapper/
+     * subscription' can rewrite the whole mapped array, and a filter that
+     * replaced it with a string must not fatal here.
+     *
+     * @param array<string, mixed> $mapped
+     *
+     * @return array<string, mixed>
+     */
+    private static function pause(array $mapped): array
+    {
+        $originalStatus = is_string($mapped['status'] ?? null) ? $mapped['status'] : '';
+
+        $config = is_array($mapped['config'] ?? null) ? $mapped['config'] : [];
+        $config['cartshift_original_status'] = $originalStatus;
+        $config['cartshift_paused_reason']   = 'product_not_migrated';
+
+        $mapped['config'] = $config;
+        $mapped['status'] = FcSubscriptionStatus::Paused->value;
+
+        return $mapped;
     }
 
     /**
