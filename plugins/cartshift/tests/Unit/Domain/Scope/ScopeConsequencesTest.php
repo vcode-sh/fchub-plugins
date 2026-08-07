@@ -38,6 +38,41 @@ final class ScopeConsequencesTest extends PluginTestCase
             $this->assertArrayHasKey('category', $consequence);
             $this->assertArrayHasKey('count', $consequence);
             $this->assertArrayHasKey('remedy', $consequence);
+            $this->assertArrayHasKey('is_minimum', $consequence);
+            $this->assertIsBool($consequence['is_minimum']);
+        }
+    }
+
+    /**
+     * `is_minimum` is the wire-level fact the UI keys "at least N" off — this
+     * pins it as a property of the descriptor, not a fact only true for one
+     * hardcoded code today. product_link_missing carries it because
+     * productLinkMissingCount() is a structurally narrower query than the
+     * truth (see its method doc); every other consequence here is either
+     * structurally zero-or-exact under the scope that produces it, so none
+     * of the rest may claim to be a floor.
+     */
+    public function testOnlyProductLinkMissingIsFlaggedAsAMinimum(): void
+    {
+        $consequences = (new ScopeConsequences(new ScopeResolver(MigrationScope::everything())))->all();
+
+        $flagged = array_values(array_filter(
+            $consequences,
+            static fn (array $consequence): bool => $consequence['is_minimum'] === true,
+        ));
+
+        $this->assertCount(1, $flagged, 'Exactly one consequence is a known structural floor today.');
+        $this->assertSame('product_link_missing', $flagged[0]['code']);
+
+        foreach ($consequences as $consequence) {
+            if ($consequence['code'] === 'product_link_missing') {
+                continue;
+            }
+
+            $this->assertFalse(
+                $consequence['is_minimum'],
+                sprintf('%s must not claim to be a lower bound.', $consequence['code']),
+            );
         }
     }
 

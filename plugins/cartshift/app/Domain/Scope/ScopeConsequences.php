@@ -35,12 +35,13 @@ final class ScopeConsequences
     }
 
     /**
-     * @return list<array{code: string, label: string, hint: string, severity: string, category: string, count: int, remedy: array{action: string, label: string, product_ids?: list<int>}|null}>
+     * @return list<array{code: string, label: string, hint: string, severity: string, category: string, count: int, remedy: array{action: string, label: string, product_ids?: list<int>}|null, is_minimum: bool}>
      */
     public function all(): array
     {
         return [
-            $this->describe(MigrationErrorCode::ProductLinkMissing, $this->productLinkMissingCount(), null),
+            // A structural floor, not the true figure — see productLinkMissingCount().
+            $this->describe(MigrationErrorCode::ProductLinkMissing, $this->productLinkMissingCount(), null, true),
             $this->describe(MigrationErrorCode::CustomerRebuiltFromOrder, $this->customerRebuiltFromOrderCount(), null),
             ...$this->subscriptionPausedMissingProduct(),
             ...$this->couponDisabledMissingRestrictions(),
@@ -71,6 +72,13 @@ final class ScopeConsequences
      * for why there must be only one: a preflight warning and a consequence
      * count that disagreed about which types are unsupported would be quoted
      * side by side to the same user.
+     *
+     * The lower-bound caveat above is not just a comment for the next PHP
+     * author — it travels on the wire. all() passes `isMinimum: true` for
+     * this code, which is the only thing that tells the UI to render "at
+     * least N" instead of a bare number. Widening this to also count the
+     * trashed case (see task-8 report) would make that call site's `true`
+     * wrong, not just this docblock stale — change both together.
      */
     private function productLinkMissingCount(): int
     {
@@ -327,14 +335,19 @@ final class ScopeConsequences
 
     /**
      * @param array{action: string, label: string, product_ids?: list<int>}|null $remedy
-     * @return array{code: string, label: string, hint: string, severity: string, category: string, count: int, remedy: array{action: string, label: string, product_ids?: list<int>}|null}
+     * @return array{code: string, label: string, hint: string, severity: string, category: string, count: int, remedy: array{action: string, label: string, product_ids?: list<int>}|null, is_minimum: bool}
      */
-    private function describe(MigrationErrorCode $code, int $count, ?array $remedy): array
+    private function describe(MigrationErrorCode $code, int $count, ?array $remedy, bool $isMinimum = false): array
     {
         return [
             ...$code->toArray(),
-            'count'  => $count,
-            'remedy' => $remedy,
+            'count'      => $count,
+            'remedy'     => $remedy,
+            // True only for a count built from a structurally narrower query
+            // than the truth (currently just product_link_missing, see its
+            // method doc) — never inferred from the code string on the
+            // reading end. The UI renders this, not `code === '...'`.
+            'is_minimum' => $isMinimum,
         ];
     }
 }

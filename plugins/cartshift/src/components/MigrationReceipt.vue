@@ -11,52 +11,58 @@
     <template v-else>
       <h2>What will come across</h2>
 
-      <table class="widefat striped">
-        <thead>
-          <tr><th>Entity</th><th>Count</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in countRows" :key="row.key">
-            <td><strong>{{ row.label }}</strong></td>
-            <td>{{ row.value.toLocaleString() }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <!-- The selection changes on a debounce as the owner edits it, so the counts
+           and consequences below are announced politely, not interrupted mid-typing. -->
+      <div aria-live="polite">
+        <table class="widefat striped">
+          <thead>
+            <tr><th>Entity</th><th>Count</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in countRows" :key="row.key">
+              <td><strong>{{ row.label }}</strong></td>
+              <td>{{ row.value.toLocaleString() }}</td>
+            </tr>
+          </tbody>
+        </table>
 
-      <p v-if="closureNote" class="cartshift-receipt-closure">{{ closureNote }}</p>
+        <p v-if="closureNote" class="cartshift-receipt-closure">{{ closureNote }}</p>
+      </div>
 
       <!-- Consequences: only when there is a preview, and only the non-zero ones. -->
       <template v-if="preview">
         <h2>What will not</h2>
 
-        <div v-if="!visibleConsequences.length" class="notice notice-success inline">
-          <p><strong>Nothing left behind.</strong></p>
-        </div>
+        <div aria-live="polite">
+          <div v-if="!visibleConsequences.length" class="notice notice-success inline">
+            <p><strong>Nothing left behind.</strong></p>
+          </div>
 
-        <ul v-else class="cartshift-receipt-list" aria-live="polite">
-          <li v-for="row in visibleConsequences" :key="row.code" class="cartshift-receipt-item">
-            <div :class="['cartshift-log-breakdown-row', 'cartshift-receipt-row', severityClass(row.severity)]">
-              <span class="cartshift-log-breakdown-count">{{ row.countLabel }}</span>
-              <div class="cartshift-log-breakdown-body">
-                <span class="cartshift-log-breakdown-label">
-                  {{ row.label }}
-                  <span :class="['cartshift-log-severity', 'cartshift-log-severity-' + row.severity]">
-                    {{ severityText(row.severity) }}
+          <ul v-else class="cartshift-receipt-list">
+            <li v-for="row in visibleConsequences" :key="row.code" class="cartshift-receipt-item">
+              <div :class="['cartshift-log-breakdown-row', 'cartshift-receipt-row', severityClass(row.severity)]">
+                <span class="cartshift-log-breakdown-count">{{ row.countLabel }}</span>
+                <div class="cartshift-log-breakdown-body">
+                  <span class="cartshift-log-breakdown-label">
+                    {{ row.label }}
+                    <span :class="['cartshift-log-severity', 'cartshift-log-severity-' + row.severity]">
+                      {{ severityText(row.severity) }}
+                    </span>
                   </span>
-                </span>
-                <span v-if="row.hint" class="cartshift-log-breakdown-hint">{{ row.hint }}</span>
+                  <span v-if="row.hint" class="cartshift-log-breakdown-hint">{{ row.hint }}</span>
+                </div>
               </div>
-            </div>
-            <button
-              v-if="row.remedy"
-              type="button"
-              class="button cartshift-remedy"
-              @click="$emit('apply-remedy', row.remedy)"
-            >
-              {{ row.remedy.label || 'Apply' }}
-            </button>
-          </li>
-        </ul>
+              <button
+                v-if="row.remedy"
+                type="button"
+                class="button cartshift-remedy"
+                @click="$emit('apply-remedy', row.remedy)"
+              >
+                {{ row.remedy.label || 'Apply' }}
+              </button>
+            </li>
+          </ul>
+        </div>
       </template>
 
       <!-- No preview available: this build predates the endpoint, so fall back to the
@@ -78,14 +84,6 @@ const props = defineProps({
 });
 
 defineEmits(['apply-remedy']);
-
-/**
- * `product_link_missing` is reused from PreflightCheck::countOrdersAffectedByTypes(),
- * which only looks at publish/draft/private orders — a matching order sitting in
- * the trash never gets counted. So the number the server sends is a floor, not
- * the true figure, and the receipt has to say so rather than presenting it as exact.
- */
-const LOWER_BOUND_CODES = new Set(['product_link_missing']);
 
 function capitalize(str) {
   if (!str) return '';
@@ -143,7 +141,11 @@ const visibleConsequences = computed(() => {
     .filter((row) => row && Number(row.count) > 0)
     .map((row) => {
       const count = Number(row.count) || 0;
-      const isMinimum = LOWER_BOUND_CODES.has(row.code);
+      // The server says whether its own count is a floor — via `is_minimum`
+      // on the descriptor (ScopeConsequences::describe()) — never inferred
+      // here from `code`. A future consequence can be flagged the same way
+      // without a front-end release, which is the whole point.
+      const isMinimum = row.is_minimum === true;
 
       return {
         code: row.code,
@@ -152,9 +154,8 @@ const visibleConsequences = computed(() => {
         severity: severityOf(row.severity),
         remedy: row.remedy || null,
         count,
-        // "At least N", never a bare N — the count is a floor, not a fact,
-        // for the one code that reuses a query with a narrower net than
-        // the truth (see LOWER_BOUND_CODES above).
+        // "At least N", never a bare N, whenever the server says its count
+        // is a floor rather than a fact.
         countLabel: isMinimum ? `At least ${count.toLocaleString()}` : count.toLocaleString(),
       };
     });

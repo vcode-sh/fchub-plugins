@@ -96,9 +96,38 @@ describe('MigrationReceipt', () => {
     expect(wrapper.text()).toContain('699');
   });
 
-  it('renders product_link_missing as a lower bound, not an exact figure', () => {
-    // Reused from PreflightCheck::countOrdersAffectedByTypes(), which excludes
-    // anything outside publish/draft/private — the true figure can be higher.
+  // The server states minimality on the wire, via `is_minimum` on the
+  // descriptor — never inferred from `code` here. These are property tests,
+  // not a test naming product_link_missing: a *different* code carrying the
+  // flag must still read "at least N", and product_link_missing itself
+  // without the flag must not. That is what keeps a future floor-producing
+  // consequence safe without a front-end release.
+  it('renders "at least N" for any descriptor flagged is_minimum, whatever its code', () => {
+    const wrapper = mount(MigrationReceipt, {
+      props: {
+        preview: preview({
+          consequences: [
+            {
+              code: 'some_other_future_floor',
+              label: 'Some other floor',
+              hint: '',
+              severity: 'warning',
+              category: 'order',
+              count: 12,
+              remedy: null,
+              is_minimum: true,
+            },
+          ],
+        }),
+        counts: null,
+        loading: false,
+      },
+    });
+
+    expect(wrapper.text()).toContain('At least 12');
+  });
+
+  it('renders a bare number for product_link_missing when it does not carry is_minimum', () => {
     const wrapper = mount(MigrationReceipt, {
       props: {
         preview: preview({
@@ -111,6 +140,7 @@ describe('MigrationReceipt', () => {
               category: 'product',
               count: 12,
               remedy: null,
+              is_minimum: false,
             },
           ],
         }),
@@ -119,10 +149,11 @@ describe('MigrationReceipt', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('At least 12');
+    expect(wrapper.text()).not.toContain('At least 12');
+    expect(wrapper.text()).toContain('12');
   });
 
-  it('does not present other consequence codes as lower bounds', () => {
+  it('renders a bare number when is_minimum is absent entirely (older payload shape)', () => {
     const wrapper = mount(MigrationReceipt, {
       props: {
         preview: preview({
@@ -174,5 +205,60 @@ describe('MigrationReceipt', () => {
     expect(text).toContain('12 more customers');
     expect(text.toLowerCase()).not.toContain('id map');
     expect(text.toLowerCase()).not.toContain('closure');
+  });
+
+  // aria-live coverage: everything the panel updates on a debounce as the
+  // owner edits their selection has to be announced, not just the
+  // consequence list — the counts table and the "Nothing left behind."
+  // all-clear are exactly the two things a screen-reader user would
+  // otherwise miss while narrowing a selection down to nothing.
+  it('announces the counts table politely', () => {
+    const wrapper = mount(MigrationReceipt, { props: { preview: preview(), counts: null, loading: false } });
+
+    const region = wrapper.findAll('[aria-live="polite"]').find((el) => el.text().includes('1,204'));
+    expect(region).toBeTruthy();
+  });
+
+  it('announces "Nothing left behind." politely, not just the consequence list', () => {
+    const wrapper = mount(MigrationReceipt, { props: { preview: preview(), counts: null, loading: false } });
+
+    const region = wrapper.findAll('[aria-live="polite"]').find((el) => el.text().includes('Nothing left behind.'));
+    expect(region).toBeTruthy();
+  });
+
+  it('announces a populated consequence list politely', () => {
+    const wrapper = mount(MigrationReceipt, {
+      props: {
+        preview: preview({
+          consequences: [
+            {
+              code: 'product_link_missing',
+              label: 'Order items link to no product',
+              hint: '',
+              severity: 'warning',
+              category: 'product',
+              count: 12,
+              remedy: null,
+              is_minimum: true,
+            },
+          ],
+        }),
+        counts: null,
+        loading: false,
+      },
+    });
+
+    const region = wrapper.findAll('[aria-live="polite"]').find((el) => el.text().includes('At least 12'));
+    expect(region).toBeTruthy();
+  });
+
+  it('keeps the too_large notice as an interrupting alert, not a polite region', () => {
+    const wrapper = mount(MigrationReceipt, {
+      props: { preview: preview({ too_large: true }), counts: null, loading: false },
+    });
+
+    const alert = wrapper.find('[role="alert"]');
+    expect(alert.exists()).toBe(true);
+    expect(alert.text()).toContain('too large');
   });
 });
