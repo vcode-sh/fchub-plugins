@@ -89,6 +89,49 @@ final class DryRunSimulationTest extends PluginTestCase
         $this->assertSame(0, $count, 'A dry run must never persist rows to the id map table.');
     }
 
+    /**
+     * The REST batch loop and Action Scheduler both rebuild the orchestrator and
+     * every repository from scratch for batch 2 onward — a fresh PHP request has
+     * no memory of the enableSimulation() call startMigration() made in the
+     * first request. This reproduces exactly that: a MigrationState already
+     * mid-dry-run (as startMigration() would have left it), but a brand new,
+     * non-simulating IdMapRepository and a brand new MigrationOrchestrator that
+     * never calls startMigration() at all — only processBatch(), the way batch
+     * 2+ actually runs.
+     *
+     * IdMapRepository::store() memoises in-request regardless of the simulating
+     * flag — that flag governs only whether the row also reaches the database
+     * (see IdMapRepository::store()). So the observable symptom of a missing
+     * re-enable is not a resolution failure, it is exactly the thing simulation
+     * exists to prevent: a real INSERT against wp_cartshift_id_map during a run
+     * the user was told creates nothing.
+     */
+    public function testProcessBatchReEnablesSimulationOnAFreshOrchestratorInstance(): void
+    {
+        $state = new MigrationState();
+        $state->start(['product'], true);
+
+        $idMap = new IdMapRepository();
+        $orchestrator = new MigrationOrchestrator([$this->productMigrator()], $state, $idMap, $this->log);
+
+        // Deliberately no startMigration() call — processBatch() must re-enable
+        // simulation on its own, the way it would for a real batch-2+ request.
+        $orchestrator->processBatch();
+
+        $inserts = array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $q): bool => $q[0] === 'insert' && str_contains((string) $q[1], 'cartshift_id_map'),
+        );
+
+        $this->assertSame(
+            [],
+            $inserts,
+            'processBatch() must re-enable simulation itself, independent of whether this '
+            . 'instance ever called startMigration() — otherwise a "dry run" batch after the '
+            . 'first silently writes real rows to the id map table.',
+        );
+    }
+
     private function orchestratorFor(array $migrators, IdMapRepository $idMap): MigrationOrchestrator
     {
         return new MigrationOrchestrator($migrators, $this->state, $idMap, $this->log);
