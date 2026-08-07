@@ -244,8 +244,16 @@ watch([() => state.scope, () => state.selectedEntities], scheduleRefresh, { deep
 // left behind", no remedies (MigrationReceipt.vue gates all of that on
 // `preview`). Ask once on arrival so the default "Everything" door is not a
 // blank read.
+//
+// {silent: true}: this call is speculative — the owner did not ask for it —
+// so a failure (a 500, a timeout, a dropped connection) must degrade
+// quietly rather than greeting the owner with an error banner about
+// something they have not done yet. A failed prime just leaves the receipt
+// unprimed, same as before this call existed. Owner-initiated refreshes
+// (the debounced watch below) never pass this, so those keep reporting
+// failures loudly.
 onMounted(() => {
-  actions.refreshPreview();
+  actions.refreshPreview({ silent: true });
 });
 
 onBeforeUnmount(() => {

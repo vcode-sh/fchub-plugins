@@ -107,6 +107,59 @@ describe('preview degradation', () => {
     });
   });
 
+  it('keeps state.error silent for a {silent: true} call that fails for a real reason', async () => {
+    // The select screen's speculative on-mount prime — the owner did not ask
+    // for this call, so a 500/timeout/dropped-connection failure must not
+    // greet them with an error banner about nothing they did.
+    apiMock.mockImplementation(async (method, endpoint) => {
+      if (endpoint === 'preview') {
+        throw apiError('Internal Server Error', 500);
+      }
+      return {};
+    });
+
+    const { state, actions } = mount();
+    await actions.refreshPreview({ silent: true });
+
+    expect(state.error).toBeNull();
+    expect(state.preview).toBeNull();
+  });
+
+  it('still reports a real failure loudly when the caller does not ask for silence', async () => {
+    // The guard against over-correcting: silence belongs to the speculative
+    // call, not to the feature. An owner-initiated refresh (no options, or
+    // {silent: false}) must keep behaving exactly as before {silent} existed.
+    apiMock.mockImplementation(async (method, endpoint) => {
+      if (endpoint === 'preview') {
+        throw apiError('Internal Server Error', 500);
+      }
+      return {};
+    });
+
+    const { state, actions } = mount();
+    await actions.refreshPreview();
+
+    expect(state.error).toBe('Internal Server Error');
+  });
+
+  it('still detects a missing /preview endpoint under {silent: true}', async () => {
+    // 404/501 is feature detection, not an error — silent must not swallow
+    // it, because every caller (including the debounced watch) needs to see
+    // previewSupport flip to 'no' to fall back correctly.
+    apiMock.mockImplementation(async (method, endpoint) => {
+      if (endpoint === 'preview') {
+        throw apiError('No route was found', 404);
+      }
+      return { counts: { order: 699 } };
+    });
+
+    const { state, actions } = mount();
+    await actions.refreshPreview({ silent: true });
+
+    expect(state.previewSupport).toBe('no');
+    expect(state.error).toBeNull();
+  });
+
   it('returns to the select screen when the closure is refused', async () => {
     // startMigration() switches to the progress screen before the request goes
     // out, so a refusal that only sets state.error leaves the owner watching a

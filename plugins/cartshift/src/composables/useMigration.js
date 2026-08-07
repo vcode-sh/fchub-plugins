@@ -300,8 +300,23 @@ export function useMigration() {
    * a degraded screen, not a failed migration, so it leaves `state.error`
    * alone and just flips `previewSupport` to 'no' so the caller can fall back
    * to `autoIncludeDependencies()` and the old counts.
+   *
+   * `{silent: true}` is for a speculative call the owner did not ask for —
+   * currently just the one the select screen fires on arrival to prime the
+   * receipt. A speculative call failing (a 500, a timeout, a dropped
+   * connection) must not greet the owner with an error banner about
+   * something they have not done yet, so it skips the `state.error`
+   * assignment and leaves the receipt simply unprimed. The 404/501
+   * `previewSupport` handling is unaffected either way — that is a feature
+   * detection outcome, not an error, and every caller needs to see it.
+   * Owner-initiated refreshes (the debounced one on every scope edit) never
+   * pass this, so a real failure is still reported exactly as before.
+   *
+   * @param {{silent?: boolean}} [options]
    */
-  async function refreshPreview() {
+  async function refreshPreview(options = {}) {
+    const silent = options.silent === true;
+
     state.previewLoading = true;
 
     try {
@@ -315,7 +330,7 @@ export function useMigration() {
     } catch (err) {
       if (err.status === 404 || err.status === 501) {
         state.previewSupport = 'no';
-      } else {
+      } else if (!silent) {
         state.error = err.message;
       }
     } finally {

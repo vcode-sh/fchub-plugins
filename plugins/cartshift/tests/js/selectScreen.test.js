@@ -103,7 +103,12 @@ describe('SelectScreen', () => {
     const ctx = context();
     mountScreen(ctx);
 
+    // {silent: true}: this call is speculative, not owner-initiated — a
+    // failure must not claim the error banner (see
+    // selectScreen.previewSilence.test.js for the integration coverage of
+    // that behaviour, which a stubbed action here cannot exercise).
     expect(ctx.actions.refreshPreview).toHaveBeenCalledTimes(1);
+    expect(ctx.actions.refreshPreview).toHaveBeenCalledWith({ silent: true });
   });
 
   it('debounces the preview refresh rather than asking per keystroke', async () => {
@@ -122,7 +127,10 @@ describe('SelectScreen', () => {
     vi.advanceTimersByTime(300);
     await nextTick();
 
+    // Owner-initiated, unlike the mount-time prime above — no {silent: true},
+    // so a failure here is still allowed to reach the error banner.
     expect(ctx.actions.refreshPreview).toHaveBeenCalledTimes(1);
+    expect(ctx.actions.refreshPreview).toHaveBeenCalledWith();
   });
 
   it('also refreshes when an entity is unticked, not only on a scope edit', async () => {
