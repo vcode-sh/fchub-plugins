@@ -270,12 +270,33 @@ final class ScopedKeysetTest extends PluginTestCase
         // SubscriptionMigrator::countTotal().
         $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'product_ids' => [12]]);
 
+        $GLOBALS['_cartshift_test_queries'] = [];
+
         $this->assertSame(0, $migrator->count());
 
         $query = $this->lastGetVarQuery();
 
         $this->assertNotNull($query, 'countTotal() must issue a COUNT(*) query.');
         $this->assertStringContainsString('1 = 0', $query);
+
+        // The branch itself, which no assertion on the rendered SQL can see:
+        // '1 = 0' carries no values, and subscriptionScopeSql() is already
+        // prepared, so the query reaches prepare() with neither a placeholder
+        // nor an argument — which real wpdb answers with _doing_it_wrong
+        // (wp-includes/class-wpdb.php). countTotal() therefore branches on
+        // values(), not on isEmpty(), and must not put the COUNT(*) through
+        // prepare() at all here. Matched on the COUNT(*) query specifically:
+        // subscriptionScopeSql() legitimately prepares its own status list on
+        // the way in, and that call is not the one under test.
+        $this->assertSame(
+            [],
+            array_values(array_filter(
+                $GLOBALS['_cartshift_test_queries'],
+                static fn (array $entry): bool => $entry[0] === 'prepare'
+                    && str_contains((string) $entry[1], 'COUNT(*)'),
+            )),
+            'A matches-nothing predicate has no values to bind, so countTotal() must not call prepare().',
+        );
     }
 
     private function lastGetVarQuery(): ?string
@@ -304,6 +325,47 @@ final class ScopedKeysetTest extends PluginTestCase
             'guest_emails' => ['bob@example.com'],
         ]);
 
+        $batch = $migrator->fetchBatch(null, 2);
+
+        $this->assertCount(1, $batch);
+        $this->assertSame(9001, $batch[0]->get_id());
+    }
+
+    public function testAPickedGuestEmailOnARegisteredAccountIsCountedAndMigratedAlike(): void
+    {
+        // countTotal() counts through ScopeResolver::seedSubscriptionPredicate(),
+        // which is `customer_id IN (…) OR billing_email IN (…)` with no
+        // `customer_id = 0` guard on the email side. Owner-typed guest_emails
+        // are never filtered against the registered accounts, so an owner who
+        // types the email of a registered buyer selects that buyer's
+        // subscription in the count. If the PHP filter read the same scope as
+        // "email only when customer_id is 0", the row would be counted and
+        // never fetched: total above processed, silently and for ever.
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 42, 'active', 'bob@example.com'),
+            new \CartShiftTestSubscription(9002, [], 43, 'active', 'eve@example.com'),
+        ];
+
+        $migrator = $this->subscriptionMigrator([
+            'mode'         => 'explicit',
+            'customer_ids' => [7],
+            'guest_emails' => ['bob@example.com'],
+        ]);
+
+        $GLOBALS['_cartshift_test_queries'] = [];
+
+        $migrator->count();
+
+        // The count selects it: the email disjunct is unguarded, so customer 42
+        // is inside the counted set on the strength of the address alone.
+        $query = (string) $this->lastGetVarQuery();
+
+        $this->assertStringContainsString('customer_id IN (7)', $query);
+        $this->assertStringContainsString("billing_email IN ('bob@example.com')", $query);
+        $this->assertStringNotContainsString('customer_id = 0', $query);
+
+        // And the fetch selects exactly the same row. The two agreeing is the
+        // assertion; which way they agree is the resolver's business.
         $batch = $migrator->fetchBatch(null, 2);
 
         $this->assertCount(1, $batch);

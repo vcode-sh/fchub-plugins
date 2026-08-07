@@ -195,11 +195,29 @@ final class SubscriptionMigrator extends AbstractMigrator
         $registered = array_flip($closed['registered']);
         $guests     = array_flip($closed['guests']);
 
+        // A disjunction, not a branch, because ScopeResolver::
+        // seedSubscriptionPredicate() is a disjunction: `customer_id IN (…) OR
+        // billing_email IN (…)`, with no `customer_id = 0` guard on the email
+        // side. countTotal() counts through that predicate and this filters the
+        // fetched page, so anything the two read differently is a subscription
+        // counted and never migrated — total stuck above processed, silently
+        // and for ever, which is the exact failure countTotal()'s docblock
+        // exists to prevent.
+        //
+        // The gap is real rather than theoretical: closedCustomers() keeps its
+        // *derived* sets disjoint, but an owner is free to type the email of a
+        // registered account into guest_emails, and nothing filters it out. The
+        // resolver's reading is also the one the order side already applies —
+        // seedOrderPredicate() ORs the same two sets — so mirroring it here
+        // keeps subscriptions consistent with the orders they belong to. If
+        // such a subscription's customer was not selected, processRecord()
+        // skips it with a logged warning: visible, counted, and nothing like a
+        // number that never moves.
         return array_values(array_filter($subs, static function (object $sub) use ($registered, $guests): bool {
             $customerId = (int) $sub->get_customer_id();
 
-            if ($customerId > 0) {
-                return isset($registered[$customerId]);
+            if ($customerId > 0 && isset($registered[$customerId])) {
+                return true;
             }
 
             // Lower-cased on both sides: MigrationScope normalises the picked

@@ -824,6 +824,13 @@ if (!class_exists('wpdb')) {
 
         public function prepare(string $query, mixed ...$args): string
         {
+            // Recorded before the early return, so a prepare() call with no
+            // values at all still leaves a trace. Real wpdb::prepare() answers
+            // a placeholder-free query with _doing_it_wrong (see
+            // wp-includes/class-wpdb.php), and this stub is far too forgiving
+            // to notice — so the *fact* of the call is what tests assert on.
+            $GLOBALS['_cartshift_test_queries'][] = ['prepare', $query, $args];
+
             if (empty($args)) {
                 return $query;
             }
