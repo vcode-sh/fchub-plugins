@@ -65,6 +65,31 @@ final class ProductMigrator extends AbstractMigrator
      */
     private const int SIMULATED_VARIATION_BASE = 950_000_000;
 
+    /**
+     * Base for a dry run's synthetic taxonomy IDs.
+     *
+     * Categories, brands, shipping classes and attribute terms are all WordPress
+     * terms, and wp_terms IDs are unique across every taxonomy, so one base
+     * serves all four without any two of them ever landing on the same number.
+     *
+     * Placed well below MigrationOrchestrator::$simulatedId (900,000,001 upward)
+     * rather than above it, because the two bases above this one already climb
+     * with WordPress post IDs and adding a third in that neighbourhood would
+     * eventually squeeze them together. A store would need fifty million terms
+     * to reach 900,000,000 from here.
+     */
+    private const int SIMULATED_TERM_BASE = 800_000_000;
+
+    /**
+     * Base for a dry run's synthetic attribute group IDs.
+     *
+     * Its own base because a WooCommerce attribute ID comes from
+     * woocommerce_attribute_taxonomies, a sequence entirely unrelated to
+     * wp_terms — attribute 12 and term 12 are different things and must not
+     * simulate to the same number.
+     */
+    private const int SIMULATED_ATTRIBUTE_GROUP_BASE = 700_000_000;
+
     private ProductMapper $productMapper;
     private VariationMapper $variationMapper;
 
@@ -99,6 +124,270 @@ final class ProductMigrator extends AbstractMigrator
 
         // Rebuild mappers now that shipping class map is populated.
         $this->rebuildMappers();
+    }
+
+    /**
+     * The read-only counterpart of initialize(), for a dry run.
+     *
+     * A dry run creates nothing, so initialize() is off limits — it inserts
+     * WordPress terms, FluentCart attribute groups, attribute terms and shipping
+     * classes. But skipping it outright, which is what the orchestrator used to
+     * do, left ENTITY_CATEGORY completely unpopulated for the whole run. Every
+     * `included_categories` and `excluded_categories` restriction then resolved to
+     * an empty list, both of those keys are in CouponMapper's
+     * WIDENING_ON_TOTAL_LOSS, and so every coupon carrying a category restriction
+     * was reported as would-be-disabled whether or not it would be. The one number
+     * the dry run exists to produce was therefore an upper bound wearing a precise
+     * figure's clothing.
+     *
+     * So: resolve what a real run would find already present in FluentCart, and
+     * mint a synthetic ID for what it would have to create. Nothing is written
+     * outside CartShift's own ID map, and those rows carry `is_simulated = 1`.
+     *
+     * Idempotent by construction — every map re-reads the ID map first, so a batch
+     * that died before advancing its offset re-runs this harmlessly.
+     */
+    #[\Override]
+    public function initializeSimulated(): void
+    {
+        $this->categoryMap += $this->simulateTermMap(
+            'product_cat',
+            'product-categories',
+            Constants::ENTITY_CATEGORY,
+            // migrateCategories() skips this term outright, so a real run never
+            // maps it and neither may the rehearsal.
+            ['uncategorized'],
+        );
+
+        $brandTaxonomy = $this->getWcBrandTaxonomy();
+
+        if ($brandTaxonomy !== null) {
+            $this->brandMap += $this->simulateTermMap(
+                $brandTaxonomy,
+                'product-brands',
+                Constants::ENTITY_BRAND,
+                [],
+            );
+        }
+
+        $this->shippingClassMap += $this->simulateShippingClasses();
+
+        $this->simulateAttributes();
+
+        $this->mapsLoaded = true;
+
+        // Same reason as initialize(): the mappers hold a copy of the shipping
+        // class map, so they have to be rebuilt once it is populated.
+        $this->rebuildMappers();
+    }
+
+    /**
+     * Resolve one WC taxonomy against its FluentCart counterpart without creating
+     * anything, registering each result in the simulated ID map.
+     *
+     * @param list<string> $skipSlugs WC term slugs a real run would not migrate.
+     *
+     * @return array<int, int> WC term_id => FC term_id
+     */
+    private function simulateTermMap(
+        string $wcTaxonomy,
+        string $fcTaxonomy,
+        string $entityType,
+        array $skipSlugs,
+    ): array {
+        $wcTerms = get_terms([
+            'taxonomy'   => $wcTaxonomy,
+            'hide_empty' => false,
+        ]);
+
+        if (is_wp_error($wcTerms) || empty($wcTerms)) {
+            return [];
+        }
+
+        $stored = $this->idMap->getMapForEntityType($entityType);
+        $map    = [];
+
+        foreach ($wcTerms as $wcTerm) {
+            if (in_array($wcTerm->slug, $skipSlugs, true)) {
+                continue;
+            }
+
+            $wcTermId = (int) $wcTerm->term_id;
+
+            if (isset($stored[(string) $wcTermId])) {
+                $map[$wcTermId] = (int) $stored[(string) $wcTermId];
+                continue;
+            }
+
+            $existing = get_term_by('slug', $wcTerm->slug, $fcTaxonomy);
+            $fcId     = $existing ? (int) $existing->term_id : self::SIMULATED_TERM_BASE + $wcTermId;
+
+            $map[$wcTermId] = $fcId;
+
+            $this->idMap->store(
+                $entityType,
+                (string) $wcTermId,
+                $fcId,
+                $this->migrationId(),
+                !$existing,
+            );
+        }
+
+        return $map;
+    }
+
+    /**
+     * The shipping class map a real run would build, without building it.
+     *
+     * @return array<int, int> WC term_id => FC shipping class ID
+     */
+    private function simulateShippingClasses(): array
+    {
+        $wcShippingClasses = get_terms([
+            'taxonomy'   => 'product_shipping_class',
+            'hide_empty' => false,
+        ]);
+
+        if (is_wp_error($wcShippingClasses) || empty($wcShippingClasses)) {
+            return [];
+        }
+
+        $stored = $this->idMap->getMapForEntityType(Constants::ENTITY_SHIPPING_CLASS);
+        $map    = [];
+
+        foreach ($wcShippingClasses as $wcTerm) {
+            $wcTermId = (int) $wcTerm->term_id;
+
+            if (isset($stored[(string) $wcTermId])) {
+                $map[$wcTermId] = (int) $stored[(string) $wcTermId];
+                continue;
+            }
+
+            $existing = ShippingClass::query()->where('name', $wcTerm->name)->first();
+            $fcId     = $existing ? (int) $existing->id : self::SIMULATED_TERM_BASE + $wcTermId;
+
+            $map[$wcTermId] = $fcId;
+
+            $this->idMap->store(
+                Constants::ENTITY_SHIPPING_CLASS,
+                (string) $wcTermId,
+                $fcId,
+                $this->migrationId(),
+                !$existing,
+            );
+        }
+
+        return $map;
+    }
+
+    /**
+     * The attribute group and term maps a real run would build, without building
+     * them.
+     *
+     * Mirrors migrateAttributes() down to the table-existence guard: with no
+     * FluentCart attribute tables a real run maps no attributes at all, and the
+     * rehearsal has to agree with it rather than invent a rosier picture.
+     */
+    private function simulateAttributes(): void
+    {
+        global $wpdb;
+
+        $tableExists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s",
+                $wpdb->prefix . 'fct_atts_groups',
+            ),
+        );
+
+        if (!$tableExists) {
+            return;
+        }
+
+        $wcAttributes = wc_get_attribute_taxonomies();
+
+        if (empty($wcAttributes)) {
+            return;
+        }
+
+        $storedGroups = $this->idMap->getMapForEntityType(Constants::ENTITY_ATTRIBUTE_GROUP);
+        $storedTerms  = $this->idMap->getMapForEntityType(Constants::ENTITY_ATTRIBUTE_TERM);
+
+        foreach ($wcAttributes as $wcAttr) {
+            $slug      = wc_attribute_taxonomy_name($wcAttr->attribute_name);
+            $groupSlug = sanitize_title($wcAttr->attribute_name);
+            $wcAttrId  = (int) $wcAttr->attribute_id;
+
+            $groupId = $storedGroups[(string) $wcAttrId] ?? null;
+
+            if ($groupId === null) {
+                $existing = AttributeGroup::query()->where('slug', $groupSlug)->first();
+                $groupId  = $existing
+                    ? (int) $existing->id
+                    : self::SIMULATED_ATTRIBUTE_GROUP_BASE + $wcAttrId;
+
+                $this->idMap->store(
+                    Constants::ENTITY_ATTRIBUTE_GROUP,
+                    (string) $wcAttrId,
+                    (int) $groupId,
+                    $this->migrationId(),
+                    !$existing,
+                );
+            }
+
+            $this->attributeGroupMap[$slug] = (int) $groupId;
+
+            $this->simulateAttributeTerms($slug, $groupSlug, (int) $groupId, $storedTerms);
+        }
+    }
+
+    /**
+     * Resolve the terms of one WC attribute taxonomy without creating any.
+     *
+     * @param array<string, int> $storedTerms WC term_id => FC term ID already in the ID map.
+     */
+    private function simulateAttributeTerms(
+        string $taxonomy,
+        string $groupSlug,
+        int $groupId,
+        array $storedTerms,
+    ): void {
+        $wcTerms = get_terms([
+            'taxonomy'   => $taxonomy,
+            'hide_empty' => false,
+        ]);
+
+        if (is_wp_error($wcTerms) || empty($wcTerms)) {
+            return;
+        }
+
+        foreach ($wcTerms as $wcTerm) {
+            $termSlug     = sanitize_title($wcTerm->slug);
+            $compositeKey = $groupSlug . ':' . $termSlug;
+            $wcTermId     = (int) $wcTerm->term_id;
+
+            $fcTermId = $storedTerms[(string) $wcTermId] ?? null;
+
+            if ($fcTermId === null) {
+                $existing = AttributeTerm::query()
+                    ->where('group_id', $groupId)
+                    ->where('slug', $termSlug)
+                    ->first();
+
+                $fcTermId = $existing
+                    ? (int) $existing->id
+                    : self::SIMULATED_TERM_BASE + $wcTermId;
+
+                $this->idMap->store(
+                    Constants::ENTITY_ATTRIBUTE_TERM,
+                    (string) $wcTermId,
+                    (int) $fcTermId,
+                    $this->migrationId(),
+                    !$existing,
+                );
+            }
+
+            $this->attributeTermMap[$compositeKey] = (int) $fcTermId;
+        }
     }
 
     /**
@@ -506,6 +795,11 @@ final class ProductMigrator extends AbstractMigrator
     {
         $wcId = $product->get_id();
         $name = $product->get_name();
+
+        // initializeSimulated() only runs on the first batch, and a dry run's
+        // later batches arrive in fresh PHP processes. Everything it registered is
+        // in the ID map, so rebuild from there — same reasoning as processRecord().
+        $this->ensureTaxonomyMaps();
 
         if ($this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcId)) {
             $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.', MigrationErrorCode::AlreadyMigrated);

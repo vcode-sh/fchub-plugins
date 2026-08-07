@@ -62,7 +62,7 @@ final class ProductMigratorSimulatedVariationTest extends PluginTestCase
 
     public function testASimpleProductRegistersItsSimulatedVariationWhenSimulating(): void
     {
-        $this->idMap->enableSimulation();
+        $this->idMap->setSimulating(true);
 
         $migrator = new ProductMigrator($this->idMap, $this->log, $this->state);
 
@@ -90,7 +90,7 @@ final class ProductMigratorSimulatedVariationTest extends PluginTestCase
      */
     public function testAFailedValidationRegistersNothingEvenWhileSimulating(): void
     {
-        $this->idMap->enableSimulation();
+        $this->idMap->setSimulating(true);
 
         $migrator = new ProductMigrator($this->idMap, $this->log, $this->state);
 

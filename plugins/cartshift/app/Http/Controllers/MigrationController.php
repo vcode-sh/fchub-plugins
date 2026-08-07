@@ -413,6 +413,13 @@ final class MigrationController
             $this->batchProcessor()->cancel($migrationId);
         }
 
+        // A dry run's ID-map rows exist only to carry references between its own
+        // batches. Forgetting the run has to forget them too, or an abandoned
+        // rehearsal leaves rows behind with nothing left to clear them. Real rows
+        // are untouched: reset forgets a run, rollback unpicks one.
+        $idMap = $this->container->get(IdMapRepository::class);
+        $idMap->purgeSimulated();
+
         $state->reset();
 
         return new WP_REST_Response([

@@ -176,6 +176,30 @@ final class CouponMapperTest extends PluginTestCase
         $this->assertSame([9001, 9002], $result['conditions']['included_products']);
     }
 
+    /**
+     * One migrator instance maps every coupon in a batch, and a shop that
+     * restricts a lot of coupons to the same few products was paying for the same
+     * wc_get_product() round trip once per restriction ID per coupon.
+     */
+    public function testAProductsVariationsAreLookedUpOncePerMapper(): void
+    {
+        $variableProduct = new \WC_Product();
+        (new \ReflectionClass($variableProduct))->getProperty('children')->setValue($variableProduct, [201, 202]);
+
+        $GLOBALS['_cartshift_test_wc_products'][300] = $variableProduct;
+        $GLOBALS['_cartshift_test_wc_product_lookups'] = 0;
+
+        $this->mapper->map($this->couponRestrictedTo([300]));
+        $this->mapper->map($this->couponRestrictedTo([300]));
+        $this->mapper->map($this->couponRestrictedTo([300, 300]));
+
+        $this->assertSame(
+            1,
+            $GLOBALS['_cartshift_test_wc_product_lookups'],
+            'The same product must not be re-read once per coupon.',
+        );
+    }
+
     public function testEmptyProductIdsHandledGracefully(): void
     {
         // Empty product_ids array should not produce included_products key.

@@ -79,6 +79,19 @@ final class CouponMapper
      */
     private array $restrictionAudit = [];
 
+    /**
+     * WC product ID => its WC variation IDs, for the life of this mapper.
+     *
+     * variationWcIdsForProduct() calls wc_get_product() once per restriction ID
+     * per coupon, and one migrator instance maps every coupon in a batch. Stores
+     * that restrict a lot of coupons to the same handful of products were paying
+     * for the same object-cache round trip over and over. Bounded by the number
+     * of distinct restricted products in the batch, which is small.
+     *
+     * @var array<int, list<int>>
+     */
+    private array $variationIdsByProduct = [];
+
     public function __construct(
         private readonly IdMapRepository $idMap,
         private readonly string $currency,
@@ -351,16 +364,21 @@ final class CouponMapper
      */
     private function variationWcIdsForProduct(int $wcProductId): array
     {
+        if (isset($this->variationIdsByProduct[$wcProductId])) {
+            return $this->variationIdsByProduct[$wcProductId];
+        }
+
         $product = wc_get_product($wcProductId);
+        $ids     = [$wcProductId];
 
         if ($product instanceof \WC_Product) {
             $children = array_values(array_map(intval(...), $product->get_children()));
             if ($children !== []) {
-                return $children;
+                $ids = $children;
             }
         }
 
-        return [$wcProductId];
+        return $this->variationIdsByProduct[$wcProductId] = $ids;
     }
 
     /**

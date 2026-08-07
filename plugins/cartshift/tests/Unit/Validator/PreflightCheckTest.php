@@ -418,6 +418,172 @@ final class PreflightCheckTest extends PluginTestCase
     }
 
     /**
+     * Numerator and denominator have to count the same row set, or the sentence
+     * built from them is nonsense.
+     *
+     * The numerator used to join woocommerce_order_items to nothing at all, so it
+     * counted refunds, subscriptions, trashed orders and checkout-drafts, while
+     * countMigratableOrders() excludes every one of those. On a store with
+     * WooCommerce Subscriptions selling a course product on subscription, that
+     * reaches "in 812 of your 699 orders" — a number that is not merely wrong but
+     * visibly impossible.
+     */
+    public function testTheAffectedOrderCountIsScopedToTheSameOrdersItIsQuotedAgainst(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 25],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $numerator = null;
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use (&$numerator): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                $numerator = $query;
+
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        (new PreflightCheck())->run();
+
+        $this->assertNotNull($numerator, 'The affected-order count must actually be issued.');
+
+        $this->assertStringContainsString(
+            'wp_wc_orders o',
+            $numerator,
+            'Without a join to the orders table the numerator counts rows the denominator never does.',
+        );
+        $this->assertStringContainsString('o.id = oi.order_id', $numerator);
+        $this->assertStringContainsString("type = 'shop_order'", $numerator);
+        $this->assertStringContainsString('status IN (', $numerator);
+
+        $this->assertStringContainsString(
+            "p.post_status IN ('publish', 'draft', 'private')",
+            $numerator,
+            'The product side must match the type histogram, or a trashed unsupported '
+            . 'product inflates the numerator without appearing in the counts beside it.',
+        );
+        $this->assertStringContainsString("p.post_type = 'product'", $numerator);
+    }
+
+    /**
+     * The CAST on the meta side makes any index on meta_value unusable, so this
+     * query scans woocommerce_order_itemmeta — and the preflight screen fires on
+     * mount. Free at 699 orders, several million rows per admin page load at 500k.
+     */
+    public function testTheAffectedOrderCountIsCachedBetweenPreflightRuns(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 25],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $scans = 0;
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use (&$scans): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                $scans++;
+
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        $first  = (new PreflightCheck())->run()['checks']['product_types'];
+        $second = (new PreflightCheck())->run()['checks']['product_types'];
+
+        $this->assertSame(1, $scans, 'The itemmeta scan must not run once per admin page load.');
+        $this->assertSame(41, $second['unsupported_product_types']['orders_affected']);
+        $this->assertSame(
+            $first['unsupported_product_types'],
+            $second['unsupported_product_types'],
+            'A cached answer is still the same answer.',
+        );
+    }
+
+    /**
+     * Keyed on the slug list, so a store whose unsupported types change gets a
+     * fresh number rather than the previous shape's.
+     */
+    public function testTheAffectedOrderCountCacheIsKeyedOnTheSlugList(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $slugs = ['course'];
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query) use (&$slugs): array {
+            if (str_contains($query, 'product_type')) {
+                return array_merge(
+                    [(object) ['slug' => 'simple', 'count' => 25]],
+                    array_map(
+                        static fn (string $slug): object => (object) ['slug' => $slug, 'count' => 1],
+                        $slugs,
+                    ),
+                );
+            }
+
+            return [];
+        };
+
+        $scans = 0;
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use (&$scans): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                $scans++;
+
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        (new PreflightCheck())->run();
+
+        $slugs = ['course', 'bundle'];
+        (new PreflightCheck())->run();
+
+        $this->assertSame(2, $scans, 'A different set of unsupported types is a different question.');
+    }
+
+    /**
      * No unsupported types, nothing to report: the new key stays present but empty
      * rather than being omitted, so a generic UI reading it never has to guess.
      */

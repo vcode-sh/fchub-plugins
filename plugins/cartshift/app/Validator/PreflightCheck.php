@@ -25,6 +25,9 @@ final class PreflightCheck
     /** Recommended max_execution_time, in seconds. */
     private const int RECOMMENDED_EXECUTION_SECONDS = 300;
 
+    /** How long the unsupported-type order count stays cached. */
+    private const int ORDERS_AFFECTED_CACHE_SECONDS = 300;
+
     /** WooCommerce's HPOS opt-in option. */
     private const string HPOS_OPTION = 'woocommerce_custom_orders_table_enabled';
 
@@ -486,6 +489,16 @@ final class PreflightCheck
      * HPOS moved the order and order-meta tables, not the line-item tables — so this
      * join is valid regardless of which storage mode is active.
      *
+     * Numerator and denominator must count the same row set or the sentence built
+     * from them is nonsense. Without the join to wc_orders this counted refunds
+     * (`shop_order_refund`), subscriptions (`shop_subscription`), trashed orders and
+     * `checkout-draft` rows, none of which countMigratableOrders() counts — so on a
+     * store with WooCommerce Subscriptions selling one unsupported product type the
+     * message could read "in 812 of your 699 orders". Same for the product side: the
+     * type histogram this number is quoted alongside is limited to
+     * publish/draft/private, so an unsupported product sitting in the trash must not
+     * inflate the count of orders it appears in.
+     *
      * @param list<string> $slugs
      */
     private function countOrdersAffectedByTypes(array $slugs): int
@@ -494,23 +507,100 @@ final class PreflightCheck
             return 0;
         }
 
+        $cached = $this->cachedOrdersAffected($slugs);
+
+        if ($cached !== null) {
+            return $cached;
+        }
+
         global $wpdb;
 
         $placeholders = implode(', ', array_fill(0, count($slugs), '%s'));
+        $ordersTable  = WooStorage::ordersTable();
+        [$scopeSql, $scopeValues] = WooStorage::orderScopeParts();
 
         $sql = $wpdb->prepare(
             "SELECT COUNT(DISTINCT oi.order_id)
              FROM {$wpdb->prefix}woocommerce_order_items oi
+             INNER JOIN {$ordersTable} o
+                     ON o.id = oi.order_id AND {$scopeSql}
              INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta im
                      ON im.order_item_id = oi.order_item_id AND im.meta_key = '_product_id'
-             INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = CAST(im.meta_value AS UNSIGNED)
+             INNER JOIN {$wpdb->posts} p
+                     ON p.ID = CAST(im.meta_value AS UNSIGNED)
+                    AND p.post_type = 'product'
+                    AND p.post_status IN ('publish', 'draft', 'private')
+             INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = p.ID
              INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
              INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
              WHERE tt.taxonomy = 'product_type' AND t.slug IN ({$placeholders})",
-            ...$slugs,
+            ...[...$scopeValues, ...$slugs],
         );
 
-        return (int) $wpdb->get_var($sql);
+        $count = (int) $wpdb->get_var($sql);
+
+        $this->rememberOrdersAffected($slugs, $count);
+
+        return $count;
+    }
+
+    /**
+     * The remembered answer for this exact slug list, or null.
+     *
+     * This query cannot be made cheap. `CAST(im.meta_value AS UNSIGNED)` on the meta
+     * side makes any index on meta_value unusable, so MySQL scans
+     * woocommerce_order_itemmeta filtered by nothing more selective than the
+     * meta_key index — free on a 699-order shop, several million rows on a 500k one.
+     * And PreflightScreen.vue fires the preflight endpoint on mount, so that scan ran
+     * on every visit to the screen, on exactly the store least able to afford it.
+     *
+     * A transient rather than an EXISTS rewrite: EXISTS changes which rows are
+     * examined but not the fact that the meta side cannot be indexed for this
+     * predicate, so it would move the cost rather than remove it. The number is
+     * advisory — it names orders the admin should go and look at, it never gates
+     * readiness — so a few minutes of staleness costs nothing, and the cache is
+     * keyed on the slug list so a store whose unsupported types change gets a fresh
+     * answer immediately.
+     *
+     * @param list<string> $slugs
+     */
+    private function cachedOrdersAffected(array $slugs): ?int
+    {
+        if (!function_exists('get_transient')) {
+            return null;
+        }
+
+        $cached = get_transient(self::ordersAffectedCacheKey($slugs));
+
+        return is_numeric($cached) ? (int) $cached : null;
+    }
+
+    /**
+     * @param list<string> $slugs
+     */
+    private function rememberOrdersAffected(array $slugs, int $count): void
+    {
+        if (!function_exists('set_transient')) {
+            return;
+        }
+
+        set_transient(self::ordersAffectedCacheKey($slugs), $count, self::ORDERS_AFFECTED_CACHE_SECONDS);
+    }
+
+    /**
+     * Hashed because the slug list is unbounded and option names are not — a
+     * WordPress transient key has 172 characters to play with once the `_transient_`
+     * prefix is accounted for, and a store with a dozen third-party product types
+     * would blow through that.
+     *
+     * @param list<string> $slugs
+     */
+    private static function ordersAffectedCacheKey(array $slugs): string
+    {
+        $normalized = $slugs;
+        sort($normalized);
+
+        return 'cartshift_orders_affected_' . md5(implode('|', $normalized));
     }
 
     /**
