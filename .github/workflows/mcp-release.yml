@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
           cache: npm
           cache-dependency-path: fluentcart-mcp/package-lock.json
       - run: npm ci
@@ -69,7 +69,7 @@ jobs:
           name: ${{ needs.validate.outputs.artifact_name }}
       - uses: actions/setup-node@v7
         with:
-          node-version: '24.13.0'
+          node-version: '26.7.0'
       - name: Install the reviewed publishing CLI
         run: npm install --global npm@11.15.0
       - name: Verify reviewed release toolchain

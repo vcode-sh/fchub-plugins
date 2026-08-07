@@ -28,7 +28,7 @@
     "@playwright/test": "1.62.1",
     "@vitejs/plugin-vue": "6.0.8",
     "@vue/test-utils": "2.4.11",
-    "jsdom": "26.1.0",
+    "jsdom": "30.0.1",
     "unplugin-vue-components": "32.1.0",
     "vite": "8.2.0",
     "vitest": "4.1.10"

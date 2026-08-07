@@ -56,7 +56,7 @@ jobs:
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Install locked script dependencies
         run: npm ci --prefix fluentcart-mcp
       - uses: actions/download-artifact@v8
