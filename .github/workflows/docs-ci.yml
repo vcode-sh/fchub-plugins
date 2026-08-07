@@ -77,6 +77,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The site has to actually build. Every check below this one reads content
+  # and compares it against something; none of them run Next, which is how a
+  # docs site that cannot be built sat on main behind a green tick. Two real
+  # breakages hid here: a floating base-image tag that took the Docker build
+  # with it, and a duplicated @base-ui/react that left a React context
+  # unresolvable at prerender. Both were invisible to every gate in this file.
+  build:
+    name: Site builds
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-docs
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+
+      # --frozen-lockfile on purpose: the committed lockfile is what deploys,
+      # so a build that only passes after resolution drifts is not a pass.
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # Node, not bun, and Next invoked directly — the same command
+      # web-docs/Dockerfile runs, so this gate exercises the path that ships
+      # rather than a convenient local approximation. NEXT_PUBLIC_URL matches
+      # the Dockerfile's default for the same reason.
+      - name: Build
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_URL: https://fchub.co
+        run: node ./node_modules/next/dist/bin/next build
+
   consistency:
     name: Version Consistency
     runs-on: ubuntu-latest
