@@ -51,6 +51,20 @@ final class ProductMigrator extends AbstractMigrator
     /** Upper bound on suffix attempts when de-duplicating a SKU */
     private const int SKU_SUFFIX_LIMIT = 50;
 
+    /**
+     * Base for a dry run's synthetic variation IDs.
+     *
+     * Kept well clear of MigrationOrchestrator::$simulatedId, which starts at
+     * 900,000,001 and increments by one per validated record across every
+     * entity type in the run — a store big enough to validate 500,000 records
+     * in one dry run would otherwise walk that counter straight into the
+     * original 900,500,000 base the brief specified. WooCommerce variation IDs
+     * are WordPress post IDs, so this base has room for post IDs into the tens
+     * of millions before it could ever meet the orchestrator's counter coming
+     * the other way.
+     */
+    private const int SIMULATED_VARIATION_BASE = 950_000_000;
+
     private ProductMapper $productMapper;
     private VariationMapper $variationMapper;
 
@@ -532,6 +546,27 @@ final class ProductMigrator extends AbstractMigrator
             $name,
             $variationCount,
         ));
+
+        if ($this->idMap->isSimulating()) {
+            // Order line items and subscriptions resolve ENTITY_VARIATION, which the
+            // orchestrator cannot know about — it only registers the product itself.
+            // A real run maps one variation per mapped variation row; mirror that so
+            // orders and subscriptions validated later resolve their variation
+            // references too.
+            $isVariable = $product->get_type() === 'variable';
+            $wcVariationIds = $isVariable ? array_keys($this->loadVariations($product)) : [$wcId];
+
+            foreach (array_keys($mapped['variations']) as $index) {
+                $wcVariationId = $wcVariationIds[$index] ?? $wcId;
+                $this->idMap->store(
+                    Constants::ENTITY_VARIATION,
+                    (string) $wcVariationId,
+                    self::SIMULATED_VARIATION_BASE + (int) $wcVariationId,
+                    $this->migrationId(),
+                    true,
+                );
+            }
+        }
 
         return true;
     }
