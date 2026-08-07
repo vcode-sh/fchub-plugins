@@ -14,7 +14,14 @@ final class VariationMapperTest extends PluginTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $GLOBALS['_cartshift_test_terms'] = [];
         $this->mapper = new VariationMapper('USD');
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['_cartshift_test_terms']);
+        parent::tearDown();
     }
 
     public function testBackordersNotifyMapsToOne(): void
@@ -152,6 +159,130 @@ final class VariationMapperTest extends PluginTestCase
         $this->assertArrayNotHasKey('length', $result['other_info']);
         $this->assertArrayNotHasKey('width', $result['other_info']);
         $this->assertArrayNotHasKey('height', $result['other_info']);
+    }
+
+    // ──────────────────────────────────────────────
+    // Attribute term memo cache
+    // ──────────────────────────────────────────────
+
+    public function testAttributeTermNameUsedForVariationTitle(): void
+    {
+        $GLOBALS['_cartshift_test_terms']['pa_color']['red'] = (object) ['name' => 'Rosso'];
+        $GLOBALS['_cartshift_test_terms']['pa_size']['lg'] = (object) ['name' => 'Large'];
+
+        $variation = $this->createVariation([
+            'attributes' => ['attribute_pa_color' => 'red', 'attribute_pa_size' => 'lg'],
+        ]);
+
+        $result = $this->mapper->mapVariation($variation);
+
+        $this->assertSame('Rosso / Large', $result['variation_title']);
+        $this->assertSame('rosso---large', $result['variation_identifier']);
+    }
+
+    public function testAttributeTermLookupIsMemoised(): void
+    {
+        // Prime the cache, then pull the term out from under the mapper. A second lookup
+        // that still returns the term name proves get_term_by() was not called again.
+        $GLOBALS['_cartshift_test_terms']['pa_color']['red'] = (object) ['name' => 'Rosso'];
+
+        $first = $this->mapper->mapVariation($this->createVariation([
+            'attributes' => ['attribute_pa_color' => 'red'],
+        ]));
+        $this->assertSame('Rosso', $first['variation_title']);
+
+        unset($GLOBALS['_cartshift_test_terms']['pa_color']['red']);
+
+        $second = $this->mapper->mapVariation($this->createVariation([
+            'attributes' => ['attribute_pa_color' => 'red'],
+        ], 1));
+
+        $this->assertSame('Rosso', $second['variation_title'], 'Term lookup was not memoised');
+    }
+
+    public function testAttributeTermMissesAreMemoisedToo(): void
+    {
+        // Custom (non-taxonomy) attribute values miss on every lookup, which is exactly
+        // the case that must not hammer the database once per variation.
+        $first = $this->mapper->mapVariation($this->createVariation([
+            'attributes' => ['attribute_custom' => 'bespoke'],
+        ]));
+        $this->assertSame('bespoke', $first['variation_title']);
+
+        // Add the term after the miss was cached — the cached miss must win.
+        $GLOBALS['_cartshift_test_terms']['custom']['bespoke'] = (object) ['name' => 'Bespoke'];
+
+        $second = $this->mapper->mapVariation($this->createVariation([
+            'attributes' => ['attribute_custom' => 'bespoke'],
+        ], 1));
+
+        $this->assertSame('bespoke', $second['variation_title'], 'Negative lookup was not memoised');
+    }
+
+    public function testMemoIsKeyedByTaxonomyAndSlug(): void
+    {
+        // Same slug under two taxonomies must not collide.
+        $GLOBALS['_cartshift_test_terms']['pa_color']['small'] = (object) ['name' => 'Smalt Blue'];
+        $GLOBALS['_cartshift_test_terms']['pa_size']['small'] = (object) ['name' => 'Small'];
+
+        $result = $this->mapper->mapVariation($this->createVariation([
+            'attributes' => ['attribute_pa_color' => 'small', 'attribute_pa_size' => 'small'],
+        ]));
+
+        $this->assertSame('Smalt Blue / Small', $result['variation_title']);
+    }
+
+    public function testEmptyAttributeValuesAreSkipped(): void
+    {
+        $GLOBALS['_cartshift_test_terms']['pa_color']['red'] = (object) ['name' => 'Rosso'];
+
+        $result = $this->mapper->mapVariation($this->createVariation([
+            'attributes' => ['attribute_pa_color' => 'red', 'attribute_pa_size' => ''],
+        ]));
+
+        $this->assertSame('Rosso', $result['variation_title']);
+    }
+
+    public function testVariationWithNoAttributesGetsDefaultTitle(): void
+    {
+        $result = $this->mapper->mapVariation($this->createVariation(['attributes' => []]));
+
+        $this->assertSame('Default', $result['variation_title']);
+    }
+
+    private function createVariation(array $overrides = [], int $id = 0): \WC_Product_Variation
+    {
+        $variation = new \WC_Product_Variation();
+        $defaults = [
+            'id' => 500 + $id,
+            'name' => 'Test Variation',
+            'slug' => 'test-variation',
+            'status' => 'publish',
+            'price' => '19.99',
+            'regular_price' => '19.99',
+            'sale_price' => '',
+            'sku' => 'VAR-001',
+            'virtual' => false,
+            'downloadable' => false,
+            'in_stock' => true,
+            'manage_stock' => false,
+            'sold_individually' => false,
+            'stock_quantity' => null,
+            'backorders' => 'no',
+            'attributes' => [],
+        ];
+
+        $data = array_merge($defaults, $overrides);
+
+        $ref = new \ReflectionClass($variation);
+        foreach ($data as $key => $value) {
+            if ($ref->hasProperty($key)) {
+                $prop = $ref->getProperty($key);
+                $prop->setValue($variation, $value);
+            }
+        }
+
+        return $variation;
     }
 
     private function createProduct(array $overrides = []): \WC_Product

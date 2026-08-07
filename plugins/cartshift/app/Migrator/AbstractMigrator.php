@@ -11,9 +11,21 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\MigrationErrorCode;
 
+/**
+ * Shared plumbing for entity migrators.
+ *
+ * The batch loop lives in MigrationOrchestrator::processBatch(), not here — both the
+ * REST controller and the WP-CLI command drive it from there. This class supplies the
+ * per-record contract (fetchBatch/processRecord/validateRecord) and the odds and ends
+ * every migrator needs.
+ */
 abstract class AbstractMigrator implements MigratorInterface
 {
+    // Counter surface for subclasses. The orchestrator keeps its own tallies; these are
+    // here for migrators that want to track their own.
+
     /** @var int Running counter of processed records */
     protected int $processed = 0;
 
@@ -27,9 +39,30 @@ abstract class AbstractMigrator implements MigratorInterface
         protected readonly IdMapRepository $idMap,
         protected readonly MigrationLogRepository $log,
         protected readonly MigrationState $migrationState,
-        protected readonly string $migrationId,
         protected readonly int $batchSize = Constants::DEFAULT_BATCH_SIZE,
     ) {}
+
+    /**
+     * The migration ID every log row and ID-map row this migrator writes is stamped with.
+     *
+     * Read from MigrationState on every use, never held. A migrator used to be
+     * handed the ID at construction, which meant a caller could — and the REST
+     * controller and the WP-CLI command both did — build its migrators before
+     * MigrationOrchestrator::startMigration() called MigrationState::start(),
+     * which mints a fresh UUID. The first batch then wrote its ID-map and log
+     * rows under an ID that appeared in no state anywhere: rollback could not see
+     * those records, and retry could not see those failures.
+     *
+     * The fix is not to reorder the construction. It is to leave the migrator
+     * with nothing to be stale about: MigrationState owns the ID, there is no
+     * second copy, and a divergence between them is no longer a thing that can be
+     * expressed. An empty string is the honest answer when no run is in flight —
+     * the preflight controller builds migrators purely to count rows.
+     */
+    protected function migrationId(): string
+    {
+        return $this->migrationState->getMigrationId() ?? '';
+    }
 
     #[\Override]
     public function entityType(): string
@@ -50,165 +83,6 @@ abstract class AbstractMigrator implements MigratorInterface
     public function initialize(): void
     {
         // No-op by default.
-    }
-
-    #[\Override]
-    public function run(): void
-    {
-        $isDryRun = $this->migrationState->isDryRun();
-
-        // In dry-run mode, skip initialize() — it creates categories, brands, attributes.
-        if (!$isDryRun) {
-            $this->initialize();
-        }
-
-        $effectiveBatchSize = (int) apply_filters(
-            'cartshift/migration/batch_size',
-            $this->batchSize,
-            $this->getEntityType(),
-        );
-
-        $total = $this->countTotal();
-
-        $this->migrationState->updateProgress(
-            $this->getEntityType(),
-            0,
-            $total,
-            0,
-            0,
-        );
-
-        if ($total === 0) {
-            $this->migrationState->completeEntity($this->getEntityType());
-            return;
-        }
-
-        $offset = 0;
-        $batchNumber = 0;
-
-        while (true) {
-            if ($this->shouldCancel()) {
-                break;
-            }
-
-            $batch = $this->fetchBatch($offset, $effectiveBatchSize);
-
-            if (empty($batch)) {
-                break;
-            }
-
-            foreach ($batch as $record) {
-                if ($this->shouldCancel()) {
-                    break 2;
-                }
-
-                if ($isDryRun) {
-                    $this->processDryRunRecord($record);
-                } else {
-                    $this->processRealRecord($record);
-                }
-
-                $this->migrationState->updateProgress(
-                    $this->getEntityType(),
-                    $this->processed,
-                    $total,
-                    $this->skipped,
-                    $this->errors,
-                );
-            }
-
-            $offset += count($batch);
-            $batchNumber++;
-
-            // Flush object cache every 5 batches to prevent memory exhaustion.
-            if ($batchNumber % 5 === 0) {
-                wp_cache_flush();
-                if (function_exists('gc_collect_cycles')) {
-                    gc_collect_cycles();
-                }
-            }
-
-            if (count($batch) < $effectiveBatchSize) {
-                break;
-            }
-        }
-
-        // F7: Only mark completed if migration wasn't cancelled mid-batch.
-        if ($this->shouldCancel()) {
-            $this->migrationState->setCancelled($this->getEntityType());
-        } else {
-            $this->migrationState->completeEntity($this->getEntityType());
-        }
-    }
-
-    /**
-     * Process a single record during a real (non-dry-run) migration.
-     * Wraps processRecord() in a transaction with error handling.
-     */
-    private function processRealRecord(mixed $record): void
-    {
-        // A2: Transaction wrapping prevents partial data on per-record failures.
-        global $wpdb;
-        $wpdb->query('START TRANSACTION');
-
-        try {
-            $result = $this->processRecord($record);
-
-            if ($result === false) {
-                $wpdb->query('COMMIT');
-                $this->skipped++;
-            } else {
-                $wpdb->query('COMMIT');
-                $this->processed++;
-
-                /** @see 'cartshift/migration/record_migrated' */
-                do_action(
-                    'cartshift/migration/record_migrated',
-                    $this->getEntityType(),
-                    $this->getRecordId($record),
-                    $result,
-                    $this->migrationId,
-                );
-            }
-        } catch (\Throwable $e) {
-            $wpdb->query('ROLLBACK');
-            $this->errors++;
-            $wcId = $this->getRecordId($record);
-            $this->log->write(
-                $this->migrationId,
-                $this->getEntityType(),
-                $wcId,
-                'error',
-                $e->getMessage(),
-            );
-        }
-    }
-
-    /**
-     * Process a single record during a dry-run migration.
-     * Validates data mapping without creating any FC records.
-     */
-    private function processDryRunRecord(mixed $record): void
-    {
-        try {
-            $result = $this->validateRecord($record);
-
-            if ($result) {
-                $this->processed++;
-            } else {
-                $this->skipped++;
-            }
-        } catch (\Throwable $e) {
-            $this->errors++;
-            $wcId = $this->getRecordId($record);
-            $this->log->write(
-                $this->migrationId,
-                $this->getEntityType(),
-                $wcId,
-                'error',
-                sprintf('dry-run validation failed: %s', $e->getMessage()),
-            );
-        }
     }
 
     /**
@@ -244,12 +118,146 @@ abstract class AbstractMigrator implements MigratorInterface
     abstract protected function countTotal(): int;
 
     /**
-     * Fetch a batch of WC records at the given offset.
+     * Fetch the next batch of WC records after the given cursor.
      *
      * @return mixed[]
      */
     #[\Override]
-    abstract public function fetchBatch(int $offset, int $limit): array;
+    abstract public function fetchBatch(string|int|null $cursor, int $limit): array;
+
+    /**
+     * Hydrate exactly these WC records, for a retry run.
+     *
+     * Concrete rather than abstract, and the difference matters on upgrade. An
+     * abstract method added to a base class is a fatal error for every existing
+     * subclass — the whole site, not one migrator — the moment the plugin
+     * updates. Every migrator shipped here overrides this, so the default costs
+     * them nothing; it exists so that a third-party migrator written against an
+     * earlier version keeps loading.
+     *
+     * It throws rather than returning []. Returning [] would be the wrong kind
+     * of graceful: to the orchestrator an empty result is indistinguishable from
+     * "nothing left to retry", so the user would click Retry, watch zero records
+     * be attempted, and conclude their data was fine all along. A quiet lie is
+     * worse than a loud failure. Throwing fails the run with a sentence that
+     * says exactly which migrator is at fault, and the orchestrator logs it as
+     * `migration_aborted`.
+     *
+     * An empty ID list is not an error — there is genuinely nothing to do — so
+     * that case returns before the throw.
+     *
+     * @param array<int, string|int> $wcIds
+     *
+     * @return mixed[]
+     *
+     * @throws RecordMigrationException Always, unless the ID list is empty.
+     */
+    #[\Override]
+    public function fetchByIds(array $wcIds): array
+    {
+        if ($wcIds === []) {
+            return [];
+        }
+
+        throw new RecordMigrationException(
+            sprintf(
+                'Cannot retry %d %s record(s): %s does not implement fetchByIds().',
+                count($wcIds),
+                $this->getEntityType(),
+                static::class,
+            ),
+            MigrationErrorCode::MigrationAborted,
+        );
+    }
+
+    /**
+     * Deduplicate a list of retry IDs into positive integers, order preserved.
+     *
+     * The log stores IDs as strings, and a retry list arrives from a query that
+     * has already made them DISTINCT — but the list also passes through a REST
+     * request and a filter or two on its way here, so neither is worth trusting.
+     *
+     * @param array<int, string|int> $wcIds
+     *
+     * @return list<int>
+     */
+    protected static function normalizeIntIds(array $wcIds): array
+    {
+        $ids = [];
+
+        foreach ($wcIds as $raw) {
+            if (!is_int($raw) && !is_string($raw)) {
+                continue;
+            }
+
+            $id = (int) $raw;
+
+            if ($id > 0) {
+                $ids[$id] = true;
+            }
+        }
+
+        return array_keys($ids);
+    }
+
+    /**
+     * The cursor value reached by having handed out this record.
+     *
+     * The default is the record's own source ID, which is what every
+     * `WHERE id > :cursor ORDER BY id ASC` migrator wants. Numeric IDs are
+     * returned as ints so the persisted cursor round-trips through
+     * update_option()/get_option() without turning into a string mid-run.
+     */
+    #[\Override]
+    public function cursorFor(mixed $record): string|int
+    {
+        $id = $this->getRecordId($record);
+
+        return ctype_digit($id) ? (int) $id : $id;
+    }
+
+    /**
+     * Count the ID-map rows already recorded for this entity type.
+     *
+     * A COUNT query, deliberately: IdMapRepository's bulk getter loads every
+     * mapping row into memory, which is precisely what a 200k-order store
+     * cannot afford. This class does not own IdMapRepository, so the count is
+     * issued here against the same table that repository writes to.
+     *
+     * @see \CartShift\Storage\IdMapRepository
+     */
+    #[\Override]
+    public function migratedCount(): int
+    {
+        global $wpdb;
+
+        $types = $this->migratedEntityTypes();
+
+        if ($types === []) {
+            return 0;
+        }
+
+        $table = $wpdb->prefix . 'cartshift_id_map';
+        $placeholders = implode(', ', array_fill(0, count($types), '%s'));
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE entity_type IN ({$placeholders})",
+            ...$types,
+        ));
+    }
+
+    /**
+     * The ID-map entity types migratedCount() should tally.
+     *
+     * One entity type for most migrators. Customers are the exception — they
+     * write both `customer` and `guest_customer` rows.
+     *
+     * @return list<string>
+     */
+    protected function migratedEntityTypes(): array
+    {
+        return [$this->getEntityType()];
+    }
 
     /**
      * Process a single WC record. Return false to mark as skipped.
@@ -278,15 +286,29 @@ abstract class AbstractMigrator implements MigratorInterface
 
     /**
      * Convenience: write a log entry via the repository.
+     *
+     * `$code` is additive metadata and trails the existing parameters, so every
+     * caller that predates it keeps working. It never replaces `$message`: the
+     * message carries the specifics — which SKU, which coupon code, which ID —
+     * and the code carries the class of thing that went wrong, which is the part
+     * a UI can group four thousand rows by.
+     *
+     * @see \CartShift\Support\Enums\MigrationErrorCode
      */
-    protected function writeLog(string|int $wcId, string $status, string $message = ''): void
-    {
+    protected function writeLog(
+        string|int $wcId,
+        string $status,
+        string $message = '',
+        MigrationErrorCode|string|null $code = null,
+    ): void {
         $this->log->write(
-            $this->migrationId,
+            $this->migrationId(),
             $this->getEntityType(),
             $wcId,
             $status,
             $message,
+            null,
+            $code,
         );
     }
 

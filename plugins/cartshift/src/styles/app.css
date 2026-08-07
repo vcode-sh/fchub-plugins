@@ -369,9 +369,19 @@ body.dark #cartshift-app table.widefat tbody tr:hover td {
   color: #529b2e;
 }
 
+#cartshift-app .notice-info {
+  background: #ecf5ff;
+  color: #3573b8;
+}
+
+#cartshift-app .notice p + p {
+  margin-top: 8px;
+}
+
 body.dark #cartshift-app .notice-error   { background: #2d1f1f; color: #f89898; }
 body.dark #cartshift-app .notice-warning { background: #2d2614; color: #f0c78a; }
 body.dark #cartshift-app .notice-success { background: #1d2d14; color: #95d475; }
+body.dark #cartshift-app .notice-info    { background: #16232d; color: #8ec5f0; }
 
 /* ── Checkboxes ── */
 #cartshift-app input[type="checkbox"] {
@@ -613,7 +623,10 @@ body.dark #cartshift-app .button-link-delete:hover {
 
 .cartshift-log-stat-icon-total   { color: var(--cartshift-primary); }
 .cartshift-log-stat-icon-success { color: var(--cartshift-success); }
-.cartshift-log-stat-icon-skipped { color: var(--cartshift-warning); }
+/* Skipped hands amber over to warning and takes neutral grey: nothing was
+   written, which is a non-event, not a caution. */
+.cartshift-log-stat-icon-skipped { color: var(--cartshift-info); }
+.cartshift-log-stat-icon-warning { color: var(--cartshift-warning); }
 .cartshift-log-stat-icon-error   { color: var(--cartshift-danger); }
 .cartshift-log-stat-icon-dryrun  { color: #1890ff; }
 
@@ -645,7 +658,8 @@ body.dark #cartshift-app .button-link-delete:hover {
 }
 
 .cartshift-log-summary-bar-success { background: var(--cartshift-success); }
-.cartshift-log-summary-bar-skipped { background: var(--cartshift-warning); }
+.cartshift-log-summary-bar-skipped { background: var(--cartshift-info); }
+.cartshift-log-summary-bar-warning { background: var(--cartshift-warning); }
 .cartshift-log-summary-bar-error   { background: var(--cartshift-danger); }
 .cartshift-log-summary-bar-dryrun  { background: #1890ff; }
 
@@ -790,12 +804,20 @@ body.dark .cartshift-log-row:hover td {
   background: #ffeded !important;
 }
 
-.cartshift-log-row-skipped td {
+.cartshift-log-row-warning td {
   background: #fffdf5;
 }
 
-.cartshift-log-row-skipped:hover td {
+.cartshift-log-row-warning:hover td {
   background: #fff9e6 !important;
+}
+
+.cartshift-log-row-skipped td {
+  background: #fafafb;
+}
+
+.cartshift-log-row-skipped:hover td {
+  background: #f2f3f6 !important;
 }
 
 .cartshift-log-row-dryrun td {
@@ -808,8 +830,10 @@ body.dark .cartshift-log-row:hover td {
 
 body.dark .cartshift-log-row-error td     { background: #2a1f1f; }
 body.dark .cartshift-log-row-error:hover td   { background: #33211f !important; }
-body.dark .cartshift-log-row-skipped td   { background: #2a2614; }
-body.dark .cartshift-log-row-skipped:hover td { background: #332d14 !important; }
+body.dark .cartshift-log-row-warning td   { background: #2a2614; }
+body.dark .cartshift-log-row-warning:hover td { background: #332d14 !important; }
+body.dark .cartshift-log-row-skipped td   { background: #262a32; }
+body.dark .cartshift-log-row-skipped:hover td { background: #2d323b !important; }
 body.dark .cartshift-log-row-dryrun td    { background: #1c2540; }
 body.dark .cartshift-log-row-dryrun:hover td  { background: #1f2d50 !important; }
 
@@ -828,13 +852,15 @@ body.dark .cartshift-log-row-dryrun:hover td  { background: #1f2d50 !important; 
 
 .cartshift-log-status-icon-success { background: #f0f9eb; color: var(--cartshift-success); }
 .cartshift-log-status-icon-error   { background: #fef0f0; color: var(--cartshift-danger); }
-.cartshift-log-status-icon-skipped { background: #fdf6ec; color: var(--cartshift-warning); }
+.cartshift-log-status-icon-warning { background: #fdf6ec; color: var(--cartshift-warning); }
+.cartshift-log-status-icon-skipped { background: #f4f4f5; color: var(--cartshift-info); }
 .cartshift-log-status-icon-dryrun  { background: #e6f7ff; color: #1890ff; }
 .cartshift-log-status-icon-pending { background: #f4f4f5; color: var(--cartshift-info); }
 
 body.dark .cartshift-log-status-icon-success { background: #1d2d14; color: #95d475; }
 body.dark .cartshift-log-status-icon-error   { background: #2d1f1f; color: #f89898; }
-body.dark .cartshift-log-status-icon-skipped { background: #2d2614; color: #f0c78a; }
+body.dark .cartshift-log-status-icon-warning { background: #2d2614; color: #f0c78a; }
+body.dark .cartshift-log-status-icon-skipped { background: #2a2e37; color: #9da3ae; }
 body.dark .cartshift-log-status-icon-dryrun  { background: #1c2540; color: #6d8cff; }
 body.dark .cartshift-log-status-icon-pending { background: #2a2e37; color: #9da3ae; }
 
@@ -1033,4 +1059,628 @@ body.dark .cartshift-log-detail-json pre {
   .cartshift-log-row-time {
     display: none;
   }
+
+  .cartshift-log-breakdown-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #cartshift-app .cartshift-log-breakdown-retry {
+    align-self: flex-start;
+  }
+
+  .cartshift-action-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Accessibility helpers
+   ═══════════════════════════════════════════════════════════════ */
+
+.cartshift-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Visible focus. WP admin's reset kills it; screen readers are not the only
+   people who navigate by keyboard. */
+#cartshift-app a:focus-visible,
+#cartshift-app button:focus-visible,
+#cartshift-app input:focus-visible,
+#cartshift-app select:focus-visible,
+#cartshift-app summary:focus-visible,
+#cartshift-app [tabindex]:focus-visible {
+  outline: 2px solid var(--cartshift-primary);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Preflight check groups
+   ═══════════════════════════════════════════════════════════════ */
+
+.cartshift-check-group {
+  margin: 0 0 20px 0;
+  padding: 16px 18px;
+  border-radius: var(--cartshift-radius-card);
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+}
+
+.cartshift-check-group-fail {
+  border-left: 4px solid var(--cartshift-danger);
+}
+
+.cartshift-check-group-warn {
+  border-left: 4px solid var(--cartshift-warning);
+}
+
+#cartshift-app .cartshift-check-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px 0;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cartshift-text-primary);
+}
+
+#cartshift-app .cartshift-check-group-lede {
+  margin: 0 0 14px 0;
+  font-size: 13px;
+  color: var(--cartshift-text-secondary);
+}
+
+.cartshift-check-glyph {
+  line-height: 1;
+}
+
+.cartshift-check-card + .cartshift-check-card {
+  margin-top: 10px;
+}
+
+.cartshift-check-card {
+  padding: 14px 16px;
+  border-radius: 6px;
+}
+
+.cartshift-check-card-fail {
+  background: #fef0f0;
+}
+
+.cartshift-check-card-warn {
+  background: #fdf6ec;
+}
+
+body.dark .cartshift-check-card-fail { background: #2d1f1f; }
+body.dark .cartshift-check-card-warn { background: #2d2614; }
+
+#cartshift-app .cartshift-check-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cartshift-text-primary);
+}
+
+#cartshift-app .cartshift-check-card-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--cartshift-text-primary);
+}
+
+body.dark #cartshift-app .cartshift-check-card-fail .cartshift-check-card-title,
+body.dark #cartshift-app .cartshift-check-card-fail .cartshift-check-card-message { color: #f89898; }
+body.dark #cartshift-app .cartshift-check-card-warn .cartshift-check-card-title,
+body.dark #cartshift-app .cartshift-check-card-warn .cartshift-check-card-message { color: #f0c78a; }
+
+/* Severity chips — the word next to the colour, so colour is never the message */
+.cartshift-check-severity {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cartshift-check-severity-fail { background: var(--cartshift-danger); color: #fff; }
+.cartshift-check-severity-warn { background: var(--cartshift-warning); color: #fff; }
+.cartshift-check-severity-pass { background: #f0f9eb; color: #529b2e; text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+body.dark .cartshift-check-severity-pass { background: #1d2d14; color: #95d475; }
+
+.cartshift-check-passed {
+  margin-bottom: 20px;
+}
+
+.cartshift-check-passed > summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  border-radius: var(--cartshift-radius-card);
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cartshift-text-secondary);
+}
+
+.cartshift-check-passed[open] > summary {
+  margin-bottom: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Progress notes — the honest kind of zero
+   ═══════════════════════════════════════════════════════════════ */
+
+.cartshift-progress-note {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--cartshift-progress-bg);
+  color: var(--cartshift-text-secondary);
+  cursor: help;
+}
+
+.cartshift-progress-note-empty   { background: #f4f4f5; color: #909399; }
+.cartshift-progress-note-unknown { background: #fdf6ec; color: #b88230; }
+
+body.dark .cartshift-progress-note-empty   { background: #2a2e37; color: #9da3ae; }
+body.dark .cartshift-progress-note-unknown { background: #2d2614; color: #f0c78a; }
+
+.cartshift-warn-text { color: var(--cartshift-warning); font-weight: 600; }
+body.dark .cartshift-warn-text { color: #f0c78a; }
+
+.cartshift-outcome p + p {
+  margin-top: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Action panel + danger zone
+   ═══════════════════════════════════════════════════════════════ */
+
+.cartshift-action-panel {
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+  margin-bottom: 28px;
+}
+
+.cartshift-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 18px;
+}
+
+.cartshift-action-panel .cartshift-action-row + .cartshift-action-row {
+  border-top: 1px solid var(--cartshift-border-color);
+}
+
+.cartshift-action-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 620px;
+}
+
+.cartshift-action-copy strong {
+  font-size: 14px;
+  color: var(--cartshift-text-primary);
+}
+
+.cartshift-action-copy span {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--cartshift-text-secondary);
+}
+
+.cartshift-action-row .button {
+  flex: 0 0 auto;
+}
+
+/* ── Retry zone: the recommended move, ranked above the plain panel ── */
+.cartshift-retry-zone {
+  border: 1px solid var(--cartshift-primary);
+  border-radius: var(--cartshift-radius-card);
+  background: var(--cartshift-card-bg);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+#cartshift-app .cartshift-retry-zone-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--cartshift-primary);
+}
+
+.cartshift-retry-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cartshift-retry-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cartshift-text-secondary);
+  cursor: pointer;
+}
+
+.cartshift-retry-option input[type="checkbox"] {
+  margin-top: 2px;
+}
+
+.cartshift-retry-unavailable {
+  font-size: 13px !important;
+  line-height: 1.6;
+  color: var(--cartshift-text-secondary);
+  font-style: italic;
+}
+
+.cartshift-retry-lineage {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+  background: var(--cartshift-card-bg);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--cartshift-text-secondary);
+}
+
+.cartshift-danger-zone {
+  border: 1px solid var(--cartshift-danger);
+  border-radius: var(--cartshift-radius-card);
+  background: var(--cartshift-card-bg);
+  margin-bottom: 32px;
+  overflow: hidden;
+}
+
+#cartshift-app .cartshift-danger-zone-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--cartshift-danger);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Modal
+   ═══════════════════════════════════════════════════════════════ */
+
+.cartshift-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(21, 29, 38, 0.55);
+}
+
+.cartshift-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--cartshift-card-bg);
+  color: var(--cartshift-text-primary);
+  border-radius: var(--cartshift-radius-card);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  padding: 24px;
+  font-family: var(--cartshift-font-family);
+}
+
+.cartshift-modal-danger {
+  border-top: 4px solid var(--cartshift-danger);
+}
+
+#cartshift-app .cartshift-modal-title {
+  margin: 0 0 12px 0;
+  padding: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--cartshift-text-primary);
+}
+
+#cartshift-app .cartshift-modal-body p {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--cartshift-text-secondary);
+}
+
+#cartshift-app .cartshift-modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+#cartshift-app .cartshift-modal-body strong {
+  color: var(--cartshift-text-primary);
+}
+
+.cartshift-modal-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fef0f0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #c45656;
+  cursor: pointer;
+}
+
+body.dark .cartshift-modal-ack { background: #2d1f1f; color: #f89898; }
+
+.cartshift-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+#cartshift-app .cartshift-modal-actions .button + .button {
+  margin-left: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Log breakdown — the "why", grouped
+   ═══════════════════════════════════════════════════════════════ */
+
+.cartshift-log-breakdown {
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+#cartshift-app .cartshift-log-breakdown-title {
+  margin: 0 0 4px 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cartshift-text-primary);
+}
+
+#cartshift-app .cartshift-log-breakdown-lede {
+  margin: 0 0 14px 0;
+  font-size: 13px;
+  color: var(--cartshift-text-secondary);
+}
+
+.cartshift-log-breakdown-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cartshift-log-breakdown-list li + li {
+  margin-top: 8px;
+}
+
+/* The reason row and its retry button are siblings, not nested — a button
+   inside a button is not a thing browsers agree on. */
+.cartshift-log-breakdown-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.cartshift-log-breakdown-item .cartshift-log-breakdown-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#cartshift-app .cartshift-log-breakdown-retry {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+}
+
+.cartshift-log-breakdown-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--cartshift-border-color);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--cartshift-font-family);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.cartshift-log-breakdown-row:hover {
+  background: #f8f9fc;
+}
+
+body.dark .cartshift-log-breakdown-row:hover {
+  background: #2a2e37;
+}
+
+.cartshift-log-breakdown-row-error   { border-left-color: var(--cartshift-danger); }
+.cartshift-log-breakdown-row-warning { border-left-color: var(--cartshift-warning); }
+.cartshift-log-breakdown-row-info    { border-left-color: var(--cartshift-info); }
+.cartshift-log-breakdown-row-plain   { border-left-color: var(--cartshift-border-color); }
+
+.cartshift-log-breakdown-row-active {
+  background: #ecf5ff;
+  border-color: var(--cartshift-primary);
+}
+
+body.dark .cartshift-log-breakdown-row-active {
+  background: #1c2540;
+}
+
+.cartshift-log-breakdown-count {
+  flex: 0 0 auto;
+  min-width: 62px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cartshift-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cartshift-log-breakdown-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cartshift-log-breakdown-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cartshift-text-primary);
+}
+
+.cartshift-log-breakdown-hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cartshift-text-secondary);
+}
+
+.cartshift-log-breakdown-code,
+.cartshift-log-row-code {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--cartshift-progress-bg);
+  color: var(--cartshift-text-secondary);
+  font-family: Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.cartshift-log-breakdown-code {
+  align-self: flex-start;
+}
+
+.cartshift-log-row-code {
+  margin-right: 6px;
+  font-family: var(--cartshift-font-family);
+  font-weight: 600;
+}
+
+.cartshift-log-breakdown-action {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cartshift-primary);
+}
+
+.cartshift-log-breakdown-foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+#cartshift-app .cartshift-log-breakdown-foot .button + .button {
+  margin-left: 0;
+}
+
+.cartshift-log-severity {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cartshift-log-severity-error   { background: #fef0f0; color: #c45656; }
+.cartshift-log-severity-warning { background: #fdf6ec; color: #b88230; }
+.cartshift-log-severity-info    { background: #f4f4f5; color: #6a6d78; }
+
+body.dark .cartshift-log-severity-error   { background: #2d1f1f; color: #f89898; }
+body.dark .cartshift-log-severity-warning { background: #2d2614; color: #f0c78a; }
+body.dark .cartshift-log-severity-info    { background: #2a2e37; color: #9da3ae; }
+
+.cartshift-log-active-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  margin: 0 0 12px 0;
+  border-radius: 6px;
+  background: #ecf5ff;
+  font-size: 13px;
+  color: #3573b8;
+}
+
+body.dark .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
+
+#cartshift-app .cartshift-log-active-filter code {
+  background: transparent;
+  font-weight: 700;
+}
+
+.cartshift-log-chevron-btn {
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+#cartshift-app .cartshift-log-detail-hint {
+  margin: 6px 0 0 0;
+  font-size: 13px;
+  color: var(--cartshift-text-secondary);
 }

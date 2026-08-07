@@ -50,6 +50,14 @@ final class LogController
                     'default'           => null,
                     'sanitize_callback' => 'sanitize_text_field',
                 ],
+                // Machine-readable failure reason. Unregistered args are dropped
+                // by the REST layer, which is why this needs declaring rather
+                // than just reading through in index().
+                'code' => [
+                    'type'              => 'string',
+                    'default'           => null,
+                    'sanitize_callback' => 'sanitize_text_field',
+                ],
             ],
         ]);
 
@@ -77,6 +85,7 @@ final class LogController
             page: (int) ($request->get_param('page') ?? 1),
             perPage: (int) ($request->get_param('per_page') ?? 50),
             status: $request->get_param('status'),
+            code: $request->get_param('code'),
         );
 
         return new WP_REST_Response(['data' => $result]);

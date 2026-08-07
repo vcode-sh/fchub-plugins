@@ -11,7 +11,9 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\MoneyHelper;
+use CartShift\Support\WooStorage;
 use FluentCart\App\Models\AppliedCoupon;
 use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderAddress;
@@ -23,14 +25,16 @@ final class OrderMigrator extends AbstractMigrator
 {
     private readonly OrderMapper $orderMapper;
 
+    /** @var int|null Highest order ID covered by the ID page fetchBatch() last read. */
+    private ?int $pageEndCursor = null;
+
     public function __construct(
         IdMapRepository $idMap,
         MigrationLogRepository $log,
         MigrationState $migrationState,
-        string $migrationId,
         int $batchSize = Constants::DEFAULT_BATCH_SIZE,
     ) {
-        parent::__construct($idMap, $log, $migrationState, $migrationId, $batchSize);
+        parent::__construct($idMap, $log, $migrationState, $batchSize);
 
         $currency = get_woocommerce_currency();
         $this->orderMapper = new OrderMapper($idMap, $currency);
@@ -42,29 +46,157 @@ final class OrderMigrator extends AbstractMigrator
         return Constants::ENTITY_ORDER;
     }
 
+    /**
+     * Count exactly the rows fetchBatch() will hand back.
+     *
+     * An unfiltered COUNT(*) also sweeps up checkout-drafts and trashed orders,
+     * neither of which wc_get_orders(['status' => 'any']) ever returns — so the
+     * progress bar could never reach 100%.
+     */
     #[\Override]
     protected function countTotal(): int
     {
         global $wpdb;
 
+        $scope = WooStorage::orderScopeSql();
+        $table = WooStorage::ordersTable();
+
         return (int) $wpdb->get_var(
             "SELECT COUNT(*)
-             FROM {$wpdb->prefix}wc_orders
-             WHERE type = 'shop_order'",
+             FROM {$table}
+             WHERE {$scope}",
         );
     }
 
+    /**
+     * Keyset pagination over HPOS order IDs.
+     *
+     * `wc_get_orders(['offset' => 50000])` makes MySQL walk and discard fifty
+     * thousand rows before it hands back one, which is why the tail of a large
+     * store crawls. The ID page instead seeks straight into the primary key,
+     * reusing WooStorage::orderScopeParts() so the status/type set stays
+     * byte-identical to wc_get_orders(['status' => 'any']).
+     *
+     * Hydration still goes through wc_get_orders() — post__in is the HPOS query
+     * layer's own alias for `id`, so one query fetches the page.
+     *
+     * @see woocommerce/src/Internal/DataStores/Orders/OrdersTableQuery.php (v11.0.0, line 278: 'post__in' => 'id')
+     */
     #[\Override]
-    public function fetchBatch(int $offset, int $limit): array
+    public function fetchBatch(string|int|null $cursor, int $limit): array
     {
-        return wc_get_orders([
-            'limit'   => $limit,
-            'offset'  => $offset,
-            'status'  => 'any',
-            'type'    => 'shop_order',
-            'orderby' => 'ID',
-            'order'   => 'ASC',
+        $after = max(0, (int) $cursor);
+
+        // Loop only when an entire ID page fails to hydrate; returning [] there
+        // would end the entity early and silently truncate the migration.
+        while (true) {
+            $ids = $this->fetchOrderIdPage($after, $limit);
+
+            if ($ids === []) {
+                return [];
+            }
+
+            $after = (int) end($ids);
+            $this->pageEndCursor = $after;
+
+            $orders = wc_get_orders([
+                'limit'    => count($ids),
+                'post__in' => $ids,
+                'status'   => 'any',
+                'type'     => WooStorage::TYPE_ORDER,
+                'orderby'  => 'ID',
+                'order'    => 'ASC',
+            ]);
+
+            $orders = array_values(array_filter(
+                (array) $orders,
+                static fn (mixed $order): bool => is_object($order),
+            ));
+
+            if ($orders !== []) {
+                return $orders;
+            }
+        }
+    }
+
+    /**
+     * Hydrate exactly these order IDs, for a retry run.
+     *
+     * Same wc_get_orders() call fetchBatch() hydrates its ID page with, and the
+     * same WooStorage type scoping — `post__in` is the HPOS query layer's alias
+     * for `id`, so one query covers the page. An order that has been deleted or
+     * moved out of scope since the run that failed on it simply does not come
+     * back.
+     *
+     * The page cursor is left untouched: a retry paginates an ID list, not the
+     * orders table.
+     *
+     * @param array<int, string|int> $wcIds
+     *
+     * @return list<\WC_Order>
+     */
+    #[\Override]
+    public function fetchByIds(array $wcIds): array
+    {
+        $ids = self::normalizeIntIds($wcIds);
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $orders = wc_get_orders([
+            'limit'    => count($ids),
+            'post__in' => $ids,
+            'status'   => 'any',
+            'type'     => WooStorage::TYPE_ORDER,
+            'orderby'  => 'ID',
+            'order'    => 'ASC',
         ]);
+
+        return array_values(array_filter(
+            (array) $orders,
+            static fn (mixed $order): bool => is_object($order),
+        ));
+    }
+
+    /**
+     * The cursor is the end of the ID page, not the last hydrated order — a
+     * trailing ID that wc_get_orders() declines to return would otherwise be
+     * re-read for ever.
+     */
+    #[\Override]
+    public function cursorFor(mixed $record): string|int
+    {
+        return $this->pageEndCursor ?? parent::cursorFor($record);
+    }
+
+    /**
+     * The next page of order IDs strictly after $afterId, in the same scope
+     * countTotal() counts.
+     *
+     * @return list<int>
+     */
+    private function fetchOrderIdPage(int $afterId, int $limit): array
+    {
+        global $wpdb;
+
+        $table = WooStorage::ordersTable();
+
+        // Placeholder form, so the scope and the pagination go through a single
+        // prepare() rather than nesting one prepared string inside another.
+        [$scope, $scopeValues] = WooStorage::orderScopeParts();
+
+        $ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT id
+             FROM {$table}
+             WHERE {$scope}
+               AND id > %d
+             ORDER BY id ASC
+             LIMIT %d",
+            ...[...$scopeValues, $afterId, $limit],
+        ));
+
+        return array_map(intval(...), $ids);
     }
 
     /**
@@ -79,7 +211,7 @@ final class OrderMigrator extends AbstractMigrator
         $wcId = $wcOrder->get_id();
 
         if ($this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $wcId)) {
-            $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.');
+            $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.', MigrationErrorCode::AlreadyMigrated);
             return false;
         }
 
@@ -87,7 +219,7 @@ final class OrderMigrator extends AbstractMigrator
 
         $itemCount = count($mapped['items']);
         if ($itemCount === 0) {
-            $this->writeLog($wcId, 'dry-run', 'dry-run: order has no items, would fail.');
+            $this->writeLog($wcId, 'dry-run', 'dry-run: order has no items, would fail.', MigrationErrorCode::OrderHasNoItems);
             return false;
         }
 
@@ -109,7 +241,22 @@ final class OrderMigrator extends AbstractMigrator
         $wcId = $wcOrder->get_id();
 
         if ($this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $wcId)) {
-            $this->writeLog($wcId, 'skipped', 'Already migrated.');
+            $this->writeLog($wcId, 'skipped', 'Already migrated.', MigrationErrorCode::AlreadyMigrated);
+            return false;
+        }
+
+        // FluentCart's own WooCommerce migrator may have imported this order first.
+        // Adopt it rather than creating a duplicate — same convention as the
+        // FIX C9 blocks in CustomerMigrator and CouponMigrator.
+        $adopted = $this->findFluentCartImportedOrder($wcId);
+        if ($adopted !== null) {
+            $this->idMap->store(Constants::ENTITY_ORDER, (string) $wcId, $adopted, $this->migrationId(), false);
+            $this->writeLog($wcId, 'skipped', sprintf(
+                'Order already imported into FluentCart as #%d (invoice_no "WC-%d"). Adopted into the ID map; rollback will leave it alone.',
+                $adopted,
+                $wcId,
+            ), MigrationErrorCode::AlreadyExistsInFluentCart);
+
             return false;
         }
 
@@ -129,6 +276,7 @@ final class OrderMigrator extends AbstractMigrator
                         $wcId,
                         'warning',
                         sprintf('Customer ID %d not found in ID map. Skipping order.', $wcCustomerId),
+                        MigrationErrorCode::CustomerNotFound,
                     );
                     return false;
                 }
@@ -139,7 +287,7 @@ final class OrderMigrator extends AbstractMigrator
 
         // 1. Create the FC order.
         $fcOrder = Order::query()->create($mapped['order']);
-        $this->idMap->store(Constants::ENTITY_ORDER, (string) $wcId, $fcOrder->id, $this->migrationId, true);
+        $this->idMap->store(Constants::ENTITY_ORDER, (string) $wcId, $fcOrder->id, $this->migrationId(), true);
 
         // 2. Create order items with compound keys (FIX C7).
         $totalQuantity = 0;
@@ -148,7 +296,7 @@ final class OrderMigrator extends AbstractMigrator
             $fcItem = OrderItem::query()->create($itemData);
             $totalQuantity += (int) ($itemData['quantity'] ?? 1);
             $itemKey = "{$wcId}_{$index}";
-            $this->idMap->store(Constants::ENTITY_ORDER_ITEM, $itemKey, $fcItem->id, $this->migrationId, true);
+            $this->idMap->store(Constants::ENTITY_ORDER_ITEM, $itemKey, $fcItem->id, $this->migrationId(), true);
         }
 
         // 2b. Update item_count on the FC order (sum of all item quantities).
@@ -168,7 +316,7 @@ final class OrderMigrator extends AbstractMigrator
             $addressData['order_id'] = $fcOrder->id;
             $fcAddress = OrderAddress::query()->create($addressData);
             $addressKey = "{$wcId}_{$addressData['type']}";
-            $this->idMap->store(Constants::ENTITY_ORDER_ADDRESS, $addressKey, $fcAddress->id, $this->migrationId, true);
+            $this->idMap->store(Constants::ENTITY_ORDER_ADDRESS, $addressKey, $fcAddress->id, $this->migrationId(), true);
         }
 
         // 4. Create order transaction with compound key (FIX C7).
@@ -177,7 +325,7 @@ final class OrderMigrator extends AbstractMigrator
             $transactionData['order_id'] = $fcOrder->id;
             $fcTransaction = OrderTransaction::query()->create($transactionData);
             $transactionKey = "{$wcId}_charge";
-            $this->idMap->store(Constants::ENTITY_ORDER_TRANSACTION, $transactionKey, $fcTransaction->id, $this->migrationId, true);
+            $this->idMap->store(Constants::ENTITY_ORDER_TRANSACTION, $transactionKey, $fcTransaction->id, $this->migrationId(), true);
         }
 
         // 5. Handle refund transactions (FIX C1: no json_encode on meta).
@@ -209,6 +357,32 @@ final class OrderMigrator extends AbstractMigrator
         ));
 
         return $fcOrder->id;
+    }
+
+    /**
+     * Find a FluentCart order that was already imported from this WC order.
+     *
+     * FluentCart's own WooCommerce migrator stamps imported orders with
+     * `invoice_no LIKE 'WC-%'`, and OrderMapper writes the identical
+     * `'WC-' . $wcOrderId` marker — so an exact match on that column identifies
+     * the same order regardless of which tool did the importing.
+     *
+     * fct_orders.invoice_no is VARCHAR(192) and indexed, so this is a single
+     * index lookup per order.
+     *
+     * @see fluent-cart/database/Migrations/OrdersMigrator.php (lines 19, 51)
+     * @see \CartShift\Domain\Mapping\OrderMapper
+     */
+    private function findFluentCartImportedOrder(int $wcOrderId): ?int
+    {
+        global $wpdb;
+
+        $fcId = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$wpdb->prefix}fct_orders WHERE invoice_no = %s LIMIT 1",
+            'WC-' . $wcOrderId,
+        ));
+
+        return $fcId !== null && (int) $fcId > 0 ? (int) $fcId : null;
     }
 
     /**
@@ -248,7 +422,7 @@ final class OrderMigrator extends AbstractMigrator
 
         $fcTransaction = OrderTransaction::query()->create($transactionData);
         $transactionKey = "{$wcOrderId}_refund_{$refund->get_id()}";
-        $this->idMap->store(Constants::ENTITY_ORDER_TRANSACTION, $transactionKey, $fcTransaction->id, $this->migrationId, true);
+        $this->idMap->store(Constants::ENTITY_ORDER_TRANSACTION, $transactionKey, $fcTransaction->id, $this->migrationId(), true);
     }
 
     /**
@@ -435,20 +609,41 @@ final class OrderMigrator extends AbstractMigrator
     /**
      * FIX M7: Migrate WooCommerce order notes to FC order meta.
      * Each note is stored as a separate 'wc_note' meta entry.
+     *
+     * Notes live in wp_comments keyed by order ID under both order backends.
+     * Two things matter here:
+     *
+     * 1. Only comment_type = 'order_note' counts. Matching comment_type = ''
+     *    as well used to drag in ordinary blog comments, because under HPOS
+     *    order IDs and post IDs come from different sequences and can collide.
+     * 2. The customer-visible flag is real data, not a guess. WooCommerce
+     *    writes it to commentmeta under 'is_customer_note', and only when the
+     *    note is a customer note — so an absent row means "private note".
+     *    A correlated subquery reads it without an N+1.
+     *
+     * @see woocommerce/includes/class-wc-order.php::add_order_note() (v11.0.0, lines 2104, 2110, 2117)
      */
     private function migrateOrderNotes(int $wcOrderId, int $fcOrderId): void
     {
         global $wpdb;
 
-        // Query WC order notes directly from wp_comments (works regardless of HPOS).
         $notes = $wpdb->get_results($wpdb->prepare(
-            "SELECT comment_content, comment_date_gmt, comment_author, comment_author_email
-             FROM {$wpdb->comments}
-             WHERE comment_post_ID = %d
-               AND comment_type IN ('order_note', '')
-               AND comment_approved = '1'
-             ORDER BY comment_date_gmt ASC",
+            "SELECT c.comment_content,
+                    c.comment_date_gmt,
+                    c.comment_author,
+                    (SELECT cm.meta_value
+                       FROM {$wpdb->commentmeta} AS cm
+                      WHERE cm.comment_id = c.comment_ID
+                        AND cm.meta_key = %s
+                      LIMIT 1) AS is_customer_note
+             FROM {$wpdb->comments} AS c
+             WHERE c.comment_post_ID = %d
+               AND c.comment_type = %s
+               AND c.comment_approved = '1'
+             ORDER BY c.comment_date_gmt ASC",
+            'is_customer_note',
             $wcOrderId,
+            'order_note',
         ));
 
         if (empty($notes)) {
@@ -456,18 +651,39 @@ final class OrderMigrator extends AbstractMigrator
         }
 
         foreach ($notes as $note) {
-            $isCustomerNote = ($note->comment_author_email === '' || $note->comment_author === __('WooCommerce', 'woocommerce'));
-
             OrderMeta::query()->create([
                 'order_id'   => $fcOrderId,
                 'meta_key'   => 'wc_note',
                 'meta_value' => [
                     'content'       => $note->comment_content,
                     'added_by'      => $note->comment_author ?: 'system',
-                    'customer_note' => !$isCustomerNote,
+                    'customer_note' => self::isCustomerNote($note->is_customer_note ?? null),
                     'date'          => $note->comment_date_gmt,
                 ],
             ]);
         }
+    }
+
+    /**
+     * Interpret the raw 'is_customer_note' commentmeta value.
+     *
+     * WooCommerce writes the integer 1 and never writes a falsey row, but read
+     * it the way wc_string_to_bool() would so hand-edited data behaves.
+     */
+    private static function isCustomerNote(mixed $rawMetaValue): bool
+    {
+        if ($rawMetaValue === null || $rawMetaValue === false) {
+            return false;
+        }
+
+        if (is_bool($rawMetaValue)) {
+            return $rawMetaValue;
+        }
+
+        return in_array(
+            strtolower(trim((string) $rawMetaValue)),
+            ['1', 'yes', 'true', 'on'],
+            true,
+        );
     }
 }

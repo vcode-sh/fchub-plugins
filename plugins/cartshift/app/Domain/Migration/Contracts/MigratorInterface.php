@@ -19,22 +19,65 @@ interface MigratorInterface
     public function count(): int;
 
     /**
+     * Count the records of this entity type that are already in the ID map.
+     *
+     * Lets the UI say "1,204 of 5,000 already migrated" without loading a
+     * single mapping row.
+     */
+    public function migratedCount(): int;
+
+    /**
      * Run one-time setup before the first batch (e.g. taxonomy migrations).
      * Called once per entity type when offset is 0.
      */
     public function initialize(): void;
 
     /**
-     * Execute the full migration for this entity type (synchronous).
-     */
-    public function run(): void;
-
-    /**
-     * Fetch a batch of WC records at the given offset.
+     * Fetch the next batch of WC records after the given cursor.
+     *
+     * Keyset pagination, not LIMIT/OFFSET. The cursor is an opaque marker
+     * produced by cursorFor() — for most migrators the source primary key of
+     * the last record handed out, so the query becomes an index seek
+     * (`WHERE id > :cursor ORDER BY id ASC LIMIT n`) instead of a scan that
+     * throws away everything before the offset.
+     *
+     * A null cursor means "start at the beginning of this entity".
      *
      * @return mixed[]
      */
-    public function fetchBatch(int $offset, int $limit): array;
+    public function fetchBatch(string|int|null $cursor, int $limit): array;
+
+    /**
+     * Hydrate exactly the given WC records, for a retry run.
+     *
+     * The complement of fetchBatch(): no cursor, no ordering promise, no
+     * pagination — the caller already knows which records it wants, because it
+     * read them out of a previous run's log. An ID that no longer resolves to a
+     * record is simply absent from the result, so the returned array may be
+     * shorter than the one asked for and may be empty.
+     *
+     * The IDs are in the form getRecordId() returns, which is what the log
+     * stores. For most migrators that is the source primary key as a string;
+     * CustomerMigrator is the exception, and says so in its own docblock.
+     *
+     * Implementations must not touch pagination state — a retry run does not
+     * keyset, and a fetchByIds() call that moved the cursor would corrupt any
+     * normal run sharing the instance.
+     *
+     * @param array<int, string|int> $wcIds
+     *
+     * @return mixed[]
+     */
+    public function fetchByIds(array $wcIds): array;
+
+    /**
+     * The cursor value reached by having handed out this record.
+     *
+     * Must be strictly monotonic in the order fetchBatch() returns records,
+     * so that feeding it back in never re-reads the same row. Termination is
+     * therefore guaranteed even for a record that can never be migrated.
+     */
+    public function cursorFor(mixed $record): string|int;
 
     /**
      * Process a single WC record. Return false to mark as skipped.

@@ -12,6 +12,19 @@ use CartShift\Support\MoneyHelper;
 final class VariationMapper
 {
     /**
+     * Memo for attribute term lookups: "taxonomy|slug" => term name, or null when the slug
+     * resolves to no term (a custom, non-taxonomy attribute value).
+     *
+     * Every variation of a variable product repeats the same handful of attribute slugs, so
+     * without this each variation re-runs get_term_by() — one query per attribute per variation.
+     * Misses are memoised too: a product with custom attribute values would otherwise miss the
+     * cache on every single lookup, which is the exact case that needs it most.
+     *
+     * @var array<string, string|null>
+     */
+    private array $termNameCache = [];
+
+    /**
      * @param array<int, int> $shippingClassMap WC shipping class term_id => FC shipping class ID.
      */
     public function __construct(
@@ -73,9 +86,8 @@ final class VariationMapper
         $titleParts = [];
         foreach ($attributes as $attrName => $attrValue) {
             if ($attrValue) {
-                $taxonomy = str_replace('attribute_', '', $attrName);
-                $term = get_term_by('slug', $attrValue, $taxonomy);
-                $titleParts[] = $term ? $term->name : $attrValue;
+                $taxonomy = str_replace('attribute_', '', (string) $attrName);
+                $titleParts[] = $this->resolveAttributeLabel($taxonomy, (string) $attrValue);
             }
         }
         $variationTitle = !empty($titleParts) ? implode(' / ', $titleParts) : 'Default';
@@ -180,6 +192,26 @@ final class VariationMapper
             'media_id'             => self::getMediaId($product),
             'other_info'           => !empty($otherInfo) ? $otherInfo : null,
         ];
+    }
+
+    /**
+     * Resolve an attribute slug to its human-readable term name, memoised per instance.
+     *
+     * Falls back to the raw slug when the value is not a taxonomy term.
+     */
+    private function resolveAttributeLabel(string $taxonomy, string $slug): string
+    {
+        $key = $taxonomy . '|' . $slug;
+
+        if (!array_key_exists($key, $this->termNameCache)) {
+            $term = get_term_by('slug', $slug, $taxonomy);
+
+            $this->termNameCache[$key] = ($term && isset($term->name) && $term->name !== '')
+                ? (string) $term->name
+                : null;
+        }
+
+        return $this->termNameCache[$key] ?? $slug;
     }
 
     /**

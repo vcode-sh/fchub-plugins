@@ -64,12 +64,15 @@ final class OrderMapper
                 'shipping_lines' => self::mapShippingLines($order) ?: null,
                 'fee_lines'      => self::mapFeeLines($order) ?: null,
             ]),
-            'created_at'            => $order->get_date_created()
-                ? $order->get_date_created()->date('Y-m-d H:i:s')
-                : gmdate('Y-m-d H:i:s'),
-            'completed_at'          => $order->get_date_completed()
-                ? $order->get_date_completed()->date('Y-m-d H:i:s')
-                : null,
+            // UTC. FluentCart's own WooCommerce importer fills fct_orders.created_at from
+            // wc_orders.date_created_gmt and falls back to current_time('mysql', true)
+            // (app/Modules/WooCommerceMigrator/Services/OrderMigrationService.php:225-226),
+            // so every fct_* timestamp this mapper produces is UTC. WC_DateTime::date() renders
+            // site-local, which mixed local and UTC values into one column depending on whether
+            // the WC date happened to be set.
+            'created_at'            => self::toUtcString($order->get_date_created())
+                ?? gmdate('Y-m-d H:i:s'),
+            'completed_at'          => self::toUtcString($order->get_date_completed()),
         ];
 
         $items = $this->mapItems($order);
@@ -169,9 +172,8 @@ final class OrderMapper
                 'payment_type'     => $paymentType,
                 'other_info'       => !empty($otherInfo) ? $otherInfo : [],
                 'line_meta'        => self::extractItemMeta($item),
-                'created_at'       => $order->get_date_created()
-                    ? $order->get_date_created()->date('Y-m-d H:i:s')
-                    : gmdate('Y-m-d H:i:s'),
+                'created_at'       => self::toUtcString($order->get_date_created())
+                    ?? gmdate('Y-m-d H:i:s'),
             ];
         }
 
@@ -216,9 +218,8 @@ final class OrderMapper
                 'payment_type'     => 'onetime',
                 'other_info'       => ['is_custom' => true],
                 'line_meta'        => [],
-                'created_at'       => $order->get_date_created()
-                    ? $order->get_date_created()->date('Y-m-d H:i:s')
-                    : gmdate('Y-m-d H:i:s'),
+                'created_at'       => self::toUtcString($order->get_date_created())
+                    ?? gmdate('Y-m-d H:i:s'),
             ];
         }
 
@@ -313,12 +314,26 @@ final class OrderMapper
                 'wc_order_id'    => $order->get_id(),
                 'wc_transaction' => $order->get_transaction_id(),
             ],
-            'created_at'          => $order->get_date_paid()
-                ? $order->get_date_paid()->date('Y-m-d H:i:s')
-                : ($order->get_date_created()
-                    ? $order->get_date_created()->date('Y-m-d H:i:s')
-                    : gmdate('Y-m-d H:i:s')),
+            'created_at'          => self::toUtcString($order->get_date_paid())
+                ?? self::toUtcString($order->get_date_created())
+                ?? gmdate('Y-m-d H:i:s'),
         ];
+    }
+
+    /**
+     * Render a WC_DateTime as a UTC 'Y-m-d H:i:s' string.
+     *
+     * WC_DateTime::date() formats against getOffsetTimestamp() (site-local); getTimestamp()
+     * is the plain UTC epoch, so gmdate() over it is the UTC rendering that every fct_* column
+     * expects.
+     */
+    private static function toUtcString(?object $date): ?string
+    {
+        if (!$date || !method_exists($date, 'getTimestamp')) {
+            return null;
+        }
+
+        return gmdate('Y-m-d H:i:s', $date->getTimestamp());
     }
 
     /**

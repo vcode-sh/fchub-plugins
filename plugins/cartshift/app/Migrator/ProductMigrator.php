@@ -12,6 +12,7 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\MigrationErrorCode;
 use FluentCart\App\Models\AttributeGroup;
 use FluentCart\App\Models\AttributeRelation;
 use FluentCart\App\Models\AttributeTerm;
@@ -23,6 +24,9 @@ use FluentCart\App\Models\ShippingClass;
 
 final class ProductMigrator extends AbstractMigrator
 {
+    /** @var int|null Highest product ID covered by the ID page fetchBatch() last read. */
+    private ?int $pageEndCursor = null;
+
     /** @var array<int, int> WC term_id => FC term_id mapping for categories */
     private array $categoryMap = [];
 
@@ -38,6 +42,15 @@ final class ProductMigrator extends AbstractMigrator
     /** @var array<int, int> WC shipping class term_id => FC shipping class ID */
     private array $shippingClassMap = [];
 
+    /** @var bool True once the taxonomy maps above hold this migration's data */
+    private bool $mapsLoaded = false;
+
+    /** @var array<string, true> SKUs already known to be taken in FluentCart */
+    private array $knownSkus = [];
+
+    /** Upper bound on suffix attempts when de-duplicating a SKU */
+    private const int SKU_SUFFIX_LIMIT = 50;
+
     private ProductMapper $productMapper;
     private VariationMapper $variationMapper;
 
@@ -45,10 +58,9 @@ final class ProductMigrator extends AbstractMigrator
         IdMapRepository $idMap,
         MigrationLogRepository $log,
         MigrationState $migrationState,
-        string $migrationId,
         int $batchSize = Constants::DEFAULT_BATCH_SIZE,
     ) {
-        parent::__construct($idMap, $log, $migrationState, $migrationId, $batchSize);
+        parent::__construct($idMap, $log, $migrationState, $batchSize);
 
         $currency = get_woocommerce_currency();
         $this->productMapper = new ProductMapper($currency);
@@ -57,6 +69,9 @@ final class ProductMigrator extends AbstractMigrator
 
     /**
      * Run one-time setup: migrate categories, brands, and attributes before processing products.
+     *
+     * Idempotent: entities already recorded in the ID map are adopted straight from it,
+     * without a second ID map row or a second log line.
      */
     #[\Override]
     public function initialize(): void
@@ -66,7 +81,117 @@ final class ProductMigrator extends AbstractMigrator
         $this->migrateAttributes();
         $this->migrateShippingClasses();
 
+        $this->mapsLoaded = true;
+
         // Rebuild mappers now that shipping class map is populated.
+        $this->rebuildMappers();
+    }
+
+    /**
+     * Make sure the taxonomy maps are populated for this PHP process.
+     *
+     * A fresh ProductMigrator is constructed on every REST batch request and every
+     * Action Scheduler invocation, but initialize() only runs on the first batch.
+     * Without this, products beyond the first batch would silently lose their
+     * categories, brands, attributes and shipping classes. Everything needed is
+     * already persisted in the ID map, so rebuild from there instead of replaying
+     * the setup work.
+     */
+    private function ensureTaxonomyMaps(): void
+    {
+        if ($this->mapsLoaded) {
+            return;
+        }
+
+        $this->mapsLoaded = true;
+
+        // Union with in-memory precedence: anything already resolved stays.
+        $this->categoryMap      += $this->rehydrateTermMap(Constants::ENTITY_CATEGORY);
+        $this->brandMap         += $this->rehydrateTermMap(Constants::ENTITY_BRAND);
+        $this->shippingClassMap += $this->rehydrateTermMap(Constants::ENTITY_SHIPPING_CLASS);
+
+        $this->rehydrateAttributeMaps();
+
+        $this->rebuildMappers();
+    }
+
+    /**
+     * Rebuild a WC term_id => FC id map straight from the ID map table.
+     *
+     * @return array<int, int>
+     */
+    private function rehydrateTermMap(string $entityType): array
+    {
+        $map = [];
+
+        foreach ($this->idMap->getMapForEntityType($entityType) as $wcId => $fcId) {
+            $map[(int) $wcId] = (int) $fcId;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Rebuild the attribute group and term maps.
+     *
+     * Neither map is keyed by the WC ID the ID map stores: groups are keyed by the WC
+     * attribute taxonomy slug ("pa_color") and terms by "groupSlug:termSlug". The
+     * composite keys are re-derived from WooCommerce exactly as migrateAttributes()
+     * derives them, then matched against the stored WC attribute and term IDs.
+     */
+    private function rehydrateAttributeMaps(): void
+    {
+        $storedGroups = $this->idMap->getMapForEntityType(Constants::ENTITY_ATTRIBUTE_GROUP);
+
+        if (empty($storedGroups)) {
+            // Nothing was migrated (no FC attribute tables, or no WC attributes).
+            return;
+        }
+
+        $storedTerms = $this->idMap->getMapForEntityType(Constants::ENTITY_ATTRIBUTE_TERM);
+
+        foreach (wc_get_attribute_taxonomies() ?: [] as $wcAttr) {
+            $fcGroupId = $storedGroups[(string) $wcAttr->attribute_id] ?? null;
+
+            if ($fcGroupId === null) {
+                continue;
+            }
+
+            $slug      = wc_attribute_taxonomy_name($wcAttr->attribute_name);
+            $groupSlug = sanitize_title($wcAttr->attribute_name);
+
+            $this->attributeGroupMap[$slug] = (int) $fcGroupId;
+
+            if (empty($storedTerms)) {
+                continue;
+            }
+
+            $wcTerms = get_terms([
+                'taxonomy'   => $slug,
+                'hide_empty' => false,
+            ]);
+
+            if (is_wp_error($wcTerms) || empty($wcTerms)) {
+                continue;
+            }
+
+            foreach ($wcTerms as $wcTerm) {
+                $fcTermId = $storedTerms[(string) $wcTerm->term_id] ?? null;
+
+                if ($fcTermId === null) {
+                    continue;
+                }
+
+                $this->attributeTermMap[$groupSlug . ':' . sanitize_title($wcTerm->slug)] = (int) $fcTermId;
+            }
+        }
+    }
+
+    /**
+     * Rebuild both mappers so they carry the current shipping class map.
+     */
+    private function rebuildMappers(): void
+    {
         $currency = get_woocommerce_currency();
         $this->productMapper = new ProductMapper($currency, $this->shippingClassMap);
         $this->variationMapper = new VariationMapper($currency, $this->shippingClassMap);
@@ -89,8 +214,17 @@ final class ProductMigrator extends AbstractMigrator
         // FIX H3: topological sort — parents always processed before children.
         $sorted = $this->sortCategoriesByHierarchy($wcCategories);
 
+        // Already-mapped terms are adopted from the ID map, so a re-run neither
+        // duplicates rows nor repeats log lines.
+        $stored = $this->idMap->getMapForEntityType(Constants::ENTITY_CATEGORY);
+
         foreach ($sorted as $wcTerm) {
             if ($wcTerm->slug === 'uncategorized') {
+                continue;
+            }
+
+            if (isset($stored[(string) $wcTerm->term_id])) {
+                $this->categoryMap[$wcTerm->term_id] = (int) $stored[(string) $wcTerm->term_id];
                 continue;
             }
 
@@ -102,13 +236,14 @@ final class ProductMigrator extends AbstractMigrator
                     Constants::ENTITY_CATEGORY,
                     (string) $wcTerm->term_id,
                     $existing->term_id,
-                    $this->migrationId,
+                    $this->migrationId(),
                     false,
                 );
                 $this->writeLog(
                     $wcTerm->term_id,
                     'skipped',
                     sprintf('Category "%s" already exists in FluentCart (FC term %d).', $wcTerm->name, $existing->term_id),
+                    MigrationErrorCode::AlreadyExistsInFluentCart,
                 );
                 continue;
             }
@@ -129,6 +264,7 @@ final class ProductMigrator extends AbstractMigrator
                     $wcTerm->term_id,
                     'error',
                     sprintf('Failed to create category "%s": %s', $wcTerm->name, $result->get_error_message()),
+                    MigrationErrorCode::TermCreationFailed,
                 );
                 continue;
             }
@@ -138,7 +274,7 @@ final class ProductMigrator extends AbstractMigrator
                 Constants::ENTITY_CATEGORY,
                 (string) $wcTerm->term_id,
                 $result['term_id'],
-                $this->migrationId,
+                $this->migrationId(),
                 true,
             );
             $this->writeLog(
@@ -183,17 +319,167 @@ final class ProductMigrator extends AbstractMigrator
         ));
     }
 
+    /**
+     * Keyset pagination over product IDs.
+     *
+     * WC_Product_Query cannot express `ID > x`. Its whole vocabulary is the
+     * array returned by get_default_query_vars() — status, type, sku, price,
+     * date_created, include/exclude and friends — and `include` maps straight
+     * to WP_Query's post__in, which is a set membership test, not a range.
+     *
+     * @see woocommerce/includes/class-wc-product-query.php::get_default_query_vars() (v11.0.0, line 26)
+     * @see woocommerce/includes/data-stores/class-wc-product-data-store-cpt.php::get_wp_query_args() (v11.0.0, line 2194: 'include' => 'post__in')
+     *
+     * So the ID page comes from a direct indexed query that reuses countTotal()'s
+     * exact type/status filtering — the two must agree, or the progress bar lies
+     * — and hydration goes through wc_get_products(['include' => $ids]), which
+     * primes the post caches in one pass the way the old call did.
+     */
     #[\Override]
-    public function fetchBatch(int $offset, int $limit): array
+    public function fetchBatch(string|int|null $cursor, int $limit): array
     {
-        return wc_get_products([
-            'limit'   => $limit,
-            'offset'  => $offset,
+        $after = max(0, (int) $cursor);
+
+        // Loop only in the pathological case where an entire ID page fails to
+        // hydrate. Returning [] there would tell the orchestrator the entity is
+        // finished and silently truncate the migration, so keep walking until
+        // there is something to hand back or the table runs out.
+        while (true) {
+            $ids = $this->fetchProductIdPage($after, $limit);
+
+            if ($ids === []) {
+                return [];
+            }
+
+            $after = (int) end($ids);
+            $this->pageEndCursor = $after;
+
+            $products = wc_get_products([
+                'limit'   => count($ids),
+                'include' => $ids,
+                'type'    => $this->getProductTypes(),
+                'status'  => ['publish', 'draft', 'private'],
+                'orderby' => 'ID',
+                'order'   => 'ASC',
+            ]);
+
+            $products = array_values(array_filter(
+                (array) $products,
+                static fn (mixed $product): bool => is_object($product),
+            ));
+
+            if ($products !== []) {
+                return $products;
+            }
+        }
+    }
+
+    /**
+     * Hydrate exactly these product IDs, for a retry run.
+     *
+     * The same wc_get_products() call fetchBatch() hydrates its ID page with,
+     * carrying the identical type and status filter — a product that has since
+     * been trashed, or whose type was changed to one this migrator does not
+     * handle, is not returned rather than being migrated by a back door the
+     * normal run does not have.
+     *
+     * The page cursor is left alone: a retry paginates an ID list, not wp_posts.
+     *
+     * @param array<int, string|int> $wcIds
+     *
+     * @return list<\WC_Product>
+     */
+    #[\Override]
+    public function fetchByIds(array $wcIds): array
+    {
+        $ids = self::normalizeIntIds($wcIds);
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $products = wc_get_products([
+            'limit'   => count($ids),
+            'include' => $ids,
             'type'    => $this->getProductTypes(),
             'status'  => ['publish', 'draft', 'private'],
             'orderby' => 'ID',
             'order'   => 'ASC',
         ]);
+
+        return array_values(array_filter(
+            (array) $products,
+            static fn (mixed $product): bool => is_object($product),
+        ));
+    }
+
+    /**
+     * The cursor is the end of the ID page, not the last hydrated record.
+     *
+     * If wc_get_products() drops a trailing ID — a corrupt row, a filter that
+     * vetoes it — resuming from the last hydrated product would re-read that ID
+     * for ever. The page end always moves forward.
+     */
+    #[\Override]
+    public function cursorFor(mixed $record): string|int
+    {
+        return $this->pageEndCursor ?? parent::cursorFor($record);
+    }
+
+    /**
+     * The next page of product IDs strictly after $afterId.
+     *
+     * Same joins, same post_type/post_status/product_type filtering as
+     * countTotal(); only the range clause, the ordering and the projection
+     * differ.
+     *
+     * @return list<int>
+     */
+    private function fetchProductIdPage(int $afterId, int $limit): array
+    {
+        global $wpdb;
+
+        $types = $this->getProductTypes();
+        $placeholders = implode(',', array_fill(0, count($types), '%s'));
+
+        $ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT p.ID
+             FROM {$wpdb->prefix}wc_product_meta_lookup pml
+             INNER JOIN {$wpdb->posts} p ON p.ID = pml.product_id
+             WHERE p.post_type = 'product'
+               AND p.post_status IN ('publish', 'draft', 'private')
+               AND p.ID > %d
+               AND pml.product_id IN (
+                   SELECT object_id FROM {$wpdb->term_relationships} tr
+                   INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+                   INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
+                   WHERE tt.taxonomy = 'product_type'
+                     AND t.slug IN ({$placeholders})
+               )
+             ORDER BY p.ID ASC
+             LIMIT %d",
+            ...[$afterId, ...$types, $limit],
+        ));
+
+        return array_map(intval(...), $ids);
+    }
+
+    /**
+     * Write the mapper's warnings about the product just mapped into the log.
+     *
+     * Mirrors CouponMigrator and SubscriptionMigrator. Until this existed the
+     * product mapper's only warning — a WooCommerce product visible in the
+     * catalog but not in search, or the other way round, a distinction
+     * FluentCart cannot express — was handed to a filter nobody consumes and
+     * then dropped. The information loss was real and permanent; the record of
+     * it lasted microseconds. `partial_catalog_visibility` was consequently a
+     * failure-reason filter that could only ever return zero rows.
+     */
+    private function flushMapperWarnings(int|string $wcId): void
+    {
+        foreach ($this->productMapper->getCodedWarnings() as $warning) {
+            $this->writeLog($wcId, 'warning', $warning['message'], $warning['code']);
+        }
     }
 
     /**
@@ -208,7 +494,7 @@ final class ProductMigrator extends AbstractMigrator
         $name = $product->get_name();
 
         if ($this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcId)) {
-            $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.');
+            $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.', MigrationErrorCode::AlreadyMigrated);
             return false;
         }
 
@@ -218,19 +504,26 @@ final class ProductMigrator extends AbstractMigrator
             $this->writeLog($wcId, 'dry-run', sprintf(
                 'dry-run: unsupported product type "%s", would skip.',
                 $product->get_type(),
-            ));
+            ), MigrationErrorCode::UnsupportedProductType);
             return false;
         }
 
+        $this->flushMapperWarnings($wcId);
+
         if (empty($name)) {
-            $this->writeLog($wcId, 'dry-run', 'dry-run: product name is empty, would fail.');
+            $this->writeLog($wcId, 'dry-run', 'dry-run: product name is empty, would fail.', MigrationErrorCode::EmptyProductName);
             return false;
         }
 
         $variationCount = count($mapped['variations']);
 
         if ($variationCount === 0) {
-            $this->writeLog($wcId, 'dry-run', 'dry-run: no variations would be created, would fail.');
+            $this->writeLog(
+                $wcId,
+                'dry-run',
+                'dry-run: no variations would be created, would fail.',
+                MigrationErrorCode::NoVariationsMapped,
+            );
             return false;
         }
 
@@ -251,40 +544,61 @@ final class ProductMigrator extends AbstractMigrator
     {
         $wcId = $product->get_id();
 
+        // initialize() only runs on the first batch, and this instance may well be
+        // a later batch in a fresh PHP process.
+        $this->ensureTaxonomyMaps();
+
         if ($this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcId)) {
-            $this->writeLog($wcId, 'skipped', 'Already migrated.');
+            $this->writeLog($wcId, 'skipped', 'Already migrated.', MigrationErrorCode::AlreadyMigrated);
             return false;
         }
 
         $mapped = $this->productMapper->map($product);
 
         if ($mapped === null) {
-            $this->writeLog($wcId, 'skipped', sprintf('Unsupported product type: %s', $product->get_type()));
+            $this->writeLog(
+                $wcId,
+                'skipped',
+                sprintf('Unsupported product type: %s', $product->get_type()),
+                MigrationErrorCode::UnsupportedProductType,
+            );
             return false;
         }
+
+        $this->flushMapperWarnings($wcId);
 
         // 1. Create the WP post (FC product).
         $postId = wp_insert_post($mapped['product'], true);
 
         if (is_wp_error($postId)) {
-            throw new \RuntimeException($postId->get_error_message());
+            // Thrown, not logged: the orchestrator wraps this record in a
+            // transaction and would roll a log row straight back out again.
+            // RecordMigrationException carries the reason across that boundary.
+            throw new RecordMigrationException(
+                $postId->get_error_message(),
+                MigrationErrorCode::ProductCreationFailed,
+            );
         }
 
-        $this->idMap->store(Constants::ENTITY_PRODUCT, (string) $wcId, $postId, $this->migrationId, true);
+        $this->idMap->store(Constants::ENTITY_PRODUCT, (string) $wcId, $postId, $this->migrationId(), true);
 
         // 2. Create product detail row.
         $detailData = $mapped['detail'];
         $detailData['post_id'] = $postId;
 
         $detail = ProductDetail::query()->create($detailData);
-        $this->idMap->store(Constants::ENTITY_PRODUCT_DETAIL, (string) $wcId, $detail->id, $this->migrationId, true);
+        $this->idMap->store(Constants::ENTITY_PRODUCT_DETAIL, (string) $wcId, $detail->id, $this->migrationId(), true);
 
         // 3. Create variations.
         $minPrice = PHP_INT_MAX;
         $maxPrice = 0;
         $firstVariationId = null;
         $isVariable = $product->get_type() === 'variable';
-        $wcVariationIds = $isVariable ? $product->get_children() : [$wcId];
+
+        // Load every WC variation exactly once and pass the objects around; the
+        // variation loop, attribute assignment and download migration all need them.
+        $wcVariations = $isVariable ? $this->loadVariations($product) : [];
+        $wcVariationIds = $isVariable ? array_keys($wcVariations) : [$wcId];
 
         /** @var array<int, array{fc_id: int, attributes: array}> FC variation ID => attributes for M15 matching */
         $fcVariationMap = [];
@@ -315,22 +629,23 @@ final class ProductMigrator extends AbstractMigrator
                 Constants::ENTITY_VARIATION,
                 (string) $variationWcId,
                 $fcVariation->id,
-                $this->migrationId,
+                $this->migrationId(),
                 true,
             );
 
             // FIX M3: Migrate variation thumbnail.
-            if ($isVariable && isset($wcVariationIds[$index])) {
-                $wcVariation = wc_get_product($wcVariationIds[$index]);
-                if ($wcVariation instanceof \WC_Product_Variation) {
-                    $this->migrateVariationThumbnail($wcVariation, $fcVariation->id);
+            $wcVariation = $isVariable && isset($wcVariationIds[$index])
+                ? ($wcVariations[$wcVariationIds[$index]] ?? null)
+                : null;
 
-                    // Collect attributes for M15 default variation matching.
-                    $fcVariationMap[] = [
-                        'fc_id'      => $fcVariation->id,
-                        'attributes' => $wcVariation->get_attributes(),
-                    ];
-                }
+            if ($wcVariation !== null) {
+                $this->migrateVariationThumbnail($wcVariation, $fcVariation->id);
+
+                // Collect attributes for M15 default variation matching.
+                $fcVariationMap[] = [
+                    'fc_id'      => $fcVariation->id,
+                    'attributes' => $wcVariation->get_attributes(),
+                ];
             }
         }
 
@@ -369,13 +684,13 @@ final class ProductMigrator extends AbstractMigrator
 
         // FIX M6: Create FC attribute relations for variations.
         if ($isVariable) {
-            $this->assignAttributes($product, $postId, $wcVariationIds);
+            $this->assignAttributes($wcVariations);
         }
 
         // FIX M4: Migrate downloadable files.
         // For variable products, downloadable flag lives on individual variations, not the parent.
         if ($product->is_downloadable() || $isVariable) {
-            $this->migrateDownloadFiles($product, $postId, $isVariable, $wcVariationIds);
+            $this->migrateDownloadFiles($product, $postId, $isVariable, $wcVariations);
         }
 
         $this->writeLog($wcId, 'success', sprintf(
@@ -465,19 +780,42 @@ final class ProductMigrator extends AbstractMigrator
      * For simple products the downloads belong to a single variation.
      * For variable products each WC variation's downloads are mapped to the corresponding FC variation.
      *
-     * @param int[] $wcVariationIds WC variation (or product) IDs in variation order.
+     * @param array<int, \WC_Product_Variation> $wcVariations WC variation ID => already loaded object.
      */
     private function migrateDownloadFiles(
         \WC_Product $product,
         int $fcPostId,
         bool $isVariable,
-        array $wcVariationIds,
+        array $wcVariations,
     ): void {
         if ($isVariable) {
-            $this->migrateVariableDownloads($product, $fcPostId, $wcVariationIds);
+            $this->migrateVariableDownloads($product, $fcPostId, $wcVariations);
         } else {
             $this->migrateSimpleDownloads($product, $fcPostId);
         }
+    }
+
+    /**
+     * Load a variable product's children once, keyed by WC variation ID.
+     *
+     * Children that no longer resolve to a variation are dropped, which keeps the
+     * index alignment with ProductMapper::map() — it filters the same way.
+     *
+     * @return array<int, \WC_Product_Variation>
+     */
+    private function loadVariations(\WC_Product $product): array
+    {
+        $variations = [];
+
+        foreach ($product->get_children() as $childId) {
+            $wcVariation = wc_get_product((int) $childId);
+
+            if ($wcVariation instanceof \WC_Product_Variation) {
+                $variations[(int) $childId] = $wcVariation;
+            }
+        }
+
+        return $variations;
     }
 
     /**
@@ -510,12 +848,12 @@ final class ProductMigrator extends AbstractMigrator
     /**
      * Migrate downloads for a variable product — each WC variation's files map to its FC variation.
      *
-     * @param int[] $wcVariationIds WC variation IDs in order.
+     * @param array<int, \WC_Product_Variation> $wcVariations WC variation ID => already loaded object.
      */
     private function migrateVariableDownloads(
         \WC_Product $product,
         int $fcPostId,
-        array $wcVariationIds,
+        array $wcVariations,
     ): void {
         /**
          * Group identical files across variations so a single FC download record
@@ -525,9 +863,8 @@ final class ProductMigrator extends AbstractMigrator
          */
         $groups = [];
 
-        foreach ($wcVariationIds as $wcVarId) {
-            $wcVariation = wc_get_product($wcVarId);
-            if (!$wcVariation instanceof \WC_Product_Variation || !$wcVariation->is_downloadable()) {
+        foreach ($wcVariations as $wcVarId => $wcVariation) {
+            if (!$wcVariation->is_downloadable()) {
                 continue;
             }
 
@@ -750,7 +1087,14 @@ final class ProductMigrator extends AbstractMigrator
             return;
         }
 
+        $stored = $this->idMap->getMapForEntityType(Constants::ENTITY_BRAND);
+
         foreach ($wcBrands as $wcTerm) {
+            if (isset($stored[(string) $wcTerm->term_id])) {
+                $this->brandMap[$wcTerm->term_id] = (int) $stored[(string) $wcTerm->term_id];
+                continue;
+            }
+
             $existing = get_term_by('slug', $wcTerm->slug, 'product-brands');
 
             if ($existing) {
@@ -759,13 +1103,14 @@ final class ProductMigrator extends AbstractMigrator
                     Constants::ENTITY_BRAND,
                     (string) $wcTerm->term_id,
                     $existing->term_id,
-                    $this->migrationId,
+                    $this->migrationId(),
                     false,
                 );
                 $this->writeLog(
                     $wcTerm->term_id,
                     'skipped',
                     sprintf('Brand "%s" already exists in FluentCart (FC term %d).', $wcTerm->name, $existing->term_id),
+                    MigrationErrorCode::AlreadyExistsInFluentCart,
                 );
                 continue;
             }
@@ -780,6 +1125,7 @@ final class ProductMigrator extends AbstractMigrator
                     $wcTerm->term_id,
                     'error',
                     sprintf('Failed to create brand "%s": %s', $wcTerm->name, $result->get_error_message()),
+                    MigrationErrorCode::TermCreationFailed,
                 );
                 continue;
             }
@@ -789,7 +1135,7 @@ final class ProductMigrator extends AbstractMigrator
                 Constants::ENTITY_BRAND,
                 (string) $wcTerm->term_id,
                 $result['term_id'],
-                $this->migrationId,
+                $this->migrationId(),
                 true,
             );
             $this->writeLog(
@@ -865,9 +1211,21 @@ final class ProductMigrator extends AbstractMigrator
             return;
         }
 
+        $storedGroups = $this->idMap->getMapForEntityType(Constants::ENTITY_ATTRIBUTE_GROUP);
+        $storedTerms  = $this->idMap->getMapForEntityType(Constants::ENTITY_ATTRIBUTE_TERM);
+
         foreach ($wcAttributes as $wcAttr) {
             $slug = wc_attribute_taxonomy_name($wcAttr->attribute_name);
             $groupSlug = sanitize_title($wcAttr->attribute_name);
+
+            $storedGroupId = $storedGroups[(string) $wcAttr->attribute_id] ?? null;
+
+            if ($storedGroupId !== null) {
+                // Already recorded by an earlier run — adopt without touching the ID map.
+                $this->attributeGroupMap[$slug] = (int) $storedGroupId;
+                $this->migrateAttributeTerms($slug, $groupSlug, (int) $storedGroupId, $storedTerms);
+                continue;
+            }
 
             // Check if group already exists in FC.
             $existing = AttributeGroup::query()->where('slug', $groupSlug)->first();
@@ -878,7 +1236,7 @@ final class ProductMigrator extends AbstractMigrator
                     Constants::ENTITY_ATTRIBUTE_GROUP,
                     (string) $wcAttr->attribute_id,
                     (int) $existing->id,
-                    $this->migrationId,
+                    $this->migrationId(),
                     false,
                 );
             } else {
@@ -892,7 +1250,7 @@ final class ProductMigrator extends AbstractMigrator
                     Constants::ENTITY_ATTRIBUTE_GROUP,
                     (string) $wcAttr->attribute_id,
                     (int) $group->id,
-                    $this->migrationId,
+                    $this->migrationId(),
                     true,
                 );
                 $this->writeLog(
@@ -902,55 +1260,78 @@ final class ProductMigrator extends AbstractMigrator
                 );
             }
 
-            // Migrate terms for this attribute.
-            $wcTerms = get_terms([
-                'taxonomy'   => $slug,
-                'hide_empty' => false,
-            ]);
+            $this->migrateAttributeTerms($slug, $groupSlug, $this->attributeGroupMap[$slug], $storedTerms);
+        }
+    }
 
-            if (is_wp_error($wcTerms) || empty($wcTerms)) {
+    /**
+     * Migrate the terms of a single WC attribute taxonomy into an FC attribute group.
+     *
+     * @param string             $taxonomy    WC attribute taxonomy slug, e.g. "pa_color".
+     * @param string             $groupSlug   Sanitised attribute name, the composite key prefix.
+     * @param int                $groupId     FC attribute group ID.
+     * @param array<string, int> $storedTerms WC term_id => FC term ID already in the ID map.
+     */
+    private function migrateAttributeTerms(
+        string $taxonomy,
+        string $groupSlug,
+        int $groupId,
+        array $storedTerms,
+    ): void {
+        $wcTerms = get_terms([
+            'taxonomy'   => $taxonomy,
+            'hide_empty' => false,
+        ]);
+
+        if (is_wp_error($wcTerms) || empty($wcTerms)) {
+            return;
+        }
+
+        $serial = 1;
+
+        foreach ($wcTerms as $wcTerm) {
+            $termSlug = sanitize_title($wcTerm->slug);
+            $compositeKey = $groupSlug . ':' . $termSlug;
+
+            $storedTermId = $storedTerms[(string) $wcTerm->term_id] ?? null;
+
+            if ($storedTermId !== null) {
+                $this->attributeTermMap[$compositeKey] = (int) $storedTermId;
                 continue;
             }
 
-            $groupId = $this->attributeGroupMap[$slug];
-            $serial = 1;
+            $existingTerm = AttributeTerm::query()
+                ->where('group_id', $groupId)
+                ->where('slug', $termSlug)
+                ->first();
 
-            foreach ($wcTerms as $wcTerm) {
-                $termSlug = sanitize_title($wcTerm->slug);
-                $compositeKey = $groupSlug . ':' . $termSlug;
-
-                $existingTerm = AttributeTerm::query()
-                    ->where('group_id', $groupId)
-                    ->where('slug', $termSlug)
-                    ->first();
-
-                if ($existingTerm) {
-                    $this->attributeTermMap[$compositeKey] = (int) $existingTerm->id;
-                    $this->idMap->store(
-                        Constants::ENTITY_ATTRIBUTE_TERM,
-                        (string) $wcTerm->term_id,
-                        (int) $existingTerm->id,
-                        $this->migrationId,
-                        false,
-                    );
-                } else {
-                    $fcTerm = AttributeTerm::query()->create([
-                        'group_id' => $groupId,
-                        'serial'   => $serial++,
-                        'title'    => $wcTerm->name,
-                        'slug'     => $termSlug,
-                    ]);
-
-                    $this->attributeTermMap[$compositeKey] = (int) $fcTerm->id;
-                    $this->idMap->store(
-                        Constants::ENTITY_ATTRIBUTE_TERM,
-                        (string) $wcTerm->term_id,
-                        (int) $fcTerm->id,
-                        $this->migrationId,
-                        true,
-                    );
-                }
+            if ($existingTerm) {
+                $this->attributeTermMap[$compositeKey] = (int) $existingTerm->id;
+                $this->idMap->store(
+                    Constants::ENTITY_ATTRIBUTE_TERM,
+                    (string) $wcTerm->term_id,
+                    (int) $existingTerm->id,
+                    $this->migrationId(),
+                    false,
+                );
+                continue;
             }
+
+            $fcTerm = AttributeTerm::query()->create([
+                'group_id' => $groupId,
+                'serial'   => $serial++,
+                'title'    => $wcTerm->name,
+                'slug'     => $termSlug,
+            ]);
+
+            $this->attributeTermMap[$compositeKey] = (int) $fcTerm->id;
+            $this->idMap->store(
+                Constants::ENTITY_ATTRIBUTE_TERM,
+                (string) $wcTerm->term_id,
+                (int) $fcTerm->id,
+                $this->migrationId(),
+                true,
+            );
         }
     }
 
@@ -968,7 +1349,14 @@ final class ProductMigrator extends AbstractMigrator
             return;
         }
 
+        $stored = $this->idMap->getMapForEntityType(Constants::ENTITY_SHIPPING_CLASS);
+
         foreach ($wcShippingClasses as $wcTerm) {
+            if (isset($stored[(string) $wcTerm->term_id])) {
+                $this->shippingClassMap[$wcTerm->term_id] = (int) $stored[(string) $wcTerm->term_id];
+                continue;
+            }
+
             $existing = ShippingClass::query()->where('name', $wcTerm->name)->first();
 
             if ($existing) {
@@ -977,13 +1365,14 @@ final class ProductMigrator extends AbstractMigrator
                     Constants::ENTITY_SHIPPING_CLASS,
                     (string) $wcTerm->term_id,
                     (int) $existing->id,
-                    $this->migrationId,
+                    $this->migrationId(),
                     false,
                 );
                 $this->writeLog(
                     $wcTerm->term_id,
                     'skipped',
                     sprintf('Shipping class "%s" already exists in FluentCart (FC ID %d).', $wcTerm->name, $existing->id),
+                    MigrationErrorCode::AlreadyExistsInFluentCart,
                 );
                 continue;
             }
@@ -1000,7 +1389,7 @@ final class ProductMigrator extends AbstractMigrator
                 Constants::ENTITY_SHIPPING_CLASS,
                 (string) $wcTerm->term_id,
                 (int) $fcShippingClass->id,
-                $this->migrationId,
+                $this->migrationId(),
                 true,
             );
             $this->writeLog(
@@ -1014,22 +1403,17 @@ final class ProductMigrator extends AbstractMigrator
     /**
      * FIX M6: Create FC attribute relations for a variable product's variations.
      *
-     * @param int[] $wcVariationIds WC variation IDs in order.
+     * @param array<int, \WC_Product_Variation> $wcVariations WC variation ID => already loaded object.
      */
-    private function assignAttributes(\WC_Product $product, int $fcPostId, array $wcVariationIds): void
+    private function assignAttributes(array $wcVariations): void
     {
         if (empty($this->attributeGroupMap)) {
             return;
         }
 
-        foreach ($wcVariationIds as $wcVarId) {
+        foreach ($wcVariations as $wcVarId => $wcVariation) {
             $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcVarId);
             if (!$fcVariationId) {
-                continue;
-            }
-
-            $wcVariation = wc_get_product($wcVarId);
-            if (!$wcVariation instanceof \WC_Product_Variation) {
                 continue;
             }
 
@@ -1064,22 +1448,53 @@ final class ProductMigrator extends AbstractMigrator
 
     /**
      * Ensure SKU uniqueness by appending a suffix if the SKU already exists in FC.
+     *
+     * Every SKU this run has seen — found in FluentCart or handed out here — is
+     * remembered, so a repeated SKU costs no second query and collisions created
+     * earlier in the same run are still caught.
      */
     private function ensureUniqueSku(string $sku, int $wcId): string
     {
-        $existing = ProductVariation::query()->where('sku', $sku)->first();
+        if (!$this->skuExists($sku)) {
+            $this->knownSkus[$sku] = true;
 
-        if (!$existing) {
             return $sku;
         }
 
         $newSku = $sku . '-wc' . $wcId;
+
+        for ($attempt = 2; $attempt <= self::SKU_SUFFIX_LIMIT && $this->skuExists($newSku); $attempt++) {
+            $newSku = $sku . '-wc' . $wcId . '-' . $attempt;
+        }
+
+        $this->knownSkus[$newSku] = true;
+
         $this->writeLog($wcId, 'skipped', sprintf(
             'SKU "%s" already exists in FluentCart. Using "%s" instead.',
             $sku,
             $newSku,
-        ));
+        ), MigrationErrorCode::SkuCollision);
 
         return $newSku;
+    }
+
+    /**
+     * Is this SKU already taken, either in FluentCart or by this run?
+     */
+    private function skuExists(string $sku): bool
+    {
+        if (isset($this->knownSkus[$sku])) {
+            return true;
+        }
+
+        $existing = ProductVariation::query()->where('sku', $sku)->first();
+
+        if (!$existing) {
+            return false;
+        }
+
+        $this->knownSkus[$sku] = true;
+
+        return true;
     }
 }

@@ -4,13 +4,17 @@
 node_modules/
 vendor/
 tests/
+tests/js/
 docs/
+stubs/
+biome.json
 .phpunit.cache/
 composer.json
 composer.lock
 package.json
 package-lock.json
 vite.config.js
+vitest.config.js
 phpunit.xml
 phpunit.xml.dist
 *.md

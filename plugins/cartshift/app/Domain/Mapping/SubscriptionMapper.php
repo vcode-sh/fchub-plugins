@@ -10,6 +10,7 @@ use CartShift\Storage\IdMapRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\Enums\FcBillingInterval;
 use CartShift\Support\Enums\FcSubscriptionStatus;
+use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\MoneyHelper;
 
 final class SubscriptionMapper
@@ -19,7 +20,11 @@ final class SubscriptionMapper
         private readonly string $currency,
     ) {}
 
-    /** @var string[] Warnings collected during the last map() call. */
+    /**
+     * Warnings collected during the last map() call, each with its code.
+     *
+     * @var list<array{message: string, code: MigrationErrorCode}>
+     */
     private array $warnings = [];
 
     /**
@@ -54,12 +59,15 @@ final class SubscriptionMapper
                 static fn ($item) => $item->get_name(),
                 array_slice($items, 1),
             );
-            $this->warnings[] = sprintf(
-                'Subscription #%d has %d items — only the first will be migrated. Items dropped: [%s]',
-                $subscription->get_id(),
-                count($items),
-                implode(', ', $droppedNames),
-            );
+            $this->warnings[] = [
+                'message' => sprintf(
+                    'Subscription #%d has %d items — only the first will be migrated. Items dropped: [%s]',
+                    $subscription->get_id(),
+                    count($items),
+                    implode(', ', $droppedNames),
+                ),
+                'code' => MigrationErrorCode::MultiItemSubscription,
+            ];
         }
 
         if (!empty($items)) {
@@ -173,9 +181,25 @@ final class SubscriptionMapper
     /**
      * Warnings collected during the last map() call.
      *
-     * @return string[]
+     * Plain sentences, because that is what every existing caller expects.
+     * getCodedWarnings() is the one to reach for when the code matters too.
+     *
+     * @return list<string>
      */
     public function getWarnings(): array
+    {
+        return array_map(
+            static fn (array $warning): string => $warning['message'],
+            $this->warnings,
+        );
+    }
+
+    /**
+     * The same warnings, each paired with the reason code it stands for.
+     *
+     * @return list<array{message: string, code: MigrationErrorCode}>
+     */
+    public function getCodedWarnings(): array
     {
         return $this->warnings;
     }
@@ -205,11 +229,14 @@ final class SubscriptionMapper
 
         // Unknown gateway with a payment method set — log for visibility.
         if ($paymentMethod && !in_array($paymentMethod, ['', 'manual', 'bacs', 'cheque', 'cod'], true)) {
-            $this->warnings[] = sprintf(
-                'Subscription #%d uses gateway "%s" — no vendor ID mapping defined. vendor_*_id fields left empty.',
-                $subscription->get_id(),
-                $paymentMethod,
-            );
+            $this->warnings[] = [
+                'message' => sprintf(
+                    'Subscription #%d uses gateway "%s" — no vendor ID mapping defined. vendor_*_id fields left empty.',
+                    $subscription->get_id(),
+                    $paymentMethod,
+                ),
+                'code' => MigrationErrorCode::UnmappedSubscriptionGateway,
+            ];
         }
 
         return [null, null, null];

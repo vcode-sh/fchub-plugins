@@ -625,6 +625,22 @@ if (!class_exists('WC_Coupon')) {
         protected float $maximum_amount = 0.0;
         protected array $meta = [];
 
+        /**
+         * Real WooCommerce takes an ID (or a code) here and loads the coupon;
+         * the stub takes the ID and remembers it, which is enough for anything
+         * that hydrates a known coupon ID. Tests that build a coupon by setting
+         * properties through reflection keep calling `new WC_Coupon()` with no
+         * argument and are unaffected.
+         */
+        public function __construct(int|string $data = 0)
+        {
+            $id = is_int($data) ? $data : (int) $data;
+
+            if ($id > 0) {
+                $this->id = $id;
+            }
+        }
+
         public function get_id(): int { return $this->id; }
         public function get_code(): string { return $this->code; }
         public function get_discount_type(): string { return $this->discount_type; }

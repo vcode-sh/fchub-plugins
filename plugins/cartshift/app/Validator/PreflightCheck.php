@@ -8,27 +8,62 @@ defined('ABSPATH') || exit;
 
 final class PreflightCheck
 {
+    /** Nothing to see here. */
+    public const string SEVERITY_PASS = 'pass';
+
+    /** Worth knowing. Not worth stopping for. */
+    public const string SEVERITY_WARN = 'warn';
+
+    /** Migrate now and you will get wrong data. Blocks. */
+    public const string SEVERITY_FAIL = 'fail';
+
+    /** Recommended PHP memory limit, in bytes. Below this we grumble, we don't stop. */
+    private const int RECOMMENDED_MEMORY_BYTES = 268435456; // 256 MB
+
+    /** Recommended max_execution_time, in seconds. */
+    private const int RECOMMENDED_EXECUTION_SECONDS = 300;
+
+    /** WooCommerce's HPOS opt-in option. */
+    private const string HPOS_OPTION = 'woocommerce_custom_orders_table_enabled';
+
+    /** WooCommerce's posts <-> HPOS realtime sync option. */
+    private const string HPOS_SYNC_OPTION = 'woocommerce_custom_orders_table_data_sync_enabled';
+
+    private const string ORDER_UTIL = '\Automattic\WooCommerce\Utilities\OrderUtil';
+
+    private const string HPOS_DATA_STORE = '\Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore';
+
     /**
      * Run all preflight checks and return structured results.
      *
-     * @return array{checks: array, ready: bool}
+     * Readiness is derived from severity, not from vibes: any check marked
+     * SEVERITY_FAIL blocks the migration, everything else does not. Warnings are for
+     * things the admin should know about; failures are for things that would make
+     * the migration produce quietly wrong data.
+     *
+     * @return array{checks: array<string, array<string, mixed>>, ready: bool}
      */
     public function run(): array
     {
         $checks = [];
 
-        $checks['woocommerce'] = $this->checkWooCommerce();
-        $checks['fluentcart']  = $this->checkFluentCart();
-        $checks['wc_subscriptions'] = $this->checkWcSubscriptions();
-        $checks['php_memory']  = $this->checkPhpMemory();
+        $checks['woocommerce']        = $this->checkWooCommerce();
+        $checks['fluentcart']         = $this->checkFluentCart();
+        $checks['order_storage']      = $this->checkOrderStorage();
+        $checks['wc_subscriptions']   = $this->checkWcSubscriptions();
+        $checks['php_memory']         = $this->checkPhpMemory();
         $checks['max_execution_time'] = $this->checkMaxExecutionTime();
-        $checks['product_types'] = $this->checkProductTypes();
-        $checks['fc_data']     = $this->checkExistingFcData();
-        $checks['migration_tables'] = $this->checkMigrationTables();
+        $checks['product_types']      = $this->checkProductTypes();
+        $checks['fc_data']            = $this->checkExistingFcData();
+        $checks['migration_tables']   = $this->checkMigrationTables();
 
-        $ready = $checks['woocommerce']['pass']
-            && $checks['fluentcart']['pass']
-            && $checks['migration_tables']['pass'];
+        $ready = true;
+
+        foreach ($checks as $check) {
+            if (($check['severity'] ?? self::SEVERITY_PASS) === self::SEVERITY_FAIL) {
+                $ready = false;
+            }
+        }
 
         return [
             'checks' => $checks,
@@ -36,111 +71,292 @@ final class PreflightCheck
         ];
     }
 
-    private function checkWooCommerce(): array
+    /**
+     * Build a check result.
+     *
+     * `pass` and `warning` are derived from severity so the admin UI keeps reading
+     * exactly the keys it always read. `severity` is the thing to reason about.
+     *
+     * @param array<string, mixed> $extra
+     * @return array<string, mixed>
+     */
+    private function result(string $label, string $severity, string $message, array $extra = []): array
     {
-        $active = class_exists('WooCommerce');
-        $version = $active && defined('WC_VERSION') ? WC_VERSION : null;
-
         return [
-            'label'   => 'WooCommerce',
-            'pass'    => $active,
-            'version' => $version,
-            'message' => $active
-                ? sprintf('WooCommerce %s is active.', $version)
-                : 'WooCommerce is not active. Please activate it before migrating.',
-        ];
-    }
-
-    private function checkFluentCart(): array
-    {
-        $active = defined('FLUENTCART_PLUGIN_PATH');
-        $version = defined('FLUENTCART_VERSION') ? FLUENTCART_VERSION : null;
-
-        return [
-            'label'   => 'FluentCart',
-            'pass'    => $active,
-            'version' => $version,
-            'message' => $active
-                ? sprintf('FluentCart %s is active.', $version)
-                : 'FluentCart is not active. Please activate it before migrating.',
-        ];
-    }
-
-    private function checkWcSubscriptions(): array
-    {
-        $active = class_exists('WC_Subscriptions');
-        $version = $active && defined('WCS_VERSION') ? WCS_VERSION : null;
-
-        return [
-            'label'    => 'WooCommerce Subscriptions',
-            'pass'     => true, // Not required, always passes
-            'optional' => true,
-            'active'   => $active,
-            'version'  => $version,
-            'message'  => $active
-                ? sprintf('WC Subscriptions %s detected. Subscription migration will be available.', $version)
-                : 'WC Subscriptions not detected. Subscription migration will be skipped.',
-        ];
-    }
-
-    private function checkPhpMemory(): array
-    {
-        $limit = ini_get('memory_limit');
-        $bytes = wp_convert_hr_to_bytes($limit);
-        // -1 means unlimited
-        $adequate = ($bytes === -1) || ($bytes >= 256 * 1024 * 1024);
-
-        return [
-            'label'   => 'PHP Memory',
-            'pass'    => $adequate,
-            'value'   => $limit,
-            'message' => $adequate
-                ? sprintf('PHP memory limit is %s (recommended: 256M+).', $limit)
-                : sprintf('PHP memory limit is %s. Consider increasing to at least 256M for large migrations.', $limit),
-        ];
+            'label'    => $label,
+            'severity' => $severity,
+            'pass'     => $severity !== self::SEVERITY_FAIL,
+            'warning'  => $severity === self::SEVERITY_WARN,
+            'message'  => $message,
+        ] + $extra;
     }
 
     /**
-     * F5: Check max_execution_time — warn if too low, note that batched migration handles this.
+     * BLOCKING. No WooCommerce, nothing to migrate from.
+     */
+    private function checkWooCommerce(): array
+    {
+        $active  = class_exists('WooCommerce');
+        $version = $active && defined('WC_VERSION') ? WC_VERSION : null;
+
+        return $this->result(
+            'WooCommerce',
+            $active ? self::SEVERITY_PASS : self::SEVERITY_FAIL,
+            $active
+                ? sprintf('WooCommerce %s is active.', $version)
+                : 'WooCommerce is not active. Activate it before migrating.',
+            ['version' => $version],
+        );
+    }
+
+    /**
+     * BLOCKING. No FluentCart, nothing to migrate into.
+     */
+    private function checkFluentCart(): array
+    {
+        $active  = defined('FLUENTCART_PLUGIN_PATH');
+        $version = defined('FLUENTCART_VERSION') ? FLUENTCART_VERSION : null;
+
+        return $this->result(
+            'FluentCart',
+            $active ? self::SEVERITY_PASS : self::SEVERITY_FAIL,
+            $active
+                ? sprintf('FluentCart %s is active.', $version)
+                : 'FluentCart is not active. Activate it before migrating.',
+            ['version' => $version],
+        );
+    }
+
+    /**
+     * BLOCKING. The check that stops CartShift lying to you.
+     *
+     * CartShift reads orders, customers and subscriptions exclusively from the HPOS
+     * table ({prefix}wc_orders). On a store still on legacy post storage that table is
+     * empty or absent, every COUNT() comes back NULL, NULL casts to 0, and absolutely
+     * nothing raises its hand. The migration then "succeeds": zero customers, every
+     * order skipped for a missing customer mapping, every subscription skipped, and a
+     * cheerful green results screen listing your products. Hence: fail, loudly, first.
+     *
+     * FluentCart's own WooCommerce migrator requires HPOS for the same reason, so this
+     * is not CartShift being precious — it is how the ecosystem reads orders now.
+     *
+     * Sync state is a warning at most. See detectPendingSync() for why.
+     */
+    private function checkOrderStorage(): array
+    {
+        $label = 'Order Storage (HPOS)';
+
+        if (! class_exists('WooCommerce')) {
+            return $this->result(
+                $label,
+                self::SEVERITY_WARN,
+                'Cannot determine order storage while WooCommerce is inactive.',
+                ['hpos' => null],
+            );
+        }
+
+        if (! $this->detectHpos()) {
+            return $this->result(
+                $label,
+                self::SEVERITY_FAIL,
+                'High-Performance Order Storage is off, so WooCommerce is still keeping orders in the posts table. '
+                . 'CartShift reads orders, customers and subscriptions from the HPOS tables and nowhere else, so '
+                . 'migrating now would silently produce products and nothing else. '
+                . 'Fix it in WooCommerce > Settings > Advanced > Features: set order data storage to '
+                . '"High-performance order storage", wait for the sync to finish, then re-run preflight.',
+                ['hpos' => false],
+            );
+        }
+
+        $pendingSync = $this->detectPendingSync();
+
+        if ($pendingSync === true) {
+            return $this->result(
+                $label,
+                self::SEVERITY_WARN,
+                'HPOS is enabled, but WooCommerce still has orders pending synchronisation. If the posts-to-HPOS '
+                . 'migration has not finished, the HPOS tables are incomplete and CartShift will migrate whatever '
+                . 'is there so far. Let WooCommerce > Settings > Advanced > Features finish syncing first.',
+                ['hpos' => true, 'pending_sync' => true],
+            );
+        }
+
+        return $this->result(
+            $label,
+            self::SEVERITY_PASS,
+            'High-Performance Order Storage is enabled. Orders, customers and subscriptions are readable.',
+            ['hpos' => true, 'pending_sync' => $pendingSync],
+        );
+    }
+
+    /**
+     * Is HPOS the authoritative order store?
+     *
+     * Three routes, in order of how much we trust them:
+     *   1. CartShift's own shared helper, if another module has shipped it.
+     *   2. WooCommerce's public OrderUtil API (present since the HPOS rollout).
+     *   3. The data-store class plus the opt-in option — the same pair FluentCart's
+     *      migrator checks, and the only thing left on odd WooCommerce builds.
+     */
+    private function detectHpos(): bool
+    {
+        $helper = '\CartShift\Support\WooStorage';
+
+        if (class_exists($helper) && method_exists($helper, 'isHposEnabled')) {
+            try {
+                return (bool) $helper::isHposEnabled();
+            } catch (\Throwable) {
+                // Helper blew up. Fall through and ask WooCommerce ourselves.
+            }
+        }
+
+        if (class_exists(self::ORDER_UTIL) && method_exists(self::ORDER_UTIL, 'custom_orders_table_usage_is_enabled')) {
+            try {
+                return (bool) (self::ORDER_UTIL)::custom_orders_table_usage_is_enabled();
+            } catch (\Throwable) {
+                // OrderUtil resolves through WooCommerce's DI container, which can
+                // throw if WooCommerce is half-booted. Fall through to the option.
+            }
+        }
+
+        return class_exists(self::HPOS_DATA_STORE)
+            && get_option(self::HPOS_OPTION) === 'yes';
+    }
+
+    /**
+     * Does WooCommerce have orders waiting to sync between the posts and HPOS tables?
+     *
+     * Returns null when the question does not apply or cannot be answered.
+     *
+     * The trap here: OrderUtil::is_custom_order_tables_in_sync() returns false when
+     * realtime sync is simply switched off — which is the recommended end state for an
+     * HPOS store, not a fault. Calling it blind would slap a warning on every healthy
+     * shop. So ask whether sync is even enabled first, and only then whether it has
+     * caught up.
+     */
+    private function detectPendingSync(): ?bool
+    {
+        if (! class_exists(self::ORDER_UTIL)) {
+            return null;
+        }
+
+        try {
+            if (method_exists(self::ORDER_UTIL, 'custom_orders_table_data_sync_is_enabled')) {
+                $syncEnabled = (bool) (self::ORDER_UTIL)::custom_orders_table_data_sync_is_enabled();
+            } else {
+                // WooCommerce below 11.0.0 has no cheap accessor. Read the option.
+                $syncEnabled = get_option(self::HPOS_SYNC_OPTION) === 'yes';
+            }
+
+            if (! $syncEnabled) {
+                return null;
+            }
+
+            if (! method_exists(self::ORDER_UTIL, 'is_custom_order_tables_in_sync')) {
+                return null;
+            }
+
+            return ! (self::ORDER_UTIL)::is_custom_order_tables_in_sync();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * INFORMATIONAL. Optional dependency — its absence just means fewer entities.
+     */
+    private function checkWcSubscriptions(): array
+    {
+        $active  = class_exists('WC_Subscriptions');
+        $version = $active && defined('WCS_VERSION') ? WCS_VERSION : null;
+
+        return $this->result(
+            'WooCommerce Subscriptions',
+            self::SEVERITY_PASS,
+            $active
+                ? sprintf('WC Subscriptions %s detected. Subscription migration will be available.', $version)
+                : 'WC Subscriptions not detected. Subscription migration will be skipped.',
+            ['optional' => true, 'active' => $active, 'version' => $version],
+        );
+    }
+
+    /**
+     * ADVISORY. Never blocks.
+     *
+     * Migration runs in bounded batches, and the batch size is filterable, so a modest
+     * memory limit is a comfort problem rather than a correctness one. If PHP does run
+     * out of memory it does so with a fatal error, which nobody mistakes for success —
+     * unlike the HPOS failure above, this one cannot be silent. A 128M limit on a
+     * twenty-product store is fine and we are not going to pretend otherwise.
+     */
+    private function checkPhpMemory(): array
+    {
+        $limit = (string) ini_get('memory_limit');
+        $bytes = $limit === '' ? -1 : wp_convert_hr_to_bytes($limit);
+
+        // -1 means unlimited.
+        $adequate = ($bytes === -1) || ($bytes >= self::RECOMMENDED_MEMORY_BYTES);
+
+        return $this->result(
+            'PHP Memory',
+            $adequate ? self::SEVERITY_PASS : self::SEVERITY_WARN,
+            $adequate
+                ? sprintf('PHP memory limit is %s (recommended: 256M+).', $limit)
+                : sprintf(
+                    'PHP memory limit is %s. Batching keeps this survivable, but 256M+ gives you headroom on a '
+                    . 'large store. Not a blocker.',
+                    $limit,
+                ),
+            ['value' => $limit, 'optional' => true],
+        );
+    }
+
+    /**
+     * ADVISORY. Never blocks — batched migration is the whole point.
      */
     private function checkMaxExecutionTime(): array
     {
         $maxTime = (int) ini_get('max_execution_time');
-        // 0 means unlimited
-        $adequate = ($maxTime === 0) || ($maxTime >= 300);
+
+        // 0 means unlimited.
+        $adequate = ($maxTime === 0) || ($maxTime >= self::RECOMMENDED_EXECUTION_SECONDS);
 
         $message = match (true) {
             $maxTime === 0 => 'max_execution_time is unlimited.',
             $adequate      => sprintf('max_execution_time is %ds (adequate).', $maxTime),
             default        => sprintf(
-                'max_execution_time is %ds (recommended: 300s+). Batched migration mitigates this, but consider increasing for safety.',
+                'max_execution_time is %ds (recommended: 300s+). Batched migration mitigates this, but consider '
+                . 'increasing it for safety.',
                 $maxTime,
             ),
         };
 
-        return [
-            'label'    => 'Max Execution Time',
-            'pass'     => true, // Never blocks — batched migration handles this.
-            'warning'  => !$adequate,
-            'optional' => true,
-            'value'    => $maxTime,
-            'message'  => $message,
-        ];
+        return $this->result(
+            'Max Execution Time',
+            $adequate ? self::SEVERITY_PASS : self::SEVERITY_WARN,
+            $message,
+            ['value' => $maxTime, 'optional' => true],
+        );
     }
 
     /**
-     * F4: Product type breakdown — report counts per WC product type and warn about unsupported types.
+     * ADVISORY. Never blocks.
+     *
+     * Unsupported product types are skipped by design and reported per-record in the
+     * migration log. Refusing to migrate 500 simple products because someone once made
+     * a grouped product would be absurd.
      */
     private function checkProductTypes(): array
     {
-        if (!class_exists('WooCommerce')) {
-            return [
-                'label'    => 'Product Types',
-                'pass'     => true,
-                'optional' => true,
-                'types'    => [],
-                'message'  => 'WooCommerce not active. Skipping product type check.',
-            ];
+        $label = 'Product Types';
+
+        if (! class_exists('WooCommerce')) {
+            return $this->result(
+                $label,
+                self::SEVERITY_PASS,
+                'WooCommerce not active. Skipping product type check.',
+                ['optional' => true, 'types' => []],
+            );
         }
 
         global $wpdb;
@@ -163,8 +379,9 @@ final class PreflightCheck
             $types[$row->slug] = (int) $row->count;
         }
 
-        $supported = ['simple', 'variable', 'subscription', 'variable-subscription'];
+        $supported   = ['simple', 'variable', 'subscription', 'variable-subscription'];
         $unsupported = array_diff(array_keys($types), $supported);
+
         $unsupportedCount = 0;
         foreach ($unsupported as $type) {
             $unsupportedCount += $types[$type];
@@ -174,12 +391,12 @@ final class PreflightCheck
 
         $parts = [];
         foreach ($types as $slug => $count) {
-            $label = ucfirst(str_replace('-', ' ', $slug));
-            $marker = in_array($slug, $supported, true) ? '' : ' (unsupported)';
-            $parts[] = sprintf('%s: %d%s', $label, $count, $marker);
+            $typeLabel = ucfirst(str_replace('-', ' ', $slug));
+            $marker    = in_array($slug, $supported, true) ? '' : ' (unsupported)';
+            $parts[]   = sprintf('%s: %d%s', $typeLabel, $count, $marker);
         }
 
-        $message = empty($parts)
+        $message = $parts === []
             ? 'No WooCommerce products found.'
             : implode(', ', $parts) . '.';
 
@@ -187,20 +404,20 @@ final class PreflightCheck
             $message .= sprintf(' %d product(s) with unsupported types will be skipped.', $unsupportedCount);
         }
 
-        return [
-            'label'    => 'Product Types',
-            'pass'     => true, // Never blocks migration.
-            'warning'  => $hasWarning,
-            'optional' => true,
-            'types'    => $types,
-            'unsupported' => array_values($unsupported),
-            'message'  => $message,
-        ];
+        return $this->result(
+            $label,
+            $hasWarning ? self::SEVERITY_WARN : self::SEVERITY_PASS,
+            $message,
+            [
+                'optional'    => true,
+                'types'       => $types,
+                'unsupported' => array_values($unsupported),
+            ],
+        );
     }
 
     /**
-     * F6: Verify CartShift migration tables exist. Missing tables mean the plugin
-     * wasn't activated properly — deactivate and reactivate to create them.
+     * BLOCKING. No tables, nowhere to write the ID map, no rollback, no log.
      */
     private function checkMigrationTables(): array
     {
@@ -219,31 +436,40 @@ final class PreflightCheck
         $pass = $hasIdMap && $hasLog;
 
         $missing = [];
-        if (!$hasIdMap) {
+        if (! $hasIdMap) {
             $missing[] = $idMapTable;
         }
-        if (!$hasLog) {
+        if (! $hasLog) {
             $missing[] = $logTable;
         }
 
-        return [
-            'label'   => 'Migration Tables',
-            'pass'    => $pass,
-            'message' => $pass
+        return $this->result(
+            'Migration Tables',
+            $pass ? self::SEVERITY_PASS : self::SEVERITY_FAIL,
+            $pass
                 ? 'Migration tables exist and are ready.'
                 : sprintf(
                     'Missing tables: %s. Deactivate and reactivate CartShift to create them.',
                     implode(', ', $missing),
                 ),
-        ];
+        );
     }
 
+    /**
+     * ADVISORY. Never blocks.
+     *
+     * Pre-existing FluentCart data is a "know what you are doing" situation, not an
+     * error — migration appends, it does not overwrite. Plenty of people migrate into
+     * a store that already has a product or two.
+     */
     private function checkExistingFcData(): array
     {
         global $wpdb;
 
         $counts = [];
         $tables = [
+            // 'fluent-products' verified against FluentCart 1.6.0:
+            // app/CPT/FluentProducts.php -> const CPT_NAME = 'fluent-products'.
             'products'      => $wpdb->posts,
             'customers'     => $wpdb->prefix . 'fct_customers',
             'orders'        => $wpdb->prefix . 'fct_orders',
@@ -256,22 +482,22 @@ final class PreflightCheck
                 $counts[$key] = (int) $wpdb->get_var(
                     "SELECT COUNT(*) FROM {$table} WHERE post_type = 'fluent-products' AND post_status != 'auto-draft'",
                 );
-            } else {
-                $tableExists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
-                $counts[$key] = $tableExists ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}") : 0;
+                continue;
             }
+
+            $tableExists  = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+            $counts[$key] = $tableExists ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}") : 0;
         }
 
         $hasData = array_sum($counts) > 0;
 
-        return [
-            'label'   => 'Existing FluentCart Data',
-            'pass'    => true,
-            'warning' => $hasData,
-            'counts'  => $counts,
-            'message' => $hasData
+        return $this->result(
+            'Existing FluentCart Data',
+            $hasData ? self::SEVERITY_WARN : self::SEVERITY_PASS,
+            $hasData
                 ? 'FluentCart already contains data. Migration will add new records alongside existing ones.'
                 : 'FluentCart database is empty. Ready for clean migration.',
-        ];
+            ['counts' => $counts],
+        );
     }
 }

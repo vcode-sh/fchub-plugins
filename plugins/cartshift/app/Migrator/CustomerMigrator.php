@@ -11,11 +11,19 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\MigrationErrorCode;
+use CartShift\Support\WooStorage;
 use FluentCart\App\Models\Customer;
 use FluentCart\App\Models\CustomerAddresses;
 
 final class CustomerMigrator extends AbstractMigrator
 {
+    /** Cursor phase: registered WP users, keyed on wc_orders.customer_id. */
+    private const string PHASE_REGISTERED = 'registered';
+
+    /** Cursor phase: guest checkouts, keyed on wc_orders.billing_email. */
+    private const string PHASE_GUEST = 'guest';
+
     private readonly CustomerMapper $customerMapper;
 
     /** @var int|null Cached registered customer count */
@@ -25,10 +33,9 @@ final class CustomerMigrator extends AbstractMigrator
         IdMapRepository $idMap,
         MigrationLogRepository $log,
         MigrationState $migrationState,
-        string $migrationId,
         int $batchSize = Constants::DEFAULT_BATCH_SIZE,
     ) {
-        parent::__construct($idMap, $log, $migrationState, $migrationId, $batchSize);
+        parent::__construct($idMap, $log, $migrationState, $batchSize);
         $this->customerMapper = new CustomerMapper($idMap);
     }
 
@@ -48,27 +55,204 @@ final class CustomerMigrator extends AbstractMigrator
         return $this->countRegisteredCustomers() + $this->countGuestCustomers();
     }
 
+    /**
+     * Two sources, two cursors, one sequence.
+     *
+     * Customers are spliced out of registered user IDs first and guest billing
+     * emails second, and a single integer cursor cannot express that: `123` is
+     * both a plausible customer_id and meaningless as an email. So the cursor
+     * carries an explicit phase marker — `registered:<customer_id>` or
+     * `guest:<billing_email>` — and each phase keysets on its own ordering
+     * column, matching the ORDER BY of the query that produced it.
+     *
+     * The phase transition is the subtle bit. A short registered page means the
+     * registered phase is exhausted, so the batch is topped up from the very
+     * start of the guest phase; the last record in that spliced batch is a
+     * guest, so cursorFor() reports a `guest:` cursor and the next call never
+     * looks at registered users again. A registered page that happens to fill
+     * the batch exactly returns as-is, and the following call finds no more
+     * registered rows and tops up from the start of the guests — same outcome,
+     * one batch later.
+     */
     #[\Override]
-    public function fetchBatch(int $offset, int $limit): array
+    public function fetchBatch(string|int|null $cursor, int $limit): array
     {
-        $batch = [];
-        $registeredTotal = $this->countRegisteredCustomers();
+        [$phase, $value] = self::decodeCursor($cursor);
 
-        if ($offset < $registeredTotal) {
-            $batch = $this->fetchRegisteredBatch($offset, $limit);
+        $batch = [];
+        $guestAfter = null;
+
+        if ($phase === self::PHASE_REGISTERED) {
+            $batch = $this->fetchRegisteredBatch(is_int($value) ? $value : 0, $limit);
 
             if (count($batch) >= $limit) {
                 return $batch;
             }
+        } else {
+            $guestAfter = is_string($value) ? $value : null;
         }
 
         $remaining = $limit - count($batch);
-        $guestOffset = max(0, $offset - $registeredTotal);
 
-        $guestBatch = $this->fetchGuestBatch($guestOffset, $remaining);
-        $batch = array_merge($batch, $guestBatch);
+        if ($remaining > 0) {
+            $batch = array_merge($batch, $this->fetchGuestBatch($guestAfter, $remaining));
+        }
 
         return $batch;
+    }
+
+    /**
+     * Phase-tagged cursor for the record just handed out.
+     */
+    #[\Override]
+    public function cursorFor(mixed $record): string|int
+    {
+        if (($record['type'] ?? null) === 'guest') {
+            return self::PHASE_GUEST . ':' . (string) $record['data']['email'];
+        }
+
+        return self::PHASE_REGISTERED . ':' . (int) $record['data']['user_id'];
+    }
+
+    /**
+     * Hydrate exactly these customers, for a retry run.
+     *
+     * The fiddly one, because a customer has two identities and a retry only
+     * ever sees one of them. The ID map is keyed by phase — `customer` rows on
+     * the user ID, `guest_customer` rows on the email — but the *log* is keyed
+     * by getRecordId(), which returns the bare value with no phase attached:
+     * `"42"` for a registered user, `"bob@example.com"` for a guest. That is
+     * what a retry list contains, so that is what this method has to read.
+     *
+     * The two forms are distinguishable, and not by luck: a registered ID is
+     * getRecordId()'s `(string) $userData['user_id']`, so it is always decimal
+     * digits, and an email always contains an `@`, so it never is. Digits mean
+     * registered, anything else means guest.
+     *
+     * Phase-prefixed IDs — `registered:42`, `guest:bob@example.com`, the form
+     * cursorFor() emits — are accepted too. They are not what the log stores,
+     * but they are what someone reading the cursor code would reasonably pass,
+     * and honouring them costs two str_starts_with() calls.
+     *
+     * No existence check is done here on purpose. A user ID whose WP row has
+     * been deleted comes back as a record, is handed to processRegistered(),
+     * and is logged as `user_not_found` against the retry run — which is the
+     * answer the user asked for. Dropping it silently would leave the retry
+     * looking like it fixed something.
+     *
+     * @param array<int, string|int> $wcIds
+     *
+     * @return list<array{type: string, data: array<string, int|string>}>
+     */
+    #[\Override]
+    public function fetchByIds(array $wcIds): array
+    {
+        $userIds = [];
+        $emails = [];
+
+        foreach ($wcIds as $raw) {
+            if (!is_int($raw) && !is_string($raw)) {
+                continue;
+            }
+
+            $id = trim((string) $raw);
+
+            if ($id === '') {
+                continue;
+            }
+
+            if (str_starts_with($id, self::PHASE_REGISTERED . ':')) {
+                $id = substr($id, strlen(self::PHASE_REGISTERED) + 1);
+                $userId = ctype_digit($id) ? (int) $id : 0;
+
+                if ($userId > 0) {
+                    $userIds[$userId] = true;
+                }
+
+                continue;
+            }
+
+            if (str_starts_with($id, self::PHASE_GUEST . ':')) {
+                $email = substr($id, strlen(self::PHASE_GUEST) + 1);
+
+                if ($email !== '') {
+                    $emails[$email] = true;
+                }
+
+                continue;
+            }
+
+            if (ctype_digit($id)) {
+                $userId = (int) $id;
+
+                if ($userId > 0) {
+                    $userIds[$userId] = true;
+                }
+
+                continue;
+            }
+
+            $emails[$id] = true;
+        }
+
+        $userIds = array_keys($userIds);
+
+        // Same one-shot cache priming fetchRegisteredBatch() does, so the
+        // per-record get_userdata() calls stay cache hits.
+        if ($userIds !== [] && function_exists('cache_users')) {
+            cache_users($userIds);
+        }
+
+        $batch = array_map(
+            static fn (int $id): array => ['type' => 'registered', 'data' => ['user_id' => $id]],
+            $userIds,
+        );
+
+        foreach (array_keys($emails) as $email) {
+            $batch[] = ['type' => 'guest', 'data' => ['email' => (string) $email]];
+        }
+
+        return $batch;
+    }
+
+    /**
+     * Customers write two kinds of ID-map row, and both count as migrated.
+     *
+     * @return list<string>
+     */
+    #[\Override]
+    protected function migratedEntityTypes(): array
+    {
+        return [Constants::ENTITY_CUSTOMER, Constants::ENTITY_GUEST_CUSTOMER];
+    }
+
+    /**
+     * Split a cursor into its phase and per-phase position.
+     *
+     * Anything unrecognised — null, a bare integer left over from the offset
+     * era, a malformed string — starts the entity from the beginning of the
+     * registered phase. Re-reads are idempotent skips, so restarting is the
+     * safe reading of an ambiguous cursor.
+     *
+     * @return array{0: string, 1: int|string|null}
+     */
+    private static function decodeCursor(string|int|null $cursor): array
+    {
+        if (!is_string($cursor) || !str_contains($cursor, ':')) {
+            return [self::PHASE_REGISTERED, null];
+        }
+
+        [$phase, $value] = explode(':', $cursor, 2);
+
+        if ($phase === self::PHASE_GUEST) {
+            return [self::PHASE_GUEST, $value];
+        }
+
+        if ($phase === self::PHASE_REGISTERED && ctype_digit($value)) {
+            return [self::PHASE_REGISTERED, (int) $value];
+        }
+
+        return [self::PHASE_REGISTERED, null];
     }
 
     /**
@@ -118,18 +302,18 @@ final class CustomerMigrator extends AbstractMigrator
         $userId = (int) $userData['user_id'];
 
         if ($this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $userId)) {
-            $this->writeLog($userId, 'dry-run', 'dry-run: already migrated, would skip.');
+            $this->writeLog($userId, 'dry-run', 'dry-run: already migrated, would skip.', MigrationErrorCode::AlreadyMigrated);
             return false;
         }
 
         $user = get_userdata($userId);
         if (!$user) {
-            $this->writeLog($userId, 'dry-run', 'dry-run: user not found, would fail.');
+            $this->writeLog($userId, 'dry-run', 'dry-run: user not found, would fail.', MigrationErrorCode::UserNotFound);
             return false;
         }
 
         if (empty($user->user_email)) {
-            $this->writeLog($userId, 'dry-run', 'dry-run: user has no email, would fail.');
+            $this->writeLog($userId, 'dry-run', 'dry-run: user has no email, would fail.', MigrationErrorCode::MissingEmail);
             return false;
         }
 
@@ -149,12 +333,12 @@ final class CustomerMigrator extends AbstractMigrator
         $email = $guestData['email'];
 
         if (empty($email)) {
-            $this->writeLog($email, 'dry-run', 'dry-run: guest email is empty, would fail.');
+            $this->writeLog($email, 'dry-run', 'dry-run: guest email is empty, would fail.', MigrationErrorCode::MissingEmail);
             return false;
         }
 
         if ($this->idMap->getFcId(Constants::ENTITY_GUEST_CUSTOMER, $email)) {
-            $this->writeLog($email, 'dry-run', 'dry-run: guest already migrated, would skip.');
+            $this->writeLog($email, 'dry-run', 'dry-run: guest already migrated, would skip.', MigrationErrorCode::AlreadyMigrated);
             return false;
         }
 
@@ -174,13 +358,13 @@ final class CustomerMigrator extends AbstractMigrator
         $userId = (int) $userData['user_id'];
 
         if ($this->idMap->getFcId(Constants::ENTITY_CUSTOMER, (string) $userId)) {
-            $this->writeLog($userId, 'skipped', 'Already migrated.');
+            $this->writeLog($userId, 'skipped', 'Already migrated.', MigrationErrorCode::AlreadyMigrated);
             return false;
         }
 
         $user = get_userdata($userId);
         if (!$user) {
-            $this->writeLog($userId, 'error', 'User not found.');
+            $this->writeLog($userId, 'error', 'User not found.', MigrationErrorCode::UserNotFound);
             return false;
         }
 
@@ -191,10 +375,10 @@ final class CustomerMigrator extends AbstractMigrator
                 Constants::ENTITY_CUSTOMER,
                 (string) $userId,
                 $existing->id,
-                $this->migrationId,
+                $this->migrationId(),
                 false,
             );
-            $this->writeLog($userId, 'skipped', 'Customer already exists in FluentCart.');
+            $this->writeLog($userId, 'skipped', 'Customer already exists in FluentCart.', MigrationErrorCode::AlreadyExistsInFluentCart);
             return false;
         }
 
@@ -205,7 +389,7 @@ final class CustomerMigrator extends AbstractMigrator
             Constants::ENTITY_CUSTOMER,
             (string) $userId,
             $customer->id,
-            $this->migrationId,
+            $this->migrationId(),
             true,
         );
 
@@ -218,7 +402,7 @@ final class CustomerMigrator extends AbstractMigrator
                 Constants::ENTITY_CUSTOMER_ADDRESS,
                 $addressKey,
                 $address->id,
-                $this->migrationId,
+                $this->migrationId(),
                 true,
             );
         }
@@ -241,7 +425,7 @@ final class CustomerMigrator extends AbstractMigrator
         $email = $guestData['email'];
 
         if ($this->idMap->getFcId(Constants::ENTITY_GUEST_CUSTOMER, $email)) {
-            $this->writeLog($email, 'skipped', 'Guest customer already migrated.');
+            $this->writeLog($email, 'skipped', 'Guest customer already migrated.', MigrationErrorCode::AlreadyMigrated);
             return false;
         }
 
@@ -252,17 +436,17 @@ final class CustomerMigrator extends AbstractMigrator
                 Constants::ENTITY_GUEST_CUSTOMER,
                 $email,
                 $existing->id,
-                $this->migrationId,
+                $this->migrationId(),
                 false,
             );
-            $this->writeLog($email, 'skipped', 'Guest customer already exists in FluentCart.');
+            $this->writeLog($email, 'skipped', 'Guest customer already exists in FluentCart.', MigrationErrorCode::AlreadyExistsInFluentCart);
             return false;
         }
 
         // Find the first order for this guest to build mapped data.
         $order = $this->findFirstGuestOrder($email);
         if (!$order) {
-            $this->writeLog($email, 'error', 'No order found for guest email.');
+            $this->writeLog($email, 'error', 'No order found for guest email.', MigrationErrorCode::NoOrderForGuest);
             return false;
         }
 
@@ -273,7 +457,7 @@ final class CustomerMigrator extends AbstractMigrator
             Constants::ENTITY_GUEST_CUSTOMER,
             $email,
             $customer->id,
-            $this->migrationId,
+            $this->migrationId(),
             true,
         );
 
@@ -286,7 +470,7 @@ final class CustomerMigrator extends AbstractMigrator
                 Constants::ENTITY_CUSTOMER_ADDRESS,
                 $addressKey,
                 $address->id,
-                $this->migrationId,
+                $this->migrationId(),
                 true,
             );
         }
@@ -303,6 +487,9 @@ final class CustomerMigrator extends AbstractMigrator
     /**
      * FIX H4: count registered customers by order history, not just 'customer' role.
      * Users who have placed orders (customer_id > 0 in wc_orders).
+     *
+     * Scoped to the same statuses wc_get_orders() returns — an unfiltered query
+     * counts people whose only "order" is an abandoned checkout draft.
      */
     private function countRegisteredCustomers(): int
     {
@@ -312,11 +499,14 @@ final class CustomerMigrator extends AbstractMigrator
 
         global $wpdb;
 
+        $table = WooStorage::ordersTable();
+        $scope = WooStorage::orderScopeSql();
+
         $this->registeredCount = (int) $wpdb->get_var(
             "SELECT COUNT(DISTINCT customer_id)
-             FROM {$wpdb->prefix}wc_orders
+             FROM {$table}
              WHERE customer_id > 0
-               AND type = 'shop_order'",
+               AND {$scope}",
         );
 
         return $this->registeredCount;
@@ -324,72 +514,119 @@ final class CustomerMigrator extends AbstractMigrator
 
     /**
      * FIX H5: count unique guest emails directly via SQL.
+     *
+     * Same status scope as everything else. Without it, every abandoned cart
+     * email becomes a FluentCart customer.
      */
     private function countGuestCustomers(): int
     {
         global $wpdb;
 
+        $table = WooStorage::ordersTable();
+        $scope = WooStorage::orderScopeSql();
+
         return (int) $wpdb->get_var(
             "SELECT COUNT(DISTINCT billing_email)
-             FROM {$wpdb->prefix}wc_orders
+             FROM {$table}
              WHERE (customer_id IS NULL OR customer_id = 0)
                AND billing_email != ''
-               AND type = 'shop_order'",
+               AND {$scope}",
         );
     }
 
     /**
-     * FIX H4: fetch registered customers by order history with LIMIT/OFFSET.
+     * FIX H4: registered customers by order history, keyset on customer_id.
+     *
+     * wc_orders.customer_id is the WP user ID. Verified, because FluentCart's
+     * migrator gets this wrong by joining wc_customer_lookup, whose customer_id
+     * is that table's own AUTO_INCREMENT primary key and nothing to do with
+     * users:
+     *
+     * @see woocommerce/src/Internal/DataStores/Orders/OrdersTableDataStore.php (v11.0.0, lines 3068, 3072 — customer_id passed to wc_update_user_last_active())
+     *
+     * @return list<array{type: string, data: array{user_id: int}}>
      */
-    private function fetchRegisteredBatch(int $offset, int $limit): array
+    private function fetchRegisteredBatch(int $afterUserId, int $limit): array
     {
         global $wpdb;
 
+        $table = WooStorage::ordersTable();
+
+        // Placeholder form, so the scope and the pagination go through a single
+        // prepare() rather than nesting one prepared string inside another.
+        [$scope, $scopeValues] = WooStorage::orderScopeParts();
+
         $userIds = $wpdb->get_col($wpdb->prepare(
             "SELECT DISTINCT customer_id
-             FROM {$wpdb->prefix}wc_orders
-             WHERE customer_id > 0
-               AND type = 'shop_order'
+             FROM {$table}
+             WHERE customer_id > %d
+               AND {$scope}
              ORDER BY customer_id ASC
-             LIMIT %d OFFSET %d",
-            $limit,
-            $offset,
+             LIMIT %d",
+            ...[max(0, $afterUserId), ...$scopeValues, $limit],
         ));
 
+        $userIds = array_map(intval(...), $userIds);
+
+        // Prime the user cache once for the whole page so the per-record
+        // get_userdata() calls in processRegistered()/validateRegistered()
+        // become cache hits instead of one query each.
+        if ($userIds !== [] && function_exists('cache_users')) {
+            cache_users($userIds);
+        }
+
         return array_map(
-            fn (string $id): array => ['type' => 'registered', 'data' => ['user_id' => (int) $id]],
+            static fn (int $id): array => ['type' => 'registered', 'data' => ['user_id' => $id]],
             $userIds,
         );
     }
 
     /**
-     * FIX H5: fetch unique guest emails directly via SQL with LIMIT/OFFSET.
-     * Uses isset() for O(1) dedup instead of in_array().
+     * FIX H5: unique guest emails, keyset on billing_email.
+     *
+     * The `>` comparison and the ORDER BY both run under the column's own
+     * collation, so the two agree by construction — which is what keyset
+     * pagination on a string column needs. (Under a case-insensitive collation
+     * DISTINCT folds case as well, consistently with both.)
+     *
+     * @return list<array{type: string, data: array{email: string}}>
      */
-    private function fetchGuestBatch(int $offset, int $limit): array
+    private function fetchGuestBatch(?string $afterEmail, int $limit): array
     {
         global $wpdb;
 
+        $table = WooStorage::ordersTable();
+
+        [$scope, $scopeValues] = WooStorage::orderScopeParts();
+
+        $after = $afterEmail !== null ? 'AND billing_email > %s' : '';
+        $afterValues = $afterEmail !== null ? [$afterEmail] : [];
+
         $emails = $wpdb->get_col($wpdb->prepare(
             "SELECT DISTINCT billing_email
-             FROM {$wpdb->prefix}wc_orders
+             FROM {$table}
              WHERE (customer_id IS NULL OR customer_id = 0)
                AND billing_email != ''
-               AND type = 'shop_order'
+               {$after}
+               AND {$scope}
              ORDER BY billing_email ASC
-             LIMIT %d OFFSET %d",
-            $limit,
-            $offset,
+             LIMIT %d",
+            ...[...$afterValues, ...$scopeValues, $limit],
         ));
 
         return array_map(
-            fn (string $email): array => ['type' => 'guest', 'data' => ['email' => $email]],
+            static fn (string $email): array => ['type' => 'guest', 'data' => ['email' => $email]],
             $emails,
         );
     }
 
     /**
      * Find the first WC order for a guest email to extract customer data.
+     *
+     * No 'status' arg is needed: WC_Order_Query defaults it to
+     * array_keys(wc_get_order_statuses()), the same set used everywhere else.
+     *
+     * @see woocommerce/includes/class-wc-order-query.php::get_default_query_vars() (v11.0.0, line 26)
      */
     private function findFirstGuestOrder(string $email): ?\WC_Order
     {
@@ -399,7 +636,8 @@ final class CustomerMigrator extends AbstractMigrator
             'limit'         => 1,
             'orderby'       => 'ID',
             'order'         => 'ASC',
-            'type'          => 'shop_order',
+            'status'        => 'any',
+            'type'          => WooStorage::TYPE_ORDER,
         ]);
 
         return $orders[0] ?? null;

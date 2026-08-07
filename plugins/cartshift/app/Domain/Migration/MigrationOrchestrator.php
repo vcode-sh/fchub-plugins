@@ -6,14 +6,37 @@ namespace CartShift\Domain\Migration;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Domain\Migration\Contracts\HasErrorCode;
 use CartShift\Domain\Migration\Contracts\MigratorInterface;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\MigrationErrorCode;
 
 final class MigrationOrchestrator
 {
+    /**
+     * Where the retry plan lives.
+     *
+     * Its own option rather than a key inside the migration state, because the
+     * state array is owned elsewhere and a retry is the only thing that needs
+     * this. The plan records which run is being retried and the exact ID list
+     * per entity type, so a retry resumes across requests the way a normal run
+     * resumes from its cursor.
+     */
+    private const string RETRY_OPTION = 'cartshift_migration_retry';
+
+    /**
+     * In-request copy of the retry plan option.
+     *
+     * @var array{migration_id: string, retry_of: string, ids: array<string, list<string>>}|null
+     */
+    private array|null $retryPlan = null;
+
+    /** Whether $retryPlan holds a real read. Distinguishes "no plan" from "not read yet". */
+    private bool $retryPlanLoaded = false;
+
     /**
      * @param MigratorInterface[] $migrators
      */
@@ -27,6 +50,12 @@ final class MigrationOrchestrator
 
     /**
      * Initialise migration state and process the first batch.
+     *
+     * The migration ID is minted here, by MigrationState::start(), and the first
+     * batch runs before this method returns. Nothing may hold a migration ID
+     * across that line: migrators read theirs from MigrationState at the moment
+     * they write, which is what stops the first batch filing its rows under an
+     * ID no state has ever heard of. See AbstractMigrator::migrationId().
      *
      * @param string[] $entityTypes Entity types to migrate (e.g. ['products', 'customers']).
      * @return array{continue: bool, migration_id: string, entity_type: string|null, offset: int, total: int, processed: int}
@@ -50,6 +79,205 @@ final class MigrationOrchestrator
         }
 
         return $this->processBatch();
+    }
+
+    /**
+     * Start a run that re-attempts the records a previous run did not migrate.
+     *
+     * A retry is a migration in its own right, not an addendum to the one it
+     * repairs: it seeds a fresh migration ID, writes its own log rows and its
+     * own ID-map rows, and can therefore be rolled back or retried again on its
+     * own terms. `retry_of` records where its work list came from and is the
+     * only link back.
+     *
+     * The work list is pulled once, up front, from the source run's log — the
+     * distinct WC IDs that ended in one of `$statuses`. Everything after that is
+     * index pagination through that list. Deliberately not keyset pagination
+     * against the source tables: the list is defined by what failed, which has
+     * no relationship to where those rows sit in wp_posts, and any ordering
+     * imposed on it would be a fiction.
+     *
+     * `$dryRun` is asked for, never inherited. A dry retry rehearses the repair —
+     * it re-reads the failed records, re-runs the validation, writes dry-run log
+     * rows and creates nothing — which is exactly what you want before letting a
+     * fix loose on four thousand orders. What it must never do is come from the
+     * source run: a dry run creates nothing, so it has nothing to repair, and
+     * retrying one "for real" by inheriting its flag would be a silent promotion
+     * from rehearsal to performance.
+     *
+     * @param string[] $entityTypes Entity types to retry; empty means every one
+     *                              this orchestrator knows about.
+     * @param string[] $statuses    Log statuses that count as retryable.
+     * @param bool     $dryRun      Validate the work list without writing anything.
+     *
+     * @return array<string, mixed> The same shape startMigration() returns, plus `retry_of`.
+     */
+    public function startRetry(
+        string $sourceMigrationId,
+        array $entityTypes = [],
+        array $statuses = ['error'],
+        bool $dryRun = false,
+    ): array {
+        $statuses = array_values(array_filter(
+            array_map(static fn (mixed $status): string => is_string($status) ? $status : '', $statuses),
+            static fn (string $status): bool => $status !== '',
+        ));
+
+        if ($statuses === []) {
+            $statuses = ['error'];
+        }
+
+        if ($entityTypes === []) {
+            $entityTypes = array_map(
+                static fn (MigratorInterface $migrator): string => $migrator->entityType(),
+                $this->migrators,
+            );
+        }
+
+        /** @see 'cartshift/migration/entity_types' */
+        $entityTypes = array_values(apply_filters('cartshift/migration/entity_types', $entityTypes));
+
+        $ids = [];
+
+        foreach ($entityTypes as $entityType) {
+            $ids[$entityType] = $this->retryableIds($sourceMigrationId, $entityType, $statuses);
+        }
+
+        $this->state->start($entityTypes, $dryRun);
+
+        $migrationId = (string) $this->state->getMigrationId();
+
+        $this->rememberRetryPlan([
+            'migration_id' => $migrationId,
+            'retry_of'     => $sourceMigrationId,
+            'ids'          => $ids,
+        ]);
+
+        /** @see 'cartshift/migration/started' */
+        do_action('cartshift/migration/started', $migrationId, $entityTypes, $dryRun);
+
+        /** @see 'cartshift/migration/retry_started' */
+        do_action('cartshift/migration/retry_started', $migrationId, $sourceMigrationId, $ids, $statuses);
+
+        // The total is the size of the work list, not the size of the source
+        // table — a retry of nine failed orders is nine of nine, not nine of
+        // forty thousand.
+        foreach ($entityTypes as $entityType) {
+            $this->state->updateProgress($entityType, 0, count($ids[$entityType] ?? []));
+        }
+
+        return $this->processBatch();
+    }
+
+    /**
+     * The WC IDs a previous run left in one of the given statuses.
+     *
+     * Guarded rather than called outright: getRetryableIds() lives in a
+     * repository this class does not own and may not have landed yet. An empty
+     * list plus a log line beats a fatal, and beats a silent empty retry that
+     * reads as "nothing failed".
+     *
+     * @param string[] $statuses
+     *
+     * @return list<string>
+     */
+    private function retryableIds(string $sourceMigrationId, string $entityType, array $statuses): array
+    {
+        if (!method_exists($this->log, 'getRetryableIds')) {
+            $this->log->write(
+                $sourceMigrationId,
+                $entityType,
+                0,
+                'warning',
+                'Cannot build a retry list: MigrationLogRepository::getRetryableIds() is not available in this build.',
+            );
+
+            return [];
+        }
+
+        $ids = $this->log->getRetryableIds($sourceMigrationId, $entityType, $statuses);
+
+        return array_values(array_map(
+            static fn (mixed $id): string => (string) $id,
+            is_array($ids) ? $ids : [],
+        ));
+    }
+
+    /**
+     * Persist the retry plan and keep the in-request copy in step with it.
+     *
+     * @param array{migration_id: string, retry_of: string, ids: array<string, list<string>>} $plan
+     */
+    private function rememberRetryPlan(array $plan): void
+    {
+        update_option(self::RETRY_OPTION, $plan, false);
+
+        $this->retryPlan = $plan;
+        $this->retryPlanLoaded = true;
+    }
+
+    /**
+     * The retry plan governing the run currently in state, or null.
+     *
+     * Keyed on the migration ID rather than merely existing, so a plan left
+     * behind by a finished retry cannot bleed into the next ordinary run and
+     * quietly restrict it to a stale ID list.
+     *
+     * @return array{migration_id: string, retry_of: string, ids: array<string, list<string>>}|null
+     */
+    private function retryPlan(): array|null
+    {
+        if (!$this->retryPlanLoaded) {
+            $stored = get_option(self::RETRY_OPTION, null);
+
+            $this->retryPlan = is_array($stored) ? $stored : null;
+            $this->retryPlanLoaded = true;
+        }
+
+        $plan = $this->retryPlan;
+
+        if ($plan === null) {
+            return null;
+        }
+
+        $migrationId = $this->state->getMigrationId();
+
+        if ($migrationId === null || ($plan['migration_id'] ?? null) !== $migrationId) {
+            return null;
+        }
+
+        return $plan;
+    }
+
+    /**
+     * The retry work list for one entity type, or null when this is not a retry.
+     *
+     * Null and [] mean different things here: null is "run normally", [] is
+     * "this is a retry and this entity type has nothing to repair".
+     *
+     * @return list<string>|null
+     */
+    private function retryIdsFor(string $entityType): array|null
+    {
+        $plan = $this->retryPlan();
+
+        if ($plan === null) {
+            return null;
+        }
+
+        $ids = $plan['ids'][$entityType] ?? [];
+
+        return is_array($ids) ? array_values($ids) : [];
+    }
+
+    /**
+     * The migration this run is repairing, or null when it is not a retry.
+     */
+    private function retryOf(): string|null
+    {
+        $plan = $this->retryPlan();
+
+        return $plan !== null ? (string) $plan['retry_of'] : null;
     }
 
     /**
@@ -118,36 +346,55 @@ final class MigrationOrchestrator
                 do_action('cartshift/migration/entity_started', $currentType, $migrationId);
             }
 
-            $batch = $migrator->fetchBatch($offset, $batchSize);
+            // Retry runs paginate a fixed list of IDs by index. Keyset ordering is
+            // meaningless there — the IDs were chosen by what failed, not by where
+            // they sit in the source table — so the cursor machinery is bypassed
+            // entirely rather than fed a cursor it cannot honour.
+            $retryIds = $this->retryIdsFor($currentType);
+            $isRetry = $retryIds !== null;
+            $slice = [];
 
-            if (empty($batch)) {
-                // Entity is done.
-                $this->state->completeEntity($currentType);
+            if ($isRetry) {
+                $slice = array_slice($retryIds, $offset, $batchSize);
 
-                /** @see 'cartshift/migration/entity_completed' */
-                do_action('cartshift/migration/entity_completed', $currentType, $migrationId);
-
-                $this->state->advanceEntity();
-
-                // Check if there are more entities.
-                $nextIndex = $this->state->getCurrentEntityIndex();
-                $hasMore = $nextIndex < count($entityTypes);
-
-                if (!$hasMore) {
-                    $this->state->complete();
-
-                    /** @see 'cartshift/migration/completed' */
-                    do_action('cartshift/migration/completed', $migrationId);
+                if ($slice === []) {
+                    return $this->finishEntity($currentType, $migrationId, count($entityTypes));
                 }
 
-                return $this->buildResult($hasMore);
+                $cursor = null;
+                $batch = $migrator->fetchByIds($slice);
+            } else {
+                $cursor = $this->resolveCursor($currentType, $offset, $migrationId);
+
+                $batch = $migrator->fetchBatch($cursor, $batchSize);
+            }
+
+            if (empty($batch)) {
+                if ($isRetry) {
+                    // Every ID in this slice has gone from WooCommerce since the run
+                    // that failed on it. Step over the slice rather than ending the
+                    // entity: the list is finite and indexed, so the entity still
+                    // terminates, and the IDs after this slice still get their turn.
+                    $this->state->advanceOffset(count($slice));
+
+                    return $this->buildResult(true);
+                }
+
+                // An empty batch is now the *only* end-of-entity signal. Under keyset
+                // pagination a short batch no longer means "no more rows" — the
+                // customer migrator hands back a short batch at its registered/guest
+                // boundary, and any migrator that hydrates IDs can drop a row — so
+                // stopping on one would silently truncate the migration.
+                return $this->finishEntity($currentType, $migrationId, count($entityTypes));
             }
 
             $entityState = $this->state->getCurrent()['entities'][$currentType] ?? [];
             $processed = $entityState['processed'] ?? 0;
             $skipped = $entityState['skipped'] ?? 0;
             $errors = $entityState['errors'] ?? 0;
-            $total = $entityState['total'] ?? $migrator->count();
+            $total = $isRetry
+                ? count($retryIds)
+                : ($entityState['total'] ?? $migrator->count());
 
             global $wpdb;
 
@@ -177,6 +424,8 @@ final class MigrationOrchestrator
                             $wcId,
                             'error',
                             sprintf('dry-run validation failed: %s', $e->getMessage()),
+                            null,
+                            MigrationErrorCode::DryRunValidationFailed,
                         );
                     }
                 } else {
@@ -212,43 +461,58 @@ final class MigrationOrchestrator
                             $wcId,
                             'error',
                             $e->getMessage(),
+                            null,
+                            self::errorCodeFor($e),
                         );
                     }
                 }
             }
 
             $this->state->updateProgress($currentType, $processed, $total, $skipped, $errors);
-            $this->state->advanceOffset(count($batch));
 
-            // Flush object cache every 5 batches (250 records) to prevent memory exhaustion.
-            $newOffset = $this->state->getCurrentOffset();
-            if ($newOffset > 0 && intdiv($newOffset, $batchSize) % 5 === 0) {
-                wp_cache_flush();
-                if (function_exists('gc_collect_cycles')) {
-                    gc_collect_cycles();
+            // A retry advances by the slice it asked for, not by the records that
+            // came back. fetchByIds() drops IDs that no longer resolve, so advancing
+            // by the batch would leave the missing ones in front of the index for
+            // ever and the entity would never finish.
+            $this->state->advanceOffset($isRetry ? count($slice) : count($batch));
+
+            if (!$isRetry) {
+                // Advance the cursor to the last record this batch handed out. Doing it
+                // after the loop means a fatal mid-batch replays the batch — harmless,
+                // because every processRecord() short-circuits on an ID-map hit.
+                $nextCursor = $migrator->cursorFor($batch[array_key_last($batch)]);
+                $this->state->setEntityCursor($currentType, $nextCursor);
+
+                // Belt and braces. A cursor that fails to move would spin this entity
+                // for ever; keyset ordering makes that impossible, so if it happens the
+                // migrator is broken and stopping is the only safe answer.
+                if ($cursor !== null && $nextCursor === $cursor) {
+                    $this->log->write(
+                        (string) $migrationId,
+                        $currentType,
+                        0,
+                        'warning',
+                        sprintf(
+                            'Cursor did not advance past "%s"; stopping this entity to avoid an endless loop.',
+                            (string) $cursor,
+                        ),
+                    );
+
+                    return $this->finishEntity($currentType, $migrationId, count($entityTypes));
                 }
             }
 
-            // If batch was smaller than batch size, entity is done.
-            if (count($batch) < $batchSize) {
-                $this->state->completeEntity($currentType);
+            // Drop the in-process cache every 5 batches (250 records) to prevent memory
+            // exhaustion. Deliberately NOT wp_cache_flush(): with a persistent object
+            // cache that would wipe Redis/Memcached for the entire site, over and over,
+            // while the migration runs. Only the per-request array needs clearing.
+            $newOffset = $this->state->getCurrentOffset();
+            if ($newOffset > 0 && intdiv($newOffset, $batchSize) % 5 === 0) {
+                self::flushRuntimeCache();
 
-                /** @see 'cartshift/migration/entity_completed' */
-                do_action('cartshift/migration/entity_completed', $currentType, $migrationId);
-
-                $this->state->advanceEntity();
-
-                $nextIndex = $this->state->getCurrentEntityIndex();
-                $hasMore = $nextIndex < count($entityTypes);
-
-                if (!$hasMore) {
-                    $this->state->complete();
-
-                    /** @see 'cartshift/migration/completed' */
-                    do_action('cartshift/migration/completed', $migrationId);
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
                 }
-
-                return $this->buildResult($hasMore);
             }
 
             return $this->buildResult(true);
@@ -261,6 +525,8 @@ final class MigrationOrchestrator
                 0,
                 'error',
                 $e->getMessage(),
+                null,
+                MigrationErrorCode::MigrationAborted,
             );
 
             /** @see 'cartshift/migration/failed' */
@@ -268,6 +534,68 @@ final class MigrationOrchestrator
 
             return $this->buildResult(false);
         }
+    }
+
+    /**
+     * Work out where in the source table this entity should resume.
+     *
+     * A run that was already in flight when cursors landed has no cursor key at
+     * all. Restarting that entity from the beginning is the safe reading: every
+     * processRecord() short-circuits on an ID-map hit, so the re-read costs a
+     * pass of cheap skips rather than duplicated data. Guessing a cursor from
+     * the old offset, by contrast, would skip rows outright.
+     */
+    private function resolveCursor(string $entityType, int $offset, ?string $migrationId): string|int|null
+    {
+        if ($this->state->hasEntityCursor($entityType)) {
+            return $this->state->getEntityCursor($entityType);
+        }
+
+        if ($offset > 0) {
+            $this->log->write(
+                (string) $migrationId,
+                $entityType,
+                0,
+                'warning',
+                sprintf(
+                    'No keyset cursor found at offset %d (run started before cursor pagination). '
+                    . 'Restarting this entity from the beginning; already-migrated records are skipped via the ID map.',
+                    $offset,
+                ),
+            );
+        }
+
+        // Write the key so the decision is taken exactly once per entity.
+        $this->state->setEntityCursor($entityType, null);
+
+        return null;
+    }
+
+    /**
+     * Close off the current entity and move to the next, completing the run if
+     * this was the last one.
+     *
+     * @return array{continue: bool, migration_id: string|null, entity_type: string|null, offset: int, total: int, processed: int}
+     */
+    private function finishEntity(string $currentType, ?string $migrationId, int $entityCount): array
+    {
+        $this->state->completeEntity($currentType);
+
+        /** @see 'cartshift/migration/entity_completed' */
+        do_action('cartshift/migration/entity_completed', $currentType, $migrationId);
+
+        $this->state->advanceEntity();
+
+        $hasMore = $this->state->getCurrentEntityIndex() < $entityCount;
+
+        if (!$hasMore) {
+            $this->state->complete();
+
+            /** @see 'cartshift/migration/completed' */
+            do_action('cartshift/migration/completed', $migrationId);
+        }
+
+        return $this->buildResult($hasMore);
     }
 
     /**
@@ -286,6 +614,26 @@ final class MigrationOrchestrator
     public function cancel(): void
     {
         $this->state->cancel();
+    }
+
+    /**
+     * Clear the in-process object cache without nuking a shared persistent cache.
+     *
+     * wp_cache_flush_runtime() landed in WordPress 6.0. Core's non-persistent
+     * implementation aliases it to wp_cache_flush(), which is harmless because
+     * that cache is per-request anyway. Drop-ins (Redis, Memcached) override it
+     * to clear only their local array and leave the shared server untouched —
+     * which is the whole point. Fall back only where the function is absent.
+     */
+    public static function flushRuntimeCache(): void
+    {
+        if (function_exists('wp_cache_flush_runtime')) {
+            wp_cache_flush_runtime();
+
+            return;
+        }
+
+        wp_cache_flush();
     }
 
     /**
@@ -312,7 +660,12 @@ final class MigrationOrchestrator
         $entityTypes = $state['entity_types'] ?? [];
         $entityIndex = $state['current_entity_index'] ?? 0;
         $currentType = $entityTypes[$entityIndex] ?? null;
-        $entityData = $state['entities'][$currentType] ?? [];
+
+        // Once every entity is done $currentType is null, and null is not a usable
+        // array key — PHP 8.5 deprecates coercing it to ''. Guard instead of casting.
+        $entityData = $currentType !== null
+            ? ($state['entities'][$currentType] ?? [])
+            : [];
 
         return [
             'continue'      => $continue,
@@ -325,7 +678,53 @@ final class MigrationOrchestrator
             'total'         => $entityData['total'] ?? 0,
             'processed'     => $entityData['processed'] ?? 0,
             'entities'      => $state['entities'] ?? [],
+            // Additive keys. Nothing existing may be removed or renamed — the REST
+            // controller, the WP-CLI command and the Vue UI all read this shape.
+            'cursor'        => $currentType !== null ? ($state['cursors'][$currentType] ?? null) : null,
+            'migrated'      => $currentType !== null ? $this->migratedCountFor($currentType) : 0,
+            // The run this one is repairing, or null for an ordinary migration.
+            // Always present so a caller can read it without knowing which kind
+            // of run it asked for.
+            'retry_of'      => $this->retryOf(),
         ];
+    }
+
+    /**
+     * How many records of this entity type are already in the ID map.
+     *
+     * One indexed COUNT per batch result, so the UI can say "1,204 of 5,000
+     * already migrated" without the orchestrator holding any mapping rows.
+     */
+    private function migratedCountFor(string $entityType): int
+    {
+        $migrators = $this->resolveMigrators([$entityType]);
+
+        if ($migrators === []) {
+            return 0;
+        }
+
+        try {
+            return $migrators[0]->migratedCount();
+        } catch (\Throwable) {
+            // A progress nicety must never take a migration down with it.
+            return 0;
+        }
+    }
+
+    /**
+     * The code to log for an exception a record threw.
+     *
+     * A migrator that already knows why it failed says so by throwing something
+     * that carries the reason; everything else is genuinely unexpected, and
+     * saying so is more honest than guessing.
+     *
+     * @see HasErrorCode
+     */
+    private static function errorCodeFor(\Throwable $e): MigrationErrorCode
+    {
+        return $e instanceof HasErrorCode
+            ? $e->errorCode()
+            : MigrationErrorCode::UnexpectedException;
     }
 
     /**

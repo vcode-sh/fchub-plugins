@@ -38,6 +38,19 @@
       </label>
     </div>
 
+    <div class="cartshift-option-box">
+      <label>
+        <input type="checkbox" v-model="state.useBackground" :disabled="!state.backgroundAvailable" />
+        <strong>Run in the background</strong> &mdash; hand the batches to Action Scheduler so the
+        migration survives this tab being closed. Progress updates every couple of seconds instead
+        of live. Leave this off for a real-time run you intend to watch.
+      </label>
+      <p v-if="!state.backgroundAvailable" class="description">
+        Unavailable: Action Scheduler was not found. It ships with both WooCommerce and FluentCart,
+        so this normally means neither is loaded.
+      </p>
+    </div>
+
     <p style="margin-top:15px;">
       <button
         class="button button-primary button-hero"

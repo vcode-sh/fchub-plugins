@@ -6,10 +6,24 @@ namespace CartShift\Domain\Mapping;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\MoneyHelper;
 
 final class ProductMapper
 {
+    /**
+     * Shared across map() calls so VariationMapper's attribute-term memo cache survives
+     * the whole run instead of being thrown away after every product.
+     */
+    private ?VariationMapper $variationMapper = null;
+
+    /**
+     * Warnings raised by the last map() call, each with its reason code.
+     *
+     * @var list<array{message: string, code: MigrationErrorCode}>
+     */
+    private array $warnings = [];
+
     /**
      * @param array<int, int> $shippingClassMap WC shipping class term_id => FC shipping class ID.
      */
@@ -25,6 +39,8 @@ final class ProductMapper
      */
     public function map(\WC_Product $product): ?array
     {
+        $this->warnings = [];
+
         $type = $product->get_type();
 
         if (in_array($type, ['grouped', 'external'], true)) {
@@ -34,19 +50,23 @@ final class ProductMapper
         $isVariable = $type === 'variable';
         $fulfillmentType = self::getFulfillmentType($product);
 
+        $dateCreated = $product->get_date_created();
+
         $postData = [
             'post_title'    => $product->get_name(),
             'post_content'  => $product->get_description(),
             'post_excerpt'  => $product->get_short_description(),
-            'post_status'   => self::resolvePostStatus($product),
+            'post_status'   => $this->resolvePostStatus($product),
             'post_type'     => 'fluent-products',
             'post_name'     => $product->get_slug(),
-            'post_date'     => $product->get_date_created()
-                ? $product->get_date_created()->date('Y-m-d H:i:s')
+            // wp_posts keeps the two apart: post_date is site-local, post_date_gmt is UTC.
+            // WC_DateTime::date() formats against getOffsetTimestamp() — site-local — so it is
+            // right for post_date and wrong for post_date_gmt. getTimestamp() is the plain UTC
+            // epoch, which is what post_date_gmt wants.
+            'post_date'     => $dateCreated
+                ? $dateCreated->date('Y-m-d H:i:s')
                 : current_time('mysql'),
-            'post_date_gmt' => $product->get_date_created()
-                ? $product->get_date_created()->date('Y-m-d H:i:s')
-                : current_time('mysql', true),
+            'post_date_gmt' => self::toUtcString($dateCreated) ?? current_time('mysql', true),
         ];
 
         $variationType = $isVariable ? 'advanced_variations' : 'simple';
@@ -60,7 +80,7 @@ final class ProductMapper
             'other_info'          => self::buildDetailOtherInfo($product),
         ];
 
-        $variationMapper = new VariationMapper($this->currency, $this->shippingClassMap);
+        $variationMapper = $this->variationMapper();
         $variations = [];
 
         if ($isVariable) {
@@ -108,6 +128,29 @@ final class ProductMapper
     }
 
     /**
+     * The shared VariationMapper for this run.
+     */
+    private function variationMapper(): VariationMapper
+    {
+        return $this->variationMapper ??= new VariationMapper($this->currency, $this->shippingClassMap);
+    }
+
+    /**
+     * Render a WC_DateTime as a UTC 'Y-m-d H:i:s' string.
+     *
+     * WC_DateTime::date() formats against getOffsetTimestamp() (site-local); getTimestamp()
+     * is the plain UTC epoch, so gmdate() over it is the UTC rendering.
+     */
+    private static function toUtcString(?object $date): ?string
+    {
+        if (!$date || !method_exists($date, 'getTimestamp')) {
+            return null;
+        }
+
+        return gmdate('Y-m-d H:i:s', $date->getTimestamp());
+    }
+
+    /**
      * Build the other_info array for product detail, including weight/dimensions when present.
      */
     private static function buildDetailOtherInfo(\WC_Product $product): array
@@ -149,10 +192,11 @@ final class ProductMapper
      * (visible/catalog/search/hidden). FC only has publish/draft/private.
      *
      * Products that are published but hidden from both catalog and search are mapped to draft.
-     * Products with partial visibility (catalog-only or search-only) stay published but
-     * generate a warning via the 'cartshift/mapper/product/warnings' filter.
+     * Products with partial visibility (catalog-only or search-only) stay published, and the
+     * fact that the distinction was lost is collected as a coded warning — see getCodedWarnings().
+     * The 'cartshift/mapper/product/warnings' filter still fires for anything already hooked to it.
      */
-    private static function resolvePostStatus(\WC_Product $product): string
+    private function resolvePostStatus(\WC_Product $product): string
     {
         $wcStatus = $product->get_status();
         $visibility = method_exists($product, 'get_catalog_visibility')
@@ -167,17 +211,47 @@ final class ProductMapper
         };
 
         if ($wcStatus === 'publish' && in_array($visibility, ['catalog', 'search'], true)) {
+            $message = sprintf(
+                'Product #%d has partial visibility "%s" — mapped as published. FC does not support partial catalog visibility.',
+                $product->get_id(),
+                $visibility,
+            );
+
+            $this->warnings[] = [
+                'message' => $message,
+                'code'    => MigrationErrorCode::PartialCatalogVisibility,
+            ];
+
             /** @see 'cartshift/mapper/product/warnings' */
-            apply_filters('cartshift/mapper/product/warnings', [
-                sprintf(
-                    'Product #%d has partial visibility "%s" — mapped as published. FC does not support partial catalog visibility.',
-                    $product->get_id(),
-                    $visibility,
-                ),
-            ], $product);
+            apply_filters('cartshift/mapper/product/warnings', [$message], $product);
         }
 
         return $fcStatus;
+    }
+
+    /**
+     * Warnings collected during the last map() call.
+     *
+     * Plain sentences, matching CouponMapper and SubscriptionMapper.
+     *
+     * @return list<string>
+     */
+    public function getWarnings(): array
+    {
+        return array_map(
+            static fn (array $warning): string => $warning['message'],
+            $this->warnings,
+        );
+    }
+
+    /**
+     * The same warnings, each paired with the reason code it stands for.
+     *
+     * @return list<array{message: string, code: MigrationErrorCode}>
+     */
+    public function getCodedWarnings(): array
+    {
+        return $this->warnings;
     }
 
     /**

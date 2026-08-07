@@ -8,6 +8,8 @@ use CartShift\Domain\Mapping\OrderMapper;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Tests\Unit\PluginTestCase;
 
+require_once __DIR__ . '/../../../stubs/MapperStubs.php';
+
 final class OrderMapperTest extends PluginTestCase
 {
     private OrderMapper $mapper;
@@ -537,6 +539,117 @@ final class OrderMapperTest extends PluginTestCase
         $this->assertSame('Large', $lineMeta[0]['value']);
         $this->assertSame('Gift Message', $lineMeta[1]['key']);
         $this->assertSame('Happy Birthday', $lineMeta[1]['value']);
+    }
+
+    // ──────────────────────────────────────────────
+    // Timestamps — every fct_* column is UTC
+    // ──────────────────────────────────────────────
+
+    public function testOrderTimestampsAreUtcNotSiteLocal(): void
+    {
+        // Site at UTC+2. FluentCart's own importer fills fct_orders.created_at from
+        // wc_orders.date_created_gmt (OrderMigrationService.php:225), so UTC it is.
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '50.00',
+            'date_created' => cartshift_test_wc_date('2024-01-15 10:30:00', 2),
+            'date_completed' => cartshift_test_wc_date('2024-01-16 08:00:00', 2),
+            'date_paid' => cartshift_test_wc_date('2024-01-15 11:00:00', 2),
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame('2024-01-15 10:30:00', $result['order']['created_at']);
+        $this->assertSame('2024-01-16 08:00:00', $result['order']['completed_at']);
+        $this->assertSame('2024-01-15 11:00:00', $result['transaction']['created_at']);
+    }
+
+    public function testOrderTimestampsHandleNegativeOffset(): void
+    {
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '50.00',
+            'date_created' => cartshift_test_wc_date('2024-01-15 03:00:00', -5),
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        // Site-local would have been 2024-01-14 22:00:00 — the previous day.
+        $this->assertSame('2024-01-15 03:00:00', $result['order']['created_at']);
+    }
+
+    public function testLineItemCreatedAtIsUtc(): void
+    {
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '50.00',
+            'date_created' => cartshift_test_wc_date('2024-01-15 10:30:00', 2),
+            'items' => [
+                $this->createOrderItem([
+                    'product_id' => 1,
+                    'quantity' => 1,
+                    'total' => '50.00',
+                    'subtotal' => '50.00',
+                ]),
+            ],
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertNotEmpty($result['items']);
+        $this->assertSame('2024-01-15 10:30:00', $result['items'][0]['created_at']);
+    }
+
+    public function testTransactionFallsBackToCreatedAtWhenUnpaid(): void
+    {
+        // No date_paid — the transaction timestamp falls back to the order's created_at,
+        // and the fallback must be UTC too rather than swapping conventions mid-column.
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '50.00',
+            'date_created' => cartshift_test_wc_date('2024-01-15 10:30:00', 2),
+            'date_paid' => null,
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame('2024-01-15 10:30:00', $result['transaction']['created_at']);
+        $this->assertSame($result['order']['created_at'], $result['transaction']['created_at']);
+    }
+
+    public function testCompletedAtIsNullWhenOrderNeverCompleted(): void
+    {
+        $order = $this->createOrder([
+            'status' => 'pending',
+            'total' => '50.00',
+            'date_created' => cartshift_test_wc_date('2024-01-15 10:30:00', 2),
+            'date_completed' => null,
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertNull($result['order']['completed_at']);
+    }
+
+    public function testMissingDateCreatedFallsBackToUtcNow(): void
+    {
+        $order = $this->createOrder([
+            'status' => 'completed',
+            'total' => '50.00',
+            'date_created' => null,
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertMatchesRegularExpression(
+            '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+            $result['order']['created_at'],
+        );
+        // Within a minute of "now" in UTC.
+        $this->assertLessThan(
+            60,
+            abs(strtotime($result['order']['created_at'] . ' UTC') - time()),
+        );
     }
 
     private function createOrder(array $overrides = []): \WC_Order

@@ -22,6 +22,15 @@
         </div>
       </div>
 
+      <div v-if="code" class="cartshift-log-detail-message">
+        <span class="cartshift-log-detail-label">Reason</span>
+        <p>
+          {{ descriptor?.label || humaniseCode(code) }}
+          <code class="cartshift-log-breakdown-code">{{ code }}</code>
+        </p>
+        <p v-if="descriptor?.hint" class="cartshift-log-detail-hint">{{ descriptor.hint }}</p>
+      </div>
+
       <div v-if="entry.message" class="cartshift-log-detail-message">
         <span class="cartshift-log-detail-label">Message</span>
         <p>{{ entry.message }}</p>
@@ -37,13 +46,20 @@
 
 <script setup>
 import { computed } from 'vue';
+import { extractCode, humaniseCode } from '@/composables/useLogViewer.js';
 
 const props = defineProps({
   entry: {
     type: Object,
     required: true,
   },
+  descriptor: {
+    type: Object,
+    default: null,
+  },
 });
+
+const code = computed(() => extractCode(props.entry));
 
 const normalizedStatus = computed(() => {
   const s = props.entry.status;

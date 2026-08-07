@@ -15,6 +15,36 @@ use CartShift\Tests\Unit\PluginTestCase;
 final class PreflightControllerTest extends PluginTestCase
 {
     /**
+     * Clear the query callbacks.
+     *
+     * This class installs both, and PluginTestCase::setUp() does not reset
+     * them, so without this they stay live for every test class that runs
+     * afterwards — surfacing as a fatal in an unrelated file with nothing
+     * pointing back here.
+     *
+     * Note the WooCommerce class this file eval()s into existence cannot be
+     * torn down — a class declaration is process-global and there is no undo.
+     *
+     * That is benign only for as long as nothing expects the negative. A future
+     * test asserting WooCommerce is *absent* — a preflight case covering the
+     * "WooCommerce not installed" branch, say — will fail whenever it runs after
+     * this file, and pass when run alone. It will look broken rather than
+     * poisoned, so start here. The real fix is a separate process
+     * (@runInSeparateProcess) for whichever test needs the negative, not
+     * anything this tearDown can do.
+     */
+    #[\Override]
+    protected function tearDown(): void
+    {
+        unset(
+            $GLOBALS['_cartshift_test_get_var_callback'],
+            $GLOBALS['_cartshift_test_get_results_callback'],
+        );
+
+        parent::tearDown();
+    }
+
+    /**
      * Verify table existence check detects missing migration tables.
      */
     public function testPreflightReturnsTableExistenceCheck(): void
@@ -52,7 +82,15 @@ final class PreflightControllerTest extends PluginTestCase
      */
     public function testPreflightReturnsProductTypeBreakdown(): void
     {
-        // Simulate WooCommerce being active.
+        // Simulate WooCommerce being active. PreflightCheck gates on
+        // class_exists('WooCommerce'), so the test needs the bare symbol to
+        // exist and nothing more.
+        //
+        // The eval() is a fixed, hard-coded string with no interpolation and no
+        // external input — it cannot execute anything a caller supplies, and it
+        // runs only under PHPUnit, never in the shipped plugin. It is here
+        // because the class must be declared conditionally at runtime, which a
+        // normal declaration cannot do. Do not generalise it to take a variable.
         if (!class_exists('WooCommerce')) {
             // @phpcs:ignore
             eval('class WooCommerce {}');

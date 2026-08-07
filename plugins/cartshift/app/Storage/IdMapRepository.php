@@ -10,6 +10,17 @@ final class IdMapRepository
 {
     private readonly string $table;
 
+    /**
+     * In-request lookup memo: entity_type => wc_id => fc_id, where null records a known miss.
+     *
+     * A migration resolves the same handful of IDs per order, line item, variation and
+     * coupon condition, so an uncached repository fires hundreds of thousands of
+     * single-row SELECTs on a large store. The memo lives for one request only.
+     *
+     * @var array<string, array<string, int|null>>
+     */
+    private array $memo = [];
+
     public function __construct()
     {
         global $wpdb;
@@ -40,6 +51,12 @@ final class IdMapRepository
             ],
             ['%s', '%s', '%d', '%s', '%d', '%s'],
         );
+
+        // isset() is false for a memoised miss, so a miss is replaced while an
+        // earlier hit is kept — matching the "first match wins" read semantics.
+        if (!isset($this->memo[$entityType][$wcId])) {
+            $this->memo[$entityType][$wcId] = $fcId;
+        }
     }
 
     /**
@@ -47,6 +64,10 @@ final class IdMapRepository
      */
     public function getFcId(string $entityType, string $wcId): int|null
     {
+        if (array_key_exists($wcId, $this->memo[$entityType] ?? [])) {
+            return $this->memo[$entityType][$wcId];
+        }
+
         global $wpdb;
 
         $result = $wpdb->get_var($wpdb->prepare(
@@ -55,7 +76,55 @@ final class IdMapRepository
             $wcId,
         ));
 
-        return $result !== null ? (int) $result : null;
+        $fcId = $result !== null ? (int) $result : null;
+
+        // Misses are memoised too, so a repeated lookup for an unmigrated record
+        // does not hit the database again.
+        $this->memo[$entityType][$wcId] = $fcId;
+
+        return $fcId;
+    }
+
+    /**
+     * Load every mapping for one entity type in a single query.
+     *
+     * Used to rehydrate taxonomy maps between batches without replaying the
+     * one-time setup work. First row wins, mirroring getFcId().
+     *
+     * @return array<string, int> wc_id => fc_id
+     */
+    public function getMapForEntityType(string $entityType): array
+    {
+        global $wpdb;
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT wc_id, fc_id FROM {$this->table} WHERE entity_type = %s",
+            $entityType,
+        ));
+
+        $map = [];
+
+        foreach ($rows ?: [] as $row) {
+            $wcId = (string) $row->wc_id;
+
+            if (isset($map[$wcId])) {
+                continue;
+            }
+
+            $map[$wcId] = (int) $row->fc_id;
+        }
+
+        $this->memo[$entityType] = $map + ($this->memo[$entityType] ?? []);
+
+        return $map;
+    }
+
+    /**
+     * Drop the in-request memo. Call after out-of-band writes to the table.
+     */
+    public function flushMemo(): void
+    {
+        $this->memo = [];
     }
 
     /**
@@ -110,6 +179,8 @@ final class IdMapRepository
             ['migration_id' => $migrationId],
             ['%s'],
         );
+
+        $this->flushMemo();
     }
 
     /**
@@ -123,6 +194,8 @@ final class IdMapRepository
             "DELETE FROM {$this->table} WHERE migration_id = %s AND created_by_migration = 1",
             $migrationId,
         ));
+
+        $this->flushMemo();
     }
 
     /**
@@ -133,5 +206,7 @@ final class IdMapRepository
         global $wpdb;
 
         $wpdb->query("TRUNCATE TABLE {$this->table}");
+
+        $this->flushMemo();
     }
 }

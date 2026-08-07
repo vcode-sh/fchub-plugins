@@ -42,6 +42,18 @@ final class InMemoryIdMap
         return $this->getAllByEntityType($entityType);
     }
 
+    /**
+     * @return array<string, int> wc_id => fc_id
+     */
+    public function getMapForEntityType(string $entityType): array
+    {
+        $map = [];
+        foreach ($this->map[$entityType] ?? [] as $wcId => $fcId) {
+            $map[(string) $wcId] = $fcId;
+        }
+        return $map;
+    }
+
     public function deleteByMigration(string $migrationId): void
     {
         $this->map = [];
@@ -55,5 +67,10 @@ final class InMemoryIdMap
     public function truncate(): void
     {
         $this->map = [];
+    }
+
+    public function flushMemo(): void
+    {
+        // No memo layer — every read is already in memory.
     }
 }

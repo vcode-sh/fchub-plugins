@@ -10,7 +10,7 @@
 </template>
 
 <script setup>
-import { provide, onMounted, onBeforeUnmount } from 'vue';
+import { provide, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useMigration } from '@/composables/useMigration.js';
 import { useTheme } from '@/composables/useTheme.js';
 import PreflightScreen from '@/components/PreflightScreen.vue';
@@ -24,7 +24,35 @@ const theme = useTheme();
 provide('migration', { state, actions });
 provide('theme', theme);
 
+/**
+ * Guard the tab while the browser is the thing driving the migration. Closing
+ * it mid-run leaves the server stuck on 'running' until someone resets it.
+ * Background runs need no guard — surviving a closed tab is the whole point.
+ */
+function beforeUnloadHandler(event) {
+  event.preventDefault();
+  event.returnValue = '';
+  return '';
+}
+
+function setUnloadGuard(active) {
+  if (active) {
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+  } else {
+    window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }
+}
+
+watch(
+  () => state.migrating && !state.background,
+  (active) => setUnloadGuard(active)
+);
+
 onMounted(() => {
-  actions.runPreflight();
+  actions.bootstrap();
+});
+
+onBeforeUnmount(() => {
+  setUnloadGuard(false);
 });
 </script>

@@ -41,20 +41,20 @@ final class MigrationModule implements ModuleInterface
         $container->singleton(BatchProcessor::class, static function (Container $c): BatchProcessor {
             $state = $c->get(MigrationState::class);
 
-            // Factory builds a fresh orchestrator each invocation so migrators
-            // always carry the current migration ID from state.
+            // Factory builds a fresh orchestrator each invocation. Migrators read
+            // the migration ID from MigrationState at the moment they write, so
+            // this is about not holding stale repositories, nothing more.
             $orchestratorFactory = static function () use ($c): MigrationOrchestrator {
                 $state = $c->get(MigrationState::class);
                 $idMap = $c->get(IdMapRepository::class);
                 $log = $c->get(MigrationLogRepository::class);
-                $migrationId = $state->getMigrationId() ?? '';
 
                 $migrators = [
-                    new ProductMigrator($idMap, $log, $state, $migrationId),
-                    new CustomerMigrator($idMap, $log, $state, $migrationId),
-                    new CouponMigrator($idMap, $log, $state, $migrationId),
-                    new OrderMigrator($idMap, $log, $state, $migrationId),
-                    new SubscriptionMigrator($idMap, $log, $state, $migrationId),
+                    new ProductMigrator($idMap, $log, $state),
+                    new CustomerMigrator($idMap, $log, $state),
+                    new CouponMigrator($idMap, $log, $state),
+                    new OrderMigrator($idMap, $log, $state),
+                    new SubscriptionMigrator($idMap, $log, $state),
                 ];
 
                 return new MigrationOrchestrator($migrators, $state, $idMap, $log);
@@ -63,7 +63,10 @@ final class MigrationModule implements ModuleInterface
             return new BatchProcessor($orchestratorFactory, $state);
         });
 
-        // Register Action Scheduler hook early so AS can find it.
+        // The Action Scheduler handler must be attached on every request, not
+        // just admin ones: the request that actually runs a queued batch is a
+        // cron or Action Scheduler runner request, and it will not find the hook
+        // unless it was registered at plugin boot.
         $batchProcessor = $container->get(BatchProcessor::class);
         $batchProcessor->register();
 

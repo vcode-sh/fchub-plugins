@@ -203,12 +203,41 @@ final class DryRunTest extends PluginTestCase
             }
 
             #[\Override]
-            public function run(): void {}
+            public function fetchByIds(array $wcIds): array
+            {
+                $wanted = array_map(intval(...), $wcIds);
+
+                return array_values(array_filter(
+                    $this->records,
+                    static fn (object $record): bool => in_array((int) $record->id, $wanted, true),
+                ));
+            }
 
             #[\Override]
-            public function fetchBatch(int $offset, int $limit): array
+            public function fetchBatch(string|int|null $cursor, int $limit): array
             {
-                return array_slice($this->records, $offset, $limit);
+                $after = (int) $cursor;
+
+                return array_slice(
+                    array_values(array_filter(
+                        $this->records,
+                        static fn (object $record): bool => (int) $record->id > $after,
+                    )),
+                    0,
+                    $limit,
+                );
+            }
+
+            #[\Override]
+            public function cursorFor(mixed $record): string|int
+            {
+                return (int) $record->id;
+            }
+
+            #[\Override]
+            public function migratedCount(): int
+            {
+                return 0;
             }
 
             #[\Override]

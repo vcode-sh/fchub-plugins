@@ -12,7 +12,12 @@ final class AdminMenu
 {
     public const string MENU_SLUG = 'cartshift-migrator';
 
+    private const string ENTRY_KEY = 'src/main.js';
+
     private string $hookSuffix = '';
+
+    /** Set when the Vite build output is missing, so renderPage() can say so. */
+    private bool $buildMissing = false;
 
     public function __construct(
         private readonly FeatureFlags $flags,
@@ -35,62 +40,38 @@ final class AdminMenu
             return;
         }
 
-        $distPath = CARTSHIFT_PLUGIN_PATH . 'resources/admin/dist/';
-        $distUrl  = CARTSHIFT_PLUGIN_URL . 'resources/admin/dist/';
-        $manifest = $distPath . '.vite/manifest.json';
-        $entryKey = 'src/main.js';
+        $distUrl      = CARTSHIFT_PLUGIN_URL . 'resources/admin/dist/';
+        $manifestPath = CARTSHIFT_PLUGIN_PATH . 'resources/admin/dist/.vite/manifest.json';
 
-        if (file_exists($manifest)) {
-            $assets       = json_decode(file_get_contents($manifest), true);
-            $entry        = $assets[$entryKey] ?? null;
-            $buildVersion = (string) filemtime($manifest);
+        $entry = $this->readManifestEntry($manifestPath);
 
-            if ($entry) {
-                if (! empty($entry['css'])) {
-                    foreach ($entry['css'] as $i => $css) {
-                        wp_enqueue_style(
-                            'cartshift-admin' . ($i ? "-{$i}" : ''),
-                            $distUrl . $css,
-                            [],
-                            $buildVersion,
-                        );
-                    }
-                }
-
-                wp_enqueue_script(
-                    'cartshift-admin',
-                    $distUrl . $entry['file'],
-                    [],
-                    $buildVersion,
-                    true,
-                );
-            }
-        } else {
-            // Fallback: load legacy vanilla JS bundle.
-            wp_enqueue_style(
-                'cartshift-admin',
-                CARTSHIFT_PLUGIN_URL . 'resources/admin/style.css',
-                [],
-                (string) filemtime(CARTSHIFT_PLUGIN_PATH . 'resources/admin/style.css'),
-            );
-
-            wp_enqueue_script(
-                'cartshift-admin',
-                CARTSHIFT_PLUGIN_URL . 'resources/admin/app.js',
-                [],
-                (string) filemtime(CARTSHIFT_PLUGIN_PATH . 'resources/admin/app.js'),
-                true,
-            );
-
-            wp_localize_script('cartshift-admin', 'cartshift', [
-                'restUrl'  => rest_url('cartshift/v1/'),
-                'nonce'    => wp_create_nonce('wp_rest'),
-                'version'  => CARTSHIFT_VERSION,
-                'features' => $this->flags->all(),
-            ]);
+        if ($entry === null) {
+            // No build output means no admin app. Flag it so renderPage() explains
+            // itself, rather than serving an empty div and letting the admin wonder
+            // whether their browser is broken.
+            $this->buildMissing = true;
 
             return;
         }
+
+        $buildVersion = (string) (filemtime($manifestPath) ?: CARTSHIFT_VERSION);
+
+        foreach ($entry['css'] as $i => $css) {
+            wp_enqueue_style(
+                'cartshift-admin' . ($i ? "-{$i}" : ''),
+                $distUrl . $css,
+                [],
+                $buildVersion,
+            );
+        }
+
+        wp_enqueue_script(
+            'cartshift-admin',
+            $distUrl . $entry['file'],
+            [],
+            $buildVersion,
+            true,
+        );
 
         // Add type="module" for Vite ESM output.
         add_filter('script_loader_tag', function (string $tag, string $handle): string {
@@ -110,8 +91,57 @@ final class AdminMenu
         wp_add_inline_script('cartshift-admin', "window.cartshift = {$config};", 'before');
     }
 
+    /**
+     * Read the Vite entry from the build manifest.
+     *
+     * Returns null for every flavour of "there is no usable build here": no manifest,
+     * unreadable manifest, manifest that is not JSON, manifest without our entry, entry
+     * without a file. Callers get one thing to check instead of five.
+     *
+     * @return array{file: string, css: list<string>}|null
+     */
+    private function readManifestEntry(string $manifestPath): ?array
+    {
+        if (! is_readable($manifestPath)) {
+            return null;
+        }
+
+        $raw = file_get_contents($manifestPath);
+
+        if ($raw === false) {
+            return null;
+        }
+
+        $manifest = json_decode($raw, true);
+
+        if (! is_array($manifest)) {
+            return null;
+        }
+
+        $entry = $manifest[self::ENTRY_KEY] ?? null;
+
+        if (! is_array($entry) || ! is_string($entry['file'] ?? null) || $entry['file'] === '') {
+            return null;
+        }
+
+        $css = [];
+        foreach ((array) ($entry['css'] ?? []) as $path) {
+            if (is_string($path) && $path !== '') {
+                $css[] = $path;
+            }
+        }
+
+        return ['file' => $entry['file'], 'css' => $css];
+    }
+
     public function renderPage(): void
     {
+        if ($this->buildMissing) {
+            $this->renderBuildMissingNotice();
+
+            return;
+        }
+
         echo '<style>#wpbody-content { padding-bottom: 0; } #wpbody-content > .notice, #wpbody-content > .updated, #wpbody-content > .error, #wpbody-content > .update-nag { display: none !important; }</style>';
         echo '<script>'
             . '(function(){'
@@ -124,5 +154,30 @@ final class AdminMenu
             . '})();'
             . '</script>';
         echo '<div id="cartshift-app"></div>';
+    }
+
+    /**
+     * Explain a missing build instead of rendering a blank page.
+     *
+     * Printed inline rather than through admin_notices, because renderPage() hides
+     * notices inside #wpbody-content and this is the one message that must survive that.
+     */
+    private function renderBuildMissingNotice(): void
+    {
+        echo '<div class="wrap">';
+        echo '<h1>' . esc_html__('CartShift', 'cartshift') . '</h1>';
+        echo '<div class="notice notice-error"><p><strong>'
+            . esc_html__('The admin interface has not been built.', 'cartshift')
+            . '</strong></p><p>'
+            . esc_html__(
+                'CartShift could not read resources/admin/dist/.vite/manifest.json, so there is no interface to '
+                . 'show you. Installed from a release ZIP? That build is broken — fetch a fresh one. Working from '
+                . 'a checkout? Run "npm install && npm run build".',
+                'cartshift',
+            )
+            . '</p><p>'
+            . esc_html__('The REST API and the "wp cartshift" CLI commands are unaffected.', 'cartshift')
+            . '</p></div>';
+        echo '</div>';
     }
 }

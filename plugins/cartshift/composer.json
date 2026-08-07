@@ -20,8 +20,7 @@
     },
     "autoload": {
         "psr-4": {
-            "CartShift\\": "app/",
-            "CartShift\\Database\\": "database/Migrations/"
+            "CartShift\\": "app/"
         }
     },
     "autoload-dev": {

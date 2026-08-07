@@ -11,6 +11,21 @@ final class MigrationState
     private const string OPTION_KEY = 'cartshift_migration_state';
 
     /**
+     * In-request copy of the option, or null when nothing has been read yet.
+     *
+     * A single processBatch() call reads the state a dozen-plus times — entity types,
+     * index, offset, migration id, dry-run flag, per-entity counters — and the option
+     * cannot change under it except by cancellation, which isCancelled() reads
+     * separately. See $memoLoaded for why null alone is not a "not loaded" marker.
+     *
+     * @var array<string, mixed>|null
+     */
+    private array|null $memo = null;
+
+    /** Whether $memo holds a real read. Distinguishes "no state" from "not read yet". */
+    private bool $memoLoaded = false;
+
+    /**
      * Start a new migration run.
      *
      * @param string[] $entityTypes Entity types to migrate.
@@ -27,6 +42,7 @@ final class MigrationState
             'entity_types'         => array_values($entityTypes),
             'current_entity_index' => 0,
             'current_offset'       => 0,
+            'cursors'              => [],
             'entities'             => [],
         ];
 
@@ -40,7 +56,7 @@ final class MigrationState
             ];
         }
 
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
 
         return $state;
     }
@@ -63,7 +79,7 @@ final class MigrationState
             'errors'    => $errors,
         ];
 
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
     }
 
     /**
@@ -77,7 +93,7 @@ final class MigrationState
         }
 
         $state['entities'][$entity]['status'] = 'completed';
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
     }
 
     /**
@@ -93,7 +109,7 @@ final class MigrationState
         $state['status'] = 'completed';
         $state['completed_at'] = gmdate('Y-m-d H:i:s');
 
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
     }
 
     /**
@@ -109,7 +125,7 @@ final class MigrationState
         $state['status'] = 'cancelled';
         $state['completed_at'] = gmdate('Y-m-d H:i:s');
 
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
     }
 
     /**
@@ -123,15 +139,22 @@ final class MigrationState
         }
 
         $state['entities'][$entity]['status'] = 'cancelled';
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
     }
 
     /**
      * Check whether the migration has been cancelled.
+     *
+     * Deliberately bypasses the memo. Cancellation is the one state change that
+     * arrives from a *different* PHP request — the UI fires its own REST call while a
+     * batch is mid-flight — so a cached read here would let the batch grind on to the
+     * end of the entity after the user hit cancel. The fresh value is written back
+     * into the memo, so a cancellation observed here is visible to every later reader
+     * in this request too.
      */
     public function isCancelled(): bool
     {
-        $state = $this->getCurrent();
+        $state = $this->readFresh();
 
         return $state !== null && $state['status'] === 'cancelled';
     }
@@ -150,7 +173,7 @@ final class MigrationState
         $state['error'] = $message;
         $state['completed_at'] = gmdate('Y-m-d H:i:s');
 
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
     }
 
     /**
@@ -164,13 +187,61 @@ final class MigrationState
     }
 
     /**
-     * Get the current offset within the current entity batch.
+     * How many records of the current entity have been handed to the batch loop.
+     *
+     * Since keyset pagination replaced LIMIT/OFFSET this is a progress counter
+     * and nothing more — it no longer drives any query. The UI and the CLI both
+     * read it, so it stays monotonically increasing and resets per entity.
      */
     public function getCurrentOffset(): int
     {
         $state = $this->getCurrent();
 
         return $state['current_offset'] ?? 0;
+    }
+
+    /**
+     * The persisted keyset cursor for an entity type, or null at the start.
+     *
+     * Note the difference between "null cursor" and "no cursor": a run started
+     * before cursors existed has no key at all, which hasEntityCursor() reports
+     * and the orchestrator treats as "restart this entity".
+     */
+    public function getEntityCursor(string $entity): string|int|null
+    {
+        $state = $this->getCurrent();
+        $cursor = $state['cursors'][$entity] ?? null;
+
+        return is_string($cursor) || is_int($cursor) ? $cursor : null;
+    }
+
+    /**
+     * Whether a cursor has ever been written for this entity in this run.
+     */
+    public function hasEntityCursor(string $entity): bool
+    {
+        $state = $this->getCurrent();
+
+        return is_array($state['cursors'] ?? null)
+            && array_key_exists($entity, $state['cursors']);
+    }
+
+    /**
+     * Persist the keyset cursor an entity has reached.
+     */
+    public function setEntityCursor(string $entity, string|int|null $cursor): void
+    {
+        $state = $this->getCurrent();
+        if (!$state) {
+            return;
+        }
+
+        if (!is_array($state['cursors'] ?? null)) {
+            $state['cursors'] = [];
+        }
+
+        $state['cursors'][$entity] = $cursor;
+        $this->persist($state);
     }
 
     /**
@@ -196,7 +267,7 @@ final class MigrationState
         }
 
         $state['current_offset'] = ($state['current_offset'] ?? 0) + $amount;
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
     }
 
     /**
@@ -211,7 +282,7 @@ final class MigrationState
 
         $state['current_entity_index'] = ($state['current_entity_index'] ?? 0) + 1;
         $state['current_offset'] = 0;
-        update_option(self::OPTION_KEY, $state, false);
+        $this->persist($state);
     }
 
     /**
@@ -247,13 +318,55 @@ final class MigrationState
     /**
      * Get the current migration state.
      *
+     * Served from the in-request memo after the first read. Every write in this class
+     * refreshes it, so the memo can never be behind this request's own changes; the
+     * only writer it cannot see is another request, and isCancelled() handles that.
+     *
      * @return array<string, mixed>|null
      */
     public function getCurrent(): ?array
     {
+        if ($this->memoLoaded) {
+            return $this->memo;
+        }
+
+        return $this->readFresh();
+    }
+
+    /**
+     * Read the option, bypassing the memo, and refresh the memo with what came back.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function readFresh(): array|null
+    {
         $state = get_option(self::OPTION_KEY, null);
 
-        return is_array($state) ? $state : null;
+        return $this->remember(is_array($state) ? $state : null);
+    }
+
+    /**
+     * Persist state and keep the memo in step with it.
+     *
+     * @param array<string, mixed> $state
+     */
+    private function persist(array $state): void
+    {
+        update_option(self::OPTION_KEY, $state, false);
+
+        $this->remember($state);
+    }
+
+    /**
+     * @param array<string, mixed>|null $state
+     * @return array<string, mixed>|null
+     */
+    private function remember(array|null $state): array|null
+    {
+        $this->memo = $state;
+        $this->memoLoaded = true;
+
+        return $state;
     }
 
     /**
@@ -277,5 +390,7 @@ final class MigrationState
     public function reset(): void
     {
         delete_option(self::OPTION_KEY);
+
+        $this->remember(null);
     }
 }

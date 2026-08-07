@@ -7,6 +7,8 @@ namespace CartShift\Tests\Unit\Domain\Mapping;
 use CartShift\Domain\Mapping\ProductMapper;
 use CartShift\Tests\Unit\PluginTestCase;
 
+require_once __DIR__ . '/../../../stubs/MapperStubs.php';
+
 final class ProductMapperTest extends PluginTestCase
 {
     private ProductMapper $mapper;
@@ -74,8 +76,9 @@ final class ProductMapperTest extends PluginTestCase
         $result = $mapper->map($product);
 
         $this->assertNotNull($result);
-        // JPY: 1000 stays as 1000 (no multiplication by 100)
-        $this->assertSame(1000, $result['variations'][0]['item_price']);
+        // FluentCart stores every currency as amount x 100 (Helper::toCent() takes no
+        // currency at all), so JPY 1000 becomes 100000 and renders back as "1,000".
+        $this->assertSame(100000, $result['variations'][0]['item_price']);
     }
 
     public function testDetailOtherInfoIsArrayNotJsonString(): void
@@ -225,6 +228,118 @@ final class ProductMapperTest extends PluginTestCase
 
         $this->assertNotNull($result);
         $this->assertSame('draft', $result['product']['post_status']);
+    }
+
+    public function testPostDateIsSiteLocalAndPostDateGmtIsUtc(): void
+    {
+        // Site at UTC+2. The same instant must render 12:30 local / 10:30 UTC.
+        $product = $this->createProduct([
+            'date_created' => cartshift_test_wc_date('2024-01-15 10:30:00', 2),
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertSame('2024-01-15 12:30:00', $result['product']['post_date']);
+        $this->assertSame('2024-01-15 10:30:00', $result['product']['post_date_gmt']);
+        $this->assertNotSame(
+            $result['product']['post_date'],
+            $result['product']['post_date_gmt'],
+            'post_date and post_date_gmt must differ on a site with a non-zero UTC offset',
+        );
+    }
+
+    public function testPostDateGmtHandlesNegativeOffset(): void
+    {
+        // Site at UTC-5. Local time falls on the previous day.
+        $product = $this->createProduct([
+            'date_created' => cartshift_test_wc_date('2024-01-15 03:00:00', -5),
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertSame('2024-01-14 22:00:00', $result['product']['post_date']);
+        $this->assertSame('2024-01-15 03:00:00', $result['product']['post_date_gmt']);
+    }
+
+    public function testPostDatesMatchOnUtcSite(): void
+    {
+        $product = $this->createProduct([
+            'date_created' => cartshift_test_wc_date('2024-06-01 08:15:45', 0),
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertSame('2024-06-01 08:15:45', $result['product']['post_date']);
+        $this->assertSame('2024-06-01 08:15:45', $result['product']['post_date_gmt']);
+    }
+
+    public function testMissingDateCreatedFallsBackToCurrentTime(): void
+    {
+        $product = $this->createProduct(['date_created' => null]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertMatchesRegularExpression(
+            '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+            $result['product']['post_date'],
+        );
+        $this->assertMatchesRegularExpression(
+            '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+            $result['product']['post_date_gmt'],
+        );
+    }
+
+    public function testAttributeTermMemoSurvivesAcrossProducts(): void
+    {
+        // ProductMapper shares one VariationMapper for its whole lifetime, so the term memo
+        // spans every product in a run — not just the variations of a single one.
+        $GLOBALS['_cartshift_test_terms']['pa_color']['red'] = (object) ['name' => 'Rosso'];
+
+        $first = $this->mapper->map($this->createVariableProduct(1, 11));
+        $this->assertSame('Rosso', $first['variations'][0]['variation_title']);
+
+        unset($GLOBALS['_cartshift_test_terms']['pa_color']['red']);
+
+        $second = $this->mapper->map($this->createVariableProduct(2, 22));
+        $this->assertSame(
+            'Rosso',
+            $second['variations'][0]['variation_title'],
+            'Term memo did not survive between products',
+        );
+
+        unset($GLOBALS['_cartshift_test_terms']);
+    }
+
+    /**
+     * A variable product with a single 'red' variation, registered with the wc_get_product stub.
+     */
+    private function createVariableProduct(int $productId, int $variationId): \WC_Product
+    {
+        $variation = new \WC_Product_Variation();
+        $varRef = new \ReflectionClass($variation);
+        foreach ([
+            'id' => $variationId,
+            'status' => 'publish',
+            'price' => '19.99',
+            'regular_price' => '19.99',
+            'attributes' => ['attribute_pa_color' => 'red'],
+        ] as $key => $value) {
+            if ($varRef->hasProperty($key)) {
+                $varRef->getProperty($key)->setValue($variation, $value);
+            }
+        }
+
+        $GLOBALS['_cartshift_test_wc_products'][$variationId] = $variation;
+
+        return $this->createProduct([
+            'id' => $productId,
+            'type' => 'variable',
+            'children' => [$variationId],
+        ]);
     }
 
     public function testMapAppliesCartshiftMapperProductFilter(): void

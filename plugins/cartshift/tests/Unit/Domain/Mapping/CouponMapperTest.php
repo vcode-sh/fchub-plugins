@@ -7,6 +7,9 @@ namespace CartShift\Tests\Unit\Domain\Mapping;
 use CartShift\Domain\Mapping\CouponMapper;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Tests\Unit\PluginTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+require_once __DIR__ . '/../../../stubs/MapperStubs.php';
 
 final class CouponMapperTest extends PluginTestCase
 {
@@ -145,6 +148,231 @@ final class CouponMapperTest extends PluginTestCase
             // No conditions at all is also fine.
             $this->assertNull($result['conditions']);
         }
+    }
+
+    // ──────────────────────────────────────────────
+    // Discount type mapping
+    // ──────────────────────────────────────────────
+
+    /**
+     * One case per WooCommerce discount type this migrator knows about.
+     *
+     * FluentCart only compares against the literals 'fixed' and 'percent'
+     * (app/Services/Coupon/DiscountService.php:252, :389).
+     */
+    #[DataProvider('couponTypeProvider')]
+    public function testCouponTypeMapping(string $wcType, string $expectedFcType): void
+    {
+        $coupon = $this->createCoupon([
+            'code' => 'TYPECHECK',
+            'discount_type' => $wcType,
+            'amount' => 50.0,
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame($expectedFcType, $result['type'], "WC type '{$wcType}' mapped wrongly");
+        $this->assertSame([], $this->mapper->getWarnings(), "WC type '{$wcType}' should be recognised");
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function couponTypeProvider(): array
+    {
+        return [
+            // WooCommerce core.
+            'percent'             => ['percent', 'percent'],
+            'fixed_cart'          => ['fixed_cart', 'fixed'],
+            'fixed_product'       => ['fixed_product', 'fixed'],
+            // WooCommerce Subscriptions. The `_percent` suffix is the whole signal:
+            // present means percentage, absent means a fixed currency amount.
+            'recurring_percent'   => ['recurring_percent', 'percent'],
+            'recurring_fee'       => ['recurring_fee', 'fixed'],
+            'sign_up_fee_percent' => ['sign_up_fee_percent', 'percent'],
+            'sign_up_fee'         => ['sign_up_fee', 'fixed'],
+        ];
+    }
+
+    public function testRecurringFeeIsFixedAmountNotPercentage(): void
+    {
+        // Regression guard: 'recurring_fee' used to map to 'percent', turning a
+        // "50 off every renewal" coupon into "50% off every renewal".
+        $coupon = $this->createCoupon([
+            'code' => 'RECURRING50',
+            'discount_type' => 'recurring_fee',
+            'amount' => 50.0,
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('fixed', $result['type']);
+        // Fixed amounts are stored in minor units — FluentCart compares them directly
+        // against a cart subtotal in cents (DiscountService.php:389).
+        $this->assertSame(5000, $result['amount']);
+    }
+
+    public function testSignUpFeeIsFixedAmountNotPercentage(): void
+    {
+        $coupon = $this->createCoupon([
+            'code' => 'SIGNUP25',
+            'discount_type' => 'sign_up_fee',
+            'amount' => 25.0,
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('fixed', $result['type']);
+        $this->assertSame(2500, $result['amount']);
+    }
+
+    public function testPercentTypesKeepPlainPercentageAmount(): void
+    {
+        foreach (['percent', 'recurring_percent', 'sign_up_fee_percent'] as $wcType) {
+            $coupon = $this->createCoupon([
+                'code' => 'PCT',
+                'discount_type' => $wcType,
+                'amount' => 15.0,
+            ]);
+
+            $result = $this->mapper->map($coupon);
+
+            $this->assertSame('percent', $result['type'], $wcType);
+            // Percentages are NOT converted to minor units (DiscountService.php:396).
+            $this->assertSame(15.0, $result['amount'], $wcType);
+        }
+    }
+
+    public function testUnknownTypeFallsBackToInertFixedZero(): void
+    {
+        // An unrecognised third-party type must never become a percentage: a wrong
+        // percentage gives money away, a fixed 0 is a no-op the shop owner can correct.
+        $coupon = $this->createCoupon([
+            'code' => 'MYSTERY',
+            'discount_type' => 'some_third_party_type',
+            'amount' => 50.0,
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('fixed', $result['type']);
+        $this->assertSame(0, $result['amount']);
+        $this->assertNotSame('percent', $result['type']);
+    }
+
+    public function testUnknownTypeRecordsWarning(): void
+    {
+        $coupon = $this->createCoupon([
+            'code' => 'MYSTERY',
+            'discount_type' => 'some_third_party_type',
+            'amount' => 50.0,
+        ]);
+
+        $this->mapper->map($coupon);
+
+        $warnings = $this->mapper->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString('some_third_party_type', $warnings[0]);
+        $this->assertStringContainsString('MYSTERY', $warnings[0]);
+    }
+
+    public function testUnknownTypeStillMigratesTheRestOfTheCoupon(): void
+    {
+        $coupon = $this->createCoupon([
+            'code' => 'MYSTERY',
+            'discount_type' => 'some_third_party_type',
+            'amount' => 50.0,
+            'usage_count' => 7,
+            'minimum_amount' => 20.0,
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('MYSTERY', $result['code']);
+        $this->assertSame(7, $result['use_count']);
+        $this->assertSame(2000, $result['conditions']['min_purchase_amount']);
+    }
+
+    public function testWarningsAreResetBetweenMapCalls(): void
+    {
+        $this->mapper->map($this->createCoupon([
+            'code' => 'MYSTERY',
+            'discount_type' => 'some_third_party_type',
+        ]));
+        $this->assertCount(1, $this->mapper->getWarnings());
+
+        $this->mapper->map($this->createCoupon([
+            'code' => 'NORMAL',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+        ]));
+        $this->assertSame([], $this->mapper->getWarnings());
+    }
+
+    public function testEmptyDiscountTypeIsTreatedAsUnknown(): void
+    {
+        $coupon = $this->createCoupon([
+            'code' => 'BLANK',
+            'discount_type' => '',
+            'amount' => 30.0,
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('fixed', $result['type']);
+        $this->assertSame(0, $result['amount']);
+        $this->assertCount(1, $this->mapper->getWarnings());
+    }
+
+    // ──────────────────────────────────────────────
+    // Dates
+    // ──────────────────────────────────────────────
+
+    public function testCouponDatesAreWrittenInUtc(): void
+    {
+        // Site at UTC+2. FluentCart validates start/end with strtotime() against time(),
+        // and WordPress pins PHP's default timezone to UTC — so these must be UTC.
+        $coupon = $this->createCoupon([
+            'code' => 'DATED',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'date_created' => cartshift_test_wc_date('2024-01-15 10:30:00', 2),
+            'date_expires' => cartshift_test_wc_date('2099-06-30 23:00:00', 2),
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('2024-01-15 10:30:00', $result['start_date']);
+        $this->assertSame('2099-06-30 23:00:00', $result['end_date']);
+    }
+
+    public function testCouponDatesAreNullWhenAbsent(): void
+    {
+        $coupon = $this->createCoupon([
+            'code' => 'UNDATED',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertNull($result['start_date']);
+        $this->assertNull($result['end_date']);
+    }
+
+    public function testPastExpiryMarksCouponExpired(): void
+    {
+        $coupon = $this->createCoupon([
+            'code' => 'GONE',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'date_expires' => cartshift_test_wc_date('2001-01-01 00:00:00', 2),
+        ]);
+
+        $result = $this->mapper->map($coupon);
+
+        $this->assertSame('expired', $result['status']);
+        $this->assertSame('2001-01-01 00:00:00', $result['end_date']);
     }
 
     public function testMapAppliesFilter(): void

@@ -4,14 +4,14 @@
  * Plugin Name: CartShift
  * Plugin URI: https://fchub.co
  * Description: Migrate WooCommerce data (products, customers, orders, subscriptions, coupons) to FluentCart.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: cartshift
  * Domain Path: /languages
- * Requires at least: 6.7
+ * Requires at least: 6.8
  * Requires PHP: 8.3
  * Tested up to:    7.0
  * Requires Plugins: woocommerce, fluent-cart
@@ -20,8 +20,8 @@
 
 defined('ABSPATH') or die;
 
-define('CARTSHIFT_VERSION', '1.1.0');
-define('CARTSHIFT_DB_VERSION', '1');
+define('CARTSHIFT_VERSION', '1.2.0');
+define('CARTSHIFT_DB_VERSION', '4');
 define('CARTSHIFT_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CARTSHIFT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CARTSHIFT_PLUGIN_FILE', __FILE__);
@@ -32,7 +32,8 @@ FCHub_GitHub_Updater::register('cartshift', plugin_basename(__FILE__), CARTSHIFT
 /**
  * PSR-4 autoloader for the CartShift namespace.
  *
- * Maps CartShift\* to app/ and CartShift\Database\* to database/Migrations/.
+ * Maps CartShift\* to app/. Schema changes live in CartShift\Support\Migrations,
+ * so there is no separate database/ namespace to resolve.
  */
 spl_autoload_register(function ($class) {
     $prefix = 'CartShift\\';
@@ -44,14 +45,7 @@ spl_autoload_register(function ($class) {
 
     $relativeClass = substr($class, $len);
 
-    // Special mapping for database namespace.
-    $dbPrefix = 'Database\\';
-    if (strncmp($dbPrefix, $relativeClass, strlen($dbPrefix)) === 0) {
-        $dbRelative = substr($relativeClass, strlen($dbPrefix));
-        $file = __DIR__ . '/database/Migrations/' . str_replace('\\', '/', $dbRelative) . '.php';
-    } else {
-        $file = __DIR__ . '/app/' . str_replace('\\', '/', $relativeClass) . '.php';
-    }
+    $file = __DIR__ . '/app/' . str_replace('\\', '/', $relativeClass) . '.php';
 
     // H1: Prevent path traversal — resolved path must stay within plugin directory.
     if (file_exists($file)) {

@@ -6,6 +6,7 @@ namespace CartShift\CLI;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
 use CartShift\Domain\Migration\MigrationRollback;
 use CartShift\Migrator\CouponMigrator;
@@ -39,7 +40,9 @@ final class MigrateCommand
     public static function register(): void
     {
         \WP_CLI::add_command('cartshift migrate', [self::class, 'migrate']);
+        \WP_CLI::add_command('cartshift retry', [self::class, 'retry']);
         \WP_CLI::add_command('cartshift rollback', [self::class, 'rollback']);
+        \WP_CLI::add_command('cartshift reset', [self::class, 'reset']);
         \WP_CLI::add_command('cartshift status', [self::class, 'status']);
         \WP_CLI::add_command('cartshift log', [self::class, 'log']);
         \WP_CLI::add_command('cartshift finalize', [self::class, 'finalize']);
@@ -65,11 +68,18 @@ final class MigrateCommand
      * [--dry-run]
      * : Log what would happen without creating any records.
      *
+     * [--background]
+     * : Hand the remaining batches to Action Scheduler and return immediately.
+     * The run then continues without this process. Track it with
+     * `wp cartshift status`. Note that --batch-size only applies to the first
+     * batch, which still runs here; background batches use the site default.
+     *
      * ## EXAMPLES
      *
      *     wp cartshift migrate
      *     wp cartshift migrate --entities=product,customer
      *     wp cartshift migrate --batch-size=100 --dry-run
+     *     wp cartshift migrate --background
      *
      * @param string[] $args       Positional arguments.
      * @param string[] $assocArgs  Associative arguments.
@@ -81,6 +91,7 @@ final class MigrateCommand
         $entityTypes = self::resolveEntityTypes($assocArgs);
         $batchSize = (int) ($assocArgs['batch-size'] ?? Constants::DEFAULT_BATCH_SIZE);
         $dryRun = \WP_CLI\Utils\get_flag_value($assocArgs, 'dry-run', false);
+        $background = (bool) \WP_CLI\Utils\get_flag_value($assocArgs, 'background', false);
 
         if ($batchSize < 1) {
             \WP_CLI::error('Batch size must be at least 1.');
@@ -90,16 +101,30 @@ final class MigrateCommand
             \WP_CLI::error('No valid entity types specified.');
         }
 
+        if ($background && !BatchProcessor::isAvailable()) {
+            \WP_CLI::error(
+                'Background processing needs Action Scheduler, which ships with both WooCommerce and FluentCart. '
+                . 'Neither appears to be loaded, so there is nothing to queue batches with.',
+            );
+        }
+
         $idMap = new IdMapRepository();
         $log = new MigrationLogRepository();
         $state = new MigrationState();
 
         if ($state->isRunning()) {
-            \WP_CLI::error('A migration is already in progress. Run `wp cartshift status` for details.');
+            \WP_CLI::error(
+                'A migration is already in progress. Run `wp cartshift status` for details, '
+                . 'or `wp cartshift reset` if the run is stale.',
+            );
         }
 
         if ($dryRun) {
             \WP_CLI::log('Dry run — no records will be created.');
+        }
+
+        if ($background && isset($assocArgs['batch-size'])) {
+            \WP_CLI::warning('--batch-size applies to the first batch only; background batches use the site default.');
         }
 
         \WP_CLI::log(sprintf(
@@ -110,13 +135,40 @@ final class MigrateCommand
 
         add_filter('cartshift/migration/batch_size', fn(): int => $batchSize, 99);
 
-        $migrationId = wp_generate_uuid4();
-        $migrators = self::buildMigrators($entityTypes, $idMap, $log, $state, $migrationId, $batchSize);
+        $migrators = self::buildMigrators($entityTypes, $idMap, $log, $state, $batchSize);
 
         $orchestrator = new MigrationOrchestrator($migrators, $state, $idMap, $log);
 
         $result = $orchestrator->startMigration($entityTypes, $dryRun);
 
+        if ($background) {
+            self::handoffToBackground($state, $result, $startTime);
+
+            return;
+        }
+
+        self::driveForeground($orchestrator, $state, $result, $entityTypes, $startTime);
+    }
+
+    /**
+     * Drive a run to completion in this process, with progress bars and a summary.
+     *
+     * Shared by `migrate` and `retry` because they differ only in how the first
+     * batch was kicked off — after that both are the same loop over
+     * processBatch(), and two copies of a hundred lines of progress-bar
+     * bookkeeping is two places for the counters to drift apart.
+     *
+     * @param array<string, mixed> $result      Result of the first batch.
+     * @param string[]             $entityTypes Entity types to report on.
+     */
+    private static function driveForeground(
+        MigrationOrchestrator $orchestrator,
+        MigrationState $state,
+        array $result,
+        array $entityTypes,
+        float $startTime,
+        string $label = 'Migration',
+    ): void {
         /** @var array<string, \cli\progress\Bar|null> $progressBars */
         $progressBars = [];
         /** @var array<string, int> $barProcessed — tracks ticked count per entity */
@@ -177,7 +229,7 @@ final class MigrateCommand
         $finalStatus = $progress['status'] ?? 'unknown';
 
         if ($finalStatus === 'failed') {
-            \WP_CLI::warning(sprintf('Migration failed: %s', $progress['error'] ?? 'Unknown error'));
+            \WP_CLI::warning(sprintf('%s failed: %s', $label, $progress['error'] ?? 'Unknown error'));
         }
 
         // Build per-entity summary table.
@@ -222,12 +274,175 @@ final class MigrateCommand
             ));
         } else {
             \WP_CLI::success(sprintf(
-                'Migration complete. %d migrated, %d skipped in %ss.',
+                '%s complete. %d migrated, %d skipped in %ss.',
+                $label,
                 $totalMigrated,
                 $totalSkipped,
                 $elapsed,
             ));
         }
+    }
+
+    /**
+     * Re-run only the records a previous migration did not get right.
+     *
+     * Reads the migration log for the ids still outstanding and runs those,
+     * rather than re-walking the whole shop and relying on the id map to skip
+     * what already worked.
+     *
+     * A record logged as an error and later migrated successfully is not
+     * retried — its error row is still in the log, but re-running it would
+     * create a second copy.
+     *
+     * ## OPTIONS
+     *
+     * --migration=<id>
+     * : The migration ID to retry records from.
+     *
+     * [--entities=<entities>]
+     * : Comma-separated entity types to retry. Defaults to every type with
+     * something outstanding.
+     * ---
+     * default: all
+     * ---
+     *
+     * [--statuses=<statuses>]
+     * : Comma-separated statuses to re-attempt. Warnings are usually worth
+     * including — a subscription warned about an unmapped product is a real gap
+     * in the migrated data.
+     * ---
+     * default: error
+     * ---
+     *
+     * [--batch-size=<size>]
+     * : Number of records to process per batch.
+     * ---
+     * default: 50
+     * ---
+     *
+     * [--dry-run]
+     * : Log what would happen without creating any records.
+     *
+     * [--background]
+     * : Hand the remaining batches to Action Scheduler and return immediately.
+     *
+     * ## EXAMPLES
+     *
+     *     wp cartshift retry --migration=abc-123
+     *     wp cartshift retry --migration=abc-123 --statuses=error,warning
+     *     wp cartshift retry --migration=abc-123 --entities=order,subscription --dry-run
+     *
+     * Every WP_CLI::error() below is followed by an explicit return. WP-CLI's
+     * own error() exits, so those returns are unreachable in production — they
+     * are there because the test stub does not exit, and without them a refused
+     * command would carry on and reach the orchestrator anyway. Belt and braces
+     * on a guard is cheaper than a guard that only works outside the tests.
+     *
+     * @param string[] $args       Positional arguments.
+     * @param string[] $assocArgs  Associative arguments.
+     */
+    public static function retry(array $args, array $assocArgs): void
+    {
+        $startTime = microtime(true);
+
+        $sourceMigrationId = self::resolveRetrySource($assocArgs);
+
+        if ($sourceMigrationId === '') {
+            \WP_CLI::error('A migration ID is required. Pass --migration=<id>.');
+
+            return;
+        }
+
+        $entityTypes = self::resolveEntityTypes($assocArgs);
+        $statuses = self::resolveStatuses($assocArgs);
+        $batchSize = (int) ($assocArgs['batch-size'] ?? Constants::DEFAULT_BATCH_SIZE);
+        $dryRun = (bool) \WP_CLI\Utils\get_flag_value($assocArgs, 'dry-run', false);
+        $background = (bool) \WP_CLI\Utils\get_flag_value($assocArgs, 'background', false);
+
+        if ($batchSize < 1) {
+            \WP_CLI::error('Batch size must be at least 1.');
+
+            return;
+        }
+
+        if (empty($entityTypes)) {
+            \WP_CLI::error('No valid entity types specified.');
+
+            return;
+        }
+
+        if (empty($statuses)) {
+            \WP_CLI::error(sprintf(
+                'No valid statuses specified. Retryable statuses are: %s.',
+                implode(', ', MigrationLogRepository::RETRYABLE_STATUSES),
+            ));
+
+            return;
+        }
+
+        if ($background && !BatchProcessor::isAvailable()) {
+            \WP_CLI::error(
+                'Background processing needs Action Scheduler, which ships with both WooCommerce and FluentCart. '
+                . 'Neither appears to be loaded, so there is nothing to queue batches with.',
+            );
+
+            return;
+        }
+
+        $idMap = new IdMapRepository();
+        $log = new MigrationLogRepository();
+        $state = new MigrationState();
+
+        if ($state->isRunning()) {
+            \WP_CLI::error(
+                'A migration is already in progress. Run `wp cartshift status` for details, '
+                . 'or `wp cartshift reset` if the run is stale.',
+            );
+
+            return;
+        }
+
+        // A typo'd id would otherwise start a run with nothing to do and then
+        // report success, which reads exactly like "there was nothing wrong".
+        if (!$log->hasEntries($sourceMigrationId)) {
+            \WP_CLI::error(sprintf('No log entries found for migration ID: %s', $sourceMigrationId));
+
+            return;
+        }
+
+        if ($dryRun) {
+            \WP_CLI::log('Dry run — no records will be created.');
+        }
+
+        \WP_CLI::log(sprintf(
+            'Retrying %s from migration %s (statuses: %s, batch size: %d)',
+            implode(', ', $entityTypes),
+            $sourceMigrationId,
+            implode(', ', $statuses),
+            $batchSize,
+        ));
+
+        add_filter('cartshift/migration/batch_size', fn(): int => $batchSize, 99);
+
+        $migrators = self::buildMigrators($entityTypes, $idMap, $log, $state, $batchSize);
+
+        $orchestrator = new MigrationOrchestrator($migrators, $state, $idMap, $log);
+
+        if (!method_exists($orchestrator, 'startRetry')) {
+            \WP_CLI::error('Retry is not available in this build — the migration orchestrator does not support it.');
+
+            return;
+        }
+
+        $result = $orchestrator->startRetry($sourceMigrationId, $entityTypes, $statuses, $dryRun);
+
+        if ($background) {
+            self::handoffToBackground($state, $result, $startTime);
+
+            return;
+        }
+
+        self::driveForeground($orchestrator, $state, $result, $entityTypes, $startTime, 'Retry');
     }
 
     /**
@@ -298,6 +513,82 @@ final class MigrateCommand
 
         $total = array_sum($deletedCounts);
         \WP_CLI::success(sprintf('Rollback complete. %d record(s) deleted.', $total));
+    }
+
+    /**
+     * Clear the stored migration state so a new run can start.
+     *
+     * Reset is not rollback. Reset forgets the run and drops any queued
+     * background batches; every record already written to FluentCart, and every
+     * id-map row pointing at it, stays put. Use `wp cartshift rollback <id>` when
+     * you want those records gone.
+     *
+     * The usual reason to reach for this: a browser tab drove a migration, the
+     * tab went away, and the state is stuck on 'running' forever.
+     *
+     * ## OPTIONS
+     *
+     * [--force]
+     * : Reset even when the migration still looks alive (a batch running right
+     * now, or background batches queued).
+     *
+     * [--yes]
+     * : Skip the confirmation prompt.
+     *
+     * ## EXAMPLES
+     *
+     *     wp cartshift reset
+     *     wp cartshift reset --force --yes
+     *
+     * @param string[] $args       Positional arguments.
+     * @param string[] $assocArgs  Associative arguments.
+     */
+    public static function reset(array $args, array $assocArgs): void
+    {
+        $force = (bool) \WP_CLI\Utils\get_flag_value($assocArgs, 'force', false);
+        $skipConfirm = (bool) \WP_CLI\Utils\get_flag_value($assocArgs, 'yes', false);
+
+        $state = new MigrationState();
+        $progress = $state->getProgress();
+        $previousStatus = (string) ($progress['status'] ?? 'idle');
+
+        if ($previousStatus === 'idle') {
+            \WP_CLI::success('There is no migration state to reset.');
+
+            return;
+        }
+
+        $migrationId = $state->getMigrationId();
+        $processor = self::makeBatchProcessor($state);
+
+        if (!$force && $previousStatus === 'running' && self::looksAlive($processor, $migrationId)) {
+            \WP_CLI::error(
+                'This migration is still alive — a batch is running right now, or background batches are queued. '
+                . 'Let it finish, cancel it with `wp cartshift status` first, or pass --force.',
+            );
+        }
+
+        \WP_CLI::log(sprintf('Status: %s', $previousStatus));
+        \WP_CLI::log(sprintf('Migration ID: %s', $migrationId ?? 'n/a'));
+        \WP_CLI::log('');
+        \WP_CLI::log('Reset clears the state only. Migrated records and id-map entries are kept.');
+
+        if (!$skipConfirm) {
+            \WP_CLI::confirm('Clear the stored migration state?');
+        }
+
+        if ($migrationId !== null && $migrationId !== '' && BatchProcessor::isAvailable()) {
+            $processor->cancel($migrationId);
+            \WP_CLI::log('Pending background batches cancelled.');
+        }
+
+        $state->reset();
+
+        \WP_CLI::success(sprintf(
+            'Migration state cleared (was: %s). To delete the migrated records, run `wp cartshift rollback %s`.',
+            $previousStatus,
+            $migrationId ?? '<migration-id>',
+        ));
     }
 
     /**
@@ -536,6 +827,88 @@ final class MigrateCommand
     }
 
     /**
+     * Queue the rest of the run on Action Scheduler and return.
+     *
+     * The first batch has already been processed inline by startMigration(), so
+     * the operator sees straight away whether the run is viable before walking
+     * away from it.
+     *
+     * @param array<string, mixed> $result First batch result.
+     */
+    private static function handoffToBackground(MigrationState $state, array $result, float $startTime): void
+    {
+        $migrationId = $state->getMigrationId();
+        $elapsed = round(microtime(true) - $startTime, 2);
+
+        if (!$result['continue'] || $migrationId === null || $migrationId === '') {
+            \WP_CLI::success(sprintf(
+                'Migration finished during the first batch — nothing left to queue (%ss).',
+                $elapsed,
+            ));
+
+            return;
+        }
+
+        self::makeBatchProcessor($state)->scheduleFirst($migrationId);
+
+        \WP_CLI::success(sprintf(
+            'First batch done in %ss. Remaining batches queued on Action Scheduler for migration %s. '
+            . 'Track it with `wp cartshift status`, stop it with `wp cartshift reset --force`.',
+            $elapsed,
+            $migrationId,
+        ));
+    }
+
+    /**
+     * Build a BatchProcessor for scheduling and cancelling background batches.
+     *
+     * The orchestrator factory mirrors MigrationModule: a fresh orchestrator per
+     * invocation. The migrators read the migration ID from state at write time,
+     * so nothing here has to be built in a particular order. It is not used when
+     * this instance only schedules or cancels — the action itself is handled by
+     * the instance registered at plugin boot.
+     */
+    private static function makeBatchProcessor(MigrationState $state): BatchProcessor
+    {
+        $factory = static function () use ($state): MigrationOrchestrator {
+            $idMap = new IdMapRepository();
+            $log = new MigrationLogRepository();
+            return new MigrationOrchestrator(
+                self::buildMigrators(
+                    self::DEFAULT_ENTITY_ORDER,
+                    $idMap,
+                    $log,
+                    $state,
+                    Constants::DEFAULT_BATCH_SIZE,
+                ),
+                $state,
+                $idMap,
+                $log,
+            );
+        };
+
+        return new BatchProcessor($factory, $state);
+    }
+
+    /**
+     * Whether a migration marked 'running' is genuinely still being worked on.
+     */
+    private static function looksAlive(BatchProcessor $processor, ?string $migrationId): bool
+    {
+        if ($migrationId !== null && $migrationId !== '' && $processor->hasPendingActions($migrationId)) {
+            return true;
+        }
+
+        if (!BatchProcessor::acquireLock()) {
+            return true;
+        }
+
+        BatchProcessor::releaseLock();
+
+        return false;
+    }
+
+    /**
      * Resolve which entity types to migrate from CLI arguments.
      *
      * @param string[] $assocArgs
@@ -564,6 +937,57 @@ final class MigrateCommand
     }
 
     /**
+     * The migration id a retry is sourced from.
+     *
+     * `--migration` is the documented spelling; `--migration-id` is accepted
+     * because that is what `wp cartshift log` and `wp cartshift finalize` use and
+     * nobody should have to remember which command wants which.
+     *
+     * @param array<string, mixed> $assocArgs
+     */
+    private static function resolveRetrySource(array $assocArgs): string
+    {
+        $raw = $assocArgs['migration'] ?? $assocArgs['migration-id'] ?? '';
+
+        return is_scalar($raw) ? trim((string) $raw) : '';
+    }
+
+    /**
+     * Statuses a retry should re-attempt, from --statuses.
+     *
+     * Unknown or non-retryable values are dropped with a warning rather than
+     * silently ignored: asking to retry successes is a misunderstanding worth
+     * correcting, not a typo to paper over.
+     *
+     * @param array<string, mixed> $assocArgs
+     *
+     * @return list<string>
+     */
+    private static function resolveStatuses(array $assocArgs): array
+    {
+        $raw = $assocArgs['statuses'] ?? 'error';
+
+        if (!is_scalar($raw)) {
+            return ['error'];
+        }
+
+        $requested = array_filter(array_map('trim', explode(',', (string) $raw)));
+        $valid = [];
+
+        foreach ($requested as $status) {
+            if (in_array($status, MigrationLogRepository::RETRYABLE_STATUSES, true)) {
+                $valid[] = $status;
+
+                continue;
+            }
+
+            \WP_CLI::warning(sprintf('Not a retryable status: %s (skipping)', $status));
+        }
+
+        return array_values(array_unique($valid));
+    }
+
+    /**
      * Build migrator instances for the requested entity types.
      *
      * @param string[] $entityTypes
@@ -574,7 +998,6 @@ final class MigrateCommand
         IdMapRepository $idMap,
         MigrationLogRepository $log,
         MigrationState $state,
-        string $migrationId,
         int $batchSize,
     ): array {
         $map = [
@@ -593,7 +1016,7 @@ final class MigrateCommand
             }
 
             $class = $map[$type];
-            $migrators[] = new $class($idMap, $log, $state, $migrationId, $batchSize);
+            $migrators[] = new $class($idMap, $log, $state, $batchSize);
         }
 
         return $migrators;

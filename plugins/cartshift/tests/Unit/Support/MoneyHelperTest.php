@@ -17,7 +17,11 @@ final class MoneyHelperTest extends PluginTestCase
 
     public function testToCentsZeroDecimalCurrency(): void
     {
-        $this->assertSame(1000, MoneyHelper::toCents(1000, 'JPY'));
+        // FluentCart stores every currency as amount x 100 — Helper::toCent() has no
+        // currency argument at all, and Helper::toDecimal() always divides by 100 (the
+        // zero-decimal flag only changes the rendered precision). JPY 1000 must therefore
+        // be stored as 100000, which FluentCart renders back as "1,000".
+        $this->assertSame(100000, MoneyHelper::toCents(1000, 'JPY'));
     }
 
     public function testToCentsEmptyPrice(): void
@@ -50,21 +54,29 @@ final class MoneyHelperTest extends PluginTestCase
         $this->assertSame(10000, MoneyHelper::toCents(100, 'USD'));
     }
 
-    #[DataProvider('zeroDecimalCurrencyProvider')]
-    public function testToCentsAllZeroDecimalCurrencies(string $currency): void
+    #[DataProvider('currencyExponentProvider')]
+    public function testToCentsIgnoresCurrencyExponent(string $currency): void
     {
-        $this->assertSame(500, MoneyHelper::toCents(500, $currency));
-        $this->assertSame(500, MoneyHelper::toCents('500', $currency));
+        // No currency is exempt from the x100 rule — not the ISO zero-decimal set,
+        // not the ISO three-decimal set. FluentCart has no per-currency exponent.
+        $this->assertSame(50000, MoneyHelper::toCents(500, $currency));
+        $this->assertSame(50000, MoneyHelper::toCents('500', $currency));
     }
 
     /**
+     * ISO zero-decimal and three-decimal currencies — the two groups that would need a
+     * different exponent if FluentCart had one. It does not.
+     *
      * @return array<string, array{string}>
      */
-    public static function zeroDecimalCurrencyProvider(): array
+    public static function currencyExponentProvider(): array
     {
         $currencies = [
+            // Zero-decimal.
             'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
             'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
+            // Three-decimal.
+            'BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND',
         ];
 
         $data = [];
@@ -75,17 +87,33 @@ final class MoneyHelperTest extends PluginTestCase
         return $data;
     }
 
-    public function testToCentsZeroDecimalNotMultiplied(): void
+    public function testToCentsZeroDecimalIsStillMultiplied(): void
     {
-        // JPY 1000 should stay 1000, not become 100000
-        $this->assertSame(1000, MoneyHelper::toCents(1000, 'JPY'));
-        $this->assertNotSame(100000, MoneyHelper::toCents(1000, 'JPY'));
+        // Regression guard: a previous revision special-cased zero-decimal currencies and
+        // stored JPY 1000 as 1000, which FluentCart then rendered as "10" — a 100x
+        // under-conversion on every amount in a JPY/KRW/VND store.
+        $this->assertSame(100000, MoneyHelper::toCents(1000, 'JPY'));
+        $this->assertNotSame(1000, MoneyHelper::toCents(1000, 'JPY'));
     }
 
-    public function testToCentsLowercaseCurrencyCode(): void
+    public function testToCentsThreeDecimalCurrencyUsesHundredths(): void
     {
-        // Currency codes should be case-insensitive
-        $this->assertSame(500, MoneyHelper::toCents(500, 'jpy'));
+        // KWD 1.234 -> 123. The third decimal is dropped because FluentCart's own storage
+        // has nowhere to put it; matching that beats inventing a x1000 format FluentCart
+        // would then divide by 100.
+        $this->assertSame(123, MoneyHelper::toCents(1.234, 'KWD'));
+        $this->assertSame(1235, MoneyHelper::toCents('12.345', 'BHD'));
+    }
+
+    public function testToCentsCurrencyArgumentDoesNotChangeResult(): void
+    {
+        $expected = MoneyHelper::toCents(19.99);
+
+        $this->assertSame($expected, MoneyHelper::toCents(19.99, 'USD'));
+        $this->assertSame($expected, MoneyHelper::toCents(19.99, 'JPY'));
+        $this->assertSame($expected, MoneyHelper::toCents(19.99, 'jpy'));
+        $this->assertSame($expected, MoneyHelper::toCents(19.99, 'KWD'));
+        $this->assertSame($expected, MoneyHelper::toCents(19.99, 'NOT-A-CURRENCY'));
     }
 
     public function testToCentsNoCurrencyDefaultsToStandard(): void

@@ -63,11 +63,11 @@ final class PreflightController
         $state = $this->container->get(MigrationState::class);
 
         $migrators = [
-            new ProductMigrator($idMap, $log, $state, ''),
-            new CustomerMigrator($idMap, $log, $state, ''),
-            new CouponMigrator($idMap, $log, $state, ''),
-            new OrderMigrator($idMap, $log, $state, ''),
-            new SubscriptionMigrator($idMap, $log, $state, ''),
+            new ProductMigrator($idMap, $log, $state),
+            new CustomerMigrator($idMap, $log, $state),
+            new CouponMigrator($idMap, $log, $state),
+            new OrderMigrator($idMap, $log, $state),
+            new SubscriptionMigrator($idMap, $log, $state),
         ];
 
         foreach ($migrators as $migrator) {

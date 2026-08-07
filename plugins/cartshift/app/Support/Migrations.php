@@ -4,16 +4,27 @@ declare(strict_types=1);
 
 namespace CartShift\Support;
 
+use CartShift\Storage\MigrationLogRepository;
+
 defined('ABSPATH') || exit;
 
 final class Migrations
 {
     private const string DB_VERSION_OPTION = 'cartshift_db_version';
-    private const string CURRENT_VERSION = '1';
+    private const string CURRENT_VERSION = '4';
+
+    /** Unique index guaranteeing one id-map row per (entity_type, wc_id). */
+    private const string ID_MAP_UNIQUE_INDEX = 'entity_wc_unique';
+
+    /** Index backing per-code log filtering and grouping. */
+    private const string LOG_ERROR_CODE_INDEX = 'migration_error_code';
 
     /** @var array<string, callable> */
     private const array VERSIONS = [
         '1' => 'v1',
+        '2' => 'v2',
+        '3' => 'v3',
+        '4' => 'v4',
     ];
 
     public static function run(): void
@@ -89,7 +100,215 @@ final class Migrations
             KEY status_lookup (migration_id, status)
         ) {$charset};";
 
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        // dbDelta() lives in an admin include that is not loaded on every request.
+        if (!function_exists('dbDelta')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
         dbDelta($sql);
+    }
+
+    /**
+     * v2: enforce one id-map row per (entity_type, wc_id) in the schema.
+     *
+     * Idempotency was enforced only in PHP, which is no help at all when two batch
+     * requests overlap: both read "not migrated", both insert, and the entity ends up
+     * duplicated in FluentCart with the id-map pointing at whichever row won. A UNIQUE
+     * index makes the database refuse the second insert.
+     *
+     * Existing installs are assumed dirty, so duplicates are collapsed first —
+     * ALTER TABLE would otherwise fail outright on a table that already has them.
+     * Lowest id wins, matching getFcId()'s "first match" read semantics, so nothing
+     * that already resolved changes its answer.
+     */
+    private static function v2(): void
+    {
+        global $wpdb;
+
+        $idMapTable = $wpdb->prefix . 'cartshift_id_map';
+
+        // Collapse duplicates, keeping the lowest id per (entity_type, wc_id).
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $wpdb->query(
+            "DELETE dupe FROM {$idMapTable} AS dupe
+             INNER JOIN (
+                 SELECT entity_type, wc_id, MIN(id) AS keep_id
+                 FROM {$idMapTable}
+                 GROUP BY entity_type, wc_id
+                 HAVING COUNT(*) > 1
+             ) AS keeper
+                 ON dupe.entity_type = keeper.entity_type
+                AND dupe.wc_id = keeper.wc_id
+             WHERE dupe.id > keeper.keep_id",
+        );
+
+        // Tolerate a partially applied upgrade — the index may already be there.
+        if (!self::indexExists($idMapTable, self::ID_MAP_UNIQUE_INDEX)) {
+            $indexName = self::ID_MAP_UNIQUE_INDEX;
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query(
+                "ALTER TABLE {$idMapTable}
+                 ADD UNIQUE INDEX {$indexName} (entity_type, wc_id)",
+            );
+        }
+
+        // v1's entity_lookup covers the same columns in the same order, so the new
+        // UNIQUE index serves every query it served. Two indexes on a table that
+        // takes millions of inserts during a migration is a cost with no return.
+        if (
+            self::indexExists($idMapTable, self::ID_MAP_UNIQUE_INDEX)
+            && self::indexExists($idMapTable, 'entity_lookup')
+        ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query("ALTER TABLE {$idMapTable} DROP INDEX entity_lookup");
+        }
+    }
+
+    /**
+     * v3: give the migration log a first-class error_code column.
+     *
+     * The codes were originally tucked inside the details JSON, which meant grouping
+     * failures by cause required a LIKE scan over LONGTEXT — tolerable for one run's
+     * log, wasteful forever. A real column plus (migration_id, error_code) turns both
+     * the breakdown and the per-code filter into index reads.
+     *
+     * Nullable because a log row genuinely need not have a code. The backfill for
+     * rows that do — everything written while the code lived only in the details
+     * JSON — is v4; it could not live here because nothing populated the column
+     * until the repository was taught to.
+     */
+    private static function v3(): void
+    {
+        global $wpdb;
+
+        $logTable = $wpdb->prefix . 'cartshift_migration_log';
+
+        $hasColumn = self::columnExists($logTable, 'error_code');
+
+        if (!$hasColumn) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $added = $wpdb->query(
+                "ALTER TABLE {$logTable}
+                 ADD COLUMN error_code VARCHAR(64) NULL DEFAULT NULL AFTER status",
+            );
+
+            // Trust the ALTER rather than re-issuing SHOW COLUMNS: false means the
+            // statement failed, and indexing a column that does not exist would fail too.
+            $hasColumn = $added !== false;
+        }
+
+        // Tolerate a partially applied upgrade — the index may already be there.
+        if ($hasColumn && !self::indexExists($logTable, self::LOG_ERROR_CODE_INDEX)) {
+            $indexName = self::LOG_ERROR_CODE_INDEX;
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query(
+                "ALTER TABLE {$logTable}
+                 ADD INDEX {$indexName} (migration_id, error_code)",
+            );
+        }
+    }
+
+    /**
+     * v4: backfill error_code from the details JSON.
+     *
+     * v3 added the column and its index but nothing ever wrote to it — the code was
+     * still going only into the details JSON, so the column sat permanently NULL and
+     * the index was dead weight. Now that MigrationLogRepository::write() populates
+     * it, every row written before that change still needs filling in, or those rows
+     * drop out of filtered views and per-code counts while still showing up in the
+     * unfiltered list. Same log, two different answers.
+     *
+     * String functions rather than JSON_EXTRACT on purpose: `details` is LONGTEXT and
+     * is not guaranteed to hold valid JSON, and JSON_EXTRACT errors on malformed
+     * input under MySQL 5.7 instead of returning NULL. SUBSTRING_INDEX just returns
+     * nothing useful, which is the failure mode we want.
+     *
+     * Only plausible codes are written. A value that is empty, longer than the column,
+     * or carries characters no code ever uses did not come from a real write() call —
+     * it came from a malformed row — and storing it would put a value in the column
+     * that nothing can resolve, which is strictly worse than leaving NULL for
+     * hydrate()'s JSON fallback to handle. The shape test is deliberately looser than
+     * the current enum: a code from an older build is real data and still belongs in
+     * the `other` bucket, so it is kept, while junk is not.
+     */
+    private static function v4(): void
+    {
+        global $wpdb;
+
+        $logTable = $wpdb->prefix . 'cartshift_migration_log';
+
+        // Nothing to backfill into if v3 could not add the column.
+        if (!self::columnExists($logTable, 'error_code')) {
+            return;
+        }
+
+        $marker = '"' . MigrationLogRepository::DETAILS_CODE_KEY . '":"';
+
+        // The extracted value, repeated because UPDATE cannot reference a select alias.
+        $extract = "SUBSTRING_INDEX(SUBSTRING_INDEX(details, %s, -1), '\"', 1)";
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$logTable}
+             SET error_code = {$extract}
+             WHERE error_code IS NULL
+               AND details LIKE %s
+               AND CHAR_LENGTH({$extract}) BETWEEN 1 AND 64
+               AND {$extract} REGEXP '^[A-Za-z0-9_]+$'",
+            $marker,
+            '%' . self::escLike($marker) . '%',
+            $marker,
+            $marker,
+        ));
+    }
+
+    /**
+     * Escape a literal for use inside a LIKE pattern.
+     *
+     * The marker contains an underscore, which LIKE reads as "any single
+     * character", so escaping is load-bearing rather than ceremonial. Guarded
+     * because $wpdb is swappable and not every replacement carries esc_like().
+     */
+    private static function escLike(string $literal): string
+    {
+        global $wpdb;
+
+        return method_exists($wpdb, 'esc_like')
+            ? $wpdb->esc_like($literal)
+            : addcslashes($literal, '_%\\');
+    }
+
+    /**
+     * Whether a named column exists on a table.
+     */
+    private static function columnExists(string $table, string $column): bool
+    {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SHOW COLUMNS FROM {$table} LIKE %s",
+            $column,
+        ));
+
+        return !empty($rows);
+    }
+
+    /**
+     * Whether a named index exists on a table.
+     */
+    private static function indexExists(string $table, string $indexName): bool
+    {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SHOW INDEX FROM {$table} WHERE Key_name = %s",
+            $indexName,
+        ));
+
+        return !empty($rows);
     }
 }

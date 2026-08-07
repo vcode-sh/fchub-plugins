@@ -13,6 +13,21 @@ final class MigrationFinalizer
 {
     private const int BATCH_SIZE = 100;
 
+    /**
+     * Order payment statuses that count towards customer stats.
+     *
+     * Mirrors FluentCart's Status::getOrderPaymentSuccessStatuses()
+     * (fluent-cart/app/Helpers/Status.php:328-335), which is what
+     * Customer::recountStat() filters on.
+     *
+     * @var string[]
+     */
+    private const array SUCCESS_PAYMENT_STATUSES = [
+        'paid',
+        'partially_refunded',
+        'partially_paid',
+    ];
+
     public function __construct(
         private readonly IdMapRepository $idMap,
     ) {
@@ -42,10 +57,34 @@ final class MigrationFinalizer
      * Recalculate purchase stats for every migrated customer.
      *
      * Processes in batches to avoid memory exhaustion on large datasets.
-     * Matches FluentCart's CustomerMigrationService::calculateCustomerStats() format:
-     * - purchase_value is JSON keyed by currency, e.g. {"USD": 12345}
-     * - aov is average order value in cents
-     * - ltv is lifetime value (total_paid - total_refund)
+     *
+     * Column semantics, taken from FluentCart itself rather than guessed:
+     *
+     * - `ltv` is net lifetime value in cents. FluentCart stores `total_paid`
+     *   ALREADY net of refunds — Order::recountTotalPaid() writes
+     *   `max(0, paid - refunded)` (app/Models/Order.php:898-906) and every refund
+     *   path decrements it in place (OrderTransaction.php:245-247,
+     *   StripeGateway/Webhook/IPN.php:303-305). `total_refund` holds the refunded
+     *   amount separately (Order.php:818, 834). CartShift writes the same invariant:
+     *   OrderMapper::getTotalPaid() returns `total - refunded`. So LTV is
+     *   SUM(total_paid) and nothing else — subtracting total_refund again would
+     *   deduct every refund twice. Per-order flooring at zero mirrors the
+     *   `if ($netPaid > 0)` guard in Customer::recountStat() (Customer.php:210-215).
+     *
+     * - `purchase_value` is GROSS per-currency turnover, JSON keyed by currency,
+     *   e.g. {"USD": 12345}. FluentCart's own WooCommerce importer builds it from
+     *   SUM(_order_total) — gross order totals, no refunds deducted
+     *   (WooCommerceMigrator/Services/CustomerMigrationService.php:254, 281, 303).
+     *   `total_amount` is CartShift's equivalent of that column. It is deliberately
+     *   NOT the same figure as `ltv`; net vs gross is the intended difference.
+     *
+     * - `aov` is ltv / purchase_count, matching Customer::recountStat()
+     *   (Customer.php:221), rounded because the column is BIGINT cents.
+     *
+     * Note: FluentCart's Customer::recountStat() computes
+     * `total_paid - total_refund`, which double-counts refunds against its own
+     * storage invariant. That is a FluentCart bug, not a format to copy — running
+     * it would understate LTV for FluentCart-native orders too.
      */
     public function recalculateCustomerStats(string $migrationId): int
     {
@@ -66,23 +105,27 @@ final class MigrationFinalizer
         $customersTable = $wpdb->prefix . 'fct_customers';
         $updated = 0;
 
+        $statusPlaceholders = implode(',', array_fill(0, count(self::SUCCESS_PAYMENT_STATUSES), '%s'));
+
         foreach (array_chunk($fcIds, self::BATCH_SIZE) as $batch) {
             $placeholders = implode(',', array_fill(0, count($batch), '%d'));
+            $queryArgs = [...$batch, ...self::SUCCESS_PAYMENT_STATUSES];
 
             // Fetch order-level stats grouped by customer.
+            // total_paid is already net of refunds — see the docblock above.
             // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             $stats = $wpdb->get_results($wpdb->prepare(
                 "SELECT
                     customer_id,
                     COUNT(*) AS order_count,
-                    COALESCE(SUM(total_paid - total_refund), 0) AS ltv,
+                    COALESCE(SUM(GREATEST(total_paid, 0)), 0) AS ltv,
                     MAX(created_at) AS last_order,
                     MIN(created_at) AS first_order
                 FROM {$ordersTable}
                 WHERE customer_id IN ({$placeholders})
-                  AND payment_status IN ('paid', 'partially_refunded')
+                  AND payment_status IN ({$statusPlaceholders})
                 GROUP BY customer_id",
-                ...$batch,
+                ...$queryArgs,
             ));
 
             $statsMap = [];
@@ -90,7 +133,8 @@ final class MigrationFinalizer
                 $statsMap[(int) $row->customer_id] = $row;
             }
 
-            // Fetch per-currency totals for purchase_value JSON.
+            // Fetch per-currency totals for purchase_value JSON. Gross by design:
+            // purchase_value is turnover, ltv is net. See the docblock above.
             // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             $currencyStats = $wpdb->get_results($wpdb->prepare(
                 "SELECT
@@ -99,9 +143,9 @@ final class MigrationFinalizer
                     COALESCE(SUM(total_amount), 0) AS currency_total
                 FROM {$ordersTable}
                 WHERE customer_id IN ({$placeholders})
-                  AND payment_status IN ('paid', 'partially_refunded')
+                  AND payment_status IN ({$statusPlaceholders})
                 GROUP BY customer_id, currency",
-                ...$batch,
+                ...$queryArgs,
             ));
 
             $currencyMap = [];
@@ -115,8 +159,8 @@ final class MigrationFinalizer
 
                 $count = $row ? (int) $row->order_count : 0;
                 $ltv = $row ? (int) $row->ltv : 0;
-                $lastOrder = $row->last_order ?? null;
-                $firstOrder = $row->first_order ?? null;
+                $lastOrder = $row ? $row->last_order : null;
+                $firstOrder = $row ? $row->first_order : null;
                 $aov = $count > 0 ? (int) round($ltv / $count) : 0;
 
                 $purchaseValue = $currencyMap[$customerId] ?? [];
@@ -146,10 +190,23 @@ final class MigrationFinalizer
 
     /**
      * Flush WordPress object cache and FC-specific transients.
+     *
+     * A full flush once, at the end of a migration, is defensible: the store's
+     * cached product/order data is now wrong wholesale. It is still a blunt
+     * instrument on a shared Redis or Memcached, so it is opt-out via
+     * 'cartshift/finalize/flush_object_cache'. Declining it still clears the
+     * in-process cache, which costs nobody anything.
      */
     public function clearCaches(): void
     {
-        wp_cache_flush();
+        /** @see 'cartshift/finalize/flush_object_cache' */
+        $fullFlush = (bool) apply_filters('cartshift/finalize/flush_object_cache', true);
+
+        if ($fullFlush) {
+            wp_cache_flush();
+        } else {
+            MigrationOrchestrator::flushRuntimeCache();
+        }
 
         global $wpdb;
 

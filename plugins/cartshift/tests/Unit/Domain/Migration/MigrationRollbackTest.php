@@ -26,6 +26,25 @@ final class MigrationRollbackTest extends PluginTestCase
     }
 
     /**
+     * PluginTestCase::setUp() does not clear the query callbacks, so a test that
+     * installs one and walks away leaves it running for every class that follows.
+     * The callbacks here return stdClass rows — correct for this class, since the
+     * id-map reads them as objects — which then land in a later class that asked
+     * for ARRAY_A and indexes them as arrays. That surfaces as a fatal several
+     * files away with nothing pointing back here, so the cleanup belongs with the
+     * code that does the setting.
+     */
+    protected function tearDown(): void
+    {
+        unset(
+            $GLOBALS['_cartshift_test_get_results_callback'],
+            $GLOBALS['_cartshift_test_get_var_callback'],
+        );
+
+        parent::tearDown();
+    }
+
+    /**
      * Rollback should only request records flagged created_by_migration.
      * The query must include "created_by_migration = 1".
      */
@@ -150,5 +169,173 @@ final class MigrationRollbackTest extends PluginTestCase
         foreach ($stats as $count) {
             $this->assertGreaterThan(0, $count);
         }
+    }
+
+    // ──────────────────────────────────────────────
+    // Orphan child-row cleanup
+    // ──────────────────────────────────────────────
+
+    /**
+     * fct_order_meta and fct_applied_coupons rows are written per order but never
+     * mapped, so rollback used to leave them behind. They must be deleted by order_id.
+     */
+    public function testOrderChildRowsAreDeletedByOrderId(): void
+    {
+        $this->mapOnly(Constants::ENTITY_ORDER, [200, 201]);
+
+        $this->rollback->rollback('test-orphans-orders');
+
+        $couponSql = $this->findDeleteFor('fct_applied_coupons');
+        $this->assertStringContainsString('order_id IN (200,201)', $couponSql);
+
+        $metaSql = $this->findDeleteFor('fct_order_meta');
+        $this->assertStringContainsString('order_id IN (200,201)', $metaSql);
+    }
+
+    /**
+     * fct_product_downloads hangs off the product post via post_id — verified against
+     * FluentCart's ProductDownloadsMigrator schema, which has no `product_id` column.
+     */
+    public function testProductDownloadsAreDeletedByPostId(): void
+    {
+        $this->mapOnly(Constants::ENTITY_PRODUCT, [300]);
+
+        $this->rollback->rollback('test-orphans-downloads');
+
+        $sql = $this->findDeleteFor('fct_product_downloads');
+        $this->assertStringContainsString('post_id IN (300)', $sql);
+    }
+
+    /**
+     * fct_atts_relations and fct_product_meta both key off the FC variation id.
+     * fct_product_meta.object_id is only unique within an object_type, so the
+     * variant-info filter must be part of the WHERE clause or the delete could take
+     * out unrelated product-level meta that happens to share the id.
+     */
+    public function testVariationChildRowsAreDeletedWithObjectTypeGuard(): void
+    {
+        $this->mapOnly(Constants::ENTITY_VARIATION, [400, 401]);
+
+        $this->rollback->rollback('test-orphans-variations');
+
+        $relationsSql = $this->findDeleteFor('fct_atts_relations');
+        $this->assertStringContainsString('object_id IN (400,401)', $relationsSql);
+        $this->assertStringNotContainsString('object_type', $relationsSql);
+
+        $metaSql = $this->findDeleteFor('fct_product_meta');
+        $this->assertStringContainsString('object_id IN (400,401)', $metaSql);
+        $this->assertStringContainsString("object_type = 'product_variant_info'", $metaSql);
+    }
+
+    /**
+     * Deletes are batched into `IN (...)` chunks, not one query per row. A migration
+     * of any size would otherwise make rollback take longer than the migration did.
+     */
+    public function testOrphanDeletesAreBatchedNotPerRow(): void
+    {
+        $ids = range(1000, 1149); // 150 orders
+        $this->mapOnly(Constants::ENTITY_ORDER, $ids);
+
+        $this->rollback->rollback('test-orphans-batching');
+
+        $orderMetaDeletes = array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $q): bool => $q[0] === 'query'
+                && str_contains($q[1], 'DELETE FROM')
+                && str_contains($q[1], 'fct_order_meta'),
+        );
+
+        $this->assertCount(
+            1,
+            $orderMetaDeletes,
+            '150 ids fit in one chunk — expected a single batched DELETE, not 150.',
+        );
+    }
+
+    /**
+     * No mapped parents means nothing to clean up — and no pointless empty
+     * `IN ()` queries, which are a syntax error anyway.
+     */
+    public function testNoOrphanDeletesWhenNothingWasMigrated(): void
+    {
+        $GLOBALS['_cartshift_test_get_results_callback'] = fn (): array => [];
+
+        $stats = $this->rollback->rollback('test-orphans-empty');
+
+        $this->assertSame([], $stats);
+
+        // The id-map's own cleanup is a DELETE too, and is expected; no fct_ table
+        // should be touched.
+        $fctDeletes = array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $q): bool => $q[0] === 'query'
+                && str_contains($q[1], 'DELETE FROM')
+                && str_contains($q[1], 'fct_'),
+        );
+
+        $this->assertSame([], $fctDeletes, 'No parents mapped means no child cleanup at all.');
+    }
+
+    /**
+     * Children must go before their parents, so the parent ids are still meaningful
+     * when the child deletes are built.
+     */
+    public function testChildRowsAreDeletedBeforeParents(): void
+    {
+        $this->mapOnly(Constants::ENTITY_ORDER, [500]);
+
+        $this->rollback->rollback('test-orphans-ordering');
+
+        $childIndex = null;
+        $parentIndex = null;
+
+        foreach (array_values($GLOBALS['_cartshift_test_queries'] ?? []) as $i => $entry) {
+            if ($childIndex === null && $entry[0] === 'query' && str_contains($entry[1], 'fct_order_meta')) {
+                $childIndex = $i;
+            }
+
+            if ($parentIndex === null && $entry[0] === 'delete' && str_contains($entry[1], 'fct_orders')) {
+                $parentIndex = $i;
+            }
+        }
+
+        $this->assertNotNull($childIndex, 'Expected an fct_order_meta cleanup query.');
+        $this->assertNotNull($parentIndex, 'Expected the parent order delete.');
+        $this->assertLessThan($parentIndex, $childIndex);
+    }
+
+    // ──────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────
+
+    /**
+     * Make the id-map return the given FC ids for exactly one entity type.
+     *
+     * @param int[] $fcIds
+     */
+    private function mapOnly(string $entityType, array $fcIds): void
+    {
+        $GLOBALS['_cartshift_test_get_results_callback'] =
+            function (string $query) use ($entityType, $fcIds): array {
+                if (!str_contains($query, "entity_type = '{$entityType}'")) {
+                    return [];
+                }
+
+                return array_map(
+                    static fn (int $fcId): object => (object) ['wc_id' => (string) $fcId, 'fc_id' => $fcId],
+                    $fcIds,
+                );
+            };
+    }
+
+    private function findDeleteFor(string $table): string
+    {
+        foreach ($GLOBALS['_cartshift_test_queries'] ?? [] as $entry) {
+            if ($entry[0] === 'query' && str_contains($entry[1], 'DELETE FROM') && str_contains($entry[1], $table)) {
+                return $entry[1];
+            }
+        }
+
+        $this->fail("No orphan DELETE recorded for table: {$table}");
     }
 }

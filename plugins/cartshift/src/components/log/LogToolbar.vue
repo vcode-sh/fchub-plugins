@@ -2,8 +2,12 @@
   <div class="cartshift-log-toolbar">
     <div class="cartshift-log-toolbar-left">
       <div class="cartshift-log-search-wrap">
-        <span class="cartshift-log-search-icon">&#128269;</span>
+        <span class="cartshift-log-search-icon" aria-hidden="true">&#128269;</span>
+        <label for="cartshift-log-search" class="cartshift-sr-only">
+          Search loaded log entries
+        </label>
         <input
+          id="cartshift-log-search"
           type="text"
           :value="searchQuery"
           placeholder="Search messages, WC IDs..."
@@ -12,19 +16,24 @@
         />
       </div>
 
+      <label for="cartshift-log-status" class="cartshift-sr-only">Filter by status</label>
       <select
+        id="cartshift-log-status"
         :value="statusFilter"
         class="cartshift-log-filter-select"
         @change="$emit('filter', $event.target.value)"
       >
-        <option value="">All statuses ({{ stats.total }})</option>
-        <option value="success">Processed ({{ stats.success }})</option>
-        <option value="error">Errors ({{ stats.error }})</option>
-        <option value="skipped">Skipped ({{ stats.skipped }})</option>
-        <option v-if="stats['dry-run'] > 0" value="dry-run">Dry-run ({{ stats['dry-run'] }})</option>
+        <option value="">All statuses ({{ count('total') }})</option>
+        <option value="success">Processed ({{ count('success') }})</option>
+        <option value="error">Errors ({{ count('error') }})</option>
+        <option value="warning">Warnings ({{ count('warning') }})</option>
+        <option value="skipped">Skipped ({{ count('skipped') }})</option>
+        <option v-if="count('dry-run') > 0" value="dry-run">Dry-run ({{ count('dry-run') }})</option>
       </select>
 
+      <label for="cartshift-log-perpage" class="cartshift-sr-only">Entries per page</label>
       <select
+        id="cartshift-log-perpage"
         :value="perPage"
         class="cartshift-log-perpage-select"
         @change="$emit('perpage', Number($event.target.value))"
@@ -36,8 +45,8 @@
     </div>
 
     <div class="cartshift-log-toolbar-right">
-      <button class="button cartshift-log-export-btn" @click="$emit('export')">
-        &#8681; Export CSV
+      <button type="button" class="button cartshift-log-export-btn" @click="$emit('export')">
+        <span aria-hidden="true">&#8681;</span> Export CSV
       </button>
     </div>
   </div>
@@ -46,7 +55,7 @@
 <script setup>
 let debounceTimer = null;
 
-defineProps({
+const props = defineProps({
   searchQuery: {
     type: String,
     default: '',
@@ -61,11 +70,16 @@ defineProps({
   },
   stats: {
     type: Object,
-    default: () => ({ success: 0, skipped: 0, error: 0, 'dry-run': 0, total: 0 }),
+    default: () => ({ success: 0, skipped: 0, warning: 0, error: 0, 'dry-run': 0, total: 0 }),
   },
 });
 
 const emit = defineEmits(['search', 'filter', 'export', 'perpage']);
+
+function count(status) {
+  const value = Number(props.stats?.[status]);
+  return Number.isFinite(value) ? value : 0;
+}
 
 function onSearch(event) {
   const value = event.target.value;

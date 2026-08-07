@@ -6,18 +6,20 @@ namespace CartShift\Core;
 
 defined('ABSPATH') || exit();
 
+/**
+ * Feature toggles.
+ *
+ * Everything named here is on. Anything not named here is off unless the
+ * `cartshift_feature_flags` option or the `cartshift/feature_flags` filter turns it on,
+ * which is how experimental work gets switched on without shipping a constant that
+ * advertises a feature nobody wrote.
+ */
 final class FeatureFlags
 {
     // Free features — always enabled.
     public const string SUBSCRIPTIONS = 'subscriptions';
     public const string BACKGROUND_PROCESSING = 'background_processing';
     public const string WP_CLI = 'wp_cli';
-
-    // Pro features — gated by wp_options.
-    public const string DETAILED_REPORTING = 'detailed_reporting';
-    public const string MULTI_SOURCE = 'multi_source';
-    public const string DOWNLOAD_FILES = 'download_files';
-    public const string ATTRIBUTE_MAPPING = 'attribute_mapping';
 
     // Core module keys — always enabled.
     public const string INFRASTRUCTURE = 'infrastructure';
