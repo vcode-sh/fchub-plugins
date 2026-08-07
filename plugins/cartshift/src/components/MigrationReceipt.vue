@@ -11,26 +11,28 @@
     <template v-else>
       <h2>What will come across</h2>
 
-      <!-- The selection changes on a debounce as the owner edits it, so the counts
-           and consequences below are announced politely, not interrupted mid-typing. -->
-      <div aria-live="polite">
-        <table class="widefat striped">
-          <thead>
-            <tr><th>Entity</th><th>Count</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in countRows" :key="row.key">
-              <td><strong>{{ row.label }}</strong></td>
-              <td>{{ row.value.toLocaleString() }}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <p v-if="closureNote" class="cartshift-receipt-closure">{{ closureNote }}</p>
-      </div>
-
-      <!-- Consequences: only when there is a preview, and only the non-zero ones. -->
+      <!-- Counts and consequences alike come from the preview or not at all.
+           Both answer "what does *this* selection do", and only the server can
+           answer that. -->
       <template v-if="preview">
+        <!-- The selection changes on a debounce as the owner edits it, so the counts
+             and consequences below are announced politely, not interrupted mid-typing. -->
+        <div aria-live="polite">
+          <table class="widefat striped">
+            <thead>
+              <tr><th>Entity</th><th>Count</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in countRows" :key="row.key">
+                <td><strong>{{ row.label }}</strong></td>
+                <td>{{ row.value.toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p v-if="closureNote" class="cartshift-receipt-closure">{{ closureNote }}</p>
+        </div>
+
         <h2>What will not</h2>
 
         <div aria-live="polite">
@@ -65,11 +67,12 @@
         </div>
       </template>
 
-      <!-- No preview available: this build predates the endpoint, so fall back to the
-           old whole-shop counts and say nothing about consequences we cannot see. -->
-      <p v-else class="description">
-        {{ loading ? 'Working out what this selection includes…' : '' }}
-      </p>
+      <!-- No preview. Whole-shop counts used to stand in here, under this
+           heading, with a date or a hand-picked selection active — the same
+           confident wrong number this release exists to stop. Say what is
+           missing instead; the per-entity whole-shop counts are still on the
+           table to the left, where they are labelled as what they are. -->
+      <p v-else class="description cartshift-receipt-unavailable">{{ unavailableText }}</p>
     </template>
   </div>
 </template>
@@ -79,8 +82,15 @@ import { computed } from 'vue';
 
 const props = defineProps({
   preview: { type: Object, default: null },
-  counts: { type: Object, default: null },
   loading: { type: Boolean, default: false },
+  // Whether the owner has ticked anything at all. Nothing ticked is not a
+  // narrower question with a smaller answer — it is no question, and the panel
+  // says so rather than showing figures for a run that cannot start.
+  selected: { type: Boolean, default: false },
+  // 'unknown' | 'yes' | 'no'. Written by useMigration on a 404/501 from
+  // /preview, and read here so a build that predates the endpoint explains
+  // itself instead of leaving a blank panel.
+  previewSupport: { type: String, default: 'unknown' },
 });
 
 defineEmits(['apply-remedy']);
@@ -90,9 +100,9 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, ' ');
 }
 
-/** The counts table: the preview's counts when we have one, the old whole-shop counts otherwise. */
+/** The counts table. Preview only: nothing else can answer for this selection. */
 const countRows = computed(() => {
-  const source = props.preview ? props.preview.counts : props.counts;
+  const source = props.preview ? props.preview.counts : null;
   if (!source || typeof source !== 'object') return [];
 
   return Object.keys(source).map((key) => ({
@@ -159,6 +169,32 @@ const visibleConsequences = computed(() => {
         countLabel: isMinimum ? `At least ${count.toLocaleString()}` : count.toLocaleString(),
       };
     });
+});
+
+/**
+ * What to say when there is no preview to show.
+ *
+ * Four different silences, and telling them apart is the whole point — "we
+ * cannot work this out" and "you have not chosen anything yet" send the owner
+ * to opposite places. What none of them may do is put a number here: before
+ * this, an absent preview fell back to the whole-shop counts under the same
+ * heading, so a date-limited or hand-picked selection was quietly answered
+ * with the figures for migrating the lot.
+ */
+const unavailableText = computed(() => {
+  if (!props.selected) {
+    return 'Nothing is ticked yet. Choose at least one kind of data above and this will show what that run brings across.';
+  }
+
+  if (props.loading) {
+    return 'Working out what this selection includes…';
+  }
+
+  if (props.previewSupport === 'no') {
+    return 'This version of CartShift cannot work out what a selection includes — the summary was added later. Update the plugin, or migrate everything.';
+  }
+
+  return 'The summary could not be worked out just now, so there is nothing here worth trusting. Change the selection to ask again.';
 });
 
 function severityOf(raw) {

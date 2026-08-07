@@ -71,7 +71,7 @@ describe('serializeScope', () => {
 });
 
 describe('preview degradation', () => {
-  it('falls back to the old counts when /preview is not installed', async () => {
+  it('records that /preview is not installed, without claiming a failure', async () => {
     apiMock.mockImplementation(async (method, endpoint) => {
       if (endpoint === 'preview') {
         throw apiError('No route was found', 404);
@@ -80,10 +80,62 @@ describe('preview degradation', () => {
     });
 
     const { state, actions } = mount();
+    state.selectedEntities = ['order'];
     await actions.refreshPreview();
 
     expect(state.previewSupport).toBe('no');
     expect(state.error).toBeNull();
+    // No preview means no answer, not somebody else's answer. The receipt
+    // reads this and says so; it used to quietly print the whole-shop counts.
+    expect(state.preview).toBeNull();
+  });
+
+  it('asks about the run that will happen, not the boxes that are ticked', async () => {
+    // startMigration() runs autoIncludeDependencies() on the way out, so
+    // ticking Orders alone migrates products and customers too. A preview of
+    // the raw ticks describes a run nobody is going to get.
+    apiMock.mockResolvedValue({ counts: {}, consequences: [], closure: {}, too_large: false });
+
+    const { state, actions } = mount();
+    state.selectedEntities = ['order'];
+    await actions.refreshPreview();
+
+    const post = apiMock.mock.calls.find((c) => c[1] === 'preview');
+
+    expect(post[2].entity_types).toEqual(['product', 'customer', 'order']);
+  });
+
+  it('asks nothing at all when nothing is ticked', async () => {
+    // An empty entity_types list is read by the server as "no narrowing" and
+    // answered for all five entities — which is how arriving with nothing
+    // ticked came to show 25 products and 699 orders under "What will come
+    // across", beside a Start button that refuses for want of a selection.
+    apiMock.mockResolvedValue({ counts: { product: 25 } });
+
+    const { state, actions } = mount();
+    state.preview = { counts: { product: 25 }, consequences: [] };
+    await actions.refreshPreview();
+
+    expect(apiMock.mock.calls.find((c) => c[1] === 'preview')).toBeUndefined();
+    expect(state.preview).toBeNull();
+    expect(state.previewLoading).toBe(false);
+  });
+
+  it('drops a preview that answered the previous question when a refresh fails', async () => {
+    apiMock.mockImplementation(async (method, endpoint) => {
+      if (endpoint === 'preview') {
+        throw apiError('Internal Server Error', 500);
+      }
+      return {};
+    });
+
+    const { state, actions } = mount();
+    state.selectedEntities = ['order'];
+    state.preview = { counts: { order: 699 }, consequences: [], too_large: false };
+
+    await actions.refreshPreview();
+
+    expect(state.preview).toBeNull();
   });
 
   it('sends the serialised scope on /migrate', async () => {
@@ -119,6 +171,7 @@ describe('preview degradation', () => {
     });
 
     const { state, actions } = mount();
+    state.selectedEntities = ['order'];
     await actions.refreshPreview({ silent: true });
 
     expect(state.error).toBeNull();
@@ -137,6 +190,7 @@ describe('preview degradation', () => {
     });
 
     const { state, actions } = mount();
+    state.selectedEntities = ['order'];
     await actions.refreshPreview();
 
     expect(state.error).toBe('Internal Server Error');
@@ -154,6 +208,7 @@ describe('preview degradation', () => {
     });
 
     const { state, actions } = mount();
+    state.selectedEntities = ['order'];
     await actions.refreshPreview({ silent: true });
 
     expect(state.previewSupport).toBe('no');

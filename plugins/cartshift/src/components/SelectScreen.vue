@@ -141,8 +141,9 @@
       <div class="cartshift-select-receipt">
         <MigrationReceipt
           :preview="state.preview"
-          :counts="state.counts"
           :loading="state.previewLoading"
+          :selected="state.selectedEntities.length > 0"
+          :preview-support="state.previewSupport"
           @apply-remedy="actions.applyRemedy($event)"
         />
       </div>

@@ -105,4 +105,37 @@ describe('ScopePicker', () => {
       { id: '44', kind: 'product', label: 'Red Hoodie', sublabel: '' },
     ]);
   });
+
+  // The chips are the one control on the screen that changes what migrates,
+  // and removing one destroys the button that did it. Neither the change nor
+  // the lost focus was announced to anybody not looking at the screen.
+  it('announces the chosen items politely', () => {
+    const wrapper = mount(ScopePicker, {
+      props: {
+        modelValue: [{ id: '12', kind: 'product', label: 'Blue Hoodie', sublabel: '' }],
+        kind: 'product',
+      },
+    });
+
+    expect(wrapper.find('ul.cartshift-scope-picker-chips').attributes('aria-live')).toBe('polite');
+  });
+
+  it('returns focus to the search field when a chip is removed', async () => {
+    const wrapper = mount(ScopePicker, {
+      attachTo: document.body,
+      props: {
+        modelValue: [
+          { id: '12', kind: 'product', label: 'Blue Hoodie', sublabel: '' },
+          { id: '44', kind: 'product', label: 'Red Hoodie', sublabel: '' },
+        ],
+        kind: 'product',
+      },
+    });
+
+    await wrapper.findAll('button.cartshift-scope-chip-remove')[0].trigger('click');
+
+    expect(document.activeElement).toBe(wrapper.find('input[type="search"]').element);
+
+    wrapper.unmount();
+  });
 });

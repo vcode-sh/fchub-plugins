@@ -12,7 +12,7 @@ const preview = (overrides = {}) => ({
 
 describe('MigrationReceipt', () => {
   it('lists a count per entity', () => {
-    const wrapper = mount(MigrationReceipt, { props: { preview: preview(), counts: null, loading: false } });
+    const wrapper = mount(MigrationReceipt, { props: { preview: preview(), loading: false } });
 
     expect(wrapper.text()).toContain('1,204');
     expect(wrapper.text()).toContain('Nothing left behind.');
@@ -36,7 +36,6 @@ describe('MigrationReceipt', () => {
             },
           ],
         }),
-        counts: null,
         loading: false,
       },
     });
@@ -53,7 +52,6 @@ describe('MigrationReceipt', () => {
             { code: 'product_link_missing', label: 'No product link', hint: '', severity: 'warning', category: 'product', count: 0, remedy: null },
           ],
         }),
-        counts: null,
         loading: false,
       },
     });
@@ -78,7 +76,6 @@ describe('MigrationReceipt', () => {
             },
           ],
         }),
-        counts: null,
         loading: false,
       },
     });
@@ -88,12 +85,42 @@ describe('MigrationReceipt', () => {
     expect(wrapper.emitted('apply-remedy')[0][0].product_ids).toEqual([1, 2]);
   });
 
-  it('falls back to plain counts when there is no preview', () => {
+  // What the panel says when it has no preview. Whole-shop counts used to
+  // stand in here, under "What will come across", while a date or a hand-picked
+  // selection was active — a confident answer to a question nobody asked. Each
+  // silence now names itself, and none of them carries a number.
+  it('says nothing is chosen yet rather than showing whole-shop counts', () => {
     const wrapper = mount(MigrationReceipt, {
-      props: { preview: null, counts: { order: 699 }, loading: false },
+      props: { preview: null, loading: false, selected: false },
     });
 
-    expect(wrapper.text()).toContain('699');
+    expect(wrapper.text()).toContain('Nothing is ticked yet');
+    expect(wrapper.find('table').exists()).toBe(false);
+  });
+
+  it('says it is still working when a refresh is in flight', () => {
+    const wrapper = mount(MigrationReceipt, {
+      props: { preview: null, loading: true, selected: true },
+    });
+
+    expect(wrapper.text()).toContain('Working out what this selection includes');
+  });
+
+  it('explains an older build that has no preview endpoint', () => {
+    const wrapper = mount(MigrationReceipt, {
+      props: { preview: null, loading: false, selected: true, previewSupport: 'no' },
+    });
+
+    expect(wrapper.text()).toContain('cannot work out what a selection includes');
+  });
+
+  it('admits a failed lookup instead of answering a different question', () => {
+    const wrapper = mount(MigrationReceipt, {
+      props: { preview: null, loading: false, selected: true, previewSupport: 'yes' },
+    });
+
+    expect(wrapper.text()).toContain('could not be worked out');
+    expect(wrapper.text()).not.toMatch(/\d/);
   });
 
   // The server states minimality on the wire, via `is_minimum` on the
@@ -119,7 +146,6 @@ describe('MigrationReceipt', () => {
             },
           ],
         }),
-        counts: null,
         loading: false,
       },
     });
@@ -144,7 +170,6 @@ describe('MigrationReceipt', () => {
             },
           ],
         }),
-        counts: null,
         loading: false,
       },
     });
@@ -169,7 +194,6 @@ describe('MigrationReceipt', () => {
             },
           ],
         }),
-        counts: null,
         loading: false,
       },
     });
@@ -182,7 +206,6 @@ describe('MigrationReceipt', () => {
     const wrapper = mount(MigrationReceipt, {
       props: {
         preview: preview({ too_large: true }),
-        counts: null,
         loading: false,
       },
     });
@@ -195,7 +218,6 @@ describe('MigrationReceipt', () => {
     const wrapper = mount(MigrationReceipt, {
       props: {
         preview: preview({ closure: { products: 31, customers: 12 } }),
-        counts: null,
         loading: false,
       },
     });
@@ -213,14 +235,14 @@ describe('MigrationReceipt', () => {
   // all-clear are exactly the two things a screen-reader user would
   // otherwise miss while narrowing a selection down to nothing.
   it('announces the counts table politely', () => {
-    const wrapper = mount(MigrationReceipt, { props: { preview: preview(), counts: null, loading: false } });
+    const wrapper = mount(MigrationReceipt, { props: { preview: preview(), loading: false } });
 
     const region = wrapper.findAll('[aria-live="polite"]').find((el) => el.text().includes('1,204'));
     expect(region).toBeTruthy();
   });
 
   it('announces "Nothing left behind." politely, not just the consequence list', () => {
-    const wrapper = mount(MigrationReceipt, { props: { preview: preview(), counts: null, loading: false } });
+    const wrapper = mount(MigrationReceipt, { props: { preview: preview(), loading: false } });
 
     const region = wrapper.findAll('[aria-live="polite"]').find((el) => el.text().includes('Nothing left behind.'));
     expect(region).toBeTruthy();
@@ -243,7 +265,6 @@ describe('MigrationReceipt', () => {
             },
           ],
         }),
-        counts: null,
         loading: false,
       },
     });
@@ -254,7 +275,7 @@ describe('MigrationReceipt', () => {
 
   it('keeps the too_large notice as an interrupting alert, not a polite region', () => {
     const wrapper = mount(MigrationReceipt, {
-      props: { preview: preview({ too_large: true }), counts: null, loading: false },
+      props: { preview: preview({ too_large: true }), loading: false },
     });
 
     const alert = wrapper.find('[role="alert"]');

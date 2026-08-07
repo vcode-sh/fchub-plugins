@@ -203,6 +203,29 @@ describe('SelectScreen', () => {
     expect(ctx.actions.applyRemedy).toHaveBeenCalledWith(remedy);
   });
 
+  // The receipt cannot tell "no preview because nothing is chosen" from "no
+  // preview because the lookup failed" or "because this build has no endpoint"
+  // unless the screen tells it. Getting that wrong is how whole-shop counts
+  // came to be printed under a narrowed selection.
+  it('tells the receipt whether anything is ticked at all', async () => {
+    const ctx = context({ selectedEntities: [] });
+    const wrapper = mountScreen(ctx);
+
+    expect(wrapper.getComponent(MigrationReceipt).props('selected')).toBe(false);
+
+    ctx.state.selectedEntities = ['order'];
+    await nextTick();
+
+    expect(wrapper.getComponent(MigrationReceipt).props('selected')).toBe(true);
+  });
+
+  it('passes the preview-support tri-state through to the receipt', () => {
+    const ctx = context({ previewSupport: 'no' });
+    const wrapper = mountScreen(ctx);
+
+    expect(wrapper.getComponent(MigrationReceipt).props('previewSupport')).toBe('no');
+  });
+
   it('keeps the dry-run and background checkboxes bound to the same state as before', async () => {
     const ctx = context();
     const wrapper = mountScreen(ctx);

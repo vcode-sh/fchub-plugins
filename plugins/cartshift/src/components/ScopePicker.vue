@@ -5,6 +5,7 @@
     </label>
     <input
       :id="inputId"
+      ref="searchField"
       type="search"
       class="cartshift-scope-picker-input"
       :placeholder="kind === 'product' ? 'Search by name or SKU…' : 'Search by name or email…'"
@@ -33,7 +34,10 @@
       <p v-else-if="searched && !loading" class="description">No matches.</p>
     </div>
 
-    <ul v-if="modelValue.length" class="cartshift-scope-picker-chips">
+    <!-- The chips are what actually migrates. Adding or removing one is the
+         single most consequential thing on this screen, and until this region
+         existed a screen-reader user got no confirmation either had happened. -->
+    <ul v-if="modelValue.length" class="cartshift-scope-picker-chips" aria-live="polite">
       <li v-for="item in modelValue" :key="(item.kind || kind) + ':' + item.id" class="cartshift-scope-chip">
         <span class="cartshift-scope-chip-label">{{ chipLabel(item) }}</span>
         <button
@@ -67,6 +71,7 @@ const { api } = useApi();
 
 const inputId = `cartshift-scope-picker-${props.kind}`;
 
+const searchField = ref(null);
 const query = ref('');
 const results = ref([]);
 const truncated = ref(false);
@@ -151,5 +156,11 @@ function remove(item) {
       (existing) => !(itemKind(existing) === itemKind(item) && String(existing.id) === String(item.id))
     )
   );
+
+  // The button that was just pressed is about to be removed from the DOM with
+  // the chip it belonged to, which drops focus to <body> — keyboard and
+  // screen-reader users lose their place on the one control that decides what
+  // migrates. Put them back where they were adding from.
+  searchField.value?.focus();
 }
 </script>

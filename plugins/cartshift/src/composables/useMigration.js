@@ -312,22 +312,45 @@ export function useMigration() {
    * Owner-initiated refreshes (the debounced one on every scope edit) never
    * pass this, so a real failure is still reported exactly as before.
    *
+   * The entity list sent is the *resolved* one, not the owner's raw ticks.
+   * startMigration() runs autoIncludeDependencies() on the way out, so ticking
+   * Orders alone migrates products and customers too — a preview built from
+   * the raw ticks described a run that was never going to happen. And an empty
+   * list is not asked at all: the server reads it as "no narrowing" and
+   * answers for all five entities, which is how an arrival with nothing ticked
+   * came to show whole-shop figures under a heading promising the opposite.
+   *
    * @param {{silent?: boolean}} [options]
    */
   async function refreshPreview(options = {}) {
     const silent = options.silent === true;
+    const entityTypes = autoIncludeDependencies(state.selectedEntities);
+
+    if (entityTypes.length === 0) {
+      state.preview = null;
+      state.previewLoading = false;
+
+      return;
+    }
 
     state.previewLoading = true;
 
     try {
       const data = await api('POST', 'preview', {
-        entity_types: state.selectedEntities,
+        entity_types: entityTypes,
         scope: serializeScope(state.scope),
       });
 
       state.preview = data;
       state.previewSupport = 'yes';
     } catch (err) {
+      // Whatever went wrong, the preview on hand — if any — answers the
+      // previous question, not this one. Keeping it would leave the receipt
+      // quoting a wider selection's figures under the narrower one the owner
+      // is now looking at, which is precisely the class of confident wrong
+      // number 1.2.2 existed to stop.
+      state.preview = null;
+
       if (err.status === 404 || err.status === 501) {
         state.previewSupport = 'no';
       } else if (!silent) {
