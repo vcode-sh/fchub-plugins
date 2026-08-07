@@ -30,9 +30,15 @@ final class ScopeResolver
     /**
      * Ceiling on any single resolved ID set.
      *
-     * Above this the resolver refuses to answer rather than truncating.
-     * Truncating would migrate a subset of what the owner confirmed, which is
-     * exactly the class of silent data loss the whole release is against.
+     * Above this, exceedsClosureLimit() returns true rather than the resolver
+     * truncating the set — but this class only flags the overflow, it does not
+     * refuse anything itself. The refusal lives in the two callers that check
+     * the flag before a migration id exists: MigrationController::migrate()
+     * (REST, 422 scope_closure_too_large) and MigrateCommand::migrate() (CLI,
+     * WP_CLI::error()). Truncating would migrate a subset of what the owner
+     * confirmed, which is exactly the class of silent data loss the whole
+     * release is against — so both callers refuse outright rather than asking
+     * this class to decide what to drop.
      */
     public const int MAX_CLOSURE_IDS = 5000;
 

@@ -107,6 +107,36 @@ final class MigrateCommandTest extends PluginTestCase
         $this->assertSame('idle', $this->freshState()->getProgress()['status']);
     }
 
+    /**
+     * MigrationScope::fromArray() fails *open* on a malformed date — it falls
+     * back to "everything" — which is correct on the REST path, where a
+     * preview and an explicit confirmation sit between the value and a
+     * running migration. There is no preview on the command line: a typo
+     * would otherwise migrate the entire shop with no indication the scope
+     * was ever discarded. The CLI refuses instead.
+     *
+     * @return list<string>
+     */
+    public static function malformedSinceDates(): array
+    {
+        return [
+            'single-digit month/day' => ['2024-3-1'],
+            'not a date at all'      => ['yesterday'],
+            'empty string'           => [''],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('malformedSinceDates')]
+    public function testAMalformedSinceDateIsRefusedRatherThanMigratingEverything(string $since): void
+    {
+        MigrateCommand::migrate([], [
+            'entities' => 'order',
+            'since'    => $since,
+        ]);
+
+        $this->assertSame('idle', $this->freshState()->getProgress()['status']);
+    }
+
     public function testResetIsANoopWhenThereIsNoMigrationState(): void
     {
         MigrateCommand::reset([], []);

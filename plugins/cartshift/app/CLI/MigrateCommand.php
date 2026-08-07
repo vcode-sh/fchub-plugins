@@ -133,6 +133,24 @@ final class MigrateCommand
             return;
         }
 
+        $since = $assocArgs['since'] ?? null;
+
+        // MigrationScope::fromArray() fails *open* on a malformed date — falls
+        // back to "everything" — which is the right call for the REST path,
+        // where a preview and an explicit confirmation sit between the value
+        // and a running migration. There is no preview here: a typo on the
+        // command line would otherwise migrate the whole shop with no warning
+        // that the scope was ever discarded. Refuse instead, the same shape as
+        // every other pre-flight guard in this command.
+        if ($since !== null && !self::isValidSinceDate($since)) {
+            \WP_CLI::error(sprintf(
+                '--since must be a date in YYYY-MM-DD format ("%s" is not). Nothing was migrated.',
+                $since,
+            ));
+
+            return;
+        }
+
         $scope = self::resolveScope($assocArgs);
 
         // Checked here, before a migration id exists, so a refusal leaves no
@@ -973,6 +991,22 @@ final class MigrateCommand
         $customers = $assocArgs['customers'] ?? '';
 
         return $since !== null && ($products !== '' || $customers !== '');
+    }
+
+    /**
+     * Whether a --since value survives MigrationScope's own normalisation.
+     *
+     * Built on MigrationScope::fromArray() itself rather than a second copy of
+     * its date regex: asking with mode already set to 'since' means the only
+     * way the result comes back in a different mode is that normalizeDate()
+     * rejected the value, so mode() staying 'since' is the honest signal.
+     */
+    private static function isValidSinceDate(mixed $since): bool
+    {
+        return MigrationScope::fromArray([
+            'mode'  => MigrationScope::MODE_SINCE,
+            'since' => $since,
+        ])->mode() === MigrationScope::MODE_SINCE;
     }
 
     /**

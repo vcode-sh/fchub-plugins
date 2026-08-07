@@ -81,12 +81,14 @@ final class MigrationControllerTest extends PluginTestCase
 
     public function testMigrateStoresTheScopeItWasGiven(): void
     {
-        $this->controller->migrate($this->request([
+        $response = $this->controller->migrate($this->request([
             'entity_types' => ['order'],
             'scope'        => ['mode' => 'since', 'since' => '2024-03-01'],
         ]));
 
         $this->assertSame('since', (new MigrationState())->getScope()->mode());
+        // The brief lists `data.scope` as part of /migrate's response contract.
+        $this->assertSame('since', $response->get_data()['data']['scope']['mode']);
     }
 
     public function testMigrateWithNoScopeMigratesEverything(): void
