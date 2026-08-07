@@ -223,6 +223,11 @@ final class KeysetPaginationTest extends PluginTestCase
             {
                 return '7';
             }
+
+            #[\Override]
+            public function useScope(\CartShift\Domain\Scope\MigrationScope $scope): void
+            {
+            }
         };
 
         $orchestrator = $this->orchestrator($migrator);
@@ -462,6 +467,11 @@ final class KeysetPaginationTest extends PluginTestCase
                 $this->fetched = [];
                 $this->processed = [];
                 $this->cursors = [];
+            }
+
+            #[\Override]
+            public function useScope(\CartShift\Domain\Scope\MigrationScope $scope): void
+            {
             }
         };
     }
