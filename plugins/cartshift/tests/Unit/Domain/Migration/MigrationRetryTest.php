@@ -286,7 +286,24 @@ final class MigrationRetryTest extends PluginTestCase
         $this->assertSame(
             [],
             $this->idMapIds('product', $retryId),
-            'A dry retry writes no ID-map rows, so there is nothing to roll back.',
+            'A dry retry writes no real ID-map rows, so there is nothing to roll back.',
+        );
+
+        $simulatedInserts = array_values(array_filter(
+            $this->wpdb->idMapInserts,
+            static fn (array $row): bool => ($row['migration_id'] ?? '') === $retryId,
+        ));
+
+        $this->assertNotSame([], $simulatedInserts, 'It still records what it resolved, or later batches cannot see it.');
+
+        foreach ($simulatedInserts as $row) {
+            $this->assertSame(1, $row['is_simulated'], 'Every row a rehearsal writes belongs to the simulated realm.');
+        }
+
+        $this->assertSame(
+            [],
+            $this->idMapIds('product', $retryId, simulated: true),
+            'And a finished dry run takes its simulated rows with it.',
         );
 
         $this->assertSame(
@@ -369,16 +386,20 @@ final class MigrationRetryTest extends PluginTestCase
     }
 
     /**
-     * The WC IDs this migration created ID-map rows for.
+     * The WC IDs this migration created ID-map rows for, in one realm.
      *
      * @return list<string>
      */
-    private function idMapIds(string $entityType, string $migrationId): array
+    private function idMapIds(string $entityType, string $migrationId, bool $simulated = false): array
     {
         $ids = [];
 
         foreach ($this->wpdb->idMap as $row) {
-            if ($row['entity_type'] === $entityType && $row['migration_id'] === $migrationId) {
+            if (
+                $row['entity_type'] === $entityType
+                && $row['migration_id'] === $migrationId
+                && (bool) ($row['is_simulated'] ?? 0) === $simulated
+            ) {
                 $ids[] = (string) $row['wc_id'];
             }
         }
@@ -488,6 +509,12 @@ final class RetryTestMigrator implements MigratorInterface
     #[\Override]
     public function initialize(): void
     {
+    }
+
+    #[\Override]
+    public function initializeSimulated(): void
+    {
+        // No-op.
     }
 
     #[\Override]
@@ -601,6 +628,9 @@ final class RetryTestWpdb extends \wpdb
     /** @var list<array<string, mixed>> */
     public array $idMap = [];
 
+    /** Every id-map insert ever issued, including rows later deleted. */
+    public array $idMapInserts = [];
+
     #[\Override]
     public function insert(string $table, array $data, ?array $format = null): int|false
     {
@@ -610,9 +640,34 @@ final class RetryTestWpdb extends \wpdb
 
         if (str_contains($table, 'id_map')) {
             $this->idMap[] = $data;
+            $this->idMapInserts[] = $data;
         }
 
         return parent::insert($table, $data, $format);
+    }
+
+    /**
+     * purgeSimulated() goes through wpdb::delete(), not a raw query.
+     */
+    #[\Override]
+    public function delete(string $table, array $where, ?array $where_format = null): int|false
+    {
+        if (str_contains($table, 'id_map')) {
+            $this->idMap = array_values(array_filter(
+                $this->idMap,
+                static function (array $row) use ($where): bool {
+                    foreach ($where as $column => $value) {
+                        if ((string) ($row[$column] ?? '') !== (string) $value) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                },
+            ));
+        }
+
+        return parent::delete($table, $where, $where_format);
     }
 
     /**

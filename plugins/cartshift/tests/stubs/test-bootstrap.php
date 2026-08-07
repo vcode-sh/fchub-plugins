@@ -132,6 +132,29 @@ if (!function_exists('delete_option')) {
     }
 }
 
+if (!function_exists('get_transient')) {
+    function get_transient(string $transient): mixed
+    {
+        return $GLOBALS['_cartshift_test_transients'][$transient] ?? false;
+    }
+}
+
+if (!function_exists('set_transient')) {
+    function set_transient(string $transient, mixed $value, int $expiration = 0): bool
+    {
+        $GLOBALS['_cartshift_test_transients'][$transient] = $value;
+        return true;
+    }
+}
+
+if (!function_exists('delete_transient')) {
+    function delete_transient(string $transient): bool
+    {
+        unset($GLOBALS['_cartshift_test_transients'][$transient]);
+        return true;
+    }
+}
+
 if (!function_exists('wp_generate_uuid4')) {
     function wp_generate_uuid4(): string
     {
@@ -342,6 +365,10 @@ if (!function_exists('register_rest_route')) {
 if (!function_exists('wc_get_product')) {
     function wc_get_product(int $productId): mixed
     {
+        // Counted, so a test can assert that a lookup in a loop is not repeated.
+        $GLOBALS['_cartshift_test_wc_product_lookups'] =
+            ($GLOBALS['_cartshift_test_wc_product_lookups'] ?? 0) + 1;
+
         return $GLOBALS['_cartshift_test_wc_products'][$productId] ?? null;
     }
 }
@@ -364,6 +391,13 @@ if (!function_exists('get_user_meta')) {
     function get_user_meta(int $userId, string $key = '', bool $single = false): mixed
     {
         return $GLOBALS['_cartshift_test_user_meta'][$userId][$key] ?? '';
+    }
+}
+
+if (!function_exists('is_plugin_active')) {
+    function is_plugin_active(string $plugin): bool
+    {
+        return in_array($plugin, $GLOBALS['_cartshift_test_active_plugins'] ?? [], true);
     }
 }
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CartShift\Validator;
 
+use CartShift\Support\WooStorage;
+
 defined('ABSPATH') || exit;
 
 final class PreflightCheck
@@ -23,6 +25,9 @@ final class PreflightCheck
     /** Recommended max_execution_time, in seconds. */
     private const int RECOMMENDED_EXECUTION_SECONDS = 300;
 
+    /** How long the unsupported-type order count stays cached. */
+    private const int ORDERS_AFFECTED_CACHE_SECONDS = 300;
+
     /** WooCommerce's HPOS opt-in option. */
     private const string HPOS_OPTION = 'woocommerce_custom_orders_table_enabled';
 
@@ -32,6 +37,34 @@ final class PreflightCheck
     private const string ORDER_UTIL = '\Automattic\WooCommerce\Utilities\OrderUtil';
 
     private const string HPOS_DATA_STORE = '\Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore';
+
+    /**
+     * WooCommerce plugins that grant entitlements (course access, membership levels)
+     * on the strength of a WooCommerce order. CartShift migrates orders, customers,
+     * subscriptions and coupons — never entitlements, that boundary is deliberate and
+     * belongs to fchub-memberships instead. But an admin who never hears about it will
+     * watch a migration finish green and only discover the gap when a customer emails
+     * asking where their course went.
+     *
+     * Basename => [grant, message]. Verified live: learndash-woocommerce 2.0.2 and
+     * pmpro-woocommerce 1.10.1 both active alongside WooCommerce 11.0.0.
+     *
+     * @var array<string, array{grant: string, message: string}>
+     */
+    private const array ENTITLEMENT_BRIDGES = [
+        'learndash-woocommerce/learndash_woocommerce.php' => [
+            'grant'   => 'LearnDash course enrollment',
+            'message' => 'LearnDash course access is granted by WooCommerce on this site. CartShift migrates '
+                . 'orders and subscriptions, not course enrollments — customers will keep their purchase history '
+                . 'but lose course access until you migrate that separately.',
+        ],
+        'pmpro-woocommerce/pmpro-woocommerce.php' => [
+            'grant'   => 'Paid Memberships Pro membership level',
+            'message' => 'Paid Memberships Pro membership levels are granted by WooCommerce on this site. '
+                . 'CartShift migrates orders and subscriptions, not membership levels — customers will keep their '
+                . 'purchase history but lose their membership until you migrate that separately.',
+        ],
+    ];
 
     /**
      * Run all preflight checks and return structured results.
@@ -56,6 +89,7 @@ final class PreflightCheck
         $checks['product_types']      = $this->checkProductTypes();
         $checks['fc_data']            = $this->checkExistingFcData();
         $checks['migration_tables']   = $this->checkMigrationTables();
+        $checks['entitlements']       = $this->checkEntitlements();
 
         $ready = true;
 
@@ -342,9 +376,16 @@ final class PreflightCheck
     /**
      * ADVISORY. Never blocks.
      *
-     * Unsupported product types are skipped by design and reported per-record in the
-     * migration log. Refusing to migrate 500 simple products because someone once made
-     * a grouped product would be absurd.
+     * Unsupported product types are excluded from getProductTypes(), which is what
+     * countTotal() and fetchBatch() filter on — by design, because CartShift cannot
+     * map, say, a LearnDash course product's data and attempting to would fail in
+     * worse and less visible ways than not migrating it at all.
+     *
+     * The trap: excluded from the denominator means invisible, not skipped. A store
+     * with 27 products where 2 are `course` reports "25 / 25 migrated" and never
+     * mentions the other 2 — worse than a skip, because a skip is at least reported.
+     * This check is the only place that names them and says how many orders carry
+     * them, so the admin can go find those orders rather than discover the gap later.
      */
     private function checkProductTypes(): array
     {
@@ -379,20 +420,20 @@ final class PreflightCheck
             $types[$row->slug] = (int) $row->count;
         }
 
-        $supported   = ['simple', 'variable', 'subscription', 'variable-subscription'];
-        $unsupported = array_diff(array_keys($types), $supported);
+        $supported = ['simple', 'variable', 'subscription', 'variable-subscription'];
 
-        $unsupportedCount = 0;
-        foreach ($unsupported as $type) {
-            $unsupportedCount += $types[$type];
+        $unsupported = [];
+        foreach (array_diff(array_keys($types), $supported) as $slug) {
+            $unsupported[$slug] = $types[$slug];
         }
 
-        $hasWarning = $unsupportedCount > 0;
+        $unsupportedCount = array_sum($unsupported);
+        $hasWarning       = $unsupportedCount > 0;
 
         $parts = [];
         foreach ($types as $slug => $count) {
             $typeLabel = ucfirst(str_replace('-', ' ', $slug));
-            $marker    = in_array($slug, $supported, true) ? '' : ' (unsupported)';
+            $marker    = array_key_exists($slug, $unsupported) ? ' (unsupported)' : '';
             $parts[]   = sprintf('%s: %d%s', $typeLabel, $count, $marker);
         }
 
@@ -400,8 +441,28 @@ final class PreflightCheck
             ? 'No WooCommerce products found.'
             : implode(', ', $parts) . '.';
 
+        $ordersAffected = 0;
+
         if ($hasWarning) {
-            $message .= sprintf(' %d product(s) with unsupported types will be skipped.', $unsupportedCount);
+            $ordersAffected = $this->countOrdersAffectedByTypes(array_keys($unsupported));
+            $totalOrders    = $this->countMigratableOrders();
+
+            $typeNames = implode(', ', array_map(
+                static fn(string $slug): string => str_replace('-', ' ', $slug),
+                array_keys($unsupported),
+            ));
+
+            $message .= sprintf(
+                ' %d product%s use a type CartShift can\'t migrate (%s). They appear in %d of your %d order%s '
+                . '— those orders will still show what was bought and what it cost, but the items won\'t link '
+                . 'to a product page.',
+                $unsupportedCount,
+                $unsupportedCount === 1 ? '' : 's',
+                $typeNames,
+                $ordersAffected,
+                $totalOrders,
+                $totalOrders === 1 ? '' : 's',
+            );
         }
 
         return $this->result(
@@ -409,10 +470,155 @@ final class PreflightCheck
             $hasWarning ? self::SEVERITY_WARN : self::SEVERITY_PASS,
             $message,
             [
-                'optional'    => true,
-                'types'       => $types,
-                'unsupported' => array_values($unsupported),
+                'optional'                  => true,
+                'types'                     => $types,
+                'unsupported'               => $unsupported,
+                'unsupported_product_types' => [
+                    'types'           => $unsupported,
+                    'orders_affected' => $ordersAffected,
+                ],
             ],
+        );
+    }
+
+    /**
+     * How many orders contain at least one product of an unsupported type.
+     *
+     * Line items live in {prefix}woocommerce_order_items /
+     * {prefix}woocommerce_order_itemmeta under both legacy and HPOS order storage —
+     * HPOS moved the order and order-meta tables, not the line-item tables — so this
+     * join is valid regardless of which storage mode is active.
+     *
+     * Numerator and denominator must count the same row set or the sentence built
+     * from them is nonsense. Without the join to wc_orders this counted refunds
+     * (`shop_order_refund`), subscriptions (`shop_subscription`), trashed orders and
+     * `checkout-draft` rows, none of which countMigratableOrders() counts — so on a
+     * store with WooCommerce Subscriptions selling one unsupported product type the
+     * message could read "in 812 of your 699 orders". Same for the product side: the
+     * type histogram this number is quoted alongside is limited to
+     * publish/draft/private, so an unsupported product sitting in the trash must not
+     * inflate the count of orders it appears in.
+     *
+     * @param list<string> $slugs
+     */
+    private function countOrdersAffectedByTypes(array $slugs): int
+    {
+        if ($slugs === []) {
+            return 0;
+        }
+
+        $cached = $this->cachedOrdersAffected($slugs);
+
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        global $wpdb;
+
+        $placeholders = implode(', ', array_fill(0, count($slugs), '%s'));
+        $ordersTable  = WooStorage::ordersTable();
+        [$scopeSql, $scopeValues] = WooStorage::orderScopeParts();
+
+        $sql = $wpdb->prepare(
+            "SELECT COUNT(DISTINCT oi.order_id)
+             FROM {$wpdb->prefix}woocommerce_order_items oi
+             INNER JOIN {$ordersTable} o
+                     ON o.id = oi.order_id AND {$scopeSql}
+             INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta im
+                     ON im.order_item_id = oi.order_item_id AND im.meta_key = '_product_id'
+             INNER JOIN {$wpdb->posts} p
+                     ON p.ID = CAST(im.meta_value AS UNSIGNED)
+                    AND p.post_type = 'product'
+                    AND p.post_status IN ('publish', 'draft', 'private')
+             INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = p.ID
+             INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+             INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
+             WHERE tt.taxonomy = 'product_type' AND t.slug IN ({$placeholders})",
+            ...[...$scopeValues, ...$slugs],
+        );
+
+        $count = (int) $wpdb->get_var($sql);
+
+        $this->rememberOrdersAffected($slugs, $count);
+
+        return $count;
+    }
+
+    /**
+     * The remembered answer for this exact slug list, or null.
+     *
+     * This query cannot be made cheap. `CAST(im.meta_value AS UNSIGNED)` on the meta
+     * side makes any index on meta_value unusable, so MySQL scans
+     * woocommerce_order_itemmeta filtered by nothing more selective than the
+     * meta_key index — free on a 699-order shop, several million rows on a 500k one.
+     * And PreflightScreen.vue fires the preflight endpoint on mount, so that scan ran
+     * on every visit to the screen, on exactly the store least able to afford it.
+     *
+     * A transient rather than an EXISTS rewrite: EXISTS changes which rows are
+     * examined but not the fact that the meta side cannot be indexed for this
+     * predicate, so it would move the cost rather than remove it. The number is
+     * advisory — it names orders the admin should go and look at, it never gates
+     * readiness — so a few minutes of staleness costs nothing, and the cache is
+     * keyed on the slug list so a store whose unsupported types change gets a fresh
+     * answer immediately.
+     *
+     * @param list<string> $slugs
+     */
+    private function cachedOrdersAffected(array $slugs): ?int
+    {
+        if (!function_exists('get_transient')) {
+            return null;
+        }
+
+        $cached = get_transient(self::ordersAffectedCacheKey($slugs));
+
+        return is_numeric($cached) ? (int) $cached : null;
+    }
+
+    /**
+     * @param list<string> $slugs
+     */
+    private function rememberOrdersAffected(array $slugs, int $count): void
+    {
+        if (!function_exists('set_transient')) {
+            return;
+        }
+
+        set_transient(self::ordersAffectedCacheKey($slugs), $count, self::ORDERS_AFFECTED_CACHE_SECONDS);
+    }
+
+    /**
+     * Hashed because the slug list is unbounded and option names are not — a
+     * WordPress transient key has 172 characters to play with once the `_transient_`
+     * prefix is accounted for, and a store with a dozen third-party product types
+     * would blow through that.
+     *
+     * @param list<string> $slugs
+     */
+    private static function ordersAffectedCacheKey(array $slugs): string
+    {
+        $normalized = $slugs;
+        sort($normalized);
+
+        return 'cartshift_orders_affected_' . md5(implode('|', $normalized));
+    }
+
+    /**
+     * The order count the "N of your M orders" wording reports against — the same
+     * migratable scope OrderMigrator::countTotal() uses, so this number matches
+     * whatever the migration itself will report as the order total.
+     */
+    private function countMigratableOrders(): int
+    {
+        global $wpdb;
+
+        $scope = WooStorage::orderScopeSql();
+        $table = WooStorage::ordersTable();
+
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(*)
+             FROM {$table}
+             WHERE {$scope}",
         );
     }
 
@@ -498,6 +704,56 @@ final class PreflightCheck
                 ? 'FluentCart already contains data. Migration will add new records alongside existing ones.'
                 : 'FluentCart database is empty. Ready for clean migration.',
             ['counts' => $counts],
+        );
+    }
+
+    /**
+     * ADVISORY. Never blocks — the commerce/entitlement split is a deliberate product
+     * decision, not a defect.
+     *
+     * CartShift migrates orders, customers, subscriptions and coupons. It does not
+     * migrate entitlements — course enrollments, membership levels — because those
+     * belong to a separate plugin (fchub-memberships). On a store where a bridge
+     * plugin like LearnDash-WooCommerce or Paid Memberships Pro grants those
+     * entitlements straight off a WooCommerce order, a CartShift migration can finish
+     * with every number green and still leave customers holding purchase history with
+     * no course access and no membership. Say so before the run, not after.
+     */
+    private function checkEntitlements(): array
+    {
+        $label = 'Entitlement Bridges';
+
+        if (! function_exists('is_plugin_active')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        $active = [];
+        foreach (self::ENTITLEMENT_BRIDGES as $basename => $bridge) {
+            if (is_plugin_active($basename)) {
+                $active[$basename] = $bridge;
+            }
+        }
+
+        if ($active === []) {
+            return $this->result(
+                $label,
+                self::SEVERITY_PASS,
+                'No known entitlement-granting plugins detected. CartShift migrates commerce data only '
+                . '(orders, customers, subscriptions, coupons) — entitlements are out of scope regardless.',
+                ['bridges' => []],
+            );
+        }
+
+        $message = implode(' ', array_map(
+            static fn(array $bridge): string => $bridge['message'],
+            array_values($active),
+        ));
+
+        return $this->result(
+            $label,
+            self::SEVERITY_WARN,
+            $message,
+            ['bridges' => array_keys($active)],
         );
     }
 }

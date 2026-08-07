@@ -181,6 +181,12 @@ final class KeysetPaginationTest extends PluginTestCase
             }
 
             #[\Override]
+            public function initializeSimulated(): void
+            {
+                // No-op.
+            }
+
+            #[\Override]
             public function fetchByIds(array $wcIds): array
             {
                 return [];
@@ -361,6 +367,12 @@ final class KeysetPaginationTest extends PluginTestCase
             #[\Override]
             public function initialize(): void
             {
+            }
+
+            #[\Override]
+            public function initializeSimulated(): void
+            {
+                // No-op.
             }
 
             #[\Override]

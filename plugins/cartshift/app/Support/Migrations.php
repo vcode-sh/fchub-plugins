@@ -11,10 +11,13 @@ defined('ABSPATH') || exit;
 final class Migrations
 {
     private const string DB_VERSION_OPTION = 'cartshift_db_version';
-    private const string CURRENT_VERSION = '4';
+    private const string CURRENT_VERSION = '5';
 
-    /** Unique index guaranteeing one id-map row per (entity_type, wc_id). */
+    /** Unique index guaranteeing one id-map row per (entity_type, wc_id). Superseded by v5. */
     private const string ID_MAP_UNIQUE_INDEX = 'entity_wc_unique';
+
+    /** Unique index guaranteeing one id-map row per (entity_type, wc_id) per realm. */
+    private const string ID_MAP_REALM_UNIQUE_INDEX = 'entity_wc_realm_unique';
 
     /** Index backing per-code log filtering and grouping. */
     private const string LOG_ERROR_CODE_INDEX = 'migration_error_code';
@@ -25,6 +28,7 @@ final class Migrations
         '2' => 'v2',
         '3' => 'v3',
         '4' => 'v4',
+        '5' => 'v5',
     ];
 
     public static function run(): void
@@ -262,6 +266,81 @@ final class Migrations
             $marker,
             $marker,
         ));
+    }
+
+    /**
+     * v5: let a dry run persist its ID map without ever being mistaken for a real one.
+     *
+     * Simulation used to live in a per-request memo, which is fine under WP-CLI —
+     * one process, one memo — and useless everywhere else. The REST batch loop and
+     * Action Scheduler each run ONE entity type per request, so products were
+     * validated in an earlier request than the coupons and orders that reference
+     * them: by the time a dependency was resolved the memo was empty and every
+     * lookup missed. The dry run then over-reported exactly the outcomes it exists
+     * to predict. A dry run's mappings have to outlive the request, which means
+     * they have to be rows.
+     *
+     * `is_simulated` is the whole safety story. Every read a real migration makes
+     * is scoped to `is_simulated = 0`, so a rehearsal's leftovers can never resolve
+     * a real reference; simulated rows are purged when a dry run starts, when it
+     * finishes, and on reset.
+     *
+     * The UNIQUE key has to grow with it. v2's `(entity_type, wc_id)` would make a
+     * real row and a simulated row for the same entity mutually exclusive, so a dry
+     * run followed by a real migration would collide on the very first insert. The
+     * key is extended to `(entity_type, wc_id, is_simulated)` rather than scoped:
+     * MySQL has no partial or filtered index, so "unique among real rows only" is
+     * not expressible as an index at all. Extending it keeps the guarantee v2
+     * actually wanted — the database still refuses a duplicate within each realm,
+     * which is what stops two overlapping batch requests double-inserting — while
+     * letting the two realms coexist. It also keeps serving every point lookup,
+     * because `(entity_type, wc_id)` is still a leading prefix of it.
+     *
+     * No second index for the realm filter: `getMapForEntityType()` runs a handful
+     * of times per request, whereas inserts run millions of times during a
+     * migration. v2 dropped a redundant index for that exact reason.
+     */
+    private static function v5(): void
+    {
+        global $wpdb;
+
+        $idMapTable = $wpdb->prefix . 'cartshift_id_map';
+
+        if (!self::columnExists($idMapTable, 'is_simulated')) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $added = $wpdb->query(
+                "ALTER TABLE {$idMapTable}
+                 ADD COLUMN is_simulated TINYINT(1) NOT NULL DEFAULT 0 AFTER created_by_migration",
+            );
+
+            // Indexing a column the ALTER failed to add would fail too.
+            if ($added === false) {
+                return;
+            }
+        }
+
+        // Tolerate a partially applied upgrade — the index may already be there.
+        if (!self::indexExists($idMapTable, self::ID_MAP_REALM_UNIQUE_INDEX)) {
+            $indexName = self::ID_MAP_REALM_UNIQUE_INDEX;
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query(
+                "ALTER TABLE {$idMapTable}
+                 ADD UNIQUE INDEX {$indexName} (entity_type, wc_id, is_simulated)",
+            );
+        }
+
+        // Only once the replacement is definitely in place. Dropping first would
+        // leave a partially upgraded install with no uniqueness guarantee at all.
+        if (
+            self::indexExists($idMapTable, self::ID_MAP_REALM_UNIQUE_INDEX)
+            && self::indexExists($idMapTable, self::ID_MAP_UNIQUE_INDEX)
+        ) {
+            $legacyIndex = self::ID_MAP_UNIQUE_INDEX;
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query("ALTER TABLE {$idMapTable} DROP INDEX {$legacyIndex}");
+        }
     }
 
     /**

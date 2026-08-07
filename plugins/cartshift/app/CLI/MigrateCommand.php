@@ -571,7 +571,10 @@ final class MigrateCommand
         \WP_CLI::log(sprintf('Status: %s', $previousStatus));
         \WP_CLI::log(sprintf('Migration ID: %s', $migrationId ?? 'n/a'));
         \WP_CLI::log('');
-        \WP_CLI::log('Reset clears the state only. Migrated records and id-map entries are kept.');
+        \WP_CLI::log(
+            'Reset clears the state only. Migrated records and id-map entries are kept; '
+            . 'a dry run\'s simulated id-map rows are discarded.',
+        );
 
         if (!$skipConfirm) {
             \WP_CLI::confirm('Clear the stored migration state?');
@@ -581,6 +584,11 @@ final class MigrateCommand
             $processor->cancel($migrationId);
             \WP_CLI::log('Pending background batches cancelled.');
         }
+
+        // A dry run's ID-map rows exist only to carry references between its own
+        // batches. Forgetting the run has to forget them too. Real rows are
+        // untouched — reset forgets a run, rollback unpicks one.
+        (new IdMapRepository())->purgeSimulated();
 
         $state->reset();
 

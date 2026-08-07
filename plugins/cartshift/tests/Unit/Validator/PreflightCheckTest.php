@@ -315,8 +315,301 @@ final class PreflightCheckTest extends PluginTestCase
 
         $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
         $this->assertTrue($check['pass']);
-        $this->assertContains('grouped', $check['unsupported']);
+        $this->assertArrayHasKey('grouped', $check['unsupported']);
+        $this->assertSame(1, $check['unsupported']['grouped']);
         $this->assertTrue($result['ready']);
+    }
+
+    /**
+     * The bug this fixes: unsupported product types were excluded from
+     * getProductTypes(), which countTotal() and fetchBatch() both filter on. That
+     * makes them invisible in the migration summary rather than skipped-and-reported.
+     * This check is where they finally get named, along with how many orders carry
+     * them, so an admin can go find those orders instead of discovering the gap later.
+     */
+    public function testUnsupportedProductTypesAreReportedWithTheirOrderImpact(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 13],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        $result = (new PreflightCheck())->run();
+        $check  = $result['checks']['product_types'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertSame(['course' => 2], $check['unsupported']);
+        $this->assertStringContainsString('course', $check['message']);
+        $this->assertStringContainsString('41', $check['message']);
+        $this->assertStringContainsString('699', $check['message']);
+        $this->assertSame(
+            ['types' => ['course' => 2], 'orders_affected' => 41],
+            $check['unsupported_product_types'],
+        );
+        $this->assertTrue($result['ready'], 'An unsupported type is advisory, not blocking.');
+    }
+
+    /**
+     * The exact real-world numbers this task fixes: a live store (WooCommerce
+     * 11.0.0, HPOS, 699 orders) with 27 products, 2 of them LearnDash `course`
+     * products invisible to getProductTypes(), appearing in 41 of the 699 orders.
+     */
+    public function testUnsupportedProductTypesMatchesTheLiveStoreDefect(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 25],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        $check = (new PreflightCheck())->run()['checks']['product_types'];
+
+        $this->assertSame(2, array_sum($check['unsupported']));
+        $this->assertSame(27, array_sum($check['types']));
+        $this->assertSame(41, $check['unsupported_product_types']['orders_affected']);
+        $this->assertStringContainsString(
+            '2 products use a type CartShift can\'t migrate (course). '
+            . 'They appear in 41 of your 699 orders',
+            $check['message'],
+        );
+    }
+
+    /**
+     * Numerator and denominator have to count the same row set, or the sentence
+     * built from them is nonsense.
+     *
+     * The numerator used to join woocommerce_order_items to nothing at all, so it
+     * counted refunds, subscriptions, trashed orders and checkout-drafts, while
+     * countMigratableOrders() excludes every one of those. On a store with
+     * WooCommerce Subscriptions selling a course product on subscription, that
+     * reaches "in 812 of your 699 orders" — a number that is not merely wrong but
+     * visibly impossible.
+     */
+    public function testTheAffectedOrderCountIsScopedToTheSameOrdersItIsQuotedAgainst(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 25],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $numerator = null;
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use (&$numerator): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                $numerator = $query;
+
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        (new PreflightCheck())->run();
+
+        $this->assertNotNull($numerator, 'The affected-order count must actually be issued.');
+
+        $this->assertStringContainsString(
+            'wp_wc_orders o',
+            $numerator,
+            'Without a join to the orders table the numerator counts rows the denominator never does.',
+        );
+        $this->assertStringContainsString('o.id = oi.order_id', $numerator);
+        $this->assertStringContainsString("type = 'shop_order'", $numerator);
+        $this->assertStringContainsString('status IN (', $numerator);
+
+        $this->assertStringContainsString(
+            "p.post_status IN ('publish', 'draft', 'private')",
+            $numerator,
+            'The product side must match the type histogram, or a trashed unsupported '
+            . 'product inflates the numerator without appearing in the counts beside it.',
+        );
+        $this->assertStringContainsString("p.post_type = 'product'", $numerator);
+    }
+
+    /**
+     * The CAST on the meta side makes any index on meta_value unusable, so this
+     * query scans woocommerce_order_itemmeta — and the preflight screen fires on
+     * mount. Free at 699 orders, several million rows per admin page load at 500k.
+     */
+    public function testTheAffectedOrderCountIsCachedBetweenPreflightRuns(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 25],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $scans = 0;
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use (&$scans): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                $scans++;
+
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        $first  = (new PreflightCheck())->run()['checks']['product_types'];
+        $second = (new PreflightCheck())->run()['checks']['product_types'];
+
+        $this->assertSame(1, $scans, 'The itemmeta scan must not run once per admin page load.');
+        $this->assertSame(41, $second['unsupported_product_types']['orders_affected']);
+        $this->assertSame(
+            $first['unsupported_product_types'],
+            $second['unsupported_product_types'],
+            'A cached answer is still the same answer.',
+        );
+    }
+
+    /**
+     * Keyed on the slug list, so a store whose unsupported types change gets a
+     * fresh number rather than the previous shape's.
+     */
+    public function testTheAffectedOrderCountCacheIsKeyedOnTheSlugList(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $slugs = ['course'];
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query) use (&$slugs): array {
+            if (str_contains($query, 'product_type')) {
+                return array_merge(
+                    [(object) ['slug' => 'simple', 'count' => 25]],
+                    array_map(
+                        static fn (string $slug): object => (object) ['slug' => $slug, 'count' => 1],
+                        $slugs,
+                    ),
+                );
+            }
+
+            return [];
+        };
+
+        $scans = 0;
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use (&$scans): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                $scans++;
+
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        (new PreflightCheck())->run();
+
+        $slugs = ['course', 'bundle'];
+        (new PreflightCheck())->run();
+
+        $this->assertSame(2, $scans, 'A different set of unsupported types is a different question.');
+    }
+
+    /**
+     * No unsupported types, nothing to report: the new key stays present but empty
+     * rather than being omitted, so a generic UI reading it never has to guess.
+     */
+    public function testUnsupportedProductTypesKeyIsEmptyWhenEverythingIsSupported(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 10],
+                    (object) ['slug' => 'variable', 'count' => 5],
+                ];
+            }
+
+            return [];
+        };
+
+        $check = (new PreflightCheck())->run()['checks']['product_types'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
+        $this->assertSame([], $check['unsupported']);
+        $this->assertSame(
+            ['types' => [], 'orders_affected' => 0],
+            $check['unsupported_product_types'],
+        );
     }
 
     /**
@@ -409,5 +702,88 @@ final class PreflightCheckTest extends PluginTestCase
 
         // fc_data.counts is read directly by PreflightScreen.vue.
         $this->assertArrayHasKey('counts', $result['checks']['fc_data']);
+    }
+
+    // ──────────────────────────────────────────────
+    // Entitlement bridges
+    // ──────────────────────────────────────────────
+
+    /**
+     * CartShift deliberately migrates commerce, not entitlements. That boundary is
+     * fine — but a store where WooCommerce grants course access or membership levels
+     * through a bridge plugin can finish a migration with every number green and still
+     * leave customers with purchase history and no course access. Warn, don't block.
+     */
+    public function testEntitlementBridgesAreWarnedAboutButDoNotBlock(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = ['learndash-woocommerce/learndash_woocommerce.php'];
+
+        $result = (new PreflightCheck())->run();
+        $check  = $result['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertStringContainsString('course access', $check['message']);
+        $this->assertTrue($result['ready']);
+    }
+
+    public function testPmproWooCommerceBridgeIsWarnedAboutByMembershipWording(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = ['pmpro-woocommerce/pmpro-woocommerce.php'];
+
+        $result = (new PreflightCheck())->run();
+        $check  = $result['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertTrue($check['pass']);
+        $this->assertTrue($check['warning']);
+        $this->assertStringContainsString('membership', $check['message']);
+        $this->assertSame(['pmpro-woocommerce/pmpro-woocommerce.php'], $check['bridges']);
+        $this->assertTrue($result['ready']);
+    }
+
+    public function testBothEntitlementBridgesActiveReportsBoth(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = [
+            'learndash-woocommerce/learndash_woocommerce.php',
+            'pmpro-woocommerce/pmpro-woocommerce.php',
+        ];
+
+        $result = (new PreflightCheck())->run();
+        $check  = $result['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertStringContainsString('course access', $check['message']);
+        $this->assertStringContainsString('membership', $check['message']);
+        $this->assertCount(2, $check['bridges']);
+        $this->assertTrue($result['ready']);
+    }
+
+    public function testNoEntitlementBridgesActiveIsAPass(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = [];
+
+        $check = (new PreflightCheck())->run()['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
+        $this->assertFalse($check['warning']);
+        $this->assertSame([], $check['bridges']);
+    }
+
+    /**
+     * A plugin sharing part of the basename (e.g. some other WooCommerce integration)
+     * must not trip the check — only the exact registered basenames count.
+     */
+    public function testUnrelatedActivePluginsDoNotTriggerTheWarning(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = ['some-other-plugin/some-other-plugin.php'];
+
+        $check = (new PreflightCheck())->run()['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
     }
 }

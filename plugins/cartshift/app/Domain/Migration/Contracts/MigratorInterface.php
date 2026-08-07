@@ -33,6 +33,20 @@ interface MigratorInterface
     public function initialize(): void;
 
     /**
+     * The read-only counterpart of initialize(), for a dry run.
+     *
+     * A dry run must create nothing — no WordPress terms, no posts, no FluentCart
+     * rows — so it cannot call initialize(). But it still has to answer the
+     * questions initialize() sets up the answers to: a coupon restricted to a
+     * category can only be judged against a category map. Implementations resolve
+     * what already exists in FluentCart and register a synthetic ID for what does
+     * not, writing simulated ID-map rows and nothing else.
+     *
+     * Called once per entity type when offset is 0, in place of initialize().
+     */
+    public function initializeSimulated(): void;
+
+    /**
      * Fetch the next batch of WC records after the given cursor.
      *
      * Keyset pagination, not LIMIT/OFFSET. The cursor is an opaque marker

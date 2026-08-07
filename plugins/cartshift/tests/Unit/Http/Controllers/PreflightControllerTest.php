@@ -128,8 +128,8 @@ final class PreflightControllerTest extends PluginTestCase
         $this->assertSame(15, $productTypes['types']['variable']);
         $this->assertSame(3, $productTypes['types']['grouped']);
         $this->assertSame(1, $productTypes['types']['external']);
-        $this->assertContains('grouped', $productTypes['unsupported']);
-        $this->assertContains('external', $productTypes['unsupported']);
+        $this->assertArrayHasKey('grouped', $productTypes['unsupported']);
+        $this->assertArrayHasKey('external', $productTypes['unsupported']);
         $this->assertStringContainsString('unsupported', $productTypes['message']);
     }
 }

@@ -70,19 +70,30 @@ final class MigrateCommandTest extends PluginTestCase
         $this->assertSame([$migrationId], $unscheduled[0]['args']);
     }
 
-    public function testResetLeavesTheIdMapAlone(): void
+    /**
+     * Reset is not rollback. It clears the run's state and discards the simulated
+     * id-map rows a dry run leaves behind — those exist only to carry references
+     * between that run's own batches — and touches nothing else.
+     */
+    public function testResetDiscardsOnlyTheSimulatedIdMapRows(): void
     {
         $this->state->start(['product']);
 
         MigrateCommand::reset([], []);
 
-        // Reset is not rollback: it must not issue any delete against the id map.
-        $deletes = array_filter(
+        $deletes = array_values(array_filter(
             $GLOBALS['_cartshift_test_queries'],
             static fn (array $entry): bool => ($entry[0] ?? '') === 'delete',
+        ));
+
+        $this->assertCount(1, $deletes, 'Reset must issue exactly one delete against the id map.');
+        $this->assertSame('wp_cartshift_id_map', $deletes[0][1]);
+        $this->assertSame(
+            ['is_simulated' => 1],
+            $deletes[0][2],
+            'Real mappings survive a reset — deleting those is rollback\'s job.',
         );
 
-        $this->assertSame([], $deletes);
         $this->assertSame([], $GLOBALS['_cartshift_test_deleted_posts']);
     }
 

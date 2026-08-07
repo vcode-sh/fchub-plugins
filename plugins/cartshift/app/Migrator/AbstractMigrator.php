@@ -86,6 +86,19 @@ abstract class AbstractMigrator implements MigratorInterface
     }
 
     /**
+     * Default no-op dry-run initialisation.
+     *
+     * Concrete, not abstract: a migrator whose initialize() creates nothing has
+     * nothing to simulate, and an abstract method here would be a fatal error for
+     * every third-party migrator written against an earlier version.
+     */
+    #[\Override]
+    public function initializeSimulated(): void
+    {
+        // No-op by default.
+    }
+
+    /**
      * Validate a single record without creating any FC records.
      *
      * Default implementation: logs what would be created and returns true.
@@ -224,6 +237,9 @@ abstract class AbstractMigrator implements MigratorInterface
      * cannot afford. This class does not own IdMapRepository, so the count is
      * issued here against the same table that repository writes to.
      *
+     * Simulated rows are excluded unconditionally. This number is what the UI
+     * shows as "already migrated", and a dry run migrates nothing.
+     *
      * @see \CartShift\Storage\IdMapRepository
      */
     #[\Override]
@@ -241,7 +257,8 @@ abstract class AbstractMigrator implements MigratorInterface
         $placeholders = implode(', ', array_fill(0, count($types), '%s'));
 
         return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE entity_type IN ({$placeholders})",
+            "SELECT COUNT(*) FROM {$table}
+             WHERE entity_type IN ({$placeholders}) AND is_simulated = 0",
             ...$types,
         ));
     }

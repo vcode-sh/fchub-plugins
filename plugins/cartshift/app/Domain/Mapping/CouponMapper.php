@@ -79,6 +79,19 @@ final class CouponMapper
      */
     private array $restrictionAudit = [];
 
+    /**
+     * WC product ID => its WC variation IDs, for the life of this mapper.
+     *
+     * variationWcIdsForProduct() calls wc_get_product() once per restriction ID
+     * per coupon, and one migrator instance maps every coupon in a batch. Stores
+     * that restrict a lot of coupons to the same handful of products were paying
+     * for the same object-cache round trip over and over. Bounded by the number
+     * of distinct restricted products in the batch, which is small.
+     *
+     * @var array<int, list<int>>
+     */
+    private array $variationIdsByProduct = [];
+
     public function __construct(
         private readonly IdMapRepository $idMap,
         private readonly string $currency,
@@ -239,21 +252,26 @@ final class CouponMapper
         // list is recorded before and after so map() can tell "narrower than WC"
         // (fine) from "no restriction at all" (a discount the shop never agreed
         // to give). Key order is the order FluentCart's own schema lists them in.
+        //
+        // Product restrictions resolve through variations, not products — see
+        // mapProductIdsToVariationIds() for why.
         $restrictions = [
-            'included_products'   => [Constants::ENTITY_PRODUCT, $coupon->get_product_ids()],
-            'excluded_products'   => [Constants::ENTITY_PRODUCT, $coupon->get_excluded_product_ids()],
-            'included_categories' => [Constants::ENTITY_CATEGORY, $coupon->get_product_categories()],
-            'excluded_categories' => [Constants::ENTITY_CATEGORY, $coupon->get_excluded_product_categories()],
+            'included_products'   => ['product', $coupon->get_product_ids()],
+            'excluded_products'   => ['product', $coupon->get_excluded_product_ids()],
+            'included_categories' => ['category', $coupon->get_product_categories()],
+            'excluded_categories' => ['category', $coupon->get_excluded_product_categories()],
         ];
 
-        foreach ($restrictions as $key => [$entityType, $wcIds]) {
+        foreach ($restrictions as $key => [$kind, $wcIds]) {
             $wcIds = array_values(array_map(intval(...), (array) $wcIds));
 
             if ($wcIds === []) {
                 continue;
             }
 
-            $fcIds = $this->mapIds($entityType, $wcIds);
+            $fcIds = $kind === 'product'
+                ? $this->mapProductIdsToVariationIds($wcIds)
+                : $this->mapIds(Constants::ENTITY_CATEGORY, $wcIds);
 
             $this->restrictionAudit[$key] = [
                 'original' => $wcIds,
@@ -292,6 +310,75 @@ final class CouponMapper
         }
 
         return $fcIds;
+    }
+
+    /**
+     * Resolve WC product IDs to the FluentCart variation IDs DiscountService
+     * actually compares against.
+     *
+     * FluentCart's coupon filter checks `included_products` / `excluded_products`
+     * against `$item['object_id']` (DiscountService::filterApplicableItems(),
+     * 1.6.0 :308, :316), and a cart line item's `object_id` is the FluentCart
+     * *variation* ID, not the product post ID — CartHelper::buildCartItem()
+     * sets it to `$variation->id` (fluent-cart/app/Helpers/CartHelper.php:54,
+     * :123), and checkout carries that value straight through
+     * (CheckoutProcessor.php:673, :927). Resolving a restriction through
+     * `Constants::ENTITY_PRODUCT` — the product post ID — never matches, so
+     * every product restriction silently stopped working the moment a coupon
+     * crossed over.
+     *
+     * A WC product ID has to expand to every one of its FluentCart variation
+     * IDs to keep matching what the shop actually restricted.
+     *
+     * @param int[] $wcProductIds
+     *
+     * @return list<int>
+     */
+    private function mapProductIdsToVariationIds(array $wcProductIds): array
+    {
+        $fcIds = [];
+
+        foreach ($wcProductIds as $wcProductId) {
+            foreach ($this->variationWcIdsForProduct($wcProductId) as $variationWcId) {
+                $fcId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $variationWcId);
+                if ($fcId !== null) {
+                    $fcIds[] = $fcId;
+                }
+            }
+        }
+
+        return array_values(array_unique($fcIds));
+    }
+
+    /**
+     * The WC variation IDs belonging to one WC product.
+     *
+     * A variable product's children are its variations, and ProductMigrator
+     * stores each one under `Constants::ENTITY_VARIATION` keyed by the
+     * variation's own WC ID (ProductMigrator.php:906). A simple product has no
+     * children — CartShift migrates it as a single FluentCart variation keyed
+     * by the *product's* WC ID instead (ProductMigrator.php:866) — so for a
+     * simple product the product ID doubles as its own variation lookup key.
+     *
+     * @return list<int>
+     */
+    private function variationWcIdsForProduct(int $wcProductId): array
+    {
+        if (isset($this->variationIdsByProduct[$wcProductId])) {
+            return $this->variationIdsByProduct[$wcProductId];
+        }
+
+        $product = wc_get_product($wcProductId);
+        $ids     = [$wcProductId];
+
+        if ($product instanceof \WC_Product) {
+            $children = array_values(array_map(intval(...), $product->get_children()));
+            if ($children !== []) {
+                $ids = $children;
+            }
+        }
+
+        return $this->variationIdsByProduct[$wcProductId] = $ids;
     }
 
     /**

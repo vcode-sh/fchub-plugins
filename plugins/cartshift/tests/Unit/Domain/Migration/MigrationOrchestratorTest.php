@@ -354,6 +354,12 @@ final class MigrationOrchestratorTest extends PluginTestCase
             }
 
             #[\Override]
+            public function initializeSimulated(): void
+            {
+                // No-op.
+            }
+
+            #[\Override]
             public function fetchByIds(array $wcIds): array
             {
                 $wanted = array_map(intval(...), $wcIds);

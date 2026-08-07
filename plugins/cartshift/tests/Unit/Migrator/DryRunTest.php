@@ -51,6 +51,56 @@ final class DryRunTest extends PluginTestCase
         $this->assertFalse($initialized, 'initialize() must NOT be called during dry-run');
     }
 
+    /**
+     * Skipping initialize() is only half the answer. Skipping it and putting
+     * nothing in its place left ENTITY_CATEGORY empty for the whole run, so every
+     * coupon with a category restriction was reported as would-be-disabled
+     * regardless — the residual figure the dry run exists to produce was an upper
+     * bound wearing a precise number's clothing.
+     */
+    public function testDryRunCallsTheReadOnlyInitialiserInstead(): void
+    {
+        $simulated = false;
+
+        $migrator = $this->createDryRunMigrator(
+            'product',
+            1,
+            [(object) ['id' => 1]],
+            onInitializeSimulated: function () use (&$simulated): void {
+                $simulated = true;
+            },
+        );
+
+        $orchestrator = new MigrationOrchestrator([$migrator], $this->state, $this->idMap, $this->log);
+        $orchestrator->startMigration(['product'], dryRun: true);
+
+        $this->assertTrue($simulated, 'initializeSimulated() must run in place of initialize()');
+    }
+
+    public function testARealRunCallsInitializeAndNotTheSimulatedOne(): void
+    {
+        $initialized = false;
+        $simulated = false;
+
+        $migrator = $this->createDryRunMigrator(
+            'product',
+            1,
+            [(object) ['id' => 1]],
+            onInitialize: function () use (&$initialized): void {
+                $initialized = true;
+            },
+            onInitializeSimulated: function () use (&$simulated): void {
+                $simulated = true;
+            },
+        );
+
+        $orchestrator = new MigrationOrchestrator([$migrator], $this->state, $this->idMap, $this->log);
+        $orchestrator->startMigration(['product'], dryRun: false);
+
+        $this->assertTrue($initialized);
+        $this->assertFalse($simulated, 'A real run creates its taxonomies; it does not rehearse them.');
+    }
+
     public function testDryRunCallsValidateRecordNotProcessRecord(): void
     {
         $validateCalled = false;
@@ -164,6 +214,7 @@ final class DryRunTest extends PluginTestCase
         ?\Closure $onInitialize = null,
         ?\Closure $onValidate = null,
         ?\Closure $onProcess = null,
+        ?\Closure $onInitializeSimulated = null,
     ): MigratorInterface {
         return new class (
             $entityType,
@@ -172,6 +223,7 @@ final class DryRunTest extends PluginTestCase
             $onInitialize,
             $onValidate,
             $onProcess,
+            $onInitializeSimulated,
         ) implements MigratorInterface {
             public function __construct(
                 private readonly string $type,
@@ -180,6 +232,7 @@ final class DryRunTest extends PluginTestCase
                 private readonly ?\Closure $onInitialize,
                 private readonly ?\Closure $onValidate,
                 private readonly ?\Closure $onProcess,
+                private readonly ?\Closure $onInitializeSimulated = null,
             ) {}
 
             #[\Override]
@@ -199,6 +252,14 @@ final class DryRunTest extends PluginTestCase
             {
                 if ($this->onInitialize !== null) {
                     ($this->onInitialize)();
+                }
+            }
+
+            #[\Override]
+            public function initializeSimulated(): void
+            {
+                if ($this->onInitializeSimulated !== null) {
+                    ($this->onInitializeSimulated)();
                 }
             }
 

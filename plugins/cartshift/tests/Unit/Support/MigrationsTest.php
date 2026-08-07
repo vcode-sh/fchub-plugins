@@ -63,9 +63,20 @@ final class MigrationsTest extends PluginTestCase
         $this->assertTrue(Migrations::needsUpgrade());
     }
 
-    public function testNoUpgradeNeededWhenCurrent(): void
+    /**
+     * v4 installs predate the id-map's is_simulated column, so a dry run there
+     * still has nowhere to persist its mappings.
+     */
+    public function testV4InstallStillNeedsUpgrade(): void
     {
         $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '4';
+
+        $this->assertTrue(Migrations::needsUpgrade());
+    }
+
+    public function testNoUpgradeNeededWhenCurrent(): void
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '5';
 
         $this->assertFalse(Migrations::needsUpgrade());
     }
@@ -84,7 +95,7 @@ final class MigrationsTest extends PluginTestCase
 
         Migrations::run();
 
-        $this->assertSame('4', $GLOBALS['_cartshift_test_options']['cartshift_db_version']);
+        $this->assertSame('5', $GLOBALS['_cartshift_test_options']['cartshift_db_version']);
         $this->assertFalse(Migrations::needsUpgrade());
     }
 
@@ -93,7 +104,7 @@ final class MigrationsTest extends PluginTestCase
      */
     public function testRunIsANoOpWhenAlreadyCurrent(): void
     {
-        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '4';
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '5';
         $GLOBALS['_cartshift_test_get_results_callback'] = fn (): array => [];
 
         Migrations::run();
@@ -162,7 +173,7 @@ final class MigrationsTest extends PluginTestCase
         });
 
         $this->assertNull(
-            $this->indexOfQueryContaining($sqls, 'ADD UNIQUE INDEX'),
+            $this->indexOfQueryContaining($sqls, 'ADD UNIQUE INDEX entity_wc_unique'),
             'The ALTER must be skipped when the index is already there.',
         );
 
@@ -368,8 +379,127 @@ final class MigrationsTest extends PluginTestCase
     }
 
     // ──────────────────────────────────────────────
+    // v5: id-map simulated realm
+    // ──────────────────────────────────────────────
+
+    /**
+     * A dry run's mappings have to outlive the request that made them — the
+     * orchestrator handles one entity type per request, so a memo-only simulation
+     * has forgotten every product by the time coupons are validated.
+     */
+    public function testV5AddsTheIsSimulatedColumn(): void
+    {
+        $alter = $this->firstQueryContaining($this->runV5(), 'ADD COLUMN is_simulated');
+
+        $this->assertStringContainsString('cartshift_id_map', $alter);
+        $this->assertStringContainsString('TINYINT(1) NOT NULL DEFAULT 0', $alter);
+    }
+
+    /**
+     * v2's `(entity_type, wc_id)` key would make a simulated row and a real row
+     * for the same entity mutually exclusive, so a dry run followed by a real
+     * migration would collide on the first insert. MySQL has no partial index, so
+     * "unique among real rows only" is not expressible — the key grows instead,
+     * keeping the guarantee within each realm.
+     */
+    public function testV5WidensTheUniqueKeyToIncludeTheRealm(): void
+    {
+        $alter = $this->firstQueryContaining($this->runV5(), 'ADD UNIQUE INDEX entity_wc_realm_unique');
+
+        $this->assertStringContainsString('(entity_type, wc_id, is_simulated)', $alter);
+    }
+
+    /**
+     * The column has to exist before the index names it.
+     */
+    public function testV5AddsTheColumnBeforeTheIndex(): void
+    {
+        $sqls = $this->runV5();
+
+        $columnIndex = $this->indexOfQueryContaining($sqls, 'ADD COLUMN is_simulated');
+        $indexIndex  = $this->indexOfQueryContaining($sqls, 'ADD UNIQUE INDEX entity_wc_realm_unique');
+
+        $this->assertNotNull($columnIndex);
+        $this->assertNotNull($indexIndex);
+        $this->assertLessThan($indexIndex, $columnIndex);
+    }
+
+    /**
+     * `(entity_type, wc_id)` is a leading prefix of the new key, so the old one is
+     * dead weight on a table that takes millions of inserts during a migration —
+     * but only once the replacement is confirmed present.
+     */
+    public function testV5DropsTheSupersededUniqueIndexOnceTheNewOneExists(): void
+    {
+        $sqls = $this->runV5(static function (string $query): array {
+            if (str_contains($query, 'SHOW INDEX')) {
+                return [(object) ['Key_name' => 'present']];
+            }
+
+            return [];
+        });
+
+        $drop = $this->firstQueryContaining($sqls, 'DROP INDEX entity_wc_unique');
+
+        $this->assertStringContainsString('cartshift_id_map', $drop);
+    }
+
+    public function testV5KeepsTheOldIndexWhenTheNewOneIsNotConfirmed(): void
+    {
+        $this->assertNull(
+            $this->indexOfQueryContaining($this->runV5(), 'DROP INDEX entity_wc_unique'),
+            'Dropping the old key before the new one exists would leave no uniqueness guarantee at all.',
+        );
+    }
+
+    /**
+     * A partially applied upgrade must not blow up on a second attempt — MySQL
+     * rejects both a duplicate column and a duplicate index name.
+     */
+    public function testV5IsIdempotent(): void
+    {
+        $sqls = $this->runV5(static function (string $query): array {
+            if (str_contains($query, 'SHOW COLUMNS') && str_contains($query, 'is_simulated')) {
+                return [(object) ['Field' => 'is_simulated']];
+            }
+
+            if (str_contains($query, "Key_name = 'entity_wc_realm_unique'")) {
+                return [(object) ['Key_name' => 'entity_wc_realm_unique']];
+            }
+
+            return [];
+        });
+
+        $this->assertNull($this->indexOfQueryContaining($sqls, 'ADD COLUMN is_simulated'));
+        $this->assertNull($this->indexOfQueryContaining($sqls, 'ADD UNIQUE INDEX entity_wc_realm_unique'));
+    }
+
+    // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────
+
+    /**
+     * Run only the v5 step and return the SQL it issued.
+     *
+     * @param (callable(string): array)|null $schemaCallback Fakes SHOW COLUMNS / SHOW INDEX.
+     * @return string[]
+     */
+    private function runV5(callable|null $schemaCallback = null): array
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '4';
+        $GLOBALS['_cartshift_test_queries'] = [];
+        $GLOBALS['_cartshift_test_get_results_callback'] = $schemaCallback ?? fn (): array => [];
+
+        Migrations::run();
+
+        return array_values(array_map(
+            static fn (array $entry): string => $entry[1],
+            array_filter(
+                $GLOBALS['_cartshift_test_queries'],
+                static fn (array $entry): bool => $entry[0] === 'query',
+            ),
+        ));
+    }
 
     /**
      * Run only the v4 step, with the log's error_code column reported as present.
