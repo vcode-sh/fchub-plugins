@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout caller tag SHA
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate target and version
         env:
@@ -64,7 +64,7 @@ jobs:
           - '8.5'
     steps:
       - name: Checkout caller tag SHA
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -99,10 +99,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout caller tag SHA
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -153,12 +153,12 @@ jobs:
           - fchub-wishlist
     steps:
       - name: Checkout caller tag SHA
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -188,7 +188,7 @@ jobs:
             "${{ matrix.plugin }}"
 
       - name: Upload validated package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wporg-package-${{ matrix.plugin }}
           path: |
@@ -200,7 +200,7 @@ jobs:
 
       - name: Upload rejected package evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wporg-package-${{ matrix.plugin }}-failure
           path: |
@@ -230,10 +230,10 @@ jobs:
           - '8.5'
     steps:
       - name: Checkout caller tag SHA
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download validated package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: wporg-package-${{ matrix.plugin }}
           path: dist
@@ -277,7 +277,7 @@ jobs:
 
       - name: Upload disposable gate evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wporg-runtime-${{ matrix.plugin }}-php${{ matrix.php_version }}-failure
           path: test-results/wporg/${{ matrix.plugin }}/
