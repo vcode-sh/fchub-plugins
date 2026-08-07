@@ -198,6 +198,13 @@ describe('legacy HTTP cancellation routing', () => {
 	})
 
 	it('removes active listeners on timeout and service shutdown', async () => {
+		// Fake timers, like the tombstone test above. This previously slept a
+		// real 20ms against a 10ms timeout and asserted the entry had expired —
+		// true on an idle machine, false whenever a loaded runner stretched the
+		// gap, which is why it failed on one CI lane and passed on the other in
+		// the same run. Advancing the clock makes the expiry a fact rather than
+		// a margin.
+		vi.useFakeTimers()
 		const registry = new RequestCancellationRegistry({
 			horizonMs: 10,
 			timeoutMs: 10,
@@ -205,33 +212,40 @@ describe('legacy HTTP cancellation routing', () => {
 		const principal: TransportPrincipal = { kind: 'anonymous-loopback', id: 'loopback' }
 		let aborts = 0
 		let releases = 0
-		registry.register(
-			principal,
-			'expired',
-			() => {
-				aborts += 1
-			},
-			() => {
-				releases += 1
-			},
-		)
-		await new Promise((resolve) => setTimeout(resolve, 20))
-		expect(registry.cancel(principal, 'expired')).toBe(false)
+		try {
+			registry.register(
+				principal,
+				'expired',
+				() => {
+					aborts += 1
+				},
+				() => {
+					releases += 1
+				},
+			)
+			await vi.advanceTimersByTimeAsync(10)
+			expect(registry.cancel(principal, 'expired')).toBe(false)
 
-		registry.register(
-			principal,
-			'shutdown',
-			() => {
-				aborts += 1
-			},
-			() => {
-				releases += 1
-			},
-		)
-		registry.close()
-		expect(registry.cancel(principal, 'shutdown')).toBe(false)
-		expect(aborts).toBe(0)
-		expect(releases).toBe(2)
+			registry.register(
+				principal,
+				'shutdown',
+				() => {
+					aborts += 1
+				},
+				() => {
+					releases += 1
+				},
+			)
+			registry.close()
+			expect(registry.cancel(principal, 'shutdown')).toBe(false)
+			expect(aborts).toBe(0)
+			expect(releases).toBe(2)
+		} finally {
+			// close() short-circuits on this.closed, so the mid-test close above
+			// makes this a no-op rather than a second round of releases.
+			registry.close()
+			vi.useRealTimers()
+		}
 	})
 
 	it('disables routing on principal or request-id saturation without evicting safety state', () => {
