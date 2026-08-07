@@ -54,8 +54,8 @@ jobs:
           node-version: '26.7.0'
       - name: Verify reviewed release toolchain
         run: |
-          test "$(node --version)" = "v24.13.0"
-          test "$(npm --version)" = "11.6.2"
+          test "$(node --version)" = "v26.7.0"
+          test "$(npm --version)" = "11.19.0"
       - name: Download exact staging evidence
         uses: actions/download-artifact@v8
         with:

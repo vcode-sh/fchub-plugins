@@ -142,7 +142,7 @@ describe('MCP SDK v2 dependency and import boundary', () => {
 		assert.equal(pkg.dependencies['@modelcontextprotocol/node'], '2.0.0')
 		assert.equal(pkg.dependencies['@modelcontextprotocol/express'], '2.0.0')
 		assert.equal(pkg.devDependencies['@modelcontextprotocol/client'], '2.0.0')
-		assert.equal(pkg.devDependencies['@modelcontextprotocol/conformance'], '0.2.0-alpha.10')
+		assert.equal(pkg.devDependencies['@modelcontextprotocol/conformance'], '0.2.0-alpha.11')
 		assert.equal(pkg.dependencies[LEGACY_SDK], undefined)
 		assert.equal(
 			pkg.scripts['check:sdk-current'],

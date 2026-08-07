@@ -121,9 +121,9 @@ describe('tag-triggered publication', () => {
 	it('uses a pinned reviewed npm CLI for trusted publication', () => {
 		const body = job(stage, 'publish-npm')
 		assert.doesNotMatch(body, /npm@latest|registry-url/)
-		assert.match(body, /node-version:\s*'24\.13\.0'/)
-		assert.match(body, /npm install --global npm@11\.15\.0/)
-		assert.match(body, /test "\$\(npm --version\)" = "11\.15\.0"/)
+		assert.match(body, /node-version:\s*'26\.7\.0'/)
+		assert.match(body, /npm install --global npm@11\.19\.0/)
+		assert.match(body, /test "\$\(npm --version\)" = "11\.19\.0"/)
 		assert.match(body, /--registry https:\/\/registry\.npmjs\.org/)
 		assert.ok(body.indexOf('npm --version') < body.indexOf('npm publish'))
 	})
@@ -275,8 +275,8 @@ describe('workflow credential boundary', () => {
 	it('uses the reviewed promotion toolchain without npm install or a mutable npm selector', () => {
 		const body = job(promote, 'promote')
 		assert.doesNotMatch(body, /npm install --global|npm@latest|registry-url/)
-		assert.match(body, /node-version:\s*'24\.13\.0'/)
-		assert.match(body, /test "\$\(npm --version\)" = "11\.6\.2"/)
+		assert.match(body, /node-version:\s*'26\.7\.0'/)
+		assert.match(body, /test "\$\(npm --version\)" = "11\.19\.0"/)
 		assert.ok(body.indexOf('npm --version') < body.indexOf('github-token'))
 	})
 })
