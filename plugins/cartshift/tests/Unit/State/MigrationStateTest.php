@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CartShift\Tests\Unit\State;
 
+use CartShift\Domain\Scope\MigrationScope;
 use CartShift\State\MigrationState;
 use CartShift\Tests\Unit\PluginTestCase;
 
@@ -186,6 +187,17 @@ final class MigrationStateTest extends PluginTestCase
         $other = new MigrationState();
 
         $this->assertSame(7, $other->getCurrentOffset());
+    }
+
+    public function testStartRecordsTheScopeAlongsideTheEntityTypes(): void
+    {
+        $state = new MigrationState();
+        $state->start(['order'], false, MigrationScope::fromArray(['mode' => 'explicit', 'product_ids' => [12]]));
+
+        $stored = $state->getProgress();
+
+        $this->assertSame(['order'], $stored['entity_types']);
+        $this->assertSame([12], $stored['scope']['product_ids']);
     }
 
     /**
