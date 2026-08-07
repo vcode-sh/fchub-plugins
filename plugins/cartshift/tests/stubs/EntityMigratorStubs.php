@@ -104,6 +104,10 @@ if (!function_exists('wc_get_orders')) {
 
         $GLOBALS['_cartshift_test_wc_get_orders_calls'][] = $resolved;
 
+        if (isset($GLOBALS['_cartshift_test_wc_get_orders_callback'])) {
+            return ($GLOBALS['_cartshift_test_wc_get_orders_callback'])($resolved);
+        }
+
         return $GLOBALS['_cartshift_test_wc_get_orders_return'] ?? [];
     }
 }
