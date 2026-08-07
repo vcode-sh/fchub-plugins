@@ -395,6 +395,62 @@ final class ScopeConsequencesTest extends PluginTestCase
     }
 
     // ──────────────────────────────────────────────────────────────
+    // Products lose things on their own account.
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Tick only Products, on a shop with LearnDash courses in it, and the run
+     * drops every one of them. Filtering the order-scoped consequences out of
+     * a product-only selection was right; leaving nothing in their place let
+     * the receipt say "Nothing left behind." over exactly that run.
+     */
+    public function testAProductOnlyRunReportsTheProductsItCannotMigrate(): void
+    {
+        $this->withUnsupportedProductType();
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): int => str_contains($query, "p.post_type = 'product'") ? 2 : 0;
+
+        $consequences = (new ScopeConsequences(new ScopeResolver(MigrationScope::everything())))->all(['product']);
+
+        $row = $this->consequence($consequences, 'unsupported_product_type');
+
+        $this->assertNotNull($row, 'A product-only run must have something to say about products.');
+        $this->assertSame(2, $row['count']);
+        $this->assertNull($row['remedy'], 'Nothing the owner can add makes a course migratable.');
+
+        // The receipt hides zero-count rows, so a consequence that is present
+        // but zero is the same as saying nothing left behind.
+        $this->assertNotSame(
+            [],
+            array_filter($consequences, static fn (array $c): bool => $c['count'] > 0),
+            'A product-only run that drops products must not render as "Nothing left behind."',
+        );
+    }
+
+    public function testAShopWithNoUnsupportedTypesReportsNoProductLoss(): void
+    {
+        $consequences = (new ScopeConsequences(new ScopeResolver(MigrationScope::everything())))->all(['product']);
+
+        $this->assertSame(0, $this->consequence($consequences, 'unsupported_product_type')['count']);
+    }
+
+    /**
+     * Scope-aware: the count is of unmigratable products *in scope*, so an
+     * explicit pick that closed over nothing reports nothing rather than the
+     * whole catalogue's courses.
+     */
+    public function testTheProductLossCountIsBoundedByTheScope(): void
+    {
+        $this->withUnsupportedProductType();
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): int => str_contains($query, "p.post_type = 'product'") ? 2 : 0;
+
+        $scope = MigrationScope::fromArray(['mode' => 'explicit', 'product_ids' => []]);
+
+        $consequences = (new ScopeConsequences(new ScopeResolver($scope)))->all(['product']);
+
+        $this->assertSame(0, $this->consequence($consequences, 'unsupported_product_type')['count']);
+    }
+
+    // ──────────────────────────────────────────────────────────────
     // Consequences belong to the entities being migrated.
     // ──────────────────────────────────────────────────────────────
 
@@ -408,7 +464,7 @@ final class ScopeConsequencesTest extends PluginTestCase
 
         $codes = array_map(static fn (array $row): string => $row['code'], $consequences);
 
-        $this->assertSame(['coupon_disabled_missing_restrictions'], $codes);
+        $this->assertSame(['unsupported_product_type', 'coupon_disabled_missing_restrictions'], $codes);
     }
 
     public function testAnEmptyEntityListMeansNoFilteringAtAll(): void
@@ -420,6 +476,7 @@ final class ScopeConsequencesTest extends PluginTestCase
 
         $this->assertSame(
             [
+                'unsupported_product_type',
                 'product_link_missing',
                 'customer_rebuilt_from_order',
                 'subscription_paused_missing_product',

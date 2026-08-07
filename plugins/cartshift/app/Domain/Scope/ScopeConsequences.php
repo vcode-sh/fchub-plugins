@@ -99,6 +99,15 @@ final class ScopeConsequences
 
         $consequences = [];
 
+        if ($wanted('product')) {
+            // Products are the one entity that can lose something on their own,
+            // without an order or a coupon to lose it through. Filtering the
+            // order-scoped consequences out of a product-only run was right;
+            // leaving nothing in their place let the panel print "Nothing left
+            // behind." over a run that drops every course in the shop.
+            $consequences[] = $this->describe(MigrationErrorCode::UnsupportedProductType, $this->unsupportedProductCount(), null);
+        }
+
         if ($wanted('order')) {
             // A structural floor, not the true figure — see productLinkMissingCount().
             $consequences[] = $this->describe(MigrationErrorCode::ProductLinkMissing, $this->productLinkMissingCount(), null, true);
@@ -114,6 +123,55 @@ final class ScopeConsequences
         }
 
         return $consequences;
+    }
+
+    /**
+     * In-scope products of a type ProductMigrator cannot source.
+     *
+     * The one consequence that belongs to products themselves. Every other
+     * counter here describes something an order, a subscription or a coupon
+     * loses; this is the catalogue losing rows outright, and without it a
+     * product-only selection reported "Nothing left behind." over a run that
+     * drops every LearnDash `course` in the shop. Preflight discloses the same
+     * types on an earlier screen — which is not a defence, because this panel
+     * is what the owner reads immediately before pressing Start.
+     *
+     * Scope-aware through productPredicate(), so an explicit pick that happens
+     * to contain no unmigratable product correctly reports zero, while
+     * "Everything" reports the whole catalogue's worth. Same status trio and
+     * same unsupported-slug list as everything else — see
+     * PreflightCheck::SUPPORTED_PRODUCT_TYPES.
+     *
+     * No remedy: nothing the owner can add to the scope makes a `course`
+     * migratable. The honest move is to say so and let them decide.
+     */
+    private function unsupportedProductCount(): int
+    {
+        [$unsupportedSql, $unsupportedValues] = self::unsupportedTypeClause('p.ID');
+
+        if ($unsupportedSql === '') {
+            return 0;
+        }
+
+        global $wpdb;
+
+        $selection = $this->resolver->productPredicate('p.ID');
+
+        if ($selection->matchesNoRows()) {
+            return 0;
+        }
+
+        $sql = "SELECT COUNT(*)
+                  FROM {$wpdb->posts} p
+                 WHERE p.post_type = 'product'
+                   AND p.post_status IN ('publish', 'draft', 'private')
+                   AND {$unsupportedSql}"
+            . $selection->andSql();
+
+        // Always at least one value — the slug list is what got us past the
+        // empty-clause return above — so prepare() never sees a placeholder-free
+        // query here.
+        return (int) $wpdb->get_var($wpdb->prepare($sql, ...[...$unsupportedValues, ...$selection->values()]));
     }
 
     /**

@@ -240,11 +240,13 @@ function scheduleRefresh() {
 
 watch([() => state.scope, () => state.selectedEntities], scheduleRefresh, { deep: true });
 
-// The receipt is the primary feedback surface, but with no preview yet it
-// shows nothing past the whole-shop counts — no consequences, no "Nothing
-// left behind", no remedies (MigrationReceipt.vue gates all of that on
-// `preview`). Ask once on arrival so the default "Everything" door is not a
-// blank read.
+// The receipt is the primary feedback surface, and with no preview it shows
+// no figures at all — no counts, no consequences, no "Nothing left behind",
+// no remedies (MigrationReceipt.vue gates every one of those on `preview`,
+// and the whole-shop fallback that used to stand in for them is gone). Ask
+// once on arrival so a selection that is already ticked reads straight away.
+// Nothing ticked asks nothing: refreshPreview() returns early, and the panel
+// says so in words rather than answering a question nobody put.
 //
 // {silent: true}: this call is speculative — the owner did not ask for it —
 // so a failure (a 500, a timeout, a dropped connection) must degrade
