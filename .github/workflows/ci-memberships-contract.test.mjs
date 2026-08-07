@@ -120,7 +120,7 @@ test('Memberships pull requests run every required JavaScript, smoke, and build 
   assert.match(membershipsVite, /run: npm ci/)
   assert.match(membershipsVite, /name: Audit JavaScript dependencies[\s\S]*?run: npm audit --audit-level=high/)
   assert.match(membershipsVite, /name: Run JavaScript tests[\s\S]*?run: npm test/)
-  assert.match(membershipsVite, /actions\/cache@v4/)
+  assert.match(membershipsVite, /actions\/cache@v6/)
   assert.match(membershipsVite, /npx playwright install --with-deps chromium/)
   assert.match(membershipsVite, /npx playwright test/)
   assert.doesNotMatch(membershipsVite, /vendor\/bin\/phpunit/)

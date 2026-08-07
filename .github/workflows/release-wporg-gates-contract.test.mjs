@@ -43,7 +43,7 @@ test("WordPress.org tags call the reusable gate workflow before publication", ()
   const wporgGates = job(release, "wporg-gates");
   const publish = job(release, "release");
 
-  assert.match(prepare, /actions\/checkout@v4/);
+  assert.match(prepare, /actions\/checkout@v7/);
   assert.match(prepare, /fetch-depth:\s*0/);
   assert.match(prepare, /slug:\s*\$\{\{\s*steps\.tag\.outputs\.slug\s*\}\}/);
   assert.match(prepare, /version:\s*\$\{\{\s*steps\.tag\.outputs\.version\s*\}\}/);
@@ -70,7 +70,7 @@ test("WordPress.org tags call the reusable gate workflow before publication", ()
   assert.match(publish, /needs:\s*\[prepare,\s*wporg-gates\]/);
   assert.match(publish, /needs\.wporg-gates\.result == 'success'/);
   assert.match(publish, /needs\.wporg-gates\.result == 'skipped'/);
-  assert.match(publish, /actions\/download-artifact@v4/);
+  assert.match(publish, /actions\/download-artifact@v8/);
   assert.match(
     publish,
     /name:\s*wporg-package-\$\{\{\s*needs\.prepare\.outputs\.slug\s*\}\}/,
@@ -91,7 +91,7 @@ test("the called workflow packages and inspects every target on the caller tag S
     assert.match(packages, new RegExp(`- ${slug}(?:\\n|$)`));
   }
   assert.doesNotMatch(packages, /fchub-stream/);
-  assert.match(packages, /actions\/checkout@v4/);
+  assert.match(packages, /actions\/checkout@v7/);
   assert.match(packages, /fetch-depth:\s*0/);
   assert.doesNotMatch(packages, /ref:\s*(?:main|master)/);
   assert.match(packages, /needs:\s*\[source,\s*memberships-frontend\]/);
@@ -103,7 +103,7 @@ test("the called workflow packages and inspects every target on the caller tag S
     packages,
     /dist\/previous\/\$\{\{\s*matrix\.plugin\s*\}\}-\*\.zip/,
   );
-  assert.match(packages, /actions\/upload-artifact@v4/);
+  assert.match(packages, /actions\/upload-artifact@v7/);
 });
 
 test("source gates run the applicable PHP and Memberships frontend suites", () => {
@@ -174,7 +174,7 @@ test("the tag SHA runs five Plugin Check lanes and fifteen lifecycle lanes", () 
     assert.match(runtime, new RegExp(`- '${version.replace(".", "\\.")}'`));
   }
   assert.doesNotMatch(runtime, /fchub-stream/);
-  assert.match(runtime, /actions\/download-artifact@v4/);
+  assert.match(runtime, /actions\/download-artifact@v8/);
   assert.match(runtime, /scripts\/wporg\/run-lifecycle\.sh/);
   assert.match(runtime, /previous_zip_path=\$PREVIOUS_ZIP_PATH/);
   assert.match(

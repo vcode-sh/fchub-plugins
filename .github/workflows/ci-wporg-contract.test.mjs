@@ -119,7 +119,7 @@ test("every target builds and inspects its WordPress.org archive", () => {
   }
   assert.match(packages, /bash build\.sh "\$\{\{ matrix\.plugin \}\}"/);
   assert.match(build, /scripts\/wporg\/check-package\.mjs/);
-  assert.match(packages, /upload-artifact@v4/);
+  assert.match(packages, /upload-artifact@v7/);
   assert.match(packages, /if: failure\(\)/);
 });
 

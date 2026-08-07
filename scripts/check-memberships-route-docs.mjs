@@ -165,7 +165,7 @@ test('developer reference matches every registered route method and path', () =>
   const difference = compareRoutePairs(registered, documented);
 
   assert.deepEqual(difference, { undocumented: [], stale: [] });
-  assert.equal(registered.size, 99);
+  assert.equal(registered.size, 100);
 });
 
 test('route comparison rejects documented pairs absent from registration', () => {

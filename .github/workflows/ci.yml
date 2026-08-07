@@ -34,12 +34,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
 
       - name: Run owned workflow contracts
         run: node --test .github/workflows/ci-memberships-contract.test.mjs .github/workflows/ci-wporg-contract.test.mjs .github/workflows/release-memberships-contract.test.mjs .github/workflows/release-wporg-gates-contract.test.mjs
@@ -97,7 +97,7 @@ jobs:
             fetch_depth: 0
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: ${{ matrix.fetch_depth }}
 
@@ -162,19 +162,19 @@ jobs:
           - plugin: fchub-wishlist
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
 
       - name: Build and inspect archive
         run: bash build.sh "${{ matrix.plugin }}"
 
       - name: Upload rejected package evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wporg-package-${{ matrix.plugin }}-failure
           path: |
@@ -187,7 +187,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # `Check for changes` below diffs against the pull request base, which
           # a depth-1 checkout does not contain: the diff fails, the count comes
@@ -203,9 +203,9 @@ jobs:
 
       - name: Setup Node.js
         if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '26'
           cache: 'npm'
           cache-dependency-path: plugins/fchub-memberships/package-lock.json
 
@@ -226,7 +226,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: steps.changes.outputs.count > 0
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('plugins/fchub-memberships/package-lock.json') }}
@@ -268,7 +268,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # `Check for changes` below diffs against the pull request base, which
           # a depth-1 checkout does not contain: the diff fails, the count comes
@@ -284,9 +284,9 @@ jobs:
 
       - name: Setup Node.js
         if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '26'
           cache: 'npm'
           cache-dependency-path: plugins/fchub-portal-extender/package-lock.json
 
@@ -324,7 +324,7 @@ jobs:
       # job remains because the repository asserts Stream is still here for a
       # possible return, not because anything is expected to run.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check for changes
         id: changes
@@ -334,9 +334,9 @@ jobs:
 
       - name: Setup Node.js
         if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '26'
 
       - name: Build admin-app
         if: steps.changes.outputs.count > 0
@@ -389,12 +389,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '26'
 
       # Cheap enough to run unconditionally, and the things it guards are exactly
       # the ones a changed-path filter would have missed: the catalogue is

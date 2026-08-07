@@ -213,7 +213,7 @@
     "sh.vcode.fluentcart-mcp": {
       "generatedBy": "scripts/build-manifest.mjs",
       "packageVersion": "2.2.0",
-      "sourceTreeDigest": "sha256:8b935a629d86c9cc49f9d85ff463fd7e8c1d1275b2523d8bdef1084ff38085d7",
+      "sourceTreeDigest": "sha256:47c9a9dbcb486f1179fd6e26760a2709d4366047e5bf24bad8e1504c5887ad47",
       "release": {
         "version": "2.2.0",
         "protocols": [
@@ -232,7 +232,7 @@
           "core": "2.0.0"
         },
         "conformance": {
-          "package": "0.2.0-alpha.10",
+          "package": "0.2.0-alpha.11",
           "expectedFailures": []
         },
         "protocolCompliance": [
