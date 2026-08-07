@@ -28,6 +28,18 @@ final class MigrationOrchestrator
     private const string RETRY_OPTION = 'cartshift_migration_retry';
 
     /**
+     * Deliberately far above any plausible FluentCart id, so a leak into a real
+     * table — which enableSimulation() should always prevent — is obvious in a
+     * log rather than mistaken for a real FluentCart record.
+     *
+     * ProductMigrator mints its own simulated variation IDs from a separate,
+     * further-away base (see ProductMigrator::SIMULATED_VARIATION_BASE) so the
+     * two ranges cannot collide even on a store large enough to validate
+     * hundreds of thousands of records in one dry run.
+     */
+    private static int $simulatedId = 900000000;
+
+    /**
      * In-request copy of the retry plan option.
      *
      * @var array{migration_id: string, retry_of: string, ids: array<string, list<string>>}|null
@@ -66,6 +78,12 @@ final class MigrationOrchestrator
         $entityTypes = apply_filters('cartshift/migration/entity_types', $entityTypes);
 
         $this->state->start($entityTypes, $dryRun);
+
+        if ($dryRun) {
+            // Resolve references in memory so validation answers the same questions a
+            // real run would. Nothing reaches the database.
+            $this->idMap->enableSimulation();
+        }
 
         $migrationId = $this->state->getMigrationId();
 
@@ -293,6 +311,14 @@ final class MigrationOrchestrator
     {
         @set_time_limit(0);
 
+        if ($this->state->isDryRun()) {
+            // processBatch() runs in a fresh request for later batches — the REST
+            // batch loop and Action Scheduler both rebuild the orchestrator from
+            // scratch — so the in-memory simulation flag set in startMigration()
+            // does not survive past the first batch without this.
+            $this->idMap->enableSimulation();
+        }
+
         if ($this->state->isCancelled()) {
             return $this->buildCancelledResult();
         }
@@ -412,6 +438,13 @@ final class MigrationOrchestrator
 
                         if ($result) {
                             $processed++;
+                            $this->idMap->store(
+                                $migrator->entityType(),
+                                $migrator->getRecordId($record),
+                                self::nextSimulatedId(),
+                                (string) $migrationId,
+                                true,
+                            );
                         } else {
                             $skipped++;
                         }
@@ -725,6 +758,16 @@ final class MigrationOrchestrator
         return $e instanceof HasErrorCode
             ? $e->errorCode()
             : MigrationErrorCode::UnexpectedException;
+    }
+
+    /**
+     * The next synthetic FluentCart ID for a dry-run's in-memory ID map.
+     *
+     * @see self::$simulatedId
+     */
+    private static function nextSimulatedId(): int
+    {
+        return ++self::$simulatedId;
     }
 
     /**
