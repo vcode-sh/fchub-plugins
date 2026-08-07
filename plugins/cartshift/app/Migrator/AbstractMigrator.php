@@ -7,6 +7,8 @@ namespace CartShift\Migrator;
 defined('ABSPATH') || exit;
 
 use CartShift\Domain\Migration\Contracts\MigratorInterface;
+use CartShift\Domain\Scope\MigrationScope;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -35,6 +37,11 @@ abstract class AbstractMigrator implements MigratorInterface
     /** @var int Running counter of error records */
     protected int $errors = 0;
 
+    /** Explicit scope override, for callers that must not read or write state. */
+    private ?MigrationScope $scopeOverride = null;
+
+    private ?ScopeResolver $scopeResolver = null;
+
     public function __construct(
         protected readonly IdMapRepository $idMap,
         protected readonly MigrationLogRepository $log,
@@ -62,6 +69,43 @@ abstract class AbstractMigrator implements MigratorInterface
     protected function migrationId(): string
     {
         return $this->migrationState->getMigrationId() ?? '';
+    }
+
+    /**
+     * Migrate under this scope instead of the one in state.
+     *
+     * For /preview, which counts what a scope *would* migrate without starting
+     * anything. A real run never calls this: it reads the scope from
+     * MigrationState, the same way it reads the migration ID, and that is what
+     * makes retry and resume reuse the scope with no extra code.
+     */
+    #[\Override]
+    public function useScope(MigrationScope $scope): void
+    {
+        $this->scopeOverride = $scope;
+        $this->scopeResolver = null;
+    }
+
+    /**
+     * The scope governing this migrator, read fresh from state on every use.
+     *
+     * Never latched, for the same reason migrationId() is not: later batches
+     * run in fresh requests, and a copy taken at construction would be a second
+     * source of truth waiting to disagree with the first.
+     */
+    protected function scope(): MigrationScope
+    {
+        return $this->scopeOverride ?? $this->migrationState->getScope();
+    }
+
+    /**
+     * The resolver for this request. Memoised because the closure costs three
+     * queries and a batch asks for it several times; not cached beyond the
+     * request, because a stale closure is a silently widened migration.
+     */
+    protected function scopeResolver(): ScopeResolver
+    {
+        return $this->scopeResolver ??= new ScopeResolver($this->scope());
     }
 
     #[\Override]
