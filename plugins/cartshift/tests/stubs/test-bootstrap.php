@@ -367,6 +367,13 @@ if (!function_exists('get_user_meta')) {
     }
 }
 
+if (!function_exists('is_plugin_active')) {
+    function is_plugin_active(string $plugin): bool
+    {
+        return in_array($plugin, $GLOBALS['_cartshift_test_active_plugins'] ?? [], true);
+    }
+}
+
 if (!defined('DAY_IN_SECONDS')) {
     define('DAY_IN_SECONDS', 86400);
 }

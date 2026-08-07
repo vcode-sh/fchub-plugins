@@ -537,4 +537,87 @@ final class PreflightCheckTest extends PluginTestCase
         // fc_data.counts is read directly by PreflightScreen.vue.
         $this->assertArrayHasKey('counts', $result['checks']['fc_data']);
     }
+
+    // ──────────────────────────────────────────────
+    // Entitlement bridges
+    // ──────────────────────────────────────────────
+
+    /**
+     * CartShift deliberately migrates commerce, not entitlements. That boundary is
+     * fine — but a store where WooCommerce grants course access or membership levels
+     * through a bridge plugin can finish a migration with every number green and still
+     * leave customers with purchase history and no course access. Warn, don't block.
+     */
+    public function testEntitlementBridgesAreWarnedAboutButDoNotBlock(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = ['learndash-woocommerce/learndash_woocommerce.php'];
+
+        $result = (new PreflightCheck())->run();
+        $check  = $result['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertStringContainsString('course access', $check['message']);
+        $this->assertTrue($result['ready']);
+    }
+
+    public function testPmproWooCommerceBridgeIsWarnedAboutByMembershipWording(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = ['pmpro-woocommerce/pmpro-woocommerce.php'];
+
+        $result = (new PreflightCheck())->run();
+        $check  = $result['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertTrue($check['pass']);
+        $this->assertTrue($check['warning']);
+        $this->assertStringContainsString('membership', $check['message']);
+        $this->assertSame(['pmpro-woocommerce/pmpro-woocommerce.php'], $check['bridges']);
+        $this->assertTrue($result['ready']);
+    }
+
+    public function testBothEntitlementBridgesActiveReportsBoth(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = [
+            'learndash-woocommerce/learndash_woocommerce.php',
+            'pmpro-woocommerce/pmpro-woocommerce.php',
+        ];
+
+        $result = (new PreflightCheck())->run();
+        $check  = $result['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertStringContainsString('course access', $check['message']);
+        $this->assertStringContainsString('membership', $check['message']);
+        $this->assertCount(2, $check['bridges']);
+        $this->assertTrue($result['ready']);
+    }
+
+    public function testNoEntitlementBridgesActiveIsAPass(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = [];
+
+        $check = (new PreflightCheck())->run()['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
+        $this->assertFalse($check['warning']);
+        $this->assertSame([], $check['bridges']);
+    }
+
+    /**
+     * A plugin sharing part of the basename (e.g. some other WooCommerce integration)
+     * must not trip the check — only the exact registered basenames count.
+     */
+    public function testUnrelatedActivePluginsDoNotTriggerTheWarning(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']   = true;
+        $GLOBALS['_cartshift_test_active_plugins'] = ['some-other-plugin/some-other-plugin.php'];
+
+        $check = (new PreflightCheck())->run()['checks']['entitlements'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
+    }
 }

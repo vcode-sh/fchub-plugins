@@ -36,6 +36,34 @@ final class PreflightCheck
     private const string HPOS_DATA_STORE = '\Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore';
 
     /**
+     * WooCommerce plugins that grant entitlements (course access, membership levels)
+     * on the strength of a WooCommerce order. CartShift migrates orders, customers,
+     * subscriptions and coupons — never entitlements, that boundary is deliberate and
+     * belongs to fchub-memberships instead. But an admin who never hears about it will
+     * watch a migration finish green and only discover the gap when a customer emails
+     * asking where their course went.
+     *
+     * Basename => [grant, message]. Verified live: learndash-woocommerce 2.0.2 and
+     * pmpro-woocommerce 1.10.1 both active alongside WooCommerce 11.0.0.
+     *
+     * @var array<string, array{grant: string, message: string}>
+     */
+    private const array ENTITLEMENT_BRIDGES = [
+        'learndash-woocommerce/learndash_woocommerce.php' => [
+            'grant'   => 'LearnDash course enrollment',
+            'message' => 'LearnDash course access is granted by WooCommerce on this site. CartShift migrates '
+                . 'orders and subscriptions, not course enrollments — customers will keep their purchase history '
+                . 'but lose course access until you migrate that separately.',
+        ],
+        'pmpro-woocommerce/pmpro-woocommerce.php' => [
+            'grant'   => 'Paid Memberships Pro membership level',
+            'message' => 'Paid Memberships Pro membership levels are granted by WooCommerce on this site. '
+                . 'CartShift migrates orders and subscriptions, not membership levels — customers will keep their '
+                . 'purchase history but lose their membership until you migrate that separately.',
+        ],
+    ];
+
+    /**
      * Run all preflight checks and return structured results.
      *
      * Readiness is derived from severity, not from vibes: any check marked
@@ -58,6 +86,7 @@ final class PreflightCheck
         $checks['product_types']      = $this->checkProductTypes();
         $checks['fc_data']            = $this->checkExistingFcData();
         $checks['migration_tables']   = $this->checkMigrationTables();
+        $checks['entitlements']       = $this->checkEntitlements();
 
         $ready = true;
 
@@ -585,6 +614,56 @@ final class PreflightCheck
                 ? 'FluentCart already contains data. Migration will add new records alongside existing ones.'
                 : 'FluentCart database is empty. Ready for clean migration.',
             ['counts' => $counts],
+        );
+    }
+
+    /**
+     * ADVISORY. Never blocks — the commerce/entitlement split is a deliberate product
+     * decision, not a defect.
+     *
+     * CartShift migrates orders, customers, subscriptions and coupons. It does not
+     * migrate entitlements — course enrollments, membership levels — because those
+     * belong to a separate plugin (fchub-memberships). On a store where a bridge
+     * plugin like LearnDash-WooCommerce or Paid Memberships Pro grants those
+     * entitlements straight off a WooCommerce order, a CartShift migration can finish
+     * with every number green and still leave customers holding purchase history with
+     * no course access and no membership. Say so before the run, not after.
+     */
+    private function checkEntitlements(): array
+    {
+        $label = 'Entitlement Bridges';
+
+        if (! function_exists('is_plugin_active')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        $active = [];
+        foreach (self::ENTITLEMENT_BRIDGES as $basename => $bridge) {
+            if (is_plugin_active($basename)) {
+                $active[$basename] = $bridge;
+            }
+        }
+
+        if ($active === []) {
+            return $this->result(
+                $label,
+                self::SEVERITY_PASS,
+                'No known entitlement-granting plugins detected. CartShift migrates commerce data only '
+                . '(orders, customers, subscriptions, coupons) — entitlements are out of scope regardless.',
+                ['bridges' => []],
+            );
+        }
+
+        $message = implode(' ', array_map(
+            static fn(array $bridge): string => $bridge['message'],
+            array_values($active),
+        ));
+
+        return $this->result(
+            $label,
+            self::SEVERITY_WARN,
+            $message,
+            ['bridges' => array_keys($active)],
         );
     }
 }
