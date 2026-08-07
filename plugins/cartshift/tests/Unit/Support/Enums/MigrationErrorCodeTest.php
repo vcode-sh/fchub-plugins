@@ -89,6 +89,7 @@ final class MigrationErrorCodeTest extends PluginTestCase
             'dry_run_validation_failed',
             'unexpected_exception',
             'migration_aborted',
+            'scope_closure_too_large',
         ];
 
         $actual = array_map(

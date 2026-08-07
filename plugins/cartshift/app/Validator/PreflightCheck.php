@@ -444,8 +444,8 @@ final class PreflightCheck
         $ordersAffected = 0;
 
         if ($hasWarning) {
-            $ordersAffected = $this->countOrdersAffectedByTypes(array_keys($unsupported));
-            $totalOrders    = $this->countMigratableOrders();
+            $ordersAffected = self::countOrdersAffectedByTypes(array_keys($unsupported));
+            $totalOrders    = self::countMigratableOrders();
 
             $typeNames = implode(', ', array_map(
                 static fn(string $slug): string => str_replace('-', ' ', $slug),
@@ -501,13 +501,13 @@ final class PreflightCheck
      *
      * @param list<string> $slugs
      */
-    private function countOrdersAffectedByTypes(array $slugs): int
+    public static function countOrdersAffectedByTypes(array $slugs): int
     {
         if ($slugs === []) {
             return 0;
         }
 
-        $cached = $this->cachedOrdersAffected($slugs);
+        $cached = self::cachedOrdersAffected($slugs);
 
         if ($cached !== null) {
             return $cached;
@@ -539,7 +539,7 @@ final class PreflightCheck
 
         $count = (int) $wpdb->get_var($sql);
 
-        $this->rememberOrdersAffected($slugs, $count);
+        self::rememberOrdersAffected($slugs, $count);
 
         return $count;
     }
@@ -564,7 +564,7 @@ final class PreflightCheck
      *
      * @param list<string> $slugs
      */
-    private function cachedOrdersAffected(array $slugs): ?int
+    private static function cachedOrdersAffected(array $slugs): ?int
     {
         if (!function_exists('get_transient')) {
             return null;
@@ -578,7 +578,7 @@ final class PreflightCheck
     /**
      * @param list<string> $slugs
      */
-    private function rememberOrdersAffected(array $slugs, int $count): void
+    private static function rememberOrdersAffected(array $slugs, int $count): void
     {
         if (!function_exists('set_transient')) {
             return;
@@ -608,7 +608,7 @@ final class PreflightCheck
      * migratable scope OrderMigrator::countTotal() uses, so this number matches
      * whatever the migration itself will report as the order total.
      */
-    private function countMigratableOrders(): int
+    public static function countMigratableOrders(): int
     {
         global $wpdb;
 
