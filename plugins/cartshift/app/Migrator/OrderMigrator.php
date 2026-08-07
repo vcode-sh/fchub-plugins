@@ -62,14 +62,16 @@ final class OrderMigrator extends AbstractMigrator
     {
         global $wpdb;
 
-        $scope = WooStorage::orderScopeSql();
-        $table = WooStorage::ordersTable();
+        [$scope, $scopeValues] = WooStorage::orderScopeParts();
+        $table     = WooStorage::ordersTable();
+        $selection = $this->scopeResolver()->orderPredicate();
 
-        return (int) $wpdb->get_var(
+        return (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*)
              FROM {$table}
-             WHERE {$scope}",
-        );
+             WHERE {$scope}" . $selection->andSql(),
+            ...[...$scopeValues, ...$selection->values()],
+        ));
     }
 
     /**
@@ -189,15 +191,17 @@ final class OrderMigrator extends AbstractMigrator
         // Placeholder form, so the scope and the pagination go through a single
         // prepare() rather than nesting one prepared string inside another.
         [$scope, $scopeValues] = WooStorage::orderScopeParts();
+        $selection = $this->scopeResolver()->orderPredicate();
 
         $ids = $wpdb->get_col($wpdb->prepare(
             "SELECT id
              FROM {$table}
              WHERE {$scope}
-               AND id > %d
-             ORDER BY id ASC
+               AND id > %d"
+            . $selection->andSql()
+            . " ORDER BY id ASC
              LIMIT %d",
-            ...[...$scopeValues, $afterId, $limit],
+            ...[...$scopeValues, $afterId, ...$selection->values(), $limit],
         ));
 
         return array_map(intval(...), $ids);
