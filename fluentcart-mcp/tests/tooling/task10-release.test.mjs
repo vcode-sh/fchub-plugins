@@ -32,7 +32,7 @@ const expectedTruth = {
 		client: '2.0.0',
 		core: '2.0.0',
 	},
-	conformance: { package: '0.2.0-alpha.10', expectedFailures: [] },
+	conformance: { package: '0.2.0-alpha.11', expectedFailures: [] },
 }
 
 const expectedRecipes = [
