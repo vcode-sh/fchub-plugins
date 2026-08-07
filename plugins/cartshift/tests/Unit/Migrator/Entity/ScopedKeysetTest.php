@@ -8,6 +8,7 @@ use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Migrator\CouponMigrator;
 use CartShift\Migrator\OrderMigrator;
 use CartShift\Migrator\ProductMigrator;
+use CartShift\Migrator\SubscriptionMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -156,6 +157,187 @@ final class ScopedKeysetTest extends PluginTestCase
         $this->assertSame($scoped, $db->lastQuery);
         $this->assertStringNotContainsString('1 = 0', $scoped);
         $this->assertStringNotContainsString('IN (12)', $scoped);
+    }
+
+    public function testASubscriptionSeveralPagesInIsReturnedRatherThanEndingTheEntity(): void
+    {
+        // The regression this task exists to prevent. Filtering happens after
+        // the fetch, so a page can filter to nothing while the source still has
+        // rows — and an empty batch is the orchestrator's *only* end-of-entity
+        // signal. Returning [] from the first page would mark subscriptions
+        // complete and lose the one paying subscriber in scope, with no counter
+        // showing it.
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 11),
+            new \CartShiftTestSubscription(9002, [], 12),
+            new \CartShiftTestSubscription(9003, [], 13),
+            new \CartShiftTestSubscription(9004, [], 14),
+            new \CartShiftTestSubscription(9005, [], 7),
+        ];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'customer_ids' => [7]]);
+
+        $batch = $migrator->fetchBatch(null, 2);
+
+        $this->assertCount(1, $batch);
+        $this->assertSame(9005, $batch[0]->get_id());
+
+        // Three OFFSET pages of two were consumed to reach it. The cursor is a
+        // position in the *unfiltered* sequence, so it is 5, not 1.
+        $this->assertSame(5, $migrator->cursorFor($batch[0]));
+    }
+
+    public function testTheEntityEndsOnlyWhenTheSourceItselfRunsOut(): void
+    {
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 11),
+            new \CartShiftTestSubscription(9002, [], 12),
+        ];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'customer_ids' => [7]]);
+
+        // Nothing in scope anywhere in the source: the loop walks the whole
+        // sequence and only then returns []. It must terminate, and it must not
+        // rewind the offset on the way out.
+        $this->assertSame([], $migrator->fetchBatch(null, 2));
+        $this->assertSame(2, $migrator->cursorFor(null));
+    }
+
+    public function testTheOffsetAdvancesByRowsFetchedNotRowsKept(): void
+    {
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 7),
+            new \CartShiftTestSubscription(9002, [], 12),
+        ];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'customer_ids' => [7]]);
+
+        $batch = $migrator->fetchBatch(null, 2);
+
+        $this->assertCount(1, $batch);
+        $this->assertSame(2, $migrator->cursorFor($batch[0]));
+    }
+
+    public function testAnUnscopedRunHandsBackThePageUntouched(): void
+    {
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 7),
+            new \CartShiftTestSubscription(9002, [], 12),
+        ];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'everything']);
+
+        $this->assertCount(2, $migrator->fetchBatch(null, 2));
+    }
+
+    public function testAProductOnlyScopeSelectsNoSubscriptionsRatherThanAllOfThem(): void
+    {
+        // The migrator-level pairing of the resolver guard: an explicit scope
+        // that picked only products closes over no customers, and every
+        // subscription must fall outside it. The failure mode without the guard
+        // is the whole shop's subscriptions migrating.
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 7),
+            new \CartShiftTestSubscription(9002, [], 12),
+        ];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'product_ids' => [12]]);
+
+        $this->assertSame([], $migrator->fetchBatch(null, 2));
+    }
+
+    public function testAnUnscopedCountIssuesTheUnpreparedQuery(): void
+    {
+        // isEmpty() branch: subscriptionPredicate() is none() here, so
+        // andSql() contributes nothing and countTotal() must call
+        // $wpdb->get_var() directly rather than routing an empty values list
+        // through prepare().
+        $migrator = $this->subscriptionMigrator(['mode' => 'everything']);
+
+        $migrator->count();
+
+        $query = $this->lastGetVarQuery();
+
+        $this->assertNotNull($query, 'countTotal() must issue a COUNT(*) query.');
+        $this->assertStringNotContainsString('1 = 0', $query);
+    }
+
+    public function testAProductOnlyScopeReachesTheCountAsMatchesNothing(): void
+    {
+        // isEmpty() branch: a scope that closes over no customers renders as
+        // '1 = 0', not as "no clause" — the same failure mode Task 5 and
+        // Task 6 guard against for their own count queries, here for
+        // SubscriptionMigrator::countTotal().
+        $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'product_ids' => [12]]);
+
+        $this->assertSame(0, $migrator->count());
+
+        $query = $this->lastGetVarQuery();
+
+        $this->assertNotNull($query, 'countTotal() must issue a COUNT(*) query.');
+        $this->assertStringContainsString('1 = 0', $query);
+    }
+
+    private function lastGetVarQuery(): ?string
+    {
+        $queries = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $entry): bool => $entry[0] === 'get_var',
+        ));
+
+        if ($queries === []) {
+            return null;
+        }
+
+        return (string) end($queries)[1];
+    }
+
+    public function testAGuestSubscriptionMatchesOnLowerCasedBillingEmail(): void
+    {
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 0, 'active', 'BOB@example.com'),
+            new \CartShiftTestSubscription(9002, [], 0, 'active', 'eve@example.com'),
+        ];
+
+        $migrator = $this->subscriptionMigrator([
+            'mode'         => 'explicit',
+            'guest_emails' => ['bob@example.com'],
+        ]);
+
+        $batch = $migrator->fetchBatch(null, 2);
+
+        $this->assertCount(1, $batch);
+        $this->assertSame(9001, $batch[0]->get_id());
+    }
+
+    public function testADateScopeKeepsOnlySubscriptionsCreatedOnOrAfterTheBound(): void
+    {
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 11, 'active', '', '2024-02-29 23:59:59'),
+            new \CartShiftTestSubscription(9002, [], 12, 'active', '', '2024-03-01 00:00:00'),
+        ];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'since', 'since' => '2024-03-01']);
+
+        $batch = $migrator->fetchBatch(null, 2);
+
+        $this->assertCount(1, $batch);
+        $this->assertSame(9002, $batch[0]->get_id());
+    }
+
+    /**
+     * @param array<string, mixed> $scope
+     */
+    private function subscriptionMigrator(array $scope): SubscriptionMigrator
+    {
+        $migrator = new SubscriptionMigrator(
+            new IdMapRepository(),
+            new MigrationLogRepository(),
+            new MigrationState(),
+        );
+        $migrator->useScope(MigrationScope::fromArray($scope));
+
+        return $migrator;
     }
 
     /**

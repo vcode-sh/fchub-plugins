@@ -164,12 +164,32 @@ if (!class_exists('CartShiftTestSubscription')) {
             private readonly array $items = [],
             private readonly int $customerId = 1,
             private readonly string $status = 'active',
+            private readonly string $billingEmail = '',
+            private readonly ?string $createdGmt = null,
         ) {
         }
 
         public function get_id(): int
         {
             return $this->id;
+        }
+
+        public function get_billing_email(): string
+        {
+            return $this->billingEmail;
+        }
+
+        /**
+         * WooCommerce hands back a WC_DateTime here, or null when unset. Only
+         * getTimestamp() is used by the code under test, and DateTimeImmutable
+         * answers that identically — the point of the comparison is the instant,
+         * not the rendering.
+         */
+        public function get_date_created(): ?\DateTimeImmutable
+        {
+            return $this->createdGmt === null
+                ? null
+                : new \DateTimeImmutable($this->createdGmt . ' UTC');
         }
 
         public function get_customer_id(): int
@@ -259,5 +279,37 @@ if (!class_exists('CartShiftTestSubscription')) {
 
             return $keyed;
         }
+    }
+}
+
+if (!function_exists('wcs_get_subscriptions')) {
+    /**
+     * Stand-in for the WooCommerce Subscriptions query function.
+     *
+     * Driven by a flat list of subscription objects in
+     * $GLOBALS['_cartshift_test_wcs_pages'], sliced by offset and page size —
+     * which is exactly the OFFSET paging SubscriptionMigrator relies on. Absent
+     * global means an empty source, so every test that does not opt in sees the
+     * same "nothing to migrate" the suite saw before this function existed.
+     *
+     * PluginTestCase clears every `_cartshift_test_*` global between tests, so
+     * the source is isolated per test with no bookkeeping here.
+     *
+     * @param array<string, mixed> $args
+     *
+     * @return list<object>
+     */
+    function wcs_get_subscriptions(array $args = []): array
+    {
+        $source = $GLOBALS['_cartshift_test_wcs_pages'] ?? [];
+
+        if (!is_array($source)) {
+            return [];
+        }
+
+        $offset = max(0, (int) ($args['offset'] ?? 0));
+        $limit  = max(1, (int) ($args['subscriptions_per_page'] ?? 10));
+
+        return array_values(array_slice(array_values($source), $offset, $limit));
     }
 }

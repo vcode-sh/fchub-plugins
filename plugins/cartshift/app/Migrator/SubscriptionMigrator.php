@@ -7,6 +7,7 @@ namespace CartShift\Migrator;
 defined('ABSPATH') || exit;
 
 use CartShift\Domain\Mapping\SubscriptionMapper;
+use CartShift\Domain\Scope\MigrationScope;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -52,20 +53,29 @@ final class SubscriptionMigrator extends AbstractMigrator
     #[\Override]
     protected function countTotal(): int
     {
+        // The unit suite stubs wcs_get_subscriptions(), and a PHP function
+        // cannot be undeclared, so nothing in the suite exercises this branch
+        // any more. Its coverage is Task 15's real-store validation.
         if (!function_exists('wcs_get_subscriptions')) {
             return 0;
         }
 
         global $wpdb;
 
-        $table = WooStorage::ordersTable();
-        $scope = WooStorage::subscriptionScopeSql();
+        $table     = WooStorage::ordersTable();
+        $scope     = WooStorage::subscriptionScopeSql();
+        $selection = $this->scopeResolver()->subscriptionPredicate();
 
-        return (int) $wpdb->get_var(
-            "SELECT COUNT(*)
-             FROM {$table}
-             WHERE {$scope}",
-        );
+        $sql = "SELECT COUNT(*) FROM {$table} WHERE {$scope}" . $selection->andSql();
+
+        // subscriptionScopeSql() is already prepared, so only the selection's
+        // values are bound — and when it has none there is nothing left to
+        // prepare. prepare() with no placeholders and no values is a warning,
+        // so the branch is on the values rather than on the clause: '1 = 0' is
+        // a clause with no values, and it must go down the same door as none().
+        return (int) ($selection->values() === []
+            ? $wpdb->get_var($sql)
+            : $wpdb->get_var($wpdb->prepare($sql, ...$selection->values())));
     }
 
     /**
@@ -91,22 +101,111 @@ final class SubscriptionMigrator extends AbstractMigrator
     #[\Override]
     public function fetchBatch(string|int|null $cursor, int $limit): array
     {
+        // The unit suite stubs wcs_get_subscriptions(), and a PHP function
+        // cannot be undeclared, so nothing in the suite exercises this branch
+        // any more. Its coverage is Task 15's real-store validation.
         if (!function_exists('wcs_get_subscriptions')) {
             return [];
         }
 
         $offset = max(0, (int) $cursor);
 
-        $subs = array_values((array) wcs_get_subscriptions([
-            'subscriptions_per_page' => $limit,
-            'offset'                 => $offset,
-            'orderby'                => 'ID',
-            'order'                  => 'ASC',
-        ]));
+        // Loops only when an entire page filters away to nothing — the same
+        // shape OrderMigrator::fetchBatch() and CouponMigrator::fetchBatch() use
+        // when an entire page fails to hydrate, and for the same reason.
+        //
+        // Returning [] here while wcs_get_subscriptions() is still yielding rows
+        // would end the entity: MigrationOrchestrator treats an empty batch as
+        // the *only* end-of-entity signal. With 400 subscriptions, a batch size
+        // of 50 and the one in-scope subscriber at position 300, the first page
+        // filters to zero — and a paying subscriber never migrates, with nothing
+        // in the counters to show for it.
+        while (true) {
+            $subs = array_values((array) wcs_get_subscriptions([
+                'subscriptions_per_page' => $limit,
+                'offset'                 => $offset,
+                'orderby'                => 'ID',
+                'order'                  => 'ASC',
+            ]));
 
-        $this->nextOffset = $offset + count($subs);
+            if ($subs === []) {
+                // The source itself is exhausted. This is the only honest way
+                // out of this method with an empty array.
+                $this->nextOffset = $offset;
 
-        return $subs;
+                return [];
+            }
+
+            // The position advances by what came back, never by what survived
+            // the filter. wcs_get_subscriptions() is the one source this
+            // migrator cannot express a predicate to — its query vocabulary is
+            // not verifiable against source in this repository — so the filter
+            // happens after the fetch, and the paging position has to stay a
+            // position in the *unfiltered* sequence or a page that kept nothing
+            // would ask for the same offset for ever.
+            $offset += count($subs);
+            $this->nextOffset = $offset;
+
+            $kept = $this->inScope($subs);
+
+            if ($kept !== []) {
+                return $kept;
+            }
+        }
+    }
+
+    /**
+     * Keep only the subscriptions this scope selects.
+     *
+     * Returning fewer than were fetched is fine — a short batch is not an
+     * end-of-entity signal. Returning *none* is not fine, which is why the only
+     * caller loops rather than handing this result straight back.
+     *
+     * @param list<object> $subs
+     *
+     * @return list<object>
+     */
+    private function inScope(array $subs): array
+    {
+        $resolver = $this->scopeResolver();
+
+        if ($resolver->subscriptionPredicate()->isEmpty()) {
+            return $subs;
+        }
+
+        $scope = $resolver->scope();
+
+        if ($scope->mode() === MigrationScope::MODE_SINCE) {
+            // MigrationScope::since() is GMT. WC_DateTime carries the site
+            // timezone, so date('Y-m-d H:i:s') on it renders site-local time and
+            // comparing that string against a GMT bound shifts the boundary by
+            // the site's offset — silently, and in whichever direction the site
+            // happens to be configured. getTimestamp() is the same instant on
+            // both sides regardless, so the comparison is on epochs.
+            $bound = (int) strtotime((string) $scope->since() . ' UTC');
+
+            return array_values(array_filter($subs, static function (object $sub) use ($bound): bool {
+                $created = $sub->get_date_created();
+
+                return $created !== null && $created->getTimestamp() >= $bound;
+            }));
+        }
+
+        $closed     = $resolver->closedCustomers();
+        $registered = array_flip($closed['registered']);
+        $guests     = array_flip($closed['guests']);
+
+        return array_values(array_filter($subs, static function (object $sub) use ($registered, $guests): bool {
+            $customerId = (int) $sub->get_customer_id();
+
+            if ($customerId > 0) {
+                return isset($registered[$customerId]);
+            }
+
+            // Lower-cased on both sides: MigrationScope normalises the picked
+            // emails the same way, and a case mismatch here drops a subscriber.
+            return isset($guests[strtolower(trim((string) $sub->get_billing_email()))]);
+        }));
     }
 
     /**
