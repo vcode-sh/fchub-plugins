@@ -21,10 +21,30 @@ final class IdMapRepository
      */
     private array $memo = [];
 
+    /** True while the dry run is resolving references without persisting them. */
+    private bool $simulating = false;
+
     public function __construct()
     {
         global $wpdb;
         $this->table = $wpdb->prefix . 'cartshift_id_map';
+    }
+
+    /**
+     * Resolve references in memory only.
+     *
+     * The dry run must answer "would this order find its customer?" without writing
+     * anything. Before this existed the memo stayed empty, every lookup missed, and the
+     * dry run over-reported every dependency-driven outcome it was supposed to predict.
+     */
+    public function enableSimulation(): void
+    {
+        $this->simulating = true;
+    }
+
+    public function isSimulating(): bool
+    {
+        return $this->simulating;
     }
 
     /**
@@ -37,6 +57,16 @@ final class IdMapRepository
         string $migrationId = '',
         bool $createdByMigration = true,
     ): void {
+        // isset() is false for a memoised miss, so a miss is replaced while an
+        // earlier hit is kept — matching the "first match wins" read semantics.
+        if (!isset($this->memo[$entityType][$wcId])) {
+            $this->memo[$entityType][$wcId] = $fcId;
+        }
+
+        if ($this->simulating) {
+            return;
+        }
+
         global $wpdb;
 
         $wpdb->insert(
@@ -51,12 +81,6 @@ final class IdMapRepository
             ],
             ['%s', '%s', '%d', '%s', '%d', '%s'],
         );
-
-        // isset() is false for a memoised miss, so a miss is replaced while an
-        // earlier hit is kept — matching the "first match wins" read semantics.
-        if (!isset($this->memo[$entityType][$wcId])) {
-            $this->memo[$entityType][$wcId] = $fcId;
-        }
     }
 
     /**

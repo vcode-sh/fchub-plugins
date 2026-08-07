@@ -195,6 +195,24 @@ final class IdMapRepositoryTest extends PluginTestCase
         $this->assertNull($repo->getFcId(Constants::ENTITY_PRODUCT, '10'));
     }
 
+    public function testSimulationModeKeepsMappingsOutOfTheDatabase(): void
+    {
+        $repo = new IdMapRepository();
+        $repo->enableSimulation();
+
+        $repo->store(Constants::ENTITY_PRODUCT, '101', 5001, 'mig-1', true);
+
+        $this->assertSame(5001, $repo->getFcId(Constants::ENTITY_PRODUCT, '101'));
+        $this->assertSame(
+            [],
+            array_filter(
+                $GLOBALS['_cartshift_test_queries'] ?? [],
+                static fn (array $q): bool => $q[0] === 'insert',
+            ),
+            'Simulation must never write to the id-map table.',
+        );
+    }
+
     private function seedRow(string $entityType, string $wcId, int $fcId): void
     {
         $GLOBALS['_cartshift_test_id_map_rows'][] = [
