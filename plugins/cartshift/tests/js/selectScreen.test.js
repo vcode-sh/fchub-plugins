@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { reactive, nextTick } from 'vue';
+import { reactive, ref, nextTick } from 'vue';
 import SelectScreen from '@/components/SelectScreen.vue';
 import ScopePicker from '@/components/ScopePicker.vue';
 import MigrationReceipt from '@/components/MigrationReceipt.vue';
+
+// PageHeader (rendered by every screen) does a required inject('theme') —
+// App.vue always provides it in the real app, so the fix here is the test
+// providing the same shape, not loosening the component's contract.
+function fakeTheme() {
+  return { themeMode: ref('light'), changeTheme: vi.fn() };
+}
 
 function context(overrides = {}) {
   const state = reactive({
@@ -42,7 +49,7 @@ function context(overrides = {}) {
 }
 
 function mountScreen(ctx) {
-  return mount(SelectScreen, { global: { provide: { migration: ctx } } });
+  return mount(SelectScreen, { global: { provide: { migration: ctx, theme: fakeTheme() } } });
 }
 
 describe('SelectScreen', () => {
@@ -92,12 +99,43 @@ describe('SelectScreen', () => {
     expect(pickers[1].props('kind')).toBe('customer');
   });
 
+  it('refreshes the preview once on arrival, so the receipt is not blank on the default door', () => {
+    const ctx = context();
+    mountScreen(ctx);
+
+    expect(ctx.actions.refreshPreview).toHaveBeenCalledTimes(1);
+  });
+
   it('debounces the preview refresh rather than asking per keystroke', async () => {
     const ctx = context();
     const wrapper = mountScreen(ctx);
 
+    // The mount-time refresh above already happened; everything from here
+    // is about edits after arrival.
+    ctx.actions.refreshPreview.mockClear();
+
     await wrapper.findAll('input[type="radio"][name="cartshift-scope-mode"]')[1].setValue();
     await wrapper.find('input[type="date"].cartshift-scope-since').setValue('2024-03-01');
+
+    expect(ctx.actions.refreshPreview).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(300);
+    await nextTick();
+
+    expect(ctx.actions.refreshPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it('also refreshes when an entity is unticked, not only on a scope edit', async () => {
+    const ctx = context();
+    const wrapper = mountScreen(ctx);
+
+    ctx.actions.refreshPreview.mockClear();
+
+    // toggleEntity() is not routed through the stubbed action (same pattern
+    // as before Task 14), so drive the same mutation the checkbox handler
+    // makes and let the watch on state.selectedEntities pick it up.
+    ctx.state.selectedEntities = ctx.state.selectedEntities.filter((k) => k !== 'coupon');
+    await nextTick();
 
     expect(ctx.actions.refreshPreview).not.toHaveBeenCalled();
 
@@ -116,18 +154,27 @@ describe('SelectScreen', () => {
     expect(wrapper.find('input.cartshift-upward-offer').exists()).toBe(false);
 
     ctx.state.scope.products = [{ id: 12, label: 'Blue Hoodie' }];
+    // ScopeResolver only computes the products-containing-orders closure once
+    // includeOrdersForProducts is true (seedOrderPredicate()) — before that
+    // tick, the closure of the picks alone is what a real preview reports
+    // here, i.e. 0/0. The offer must not quote it either way.
     ctx.state.preview = {
       counts: {},
       consequences: [],
-      closure: { products: 12, customers: 31 },
+      closure: { products: 0, customers: 0 },
       too_large: false,
     };
     await nextTick();
 
     expect(wrapper.find('input.cartshift-upward-offer').exists()).toBe(true);
-    // The spec's sentence, and the numbers come off preview.closure.
-    expect(wrapper.text()).toContain('31 customers');
-    expect(wrapper.text()).toContain('12 more products');
+
+    // Qualitative, not quantitative: the closure preview() just returned
+    // cannot answer "how many would this add", so the offer must not quote
+    // a number here — least of all a bare 0, which would read as "nothing
+    // extra" when the truth is simply "not computed yet".
+    const offerText = wrapper.find('.cartshift-upward-offer-box').text();
+    expect(offerText).not.toMatch(/\b0\b/);
+    expect(offerText).toContain('the summary will show exactly how many');
   });
 
   it('passes a remedy from the receipt straight through to the action', async () => {
@@ -173,5 +220,30 @@ describe('SelectScreen', () => {
     await wrapper.findAll('button').find((b) => b.text() === 'Back').trigger('click');
 
     expect(ctx.actions.goToScreen).toHaveBeenCalledWith('preflight');
+  });
+
+  it('surfaces the 422 scope-too-large refusal instead of failing silently', () => {
+    // startMigration() (useMigration.js) sets state.screen back to 'select'
+    // and state.error to the server's message on a 422 — this screen is
+    // where that message has to land, or the owner sees the screen flicker
+    // to progress and snap back with nothing said at all.
+    const ctx = context({ error: 'This selection is too large to migrate in one run.' });
+    const wrapper = mountScreen(ctx);
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('This selection is too large to migrate in one run.');
+  });
+
+  it('surfaces the empty-selection guard the same way', () => {
+    const ctx = context({ error: 'Please select at least one entity type to migrate.' });
+    const wrapper = mountScreen(ctx);
+
+    expect(wrapper.text()).toContain('Please select at least one entity type to migrate.');
+  });
+
+  it('shows no error banner when there is nothing to say', () => {
+    const wrapper = mountScreen(context());
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
 });

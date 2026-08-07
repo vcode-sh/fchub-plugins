@@ -5,6 +5,14 @@
 
     <div class="cartshift-select-layout">
       <div class="cartshift-select-scope">
+        <!-- Surfaces both the 422 scope-too-large refusal (Task 10) and the
+             empty-selection guard — startMigration() flips the screen back
+             to 'select' and sets state.error, but leaves nothing on this
+             screen to say so unless it is rendered here. -->
+        <div v-if="state.error" class="notice notice-error inline" role="alert">
+          <p>{{ state.error }}</p>
+        </div>
+
         <fieldset class="cartshift-scope-modes">
           <legend>How much do you want to migrate?</legend>
 
@@ -143,7 +151,7 @@
 </template>
 
 <script setup>
-import { inject, computed, watch, onBeforeUnmount } from 'vue';
+import { inject, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { ENTITIES } from '@/composables/useMigration.js';
 import PageHeader from './PageHeader.vue';
 import ScopePicker from './ScopePicker.vue';
@@ -186,26 +194,25 @@ const showUpwardOffer = computed(() => {
 });
 
 /**
- * The spec's sentence, with the picked count and the closure numbers filled
- * in. The "N orders contain them" clause from the spec mock-up is left out on
- * purpose — nothing in the /preview payload carries that figure, and
- * inventing a number here would be exactly the kind of unverified count this
- * screen is not allowed to present as exact.
+ * Deliberately qualitative, no numbers. `closure.products`/`closure.customers`
+ * describe what including-orders-for-products *would* add, but the resolver
+ * only computes that once `includeOrdersForProducts` is true
+ * (ScopeResolver::seedOrderPredicate()) — before the tick, the closure the
+ * preview just reported is the closure of the picks alone, so it is 0/0 here
+ * regardless of what ticking the box would actually pull in. Quoting those
+ * numbers on the offer itself would present a zero, or someone else's
+ * customer-driven closure, as the answer to a question that has not been
+ * asked yet. The real, verified numbers appear in the receipt's own closure
+ * note once the box is ticked and a fresh preview comes back.
  */
 const upwardOfferText = computed(() => {
   const picked = state.scope.products.length;
-  const closure = state.preview && state.preview.closure ? state.preview.closure : { products: 0, customers: 0 };
-  const customers = Number(closure.customers) || 0;
-  const moreProducts = Number(closure.products) || 0;
-
   const pickedWord = picked === 1 ? 'product' : 'products';
-  const customerWord = customers === 1 ? 'customer' : 'customers';
-  const productWord = moreProducts === 1 ? 'product' : 'products';
 
   return (
-    `You picked ${picked.toLocaleString()} ${pickedWord}. Include the orders that contain them too? ` +
-    `That also brings in ${customers.toLocaleString()} ${customerWord} and ` +
-    `${moreProducts.toLocaleString()} more ${productWord}, because an order has to come complete.`
+    `You picked ${picked.toLocaleString()} ${pickedWord}. Orders have to come complete, so this ` +
+    `also brings in the other products and buyers on those orders — the summary will show ` +
+    `exactly how many.`
   );
 });
 
@@ -213,21 +220,33 @@ const upwardOfferText = computed(() => {
 // server again, debounced so editing the picker does not fire a query per
 // keystroke. This is the one place scope state is read to trigger it; it is
 // still setScopeMode()/v-model writes that mutate state.scope itself.
+//
+// The entity ticks are watched too: ScopePreview::build() keys `counts` off
+// exactly the `entity_types` list refreshPreview() sends, so unticking
+// "Coupons" without asking again would leave the receipt showing coupons
+// forever.
 let debounceTimer = null;
 
-watch(
-  () => state.scope,
-  () => {
-    if (debounceTimer !== null) {
-      clearTimeout(debounceTimer);
-    }
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null;
-      actions.refreshPreview();
-    }, DEBOUNCE_MS);
-  },
-  { deep: true }
-);
+function scheduleRefresh() {
+  if (debounceTimer !== null) {
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null;
+    actions.refreshPreview();
+  }, DEBOUNCE_MS);
+}
+
+watch([() => state.scope, () => state.selectedEntities], scheduleRefresh, { deep: true });
+
+// The receipt is the primary feedback surface, but with no preview yet it
+// shows nothing past the whole-shop counts — no consequences, no "Nothing
+// left behind", no remedies (MigrationReceipt.vue gates all of that on
+// `preview`). Ask once on arrival so the default "Everything" door is not a
+// blank read.
+onMounted(() => {
+  actions.refreshPreview();
+});
 
 onBeforeUnmount(() => {
   if (debounceTimer !== null) {

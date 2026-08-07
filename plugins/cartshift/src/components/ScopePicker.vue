@@ -34,12 +34,12 @@
     </div>
 
     <ul v-if="modelValue.length" class="cartshift-scope-picker-chips">
-      <li v-for="item in modelValue" :key="item.kind + ':' + item.id" class="cartshift-scope-chip">
-        <span class="cartshift-scope-chip-label">{{ item.label }}</span>
+      <li v-for="item in modelValue" :key="(item.kind || kind) + ':' + item.id" class="cartshift-scope-chip">
+        <span class="cartshift-scope-chip-label">{{ chipLabel(item) }}</span>
         <button
           type="button"
           class="button-link cartshift-scope-chip-remove"
-          :aria-label="'Remove ' + item.label"
+          :aria-label="'Remove ' + chipLabel(item)"
           @click="remove(item)"
         >
           &times;
@@ -122,8 +122,23 @@ onBeforeUnmount(() => {
   }
 });
 
+// applyRemedy() (useMigration.js) pushes bare `{ id }` entries — no `kind`,
+// no `label` — onto state.scope.products, ahead of the picker ever learning
+// their name. itemKind() falls back to this picker's own `kind` prop so a
+// remedy-added product still matches/removes correctly, and chipLabel()
+// shows the id rather than rendering "undefined".
+function itemKind(item) {
+  return item.kind || props.kind;
+}
+
+function chipLabel(item) {
+  return item.label || `#${item.id}`;
+}
+
 function pick(result) {
-  const known = props.modelValue.some((item) => item.kind === result.kind && String(item.id) === String(result.id));
+  const known = props.modelValue.some(
+    (item) => itemKind(item) === itemKind(result) && String(item.id) === String(result.id)
+  );
   if (known) return;
 
   emit('update:modelValue', [...props.modelValue, result]);
@@ -132,7 +147,9 @@ function pick(result) {
 function remove(item) {
   emit(
     'update:modelValue',
-    props.modelValue.filter((existing) => !(existing.kind === item.kind && String(existing.id) === String(item.id)))
+    props.modelValue.filter(
+      (existing) => !(itemKind(existing) === itemKind(item) && String(existing.id) === String(item.id))
+    )
   );
 }
 </script>

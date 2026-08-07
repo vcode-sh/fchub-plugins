@@ -74,6 +74,20 @@ describe('ScopePicker', () => {
     expect(wrapper.text()).toContain('keep typing');
   });
 
+  it('falls back to the id for a remedy-added item with no label yet', () => {
+    // applyRemedy() (useMigration.js) pushes bare `{ id }` products with no
+    // label or kind — the picker learns the name on the next search, but
+    // must not render a blank pill in the meantime.
+    const wrapper = mount(ScopePicker, {
+      props: { modelValue: [{ id: 42 }], kind: 'product' },
+    });
+
+    const chip = wrapper.find('.cartshift-scope-chip-label');
+
+    expect(chip.text()).toBe('#42');
+    expect(chip.text()).not.toContain('undefined');
+  });
+
   it('removes a chosen item without touching the rest', async () => {
     const wrapper = mount(ScopePicker, {
       props: {
