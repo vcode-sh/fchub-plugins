@@ -1684,3 +1684,39 @@ body.dark .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
   font-size: 13px;
   color: var(--cartshift-text-secondary);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Migration receipt — the "what you'll get" preview panel
+   ═══════════════════════════════════════════════════════════════ */
+
+#cartshift-app .cartshift-receipt-closure {
+  margin-top: -8px;
+}
+
+.cartshift-receipt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cartshift-receipt-list li + li {
+  margin-top: 8px;
+}
+
+.cartshift-receipt-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.cartshift-receipt-item .cartshift-receipt-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: default;
+}
+
+#cartshift-app .cartshift-remedy {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+}
