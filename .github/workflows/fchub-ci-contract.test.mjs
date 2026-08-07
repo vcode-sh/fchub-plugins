@@ -207,6 +207,15 @@ test('Docs CI watches the FCHub sources its own checks read', () => {
   const consistency = job(docs, 'consistency')
   assert.match(consistency, /node scripts\/check-fchub-docs\.mjs/)
   assert.match(consistency, /node scripts\/sync-fchub-catalog\.mjs --check/)
+
+  // Every other check in Docs CI reads content and compares it to something.
+  // None of them runs Next, which is how a site that could not be built sat
+  // on main behind a green tick. Pinned so the gate cannot quietly go away:
+  // it must run the same command the Dockerfile does, on the committed
+  // lockfile, or it is testing something other than what deploys.
+  const build = job(docs, 'build')
+  assert.match(build, /bun install --frozen-lockfile/)
+  assert.match(build, /node \.\/node_modules\/next\/dist\/bin\/next build/)
 })
 
 /**
