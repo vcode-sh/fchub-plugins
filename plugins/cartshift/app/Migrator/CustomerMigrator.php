@@ -487,14 +487,20 @@ final class CustomerMigrator extends AbstractMigrator
         global $wpdb;
 
         $table = WooStorage::ordersTable();
-        $scope = WooStorage::orderScopeSql();
+        [$scope, $scopeValues] = WooStorage::orderScopeParts();
+        $selection = $this->scopeResolver()->registeredCustomerPredicate();
 
-        $this->registeredCount = (int) $wpdb->get_var(
+        // Prepared now, where it used to be a bare string: the selection carries
+        // values, and they have to bind in the same prepare() as the status
+        // scope rather than in a nested one.
+        $this->registeredCount = (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(DISTINCT customer_id)
              FROM {$table}
              WHERE customer_id > 0
-               AND {$scope}",
-        );
+               AND {$scope}"
+            . $selection->andSql(),
+            ...[...$scopeValues, ...$selection->values()],
+        ));
 
         return $this->registeredCount;
     }
@@ -510,15 +516,18 @@ final class CustomerMigrator extends AbstractMigrator
         global $wpdb;
 
         $table = WooStorage::ordersTable();
-        $scope = WooStorage::orderScopeSql();
+        [$scope, $scopeValues] = WooStorage::orderScopeParts();
+        $selection = $this->scopeResolver()->guestCustomerPredicate();
 
-        return (int) $wpdb->get_var(
+        return (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(DISTINCT billing_email)
              FROM {$table}
              WHERE (customer_id IS NULL OR customer_id = 0)
                AND billing_email != ''
-               AND {$scope}",
-        );
+               AND {$scope}"
+            . $selection->andSql(),
+            ...[...$scopeValues, ...$selection->values()],
+        ));
     }
 
     /**
@@ -542,15 +551,20 @@ final class CustomerMigrator extends AbstractMigrator
         // Placeholder form, so the scope and the pagination go through a single
         // prepare() rather than nesting one prepared string inside another.
         [$scope, $scopeValues] = WooStorage::orderScopeParts();
+        $selection = $this->scopeResolver()->registeredCustomerPredicate();
 
+        // Values bind positionally, and this query now interleaves three
+        // sources of them plus the limit. Placeholder order in the string is
+        // keyset, status scope, selection, LIMIT — and so is the value order.
         $userIds = $wpdb->get_col($wpdb->prepare(
             "SELECT DISTINCT customer_id
              FROM {$table}
              WHERE customer_id > %d
-               AND {$scope}
-             ORDER BY customer_id ASC
+               AND {$scope}"
+            . $selection->andSql()
+            . " ORDER BY customer_id ASC
              LIMIT %d",
-            ...[max(0, $afterUserId), ...$scopeValues, $limit],
+            ...[max(0, $afterUserId), ...$scopeValues, ...$selection->values(), $limit],
         ));
 
         $userIds = array_map(intval(...), $userIds);
@@ -585,20 +599,26 @@ final class CustomerMigrator extends AbstractMigrator
         $table = WooStorage::ordersTable();
 
         [$scope, $scopeValues] = WooStorage::orderScopeParts();
+        $selection = $this->scopeResolver()->guestCustomerPredicate();
 
         $after = $afterEmail !== null ? 'AND billing_email > %s' : '';
         $afterValues = $afterEmail !== null ? [$afterEmail] : [];
 
+        // The selection is spliced after the keyset range and the status scope,
+        // so the value order stays keyset, status scope, selection, LIMIT. The
+        // selection compares billing_email against literals under the column's
+        // own collation, exactly as the `>` and the ORDER BY do.
         $emails = $wpdb->get_col($wpdb->prepare(
             "SELECT DISTINCT billing_email
              FROM {$table}
              WHERE (customer_id IS NULL OR customer_id = 0)
                AND billing_email != ''
                {$after}
-               AND {$scope}
-             ORDER BY billing_email ASC
+               AND {$scope}"
+            . $selection->andSql()
+            . " ORDER BY billing_email ASC
              LIMIT %d",
-            ...[...$afterValues, ...$scopeValues, $limit],
+            ...[...$afterValues, ...$scopeValues, ...$selection->values(), $limit],
         ));
 
         return array_map(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CartShift\Tests\Unit\Migrator\Entity;
 
+use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Migrator\CustomerMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
@@ -151,9 +152,95 @@ final class CustomerCursorBoundaryTest extends PluginTestCase
         $this->assertStringContainsString('ORDER BY billing_email ASC', $db->lastGuestQuery);
     }
 
+    public function testAScopedRegisteredPhaseCarriesThePredicateIntoTheKeysetQuery(): void
+    {
+        $db = $this->stubSources([7, 9, 19], ['ann@example.com']);
+        $migrator = $this->scopedMigrator(['mode' => 'explicit', 'customer_ids' => [7, 19]]);
+
+        $migrator->fetchBatch(null, 5);
+
+        // The scope and the cursor are conjuncts of one WHERE, not two queries
+        // and a post-filter.
+        $this->assertStringContainsString('customer_id > 0', $db->lastRegisteredQuery);
+        $this->assertStringContainsString('customer_id IN (7, 19)', $db->lastRegisteredQuery);
+        $this->assertStringContainsString('ORDER BY customer_id ASC', $db->lastRegisteredQuery);
+    }
+
+    public function testAScopedRunStillHandsOverToGuestsExactlyOnce(): void
+    {
+        $db = $this->stubSources([7, 19], ['ann@example.com', 'bob@example.com']);
+        $migrator = $this->scopedMigrator([
+            'mode'         => 'explicit',
+            'customer_ids' => [7, 19],
+            'guest_emails' => ['bob@example.com'],
+        ]);
+
+        $batch = $migrator->fetchBatch('registered:19', 5);
+
+        $this->assertFalse($db->registeredQueriedTwice ?? false);
+        $this->assertStringContainsString("billing_email IN ('bob@example.com')", $db->lastGuestQuery);
+        $this->assertSame([['guest', 'bob@example.com']], $this->describe($batch));
+    }
+
+    public function testAScopedSequenceReadsEveryScopedCustomerExactlyOnceAndNothingElse(): void
+    {
+        // The regression this whole task exists to prevent: a scoped run that
+        // skips a customer at the phase boundary looks identical to a correct
+        // one, because the total shrinks to match.
+        $this->stubSources([3, 5, 8, 13], ['ann@example.com', 'bob@example.com', 'cid@example.com']);
+        $migrator = $this->scopedMigrator([
+            'mode'         => 'explicit',
+            'customer_ids' => [3, 8, 13],
+            'guest_emails' => ['ann@example.com', 'cid@example.com'],
+        ]);
+
+        $cursor = null;
+        $seen = [];
+        $guard = 0;
+
+        while ($guard++ < 20) {
+            $batch = $migrator->fetchBatch($cursor, 2);
+
+            if ($batch === []) {
+                break;
+            }
+
+            foreach ($batch as $record) {
+                $seen[] = $migrator->getRecordId($record);
+            }
+
+            $cursor = $migrator->cursorFor($batch[array_key_last($batch)]);
+        }
+
+        $this->assertSame(['3', '8', '13', 'ann@example.com', 'cid@example.com'], $seen);
+        $this->assertSame(count($seen), count(array_unique($seen)), 'No record may be read twice.');
+    }
+
+    public function testAnExplicitScopePickingNoCustomersFetchesNobody(): void
+    {
+        // '1 = 0', not "no clause". This is the assertion that catches an empty
+        // IN list being rendered away into a full migration.
+        $db = $this->stubSources([7, 9], ['ann@example.com']);
+        $migrator = $this->scopedMigrator(['mode' => 'explicit', 'product_ids' => [12]]);
+
+        $this->assertSame([], $migrator->fetchBatch(null, 5));
+        $this->assertStringContainsString('1 = 0', $db->lastRegisteredQuery);
+    }
+
     // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────
+
+    /**
+     * @param array<string, mixed> $scope
+     */
+    private function scopedMigrator(array $scope): CustomerMigrator
+    {
+        $migrator = $this->migrator();
+        $migrator->useScope(MigrationScope::fromArray($scope));
+
+        return $migrator;
+    }
 
     private function migrator(): CustomerMigrator
     {
@@ -192,10 +279,12 @@ final class CustomerCursorBoundaryTest extends PluginTestCase
 
         $db = new class ($registered, $guests) extends \wpdb {
             public bool $registeredQueried = false;
+            public bool $registeredQueriedTwice = false;
             public bool $guestQueried = false;
             public int $lastRegisteredAfter = -1;
             public ?string $lastGuestAfter = null;
             public string $lastGuestQuery = '';
+            public string $lastRegisteredQuery = '';
 
             /**
              * @param list<int> $registered
@@ -215,15 +304,25 @@ final class CustomerCursorBoundaryTest extends PluginTestCase
                 $limit = preg_match('/LIMIT (\d+)/', $query, $m) === 1 ? (int) $m[1] : 0;
 
                 if (str_contains($query, 'SELECT DISTINCT customer_id')) {
+                    $this->registeredQueriedTwice = $this->registeredQueried;
                     $this->registeredQueried = true;
+                    $this->lastRegisteredQuery = $query;
                     $after = preg_match('/customer_id > (\d+)/', $query, $m) === 1 ? (int) $m[1] : 0;
                     $this->lastRegisteredAfter = $after;
 
-                    return array_map(strval(...), array_slice(
-                        array_values(array_filter($this->registered, static fn (int $id): bool => $id > $after)),
-                        0,
-                        $limit,
-                    ));
+                    if (self::selectsNothing($query)) {
+                        return [];
+                    }
+
+                    $selected = self::intSelection($query);
+
+                    $rows = array_filter(
+                        $this->registered,
+                        static fn (int $id): bool => $id > $after
+                            && ($selected === null || in_array($id, $selected, true)),
+                    );
+
+                    return array_map(strval(...), array_slice(array_values($rows), 0, $limit));
                 }
 
                 $this->guestQueried = true;
@@ -231,11 +330,60 @@ final class CustomerCursorBoundaryTest extends PluginTestCase
                 $after = preg_match("/billing_email > '([^']*)'/", $query, $m) === 1 ? $m[1] : null;
                 $this->lastGuestAfter = $after;
 
-                $rows = $after === null
-                    ? $this->guests
-                    : array_filter($this->guests, static fn (string $email): bool => $email > $after);
+                if (self::selectsNothing($query)) {
+                    return [];
+                }
+
+                $selected = self::stringSelection($query);
+
+                $rows = array_filter(
+                    $this->guests,
+                    static fn (string $email): bool => ($after === null || $email > $after)
+                        && ($selected === null || in_array($email, $selected, true)),
+                );
 
                 return array_slice(array_values($rows), 0, $limit);
+            }
+
+            /**
+             * The spliced-in empty set, ` AND (1 = 0)`. Deliberately narrower
+             * than a bare `1 = 0`, which WooStorage's own status template also
+             * emits when a site registers no migratable statuses.
+             */
+            private static function selectsNothing(string $query): bool
+            {
+                return str_contains($query, 'AND (1 = 0)');
+            }
+
+            /**
+             * Crude stand-in for MySQL, not for a query planner: pull the ID
+             * list out of a spliced `customer_id IN (…)` predicate. Null means
+             * the query carried no such predicate and selects everything.
+             *
+             * @return list<int>|null
+             */
+            private static function intSelection(string $query): ?array
+            {
+                if (preg_match('/customer_id IN \(([^)]*)\)/', $query, $m) !== 1) {
+                    return null;
+                }
+
+                return array_map(intval(...), array_map(trim(...), explode(',', $m[1])));
+            }
+
+            /**
+             * @return list<string>|null
+             */
+            private static function stringSelection(string $query): ?array
+            {
+                if (preg_match('/billing_email IN \(([^)]*)\)/', $query, $m) !== 1) {
+                    return null;
+                }
+
+                return array_map(
+                    static fn (string $value): string => trim(trim($value), "'"),
+                    explode(',', $m[1]),
+                );
             }
         };
 
