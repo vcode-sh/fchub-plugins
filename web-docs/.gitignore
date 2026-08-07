@@ -25,3 +25,5 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 .mcp.json
+# Written by `next dev` on every run; not a source file.
+AGENTS.md
