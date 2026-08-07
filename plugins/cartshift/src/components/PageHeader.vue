@@ -1,7 +1,7 @@
 <template>
   <div class="cartshift-page-header">
     <h1>{{ title }} <span style="font-size:11px;color:#999;font-weight:400;">v{{ version }}</span></h1>
-    <div class="cartshift-theme-switcher">
+    <div v-if="theme" class="cartshift-theme-switcher">
       <button
         class="cartshift-theme-btn"
         :title="'Theme: ' + theme.themeMode.value"
@@ -37,7 +37,10 @@ defineProps({
 });
 
 const config = inject('config', {});
-const theme = inject('theme');
+// Optional: App.vue always provides this in the real app, but a screen
+// mounted on its own in a component test (no theme provider) should not
+// crash the whole render over a theme switcher nobody asked to test.
+const theme = inject('theme', null);
 const version = config.version || '';
 const showDropdown = ref(false);
 
