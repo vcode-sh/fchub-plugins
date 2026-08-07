@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
+import { TOCProvider, TOCScrollArea } from "fumadocs-ui/components/toc";
 import { TOCItems } from "fumadocs-ui/components/toc/clerk";
-import { TOCProvider, TOCScrollArea } from "fumadocs-ui/components/toc/index";
 import { DocsBody } from "fumadocs-ui/page";
 import { ArrowLeft, Calendar, Clock, Tag, Text, User } from "lucide-react";
 import type { Metadata } from "next";
