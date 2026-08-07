@@ -15,6 +15,7 @@
       "!build",
       "!.source",
       "!components/ui",
+      "!public",
       "!lib/fchub-catalog.json"
     ]
   },
@@ -26,7 +27,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "a11y": {
         "useAnchorContent": "off"
       }

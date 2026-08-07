@@ -118,8 +118,26 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-  React.ComponentProps<"div"> & {
+}: React.ComponentProps<"div"> &
+  // recharts 3 split the Tooltip props in two. `active`, `payload`, `label`,
+  // `coordinate` and `accessibilityLayer` are no longer things you pass to
+  // <Tooltip>; they are read from chart context and handed to the `content`
+  // component instead. `TooltipContentProps` is that second, wider shape, so
+  // it is what a content component like this one must be typed against —
+  // `ComponentProps<typeof Tooltip>` now omits the very props we destructure.
+  // Partial, because recharts injects them at render time and callers write
+  // `<ChartTooltipContent />` with none of them.
+  Partial<
+    Pick<
+      RechartsPrimitive.TooltipContentProps,
+      | "active"
+      | "payload"
+      | "label"
+      | "labelFormatter"
+      | "labelClassName"
+      | "formatter"
+    >
+  > & {
     hideLabel?: boolean
     hideIndicator?: boolean
     indicator?: "line" | "dot" | "dashed"
@@ -188,7 +206,11 @@ function ChartTooltipContent({
 
             return (
               <div
-                key={item.dataKey}
+                // recharts 3 widened payload `dataKey` to `DataKey<any>`, which
+                // includes an accessor function, and a function is not a valid
+                // React key. Stringifying matches what React already did with
+                // the string | number this used to be.
+                key={`${item.dataKey}`}
                 className={cn(
                   "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
                   indicator === "dot" && "items-center"
@@ -259,7 +281,14 @@ function ChartLegendContent({
   verticalAlign = "bottom",
   nameKey,
 }: React.ComponentProps<"div"> &
-  Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+  // Same split on the Legend side: recharts 3 omits `payload` (and `layout`
+  // and `verticalAlign`) from `LegendProps`, because those are supplied to the
+  // `content` component rather than passed in. `DefaultLegendContentProps` is
+  // the shape that content actually receives.
+  Pick<
+    RechartsPrimitive.DefaultLegendContentProps,
+    "payload" | "verticalAlign"
+  > & {
     hideIcon?: boolean
     nameKey?: string
   }) {

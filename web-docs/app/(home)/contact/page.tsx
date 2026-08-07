@@ -1,7 +1,8 @@
 "use client";
 
-import { Bug, Github, Lightbulb, Send, Twitter } from "lucide-react";
+import { Bug, Lightbulb, Send } from "lucide-react";
 import { motion } from "motion/react";
+import { GithubIcon, XIcon } from "@/components/brand-icons";
 import { Button } from "@/components/ui/button";
 
 const GITHUB_REPO = "https://github.com/vcode-sh/fchub-plugins";
@@ -82,7 +83,7 @@ export default function ContactPage() {
             <div className="border rounded-md p-6 space-y-3">
               <div className="flex items-center gap-2">
                 <div className="flex items-center justify-center size-8 border rounded-sm bg-muted">
-                  <Github className="size-4" />
+                  <GithubIcon className="size-4" />
                 </div>
                 <h3 className="font-medium">GitHub Issues</h3>
               </div>
@@ -156,7 +157,7 @@ export default function ContactPage() {
             <div className="border rounded-md p-6 space-y-3">
               <div className="flex items-center gap-2">
                 <div className="flex items-center justify-center size-8 border rounded-sm bg-muted">
-                  <Twitter className="size-4" />
+                  <XIcon className="size-4" />
                 </div>
                 <h3 className="font-medium">X / Twitter</h3>
               </div>
@@ -172,7 +173,7 @@ export default function ContactPage() {
                     <a href={X_URL} target="_blank" rel="noopener noreferrer" />
                   }
                 >
-                  <Twitter className="size-3" />
+                  <XIcon className="size-3" />
                   Follow @vcode_sh
                 </Button>
               </div>
