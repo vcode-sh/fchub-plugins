@@ -61,13 +61,24 @@ jobs:
       - run: npm run typecheck && npm run typecheck:tests
       - run: npm run lint
 
+  # Two lanes on purpose. package.json declares engines >=24.0.0, so 24 is the
+  # floor a user may actually run the published package on; 26 is what the
+  # release toolchain builds with. Testing only the newest would let the
+  # declared floor rot untested until someone on Node 24 hit it first.
   test:
+    name: test (Node ${{ matrix.node_version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node_version:
+          - '24'
+          - '26'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: '26'
+          node-version: ${{ matrix.node_version }}
           cache: npm
           cache-dependency-path: fluentcart-mcp/package-lock.json
       - run: npm ci
