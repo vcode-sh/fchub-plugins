@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CartShift\Validator;
 
+use CartShift\Support\WooStorage;
+
 defined('ABSPATH') || exit;
 
 final class PreflightCheck
@@ -342,9 +344,16 @@ final class PreflightCheck
     /**
      * ADVISORY. Never blocks.
      *
-     * Unsupported product types are skipped by design and reported per-record in the
-     * migration log. Refusing to migrate 500 simple products because someone once made
-     * a grouped product would be absurd.
+     * Unsupported product types are excluded from getProductTypes(), which is what
+     * countTotal() and fetchBatch() filter on — by design, because CartShift cannot
+     * map, say, a LearnDash course product's data and attempting to would fail in
+     * worse and less visible ways than not migrating it at all.
+     *
+     * The trap: excluded from the denominator means invisible, not skipped. A store
+     * with 27 products where 2 are `course` reports "25 / 25 migrated" and never
+     * mentions the other 2 — worse than a skip, because a skip is at least reported.
+     * This check is the only place that names them and says how many orders carry
+     * them, so the admin can go find those orders rather than discover the gap later.
      */
     private function checkProductTypes(): array
     {
@@ -379,20 +388,20 @@ final class PreflightCheck
             $types[$row->slug] = (int) $row->count;
         }
 
-        $supported   = ['simple', 'variable', 'subscription', 'variable-subscription'];
-        $unsupported = array_diff(array_keys($types), $supported);
+        $supported = ['simple', 'variable', 'subscription', 'variable-subscription'];
 
-        $unsupportedCount = 0;
-        foreach ($unsupported as $type) {
-            $unsupportedCount += $types[$type];
+        $unsupported = [];
+        foreach (array_diff(array_keys($types), $supported) as $slug) {
+            $unsupported[$slug] = $types[$slug];
         }
 
-        $hasWarning = $unsupportedCount > 0;
+        $unsupportedCount = array_sum($unsupported);
+        $hasWarning       = $unsupportedCount > 0;
 
         $parts = [];
         foreach ($types as $slug => $count) {
             $typeLabel = ucfirst(str_replace('-', ' ', $slug));
-            $marker    = in_array($slug, $supported, true) ? '' : ' (unsupported)';
+            $marker    = array_key_exists($slug, $unsupported) ? ' (unsupported)' : '';
             $parts[]   = sprintf('%s: %d%s', $typeLabel, $count, $marker);
         }
 
@@ -400,8 +409,28 @@ final class PreflightCheck
             ? 'No WooCommerce products found.'
             : implode(', ', $parts) . '.';
 
+        $ordersAffected = 0;
+
         if ($hasWarning) {
-            $message .= sprintf(' %d product(s) with unsupported types will be skipped.', $unsupportedCount);
+            $ordersAffected = $this->countOrdersAffectedByTypes(array_keys($unsupported));
+            $totalOrders    = $this->countMigratableOrders();
+
+            $typeNames = implode(', ', array_map(
+                static fn(string $slug): string => str_replace('-', ' ', $slug),
+                array_keys($unsupported),
+            ));
+
+            $message .= sprintf(
+                ' %d product%s use a type CartShift can\'t migrate (%s). They appear in %d of your %d order%s '
+                . '— those orders will still show what was bought and what it cost, but the items won\'t link '
+                . 'to a product page.',
+                $unsupportedCount,
+                $unsupportedCount === 1 ? '' : 's',
+                $typeNames,
+                $ordersAffected,
+                $totalOrders,
+                $totalOrders === 1 ? '' : 's',
+            );
         }
 
         return $this->result(
@@ -409,10 +438,68 @@ final class PreflightCheck
             $hasWarning ? self::SEVERITY_WARN : self::SEVERITY_PASS,
             $message,
             [
-                'optional'    => true,
-                'types'       => $types,
-                'unsupported' => array_values($unsupported),
+                'optional'                  => true,
+                'types'                     => $types,
+                'unsupported'               => $unsupported,
+                'unsupported_product_types' => [
+                    'types'           => $unsupported,
+                    'orders_affected' => $ordersAffected,
+                ],
             ],
+        );
+    }
+
+    /**
+     * How many orders contain at least one product of an unsupported type.
+     *
+     * Line items live in {prefix}woocommerce_order_items /
+     * {prefix}woocommerce_order_itemmeta under both legacy and HPOS order storage —
+     * HPOS moved the order and order-meta tables, not the line-item tables — so this
+     * join is valid regardless of which storage mode is active.
+     *
+     * @param list<string> $slugs
+     */
+    private function countOrdersAffectedByTypes(array $slugs): int
+    {
+        if ($slugs === []) {
+            return 0;
+        }
+
+        global $wpdb;
+
+        $placeholders = implode(', ', array_fill(0, count($slugs), '%s'));
+
+        $sql = $wpdb->prepare(
+            "SELECT COUNT(DISTINCT oi.order_id)
+             FROM {$wpdb->prefix}woocommerce_order_items oi
+             INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta im
+                     ON im.order_item_id = oi.order_item_id AND im.meta_key = '_product_id'
+             INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = CAST(im.meta_value AS UNSIGNED)
+             INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+             INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
+             WHERE tt.taxonomy = 'product_type' AND t.slug IN ({$placeholders})",
+            ...$slugs,
+        );
+
+        return (int) $wpdb->get_var($sql);
+    }
+
+    /**
+     * The order count the "N of your M orders" wording reports against — the same
+     * migratable scope OrderMigrator::countTotal() uses, so this number matches
+     * whatever the migration itself will report as the order total.
+     */
+    private function countMigratableOrders(): int
+    {
+        global $wpdb;
+
+        $scope = WooStorage::orderScopeSql();
+        $table = WooStorage::ordersTable();
+
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(*)
+             FROM {$table}
+             WHERE {$scope}",
         );
     }
 

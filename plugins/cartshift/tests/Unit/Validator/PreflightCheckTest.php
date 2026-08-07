@@ -315,8 +315,135 @@ final class PreflightCheckTest extends PluginTestCase
 
         $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
         $this->assertTrue($check['pass']);
-        $this->assertContains('grouped', $check['unsupported']);
+        $this->assertArrayHasKey('grouped', $check['unsupported']);
+        $this->assertSame(1, $check['unsupported']['grouped']);
         $this->assertTrue($result['ready']);
+    }
+
+    /**
+     * The bug this fixes: unsupported product types were excluded from
+     * getProductTypes(), which countTotal() and fetchBatch() both filter on. That
+     * makes them invisible in the migration summary rather than skipped-and-reported.
+     * This check is where they finally get named, along with how many orders carry
+     * them, so an admin can go find those orders instead of discovering the gap later.
+     */
+    public function testUnsupportedProductTypesAreReportedWithTheirOrderImpact(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 13],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        $result = (new PreflightCheck())->run();
+        $check  = $result['checks']['product_types'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertSame(['course' => 2], $check['unsupported']);
+        $this->assertStringContainsString('course', $check['message']);
+        $this->assertStringContainsString('41', $check['message']);
+        $this->assertStringContainsString('699', $check['message']);
+        $this->assertSame(
+            ['types' => ['course' => 2], 'orders_affected' => 41],
+            $check['unsupported_product_types'],
+        );
+        $this->assertTrue($result['ready'], 'An unsupported type is advisory, not blocking.');
+    }
+
+    /**
+     * The exact real-world numbers this task fixes: a live store (WooCommerce
+     * 11.0.0, HPOS, 699 orders) with 27 products, 2 of them LearnDash `course`
+     * products invisible to getProductTypes(), appearing in 41 of the 699 orders.
+     */
+    public function testUnsupportedProductTypesMatchesTheLiveStoreDefect(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 25],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string|null {
+            if (str_contains($query, 'SHOW TABLES LIKE')) {
+                return 'exists';
+            }
+            if (str_contains($query, 'woocommerce_order_items')) {
+                return '41';
+            }
+            if (str_contains($query, 'wc_orders')) {
+                return '699';
+            }
+
+            return '0';
+        };
+
+        $check = (new PreflightCheck())->run()['checks']['product_types'];
+
+        $this->assertSame(2, array_sum($check['unsupported']));
+        $this->assertSame(27, array_sum($check['types']));
+        $this->assertSame(41, $check['unsupported_product_types']['orders_affected']);
+        $this->assertStringContainsString(
+            '2 products use a type CartShift can\'t migrate (course). '
+            . 'They appear in 41 of your 699 orders',
+            $check['message'],
+        );
+    }
+
+    /**
+     * No unsupported types, nothing to report: the new key stays present but empty
+     * rather than being omitted, so a generic UI reading it never has to guess.
+     */
+    public function testUnsupportedProductTypesKeyIsEmptyWhenEverythingIsSupported(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 10],
+                    (object) ['slug' => 'variable', 'count' => 5],
+                ];
+            }
+
+            return [];
+        };
+
+        $check = (new PreflightCheck())->run()['checks']['product_types'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
+        $this->assertSame([], $check['unsupported']);
+        $this->assertSame(
+            ['types' => [], 'orders_affected' => 0],
+            $check['unsupported_product_types'],
+        );
     }
 
     /**
