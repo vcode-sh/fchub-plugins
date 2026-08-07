@@ -6,6 +6,7 @@ namespace CartShift\Tests\Unit\Domain\Mapping;
 
 use CartShift\Domain\Mapping\CouponMapper;
 use CartShift\Storage\IdMapRepository;
+use CartShift\Support\Constants;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Tests\Unit\PluginTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -32,6 +33,7 @@ final class CouponMapperTest extends PluginTestCase
     {
         unset($GLOBALS['_cartshift_test_get_var_callback']);
         unset($GLOBALS['_cartshift_test_get_var_return']);
+        unset($GLOBALS['_cartshift_test_wc_products']);
         parent::tearDown();
     }
 
@@ -73,12 +75,14 @@ final class CouponMapperTest extends PluginTestCase
 
     public function testConditionsIncludedProductsMappedToFcIds(): void
     {
-        // M10: WC product IDs mapped to FC IDs via IdMap.
+        // Product restrictions resolve through ENTITY_VARIATION — that is the ID
+        // space FluentCart's DiscountService actually compares cart items
+        // against (see CouponMapper::mapProductIdsToVariationIds()).
         $GLOBALS['_cartshift_test_get_var_callback'] = function (string $query): ?string {
-            if (str_contains($query, 'product') && str_contains($query, "'100'")) {
+            if (str_contains($query, 'variation') && str_contains($query, "'100'")) {
                 return '500';
             }
-            if (str_contains($query, 'product') && str_contains($query, "'200'")) {
+            if (str_contains($query, 'variation') && str_contains($query, "'200'")) {
                 return '600';
             }
             return null;
@@ -129,6 +133,47 @@ final class CouponMapperTest extends PluginTestCase
         $this->assertNotNull($result['conditions']);
         $this->assertArrayHasKey('email_restrictions', $result['conditions']);
         $this->assertSame('vip@example.com,admin@example.com', $result['conditions']['email_restrictions']);
+    }
+
+    /**
+     * The headline correctness guard.
+     *
+     * FluentCart's DiscountService compares included_products/excluded_products
+     * against a cart item's object_id, which is the FluentCart *variation* ID
+     * (fluent-cart CartHelper.php:54, :123 — object_id = $variation->id), not
+     * the product post ID. Resolving through Constants::ENTITY_PRODUCT — as this
+     * mapper used to — produces IDs that DiscountService never compares against,
+     * so the restriction silently stops matching anything after migration.
+     */
+    public function testProductRestrictionsResolveToVariationIdsFluentCartActuallyCompares(): void
+    {
+        $this->idMap->store(Constants::ENTITY_PRODUCT, '101', 5001, 'm', true);
+        $this->idMap->store(Constants::ENTITY_VARIATION, '101', 7001, 'm', true);
+
+        $result = $this->mapper->map($this->couponRestrictedTo([101]));
+
+        $this->assertSame([7001], $result['conditions']['included_products']);
+    }
+
+    /**
+     * A variable WC product's restriction has to expand to every one of its
+     * FluentCart variations — DiscountService checks the exact variation
+     * object_id in the cart, not the parent product.
+     */
+    public function testProductRestrictionsExpandToAllVariationsOfAVariableProduct(): void
+    {
+        $variableProduct = new \WC_Product();
+        $ref = new \ReflectionClass($variableProduct);
+        $childrenProp = $ref->getProperty('children');
+        $childrenProp->setValue($variableProduct, [201, 202]);
+        $GLOBALS['_cartshift_test_wc_products'][300] = $variableProduct;
+
+        $this->idMap->store(Constants::ENTITY_VARIATION, '201', 9001, 'm', true);
+        $this->idMap->store(Constants::ENTITY_VARIATION, '202', 9002, 'm', true);
+
+        $result = $this->mapper->map($this->couponRestrictedTo([300]));
+
+        $this->assertSame([9001, 9002], $result['conditions']['included_products']);
     }
 
     public function testEmptyProductIdsHandledGracefully(): void
@@ -499,7 +544,7 @@ final class CouponMapperTest extends PluginTestCase
     public function testPartiallyResolvedRestrictionsStayActiveAndNarrower(): void
     {
         $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): ?string {
-            return str_contains($query, "'product'") && str_contains($query, "'100'") ? '500' : null;
+            return str_contains($query, "'variation'") && str_contains($query, "'100'") ? '500' : null;
         };
 
         $coupon = $this->createCoupon([
@@ -639,6 +684,16 @@ final class CouponMapperTest extends PluginTestCase
     private function noMappings(): void
     {
         $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): ?string => null;
+    }
+
+    private function couponRestrictedTo(array $productIds): \WC_Coupon
+    {
+        return $this->createCoupon([
+            'code' => 'RESTRICTED',
+            'discount_type' => 'percent',
+            'amount' => 10.0,
+            'product_ids' => $productIds,
+        ]);
     }
 
     private function createCoupon(array $overrides = []): \WC_Coupon
