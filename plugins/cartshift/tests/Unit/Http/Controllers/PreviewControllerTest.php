@@ -169,6 +169,72 @@ final class PreviewControllerTest extends PluginTestCase
         $this->assertTrue($data['truncated']);
     }
 
+    /**
+     * A product of a type ProductMigrator cannot source — a LearnDash
+     * `course`, in the real store this is a regression test for — must not
+     * appear in the picker at all. Showing it lets the owner pick it, and
+     * ScopeResolver's closure does not know about product types either, so
+     * the pick travels silently into MigrationScope::productIds() and only
+     * evaporates later as counts['product'] === 0 with no explanation.
+     *
+     * Simulates the NOT IN exclusion for real: the fake product_type_counts
+     * query reports one `course`-type product, and the fake results handler
+     * for the main product query parses the `t.slug IN (...)` values the
+     * code actually sent and drops matching fixture rows before returning
+     * them — so this fails if the exclusion clause is ever missing, not just
+     * if the fixture happens to agree with it.
+     */
+    public function testUnsupportedProductTypeIsExcludedFromSearch(): void
+    {
+        $this->stubProductTypeFixture(
+            rows: [
+                ['id' => 1, 'title' => 'Fleece Hoodie', 'sku' => 'HOOD-A', 'type' => 'simple'],
+                ['id' => 2, 'title' => 'Hoodie Course', 'sku' => '', 'type' => 'course'],
+            ],
+            typeCounts: [['slug' => 'course', 'count' => 1]],
+        );
+
+        $results = $this->controller()->search($this->request(['type' => 'product', 'q' => 'hoodie']))
+            ->get_data()['data']['results'];
+
+        $this->assertNotContains('Hoodie Course', array_column($results, 'label'));
+    }
+
+    /**
+     * The other half of the same test: the exclusion must not be so broad
+     * that it drops a supported product whose title happens to look similar
+     * to an excluded one.
+     */
+    public function testASupportedProductWithASimilarTitleStillMatches(): void
+    {
+        $this->stubProductTypeFixture(
+            rows: [
+                ['id' => 1, 'title' => 'Fleece Hoodie', 'sku' => 'HOOD-A', 'type' => 'simple'],
+                ['id' => 2, 'title' => 'Hoodie Course', 'sku' => '', 'type' => 'course'],
+            ],
+            typeCounts: [['slug' => 'course', 'count' => 1]],
+        );
+
+        $results = $this->controller()->search($this->request(['type' => 'product', 'q' => 'hoodie']))
+            ->get_data()['data']['results'];
+
+        $this->assertContains('Fleece Hoodie', array_column($results, 'label'));
+    }
+
+    /**
+     * No unsupported type present in the catalogue: the exclusion subquery
+     * must not be added at all, matching PreflightCheck's own "empty diff"
+     * shortcut and confirming this is not a permanent, unconditional clause.
+     */
+    public function testNoExclusionClauseWhenNothingIsUnsupported(): void
+    {
+        $db = $this->stubSearchResults(productRows: [['id' => 1, 'title' => 'Hoodie', 'sku' => '']]);
+
+        $this->controller()->search($this->request(['type' => 'product', 'q' => 'hoodie']));
+
+        $this->assertStringNotContainsString('NOT IN', $db->lastQuery);
+    }
+
     public function testSearchLimitIsClampedToFifty(): void
     {
         $db = $this->stubSearchResults(productRows: []);
@@ -286,6 +352,50 @@ final class PreviewControllerTest extends PluginTestCase
         $GLOBALS['wpdb'] = $db;
 
         return $db;
+    }
+
+    /**
+     * Drives search() through $GLOBALS['_cartshift_test_get_results_callback']
+     * (the mechanism the rest of the suite uses for product_type_counts —
+     * see PreflightCheckTest) rather than a custom wpdb subclass, because this
+     * one has to behave like a real database: the product_type_counts branch
+     * reports the configured type histogram, and the main product query
+     * parses the `t.slug IN (...)` values PreviewController actually put in
+     * the query and filters `$rows` by them before returning — so a missing
+     * or wrong exclusion clause fails the test on its own, not on a fixture
+     * that was curated to already look filtered.
+     *
+     * Cleared automatically: tearDown() already unsets
+     * _cartshift_test_get_results_callback after every test.
+     *
+     * @param list<array{id: int, title: string, sku: string, type: string}> $rows
+     * @param list<array{slug: string, count: int}>                         $typeCounts
+     */
+    private function stubProductTypeFixture(array $rows, array $typeCounts): void
+    {
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query) use ($rows, $typeCounts): array {
+            if (str_contains($query, 'GROUP BY t.slug')) {
+                return array_map(static fn (array $row): object => (object) $row, $typeCounts);
+            }
+
+            if (!str_contains($query, 'wc_product_meta_lookup')) {
+                return [];
+            }
+
+            $excludedTypes = [];
+
+            if (preg_match('/t\.slug IN \(([^)]*)\)/', $query, $matches)) {
+                $excludedTypes = array_map(
+                    static fn (string $slug): string => trim($slug, " '"),
+                    explode(',', $matches[1]),
+                );
+            }
+
+            return array_values(array_filter(
+                $rows,
+                static fn (array $row): bool => !in_array($row['type'], $excludedTypes, true),
+            ));
+        };
     }
 
     private function controller(): PreviewController

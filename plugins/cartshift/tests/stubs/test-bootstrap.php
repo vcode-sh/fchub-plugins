@@ -905,6 +905,17 @@ if (!class_exists('wpdb')) {
         {
             return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
         }
+
+        /**
+         * Byte-identical to WordPress core's wpdb::esc_like() (wp-includes/class-wpdb.php):
+         * addcslashes() over '_%\\' so a typed search term can't smuggle a LIKE wildcard.
+         * Added so callers guarded with method_exists($wpdb, 'esc_like') exercise the real
+         * algorithm under test instead of always falling through to their own fallback.
+         */
+        public function esc_like(string $text): string
+        {
+            return addcslashes($text, '_%\\');
+        }
     }
 }
 
