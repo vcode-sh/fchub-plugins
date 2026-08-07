@@ -1,6 +1,7 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
-import { Send, Twitter } from "lucide-react";
+import { Send } from "lucide-react";
 import Image from "next/image";
+import { XIcon } from "@/components/brand-icons";
 
 export function baseOptions(): BaseLayoutProps {
   return {
@@ -23,7 +24,7 @@ export function baseOptions(): BaseLayoutProps {
       {
         type: "icon",
         label: "Follow on X",
-        icon: <Twitter size={18} />,
+        icon: <XIcon size={18} />,
         text: "X",
         url: "https://x.com/vcode_sh",
       },

@@ -87,7 +87,11 @@ function Calendar({
             : "flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
           defaultClassNames.caption_label
         ),
-        table: "w-full border-collapse",
+        // `table` was a react-day-picker v8 key. v9 still accepted it in the
+        // types but never read it — the grid has always rendered with
+        // `classNames[UI.MonthGrid]`. v10 dropped the v8 aliases, so the key
+        // is gone rather than renamed to `month_grid`: setting `month_grid`
+        // would apply styling this calendar has never actually had.
         weekdays: cn("flex", defaultClassNames.weekdays),
         weekday: cn(
           "flex-1 rounded-(--cell-radius) text-[0.8rem] font-normal text-muted-foreground select-none",
