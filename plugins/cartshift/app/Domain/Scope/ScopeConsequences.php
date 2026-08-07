@@ -29,9 +29,6 @@ use CartShift\Validator\PreflightCheck;
  */
 final class ScopeConsequences
 {
-    /** WooCommerce product types CartShift can migrate. Mirrors PreflightCheck::checkProductTypes(). */
-    private const array SUPPORTED_PRODUCT_TYPES = ['simple', 'variable', 'subscription', 'variable-subscription'];
-
     public function __construct(
         private readonly ScopeResolver $resolver,
     ) {
@@ -67,10 +64,17 @@ final class ScopeConsequences
      * publish/draft/private, so a product of an unrecognised type sitting in
      * the trash is not counted here either — this is a lower bound, not the
      * true figure. Widening it is a later task (see task-8 report).
+     *
+     * Which types are "unrecognised" also comes from PreflightCheck —
+     * unsupportedProductTypeCounts() — rather than a second copy of the
+     * supported-type list kept here. See PreflightCheck::SUPPORTED_PRODUCT_TYPES
+     * for why there must be only one: a preflight warning and a consequence
+     * count that disagreed about which types are unsupported would be quoted
+     * side by side to the same user.
      */
     private function productLinkMissingCount(): int
     {
-        $unsupported = $this->unsupportedProductTypeSlugs();
+        $unsupported = array_keys(PreflightCheck::unsupportedProductTypeCounts());
 
         if ($unsupported === []) {
             return 0;
@@ -80,50 +84,17 @@ final class ScopeConsequences
     }
 
     /**
-     * Product type slugs present in the catalogue that CartShift does not
-     * migrate. Same query and the same supported-type list as
-     * PreflightCheck::checkProductTypes() — kept in step deliberately, because
-     * the two are quoted side by side and disagreeing on which types are
-     * unsupported would make the numbers contradict each other.
-     *
-     * @return list<string>
-     */
-    private function unsupportedProductTypeSlugs(): array
-    {
-        global $wpdb;
-
-        $results = $wpdb->get_results(
-            "SELECT t.slug, COUNT(*) as count
-             FROM {$wpdb->term_relationships} tr
-             INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-             INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-             INNER JOIN {$wpdb->posts} p ON p.ID = tr.object_id
-             WHERE tt.taxonomy = 'product_type'
-               AND p.post_type = 'product'
-               AND p.post_status IN ('publish', 'draft', 'private')
-             GROUP BY t.slug",
-        );
-
-        $slugs = [];
-
-        foreach ($results as $row) {
-            if (is_object($row) && isset($row->slug) && (int) ($row->count ?? 0) > 0) {
-                $slugs[] = (string) $row->slug;
-            }
-        }
-
-        return array_values(array_diff($slugs, self::SUPPORTED_PRODUCT_TYPES));
-    }
-
-    /**
      * In-scope orders whose customer_id is a registered customer not in the
      * closed registered set.
      *
      * Only reachable under an explicit scope: "everything" and "since" leave
      * registeredCustomerPredicate() unrestricted (see ScopeResolver), so every
      * registered customer travels and this cannot be non-zero for a reason the
-     * scope caused. It is a real, if rare, outcome even so — the WP user row
-     * behind a picked order's buyer can simply be gone.
+     * scope caused. Real triggers under an explicit scope: the WP user row
+     * behind a picked order's buyer can simply be gone, or a picked guest
+     * email happens to match the billing_email on an order whose customer_id
+     * is a registered buyer nobody picked — that order enters scope through
+     * the guest-email predicate without its buyer entering closedCustomers().
      */
     private function customerRebuiltFromOrderCount(): int
     {
