@@ -164,12 +164,18 @@ describe('preview degradation', () => {
     // startMigration() switches to the progress screen before the request goes
     // out, so a refusal that only sets state.error leaves the owner watching a
     // progress bar for a run that was never started.
+    //
+    // The payload is the shape useApi.js actually delivers — it unwraps one
+    // `data` level, so the controller's `['data' => ['code' => …]]` arrives
+    // flat. The earlier version of this fixture nested a second `data`, a
+    // shape no real response can produce, and so passed against a branch that
+    // could never run. See useMigration.closureRefusal.test.js for the same
+    // case driven through the real useApi and a real fetch response.
     apiMock.mockRejectedValue(
       apiError('Selection is too large', 422, {
-        data: {
-          code: 'scope_closure_too_large',
-          message: 'Narrow the selection, then try again. Nothing was migrated.',
-        },
+        code: 'scope_closure_too_large',
+        message: 'Narrow the selection, then try again. Nothing was migrated.',
+        scope: { mode: 'explicit' },
       }),
     );
 

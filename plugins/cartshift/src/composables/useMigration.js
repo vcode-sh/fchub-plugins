@@ -410,9 +410,17 @@ export function useMigration() {
       // before the request went out, so send the owner back to the selection
       // they still need to narrow — a progress bar for a run that does not
       // exist is worse than the error.
-      if (err.status === 422 && err.payload?.data?.code === 'scope_closure_too_large') {
+      //
+      // `err.payload` is the *unwrapped* body: useApi.js strips one `data`
+      // level before it builds the error (`data.data !== undefined ? data.data
+      // : data`), so the controller's `['data' => ['code' => …]]` arrives here
+      // as `{code, message, scope}`. Reading `err.payload.data.code` made this
+      // branch unreachable, and the test that covered it hand-built a payload
+      // useApi cannot produce, so it passed either way. Same shape as the 409
+      // branch below, which has always been right.
+      if (err.status === 422 && err.payload?.code === 'scope_closure_too_large') {
         state.screen = 'select';
-        state.error = err.payload.data.message;
+        state.error = err.payload.message;
         state.batchError = false;
 
         return;
