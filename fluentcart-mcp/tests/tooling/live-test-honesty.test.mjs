@@ -3,7 +3,13 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+// TypeScript 5, deliberately, and not the compiler this package builds with.
+// TypeScript 7 removed the classic compiler API: the package now exports only
+// version.cjs from its entry, ships no lib/typescript.js, and offers ASTs
+// solely through an `unstable/` surface with no createSourceFile or
+// ScriptTarget. This test parses source into an AST, so it keeps a pinned 5.9.3
+// aliased as typescript-ast until a stable replacement exists.
+import ts from 'typescript-ast'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const INTEGRATION_ROOT = join(PACKAGE_ROOT, 'tests', 'integration')
