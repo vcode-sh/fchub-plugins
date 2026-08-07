@@ -7,6 +7,7 @@ namespace CartShift\Tests\Unit\Http\Controllers;
 use CartShift\Core\Container;
 use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Http\Controllers\MigrationController;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
@@ -26,6 +27,7 @@ final class MigrationControllerTest extends PluginTestCase
 
     private MigrationState $state;
     private MigrationController $controller;
+    private ?\wpdb $originalWpdb = null;
 
     #[\Override]
     protected function setUp(): void
@@ -62,12 +64,91 @@ final class MigrationControllerTest extends PluginTestCase
     #[\Override]
     protected function tearDown(): void
     {
+        if ($this->originalWpdb !== null) {
+            $GLOBALS['wpdb'] = $this->originalWpdb;
+            $this->originalWpdb = null;
+        }
+
         unset(
             $GLOBALS['_cartshift_test_get_var_callback'],
             $GLOBALS['_cartshift_test_get_results_callback'],
         );
 
         parent::tearDown();
+    }
+
+    // ── Migrate: scope ─────────────────────────────────────
+
+    public function testMigrateStoresTheScopeItWasGiven(): void
+    {
+        $this->controller->migrate($this->request([
+            'entity_types' => ['order'],
+            'scope'        => ['mode' => 'since', 'since' => '2024-03-01'],
+        ]));
+
+        $this->assertSame('since', (new MigrationState())->getScope()->mode());
+    }
+
+    public function testMigrateWithNoScopeMigratesEverything(): void
+    {
+        // Every caller that predates this parameter — an old UI bundle, a
+        // scripted integration — keeps working, and keeps meaning what it meant.
+        $this->controller->migrate($this->request(['entity_types' => ['order']]));
+
+        $this->assertTrue((new MigrationState())->getScope()->isEverything());
+    }
+
+    public function testAnOversizedClosureIsRefusedBeforeAnythingIsWritten(): void
+    {
+        // The scope itself is three keys long; the *closure* is what overflows.
+        // Only a scope that accepted the upward offer runs the closure queries
+        // at all, so this is the shape that can exceed the limit — and a stubbed
+        // wpdb answers the buyers query with one ID more than MAX_CLOSURE_IDS
+        // allows.
+        $this->stubClosureBuyers(range(1, ScopeResolver::MAX_CLOSURE_IDS + 1));
+
+        $response = $this->controller->migrate($this->request([
+            'entity_types' => ['order'],
+            'scope'        => [
+                'mode'                        => 'explicit',
+                'product_ids'                 => [12],
+                'include_orders_for_products' => true,
+            ],
+        ]));
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame('scope_closure_too_large', $response->get_data()['data']['code']);
+        $this->assertSame('idle', (new MigrationState())->getProgress()['status']);
+    }
+
+    /**
+     * Swap $GLOBALS['wpdb'] for one whose DISTINCT customer_id closure query
+     * returns this many buyers, and restore the original in tearDown().
+     *
+     * The same helper PreviewControllerTest declares in Task 9, for the same
+     * query and the same reason. Neither file has a base class to hang it on;
+     * if you extract it, extract it for both.
+     *
+     * @param list<int> $buyers
+     */
+    private function stubClosureBuyers(array $buyers): void
+    {
+        $this->originalWpdb ??= $GLOBALS['wpdb'];
+
+        $GLOBALS['wpdb'] = new class ($buyers) extends \wpdb {
+            /** @param list<int> $buyers */
+            public function __construct(private readonly array $buyers)
+            {
+            }
+
+            #[\Override]
+            public function get_col(string $query): array
+            {
+                return str_contains($query, 'DISTINCT customer_id')
+                    ? array_map(strval(...), $this->buyers)
+                    : [];
+            }
+        };
     }
 
     // ── Reset ──────────────────────────────────────────────

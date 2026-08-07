@@ -9,6 +9,8 @@ defined('ABSPATH') || exit;
 use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
 use CartShift\Domain\Migration\MigrationRollback;
+use CartShift\Domain\Scope\MigrationScope;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Migrator\CouponMigrator;
 use CartShift\Migrator\CustomerMigrator;
 use CartShift\Migrator\OrderMigrator;
@@ -74,12 +76,26 @@ final class MigrateCommand
      * `wp cartshift status`. Note that --batch-size only applies to the first
      * batch, which still runs here; background batches use the site default.
      *
+     * [--since=<date>]
+     * : Only migrate records touched on or after this date (Y-m-d). Combining
+     * this with --products or --customers is a contradiction and refused.
+     *
+     * [--products=<ids>]
+     * : Comma-separated WooCommerce product IDs to migrate explicitly. Orders
+     * and customers are not pulled in automatically — pair with a scope that
+     * needs them, or accept that only the named products travel.
+     *
+     * [--customers=<ids>]
+     * : Comma-separated WooCommerce customer IDs to migrate explicitly, along
+     * with their orders and subscriptions.
+     *
      * ## EXAMPLES
      *
      *     wp cartshift migrate
      *     wp cartshift migrate --entities=product,customer
      *     wp cartshift migrate --batch-size=100 --dry-run
      *     wp cartshift migrate --background
+     *     wp cartshift migrate --since=2024-01-01
      *
      * @param string[] $args       Positional arguments.
      * @param string[] $assocArgs  Associative arguments.
@@ -106,6 +122,29 @@ final class MigrateCommand
                 'Background processing needs Action Scheduler, which ships with both WooCommerce and FluentCart. '
                 . 'Neither appears to be loaded, so there is nothing to queue batches with.',
             );
+        }
+
+        if (self::scopeFlagsContradict($assocArgs)) {
+            \WP_CLI::error(
+                '--since cannot be combined with --products or --customers — pick a date-based '
+                . 'scope or an explicit one, not both.',
+            );
+
+            return;
+        }
+
+        $scope = self::resolveScope($assocArgs);
+
+        // Checked here, before a migration id exists, so a refusal leaves no
+        // half-started run behind. Refusing is the point: truncating a closure
+        // would migrate a subset of what the owner confirmed.
+        if ((new ScopeResolver($scope))->exceedsClosureLimit()) {
+            \WP_CLI::error(
+                'Selection is too large — narrow it (fewer products or customers, or --since instead), '
+                . 'then try again. Nothing was migrated.',
+            );
+
+            return;
         }
 
         $idMap = new IdMapRepository();
@@ -139,7 +178,7 @@ final class MigrateCommand
 
         $orchestrator = new MigrationOrchestrator($migrators, $state, $idMap, $log);
 
-        $result = $orchestrator->startMigration($entityTypes, $dryRun);
+        $result = $orchestrator->startMigration($entityTypes, $dryRun, $scope);
 
         if ($background) {
             self::handoffToBackground($state, $result, $startTime);
@@ -914,6 +953,89 @@ final class MigrateCommand
         BatchProcessor::releaseLock();
 
         return false;
+    }
+
+    /**
+     * Whether --since was combined with --products or --customers.
+     *
+     * A contradiction, not a preference to silently resolve — one says "this
+     * date onward", the other says "only these", and honouring one over the
+     * other would migrate something the operator did not ask for. Checked
+     * ahead of resolveScope() so migrate() can refuse and return before doing
+     * anything else, the same shape as every other pre-flight guard here.
+     *
+     * @param array<string, mixed> $assocArgs
+     */
+    private static function scopeFlagsContradict(array $assocArgs): bool
+    {
+        $since = $assocArgs['since'] ?? null;
+        $products = $assocArgs['products'] ?? '';
+        $customers = $assocArgs['customers'] ?? '';
+
+        return $since !== null && ($products !== '' || $customers !== '');
+    }
+
+    /**
+     * Build a MigrationScope from --since, --products and --customers.
+     *
+     * Assumes scopeFlagsContradict() has already been checked by the caller.
+     *
+     * @param array<string, mixed> $assocArgs
+     */
+    private static function resolveScope(array $assocArgs): MigrationScope
+    {
+        // Read directly rather than through WP_CLI\Utils\get_flag_value():
+        // --since takes a value, and every other value-bearing option in this
+        // command (--batch-size, --statuses, --entities) is read the same way.
+        $since = $assocArgs['since'] ?? null;
+        $products = $assocArgs['products'] ?? '';
+        $customers = $assocArgs['customers'] ?? '';
+
+        return MigrationScope::fromArray([
+            'mode'         => self::resolveScopeMode($assocArgs),
+            'since'        => $since,
+            'product_ids'  => self::csvIds((string) $products),
+            'customer_ids' => self::csvIds((string) $customers),
+        ]);
+    }
+
+    /**
+     * `explicit` when --products or --customers is present, `since` when
+     * --since is, `everything` otherwise.
+     *
+     * @param array<string, mixed> $assocArgs
+     */
+    private static function resolveScopeMode(array $assocArgs): string
+    {
+        $products = $assocArgs['products'] ?? '';
+        $customers = $assocArgs['customers'] ?? '';
+
+        if ($products !== '' || $customers !== '') {
+            return MigrationScope::MODE_EXPLICIT;
+        }
+
+        if (($assocArgs['since'] ?? null) !== null) {
+            return MigrationScope::MODE_SINCE;
+        }
+
+        return MigrationScope::MODE_EVERYTHING;
+    }
+
+    /**
+     * A comma-separated list of IDs from a CLI flag, as a list of ints.
+     *
+     * MigrationScope::fromArray() does its own normalising (positive-only,
+     * deduped, sorted), so this only has to split the string.
+     *
+     * @return list<int>
+     */
+    private static function csvIds(string $raw): array
+    {
+        if (trim($raw) === '') {
+            return [];
+        }
+
+        return array_map(static fn (string $id): int => (int) trim($id), explode(',', $raw));
     }
 
     /**
