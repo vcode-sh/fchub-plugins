@@ -115,47 +115,10 @@ final class WooStorageTest extends PluginTestCase
         $this->assertSame('', WooStorage::normalizeStatus('   '));
     }
 
-    public function testStatusInClauseQuotesEveryValue(): void
-    {
-        $clause = WooStorage::statusInClause(['wc-pending', 'wc-completed']);
 
-        $this->assertSame("status IN ('wc-pending', 'wc-completed')", $clause);
-    }
 
-    public function testStatusInClauseNormalizesAndDeduplicates(): void
-    {
-        $clause = WooStorage::statusInClause(['pending', 'wc-pending', 'completed']);
 
-        $this->assertSame("status IN ('wc-pending', 'wc-completed')", $clause);
-    }
 
-    public function testStatusInClauseMatchesNothingWhenEmpty(): void
-    {
-        $this->assertSame('1 = 0', WooStorage::statusInClause([]));
-    }
-
-    public function testStatusInClauseSanitizesTheColumnName(): void
-    {
-        $clause = WooStorage::statusInClause(['wc-pending'], 'o.status; DROP TABLE wp_posts');
-
-        // This used to assert `o.statusDROPTABLEwp_posts`, the strip-list's
-        // output: not an injection, but not a column either, so the query died
-        // at the database naming something nobody wrote. The allow-list asks
-        // the question that was actually being asked — is this a column
-        // reference? — and answers no, falling back to a valid one.
-        $this->assertStringNotContainsString(';', $clause);
-        $this->assertStringNotContainsString('DROP', $clause);
-        $this->assertSame("status IN ('wc-pending')", $clause);
-    }
-
-    public function testStatusInClauseKeepsAQualifiedColumn(): void
-    {
-        // The fallback must not swallow the legitimate case it exists to guard.
-        $this->assertSame(
-            "o.status IN ('wc-pending')",
-            WooStorage::statusInClause(['wc-pending'], 'o.status'),
-        );
-    }
 
     public function testOrderScopeClauseCombinesTypeAndStatus(): void
     {

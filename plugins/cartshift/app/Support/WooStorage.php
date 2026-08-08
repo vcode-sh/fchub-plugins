@@ -181,32 +181,6 @@ final class WooStorage
         return 'wc-' . $status;
     }
 
-    /**
-     * Build a prepared `<column> IN (...)` fragment.
-     *
-     * Every value goes through $wpdb->prepare. An empty status list yields a
-     * clause that matches nothing rather than one that matches everything —
-     * silently widening a filter is how abandoned carts got imported in the
-     * first place.
-     *
-     * @param list<string> $statuses
-     */
-    public static function statusInClause(array $statuses, string $column = 'status'): string
-    {
-        global $wpdb;
-
-        $statuses = self::normalizeStatuses($statuses);
-        $column   = self::sanitizeIdentifier($column);
-
-        if ($statuses === []) {
-            return '1 = 0';
-        }
-
-        return (string) $wpdb->prepare(
-            $column . ' IN (' . self::placeholders(count($statuses)) . ')',
-            ...$statuses,
-        );
-    }
 
     /**
      * Unprepared `type = %s AND status IN (%s, ...)` fragment plus its ordered
@@ -302,13 +276,4 @@ final class WooStorage
         return implode(', ', array_fill(0, $count, '%s'));
     }
 
-    /**
-     * Column names are never user input here; SqlIdentifier keeps that true by
-     * construction rather than by everyone remembering. See its docblock for
-     * why an allow-list beats the strip-list this used to be.
-     */
-    private static function sanitizeIdentifier(string $identifier): string
-    {
-        return SqlIdentifier::column($identifier, 'status');
-    }
 }
