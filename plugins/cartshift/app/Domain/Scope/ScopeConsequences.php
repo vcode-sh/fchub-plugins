@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use CartShift\Domain\Mapping\CouponMapper;
 use CartShift\Support\Enums\MigrationErrorCode;
+use CartShift\Support\ProductTypes;
 use CartShift\Support\WooStorage;
 use CartShift\Validator\PreflightCheck;
 
@@ -25,15 +26,16 @@ use CartShift\Validator\PreflightCheck;
  *    than its product, and a coupon restricted to products nobody picked.
  *
  *  - Losses the migrators cause under *every* scope. ProductMigrator sources
- *    only the supported product types (see
- *    PreflightCheck::SUPPORTED_PRODUCT_TYPES), so a subscription selling a
- *    LearnDash `course`, or a coupon restricted to one, is left behind just as
- *    surely under a plain "Everything" run. Gating those counts on
- *    MODE_EXPLICIT on the premise that "the whole catalogue travels" reported
- *    zero in exactly the run where the owner had asked for no narrowing at all.
+ *    only the supported product types (see \CartShift\Support\ProductTypes),
+ *    so a subscription selling a LearnDash `course`, or a coupon restricted to
+ *    one, is left behind just as surely under a plain "Everything" run. Gating
+ *    those counts on MODE_EXPLICIT on the premise that "the whole catalogue
+ *    travels" reported zero in exactly the run where the owner had asked for no
+ *    narrowing at all.
  *
- * Which product types are unsupported comes from PreflightCheck and nowhere
- * else, and which coupon restriction losses disable a coupon comes from
+ * Which products are unmigratable comes from ProductTypes and nowhere else —
+ * as the literal complement of the migrator's own predicate, not a lookalike —
+ * and which coupon restriction losses disable a coupon comes from
  * CouponMapper::WIDENING_ON_TOTAL_LOSS and nowhere else. Both are read, never
  * re-listed: a preview that disagreed with the migrator it is previewing is
  * the failure mode this whole class exists to avoid.
@@ -139,8 +141,8 @@ final class ScopeConsequences
      * Scope-aware through productPredicate(), so an explicit pick that happens
      * to contain no unmigratable product correctly reports zero, while
      * "Everything" reports the whole catalogue's worth. Same status trio and
-     * same unsupported-slug list as everything else — see
-     * PreflightCheck::SUPPORTED_PRODUCT_TYPES.
+     * the same type predicate as everything else — see
+     * \CartShift\Support\ProductTypes.
      *
      * No remedy: nothing the owner can add to the scope makes a `course`
      * migratable. The honest move is to say so and let them decide.
@@ -193,11 +195,12 @@ final class ScopeConsequences
      * true figure. Widening it is a later task (see task-8 report).
      *
      * Which types are "unrecognised" also comes from PreflightCheck —
-     * unsupportedProductTypeCounts() — rather than a second copy of the
-     * supported-type list kept here. See PreflightCheck::SUPPORTED_PRODUCT_TYPES
-     * for why there must be only one: a preflight warning and a consequence
-     * count that disagreed about which types are unsupported would be quoted
-     * side by side to the same user.
+     * unsupportedProductTypeCounts(), itself the difference between this
+     * catalogue and \CartShift\Support\ProductTypes — rather than a second copy
+     * of the supported-type list kept here. See that class for why there must
+     * be only one: a preflight warning and a consequence count that disagreed
+     * about which types are unsupported would be quoted side by side to the
+     * same user.
      *
      * The lower-bound caveat above is not just a comment for the next PHP
      * author — it travels on the wire. all() passes `isMinimum: true` for
@@ -286,11 +289,10 @@ final class ScopeConsequences
      *    product type, so a course product sitting inside the closure counted
      *    as fine.
      *
-     * The unsupported types come from PreflightCheck — see
-     * PreflightCheck::SUPPORTED_PRODUCT_TYPES for why there must be only one
-     * such list — and are applied in SQL rather than by fetching every
-     * in-scope subscription and filtering in PHP, which on an "Everything" run
-     * means every subscription in the shop.
+     * The type predicate comes from \CartShift\Support\ProductTypes — see that
+     * class for why there must be only one — and is applied in SQL rather than
+     * by fetching every in-scope subscription and filtering in PHP, which on an
+     * "Everything" run means every subscription in the shop.
      *
      * @return list<array{code: string, label: string, hint: string, severity: string, category: string, count: int, remedy: array{action: string, label: string, product_ids?: list<int>}|null}>
      */
@@ -547,7 +549,7 @@ final class ScopeConsequences
      * Three ways to fail, all of them reasons CouponMapper's ID map lookup
      * comes back empty: the post is gone or trashed, its product_type is one
      * ProductMigrator does not source, or — explicit scopes only — it is
-     * outside the closure. The type list is PreflightCheck's, never a copy.
+     * outside the closure. The type predicate is ProductTypes', never a copy.
      *
      * @param list<int> $ids
      * @return list<int>
@@ -620,43 +622,32 @@ final class ScopeConsequences
     }
 
     /**
-     * `<column> IN (every product of a type CartShift cannot migrate)`.
+     * `<column> is a product CartShift would NOT migrate`.
      *
-     * Empty SQL when the shop has no unsupported types at all, so the caller
-     * can drop the clause entirely rather than emit `IN ()`.
+     * The exact complement of the predicate the migrator counts and fetches
+     * with — ProductTypes::unmigratableClause() is literally `NOT (that)` — so
+     * a row this reports as lost is a row the migrator really does drop, and
+     * the reverse. It used to be an independently written `IN (the unsupported
+     * slugs this catalogue happens to use)`, which disagreed with the migrator
+     * about every product carrying no product_type term at all: this method
+     * called such a product fine, the migrator dropped it, and the panel said
+     * nothing was left behind.
      *
-     * The slug list comes from PreflightCheck::unsupportedProductTypeCounts()
-     * — the single definition, see PreflightCheck::SUPPORTED_PRODUCT_TYPES.
-     * Products carrying no product_type term at all are not matched here,
-     * which mirrors the picker's own exclusion (PreviewController) rather than
-     * ProductMigrator's positive IN list; the two differ on that edge, and
-     * that difference predates this method.
+     * Empty SQL when nothing in the shop is unmigratable, so the callers can
+     * drop the clause and skip the query entirely. That test is still
+     * PreflightCheck::unsupportedProductTypeCounts() — catalogue-dependent, and
+     * empty exactly when every term the shop uses is supported, which is
+     * exactly when no product can fail the predicate.
      *
      * @return array{0: string, 1: list<string>}
      */
     private static function unsupportedTypeClause(string $column): array
     {
-        $slugs = array_values(array_keys(PreflightCheck::unsupportedProductTypeCounts()));
-
-        if ($slugs === []) {
+        if (PreflightCheck::unsupportedProductTypeCounts() === []) {
             return ['', []];
         }
 
-        global $wpdb;
-
-        $holes = implode(', ', array_fill(0, count($slugs), '%s'));
-
-        return [
-            "{$column} IN (
-                    SELECT tr.object_id
-                      FROM {$wpdb->term_relationships} tr
-                INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
-                INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
-                     WHERE tt.taxonomy = 'product_type'
-                       AND t.slug IN ({$holes})
-                 )",
-            $slugs,
-        ];
+        return ProductTypes::unmigratableClause($column);
     }
 
     /**

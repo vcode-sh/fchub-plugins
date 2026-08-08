@@ -54,9 +54,7 @@ final class FetchByIdsTest extends PluginTestCase
 
     public function testProductFetchByIdsHydratesTheRequestedRecords(): void
     {
-        $GLOBALS['_cartshift_test_wc_product_batches'] = [
-            [(object) ['id' => 11], (object) ['id' => 12]],
-        ];
+        $this->stubMigratableProducts([11, 12]);
 
         $records = $this->productMigrator()->fetchByIds(['11', '12']);
 
@@ -65,33 +63,51 @@ final class FetchByIdsTest extends PluginTestCase
 
     public function testProductFetchByIdsShortCircuitsOnAnEmptyList(): void
     {
-        $GLOBALS['_cartshift_test_wc_product_batches'] = [
-            [(object) ['id' => 11]],
-        ];
+        $this->stubMigratableProducts([11]);
+        $GLOBALS['_cartshift_test_queries'] = [];
 
         $this->assertSame([], $this->productMigrator()->fetchByIds([]));
 
-        $this->assertCount(
-            1,
-            $GLOBALS['_cartshift_test_wc_product_batches'],
+        $this->assertSame(
+            [],
+            $GLOBALS['_cartshift_test_queries'],
             'An empty ID list must not cost a query.',
         );
     }
 
-    public function testProductFetchByIdsDropsNonObjectsTheQueryLayerHandsBack(): void
+    public function testProductFetchByIdsDropsIdsThatNoLongerHydrate(): void
     {
-        $GLOBALS['_cartshift_test_wc_product_batches'] = [
-            [(object) ['id' => 11], false, null, (object) ['id' => 13]],
-        ];
+        // The predicate admits all three; only two still have a post behind
+        // them. A corrupt row must not become a null in the batch.
+        $this->stubMigratableProducts([11, 12, 13]);
+        unset($GLOBALS['_cartshift_test_wc_products'][12]);
 
-        $this->assertCount(2, $this->productMigrator()->fetchByIds([11, 13]));
+        $this->assertCount(2, $this->productMigrator()->fetchByIds([11, 12, 13]));
+    }
+
+    /**
+     * A retry list comes out of a log, not out of a filtered query, so it is
+     * the one path where an unmigratable product could be handed straight to
+     * the mapper. It goes through the same ProductTypes predicate the normal
+     * run's ID page does — a `course` product whose earlier failure the owner
+     * is retrying stays out, whatever the log says.
+     */
+    public function testProductFetchByIdsAppliesTheSameTypePredicateAsANormalRun(): void
+    {
+        // The database answers for the predicate: 12 does not satisfy it.
+        $this->stubMigratableProducts([11, 12, 13], migratable: [11, 13]);
+
+        $records = $this->productMigrator()->fetchByIds([11, 12, 13]);
+
+        $this->assertSame([11, 13], array_map(static fn (object $p): int => $p->id, $records));
+
+        $predicateQuery = end($GLOBALS['_cartshift_test_queries']);
+        $this->assertStringContainsString("tt.taxonomy = 'product_type'", (string) ($predicateQuery[1] ?? ''));
     }
 
     public function testProductFetchByIdsLeavesTheKeysetCursorAlone(): void
     {
-        $GLOBALS['_cartshift_test_wc_product_batches'] = [
-            [(object) ['id' => 11]],
-        ];
+        $this->stubMigratableProducts([11]);
 
         $migrator = $this->productMigrator();
         $migrator->fetchByIds([11]);
@@ -102,6 +118,34 @@ final class FetchByIdsTest extends PluginTestCase
             $cursor->getValue($migrator),
             'A retry paginates an ID list; moving the keyset cursor would corrupt a normal run.',
         );
+    }
+
+    /**
+     * Seed a catalogue: `$ids` all have a product row to hydrate, and
+     * `$migratable` (defaulting to all of them) is what the type/status
+     * predicate answers with.
+     *
+     * @param list<int>      $ids
+     * @param list<int>|null $migratable
+     */
+    private function stubMigratableProducts(array $ids, ?array $migratable = null): void
+    {
+        $admitted = $migratable ?? $ids;
+
+        foreach ($ids as $id) {
+            $GLOBALS['_cartshift_test_wc_products'][$id] = (object) ['id' => $id];
+        }
+
+        $GLOBALS['_cartshift_test_get_col_callback'] = static function (string $query) use ($admitted): array {
+            if (!str_contains($query, "tt.taxonomy = 'product_type'")) {
+                return [];
+            }
+
+            return array_values(array_filter(
+                array_map(strval(...), $admitted),
+                static fn (string $id): bool => str_contains($query, $id),
+            ));
+        };
     }
 
     // ──────────────────────────────────────────────

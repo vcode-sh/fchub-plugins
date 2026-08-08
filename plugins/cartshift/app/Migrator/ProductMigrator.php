@@ -13,6 +13,7 @@ use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\Enums\MigrationErrorCode;
+use CartShift\Support\ProductTypes;
 use FluentCart\App\Models\AttributeGroup;
 use FluentCart\App\Models\AttributeRelation;
 use FluentCart\App\Models\AttributeTerm;
@@ -596,14 +597,19 @@ final class ProductMigrator extends AbstractMigrator
 
     /**
      * FIX H2: use COUNT(*) SQL query, not wc_get_products with limit=-1.
+     *
+     * The type test is ProductTypes::migratableClause() and nothing else. This
+     * method used to build its own positive `IN (supported slugs)` subquery
+     * from a private list kept here, which is how the denominator came to
+     * disagree with the picker, the preflight warning and the consequences
+     * panel all at once.
      */
     #[\Override]
     protected function countTotal(): int
     {
         global $wpdb;
 
-        $types = $this->getProductTypes();
-        $placeholders = implode(',', array_fill(0, count($types), '%s'));
+        [$typeSql, $typeValues] = ProductTypes::migratableClause('pml.product_id');
         $selection = $this->scopeResolver()->productPredicate('p.ID');
 
         return (int) $wpdb->get_var($wpdb->prepare(
@@ -612,15 +618,9 @@ final class ProductMigrator extends AbstractMigrator
              INNER JOIN {$wpdb->posts} p ON p.ID = pml.product_id
              WHERE p.post_type = 'product'
                AND p.post_status IN ('publish', 'draft', 'private')
-               AND pml.product_id IN (
-                   SELECT object_id FROM {$wpdb->term_relationships} tr
-                   INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-                   INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-                   WHERE tt.taxonomy = 'product_type'
-                     AND t.slug IN ({$placeholders})
-               )"
+               AND {$typeSql}"
             . $selection->andSql(),
-            ...[...$types, ...$selection->values()],
+            ...[...$typeValues, ...$selection->values()],
         ));
     }
 
@@ -637,8 +637,8 @@ final class ProductMigrator extends AbstractMigrator
      *
      * So the ID page comes from a direct indexed query that reuses countTotal()'s
      * exact type/status filtering — the two must agree, or the progress bar lies
-     * — and hydration goes through wc_get_products(['include' => $ids]), which
-     * primes the post caches in one pass the way the old call did.
+     * — and hydration then turns exactly those IDs into objects, filtering
+     * nothing, because the filtering already happened in SQL.
      */
     #[\Override]
     public function fetchBatch(string|int|null $cursor, int $limit): array
@@ -659,19 +659,7 @@ final class ProductMigrator extends AbstractMigrator
             $after = (int) end($ids);
             $this->pageEndCursor = $after;
 
-            $products = wc_get_products([
-                'limit'   => count($ids),
-                'include' => $ids,
-                'type'    => $this->getProductTypes(),
-                'status'  => ['publish', 'draft', 'private'],
-                'orderby' => 'ID',
-                'order'   => 'ASC',
-            ]);
-
-            $products = array_values(array_filter(
-                (array) $products,
-                static fn (mixed $product): bool => is_object($product),
-            ));
+            $products = self::hydrate($ids);
 
             if ($products !== []) {
                 return $products;
@@ -682,11 +670,14 @@ final class ProductMigrator extends AbstractMigrator
     /**
      * Hydrate exactly these product IDs, for a retry run.
      *
-     * The same wc_get_products() call fetchBatch() hydrates its ID page with,
-     * carrying the identical type and status filter — a product that has since
-     * been trashed, or whose type was changed to one this migrator does not
+     * A retry list comes out of a previous run's log, so unlike fetchBatch()'s
+     * ID page it has been through no filter at all — which is why it goes
+     * through migratableIdsAmong() first. That applies the same post_type,
+     * status trio and ProductTypes predicate the ID page applies, so a product
+     * since trashed, or whose type was changed to one this migrator does not
      * handle, is not returned rather than being migrated by a back door the
-     * normal run does not have.
+     * normal run does not have. What it deliberately does not apply is the
+     * scope predicate: a retry re-attempts records the owner already chose.
      *
      * The page cursor is left alone: a retry paginates an ID list, not wp_posts.
      *
@@ -703,27 +694,98 @@ final class ProductMigrator extends AbstractMigrator
             return [];
         }
 
-        $products = wc_get_products([
-            'limit'   => count($ids),
-            'include' => $ids,
-            'type'    => $this->getProductTypes(),
-            'status'  => ['publish', 'draft', 'private'],
-            'orderby' => 'ID',
-            'order'   => 'ASC',
-        ]);
+        return self::hydrate($this->migratableIdsAmong($ids));
+    }
 
-        return array_values(array_filter(
-            (array) $products,
-            static fn (mixed $product): bool => is_object($product),
+    /**
+     * Turn a settled list of product IDs into product objects.
+     *
+     * Not wc_get_products(). That call cannot express this list: WC_Product_Query
+     * always emits a `product_type` tax_query — an explicit `type` argument
+     * becomes one, and omitting `type` merely defaults it to every registered
+     * type and emits one anyway — so a product carrying no product_type term is
+     * unreachable through it, whatever arguments are passed. WooCommerce itself
+     * reads such a product as simple, this migrator's ID page now includes it,
+     * and hydrating through a taxonomy query would drop it again one step later:
+     * counted in the total, never handed to the orchestrator, never logged.
+     *
+     * So hydrate the way WooCommerce's own data store does once its WP_Query has
+     * run — prime the caches for the whole page in one pass, then wc_get_product()
+     * per ID — minus the taxonomy query this list does not need, because
+     * fetchProductIdPage() and migratableIdsAmong() have already applied it.
+     *
+     * @see woocommerce/includes/data-stores/class-wc-product-data-store-cpt.php::query() (v11.0.0, line 2452)
+     * @see woocommerce/includes/data-stores/class-wc-product-data-store-cpt.php::get_wp_query_args() (v11.0.0, line 2242)
+     *
+     * @param list<int> $ids
+     *
+     * @return list<\WC_Product>
+     */
+    private static function hydrate(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        if (function_exists('_prime_post_caches')) {
+            _prime_post_caches($ids);
+        }
+
+        $products = [];
+
+        foreach ($ids as $id) {
+            $product = wc_get_product($id);
+
+            if (is_object($product)) {
+                $products[] = $product;
+            }
+        }
+
+        return $products;
+    }
+
+    /**
+     * Which of these product IDs a run would actually source.
+     *
+     * The retry path's counterpart to fetchProductIdPage()'s WHERE clause,
+     * minus the keyset range and the scope. One predicate, one place.
+     *
+     * @param list<int> $ids
+     *
+     * @return list<int>
+     */
+    private function migratableIdsAmong(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        global $wpdb;
+
+        [$typeSql, $typeValues] = ProductTypes::migratableClause('p.ID');
+        $idHoles = implode(', ', array_fill(0, count($ids), '%d'));
+
+        $rows = $wpdb->get_col($wpdb->prepare(
+            "SELECT p.ID
+             FROM {$wpdb->posts} p
+             WHERE p.post_type = 'product'
+               AND p.post_status IN ('publish', 'draft', 'private')
+               AND p.ID IN ({$idHoles})
+               AND {$typeSql}
+             ORDER BY p.ID ASC",
+            ...[...$ids, ...$typeValues],
         ));
+
+        return array_values(array_map(intval(...), (array) $rows));
     }
 
     /**
      * The cursor is the end of the ID page, not the last hydrated record.
      *
-     * If wc_get_products() drops a trailing ID — a corrupt row, a filter that
-     * vetoes it — resuming from the last hydrated product would re-read that ID
-     * for ever. The page end always moves forward.
+     * If hydration drops a trailing ID — a corrupt row, a filter on
+     * woocommerce_product_class that vetoes it — resuming from the last
+     * hydrated product would re-read that ID for ever. The page end always
+     * moves forward.
      */
     #[\Override]
     public function cursorFor(mixed $record): string|int
@@ -744,8 +806,7 @@ final class ProductMigrator extends AbstractMigrator
     {
         global $wpdb;
 
-        $types = $this->getProductTypes();
-        $placeholders = implode(',', array_fill(0, count($types), '%s'));
+        [$typeSql, $typeValues] = ProductTypes::migratableClause('pml.product_id');
         $selection = $this->scopeResolver()->productPredicate('p.ID');
 
         $ids = $wpdb->get_col($wpdb->prepare(
@@ -755,17 +816,11 @@ final class ProductMigrator extends AbstractMigrator
              WHERE p.post_type = 'product'
                AND p.post_status IN ('publish', 'draft', 'private')
                AND p.ID > %d
-               AND pml.product_id IN (
-                   SELECT object_id FROM {$wpdb->term_relationships} tr
-                   INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-                   INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-                   WHERE tt.taxonomy = 'product_type'
-                     AND t.slug IN ({$placeholders})
-               )"
+               AND {$typeSql}"
             . $selection->andSql()
             . " ORDER BY p.ID ASC
              LIMIT %d",
-            ...[$afterId, ...$types, ...$selection->values(), $limit],
+            ...[$afterId, ...$typeValues, ...$selection->values(), $limit],
         ));
 
         return array_map(intval(...), $ids);
@@ -1305,24 +1360,6 @@ final class ProductMigrator extends AbstractMigrator
         }
 
         return $fallbackId;
-    }
-
-    /**
-     * FIX H10: include 'subscription' and 'variable-subscription' product types
-     * when WC Subscriptions is active.
-     *
-     * @return string[]
-     */
-    private function getProductTypes(): array
-    {
-        $types = ['simple', 'variable'];
-
-        if (class_exists('WC_Subscriptions')) {
-            $types[] = 'subscription';
-            $types[] = 'variable-subscription';
-        }
-
-        return $types;
     }
 
     /**
