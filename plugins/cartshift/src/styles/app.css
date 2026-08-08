@@ -69,12 +69,38 @@ body.dark {
   --cartshift-progress-bg: #363b44;
 }
 
-/* ── Page wrapper — full-bleed FC background ── */
+/* ── Page wrapper — full-bleed FC background ──
+   The background sits on WP's own #wpcontent so the wrapper never has to claw
+   back ancestor padding with negative margins.
+
+   It used to: `margin: -10px -20px 0`. #wpcontent pads 20px on the left and
+   nothing on the right, so the left pull cancelled something real while the
+   right pull cancelled nothing — a permanent 20px horizontal scrollbar on
+   every screen. Below 782px WP drops that padding to 10px, so the same -20px
+   also dragged 10px of the card off the left edge, unreachable. Cancelling
+   ancestor padding you do not own is a losing game; letting WP keep its
+   padding and colouring its element instead means there is nothing to cancel. */
+body.tools_page_cartshift-migrator #wpcontent,
+body.tools_page_cartshift-migrator #wpbody-content {
+  background: var(--cartshift-page-bg);
+}
+
+/* Full-viewport colour is the job of whichever element paints the background,
+   which is now this one. #wpcontent starts below the 32px admin bar, so this
+   reaches the bottom of the viewport and stops.
+
+   The wrapper used to carry the min-height, and overshot: it also has 32px of
+   padding and a -10px pull, none of which the calc knew about, so a short
+   screen ended with a band of empty background under the last card. The
+   wrapper now sizes to its content and nothing sits below it but the footer. */
+body.tools_page_cartshift-migrator #wpcontent {
+  min-height: calc(100vh - 32px);
+}
+
 .cartshift-page-wrap {
   background: var(--cartshift-page-bg);
-  margin: -10px -20px 0;
+  margin: -10px 0 0;
   padding: 32px 24px;
-  min-height: calc(100vh - 32px);
 }
 
 /* ── Container ── */
@@ -83,6 +109,19 @@ body.dark {
   color: var(--cartshift-text-primary);
   max-width: 960px;
   margin: 0 auto;
+}
+
+/* Whatever ends a screen — a paragraph of buttons, a table, a notice — carries
+   a 20px bottom margin. Nothing between it and the page wrapper has padding or
+   a border, so that margin collapses straight out of the container and lands
+   as a strip of empty background beneath the last card, on top of the 32px the
+   wrapper already pads. Trim it where it starts.
+
+   The #cartshift-app prefix is not decoration: the margin it has to beat comes
+   from `#cartshift-app p`, and an ID outranks any number of classes. */
+#cartshift-app .cartshift-container > :last-child,
+#cartshift-app .cartshift-container > * > :last-child {
+  margin-bottom: 0;
 }
 
 /* ── Page header (title + theme switcher inline) ── */
@@ -254,9 +293,92 @@ body.dark #cartshift-app table.widefat tbody tr:hover td {
   background: #2a2e37;
 }
 
-/* Checks table column widths */
-.cartshift-checks td:first-child { width: 200px; }
-.cartshift-checks td:nth-child(2) { width: 60px; text-align: center; }
+/* ── Table column geometry ────────────────────────────────────────────────
+   `table-layout: fixed`, with the widths on the thead cells where fixed layout
+   reads them.
+
+   Auto layout sized every column to whatever happened to be in it, so the two
+   Entity/Count tables on the preflight screen — same two columns, same page,
+   stacked one above the other — resolved to 597/363 and 611/349 and visibly
+   refused to line up. The old rules here asked for 200px and 60px on `td`;
+   auto layout treats that as a suggestion and handed back 232px and 99px.
+   Declared widths that the browser ignores are worse than none: they read as
+   deliberate. Fixed layout means the numbers below are the numbers you get. */
+
+#cartshift-app table.cartshift-checks,
+#cartshift-app table.cartshift-table-counts,
+#cartshift-app table.cartshift-table-select,
+#cartshift-app table.cartshift-progress-table,
+#cartshift-app table.cartshift-table-results {
+  table-layout: fixed;
+}
+
+/* Fixed layout will not widen a cell to fit a long word, so let prose wrap
+   rather than bleed out over the next column. */
+#cartshift-app table.widefat tbody td {
+  overflow-wrap: break-word;
+}
+
+/* Numeric columns: right-aligned against the column edge, tabular figures so
+   digits stack instead of drifting. The log breakdown already did this. */
+#cartshift-app .cartshift-num,
+#cartshift-app .cartshift-table-counts th:nth-child(2),
+#cartshift-app .cartshift-table-counts td:nth-child(2),
+#cartshift-app .cartshift-table-select th:nth-child(3),
+#cartshift-app .cartshift-table-select td:nth-child(3),
+#cartshift-app .cartshift-progress-table th:nth-child(n + 3),
+#cartshift-app .cartshift-progress-table td:nth-child(n + 3),
+#cartshift-app .cartshift-table-results th:nth-child(2),
+#cartshift-app .cartshift-table-results td:nth-child(2),
+#cartshift-app .cartshift-table-results th:nth-child(3),
+#cartshift-app .cartshift-table-results td:nth-child(3),
+#cartshift-app .cartshift-table-results th:nth-child(4),
+#cartshift-app .cartshift-table-results td:nth-child(4) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Entity / Count — preflight WC counts and existing FC data */
+#cartshift-app .cartshift-table-counts th:nth-child(1) { width: 70%; }
+#cartshift-app .cartshift-table-counts th:nth-child(2) { width: 30%; }
+
+/* Check / Status / Details. Status was centred on the body cells and left on
+   the header, so the column had two different alignments. Both centre now. */
+#cartshift-app .cartshift-checks th:nth-child(1) { width: 26%; }
+#cartshift-app .cartshift-checks th:nth-child(2) { width: 14%; }
+#cartshift-app .cartshift-checks th:nth-child(3) { width: 60%; }
+
+#cartshift-app .cartshift-checks th:nth-child(2),
+#cartshift-app .cartshift-checks td:nth-child(2) {
+  text-align: center;
+}
+
+/* Checkbox / Entity / Count / Dependencies. Entity labels are one word each;
+   Dependencies carries the prose, so it takes what is left rather than being
+   the column that gets squeezed. */
+#cartshift-app .cartshift-table-select th:nth-child(1) { width: 48px; }
+#cartshift-app .cartshift-table-select th:nth-child(2) { width: 26%; }
+#cartshift-app .cartshift-table-select th:nth-child(3) { width: 14%; }
+
+/* Entity / Progress / Processed / Skipped / Errors */
+#cartshift-app .cartshift-progress-table th:nth-child(1) { width: 22%; }
+#cartshift-app .cartshift-progress-table th:nth-child(2) { width: 30%; }
+#cartshift-app .cartshift-progress-table th:nth-child(3) { width: 20%; }
+#cartshift-app .cartshift-progress-table th:nth-child(4) { width: 14%; }
+#cartshift-app .cartshift-progress-table th:nth-child(5) { width: 14%; }
+
+/* Entity / Processed / Skipped / Errors / Status */
+#cartshift-app .cartshift-table-results th:nth-child(1) { width: 28%; }
+#cartshift-app .cartshift-table-results th:nth-child(2) { width: 16%; }
+#cartshift-app .cartshift-table-results th:nth-child(3) { width: 16%; }
+#cartshift-app .cartshift-table-results th:nth-child(4) { width: 16%; }
+#cartshift-app .cartshift-table-results th:nth-child(5) { width: 24%; }
+
+/* Status badges keep their own alignment — they are not numbers. */
+#cartshift-app .cartshift-table-results th:nth-child(5),
+#cartshift-app .cartshift-table-results td:nth-child(5) {
+  text-align: left;
+}
 
 /* Progress table */
 .cartshift-progress-table td { vertical-align: middle; }
@@ -434,7 +556,10 @@ body.dark .cartshift-badge-dryrun { background: #1c2540; color: #6d8cff; border-
   background: var(--cartshift-progress-bg);
   border-radius: 12px;
   overflow: hidden;
-  min-width: 200px;
+  /* The 30% column reserves the room now. A 200px floor was how the bar kept
+     its shape under auto layout; under fixed layout it just overflows the
+     cell on narrow screens. */
+  min-width: 0;
 }
 
 .cartshift-progress-fill {
@@ -523,9 +648,24 @@ body.dark .cartshift-log-error td {
 
 .cartshift-option-box label {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   cursor: pointer;
+}
+
+/* The description after the bold name is a bare text node, which a flex parent
+   promotes to an anonymous flex item — so <strong> sits next to a very long
+   sibling and, being shrinkable by default, gets squeezed to its narrowest.
+   That is why "Dry run" rendered stacked as "Dry" over "run". Names do not
+   shrink; only the prose beside them does. */
+.cartshift-option-box label > strong {
+  flex: 0 0 auto;
+}
+
+/* The checkbox belongs against the first line of a wrapped description, not
+   floating halfway down it. */
+.cartshift-option-box label > input[type="checkbox"] {
+  margin-top: 3px;
 }
 
 /* ── Disabled checkboxes ── */
@@ -1725,9 +1865,18 @@ body.dark .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
    Select screen: scope doors + picker + receipt layout
    ═══════════════════════════════════════════════════════════════ */
 
+/* The left column is the screen: scope, the entity table, the run options —
+   everything you actually operate. The receipt on the right is a read-only
+   summary of what those choices add up to.
+
+   They used to split 1.1fr / 0.9fr, near enough half each, which is the wrong
+   trade: the left column's content wanted ~1500px and was living on 515, while
+   the receipt needed 53px at its narrowest and was handed 421. Capping the
+   receipt at a readable panel width and giving the remainder to the controls
+   costs the summary nothing and buys the working column ~100px. */
 .cartshift-select-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 24px;
   align-items: start;
   margin-top: 16px;

@@ -18,7 +18,7 @@
         <!-- The selection changes on a debounce as the owner edits it, so the counts
              and consequences below are announced politely, not interrupted mid-typing. -->
         <div aria-live="polite">
-          <table class="widefat striped">
+          <table class="widefat striped cartshift-table-counts">
             <thead>
               <tr><th>Entity</th><th>Count</th></tr>
             </thead>

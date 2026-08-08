@@ -102,14 +102,14 @@
 
         <template v-if="state.counts">
           <h2>WooCommerce Data Counts</h2>
-          <table class="widefat striped">
+          <table class="widefat striped cartshift-table-counts">
             <thead>
               <tr><th>Entity</th><th>Count</th></tr>
             </thead>
             <tbody>
               <tr v-for="(count, entity) in state.counts" :key="entity">
                 <td>{{ capitalize(entity) }}</td>
-                <td>{{ count }}</td>
+                <td>{{ formatNumber(count) }}</td>
               </tr>
             </tbody>
           </table>
@@ -121,14 +121,14 @@
             FluentCart is not empty. Migrating on top of this will not wipe it, but it will
             add to it &mdash; check the numbers below are what you expect.
           </p>
-          <table class="widefat striped">
+          <table class="widefat striped cartshift-table-counts">
             <thead>
               <tr><th>Entity</th><th>Count</th></tr>
             </thead>
             <tbody>
               <tr v-for="(count, entity) in fcDataCounts" :key="entity">
                 <td>{{ capitalize(entity) }}</td>
-                <td>{{ count }}</td>
+                <td>{{ formatNumber(count) }}</td>
               </tr>
             </tbody>
           </table>
@@ -212,5 +212,11 @@ const fcDataCounts = computed(() => {
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, ' ');
+}
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0';
+  return n.toLocaleString();
 }
 </script>

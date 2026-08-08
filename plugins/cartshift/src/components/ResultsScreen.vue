@@ -25,20 +25,20 @@
     <!-- Summary table -->
     <template v-if="state.progress?.entities">
       <h2>Summary</h2>
-      <table class="widefat striped">
+      <table class="widefat striped cartshift-table-results">
         <thead>
           <tr><th>Entity</th><th>Processed</th><th>Skipped</th><th>Errors</th><th>Status</th></tr>
         </thead>
         <tbody>
           <tr v-for="(e, entity) in state.progress.entities" :key="entity">
             <td><strong>{{ capitalize(entity) }}</strong></td>
-            <td>{{ e.processed }}</td>
+            <td>{{ formatNumber(e.processed) }}</td>
             <td>
-              <span v-if="e.skipped > 0" class="cartshift-warn-text">{{ e.skipped }}</span>
+              <span v-if="e.skipped > 0" class="cartshift-warn-text">{{ formatNumber(e.skipped) }}</span>
               <template v-else>0</template>
             </td>
             <td>
-              <span v-if="e.errors > 0" class="cartshift-fail">{{ e.errors }}</span>
+              <span v-if="e.errors > 0" class="cartshift-fail">{{ formatNumber(e.errors) }}</span>
               <template v-else>0</template>
             </td>
             <td>
@@ -49,9 +49,9 @@
           </tr>
           <tr class="cartshift-total-row">
             <td><strong>Total</strong></td>
-            <td><strong>{{ totals.processed }}</strong></td>
-            <td><strong>{{ totals.skipped }}</strong></td>
-            <td><strong>{{ totals.errors }}</strong></td>
+            <td><strong>{{ formatNumber(totals.processed) }}</strong></td>
+            <td><strong>{{ formatNumber(totals.skipped) }}</strong></td>
+            <td><strong>{{ formatNumber(totals.errors) }}</strong></td>
             <td></td>
           </tr>
         </tbody>
@@ -330,6 +330,12 @@ const outcome = computed(() => {
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, ' ');
+}
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0';
+  return n.toLocaleString();
 }
 
 function newMigration() {

@@ -73,7 +73,7 @@
           </div>
         </fieldset>
 
-        <table class="widefat striped">
+        <table class="widefat striped cartshift-table-select">
           <thead>
             <tr><th></th><th>Entity</th><th>Count</th><th>Dependencies</th></tr>
           </thead>
@@ -170,7 +170,13 @@ const wcsActive = computed(() => {
 
 function getCount(key) {
   if (!state.counts) return '?';
-  return state.counts[key] ?? state.counts[key + 's'] ?? 0;
+  return formatNumber(state.counts[key] ?? state.counts[key + 's'] ?? 0);
+}
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0';
+  return n.toLocaleString();
 }
 
 function toggleEntity(key, event) {
