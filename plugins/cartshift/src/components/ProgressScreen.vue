@@ -123,10 +123,10 @@
                 {{ progressOf(e).label }}
               </span>
             </td>
-            <td>{{ e.processed }} / {{ totalLabel(e) }}</td>
-            <td>{{ e.skipped }}</td>
+            <td>{{ formatNumber(e.processed) }} / {{ totalLabel(e) }}</td>
+            <td>{{ formatNumber(e.skipped) }}</td>
             <td>
-              <span v-if="e.errors > 0" class="cartshift-fail">{{ e.errors }}</span>
+              <span v-if="e.errors > 0" class="cartshift-fail">{{ formatNumber(e.errors) }}</span>
               <template v-else>0</template>
             </td>
           </tr>
@@ -324,7 +324,13 @@ function totalLabel(e) {
   if (!Number.isFinite(total) || total < 0) return '?';
   if (total === 0 && (e?.status || 'pending') === 'pending') return '?';
 
-  return total;
+  return formatNumber(total);
+}
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0';
+  return n.toLocaleString();
 }
 
 function openReset(force) {
