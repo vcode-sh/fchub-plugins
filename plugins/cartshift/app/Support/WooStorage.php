@@ -303,13 +303,12 @@ final class WooStorage
     }
 
     /**
-     * Column names are never user input here, but strip anything that is not a
-     * plausible identifier before it reaches a query string.
+     * Column names are never user input here; SqlIdentifier keeps that true by
+     * construction rather than by everyone remembering. See its docblock for
+     * why an allow-list beats the strip-list this used to be.
      */
     private static function sanitizeIdentifier(string $identifier): string
     {
-        $clean = preg_replace('/[^A-Za-z0-9_.]/', '', $identifier) ?? '';
-
-        return $clean === '' ? 'status' : $clean;
+        return SqlIdentifier::column($identifier, 'status');
     }
 }

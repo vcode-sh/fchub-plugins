@@ -192,18 +192,6 @@ final class ProductTypes
      */
     private static function sanitizeColumn(string $column): string
     {
-        $column = trim($column);
-
-        $identifier = '[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?';
-
-        if (preg_match('/^' . $identifier . '$/', $column) === 1) {
-            return $column;
-        }
-
-        if (preg_match('/^CAST\(' . $identifier . ' AS [A-Za-z]+\)$/', $column) === 1) {
-            return $column;
-        }
-
-        return 'p.ID';
+        return SqlIdentifier::column($column, 'p.ID');
     }
 }

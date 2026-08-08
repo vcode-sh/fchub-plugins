@@ -138,10 +138,23 @@ final class WooStorageTest extends PluginTestCase
     {
         $clause = WooStorage::statusInClause(['wc-pending'], 'o.status; DROP TABLE wp_posts');
 
-        // Everything outside [A-Za-z0-9_.] is stripped, so the statement
-        // separator and the spaces that would make this a second query are gone.
+        // This used to assert `o.statusDROPTABLEwp_posts`, the strip-list's
+        // output: not an injection, but not a column either, so the query died
+        // at the database naming something nobody wrote. The allow-list asks
+        // the question that was actually being asked — is this a column
+        // reference? — and answers no, falling back to a valid one.
         $this->assertStringNotContainsString(';', $clause);
-        $this->assertSame("o.statusDROPTABLEwp_posts IN ('wc-pending')", $clause);
+        $this->assertStringNotContainsString('DROP', $clause);
+        $this->assertSame("status IN ('wc-pending')", $clause);
+    }
+
+    public function testStatusInClauseKeepsAQualifiedColumn(): void
+    {
+        // The fallback must not swallow the legitimate case it exists to guard.
+        $this->assertSame(
+            "o.status IN ('wc-pending')",
+            WooStorage::statusInClause(['wc-pending'], 'o.status'),
+        );
     }
 
     public function testOrderScopeClauseCombinesTypeAndStatus(): void
