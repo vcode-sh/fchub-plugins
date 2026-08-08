@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CartShift\Validator;
 
+use CartShift\Support\ProductTypes;
 use CartShift\Support\WooStorage;
 
 defined('ABSPATH') || exit;
@@ -37,21 +38,6 @@ final class PreflightCheck
     private const string ORDER_UTIL = '\Automattic\WooCommerce\Utilities\OrderUtil';
 
     private const string HPOS_DATA_STORE = '\Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore';
-
-    /**
-     * WooCommerce product types CartShift can migrate.
-     *
-     * The single definition of "supported" — checkProductTypes() and
-     * ScopeConsequences::productLinkMissingCount() both read it, by way of
-     * unsupportedProductTypeCounts(), rather than each keeping their own copy.
-     * A preflight warning and a scope consequence count that disagreed about
-     * which types are unsupported would be quoted side by side to the same
-     * user; this project has produced three separate defects from exactly
-     * that class of drift.
-     *
-     * @var list<string>
-     */
-    private const array SUPPORTED_PRODUCT_TYPES = ['simple', 'variable', 'subscription', 'variable-subscription'];
 
     /**
      * WooCommerce plugins that grant entitlements (course access, membership levels)
@@ -391,10 +377,10 @@ final class PreflightCheck
     /**
      * ADVISORY. Never blocks.
      *
-     * Unsupported product types are excluded from getProductTypes(), which is what
-     * countTotal() and fetchBatch() filter on — by design, because CartShift cannot
-     * map, say, a LearnDash course product's data and attempting to would fail in
-     * worse and less visible ways than not migrating it at all.
+     * Unsupported product types are excluded by ProductTypes::migratableClause(),
+     * which is what countTotal() and fetchBatch() filter on — by design, because
+     * CartShift cannot map, say, a LearnDash course product's data and attempting
+     * to would fail in worse and less visible ways than not migrating it at all.
      *
      * The trap: excluded from the denominator means invisible, not skipped. A store
      * with 27 products where 2 are `course` reports "25 / 25 migrated" and never
@@ -473,10 +459,19 @@ final class PreflightCheck
     }
 
     /**
-     * Every product_type term present in the catalogue, keyed by slug, with how
-     * many products carry it. publish/draft/private only — the same trio
+     * The catalogue's product types, keyed by slug, with how many products
+     * carry each. publish/draft/private only — the same trio
      * countOrdersAffectedByTypes() restricts to, so a product sitting in the
      * trash cannot inflate either number.
+     *
+     * Products with no `product_type` term at all are counted under `simple`,
+     * because that is what they are: WooCommerce resolves a missing term to
+     * ProductType::SIMPLE, ProductTypes::migratableClause() therefore lets them
+     * through, and the migrator's total includes them. A histogram that left
+     * them out would report "Simple: 25" on a store the progress bar then takes
+     * to 26 — the same disagreement, one screen earlier.
+     *
+     * @see \CartShift\Support\ProductTypes
      *
      * @return array<string, int>
      */
@@ -502,7 +497,33 @@ final class PreflightCheck
             $types[$row->slug] = (int) $row->count;
         }
 
+        $untyped = self::untypedProductCount();
+
+        if ($untyped > 0) {
+            $types['simple'] = ($types['simple'] ?? 0) + $untyped;
+            arsort($types);
+        }
+
         return $types;
+    }
+
+    /**
+     * Products carrying no `product_type` term at all.
+     *
+     * Same status trio, same post_type, and the subquery comes from
+     * ProductTypes rather than being spelled out a fourth time.
+     */
+    private static function untypedProductCount(): int
+    {
+        global $wpdb;
+
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(*)
+             FROM {$wpdb->posts} p
+             WHERE p.post_type = 'product'
+               AND p.post_status IN ('publish', 'draft', 'private')
+               AND p.ID NOT IN (" . ProductTypes::typedProductSubquery() . ')',
+        );
     }
 
     /**
@@ -513,7 +534,7 @@ final class PreflightCheck
     {
         $unsupported = [];
 
-        foreach (array_diff(array_keys($types), self::SUPPORTED_PRODUCT_TYPES) as $slug) {
+        foreach (array_diff(array_keys($types), ProductTypes::supported()) as $slug) {
             $unsupported[$slug] = $types[$slug];
         }
 
@@ -524,8 +545,12 @@ final class PreflightCheck
      * product_type slugs CartShift cannot migrate, each with how many products
      * in the catalogue carry it.
      *
-     * The one place that answers "which types are unsupported" — see
-     * SUPPORTED_PRODUCT_TYPES for why there must be only one.
+     * Catalogue-dependent, which is why it lives here rather than on
+     * ProductTypes: the answer is the difference between the terms this shop
+     * actually uses and ProductTypes::supported(). The supported side is never
+     * restated — see that class for why there must be only one of it, and note
+     * that on a store where WooCommerce Subscriptions has been disabled the
+     * subscription slugs appear here, deliberately.
      *
      * @return array<string, int>
      */

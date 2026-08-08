@@ -19,8 +19,8 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\ProductTypes;
 use CartShift\Support\WooStorage;
-use CartShift\Validator\PreflightCheck;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -207,12 +207,18 @@ final class PreviewController
      * picked product of a type ProductMigrator does not source travels into
      * MigrationScope::productIds() unfiltered — ScopeResolver's closure does
      * not know about product types either — and only ProductMigrator's own
-     * SUPPORTED_PRODUCT_TYPES join at count/fetch time drops it, silently, as
+     * type join at count/fetch time drops it, silently, as
      * counts['product'] === 0 for a pick the owner made deliberately. The
      * picker showing it at all is the point the owner has no way to notice
-     * that decision was made. Reuses PreflightCheck::unsupportedProductTypeCounts()
-     * — see PreflightCheck::SUPPORTED_PRODUCT_TYPES for why a second copy of
-     * the supported-type list must never exist.
+     * that decision was made.
+     *
+     * The predicate is ProductTypes::migratableClause() — the same one the
+     * migrator counts and fetches with, and the same one the consequences
+     * panel takes the complement of. Not a lookalike: this used to be a
+     * hand-rolled `NOT IN (unsupported slugs)`, which agreed with the migrator
+     * on nothing in particular and disagreed with it about products carrying no
+     * product_type term and about subscription products on a store where
+     * WooCommerce Subscriptions has since been disabled.
      *
      * One extra row is asked for so truncation can be reported without a
      * second COUNT query: if the limit'th-plus-one row comes back, more
@@ -226,23 +232,7 @@ final class PreviewController
 
         $like = '%' . self::escLike($term) . '%';
 
-        $unsupportedTypes = array_keys(PreflightCheck::unsupportedProductTypeCounts());
-
-        $exclusion = '';
-        $exclusionValues = [];
-
-        if ($unsupportedTypes !== []) {
-            $placeholders = implode(', ', array_fill(0, count($unsupportedTypes), '%s'));
-
-            $exclusion = " AND p.ID NOT IN (
-                   SELECT tr.object_id FROM {$wpdb->term_relationships} tr
-                   INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-                   INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-                   WHERE tt.taxonomy = 'product_type'
-                     AND t.slug IN ({$placeholders})
-               )";
-            $exclusionValues = $unsupportedTypes;
-        }
+        [$typeSql, $typeValues] = ProductTypes::migratableClause('p.ID');
 
         $rows = (array) $wpdb->get_results($wpdb->prepare(
             "SELECT p.ID AS id, p.post_title AS title, pml.sku AS sku
@@ -250,11 +240,11 @@ final class PreviewController
              LEFT JOIN {$wpdb->prefix}wc_product_meta_lookup pml ON pml.product_id = p.ID
              WHERE p.post_type = 'product'
                AND p.post_status IN ('publish', 'draft', 'private')
-               AND (p.post_title LIKE %s OR pml.sku LIKE %s)"
-            . $exclusion
-            . " ORDER BY p.post_title ASC
+               AND (p.post_title LIKE %s OR pml.sku LIKE %s)
+               AND {$typeSql}
+             ORDER BY p.post_title ASC
              LIMIT %d",
-            ...[$like, $like, ...$exclusionValues, $limit + 1],
+            ...[$like, $like, ...$typeValues, $limit + 1],
         ), ARRAY_A);
 
         $truncated = count($rows) > $limit;

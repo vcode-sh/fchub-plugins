@@ -10,6 +10,7 @@ use CartShift\Http\Controllers\PreviewController;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\ProductTypes;
 use CartShift\Tests\Unit\PluginTestCase;
 use WP_REST_Request;
 
@@ -177,12 +178,11 @@ final class PreviewControllerTest extends PluginTestCase
      * the pick travels silently into MigrationScope::productIds() and only
      * evaporates later as counts['product'] === 0 with no explanation.
      *
-     * Simulates the NOT IN exclusion for real: the fake product_type_counts
+     * Simulates the type predicate for real: the fake product_type_counts
      * query reports one `course`-type product, and the fake results handler
-     * for the main product query parses the `t.slug IN (...)` values the
-     * code actually sent and drops matching fixture rows before returning
-     * them — so this fails if the exclusion clause is ever missing, not just
-     * if the fixture happens to agree with it.
+     * for the main product query evaluates the predicate the code actually
+     * sent against the fixture rows — so this fails if the predicate is ever
+     * missing, not just if the fixture happens to agree with it.
      */
     public function testUnsupportedProductTypeIsExcludedFromSearch(): void
     {
@@ -222,17 +222,59 @@ final class PreviewControllerTest extends PluginTestCase
     }
 
     /**
-     * No unsupported type present in the catalogue: the exclusion subquery
-     * must not be added at all, matching PreflightCheck's own "empty diff"
-     * shortcut and confirming this is not a permanent, unconditional clause.
+     * A product with no `product_type` term is an ordinary simple product —
+     * that is WooCommerce's own reading of a missing term — so the picker has
+     * to offer it, and the migrator has to migrate it. Both halves matter and
+     * they used to be answered differently: the picker's old `NOT IN
+     * (unsupported slugs)` let such a product through, ProductMigrator's
+     * positive `IN (supported slugs)` did not, and the owner picked something
+     * that then evaporated as counts['product'] === 0.
+     *
+     * `'type' => null` is the fixture's spelling of "no term row at all"; see
+     * stubProductTypeFixture(), which drops such a row unless the query really
+     * carries the no-type branch.
      */
-    public function testNoExclusionClauseWhenNothingIsUnsupported(): void
+    public function testAProductWithNoTypeTermIsStillOfferedByThePicker(): void
+    {
+        $this->stubProductTypeFixture(
+            rows: [
+                ['id' => 1, 'title' => 'Hoodie Untyped', 'sku' => '', 'type' => null],
+                ['id' => 2, 'title' => 'Hoodie Course', 'sku' => '', 'type' => 'course'],
+            ],
+            typeCounts: [['slug' => 'course', 'count' => 1]],
+        );
+
+        $labels = array_column(
+            $this->controller()->search($this->request(['type' => 'product', 'q' => 'hoodie']))
+                ->get_data()['data']['results'],
+            'label',
+        );
+
+        $this->assertContains('Hoodie Untyped', $labels);
+        $this->assertNotContains('Hoodie Course', $labels);
+    }
+
+    /**
+     * The predicate is unconditional now, and that is the fix rather than an
+     * oversight. It used to be added only when the catalogue happened to
+     * contain an unsupported type, which meant the picker asked a different
+     * question from the migrator on every store that had none — and the
+     * migrator's question, the one that decides what actually travels, is
+     * asked every time.
+     */
+    public function testTheTypePredicateIsAppliedEvenWithNothingUnsupportedInTheCatalogue(): void
     {
         $db = $this->stubSearchResults(productRows: [['id' => 1, 'title' => 'Hoodie', 'sku' => '']]);
 
         $this->controller()->search($this->request(['type' => 'product', 'q' => 'hoodie']));
 
-        $this->assertStringNotContainsString('NOT IN', $db->lastQuery);
+        [$expected, $values] = ProductTypes::migratableClause('p.ID');
+
+        $this->assertStringContainsString(
+            $GLOBALS['wpdb']->prepare($expected, ...$values),
+            $db->lastQuery,
+            'The picker must ask the migrator\'s question, not a lookalike.',
+        );
     }
 
     public function testSearchLimitIsClampedToFifty(): void
@@ -360,16 +402,23 @@ final class PreviewControllerTest extends PluginTestCase
      * see PreflightCheckTest) rather than a custom wpdb subclass, because this
      * one has to behave like a real database: the product_type_counts branch
      * reports the configured type histogram, and the main product query
-     * parses the `t.slug IN (...)` values PreviewController actually put in
-     * the query and filters `$rows` by them before returning — so a missing
-     * or wrong exclusion clause fails the test on its own, not on a fixture
-     * that was curated to already look filtered.
+     * evaluates the type predicate PreviewController actually put in the query
+     * against `$rows` before returning them — so a missing or wrong predicate
+     * fails the test on its own, not on a fixture that was curated to already
+     * look filtered.
+     *
+     * The predicate is positive now (ProductTypes::migratableClause: the slug
+     * list in `t.slug IN (...)` is what CartShift CAN migrate, not what it
+     * cannot) with a second branch for products carrying no `product_type`
+     * term at all. A fixture row spells that state as `'type' => null`, and
+     * this stub honours it exactly as the SQL does: kept, because WooCommerce
+     * reads a missing term as `simple`.
      *
      * Cleared automatically: tearDown() already unsets
      * _cartshift_test_get_results_callback after every test.
      *
-     * @param list<array{id: int, title: string, sku: string, type: string}> $rows
-     * @param list<array{slug: string, count: int}>                         $typeCounts
+     * @param list<array{id: int, title: string, sku: string, type: string|null}> $rows
+     * @param list<array{slug: string, count: int}>                               $typeCounts
      */
     private function stubProductTypeFixture(array $rows, array $typeCounts): void
     {
@@ -382,18 +431,24 @@ final class PreviewControllerTest extends PluginTestCase
                 return [];
             }
 
-            $excludedTypes = [];
+            $supportedTypes = [];
 
             if (preg_match('/t\.slug IN \(([^)]*)\)/', $query, $matches)) {
-                $excludedTypes = array_map(
+                $supportedTypes = array_map(
                     static fn (string $slug): string => trim($slug, " '"),
                     explode(',', $matches[1]),
                 );
             }
 
+            // The no-type branch of the real predicate. Without it in the
+            // query, an untyped fixture row must disappear here too.
+            $admitsUntyped = str_contains($query, "NOT IN (\n                        SELECT tr.object_id");
+
             return array_values(array_filter(
                 $rows,
-                static fn (array $row): bool => !in_array($row['type'], $excludedTypes, true),
+                static fn (array $row): bool => $row['type'] === null
+                    ? $admitsUntyped
+                    : in_array($row['type'], $supportedTypes, true),
             ));
         };
     }

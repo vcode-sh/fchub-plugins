@@ -10,13 +10,11 @@ use CartShift\Migrator\SubscriptionMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\ProductTypes;
 use CartShift\Tests\Unit\PluginTestCase;
 
 require_once dirname(__DIR__, 3) . '/stubs/EntityMigratorStubs.php';
 require_once dirname(__DIR__, 3) . '/stubs/ProductMigratorStubs.php';
-// wc_get_products() lives in HttpCliStubs despite the name — see the header
-// there. Its queue semantics are load-bearing for testTheProductCursorIsTheEndOfTheIdPage,
-// so require it rather than defining a second, stateless copy here.
 require_once dirname(__DIR__, 3) . '/stubs/HttpCliStubs.php';
 
 /**
@@ -127,7 +125,11 @@ final class KeysetSourceQueryTest extends PluginTestCase
         $this->assertStringContainsString('LIMIT 40', $db->lastQuery);
         $this->assertStringNotContainsString('OFFSET', $db->lastQuery);
         $this->assertStringContainsString("p.post_status IN ('publish', 'draft', 'private')", $db->lastQuery);
-        $this->assertStringContainsString("t.slug IN ('simple','variable')", $db->lastQuery);
+
+        // The type filter is ProductTypes' predicate, byte for byte, not a
+        // second list that happens to say the same thing today.
+        [$typeSql, $typeValues] = ProductTypes::migratableClause('pml.product_id');
+        $this->assertStringContainsString($db->prepare($typeSql, ...$typeValues), $db->lastQuery);
     }
 
     public function testTheProductCursorIsTheEndOfTheIdPage(): void
@@ -135,7 +137,7 @@ final class KeysetSourceQueryTest extends PluginTestCase
         // The ID page covers 11 and 12; hydration only yields 11. Resuming from
         // the last hydrated product would re-read 12 for ever.
         $this->recordingWpdb([11, 12]);
-        $GLOBALS['_cartshift_test_wc_product_batches'] = [[(object) ['id' => 11]]];
+        $GLOBALS['_cartshift_test_wc_products'] = [11 => (object) ['id' => 11]];
 
         $migrator = $this->productMigrator();
         $batch = $migrator->fetchBatch(null, 50);
