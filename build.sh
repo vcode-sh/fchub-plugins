@@ -391,16 +391,34 @@ for entry in "${PLUGINS[@]}"; do
     fi
     info "Version: $version"
 
-    # Run npm build for portal-extender
-    if [ "$slug" = "fchub-portal-extender" ]; then
-        if [ -f "$plugin_dir/package.json" ]; then
-            info "Running npm build for $slug ..."
-            (cd "$plugin_dir" && npm ci --silent && npm run build --silent)
-            if [ ! -d "$plugin_dir/assets/dist" ] || [ -z "$(ls -A "$plugin_dir/assets/dist" 2>/dev/null)" ]; then
-                error "npm build failed — assets/dist/ is empty"
+    # Rebuild any plugin that has a build, rather than trusting whatever bundle
+    # happens to be committed. This used to name fchub-portal-extender and only
+    # fchub-portal-extender, so cartshift and fchub-memberships shipped their
+    # checked-in dist/ untouched — and cartshift's went stale the moment its
+    # vite bump landed without a rebuild beside it. A release built from a
+    # bundle nobody regenerated is a release nobody can reproduce.
+    if [ -f "$plugin_dir/package.json" ] && node -e "process.exit(require('$plugin_dir/package.json').scripts?.build ? 0 : 1)" 2>/dev/null; then
+        info "Running npm build for $slug ..."
+        (cd "$plugin_dir" && npm ci --silent && npm run build --silent)
+
+        # Where the bundle lands differs per plugin, so ask the plugin rather
+        # than assuming assets/dist. An empty result means the build reported
+        # success and emitted nothing, which must not become a ZIP.
+        bundle_dir=""
+        for candidate in "assets/dist" "resources/admin/dist"; do
+            if [ -d "$plugin_dir/$candidate" ]; then
+                bundle_dir="$candidate"
+                break
             fi
-            success "npm build complete"
+        done
+
+        if [ -z "$bundle_dir" ]; then
+            error "npm build produced no known bundle directory for $slug"
         fi
+        if [ -z "$(ls -A "$plugin_dir/$bundle_dir" 2>/dev/null)" ]; then
+            error "npm build failed — $bundle_dir/ is empty"
+        fi
+        success "npm build complete ($bundle_dir)"
     fi
 
     # Run npm build for memberships
