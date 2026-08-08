@@ -8,14 +8,10 @@ defined('ABSPATH') || exit;
 
 use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
+use CartShift\Domain\Migration\MigrationOrchestratorFactory;
 use CartShift\Domain\Migration\MigrationRollback;
 use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Domain\Scope\ScopeResolver;
-use CartShift\Migrator\CouponMigrator;
-use CartShift\Migrator\CustomerMigrator;
-use CartShift\Migrator\OrderMigrator;
-use CartShift\Migrator\ProductMigrator;
-use CartShift\Migrator\SubscriptionMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -192,9 +188,7 @@ final class MigrateCommand
 
         add_filter('cartshift/migration/batch_size', fn(): int => $batchSize, 99);
 
-        $migrators = self::buildMigrators($entityTypes, $idMap, $log, $state, $batchSize);
-
-        $orchestrator = new MigrationOrchestrator($migrators, $state, $idMap, $log);
+        $orchestrator = self::orchestratorFactory($idMap, $log, $state)->forRun($entityTypes, $batchSize);
 
         $result = $orchestrator->startMigration($entityTypes, $dryRun, $scope);
 
@@ -324,20 +318,61 @@ final class MigrateCommand
         \WP_CLI::log(sprintf('Migration ID: %s', $progress['migration_id'] ?? 'N/A'));
         \WP_CLI::log(sprintf('Total time: %ss', $elapsed));
 
-        if ($totalErrors > 0) {
-            \WP_CLI::warning(sprintf(
-                'Completed with %d error(s). Run `wp cartshift log --status=error` to inspect.',
-                $totalErrors,
-            ));
+        [$level, $message] = self::closingLine($label, $totalMigrated, $totalSkipped, $totalErrors, $elapsed);
+
+        if ($level === 'warning') {
+            \WP_CLI::warning($message);
         } else {
-            \WP_CLI::success(sprintf(
-                '%s complete. %d migrated, %d skipped in %ss.',
-                $label,
-                $totalMigrated,
-                $totalSkipped,
-                $elapsed,
-            ));
+            \WP_CLI::success($message);
         }
+    }
+
+    /**
+     * The last line of a run, and whether it is allowed to say "Success".
+     *
+     * Its own method because it is the one sentence most people read, and
+     * because a decision buried in the middle of a 120-line rendering function
+     * cannot be tested without driving progress bars.
+     *
+     * "Success: Migration complete. 25 migrated, 2 skipped" is what a live run
+     * printed while writing ten `Unknown column 'item_count'` rows. The branch
+     * was already here and already correct; what was wrong was the count feeding
+     * it, which counted thrown exceptions and nothing else. See
+     * MigrationOrchestrator::reconciledErrors() for the other half.
+     *
+     * The warning carries the migrated and skipped counts too. It used to report
+     * only the errors, which contradicts the table directly above it in the
+     * other direction — a run that migrated 4,000 records and lost three columns
+     * is not a run with nothing to show for itself.
+     *
+     * @return array{0: 'warning'|'success', 1: string}
+     */
+    private static function closingLine(
+        string $label,
+        int $migrated,
+        int $skipped,
+        int $errors,
+        float $elapsed,
+    ): array {
+        if ($errors > 0) {
+            return ['warning', sprintf(
+                '%s finished with %d error(s): %d migrated, %d skipped in %ss. '
+                . 'Run `wp cartshift log --status=error` to see what went wrong.',
+                $label,
+                $errors,
+                $migrated,
+                $skipped,
+                $elapsed,
+            )];
+        }
+
+        return ['success', sprintf(
+            '%s complete. %d migrated, %d skipped in %ss.',
+            $label,
+            $migrated,
+            $skipped,
+            $elapsed,
+        )];
     }
 
     /**
@@ -481,9 +516,7 @@ final class MigrateCommand
 
         add_filter('cartshift/migration/batch_size', fn(): int => $batchSize, 99);
 
-        $migrators = self::buildMigrators($entityTypes, $idMap, $log, $state, $batchSize);
-
-        $orchestrator = new MigrationOrchestrator($migrators, $state, $idMap, $log);
+        $orchestrator = self::orchestratorFactory($idMap, $log, $state)->forRun($entityTypes, $batchSize);
 
         if (!method_exists($orchestrator, 'startRetry')) {
             \WP_CLI::error('Retry is not available in this build — the migration orchestrator does not support it.');
@@ -868,7 +901,7 @@ final class MigrateCommand
             $bar = \WP_CLI\Utils\make_progress_bar('Recalculating customer stats', count($allCustomers));
 
             foreach ($allCustomers as $mapping) {
-                self::recalculateCustomerStats((int) $mapping->fc_id);
+                self::recalculateCustomerStats((int) $mapping->fc_id, (string) $migrationId, (string) $mapping->wc_id);
                 $bar->tick();
             }
 
@@ -927,32 +960,40 @@ final class MigrateCommand
     /**
      * Build a BatchProcessor for scheduling and cancelling background batches.
      *
-     * The orchestrator factory mirrors MigrationModule: a fresh orchestrator per
-     * invocation. The migrators read the migration ID from state at write time,
-     * so nothing here has to be built in a particular order. It is not used when
-     * this instance only schedules or cancels — the action itself is handled by
-     * the instance registered at plugin boot.
+     * The orchestrator factory is the same one MigrationModule hands its own
+     * BatchProcessor: a fresh orchestrator per invocation, with the owner's
+     * mapping decisions promoted and their skips excluded. The migrators read
+     * the migration ID from state at write time, so nothing here has to be
+     * built in a particular order. It is not used when this instance only
+     * schedules or cancels — the action itself is handled by the instance
+     * registered at plugin boot.
      */
     private static function makeBatchProcessor(MigrationState $state): BatchProcessor
     {
-        $factory = static function () use ($state): MigrationOrchestrator {
-            $idMap = new IdMapRepository();
-            $log = new MigrationLogRepository();
-            return new MigrationOrchestrator(
-                self::buildMigrators(
-                    self::DEFAULT_ENTITY_ORDER,
-                    $idMap,
-                    $log,
-                    $state,
-                    Constants::DEFAULT_BATCH_SIZE,
-                ),
-                $state,
-                $idMap,
-                $log,
-            );
-        };
+        $factory = static fn (): MigrationOrchestrator => self::orchestratorFactory(
+            new IdMapRepository(),
+            new MigrationLogRepository(),
+            $state,
+        )->forRun(self::DEFAULT_ENTITY_ORDER, Constants::DEFAULT_BATCH_SIZE);
 
         return new BatchProcessor($factory, $state);
+    }
+
+    /**
+     * The assembler every WP-CLI entry point runs through.
+     *
+     * WP-CLI has no container to ask, so it builds the factory itself — but it
+     * builds the *same* factory, with the same FluentCart touchpoints, rather
+     * than a hand-rolled migrator list. That is the whole reason this method
+     * exists: three CLI call sites previously assembled their own runs and
+     * every one of them ignored product mapping.
+     */
+    private static function orchestratorFactory(
+        IdMapRepository $idMap,
+        MigrationLogRepository $log,
+        MigrationState $state,
+    ): MigrationOrchestratorFactory {
+        return MigrationOrchestratorFactory::standalone($idMap, $log, $state);
     }
 
     /**
@@ -1152,41 +1193,6 @@ final class MigrateCommand
     }
 
     /**
-     * Build migrator instances for the requested entity types.
-     *
-     * @param string[] $entityTypes
-     * @return \CartShift\Domain\Migration\Contracts\MigratorInterface[]
-     */
-    private static function buildMigrators(
-        array $entityTypes,
-        IdMapRepository $idMap,
-        MigrationLogRepository $log,
-        MigrationState $state,
-        int $batchSize,
-    ): array {
-        $map = [
-            Constants::ENTITY_PRODUCT      => ProductMigrator::class,
-            Constants::ENTITY_CUSTOMER     => CustomerMigrator::class,
-            Constants::ENTITY_COUPON       => CouponMigrator::class,
-            Constants::ENTITY_ORDER        => OrderMigrator::class,
-            Constants::ENTITY_SUBSCRIPTION => SubscriptionMigrator::class,
-        ];
-
-        $migrators = [];
-
-        foreach ($entityTypes as $type) {
-            if (!isset($map[$type])) {
-                continue;
-            }
-
-            $class = $map[$type];
-            $migrators[] = new $class($idMap, $log, $state, $batchSize);
-        }
-
-        return $migrators;
-    }
-
-    /**
      * Recalculate a single FluentCart customer's purchase stats.
      *
      * Mirrors FluentCart's Customer::recountStat() logic:
@@ -1195,8 +1201,14 @@ final class MigrateCommand
      * - ltv: lifetime value (total_paid - total_refund, only positive)
      * - aov: average order value (ltv / purchase_count)
      * - first_purchase_date / last_purchase_date: from order created_at
+     *
+     * `$migrationId` and `$wcId` are carried only so a write MySQL refuses can
+     * be logged against the customer it was for. This `$wpdb->update()` is the
+     * CLI's copy of MigrationFinalizer::recalculateCustomerStats(), and the two
+     * have to be equally honest about failing — a stats row that silently kept
+     * its zeroes reads as a customer who has never bought anything.
      */
-    private static function recalculateCustomerStats(int $fcCustomerId): void
+    private static function recalculateCustomerStats(int $fcCustomerId, string $migrationId, string $wcId): void
     {
         global $wpdb;
 
@@ -1257,6 +1269,13 @@ final class MigrateCommand
             ['id' => $fcCustomerId],
             ['%d', '%s', '%d', '%d', '%s', '%s'],
             ['%d'],
+        );
+
+        (new MigrationLogRepository())->recordWriteFailure(
+            $migrationId,
+            Constants::ENTITY_CUSTOMER,
+            $wcId,
+            'the recalculated purchase stats',
         );
     }
 }

@@ -302,7 +302,12 @@ const outcome = computed(() => {
     return {
       noticeClass: 'notice-error',
       headline: `${noun} finished with ${errors} ${errors === 1 ? 'error' : 'errors'}`,
-      detail: `${processed} records migrated, ${skipped} skipped, ${errors} failed outright.`,
+      // Not "failed outright" any more. The count is now the number of error
+      // rows in the log rather than the number of records that threw, and those
+      // are not the same thing: a record can arrive and still lose a column to a
+      // write the database refused. Telling someone three orders failed when all
+      // three are sitting in FluentCart sends them looking for the wrong problem.
+      detail: `${processed} records migrated, ${skipped} skipped, ${errors} failed or arrived incomplete.`,
       nextStep:
         'The grouped breakdown below explains what went wrong and how often. Once the cause is fixed, retry just those records — you do not have to run the whole thing again.',
     };

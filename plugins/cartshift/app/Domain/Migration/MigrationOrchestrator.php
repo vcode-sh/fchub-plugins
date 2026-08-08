@@ -523,7 +523,13 @@ final class MigrationOrchestrator
                 }
             }
 
-            $this->state->updateProgress($currentType, $processed, $total, $skipped, $errors);
+            $this->state->updateProgress(
+                $currentType,
+                $processed,
+                $total,
+                $skipped,
+                $this->reconciledErrors((string) $migrationId, $currentType, $errors),
+            );
 
             // A retry advances by the slice it asked for, not by the records that
             // came back. fetchByIds() drops IDs that no longer resolve, so advancing
@@ -589,6 +595,45 @@ final class MigrationOrchestrator
 
             return $this->buildResult(false);
         }
+    }
+
+    /**
+     * The error count for this entity, reconciled against what the log actually
+     * holds.
+     *
+     * The loop above counts an error when a record *throws*, and every throw it
+     * catches writes a log row — so for years the two agreed and nobody had to
+     * think about it. They stop agreeing the moment something fails without
+     * throwing. `$wpdb` is exactly that: a refused write sets
+     * `$wpdb->last_error`, returns false, and lets the caller carry on. A live
+     * run wrote ten `Unknown column 'item_count'` rows and reported
+     * `order 10 10 0 0 completed` followed by `Success: Migration complete`.
+     * Told a run succeeded, nobody goes looking in a PHP error log — which is
+     * how that column survived for the whole life of the feature.
+     *
+     * So the log is the authority on how many things went wrong, and the counter
+     * follows it rather than the other way round. That also puts the progress
+     * table in agreement with the retry panel, which has always taken its error
+     * count from the log's own stats: what the run reports and what a retry will
+     * re-attempt are now the same set.
+     *
+     * Reconciled per batch, not once at the end. A run of forty thousand orders
+     * reports itself every few seconds, and a number that is wrong for twenty
+     * minutes and right at the end is a number nobody can act on while there is
+     * still time to stop.
+     *
+     * `max()` rather than a straight replacement, because the one failure this
+     * cannot see is the log insert itself failing — there is no channel for
+     * reporting that a log write was refused. If that ever happens the loop's
+     * own tally is the higher, truer number, and it wins.
+     */
+    private function reconciledErrors(string $migrationId, string $entityType, int $counted): int
+    {
+        if ($migrationId === '') {
+            return $counted;
+        }
+
+        return max($counted, $this->log->countErrors($migrationId, $entityType));
     }
 
     /**

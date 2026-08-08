@@ -98,6 +98,23 @@ final class IdMapRepository
             ],
             ['%s', '%s', '%d', '%s', '%d', '%d', '%s'],
         );
+
+        // A mapping that does not land is the one silent `$wpdb` failure with
+        // consequences after the run has finished: rollback deletes what the ID
+        // map remembers, so a record created without a row here is one nothing
+        // will ever take back out, and a re-run duplicates it because the
+        // "already migrated?" check has nothing to find.
+        //
+        // The log repository is built here rather than injected. It takes no
+        // constructor arguments, this path runs only when MySQL has already
+        // refused a write, and threading a second repository through the six
+        // call sites that say `new IdMapRepository()` would buy nothing.
+        (new MigrationLogRepository())->recordWriteFailure(
+            $migrationId,
+            $entityType,
+            $wcId,
+            'the ID map entry (rollback will not be able to remove this record)',
+        );
     }
 
     /**

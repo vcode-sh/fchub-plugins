@@ -10,6 +10,7 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Tests\Unit\PluginTestCase;
 
 final class MigrationOrchestratorTest extends PluginTestCase
@@ -312,19 +313,292 @@ final class MigrationOrchestratorTest extends PluginTestCase
         );
     }
 
+    // ──────────────────────────────────────────────
+    // The error count tells the truth
+    // ──────────────────────────────────────────────
+    //
+    // The loop counts an error when a record throws, and every throw it catches
+    // writes a log row — so the two agreed for years and nobody had to think
+    // about it. They stop agreeing the moment something fails without throwing,
+    // which is exactly what `$wpdb` does. A live run wrote ten
+    // `Unknown column 'item_count'` rows and reported
+    // `order 10 10 0 0 completed` / `Success: Migration complete`. Told a run
+    // succeeded, nobody reads a PHP error log — so the column survived.
+
+    public function testAnErrorLoggedWithoutAThrowStillReachesTheCount(): void
+    {
+        $this->fakeLogTable();
+
+        $orchestrator = new MigrationOrchestrator(
+            [$this->migratorLoggingAnError('product', [(object) ['id' => 1]])],
+            $this->state,
+            $this->idMap,
+            $this->log,
+        );
+
+        $orchestrator->startMigration(['product']);
+        $orchestrator->processBatch();
+
+        $entity = $this->state->getCurrent()['entities']['product'];
+
+        $this->assertSame(1, $entity['processed'], 'The record itself did migrate.');
+        $this->assertSame(
+            1,
+            $entity['errors'],
+            'And something about it went wrong. A run that will not say so is how a bug hides.',
+        );
+    }
+
+    /**
+     * Reconciled per batch, not once at the end. A run of forty thousand orders
+     * reports itself every few seconds, and a number that is wrong for twenty
+     * minutes and right afterwards is one nobody can act on while there is still
+     * time to stop.
+     */
+    public function testTheCountIsRightAfterTheFirstBatchNotOnlyAtTheEnd(): void
+    {
+        $this->fakeLogTable();
+
+        add_filter('cartshift/migration/batch_size', static fn (): int => 1);
+
+        $orchestrator = new MigrationOrchestrator(
+            [$this->migratorLoggingAnError('product', [(object) ['id' => 1], (object) ['id' => 2]])],
+            $this->state,
+            $this->idMap,
+            $this->log,
+        );
+
+        // startMigration() runs the first batch and returns; the entity is very
+        // much still going.
+        $result = $orchestrator->startMigration(['product']);
+
+        $this->assertTrue($result['continue'], 'Precondition: the run is not over.');
+        $this->assertSame(1, $this->state->getCurrent()['entities']['product']['errors']);
+    }
+
+    /**
+     * The other half of the contract. A count that rises when nothing is wrong
+     * is a number the owner learns to scroll past.
+     */
+    public function testARunWithNoErrorRowsStillReportsNone(): void
+    {
+        $this->fakeLogTable();
+
+        $orchestrator = new MigrationOrchestrator(
+            [$this->createFakeMigrator('product', 1, [(object) ['id' => 1]])],
+            $this->state,
+            $this->idMap,
+            $this->log,
+        );
+
+        $orchestrator->startMigration(['product']);
+        $orchestrator->processBatch();
+
+        $this->assertSame(0, $this->state->getCurrent()['entities']['product']['errors']);
+    }
+
+    /**
+     * Warnings stay warnings.
+     *
+     * A subscription that came across paused because its product is missing is
+     * a warning on purpose: the subscriber and the billing history survived and
+     * nothing charges until a human decides. Sweeping those into the error count
+     * would make almost every real migration read as a failure, and an error
+     * count that is always non-zero tells you nothing at all.
+     */
+    public function testWarningsAreNotQuietlyPromotedToErrors(): void
+    {
+        $this->fakeLogTable();
+
+        $orchestrator = new MigrationOrchestrator(
+            [$this->migratorLogging('product', [(object) ['id' => 1]], 'warning')],
+            $this->state,
+            $this->idMap,
+            $this->log,
+        );
+
+        $orchestrator->startMigration(['product']);
+        $orchestrator->processBatch();
+
+        $this->assertSame(0, $this->state->getCurrent()['entities']['product']['errors']);
+    }
+
+    /**
+     * Per entity, not per run. Orders failing must not make the product row read
+     * as though products failed — that table is what people scan to decide where
+     * to look.
+     */
+    public function testErrorsAreCountedAgainstTheEntityThatCausedThem(): void
+    {
+        $this->fakeLogTable();
+
+        $orchestrator = new MigrationOrchestrator(
+            [
+                $this->createFakeMigrator('product', 1, [(object) ['id' => 1]]),
+                $this->migratorLoggingAnError('order', [(object) ['id' => 9]]),
+            ],
+            $this->state,
+            $this->idMap,
+            $this->log,
+        );
+
+        $orchestrator->startMigration(['product', 'order']);
+
+        while ($orchestrator->processBatch()['continue']) {
+            // Drive to the end.
+        }
+
+        $entities = $this->state->getCurrent()['entities'];
+
+        $this->assertSame(0, $entities['product']['errors']);
+        $this->assertSame(1, $entities['order']['errors']);
+    }
+
+    /**
+     * The log is the authority, but it cannot be the only one.
+     *
+     * If the log insert is itself refused there is no channel left to report it
+     * — writing "the log write failed" into the log is not a thing that can
+     * work. In that one case the loop's own tally is the higher, truer number,
+     * and it must survive reconciliation rather than be overwritten by a log
+     * that has no idea.
+     */
+    public function testTheLoopsOwnTallyIsNeverReducedByAnEmptyLog(): void
+    {
+        // A log that answers "nothing here", which is what a log whose own
+        // writes are failing looks like from the orchestrator.
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): ?int => null;
+
+        $orchestrator = new MigrationOrchestrator(
+            [$this->throwingMigrator('product', [(object) ['id' => 1]])],
+            $this->state,
+            $this->idMap,
+            $this->log,
+        );
+
+        $orchestrator->startMigration(['product']);
+        $orchestrator->processBatch();
+
+        $this->assertSame(1, $this->state->getCurrent()['entities']['product']['errors']);
+    }
+
+    /**
+     * Stand in for the log table: inserts are captured, and the reconciliation's
+     * COUNT(*) is answered by counting what was captured.
+     *
+     * A round trip rather than a canned number, so the test exercises the query
+     * the repository actually builds. A stub told to answer "1" would pass
+     * against a reconciliation that counted the wrong entity, the wrong status,
+     * or nothing at all.
+     */
+    private function fakeLogTable(): void
+    {
+        $rows = [];
+
+        $GLOBALS['_cartshift_test_insert_callback'] = static function (string $table, array $data) use (&$rows): int {
+            if (str_contains($table, 'cartshift_migration_log')) {
+                $rows[] = $data;
+            }
+
+            return 1;
+        };
+
+        // The status the row was written with is honoured rather than ignored:
+        // a stub that counted every row alike would pass against a
+        // reconciliation that swept warnings in with the errors, which is the
+        // one way this change could quietly make every run look like a failure.
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use (&$rows): ?int {
+            $matched = preg_match(
+                "/SELECT COUNT\(\*\).*migration_id = '([^']*)' AND entity_type = '([^']*)' AND status = '([^']*)'/s",
+                $query,
+                $m,
+            );
+
+            if ($matched !== 1) {
+                return null;
+            }
+
+            return count(array_filter(
+                $rows,
+                static fn (array $row): bool => $row['migration_id'] === $m[1]
+                    && $row['entity_type'] === $m[2]
+                    && $row['status'] === $m[3],
+            ));
+        };
+    }
+
+    /**
+     * A migrator whose records migrate, and which writes a coded error row about
+     * the part of each one that did not — which is exactly what a refused
+     * `$wpdb` write looks like from outside the migrator.
+     *
+     * @param list<object> $records
+     */
+    private function migratorLoggingAnError(string $entityType, array $records): MigratorInterface
+    {
+        return $this->migratorLogging($entityType, $records, 'error');
+    }
+
+    /**
+     * @param list<object> $records
+     */
+    private function migratorLogging(string $entityType, array $records, string $status): MigratorInterface
+    {
+        $log = $this->log;
+        $state = $this->state;
+
+        return $this->createFakeMigrator(
+            $entityType,
+            count($records),
+            $records,
+            null,
+            static function (object $record) use ($log, $state, $entityType, $status): void {
+                $log->write(
+                    (string) $state->getMigrationId(),
+                    $entityType,
+                    (string) $record->id,
+                    $status,
+                    "Could not write the item count: Unknown column 'item_count' in 'SET'",
+                    null,
+                    MigrationErrorCode::DatabaseWriteFailed,
+                );
+            },
+        );
+    }
+
+    /**
+     * A migrator that throws, so the orchestrator's own catch does the counting.
+     *
+     * @param list<object> $records
+     */
+    private function throwingMigrator(string $entityType, array $records): MigratorInterface
+    {
+        return $this->createFakeMigrator(
+            $entityType,
+            count($records),
+            $records,
+            null,
+            static function (): void {
+                throw new \RuntimeException('Boom.');
+            },
+        );
+    }
+
     /**
      * Create a fake MigratorInterface implementation for testing.
      *
      * @param object[] $records Records to return from fetchBatch (when no custom fetcher).
      * @param callable|null $customFetcher Optional (cursor, limit) => records[] callback.
+     * @param callable|null $onProcess Optional side effect run inside processRecord().
      */
     private function createFakeMigrator(
         string $entityType,
         int $count,
         array $records,
         ?callable $customFetcher = null,
+        ?callable $onProcess = null,
     ): MigratorInterface {
-        return new class ($entityType, $count, $records, $customFetcher) implements MigratorInterface {
+        return new class ($entityType, $count, $records, $customFetcher, $onProcess) implements MigratorInterface {
             private bool $initialized = false;
 
             public function __construct(
@@ -332,6 +606,7 @@ final class MigrationOrchestratorTest extends PluginTestCase
                 private readonly int $total,
                 private readonly array $records,
                 private readonly ?\Closure $customFetcher,
+                private readonly ?\Closure $onProcess = null,
             ) {
             }
 
@@ -404,6 +679,10 @@ final class MigrationOrchestratorTest extends PluginTestCase
             #[\Override]
             public function processRecord(mixed $record): int|false
             {
+                if ($this->onProcess !== null) {
+                    ($this->onProcess)($record);
+                }
+
                 return (int) $record->id;
             }
 

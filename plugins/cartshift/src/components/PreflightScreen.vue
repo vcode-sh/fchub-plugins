@@ -100,14 +100,14 @@
           </table>
         </details>
 
-        <template v-if="state.counts">
+        <template v-if="wooDataCounts">
           <h2>WooCommerce Data Counts</h2>
           <table class="widefat striped cartshift-table-counts">
             <thead>
               <tr><th>Entity</th><th>Count</th></tr>
             </thead>
             <tbody>
-              <tr v-for="(count, entity) in state.counts" :key="entity">
+              <tr v-for="(count, entity) in wooDataCounts" :key="entity">
                 <td>{{ capitalize(entity) }}</td>
                 <td>{{ formatNumber(count) }}</td>
               </tr>
@@ -199,6 +199,24 @@ const allChecks = computed(() => {
 const blockers = computed(() => allChecks.value.filter((c) => c.severity === 'fail'));
 const advisories = computed(() => allChecks.value.filter((c) => c.severity === 'warn'));
 const passed = computed(() => allChecks.value.filter((c) => c.severity === 'pass'));
+
+/**
+ * `state.counts` doubles as the wire shape of `GET /counts`, which also
+ * carries `fc_product_count` (how many FluentCart products already exist) so
+ * useMigration.js's advanceFromSelect() can decide whether the mapping step
+ * has anything to show. That count is not a WooCommerce entity, so it is
+ * filtered out here rather than rendered by the generic `v-for` below —
+ * otherwise it shows up as a spurious "Fc product count" row under a heading
+ * that promises only WooCommerce data. Filtering here, instead of moving the
+ * key out of `state.counts` itself, keeps advanceFromSelect()'s read and
+ * Task 8's tests intact — both depend on it staying inside `counts`.
+ */
+const wooDataCounts = computed(() => {
+  if (!state.counts) return null;
+
+  const { fc_product_count, ...entityCounts } = state.counts;
+  return entityCounts;
+});
 
 const fcDataCounts = computed(() => {
   const fcData = state.preflight?.checks?.fc_data;

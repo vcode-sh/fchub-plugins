@@ -9,13 +9,9 @@ defined('ABSPATH') || exit;
 use CartShift\Core\Container;
 use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
+use CartShift\Domain\Migration\MigrationOrchestratorFactory;
 use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Domain\Scope\ScopeResolver;
-use CartShift\Migrator\CouponMigrator;
-use CartShift\Migrator\CustomerMigrator;
-use CartShift\Migrator\OrderMigrator;
-use CartShift\Migrator\ProductMigrator;
-use CartShift\Migrator\SubscriptionMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -617,25 +613,20 @@ final class MigrationController
     }
 
     /**
-     * Build the MigrationOrchestrator with all registered migrators.
+     * The run this request is about to drive.
+     *
+     * Delegated rather than assembled here, and that is the whole point: this
+     * method used to build its own five migrators, which meant the endpoints
+     * the wizard actually calls promoted nothing and honoured no skip list.
+     * MigrationOrchestratorFactory owns assembly for every entry point —
+     * REST, Action Scheduler and WP-CLI alike — so there is one answer to
+     * "what does a run consist of" rather than five that can disagree.
      */
     private function buildOrchestrator(): MigrationOrchestrator
     {
-        /** @var MigrationState $state */
-        $state = $this->container->get(MigrationState::class);
-        /** @var IdMapRepository $idMap */
-        $idMap = $this->container->get(IdMapRepository::class);
-        /** @var MigrationLogRepository $log */
-        $log = $this->container->get(MigrationLogRepository::class);
+        /** @var MigrationOrchestratorFactory $factory */
+        $factory = $this->container->get(MigrationOrchestratorFactory::class);
 
-        $migrators = [
-            new ProductMigrator($idMap, $log, $state),
-            new CustomerMigrator($idMap, $log, $state),
-            new CouponMigrator($idMap, $log, $state),
-            new OrderMigrator($idMap, $log, $state),
-            new SubscriptionMigrator($idMap, $log, $state),
-        ];
-
-        return new MigrationOrchestrator($migrators, $state, $idMap, $log);
+        return $factory->forRun();
     }
 }

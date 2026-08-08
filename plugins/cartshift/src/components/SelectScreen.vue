@@ -130,7 +130,7 @@
           <button
             class="button button-primary button-hero"
             :disabled="state.migrating"
-            @click="actions.startMigration()"
+            @click="actions.advanceFromSelect()"
           >
             Start migration
           </button>

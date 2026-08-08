@@ -112,6 +112,9 @@ final class OrderMapper
         /** @var list<string> $unlinked Names of items whose product did not migrate. */
         $unlinked = [];
 
+        /** @var list<string> $variantless Names of items whose product resolved and whose variation did not. */
+        $variantless = [];
+
         foreach ($order->get_items() as $item) {
             /** @var \WC_Order_Item_Product $item */
             if (!($item instanceof \WC_Order_Item_Product)) {
@@ -142,6 +145,22 @@ final class OrderMapper
                 $unlinked[] = $item->get_name() !== ''
                     ? sprintf('"%s" (WC product %d)', $item->get_name(), $wcProductId)
                     : sprintf('WC product %d', $wcProductId);
+            }
+
+            // The quieter half of the same failure, and the more expensive one
+            // to leave unsaid. `object_id` below falls back to 0, and
+            // FluentCart's product reporting groups by `object_id` rather than
+            // by `post_id` (ProductReportService), so every zeroed line across
+            // every product collapses into one nameless bucket and this
+            // product's per-variant sales vanish. The order detail page still
+            // shows the right name and the right money, which is exactly why
+            // nobody notices.
+            //
+            // Reachable without mapping too — a WooCommerce line item on a
+            // variable product can carry _variation_id = 0 — so this is not a
+            // warning about links, it is a warning about the line.
+            if ($fcProductId && !$fcVariationId) {
+                $variantless[] = self::describeItemVariation($item, $wcProductId, $wcVariationId);
             }
 
             $paymentType = 'onetime';
@@ -214,7 +233,43 @@ final class OrderMapper
             ];
         }
 
+        if ($variantless !== []) {
+            $this->warnings[] = [
+                'message' => sprintf(
+                    'Order #%d contains %d item(s) linked to a product but to no variant: %s. The order '
+                    . 'total and the item names are unaffected, but FluentCart counts per-variant sales by '
+                    . 'variant, so these lines will not appear in the product report.',
+                    $order->get_id(),
+                    count($variantless),
+                    implode(', ', $variantless),
+                ),
+                'code' => MigrationErrorCode::VariationLinkMissing,
+            ];
+        }
+
         return $items;
+    }
+
+    /**
+     * One line item named for a warning about its variation.
+     *
+     * The WooCommerce variation ID when there is one, and the product ID when
+     * there is not — because "variation 0" is not a thing anybody can go and
+     * look at, and a line item with no variation ID at all is a distinct problem
+     * with a distinct fix.
+     */
+    private static function describeItemVariation(
+        \WC_Order_Item_Product $item,
+        int $wcProductId,
+        int $wcVariationId,
+    ): string {
+        $what = $wcVariationId > 0
+            ? sprintf('WC variation %d', $wcVariationId)
+            : sprintf('WC product %d, no variation on the line', $wcProductId);
+
+        return $item->get_name() !== ''
+            ? sprintf('"%s" (%s)', $item->get_name(), $what)
+            : $what;
     }
 
     /**

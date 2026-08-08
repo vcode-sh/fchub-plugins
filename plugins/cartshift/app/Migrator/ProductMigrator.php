@@ -14,6 +14,7 @@ use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\ProductTypes;
+use CartShift\Support\SkuAllocator;
 use FluentCart\App\Models\AttributeGroup;
 use FluentCart\App\Models\AttributeRelation;
 use FluentCart\App\Models\AttributeTerm;
@@ -46,11 +47,13 @@ final class ProductMigrator extends AbstractMigrator
     /** @var bool True once the taxonomy maps above hold this migration's data */
     private bool $mapsLoaded = false;
 
-    /** @var array<string, true> SKUs already known to be taken in FluentCart */
-    private array $knownSkus = [];
-
-    /** Upper bound on suffix attempts when de-duplicating a SKU */
-    private const int SKU_SUFFIX_LIMIT = 50;
+    /**
+     * SKU uniqueness, shared with the orphan-variant path.
+     *
+     * Lazily built because the collision log line needs this migrator's own
+     * migration ID, which does not exist at construction time.
+     */
+    private ?SkuAllocator $skuAllocator = null;
 
     /**
      * Base for a dry run's synthetic variation IDs.
@@ -596,6 +599,55 @@ final class ProductMigrator extends AbstractMigrator
     }
 
     /**
+     * WooCommerce product IDs the owner explicitly chose not to migrate.
+     *
+     * Set from the mapping screen's `skip` decisions, via MigrationModule. Empty
+     * for every run that never opened the mapping screen, which is why the SQL
+     * below appends nothing at all rather than a vacuous `NOT IN ()`.
+     *
+     * @var list<int>
+     */
+    private array $excludedProductIds = [];
+
+    /**
+     * @param list<int> $ids
+     */
+    public function excludeProductIds(array $ids): void
+    {
+        $clean = [];
+
+        foreach ($ids as $id) {
+            $id = (int) $id;
+
+            if ($id > 0) {
+                $clean[$id] = true;
+            }
+        }
+
+        $clean = array_keys($clean);
+        sort($clean);
+
+        $this->excludedProductIds = $clean;
+    }
+
+    /**
+     * The exclusion clause, or an empty string.
+     *
+     * Built by casting to int and joining rather than by %d placeholders, because
+     * both call sites already spread a positional argument list into prepare() and
+     * a variable-length placeholder run there is how off-by-one argument bugs get
+     * written. Every element is an int by construction — see excludeProductIds().
+     */
+    private function exclusionSql(): string
+    {
+        if ($this->excludedProductIds === []) {
+            return '';
+        }
+
+        return ' AND p.ID NOT IN (' . implode(',', $this->excludedProductIds) . ')';
+    }
+
+    /**
      * FIX H2: use COUNT(*) SQL query, not wc_get_products with limit=-1.
      *
      * The type test is ProductTypes::migratableClause() and nothing else. This
@@ -619,7 +671,8 @@ final class ProductMigrator extends AbstractMigrator
              WHERE p.post_type = 'product'
                AND p.post_status IN ('publish', 'draft', 'private')
                AND {$typeSql}"
-            . $selection->andSql(),
+            . $selection->andSql()
+            . $this->exclusionSql(),
             ...[...$typeValues, ...$selection->values()],
         ));
     }
@@ -818,6 +871,7 @@ final class ProductMigrator extends AbstractMigrator
                AND p.ID > %d
                AND {$typeSql}"
             . $selection->andSql()
+            . $this->exclusionSql()
             . " ORDER BY p.ID ASC
              LIMIT %d",
             ...[$afterId, ...$typeValues, ...$selection->values(), $limit],
@@ -1819,52 +1873,23 @@ final class ProductMigrator extends AbstractMigrator
     /**
      * Ensure SKU uniqueness by appending a suffix if the SKU already exists in FC.
      *
-     * Every SKU this run has seen — found in FluentCart or handed out here — is
-     * remembered, so a repeated SKU costs no second query and collisions created
-     * earlier in the same run are still caught.
+     * The probing and the memo now live in SkuAllocator, because the orphan
+     * variant path needs the identical behaviour against the identical UNIQUE
+     * index. What stays here is the migration log line, which needs this
+     * migrator's own entity type and run ID.
      */
     private function ensureUniqueSku(string $sku, int $wcId): string
     {
-        if (!$this->skuExists($sku)) {
-            $this->knownSkus[$sku] = true;
+        $this->skuAllocator ??= new SkuAllocator(
+            function (string $requested, string $granted, int $sourceId): void {
+                $this->writeLog($sourceId, 'skipped', sprintf(
+                    'SKU "%s" already exists in FluentCart. Using "%s" instead.',
+                    $requested,
+                    $granted,
+                ), MigrationErrorCode::SkuCollision);
+            },
+        );
 
-            return $sku;
-        }
-
-        $newSku = $sku . '-wc' . $wcId;
-
-        for ($attempt = 2; $attempt <= self::SKU_SUFFIX_LIMIT && $this->skuExists($newSku); $attempt++) {
-            $newSku = $sku . '-wc' . $wcId . '-' . $attempt;
-        }
-
-        $this->knownSkus[$newSku] = true;
-
-        $this->writeLog($wcId, 'skipped', sprintf(
-            'SKU "%s" already exists in FluentCart. Using "%s" instead.',
-            $sku,
-            $newSku,
-        ), MigrationErrorCode::SkuCollision);
-
-        return $newSku;
-    }
-
-    /**
-     * Is this SKU already taken, either in FluentCart or by this run?
-     */
-    private function skuExists(string $sku): bool
-    {
-        if (isset($this->knownSkus[$sku])) {
-            return true;
-        }
-
-        $existing = ProductVariation::query()->where('sku', $sku)->first();
-
-        if (!$existing) {
-            return false;
-        }
-
-        $this->knownSkus[$sku] = true;
-
-        return true;
+        return $this->skuAllocator->allocate($sku, $wcId);
     }
 }

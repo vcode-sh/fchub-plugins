@@ -395,6 +395,32 @@ final class SubscriptionMigrator extends AbstractMigrator
                 ),
                 MigrationErrorCode::SubscriptionPausedMissingProduct,
             );
+        } elseif (self::wouldBillAgainstNothing($mapped)) {
+            // Belt and braces to missingProductReference(), and not redundant
+            // with it. That method reads the WooCommerce line items; this one
+            // reads what the mapper actually produced, which is the value that
+            // reaches the database. Between them sit a line item with no product
+            // ID at all, a subscription with no items, and
+            // 'cartshift/mapper/subscription' — any of which can leave
+            // variation_id null on a record the guard above was happy with.
+            //
+            // A subscription is a live instruction, not a record of one. Paused
+            // is the only honest state for an instruction nobody can carry out.
+            $mapped = self::pause($mapped, 'variation_not_resolved');
+
+            $this->writeLog(
+                $wcId,
+                'warning',
+                sprintf(
+                    'Subscription #%d resolved to no FluentCart product variant, so it would have billed '
+                    . 'against a blank line for ever. Migrated as "paused"; the original WooCommerce status '
+                    . '"%s" is kept in the subscription config. Point it at a variant in FluentCart, then '
+                    . 'resume it.',
+                    $wcId,
+                    $subscription->get_status(),
+                ),
+                MigrationErrorCode::SubscriptionPausedMissingVariation,
+            );
         }
 
         $fcSubscription = Subscription::query()->create($mapped);
@@ -451,22 +477,78 @@ final class SubscriptionMigrator extends AbstractMigrator
                 );
             }
 
-            if ($wcVariationId > 0) {
-                $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcVariationId);
+            // Deliberately gated on the *product*, not on the variation.
+            //
+            // It used to be `if ($wcVariationId > 0)`, which meant a simple
+            // product — every subscription to one — skipped the variation check
+            // entirely. That is exactly where product mapping puts its weight:
+            // a mapped simple product's FluentCart variant is keyed by the
+            // product ID, so a promotion that wrote the product row and lost the
+            // variation row left this guard with nothing to notice and the
+            // subscription migrated active with variation_id = null. FluentCart
+            // then hands the subscriber no downloads (Subscription::
+            // getDownloads()), hides the upgrade path (canUpgrade()), and stamps
+            // every renewal invoice with a null object_id and a blank line title
+            // (RenewalService::createRenewalOrders()).
+            //
+            // The resolution below is SubscriptionMapper::map()'s, key for key:
+            // detection and mapping have to agree or this guard passes records
+            // the mapper then writes broken.
+            if ($wcProductId > 0) {
+                $fcVariationId = $wcVariationId > 0
+                    ? $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcVariationId)
+                    : null;
+
                 if (!$fcVariationId) {
                     $fcVariationId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $wcProductId);
                 }
+
                 if (!$fcVariationId) {
-                    return sprintf(
-                        'Variation ID %d for item %s was not migrated',
-                        $wcVariationId,
-                        $itemLabel,
-                    );
+                    return $wcVariationId > 0
+                        ? sprintf(
+                            'Variation ID %d for item %s was not migrated',
+                            $wcVariationId,
+                            $itemLabel,
+                        )
+                        : sprintf(
+                            'Product ID %d for item %s migrated, but nothing was migrated for the '
+                            . 'variant it bills against',
+                            $wcProductId,
+                            $itemLabel,
+                        );
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * Whether this mapped payload would go on charging somebody for a line
+     * FluentCart cannot name.
+     *
+     * Two conditions, and both have to hold. A null `variation_id` on a
+     * subscription that has already stopped is a tidy-up job, not a hazard —
+     * nothing renews a canceled subscription — and forcing it to 'paused' would
+     * dress a dead record up as a resumable one. An unrecognised status counts
+     * as live: a filter that rewrote it to something this enum has never heard
+     * of is exactly when a guess should be the cautious one.
+     *
+     * @param array<string, mixed> $mapped
+     */
+    private static function wouldBillAgainstNothing(array $mapped): bool
+    {
+        if ((int) ($mapped['variation_id'] ?? 0) > 0) {
+            return false;
+        }
+
+        $stopped = [
+            FcSubscriptionStatus::Paused->value,
+            FcSubscriptionStatus::Canceled->value,
+            FcSubscriptionStatus::Expired->value,
+        ];
+
+        return !in_array($mapped['status'] ?? null, $stopped, true);
     }
 
     /**
@@ -485,16 +567,20 @@ final class SubscriptionMigrator extends AbstractMigrator
      * replaced it with a string must not fatal here.
      *
      * @param array<string, mixed> $mapped
+     * @param string               $reason What goes in `cartshift_paused_reason`.
+     *                                     Two callers, two different causes, and
+     *                                     the config row is the only place a
+     *                                     human can tell them apart later.
      *
      * @return array<string, mixed>
      */
-    private static function pause(array $mapped): array
+    private static function pause(array $mapped, string $reason = 'product_not_migrated'): array
     {
         $originalStatus = is_string($mapped['status'] ?? null) ? $mapped['status'] : '';
 
         $config = is_array($mapped['config'] ?? null) ? $mapped['config'] : [];
         $config['cartshift_original_status'] = $originalStatus;
-        $config['cartshift_paused_reason']   = 'product_not_migrated';
+        $config['cartshift_paused_reason']   = $reason;
 
         $mapped['config'] = $config;
         $mapped['status'] = FcSubscriptionStatus::Paused->value;

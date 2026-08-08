@@ -57,9 +57,27 @@ if (!class_exists('CartShiftFcModelStore')) {
             $nextId = (int) ($GLOBALS['_cartshift_test_fc_next_id'] ?? 0) + 1;
             $GLOBALS['_cartshift_test_fc_next_id'] = $nextId;
 
-            $row = (object) array_merge($attributes, ['id' => $nextId]);
+            $row = CartShiftFcRow::of(array_merge($attributes, ['id' => $nextId]));
 
             $GLOBALS['_cartshift_test_fc_models'][$model][] = $row;
+
+            return $row;
+        }
+
+        /**
+         * Put a row where `where(...)->first()` will find it.
+         *
+         * The counterpart to existing(): that one answers with a single row
+         * whatever was asked, which is all most callers here need. This one
+         * takes a real row so a test can hand back something with working
+         * `save()` — the orphan path reads the product detail, mutates its
+         * price range and stock availability, and saves it again.
+         */
+        public static function seed(string $model, array $attributes): object
+        {
+            $row = CartShiftFcRow::of($attributes);
+
+            $GLOBALS['_cartshift_test_fc_existing'][$model] = $row;
 
             return $row;
         }
@@ -94,9 +112,50 @@ if (!class_exists('CartShiftFcModelStore')) {
     }
 }
 
+if (!class_exists('CartShiftFcRow')) {
+    /**
+     * What create() and first() hand back: a row that reads like the stdClass
+     * this used to be, and additionally answers save().
+     *
+     * FluentCart's models are saved as well as created — the orphan path reads
+     * the linked product's detail row, recomputes its price range and stock
+     * availability from the variants, and saves it — and `stdClass::save()` is
+     * a fatal, not a no-op. Dynamic properties so every existing `$row->column`
+     * read keeps working unchanged.
+     */
+    #[AllowDynamicProperties]
+    final class CartShiftFcRow
+    {
+        public static function of(array $attributes): self
+        {
+            $row = new self();
+
+            foreach ($attributes as $key => $value) {
+                $row->{$key} = $value;
+            }
+
+            return $row;
+        }
+
+        /**
+         * Records itself in `_cartshift_test_fc_saved`, so a test can assert
+         * that a row was written back and not merely mutated in memory.
+         */
+        public function save(): bool
+        {
+            $GLOBALS['_cartshift_test_fc_saved'][] = $this;
+
+            return true;
+        }
+    }
+}
+
 if (!class_exists('CartShiftFcQuery')) {
     final class CartShiftFcQuery
     {
+        /** @var list<array{0: string, 1: mixed}> Two-argument where() constraints, in order. */
+        private array $wheres = [];
+
         public function __construct(private readonly string $model) {}
 
         public function create(array $attributes): object
@@ -106,12 +165,78 @@ if (!class_exists('CartShiftFcQuery')) {
 
         public function where(mixed ...$args): self
         {
+            if (count($args) === 2 && is_string($args[0])) {
+                $this->wheres[] = [$args[0], $args[1]];
+            }
+
             return $this;
         }
 
+        /**
+         * The seeded row for this model, if it matches every recorded
+         * constraint.
+         *
+         * Constraints are honoured rather than ignored so a SKU probe can be
+         * asked about two different SKUs in one test and answer differently —
+         * which is the whole of what SkuAllocator does.
+         */
         public function first(): ?object
         {
-            return CartShiftFcModelStore::existing($this->model);
+            $row = CartShiftFcModelStore::existing($this->model);
+
+            return $row !== null && $this->matches($row) ? $row : null;
+        }
+
+        public function max(string $column): mixed
+        {
+            return $this->aggregate($column, 'max');
+        }
+
+        public function min(string $column): mixed
+        {
+            return $this->aggregate($column, 'min');
+        }
+
+        public function exists(): bool
+        {
+            return $this->rows() !== [];
+        }
+
+        /** @return list<object> Created rows for this model matching every constraint. */
+        private function rows(): array
+        {
+            return array_values(array_filter(
+                CartShiftFcModelStore::all($this->model),
+                fn (object $row): bool => $this->matches($row),
+            ));
+        }
+
+        private function aggregate(string $column, string $which): mixed
+        {
+            $values = [];
+
+            foreach ($this->rows() as $row) {
+                if (isset($row->{$column})) {
+                    $values[] = $row->{$column};
+                }
+            }
+
+            if ($values === []) {
+                return null;
+            }
+
+            return $which === 'max' ? max($values) : min($values);
+        }
+
+        private function matches(object $row): bool
+        {
+            foreach ($this->wheres as [$column, $value]) {
+                if (($row->{$column} ?? null) != $value) { // phpcs:ignore -- '900' from SQL vs 900 in PHP
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

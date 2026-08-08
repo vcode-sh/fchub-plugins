@@ -76,7 +76,7 @@ final class MigrationsTest extends PluginTestCase
 
     public function testNoUpgradeNeededWhenCurrent(): void
     {
-        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '5';
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '6';
 
         $this->assertFalse(Migrations::needsUpgrade());
     }
@@ -95,7 +95,7 @@ final class MigrationsTest extends PluginTestCase
 
         Migrations::run();
 
-        $this->assertSame('5', $GLOBALS['_cartshift_test_options']['cartshift_db_version']);
+        $this->assertSame('6', $GLOBALS['_cartshift_test_options']['cartshift_db_version']);
         $this->assertFalse(Migrations::needsUpgrade());
     }
 
@@ -104,7 +104,7 @@ final class MigrationsTest extends PluginTestCase
      */
     public function testRunIsANoOpWhenAlreadyCurrent(): void
     {
-        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '5';
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '6';
         $GLOBALS['_cartshift_test_get_results_callback'] = fn (): array => [];
 
         Migrations::run();
@@ -472,6 +472,92 @@ final class MigrationsTest extends PluginTestCase
 
         $this->assertNull($this->indexOfQueryContaining($sqls, 'ADD COLUMN is_simulated'));
         $this->assertNull($this->indexOfQueryContaining($sqls, 'ADD UNIQUE INDEX entity_wc_realm_unique'));
+    }
+
+    // ──────────────────────────────────────────────
+    // v6: product mapping staging table
+    // ──────────────────────────────────────────────
+
+    public function testV6CreatesTheProductMapTable(): void
+    {
+        $statements = [];
+
+        $GLOBALS['_cartshift_test_dbdelta_callback'] = static function (string $sql) use (&$statements): array {
+            $statements[] = $sql;
+            return [];
+        };
+
+        update_option('cartshift_db_version', '5');
+
+        Migrations::run();
+
+        $joined = implode("\n", $statements);
+
+        $this->assertStringContainsString('cartshift_product_map', $joined);
+        $this->assertStringContainsString('wc_id BIGINT UNSIGNED NOT NULL', $joined);
+        $this->assertStringContainsString('decision VARCHAR(10) NOT NULL', $joined);
+        $this->assertStringContainsString('variant_map LONGTEXT NULL', $joined);
+        $this->assertStringContainsString('UNIQUE KEY wc_product_unique (wc_id)', $joined);
+        $this->assertSame('6', get_option('cartshift_db_version'));
+    }
+
+    public function testV6IsNotReRunWhenAlreadyAtSix(): void
+    {
+        update_option('cartshift_db_version', '6');
+
+        $ran = false;
+        $GLOBALS['_cartshift_test_dbdelta_callback'] = static function () use (&$ran): array {
+            $ran = true;
+            return [];
+        };
+
+        Migrations::run();
+
+        $this->assertFalse($ran, 'A migration at the current version must not re-run.');
+    }
+
+    // ──────────────────────────────────────────────
+    // Cross-cutting: version constants
+    // ──────────────────────────────────────────────
+
+    /**
+     * cartshift.php and Migrations declare the DB version independently, and nothing
+     * enforces their agreement — this is the guard.
+     *
+     * It cannot compare against the ambient CARTSHIFT_DB_VERSION constant: phpunit.xml's
+     * bootstrap is tests/stubs/test-bootstrap.php, and nothing under tests/ ever requires
+     * the real cartshift.php — CARTSHIFT_PLUGIN_FILE holds its path but nothing loads it.
+     * So that constant would permanently resolve to the stub's own independent define(),
+     * making the assertion "does the stub agree with Migrations" — a third value, neither
+     * of the two it is meant to compare — which reproduces the exact drift this test
+     * exists to catch, just one hop removed: bump the real file and Migrations but forget
+     * the stub, and this would still show green while a genuinely broken pair of files
+     * looked fine.
+     *
+     * So it reads cartshift.php's source text directly and pulls the literal out with a
+     * regex, rather than loading the file — loading it would run the real plugin bootstrap
+     * (activation hook registration, the GitHub updater, its own autoloader), all of it
+     * unwanted side effect in a unit test.
+     */
+    public function testTheTwoVersionConstantsAgree(): void
+    {
+        $source = file_get_contents(CARTSHIFT_PLUGIN_FILE);
+
+        if ($source === false) {
+            $this->fail('Could not read cartshift.php at ' . CARTSHIFT_PLUGIN_FILE . ' to check its DB version constant.');
+        }
+
+        $matched = preg_match("/define\\('CARTSHIFT_DB_VERSION',\\s*'([^']+)'\\)/", $source, $matches);
+
+        if ($matched !== 1) {
+            $this->fail('Could not find a CARTSHIFT_DB_VERSION define() in cartshift.php — the regex may be stale.');
+        }
+
+        $this->assertSame(
+            $matches[1],
+            Migrations::currentVersion(),
+            'cartshift.php and Migrations declare the DB version independently; they must match.',
+        );
     }
 
     // ──────────────────────────────────────────────

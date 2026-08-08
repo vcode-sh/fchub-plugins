@@ -115,4 +115,16 @@ final class ConstantsTest extends PluginTestCase
             . implode(', ', array_diff_assoc($values, $unique)),
         );
     }
+
+    /**
+     * Pinned because a wrong value here shipped once already: 'fc_product'
+     * instead of 'fluent-products' silently zeroed the mapping screen's
+     * candidate list, fc_product_count, and MappingPromoter's dead-link
+     * check, all at once. Verified against the installed FluentCart plugin's
+     * app/CPT/FluentProducts.php::CPT_NAME, not guessed.
+     */
+    public function testFcProductPostTypeIsFluentProducts(): void
+    {
+        $this->assertSame('fluent-products', Constants::FC_PRODUCT_POST_TYPE);
+    }
 }

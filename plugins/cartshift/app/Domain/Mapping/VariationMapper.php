@@ -12,6 +12,15 @@ use CartShift\Support\MoneyHelper;
 final class VariationMapper
 {
     /**
+     * What a variation with no attributes to speak of is called.
+     *
+     * The title mapSimple() writes for every simple product, and the fallback
+     * variationTitle() lands on. Named because the mapping screen has to
+     * describe a Woo product in the same vocabulary — see variationTitle().
+     */
+    public const string DEFAULT_VARIATION_TITLE = 'Default';
+
+    /**
      * Memo for attribute term lookups: "taxonomy|slug" => term name, or null when the slug
      * resolves to no term (a custom, non-taxonomy attribute value).
      *
@@ -82,15 +91,7 @@ final class VariationMapper
 
         $sku = $variation->get_sku();
 
-        $attributes = $variation->get_attributes();
-        $titleParts = [];
-        foreach ($attributes as $attrName => $attrValue) {
-            if ($attrValue) {
-                $taxonomy = str_replace('attribute_', '', (string) $attrName);
-                $titleParts[] = $this->resolveAttributeLabel($taxonomy, (string) $attrValue);
-            }
-        }
-        $variationTitle = !empty($titleParts) ? implode(' / ', $titleParts) : 'Default';
+        $variationTitle = $this->variationTitle($variation);
 
         $otherInfo = self::mergeWeightDimensions($otherInfo, $variation);
 
@@ -119,6 +120,33 @@ final class VariationMapper
             'media_id'             => self::getMediaId($variation),
             'other_info'           => !empty($otherInfo) ? $otherInfo : null,
         ];
+    }
+
+    /**
+     * The title FluentCart will know this variation by: attribute labels
+     * joined with ' / '.
+     *
+     * Public, and that is the point. `WC_Product_Variation::get_name()` is the
+     * generated post title — "Parent - Blue, Large", or bare "Parent" once a
+     * product has three or more attributes — and nothing on the FluentCart
+     * side ever looks like it. So the mapping screen, which has to pair Woo
+     * variations with FC variants by name, cannot use get_name() and cannot
+     * reimplement this either: a second copy of the label resolution would
+     * agree with this one until the day a custom attribute value showed up.
+     * One method, two callers, one vocabulary.
+     */
+    public function variationTitle(\WC_Product_Variation $variation): string
+    {
+        $titleParts = [];
+
+        foreach ($variation->get_attributes() as $attrName => $attrValue) {
+            if ($attrValue) {
+                $taxonomy = str_replace('attribute_', '', (string) $attrName);
+                $titleParts[] = $this->resolveAttributeLabel($taxonomy, (string) $attrValue);
+            }
+        }
+
+        return $titleParts !== [] ? implode(' / ', $titleParts) : self::DEFAULT_VARIATION_TITLE;
     }
 
     /**
@@ -169,8 +197,8 @@ final class VariationMapper
 
         return [
             'serial_index'         => 0,
-            'variation_title'      => 'Default',
-            'variation_identifier' => 'default',
+            'variation_title'      => self::DEFAULT_VARIATION_TITLE,
+            'variation_identifier' => sanitize_title(self::DEFAULT_VARIATION_TITLE),
             'sku'                  => $sku ?: null,
             'payment_type'         => $paymentType,
             'fulfillment_type'     => $fulfillmentType,

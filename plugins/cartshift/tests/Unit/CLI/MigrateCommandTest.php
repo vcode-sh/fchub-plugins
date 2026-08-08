@@ -315,6 +315,56 @@ final class MigrateCommandTest extends PluginTestCase
         return (new \ReflectionMethod(MigrateCommand::class, $method))->invoke(null, $assocArgs);
     }
 
+    // ── the closing line ───────────────────────────────────
+    //
+    // `Success: Migration complete. 25 migrated, 2 skipped in 0.23s.` is what a
+    // live run printed while writing ten `Unknown column 'item_count'` errors.
+    // A shop owner told their migration succeeded does not then go and read a
+    // PHP error log, which is how that bug shipped for as long as it did. The
+    // branch itself was always here; what was wrong was the count feeding it.
+    //
+    // Reached by reflection for the reason callPrivate() gives above.
+
+    public function testARunWithErrorsDoesNotCloseOnSuccess(): void
+    {
+        [$level, $message] = $this->closingLine('Migration', 25, 2, 10, 0.23);
+
+        $this->assertSame('warning', $level, 'WP_CLI::success() prints "Success:", which this run did not earn.');
+        $this->assertStringContainsString('10 error(s)', $message);
+    }
+
+    /**
+     * The counts sit in the table directly above it, so the closing line has to
+     * agree with them in both directions. It used to report the errors alone,
+     * and a run that migrated 4,000 records and lost three columns is not a run
+     * with nothing to show for itself.
+     */
+    public function testTheWarningStillCarriesWhatDidWork(): void
+    {
+        [, $message] = $this->closingLine('Migration', 25, 2, 10, 0.23);
+
+        $this->assertStringContainsString('25 migrated', $message);
+        $this->assertStringContainsString('2 skipped', $message);
+        $this->assertStringContainsString('0.23s', $message);
+    }
+
+    public function testACleanRunStillClosesOnSuccess(): void
+    {
+        [$level, $message] = $this->closingLine('Migration', 25, 2, 0, 0.23);
+
+        $this->assertSame('success', $level, 'A run with nothing wrong must still be allowed to say so.');
+        $this->assertStringContainsString('25 migrated, 2 skipped', $message);
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function closingLine(string $label, int $migrated, int $skipped, int $errors, float $elapsed): array
+    {
+        return (new \ReflectionMethod(MigrateCommand::class, 'closingLine'))
+            ->invoke(null, $label, $migrated, $skipped, $errors, $elapsed);
+    }
+
     public function testResetClearsAFinishedRun(): void
     {
         $this->state->start(['product']);

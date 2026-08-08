@@ -71,6 +71,19 @@ enum MigrationErrorCode: string
      */
     case ProductLinkMissing = 'product_link_missing';
 
+    /**
+     * An order line item's *product* resolved but its variation did not, so the
+     * line was written with `object_id = 0`.
+     *
+     * Quieter than ProductLinkMissing and more expensive to leave unsaid.
+     * FluentCart's product reporting groups by `object_id`
+     * (ProductReportService), so every zeroed line across every product
+     * collapses into one nameless bucket and the product's per-variant sales
+     * disappear — while the order detail page still shows the right name and the
+     * right money, so nothing looks wrong.
+     */
+    case VariationLinkMissing = 'variation_link_missing';
+
     /** The WooCommerce product type has no FluentCart equivalent. */
     case UnsupportedProductType = 'unsupported_product_type';
 
@@ -107,6 +120,21 @@ enum MigrationErrorCode: string
      * and nothing charges until a human decides.
      */
     case SubscriptionPausedMissingProduct = 'subscription_paused_missing_product';
+
+    /**
+     * The subscription came across with nothing in `variation_id`, so it was
+     * paused rather than left billing against no variant.
+     *
+     * Distinct from SubscriptionPausedMissingProduct because the causes and the
+     * fixes are different: there the product never migrated, here the product is
+     * fine and the line has no resolvable variation — a line item with no
+     * product ID at all, a subscription with no items, or a filter that emptied
+     * the mapped payload. FluentCart reads a null `variation_id` as "no
+     * downloads" (Subscription::getDownloads()), hides the upgrade path
+     * (canUpgrade()), and stamps every renewal invoice with a null `object_id`
+     * and a blank line title (RenewalService::createRenewalOrders()).
+     */
+    case SubscriptionPausedMissingVariation = 'subscription_paused_missing_variation';
 
     /** Subscription gateway with no vendor ID mapping defined. */
     case UnmappedSubscriptionGateway = 'unmapped_subscription_gateway';
@@ -161,6 +189,76 @@ enum MigrationErrorCode: string
     case ScopeClosureTooLarge = 'scope_closure_too_large';
 
     /**
+     * A `link` decision's FluentCart target was trashed or deleted between the
+     * mapping screen and the run. Promotion falls back to creating the
+     * WooCommerce product fresh, as if it had never been mapped.
+     *
+     * Doubles as the dedup key for MappingModule's dead-link logging: promote()
+     * is idempotent and re-reports the same dead ids on every batch tick, so
+     * MigrationLogRepository::hasEntryFor() checks this exact code before a
+     * second warning for the same product is ever written.
+     */
+    case MappedFcProductMissing = 'mapped_fc_product_missing';
+
+    /**
+     * A Woo variation with no counterpart on the linked FluentCart product
+     * could not have one added — the target turned out to be an
+     * advanced-variation product, whose variants FluentCart regenerates and
+     * prunes on every combination save, or the INSERT itself failed.
+     *
+     * The link still stands and every variation that did pair up resolves
+     * normally; only this one variation's order lines are left unresolvable.
+     * Logged rather than fatal for that reason: refusing the whole link would
+     * duplicate a product the owner deliberately built by hand.
+     */
+    case OrphanVariantNotCreated = 'orphan_variant_not_created';
+
+    /**
+     * A `link` decision mapped a Woo variation onto a FluentCart variant that
+     * belongs to some other product. The mapping was dropped rather than
+     * promoted.
+     *
+     * `fct_product_variations.id` is a global auto-increment and FluentCart has
+     * no foreign key from `fct_order_items.object_id` back to it, so a stale
+     * decision — the owner tidied their product between mapping and running —
+     * or a hand-made POST would otherwise attach this product's order lines to
+     * someone else's variant, silently and permanently.
+     */
+    case MappedVariantNotOnProduct = 'mapped_variant_not_on_product';
+
+    /**
+     * The WooCommerce product carries downloadable files and the FluentCart
+     * product it was linked to carries none.
+     *
+     * A mapped product is skipped by ProductMigrator, so its downloads are never
+     * migrated — deliberately, because the linked product is the owner's and
+     * writing files into it is exactly the unrequested write mapping exists to
+     * avoid. The consequence lands on the customer rather than the owner: the
+     * order page, the receipt and the paid/shipped emails all read
+     * Order::getDownloads(), which finds nothing.
+     */
+    case MappedProductHasNoDownloads = 'mapped_product_has_no_downloads';
+
+    /**
+     * MySQL rejected a statement CartShift sent through `$wpdb` directly.
+     *
+     * `$wpdb` does not throw. It records the failure in `$wpdb->last_error`,
+     * returns false, and leaves the caller none the wiser — so a write that
+     * never landed looked exactly like one that did, and the orchestrator's
+     * error counter, which only ever counted thrown exceptions, reported zero.
+     * A real run wrote ten `Unknown column 'item_count'` lines to the PHP error
+     * log and finished with "Success: Migration complete. 25 migrated, 2
+     * skipped", which is how that column survived unnoticed for as long as it
+     * did.
+     *
+     * FluentCart's own models throw on failure and are caught per record by
+     * MigrationOrchestrator::processBatch(); this code exists for the writes
+     * that bypass them. The message carries the MySQL error verbatim, because
+     * that string is the only thing that says which column or constraint.
+     */
+    case DatabaseWriteFailed = 'database_write_failed';
+
+    /**
      * Human-readable summary. Short enough to be a group heading in the log UI.
      */
     public function label(): string
@@ -173,6 +271,7 @@ enum MigrationErrorCode: string
             self::ProductNotMapped            => __('Product not migrated', 'cartshift'),
             self::VariationNotMapped          => __('Variation not migrated', 'cartshift'),
             self::ProductLinkMissing          => __('Order items link to no product', 'cartshift'),
+            self::VariationLinkMissing        => __('Order items link to no variant', 'cartshift'),
             self::UnsupportedProductType      => __('Unsupported product type', 'cartshift'),
             self::SkuCollision                => __('SKU already taken', 'cartshift'),
             self::CouponCodeMissing           => __('Coupon has no code', 'cartshift'),
@@ -183,6 +282,7 @@ enum MigrationErrorCode: string
             self::CouponRestrictionsNarrowed  => __('Coupon restrictions partly lost', 'cartshift'),
             self::MultiItemSubscription       => __('Multi-item subscription truncated', 'cartshift'),
             self::SubscriptionPausedMissingProduct => __('Subscription paused: product not migrated', 'cartshift'),
+            self::SubscriptionPausedMissingVariation => __('Subscription paused: no variant to bill for', 'cartshift'),
             self::UnmappedSubscriptionGateway => __('Unmapped payment gateway', 'cartshift'),
             self::PartialCatalogVisibility    => __('Partial catalog visibility lost', 'cartshift'),
             self::UserNotFound                => __('WordPress user missing', 'cartshift'),
@@ -197,6 +297,11 @@ enum MigrationErrorCode: string
             self::UnexpectedException         => __('Unexpected error', 'cartshift'),
             self::MigrationAborted            => __('Migration aborted', 'cartshift'),
             self::ScopeClosureTooLarge        => __('Selection is too large', 'cartshift'),
+            self::MappedFcProductMissing      => __('Mapped FluentCart product missing', 'cartshift'),
+            self::OrphanVariantNotCreated     => __('Variant could not be added', 'cartshift'),
+            self::MappedVariantNotOnProduct   => __('Mapped variant is on another product', 'cartshift'),
+            self::MappedProductHasNoDownloads => __('Linked product has no files', 'cartshift'),
+            self::DatabaseWriteFailed         => __('Database rejected a write', 'cartshift'),
         };
     }
 
@@ -233,6 +338,10 @@ enum MigrationErrorCode: string
             ),
             self::ProductLinkMissing => __(
                 'The order still shows what was bought and what it cost; those items just do not link to a product page. Migrate the missing products and re-run to restore the links.',
+                'cartshift',
+            ),
+            self::VariationLinkMissing => __(
+                'The order shows the right item at the right price, but it points at no variant — so per-variant sales reporting will not count it. Migrate the missing variation, or map it on the mapping screen, then re-run.',
                 'cartshift',
             ),
             self::UnsupportedProductType => __(
@@ -273,6 +382,10 @@ enum MigrationErrorCode: string
             ),
             self::SubscriptionPausedMissingProduct => __(
                 'The subscriber and their billing history came across, but nothing will be charged while the subscription is paused. Migrate the product, point the subscription at it, then resume it.',
+                'cartshift',
+            ),
+            self::SubscriptionPausedMissingVariation => __(
+                'The subscriber and their billing history came across, but nothing will be charged while the subscription is paused. Point it at a product variant in FluentCart, then resume it — an active subscription with no variant bills the customer for a blank line and hands them no downloads.',
                 'cartshift',
             ),
             self::UnmappedSubscriptionGateway => __(
@@ -331,6 +444,26 @@ enum MigrationErrorCode: string
                 'Narrow the selection — pick fewer products or customers, or use "Everything from a date" instead — then try again. Nothing was migrated.',
                 'cartshift',
             ),
+            self::MappedFcProductMissing => __(
+                'The linked FluentCart product no longer exists — trashed or deleted after it was chosen on the mapping screen. The WooCommerce product was created fresh instead; relink or merge them by hand if that is not what you wanted.',
+                'cartshift',
+            ),
+            self::OrphanVariantNotCreated => __(
+                'Add the missing variant to the linked FluentCart product by hand, then run the migration again. Products using Advanced Variations cannot take one: FluentCart rebuilds their variants from the attribute options and would delete it.',
+                'cartshift',
+            ),
+            self::MappedVariantNotOnProduct => __(
+                'The variant chosen on the mapping screen is not on the product it was mapped under — most likely it was deleted or moved afterwards. Open the mapping screen, pick the variant again, then re-run.',
+                'cartshift',
+            ),
+            self::MappedProductHasNoDownloads => __(
+                'Attach the files to the linked FluentCart product yourself. CartShift will not write them into a product you built by hand, and until they are there every migrated order for it shows the customer no files.',
+                'cartshift',
+            ),
+            self::DatabaseWriteFailed => __(
+                'The database refused part of this record, so some of it is missing. The log message carries the MySQL error verbatim — send it on if it names a column or a constraint you do not recognise. Fix the cause, then roll back and re-run: a half-written record is not repaired by running again.',
+                'cartshift',
+            ),
         };
     }
 
@@ -350,10 +483,16 @@ enum MigrationErrorCode: string
             self::CouponRestrictionsNarrowed,
             self::CustomerRebuiltFromOrder,
             self::ProductLinkMissing,
+            self::VariationLinkMissing,
             self::SubscriptionPausedMissingProduct,
+            self::SubscriptionPausedMissingVariation,
             self::MultiItemSubscription,
             self::UnmappedSubscriptionGateway,
-            self::PartialCatalogVisibility => MigrationErrorSeverity::Warning,
+            self::PartialCatalogVisibility,
+            self::MappedFcProductMissing,
+            self::OrphanVariantNotCreated,
+            self::MappedVariantNotOnProduct,
+            self::MappedProductHasNoDownloads => MigrationErrorSeverity::Warning,
 
             self::CustomerNotFound,
             self::ProductNotMapped,
@@ -373,6 +512,7 @@ enum MigrationErrorCode: string
             self::DryRunValidationFailed,
             self::UnexpectedException,
             self::MigrationAborted,
+            self::DatabaseWriteFailed,
             self::ScopeClosureTooLarge => MigrationErrorSeverity::Error,
         };
     }
@@ -390,6 +530,7 @@ enum MigrationErrorCode: string
             self::MissingEmail => MigrationErrorCategory::Customer,
 
             self::ProductLinkMissing,
+            self::VariationLinkMissing,
             self::ProductNotMapped,
             self::VariationNotMapped,
             self::UnsupportedProductType,
@@ -397,7 +538,11 @@ enum MigrationErrorCode: string
             self::EmptyProductName,
             self::NoVariationsMapped,
             self::PartialCatalogVisibility,
-            self::ProductCreationFailed => MigrationErrorCategory::Product,
+            self::ProductCreationFailed,
+            self::MappedFcProductMissing,
+            self::OrphanVariantNotCreated,
+            self::MappedVariantNotOnProduct,
+            self::MappedProductHasNoDownloads => MigrationErrorCategory::Product,
 
             self::CouponCodeMissing,
             self::CouponCodeTooLong,
@@ -410,6 +555,7 @@ enum MigrationErrorCode: string
 
             self::MultiItemSubscription,
             self::SubscriptionPausedMissingProduct,
+            self::SubscriptionPausedMissingVariation,
             self::UnmappedSubscriptionGateway => MigrationErrorCategory::Subscription,
 
             self::TermCreationFailed => MigrationErrorCategory::Taxonomy,
@@ -419,6 +565,7 @@ enum MigrationErrorCode: string
             self::DryRunValidationFailed,
             self::UnexpectedException,
             self::MigrationAborted,
+            self::DatabaseWriteFailed,
             self::ScopeClosureTooLarge => MigrationErrorCategory::System,
         };
     }

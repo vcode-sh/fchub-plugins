@@ -3,6 +3,7 @@
     <div class="cartshift-container">
       <PreflightScreen v-if="state.screen === 'preflight'" />
       <SelectScreen v-else-if="state.screen === 'select'" />
+      <MapScreen v-else-if="state.screen === 'map'" />
       <ProgressScreen v-else-if="state.screen === 'progress'" />
       <ResultsScreen v-else-if="state.screen === 'results'" />
     </div>
@@ -15,6 +16,7 @@ import { useMigration } from '@/composables/useMigration.js';
 import { useTheme } from '@/composables/useTheme.js';
 import PreflightScreen from '@/components/PreflightScreen.vue';
 import SelectScreen from '@/components/SelectScreen.vue';
+import MapScreen from '@/components/MapScreen.vue';
 import ProgressScreen from '@/components/ProgressScreen.vue';
 import ResultsScreen from '@/components/ResultsScreen.vue';
 

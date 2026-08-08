@@ -66,6 +66,7 @@ final class MigrationErrorCodeTest extends PluginTestCase
             'product_not_mapped',
             'variation_not_mapped',
             'product_link_missing',
+            'variation_link_missing',
             'unsupported_product_type',
             'sku_collision',
             'coupon_code_missing',
@@ -76,6 +77,7 @@ final class MigrationErrorCodeTest extends PluginTestCase
             'coupon_restrictions_narrowed',
             'multi_item_subscription',
             'subscription_paused_missing_product',
+            'subscription_paused_missing_variation',
             'unmapped_subscription_gateway',
             'partial_catalog_visibility',
             'user_not_found',
@@ -90,6 +92,11 @@ final class MigrationErrorCodeTest extends PluginTestCase
             'unexpected_exception',
             'migration_aborted',
             'scope_closure_too_large',
+            'mapped_fc_product_missing',
+            'orphan_variant_not_created',
+            'mapped_variant_not_on_product',
+            'mapped_product_has_no_downloads',
+            'database_write_failed',
         ];
 
         $actual = array_map(

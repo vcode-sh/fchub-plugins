@@ -15,6 +15,7 @@ use CartShift\Migrator\SubscriptionMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\Constants;
 use CartShift\Validator\PreflightCheck;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -73,6 +74,24 @@ final class PreflightController
         foreach ($migrators as $migrator) {
             $counts[$migrator->entityType()] = $migrator->count();
         }
+
+        // How many FluentCart products already exist — the single value that
+        // lets the Vue wizard skip the mapping step entirely on a virgin
+        // FluentCart install. Nested inside $counts, not alongside it: the
+        // wizard's useMigration.js does
+        // `state.counts = countsData.counts || countsData`, so anything not
+        // inside this array is invisible to it. The post type comes from
+        // Constants rather than a literal — verified there against the
+        // installed plugin's app/CPT/FluentProducts.php::CPT_NAME — so this
+        // query and MappingController's candidate query cannot come to
+        // disagree about what a FluentCart product is.
+        global $wpdb;
+
+        $counts['fc_product_count'] = (int) $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$wpdb->posts}
+             WHERE post_type = '" . Constants::FC_PRODUCT_POST_TYPE . "'
+               AND post_status IN ('publish', 'draft', 'private')",
+        );
 
         return new WP_REST_Response(['data' => ['counts' => $counts]]);
     }

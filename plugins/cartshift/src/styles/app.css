@@ -309,7 +309,8 @@ body.dark #cartshift-app table.widefat tbody tr:hover td {
 #cartshift-app table.cartshift-table-counts,
 #cartshift-app table.cartshift-table-select,
 #cartshift-app table.cartshift-progress-table,
-#cartshift-app table.cartshift-table-results {
+#cartshift-app table.cartshift-table-results,
+#cartshift-app table.cartshift-table-map {
   table-layout: fixed;
 }
 
@@ -379,6 +380,14 @@ body.dark #cartshift-app table.widefat tbody tr:hover td {
 #cartshift-app .cartshift-table-results td:nth-child(5) {
   text-align: left;
 }
+
+/* WooCommerce Product / FluentCart Product / Actions — the mapping screen.
+   Woo and FC columns carry roughly the same amount of prose (name plus a
+   description line each); Actions only ever holds up to three buttons, so it
+   needs less. */
+#cartshift-app .cartshift-table-map th:nth-child(1) { width: 36%; }
+#cartshift-app .cartshift-table-map th:nth-child(2) { width: 36%; }
+#cartshift-app .cartshift-table-map th:nth-child(3) { width: 28%; }
 
 /* Progress table */
 .cartshift-progress-table td { vertical-align: middle; }
@@ -2017,4 +2026,102 @@ body.dark .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
 
 #cartshift-app .cartshift-scope-chip-remove:hover {
   color: var(--cartshift-danger);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Map screen: mapping summary, run mode, and band groups
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Three counts that belong together, read as a set — the same card shell as
+   the progress screen's status bar. */
+.cartshift-map-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  margin: 16px 0 20px;
+  padding: 14px 16px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+  font-size: 14px;
+  color: var(--cartshift-text-primary);
+}
+
+/* Run-mode fieldset — the same box treatment as the select screen's
+   scope-mode fieldset (.cartshift-scope-modes). */
+.cartshift-map-mode {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+}
+
+.cartshift-map-mode legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.cartshift-map-mode label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+/* Band header: a label, a hint and up to three bulk buttons in one control
+   row — the same flex-wrap-and-gap mechanics as the log viewer's toolbar,
+   in the same card shell as the boxes above. */
+.cartshift-map-band {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 20px 0 0;
+  padding: 12px 16px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+}
+
+/* The flex gap above already spaces every child, consecutive buttons
+   included — cancel the global adjacent-button margin so it is not applied
+   twice. */
+#cartshift-app .cartshift-map-band .button + .button {
+  margin-left: 0;
+}
+
+/* Name + description pairing in MapRow's Woo and FC cells. table-layout:
+   fixed already governs these columns (see the geometry rules above);
+   flexing the <td> itself would pull it out of the table's row/column
+   model and break that, so the stack comes from the description dropping
+   to its own block line instead. */
+#cartshift-app .cartshift-map-woo .description,
+#cartshift-app .cartshift-map-fc .description {
+  display: block;
+  margin-top: 4px;
+}
+
+/* The reset near the top of this file sets select { max-width: none } for
+   the log toolbar's filters; the candidate picker needs the opposite so a
+   long product name cannot push it past the fixed-width column. */
+#cartshift-app .cartshift-map-fc select {
+  max-width: 100%;
+}
+
+/* The one consequence on this screen that lands on the shop's customers
+   rather than on the shop: a linked product with no files of its own serves
+   none to any migrated order. It is a .description like the variant summary
+   above it and inherits that block layout, so this only has to overrule the
+   muted colour that would let it read as more small print. */
+#cartshift-app .cartshift-map-downloads {
+  color: #b32d2e;
+}
+
+/* A decided row has nothing left to do — dim it the same way a disabled
+   button already reads as "not the one to act on right now" (.button:disabled
+   above), so a long list visibly settles as rows are worked through. */
+.cartshift-map-row.is-decided {
+  opacity: 0.6;
 }
