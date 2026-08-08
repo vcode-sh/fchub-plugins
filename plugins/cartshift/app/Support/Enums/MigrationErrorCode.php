@@ -151,6 +151,16 @@ enum MigrationErrorCode: string
     case MigrationAborted = 'migration_aborted';
 
     /**
+     * The scope the owner chose resolves to more records than CartShift will
+     * hold in one closure. Nothing was migrated.
+     *
+     * Deliberately a refusal rather than a truncation: migrating a subset of
+     * what was confirmed is the exact class of silent loss this release exists
+     * to prevent.
+     */
+    case ScopeClosureTooLarge = 'scope_closure_too_large';
+
+    /**
      * Human-readable summary. Short enough to be a group heading in the log UI.
      */
     public function label(): string
@@ -186,6 +196,7 @@ enum MigrationErrorCode: string
             self::DryRunValidationFailed      => __('Dry-run validation failed', 'cartshift'),
             self::UnexpectedException         => __('Unexpected error', 'cartshift'),
             self::MigrationAborted            => __('Migration aborted', 'cartshift'),
+            self::ScopeClosureTooLarge        => __('Selection is too large', 'cartshift'),
         };
     }
 
@@ -316,6 +327,10 @@ enum MigrationErrorCode: string
                 'The run stopped. Check the log message, then start a new migration or roll this one back.',
                 'cartshift',
             ),
+            self::ScopeClosureTooLarge => __(
+                'Narrow the selection — pick fewer products or customers, or use "Everything from a date" instead — then try again. Nothing was migrated.',
+                'cartshift',
+            ),
         };
     }
 
@@ -357,7 +372,8 @@ enum MigrationErrorCode: string
             self::ProductCreationFailed,
             self::DryRunValidationFailed,
             self::UnexpectedException,
-            self::MigrationAborted => MigrationErrorSeverity::Error,
+            self::MigrationAborted,
+            self::ScopeClosureTooLarge => MigrationErrorSeverity::Error,
         };
     }
 
@@ -402,7 +418,8 @@ enum MigrationErrorCode: string
             self::AlreadyExistsInFluentCart,
             self::DryRunValidationFailed,
             self::UnexpectedException,
-            self::MigrationAborted => MigrationErrorCategory::System,
+            self::MigrationAborted,
+            self::ScopeClosureTooLarge => MigrationErrorCategory::System,
         };
     }
 

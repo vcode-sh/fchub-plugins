@@ -6,6 +6,8 @@ namespace CartShift\State;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Domain\Scope\MigrationScope;
+
 final class MigrationState
 {
     private const string OPTION_KEY = 'cartshift_migration_state';
@@ -31,7 +33,7 @@ final class MigrationState
      * @param string[] $entityTypes Entity types to migrate.
      * @return array<string, mixed> The new migration state.
      */
-    public function start(array $entityTypes, bool $dryRun = false): array
+    public function start(array $entityTypes, bool $dryRun = false, ?MigrationScope $scope = null): array
     {
         $state = [
             'migration_id'         => wp_generate_uuid4(),
@@ -40,6 +42,11 @@ final class MigrationState
             'started_at'           => gmdate('Y-m-d H:i:s'),
             'completed_at'         => null,
             'entity_types'         => array_values($entityTypes),
+            // What the owner confirmed. Read back by every later batch, by a
+            // resume, and by a retry — a run that forgot its scope between
+            // requests would silently widen, which is the one failure mode
+            // selective migration cannot have.
+            'scope'                => ($scope ?? MigrationScope::everything())->toArray(),
             'current_entity_index' => 0,
             'current_offset'       => 0,
             'cursors'              => [],
@@ -254,6 +261,31 @@ final class MigrationState
         $state = $this->getCurrent();
 
         return $state['entity_types'] ?? [];
+    }
+
+    /**
+     * What this run was asked to migrate.
+     *
+     * A run started before scopes existed has no key at all, and
+     * MigrationScope::fromArray() reads that as "everything" — which is exactly
+     * what those runs did.
+     */
+    public function getScope(): MigrationScope
+    {
+        $state = $this->getCurrent();
+
+        return MigrationScope::fromArray($state['scope'] ?? null);
+    }
+
+    public function setScope(MigrationScope $scope): void
+    {
+        $state = $this->getCurrent();
+        if (!$state) {
+            return;
+        }
+
+        $state['scope'] = $scope->toArray();
+        $this->persist($state);
     }
 
     /**

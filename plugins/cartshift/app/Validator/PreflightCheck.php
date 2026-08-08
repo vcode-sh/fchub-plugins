@@ -39,6 +39,21 @@ final class PreflightCheck
     private const string HPOS_DATA_STORE = '\Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore';
 
     /**
+     * WooCommerce product types CartShift can migrate.
+     *
+     * The single definition of "supported" — checkProductTypes() and
+     * ScopeConsequences::productLinkMissingCount() both read it, by way of
+     * unsupportedProductTypeCounts(), rather than each keeping their own copy.
+     * A preflight warning and a scope consequence count that disagreed about
+     * which types are unsupported would be quoted side by side to the same
+     * user; this project has produced three separate defects from exactly
+     * that class of drift.
+     *
+     * @var list<string>
+     */
+    private const array SUPPORTED_PRODUCT_TYPES = ['simple', 'variable', 'subscription', 'variable-subscription'];
+
+    /**
      * WooCommerce plugins that grant entitlements (course access, membership levels)
      * on the strength of a WooCommerce order. CartShift migrates orders, customers,
      * subscriptions and coupons — never entitlements, that boundary is deliberate and
@@ -400,32 +415,8 @@ final class PreflightCheck
             );
         }
 
-        global $wpdb;
-
-        $results = $wpdb->get_results(
-            "SELECT t.slug, COUNT(*) as count
-             FROM {$wpdb->term_relationships} tr
-             INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-             INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-             INNER JOIN {$wpdb->posts} p ON p.ID = tr.object_id
-             WHERE tt.taxonomy = 'product_type'
-               AND p.post_type = 'product'
-               AND p.post_status IN ('publish', 'draft', 'private')
-             GROUP BY t.slug
-             ORDER BY count DESC",
-        );
-
-        $types = [];
-        foreach ($results as $row) {
-            $types[$row->slug] = (int) $row->count;
-        }
-
-        $supported = ['simple', 'variable', 'subscription', 'variable-subscription'];
-
-        $unsupported = [];
-        foreach (array_diff(array_keys($types), $supported) as $slug) {
-            $unsupported[$slug] = $types[$slug];
-        }
+        $types       = self::productTypeCounts();
+        $unsupported = self::unsupportedFromTypeCounts($types);
 
         $unsupportedCount = array_sum($unsupported);
         $hasWarning       = $unsupportedCount > 0;
@@ -444,8 +435,8 @@ final class PreflightCheck
         $ordersAffected = 0;
 
         if ($hasWarning) {
-            $ordersAffected = $this->countOrdersAffectedByTypes(array_keys($unsupported));
-            $totalOrders    = $this->countMigratableOrders();
+            $ordersAffected = self::countOrdersAffectedByTypes(array_keys($unsupported));
+            $totalOrders    = self::countMigratableOrders();
 
             $typeNames = implode(', ', array_map(
                 static fn(string $slug): string => str_replace('-', ' ', $slug),
@@ -482,6 +473,68 @@ final class PreflightCheck
     }
 
     /**
+     * Every product_type term present in the catalogue, keyed by slug, with how
+     * many products carry it. publish/draft/private only — the same trio
+     * countOrdersAffectedByTypes() restricts to, so a product sitting in the
+     * trash cannot inflate either number.
+     *
+     * @return array<string, int>
+     */
+    private static function productTypeCounts(): array
+    {
+        global $wpdb;
+
+        $results = $wpdb->get_results(
+            "SELECT t.slug, COUNT(*) as count
+             FROM {$wpdb->term_relationships} tr
+             INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+             INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
+             INNER JOIN {$wpdb->posts} p ON p.ID = tr.object_id
+             WHERE tt.taxonomy = 'product_type'
+               AND p.post_type = 'product'
+               AND p.post_status IN ('publish', 'draft', 'private')
+             GROUP BY t.slug
+             ORDER BY count DESC",
+        );
+
+        $types = [];
+        foreach ($results as $row) {
+            $types[$row->slug] = (int) $row->count;
+        }
+
+        return $types;
+    }
+
+    /**
+     * @param array<string, int> $types
+     * @return array<string, int>
+     */
+    private static function unsupportedFromTypeCounts(array $types): array
+    {
+        $unsupported = [];
+
+        foreach (array_diff(array_keys($types), self::SUPPORTED_PRODUCT_TYPES) as $slug) {
+            $unsupported[$slug] = $types[$slug];
+        }
+
+        return $unsupported;
+    }
+
+    /**
+     * product_type slugs CartShift cannot migrate, each with how many products
+     * in the catalogue carry it.
+     *
+     * The one place that answers "which types are unsupported" — see
+     * SUPPORTED_PRODUCT_TYPES for why there must be only one.
+     *
+     * @return array<string, int>
+     */
+    public static function unsupportedProductTypeCounts(): array
+    {
+        return self::unsupportedFromTypeCounts(self::productTypeCounts());
+    }
+
+    /**
      * How many orders contain at least one product of an unsupported type.
      *
      * Line items live in {prefix}woocommerce_order_items /
@@ -501,13 +554,13 @@ final class PreflightCheck
      *
      * @param list<string> $slugs
      */
-    private function countOrdersAffectedByTypes(array $slugs): int
+    public static function countOrdersAffectedByTypes(array $slugs): int
     {
         if ($slugs === []) {
             return 0;
         }
 
-        $cached = $this->cachedOrdersAffected($slugs);
+        $cached = self::cachedOrdersAffected($slugs);
 
         if ($cached !== null) {
             return $cached;
@@ -539,7 +592,7 @@ final class PreflightCheck
 
         $count = (int) $wpdb->get_var($sql);
 
-        $this->rememberOrdersAffected($slugs, $count);
+        self::rememberOrdersAffected($slugs, $count);
 
         return $count;
     }
@@ -564,7 +617,7 @@ final class PreflightCheck
      *
      * @param list<string> $slugs
      */
-    private function cachedOrdersAffected(array $slugs): ?int
+    private static function cachedOrdersAffected(array $slugs): ?int
     {
         if (!function_exists('get_transient')) {
             return null;
@@ -578,7 +631,7 @@ final class PreflightCheck
     /**
      * @param list<string> $slugs
      */
-    private function rememberOrdersAffected(array $slugs, int $count): void
+    private static function rememberOrdersAffected(array $slugs, int $count): void
     {
         if (!function_exists('set_transient')) {
             return;
@@ -608,7 +661,7 @@ final class PreflightCheck
      * migratable scope OrderMigrator::countTotal() uses, so this number matches
      * whatever the migration itself will report as the order total.
      */
-    private function countMigratableOrders(): int
+    public static function countMigratableOrders(): int
     {
         global $wpdb;
 

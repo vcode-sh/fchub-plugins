@@ -321,6 +321,45 @@ final class PreflightCheckTest extends PluginTestCase
     }
 
     /**
+     * Regression for a class of defect this project has produced three times
+     * already: two independently maintained definitions of "supported product
+     * type" drifting apart. checkProductTypes() — quoted on the preflight
+     * screen — and unsupportedProductTypeCounts() — which
+     * ScopeConsequences::productLinkMissingCount() calls to build the
+     * product_link_missing consequence — must report the same unsupported
+     * slugs for the same catalogue, because they are now backed by one shared
+     * static method and one supported-type constant rather than two lists
+     * someone has to remember to edit together. This pins the agreement
+     * itself, not merely that each works in isolation.
+     */
+    public function testPreflightAndUnsupportedProductTypeCountsAgree(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query): array {
+            if (str_contains($query, 'product_type')) {
+                return [
+                    (object) ['slug' => 'simple', 'count' => 500],
+                    (object) ['slug' => 'grouped', 'count' => 1],
+                    (object) ['slug' => 'course', 'count' => 2],
+                ];
+            }
+
+            return [];
+        };
+
+        $check = (new PreflightCheck())->run()['checks']['product_types'];
+
+        $this->assertSame(
+            array_keys($check['unsupported']),
+            array_keys(PreflightCheck::unsupportedProductTypeCounts()),
+            'checkProductTypes() and unsupportedProductTypeCounts() must agree on which types are unsupported.',
+        );
+        $this->assertSame(['grouped', 'course'], array_keys(PreflightCheck::unsupportedProductTypeCounts()));
+        $this->assertSame(['grouped' => 1, 'course' => 2], PreflightCheck::unsupportedProductTypeCounts());
+    }
+
+    /**
      * The bug this fixes: unsupported product types were excluded from
      * getProductTypes(), which countTotal() and fetchBatch() both filter on. That
      * makes them invisible in the migration summary rather than skipped-and-reported.

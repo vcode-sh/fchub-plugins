@@ -609,6 +609,11 @@ final class RetryTestMigrator implements MigratorInterface
     {
         return (string) $record->id;
     }
+
+    #[\Override]
+    public function useScope(\CartShift\Domain\Scope\MigrationScope $scope): void
+    {
+    }
 }
 
 /**

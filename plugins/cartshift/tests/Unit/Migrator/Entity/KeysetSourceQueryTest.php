@@ -150,10 +150,12 @@ final class KeysetSourceQueryTest extends PluginTestCase
      */
     public function testSubscriptionsKeepOffsetPaginationAndStillAdvance(): void
     {
+        // No source configured, so the stub yields nothing — the same "nothing
+        // to migrate" this test asserted back when wcs_get_subscriptions() did
+        // not exist at all. countTotal()'s COUNT(*) goes through the default
+        // wpdb stub, which answers 0.
         $migrator = $this->subscriptionMigrator();
 
-        // WooCommerce Subscriptions is not installed, so the guard short-circuits.
-        $this->assertFalse(function_exists('wcs_get_subscriptions'));
         $this->assertSame([], $migrator->fetchBatch(null, 50));
         $this->assertSame(0, $migrator->count());
     }

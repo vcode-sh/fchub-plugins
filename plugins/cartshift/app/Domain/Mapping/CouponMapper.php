@@ -57,8 +57,14 @@ final class CouponMapper
      * `excluded_products` is deliberately absent. A product ID that resolves to
      * nothing is a product that is not in FluentCart at all, so there is no cart
      * item for the lost exclusion to have protected.
+     *
+     * Public because it is the authority, not a private detail: ScopeConsequences
+     * reads it to predict, before anything migrates, which coupons this run would
+     * disable. It used to keep its own list, which disagreed with this one in both
+     * directions. Adding a key here changes what the preview says as well as what
+     * the migration does, which is the point.
      */
-    private const array WIDENING_ON_TOTAL_LOSS = [
+    public const array WIDENING_ON_TOTAL_LOSS = [
         'included_products',
         'included_categories',
         'excluded_categories',

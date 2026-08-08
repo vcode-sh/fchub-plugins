@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CartShift\Tests\Unit\CLI;
 
 use CartShift\CLI\MigrateCommand;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\State\MigrationState;
 use CartShift\Tests\Unit\PluginTestCase;
 
@@ -20,6 +21,7 @@ require_once dirname(__DIR__, 2) . '/stubs/HttpCliStubs.php';
 final class MigrateCommandTest extends PluginTestCase
 {
     private MigrationState $state;
+    private ?\wpdb $originalWpdb = null;
 
     #[\Override]
     protected function setUp(): void
@@ -40,12 +42,99 @@ final class MigrateCommandTest extends PluginTestCase
     #[\Override]
     protected function tearDown(): void
     {
+        if ($this->originalWpdb !== null) {
+            $GLOBALS['wpdb'] = $this->originalWpdb;
+            $this->originalWpdb = null;
+        }
+
         unset(
             $GLOBALS['_cartshift_test_get_var_callback'],
             $GLOBALS['_cartshift_test_get_results_callback'],
         );
 
         parent::tearDown();
+    }
+
+    // ── migrate: scope ─────────────────────────────────────
+
+    public function testMigrateStoresTheScopeItWasGiven(): void
+    {
+        MigrateCommand::migrate([], ['entities' => 'order', 'since' => '2024-03-01']);
+
+        $this->assertSame('since', $this->freshState()->getScope()->mode());
+    }
+
+    public function testMigrateWithNoScopeFlagsMigratesEverything(): void
+    {
+        MigrateCommand::migrate([], ['entities' => 'order']);
+
+        $this->assertTrue($this->freshState()->getScope()->isEverything());
+    }
+
+    /**
+     * Same refusal as POST /migrate, and for the same reason: truncating a
+     * closure would migrate a subset of what the operator confirmed on the
+     * command line.
+     *
+     * Picked explicitly rather than closed into: MAX_CLOSURE_IDS + 1 customer
+     * IDs on --customers overflows noteSize() on the picked set itself, with
+     * no need to stub a closure query.
+     */
+    public function testAnOversizedClosureIsRefusedBeforeAnythingIsWritten(): void
+    {
+        $customerIds = implode(',', range(1, ScopeResolver::MAX_CLOSURE_IDS + 1));
+
+        MigrateCommand::migrate([], [
+            'entities'  => 'order',
+            'customers' => $customerIds,
+        ]);
+
+        $this->assertSame('idle', $this->freshState()->getProgress()['status']);
+    }
+
+    /**
+     * `--since` combined with `--products` or `--customers` is a contradiction,
+     * not a preference to silently resolve — refused rather than guessed.
+     */
+    public function testSinceCombinedWithProductsIsRefused(): void
+    {
+        MigrateCommand::migrate([], [
+            'entities' => 'order',
+            'since'    => '2024-01-01',
+            'products' => '12',
+        ]);
+
+        $this->assertSame('idle', $this->freshState()->getProgress()['status']);
+    }
+
+    /**
+     * MigrationScope::fromArray() fails *open* on a malformed date — it falls
+     * back to "everything" — which is correct on the REST path, where a
+     * preview and an explicit confirmation sit between the value and a
+     * running migration. There is no preview on the command line: a typo
+     * would otherwise migrate the entire shop with no indication the scope
+     * was ever discarded. The CLI refuses instead.
+     *
+     * @return list<string>
+     */
+    public static function malformedSinceDates(): array
+    {
+        return [
+            'single-digit month/day' => ['2024-3-1'],
+            'not a date at all'      => ['yesterday'],
+            'empty string'           => [''],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('malformedSinceDates')]
+    public function testAMalformedSinceDateIsRefusedRatherThanMigratingEverything(string $since): void
+    {
+        MigrateCommand::migrate([], [
+            'entities' => 'order',
+            'since'    => $since,
+        ]);
+
+        $this->assertSame('idle', $this->freshState()->getProgress()['status']);
     }
 
     public function testResetIsANoopWhenThereIsNoMigrationState(): void

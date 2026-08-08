@@ -6,6 +6,8 @@ namespace CartShift\Domain\Migration\Contracts;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Domain\Scope\MigrationScope;
+
 interface MigratorInterface
 {
     /**
@@ -83,6 +85,19 @@ interface MigratorInterface
      * @return mixed[]
      */
     public function fetchByIds(array $wcIds): array;
+
+    /**
+     * Migrate under this scope instead of the one in MigrationState.
+     *
+     * A real run never calls this. It exists for /preview, which has to count
+     * what a scope *would* migrate without starting anything and without
+     * writing a scope anywhere — so it hands the scope to the migrator
+     * directly rather than through state.
+     *
+     * Declared on the contract rather than only on AbstractMigrator because
+     * ScopePreview holds a list<MigratorInterface> and calls this on each one.
+     */
+    public function useScope(MigrationScope $scope): void;
 
     /**
      * The cursor value reached by having handed out this record.

@@ -26,6 +26,47 @@ const ACK_KEY = 'cartshift_ack_migration';
 
 const FINISHED_STATUSES = ['completed', 'failed', 'cancelled'];
 
+/**
+ * Map the UI's scope shape onto the wire shape `MigrationScope::toArray()`
+ * expects. This is the single place the two vocabularies meet — the UI keeps
+ * products and customers as `{id, label, sublabel}`/`{id, kind, label,
+ * sublabel}` for the picker, the backend wants flat id arrays split by kind.
+ *
+ * Exported so the tests can reach it without driving the whole composable.
+ *
+ * @param {Object} scope UI-shaped scope (state.scope).
+ * @return {Object} Wire-shaped scope for `POST /preview` and `POST /migrate`.
+ */
+export function serializeScope(scope) {
+  return {
+    mode: scope.mode,
+    since: scope.mode === 'since' ? scope.since : null,
+    product_ids: scope.mode === 'explicit' ? scope.products.map((p) => Number(p.id)) : [],
+    customer_ids:
+      scope.mode === 'explicit'
+        ? scope.customers.filter((c) => c.kind === 'registered').map((c) => Number(c.id))
+        : [],
+    guest_emails:
+      scope.mode === 'explicit'
+        ? scope.customers.filter((c) => c.kind === 'guest').map((c) => String(c.id))
+        : [],
+    include_orders_for_products: scope.mode === 'explicit' && !!scope.includeOrdersForProducts,
+  };
+}
+
+/**
+ * The empty scope a fresh run (or a reset one) starts from.
+ */
+function emptyScope() {
+  return {
+    mode: 'everything',
+    since: null,
+    products: [],
+    customers: [],
+    includeOrdersForProducts: false,
+  };
+}
+
 function readAck() {
   try {
     return window.localStorage.getItem(ACK_KEY);
@@ -102,6 +143,12 @@ export function useMigration() {
     retrySupport: 'unknown', // unknown | yes | no
     retryUnavailable: null, // why the control is off, in words
     retrying: false,
+
+    // Selective migration scope, and the server-computed preview of it.
+    scope: emptyScope(),
+    preview: null, // the /preview payload
+    previewLoading: false,
+    previewSupport: 'unknown', // unknown | yes | no
   });
 
   // ── Internal helpers ──
@@ -231,6 +278,125 @@ export function useMigration() {
     return canonicalOrder.filter((e) => set.has(e));
   }
 
+  /**
+   * Switch the scope's mode. Kept as an action (rather than letting the UI
+   * write `state.scope.mode` directly) so every mode change has one place to
+   * grow behaviour later — right now it just assigns.
+   *
+   * @param {string} mode 'everything' | 'since' | 'explicit'
+   */
+  function setScopeMode(mode) {
+    state.scope.mode = mode;
+  }
+
+  /**
+   * Ask the server what the current scope resolves to: counts, consequence
+   * descriptors, closure info, and whether the closure is too large to run.
+   *
+   * Debounced by the caller, not here — the composable stays predictable and
+   * the screen decides when to ask.
+   *
+   * A 404 or 501 means this build of CartShift predates the endpoint: that is
+   * a degraded screen, not a failed migration, so it leaves `state.error`
+   * alone and just flips `previewSupport` to 'no' so the caller can fall back
+   * to `autoIncludeDependencies()` and the old counts.
+   *
+   * `{silent: true}` is for a speculative call the owner did not ask for —
+   * currently just the one the select screen fires on arrival to prime the
+   * receipt. A speculative call failing (a 500, a timeout, a dropped
+   * connection) must not greet the owner with an error banner about
+   * something they have not done yet, so it skips the `state.error`
+   * assignment and leaves the receipt simply unprimed. The 404/501
+   * `previewSupport` handling is unaffected either way — that is a feature
+   * detection outcome, not an error, and every caller needs to see it.
+   * Owner-initiated refreshes (the debounced one on every scope edit) never
+   * pass this, so a real failure is still reported exactly as before.
+   *
+   * The entity list sent is the *resolved* one, not the owner's raw ticks.
+   * startMigration() runs autoIncludeDependencies() on the way out, so ticking
+   * Orders alone migrates products and customers too — a preview built from
+   * the raw ticks described a run that was never going to happen. And an empty
+   * list is not asked at all: the server reads it as "no narrowing" and
+   * answers for all five entities, which is how an arrival with nothing ticked
+   * came to show whole-shop figures under a heading promising the opposite.
+   *
+   * @param {{silent?: boolean}} [options]
+   */
+  async function refreshPreview(options = {}) {
+    const silent = options.silent === true;
+    const entityTypes = autoIncludeDependencies(state.selectedEntities);
+
+    if (entityTypes.length === 0) {
+      state.preview = null;
+      state.previewLoading = false;
+
+      return;
+    }
+
+    state.previewLoading = true;
+
+    try {
+      const data = await api('POST', 'preview', {
+        entity_types: entityTypes,
+        scope: serializeScope(state.scope),
+      });
+
+      state.preview = data;
+      state.previewSupport = 'yes';
+    } catch (err) {
+      // Whatever went wrong, the preview on hand — if any — answers the
+      // previous question, not this one. Keeping it would leave the receipt
+      // quoting a wider selection's figures under the narrower one the owner
+      // is now looking at, which is precisely the class of confident wrong
+      // number 1.2.2 existed to stop.
+      state.preview = null;
+
+      if (err.status === 404 || err.status === 501) {
+        state.previewSupport = 'no';
+      } else if (!silent) {
+        state.error = err.message;
+      }
+    } finally {
+      state.previewLoading = false;
+    }
+  }
+
+  /**
+   * Apply a remedy suggested by the preview (e.g. "add these products to the
+   * scope to keep an included order's line items resolvable").
+   *
+   * Merges the remedy's product ids into the scope (deduplicated on id),
+   * switches to explicit mode if the scope was not already explicit, then
+   * refreshes the preview so the owner sees the new closure.
+   *
+   * The picker labels arrive on the next search; a remedy-added product may
+   * show as its bare ID until then, which is acceptable and better than
+   * blocking on a lookup.
+   *
+   * @param {{action: string, product_ids?: (number|string)[]}} remedy
+   */
+  async function applyRemedy(remedy) {
+    if (!remedy || !Array.isArray(remedy.product_ids)) {
+      return;
+    }
+
+    if (state.scope.mode !== 'explicit') {
+      state.scope.mode = 'explicit';
+    }
+
+    const known = new Set(state.scope.products.map((p) => String(p.id)));
+
+    for (const id of remedy.product_ids) {
+      const key = String(id);
+      if (!known.has(key)) {
+        known.add(key);
+        state.scope.products.push({ id });
+      }
+    }
+
+    await refreshPreview();
+  }
+
   async function startMigration() {
     if (state.selectedEntities.length === 0) {
       state.error = 'Please select at least one entity type to migrate.';
@@ -255,11 +421,33 @@ export function useMigration() {
         entity_types: state.selectedEntities,
         dry_run: state.dryRun,
         background: state.useBackground,
+        scope: serializeScope(state.scope),
       });
 
       driveRun(data);
     } catch (err) {
       state.migrating = false;
+
+      // 422 with this code means the closure was refused and nothing was
+      // started. startMigration() already switched to the progress screen
+      // before the request went out, so send the owner back to the selection
+      // they still need to narrow — a progress bar for a run that does not
+      // exist is worse than the error.
+      //
+      // `err.payload` is the *unwrapped* body: useApi.js strips one `data`
+      // level before it builds the error (`data.data !== undefined ? data.data
+      // : data`), so the controller's `['data' => ['code' => …]]` arrives here
+      // as `{code, message, scope}`. Reading `err.payload.data.code` made this
+      // branch unreachable, and the test that covered it hand-built a payload
+      // useApi cannot produce, so it passed either way. Same shape as the 409
+      // branch below, which has always been right.
+      if (err.status === 422 && err.payload?.code === 'scope_closure_too_large') {
+        state.screen = 'select';
+        state.error = err.payload.message;
+        state.batchError = false;
+
+        return;
+      }
 
       // 409 means a run is already in flight or was abandoned. That is a
       // recoverable situation, not an error — show it with the resume, cancel
@@ -708,6 +896,10 @@ export function useMigration() {
     state.previousRun = null;
     state.retrying = false;
     // retrySupport is a property of the install, not of the run — keep it.
+    state.scope = emptyScope();
+    state.preview = null;
+    state.previewLoading = false;
+    // previewSupport is a property of the install, not of the run — keep it.
     lastFingerprint = '';
   }
 
@@ -733,6 +925,9 @@ export function useMigration() {
     actions: {
       bootstrap,
       runPreflight,
+      setScopeMode,
+      refreshPreview,
+      applyRemedy,
       startMigration,
       startRetry,
       probeRetrySupport,

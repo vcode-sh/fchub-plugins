@@ -824,6 +824,13 @@ if (!class_exists('wpdb')) {
 
         public function prepare(string $query, mixed ...$args): string
         {
+            // Recorded before the early return, so a prepare() call with no
+            // values at all still leaves a trace. Real wpdb::prepare() answers
+            // a placeholder-free query with _doing_it_wrong (see
+            // wp-includes/class-wpdb.php), and this stub is far too forgiving
+            // to notice — so the *fact* of the call is what tests assert on.
+            $GLOBALS['_cartshift_test_queries'][] = ['prepare', $query, $args];
+
             if (empty($args)) {
                 return $query;
             }
@@ -855,7 +862,18 @@ if (!class_exists('wpdb')) {
         public function get_col(string $query): array
         {
             $GLOBALS['_cartshift_test_queries'][] = ['get_col', $query];
-            return [];
+
+            // Same escape hatch get_var() and get_results() have had all along.
+            // Without it a get_col() always answered "no rows", which reads as
+            // "nothing survives" to any caller asking which of a set of ids is
+            // still there — a test could then only ever exercise the
+            // everything-is-missing branch and would pass against code that
+            // never looked.
+            if (isset($GLOBALS['_cartshift_test_get_col_callback'])) {
+                return ($GLOBALS['_cartshift_test_get_col_callback'])($query);
+            }
+
+            return $GLOBALS['_cartshift_test_get_col_return'] ?? [];
         }
 
         public function get_results(string $query, string $output = OBJECT): array
@@ -897,6 +915,17 @@ if (!class_exists('wpdb')) {
         public function get_charset_collate(): string
         {
             return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+        }
+
+        /**
+         * Byte-identical to WordPress core's wpdb::esc_like() (wp-includes/class-wpdb.php):
+         * addcslashes() over '_%\\' so a typed search term can't smuggle a LIKE wildcard.
+         * Added so callers guarded with method_exists($wpdb, 'esc_like') exercise the real
+         * algorithm under test instead of always falling through to their own fallback.
+         */
+        public function esc_like(string $text): string
+        {
+            return addcslashes($text, '_%\\');
         }
     }
 }

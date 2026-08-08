@@ -1684,3 +1684,188 @@ body.dark .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
   font-size: 13px;
   color: var(--cartshift-text-secondary);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Migration receipt — the "what you'll get" preview panel
+   ═══════════════════════════════════════════════════════════════ */
+
+#cartshift-app .cartshift-receipt-closure {
+  margin-top: -8px;
+}
+
+.cartshift-receipt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cartshift-receipt-list li + li {
+  margin-top: 8px;
+}
+
+.cartshift-receipt-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.cartshift-receipt-item .cartshift-receipt-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: default;
+}
+
+#cartshift-app .cartshift-remedy {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Select screen: scope doors + picker + receipt layout
+   ═══════════════════════════════════════════════════════════════ */
+
+.cartshift-select-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+@media (max-width: 782px) {
+  .cartshift-select-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cartshift-select-receipt {
+    order: 2;
+  }
+
+  .cartshift-select-scope {
+    order: 1;
+  }
+}
+
+.cartshift-scope-modes {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+}
+
+.cartshift-scope-modes legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.cartshift-scope-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.cartshift-scope-mode-detail {
+  margin: 4px 0 12px 24px;
+  padding-left: 4px;
+  border-left: 2px solid var(--cartshift-border-color);
+}
+
+.cartshift-scope-mode-detail > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--cartshift-text-secondary);
+}
+
+.cartshift-upward-offer-box {
+  margin-top: 12px;
+}
+
+.cartshift-upward-offer-box label {
+  align-items: flex-start;
+}
+
+/* ── ScopePicker ── */
+.cartshift-scope-picker {
+  margin-bottom: 16px;
+}
+
+.cartshift-scope-picker-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.cartshift-scope-picker-input {
+  width: 100%;
+}
+
+.cartshift-scope-picker-truncated {
+  margin: 6px 0;
+}
+
+.cartshift-scope-picker-results {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.cartshift-scope-picker-results li + li {
+  margin-top: 4px;
+}
+
+#cartshift-app .cartshift-scope-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+}
+
+.cartshift-scope-result-sublabel {
+  font-size: 12px;
+  color: var(--cartshift-text-secondary);
+}
+
+.cartshift-scope-picker-chips {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cartshift-scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+#cartshift-app .cartshift-scope-chip-remove {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+  color: var(--cartshift-text-secondary);
+}
+
+#cartshift-app .cartshift-scope-chip-remove:hover {
+  color: var(--cartshift-danger);
+}

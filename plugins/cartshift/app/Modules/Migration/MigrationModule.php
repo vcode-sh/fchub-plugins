@@ -73,6 +73,7 @@ final class MigrationModule implements ModuleInterface
         add_action('rest_api_init', static function () use ($container): void {
             $controllers = [
                 'CartShift\\Http\\Controllers\\PreflightController',
+                'CartShift\\Http\\Controllers\\PreviewController',
                 'CartShift\\Http\\Controllers\\MigrationController',
                 'CartShift\\Http\\Controllers\\RollbackController',
                 'CartShift\\Http\\Controllers\\FinalizeController',

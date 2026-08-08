@@ -54,6 +54,32 @@ if (!function_exists('get_woocommerce_currency')) {
     }
 }
 
+if (!function_exists('wp_count_posts')) {
+    /**
+     * Post-status tally. CouponMigrator::countTotal() reads publish/draft/private
+     * off this rather than issuing a query of its own.
+     *
+     * Tests seed $GLOBALS['_cartshift_test_post_status_counts'][$type] with an
+     * object or array shaped like WordPress's real return; an unseeded type
+     * answers all-zero rather than fatalling; a coupon count of zero is exactly
+     * what /preview must report when nothing was set up for it.
+     */
+    function wp_count_posts(string $type = 'post'): object
+    {
+        $seeded = $GLOBALS['_cartshift_test_post_status_counts'][$type] ?? null;
+
+        if (is_object($seeded)) {
+            return $seeded;
+        }
+
+        if (is_array($seeded)) {
+            return (object) $seeded;
+        }
+
+        return (object) ['publish' => 0, 'draft' => 0, 'private' => 0];
+    }
+}
+
 if (!function_exists('wc_get_products')) {
     /**
      * WooCommerce product query.

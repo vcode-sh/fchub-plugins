@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use CartShift\Domain\Migration\Contracts\HasErrorCode;
 use CartShift\Domain\Migration\Contracts\MigratorInterface;
+use CartShift\Domain\Scope\MigrationScope;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -72,12 +73,12 @@ final class MigrationOrchestrator
      * @param string[] $entityTypes Entity types to migrate (e.g. ['products', 'customers']).
      * @return array{continue: bool, migration_id: string, entity_type: string|null, offset: int, total: int, processed: int}
      */
-    public function startMigration(array $entityTypes, bool $dryRun = false): array
+    public function startMigration(array $entityTypes, bool $dryRun = false, ?MigrationScope $scope = null): array
     {
         /** @see 'cartshift/migration/entity_types' */
         $entityTypes = apply_filters('cartshift/migration/entity_types', $entityTypes);
 
-        $this->state->start($entityTypes, $dryRun);
+        $this->state->start($entityTypes, $dryRun, $scope);
         $this->idMap->setSimulating($dryRun);
 
         if ($dryRun) {
@@ -162,7 +163,13 @@ final class MigrationOrchestrator
             $ids[$entityType] = $this->retryableIds($sourceMigrationId, $entityType, $statuses);
         }
 
-        $this->state->start($entityTypes, $dryRun);
+        // Captured before start() mints fresh state. A retry re-runs an
+        // explicit ID list, so the scope does not gate anything here — but a
+        // retry whose state reads "everything" lies to the next resume and to
+        // the next person reading the run.
+        $carriedScope = $this->state->getScope();
+
+        $this->state->start($entityTypes, $dryRun, $carriedScope);
         $this->idMap->setSimulating($dryRun);
 
         if ($dryRun) {

@@ -1,0 +1,141 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
+
+const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
+
+vi.mock('@/composables/useApi.js', () => ({ useApi: () => ({ api: apiMock }) }));
+
+const { default: ScopePicker } = await import('@/components/ScopePicker.vue');
+
+describe('ScopePicker', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    apiMock.mockReset();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('searches on the debounce, not on the keystroke', async () => {
+    apiMock.mockResolvedValue({ results: [], truncated: false });
+
+    const wrapper = mount(ScopePicker, { props: { modelValue: [], kind: 'product' } });
+
+    await wrapper.find('input[type="search"]').setValue('hood');
+
+    expect(apiMock).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(300);
+    await nextTick();
+
+    // useApi's api() signature is api(method, endpoint, body) — there is no
+    // separate query argument (confirmed against useApi.js and
+    // useMigration.js's loadLog(), which bakes ?page=N into the endpoint the
+    // same way). So the query string travels in the endpoint itself.
+    expect(apiMock).toHaveBeenCalledWith('GET', 'scope/search?type=product&q=hood&limit=20');
+  });
+
+  it('emits a new array rather than mutating the prop', async () => {
+    apiMock.mockResolvedValue({
+      results: [{ id: '12', kind: 'product', label: 'Blue Hoodie', sublabel: 'SKU HOOD-1' }],
+      truncated: false,
+    });
+
+    const modelValue = [];
+    const wrapper = mount(ScopePicker, { props: { modelValue, kind: 'product' } });
+
+    await wrapper.find('input[type="search"]').setValue('hood');
+    vi.advanceTimersByTime(300);
+    await vi.runAllTicks();
+    await nextTick();
+
+    await wrapper.find('button.cartshift-scope-result').trigger('click');
+
+    const emitted = wrapper.emitted('update:modelValue');
+
+    expect(emitted[0][0]).toEqual([
+      { id: '12', kind: 'product', label: 'Blue Hoodie', sublabel: 'SKU HOOD-1' },
+    ]);
+    expect(modelValue).toEqual([]);
+  });
+
+  it('says there is more rather than implying it showed everything', async () => {
+    apiMock.mockResolvedValue({
+      results: [{ id: '12', kind: 'product', label: 'Blue Hoodie', sublabel: '' }],
+      truncated: true,
+    });
+
+    const wrapper = mount(ScopePicker, { props: { modelValue: [], kind: 'product' } });
+
+    await wrapper.find('input[type="search"]').setValue('hood');
+    vi.advanceTimersByTime(300);
+    await vi.runAllTicks();
+    await nextTick();
+
+    expect(wrapper.text()).toContain('keep typing');
+  });
+
+  it('falls back to the id for a remedy-added item with no label yet', () => {
+    // applyRemedy() (useMigration.js) pushes bare `{ id }` products with no
+    // label or kind — the picker learns the name on the next search, but
+    // must not render a blank pill in the meantime.
+    const wrapper = mount(ScopePicker, {
+      props: { modelValue: [{ id: 42 }], kind: 'product' },
+    });
+
+    const chip = wrapper.find('.cartshift-scope-chip-label');
+
+    expect(chip.text()).toBe('#42');
+    expect(chip.text()).not.toContain('undefined');
+  });
+
+  it('removes a chosen item without touching the rest', async () => {
+    const wrapper = mount(ScopePicker, {
+      props: {
+        modelValue: [
+          { id: '12', kind: 'product', label: 'Blue Hoodie', sublabel: '' },
+          { id: '44', kind: 'product', label: 'Red Hoodie', sublabel: '' },
+        ],
+        kind: 'product',
+      },
+    });
+
+    await wrapper.findAll('button.cartshift-scope-chip-remove')[0].trigger('click');
+
+    expect(wrapper.emitted('update:modelValue')[0][0]).toEqual([
+      { id: '44', kind: 'product', label: 'Red Hoodie', sublabel: '' },
+    ]);
+  });
+
+  // The chips are the one control on the screen that changes what migrates,
+  // and removing one destroys the button that did it. Neither the change nor
+  // the lost focus was announced to anybody not looking at the screen.
+  it('announces the chosen items politely', () => {
+    const wrapper = mount(ScopePicker, {
+      props: {
+        modelValue: [{ id: '12', kind: 'product', label: 'Blue Hoodie', sublabel: '' }],
+        kind: 'product',
+      },
+    });
+
+    expect(wrapper.find('ul.cartshift-scope-picker-chips').attributes('aria-live')).toBe('polite');
+  });
+
+  it('returns focus to the search field when a chip is removed', async () => {
+    const wrapper = mount(ScopePicker, {
+      attachTo: document.body,
+      props: {
+        modelValue: [
+          { id: '12', kind: 'product', label: 'Blue Hoodie', sublabel: '' },
+          { id: '44', kind: 'product', label: 'Red Hoodie', sublabel: '' },
+        ],
+        kind: 'product',
+      },
+    });
+
+    await wrapper.findAll('button.cartshift-scope-chip-remove')[0].trigger('click');
+
+    expect(document.activeElement).toBe(wrapper.find('input[type="search"]').element);
+
+    wrapper.unmount();
+  });
+});

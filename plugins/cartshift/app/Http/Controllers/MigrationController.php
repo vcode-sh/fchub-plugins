@@ -9,6 +9,8 @@ defined('ABSPATH') || exit;
 use CartShift\Core\Container;
 use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
+use CartShift\Domain\Scope\MigrationScope;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Migrator\CouponMigrator;
 use CartShift\Migrator\CustomerMigrator;
 use CartShift\Migrator\OrderMigrator;
@@ -18,6 +20,7 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\MigrationErrorCode;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -36,6 +39,14 @@ final class MigrationController
             'methods'             => 'POST',
             'callback'            => [$this, 'migrate'],
             'permission_callback' => [$this, 'checkPermission'],
+            'args'                => [
+                // No 'default', deliberately: an absent scope must stay absent
+                // so MigrationScope::fromArray(null) reads it as "everything",
+                // which is what every caller predating this parameter meant.
+                'scope' => [
+                    'type' => 'object',
+                ],
+            ],
         ]);
 
         register_rest_route(self::NAMESPACE, '/retry', [
@@ -152,8 +163,27 @@ final class MigrationController
             );
         }
 
+        $scope = MigrationScope::fromArray($request->get_param('scope'));
+
+        // Checked here, before a migration id exists, so a refusal leaves no
+        // half-started run behind. Refusing is the point: truncating a closure
+        // would migrate a subset of what the owner confirmed.
+        if ((new ScopeResolver($scope))->exceedsClosureLimit()) {
+            return new WP_REST_Response(
+                [
+                    'data' => [
+                        'code'    => MigrationErrorCode::ScopeClosureTooLarge->value,
+                        'message' => MigrationErrorCode::ScopeClosureTooLarge->hint(),
+                        'scope'   => $scope->toArray(),
+                    ],
+                ],
+                422,
+            );
+        }
+
         $orchestrator = $this->buildOrchestrator();
-        $result = $orchestrator->startMigration($entityTypes, $dryRun);
+        $result = $orchestrator->startMigration($entityTypes, $dryRun, $scope);
+        $result['scope'] = $scope->toArray();
 
         $result['background'] = false;
         $result['background_available'] = BatchProcessor::isAvailable();

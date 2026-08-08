@@ -57,6 +57,10 @@ final class CouponMigrator extends AbstractMigrator
     #[\Override]
     protected function countTotal(): int
     {
+        // No scope predicate here, and none is missing: this counts through
+        // wp_count_posts() rather than a query of our own, and couponPredicate()
+        // is empty under every mode anyway. See fetchBatch(), where the rule is
+        // stated in code.
         $counts = wp_count_posts('shop_coupon');
 
         return (int) $counts->publish + (int) $counts->draft + (int) $counts->private;
@@ -76,6 +80,12 @@ final class CouponMigrator extends AbstractMigrator
 
         $after = max(0, (int) $cursor);
 
+        // Always empty. Coupons travel whole: one is cheap to migrate, and the
+        // gap policy already disables a coupon whose restrictions did not
+        // survive rather than letting it discount the shop. Expressed as a call
+        // rather than a comment so a future scope mode cannot forget it exists.
+        $selection = $this->scopeResolver()->couponPredicate();
+
         // Loops only when a whole page of coupon IDs fails to instantiate.
         while (true) {
             $couponIds = $wpdb->get_col($wpdb->prepare(
@@ -83,11 +93,11 @@ final class CouponMigrator extends AbstractMigrator
                  FROM {$wpdb->posts}
                  WHERE post_type = 'shop_coupon'
                    AND post_status IN ('publish', 'draft', 'private')
-                   AND ID > %d
-                 ORDER BY ID ASC
+                   AND ID > %d"
+                . $selection->andSql()
+                . " ORDER BY ID ASC
                  LIMIT %d",
-                $after,
-                $limit,
+                ...[$after, ...$selection->values(), $limit],
             ));
 
             if ($couponIds === []) {
