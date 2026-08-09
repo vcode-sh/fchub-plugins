@@ -2,6 +2,10 @@
 <ruleset name="FCHub Multi-Currency Coding Standards">
     <description>PSR-12 base with WordPress security checks</description>
     <file>.</file>
+    <!-- The shared GitHub updater is vendored verbatim into every plugin. It is a
+         deliberately global, snake_cased class so one copy can serve them all via
+         class_exists, which no amount of sniffing will talk it out of. -->
+    <exclude-pattern>*/lib/*</exclude-pattern>
     <exclude-pattern>*/vendor/*</exclude-pattern>
     <exclude-pattern>*/node_modules/*</exclude-pattern>
     <exclude-pattern>*/tests/*</exclude-pattern>
