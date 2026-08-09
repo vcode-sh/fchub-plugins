@@ -148,6 +148,28 @@ class FCHub_GitHub_Updater
     }
 
     /**
+     * The latest published release for a plugin slug, or null.
+     *
+     * WordPress only offers updates for a plugin it can already see, so a
+     * plugin that is not installed yet has no header, no Update URI, and no
+     * offer. FCHub installs those, and this is where it gets the version and
+     * the package from — the same cached release data the update path uses,
+     * so both agree by construction.
+     *
+     * @return array{version: string, zip_url: string, html_url: string, name: string, published_at: string}|null
+     */
+    public static function latestRelease(string $slug): ?array
+    {
+        if (!in_array($slug, self::KNOWN_SLUGS, true)) {
+            return null;
+        }
+
+        $release = self::fetchReleases()[$slug] ?? null;
+
+        return is_array($release) && ($release['zip_url'] ?? '') !== '' ? $release : null;
+    }
+
+    /**
      * Clear our transient when WP clears its own update cache.
      */
     public static function clearCache(): void

@@ -1,6 +1,6 @@
 {
   "submissionPaused": true,
-  "submissionPausedReason": "Awaiting WordPress.org review. Until a plugin is actually listed there, WordPress has no update channel for it, so every FCHub plugin ships the GitHub updater and no build is treated as a WordPress.org target. Flip this to false when review completes.",
+  "submissionPausedReason": "FCHub plugins are not listed on WordPress.org, and may never be. They are distributed as GitHub releases and ship the GitHub updater, which Plugin Check correctly reports as plugin_updater_detected. The directory gates stay off while that is the arrangement. Flip this to false only if a listing actually happens.",
   "plugins": {
     "fchub-memberships": {
       "displayName": "FCHub Memberships",
