@@ -21,6 +21,15 @@ class EndpointRegistrar
         // otherwise wp_kses eats our icons on the portal front end.
         IconSupport::register($endpoints);
 
+        // FluentCart's API drops every custom endpoint before `profile` at
+        // priority 10 and offers no say in the matter, so the finished menu is
+        // reordered afterwards. Late enough that every endpoint has been added.
+        add_filter(
+            'fluent_cart/global_customer_menu_items',
+            static fn($items) => is_array($items) ? MenuPlacement::apply($items, $endpoints) : $items,
+            50
+        );
+
         $api = fluent_cart_api();
 
         foreach ($endpoints as $endpoint) {

@@ -103,6 +103,14 @@ jobs:
           - plugin: fchub-p24
             php_version: '8.5'
             fetch_depth: 0
+          # Had no suite at all until the menu placement work in #141 gave it
+          # one. Wired in from the first test rather than a year later.
+          - plugin: fchub-portal-extender
+            php_version: '8.4'
+            fetch_depth: 0
+          - plugin: fchub-portal-extender
+            php_version: '8.5'
+            fetch_depth: 0
           # Twenty-three passing tests that nothing was running. It has a
           # phpunit.xml and a composer.json and simply never reached this
           # matrix — the same gap CartShift sat in until #134.

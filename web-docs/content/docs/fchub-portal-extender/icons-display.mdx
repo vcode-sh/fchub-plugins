@@ -3,6 +3,7 @@ title: Icons & Display
 description: Customise how your portal endpoints look — icon types, scrollable containers, ordering, and visibility toggles. Because an endpoint without an icon is just a sad text link.
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
@@ -178,9 +179,33 @@ Not every endpoint needs a scrollable container. If the content is short — a b
 
 ## Endpoint Ordering
 
-Endpoints appear in the Customer Portal sidebar in the order you define them. The admin interface shows up/down arrow buttons next to each endpoint — click to reposition. Changes are saved immediately via the REST API, so there's no separate "save order" button to forget about.
+Two separate things decide where an endpoint lands: its order relative to your *other* endpoints, and its position among FluentCart's built-in items.
 
-The order is relative to other Portal Extender endpoints. FluentCart's built-in endpoints (Orders, Subscriptions, Addresses, etc.) maintain their own positions — your custom endpoints slot in after them.
+### Relative to your other endpoints
+
+The endpoint list has up/down arrow buttons. Click to reposition. Changes save immediately via the REST API, so there's no separate "save order" button to forget about.
+
+### Relative to FluentCart's own menu
+
+Each endpoint has a **Menu Placement** setting in the editor, under Status. Pick the built-in item you want to sit next to:
+
+| Choice | Result |
+|---|---|
+| First — above Dashboard | Top of the menu |
+| After Dashboard | Second, directly under Dashboard |
+| After Purchase History, After Subscription Plans, After Licenses, After Downloads | Directly under that item |
+| Before Profile | The default, and where every endpoint used to land |
+| After Profile | Bottom of the menu |
+
+Existing endpoints keep **Before Profile**, so upgrading changes nothing until you say otherwise.
+
+<Callout type="warn">
+The catch worth knowing before you plan a layout: FluentCart's menu is not the same for every visitor. It hides **Licenses** when FluentCart Pro or the license module is off, and hides **Subscription Plans** from customers who don't have any. So "second from the top" is a different neighbour for different people.
+
+That is why placement is anchored to a named item rather than to a number. When the item you picked isn't on screen, the endpoint takes the same slot next to the nearest item that is — "After Licenses" on a site without licenses lands where Licenses would have been, not at the bottom of the menu.
+</Callout>
+
+Endpoints sharing a slot keep the relative order you gave them in the list, and menu items belonging to other plugins are never moved or dropped.
 
 <Separator className="my-8" />
 

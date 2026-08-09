@@ -4,6 +4,8 @@ namespace FChubPortalExtender\Storage;
 
 defined('ABSPATH') || exit;
 
+use FChubPortalExtender\Portal\MenuPlacement;
+
 class EndpointRepository
 {
     private const OPTION_KEY = 'fchub_portal_endpoints';
@@ -76,6 +78,8 @@ class EndpointRepository
             'icon_type'      => in_array($data['icon_type'] ?? '', ['svg', 'dashicon', 'url']) ? $data['icon_type'] : 'svg',
             'icon_value'     => $this->sanitizeIconValue($data['icon_type'] ?? 'svg', $data['icon_value'] ?? ''),
             'position'       => $maxPosition + 1,
+            'menu_anchor'    => $this->sanitizeMenuAnchor($data['menu_anchor'] ?? null),
+            'menu_placement' => $this->sanitizeMenuPlacement($data['menu_placement'] ?? null),
             'status'         => in_array($data['status'] ?? '', ['active', 'inactive']) ? $data['status'] : 'active',
             'scroll_enabled' => !empty($data['scroll_enabled']),
             'scroll_mode'    => in_array($data['scroll_mode'] ?? '', ['auto', 'fixed']) ? $data['scroll_mode'] : 'auto',
@@ -175,6 +179,14 @@ class EndpointRepository
 
         if (isset($data['status']) && in_array($data['status'], ['active', 'inactive'])) {
             $endpoints[$index]['status'] = $data['status'];
+        }
+
+        if (array_key_exists('menu_anchor', $data)) {
+            $endpoints[$index]['menu_anchor'] = $this->sanitizeMenuAnchor($data['menu_anchor']);
+        }
+
+        if (array_key_exists('menu_placement', $data)) {
+            $endpoints[$index]['menu_placement'] = $this->sanitizeMenuPlacement($data['menu_placement']);
         }
 
         if (array_key_exists('scroll_enabled', $data)) {
@@ -277,6 +289,25 @@ class EndpointRepository
                 );
             }
         }
+    }
+
+    /**
+     * Endpoints saved before menu placement existed carry neither key, and they
+     * must keep the slot they have always had — so the default is the one
+     * FluentCart gave them.
+     */
+    private function sanitizeMenuAnchor($value): string
+    {
+        $anchor = is_string($value) ? sanitize_key($value) : '';
+
+        return MenuPlacement::isValidAnchor($anchor) ? $anchor : MenuPlacement::DEFAULT_ANCHOR;
+    }
+
+    private function sanitizeMenuPlacement($value): string
+    {
+        $placement = is_string($value) ? sanitize_key($value) : '';
+
+        return MenuPlacement::isValidPlacement($placement) ? $placement : MenuPlacement::DEFAULT_PLACEMENT;
     }
 
     private function sanitizeIconValue(string $type, string $value): string

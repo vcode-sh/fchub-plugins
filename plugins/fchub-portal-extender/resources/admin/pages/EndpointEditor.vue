@@ -44,6 +44,32 @@
               inactive-text="Inactive"
             />
           </el-form-item>
+
+          <el-form-item label="Menu Placement">
+            <el-select
+              v-model="form.menu_placement_value"
+              :loading="menuPlacementsLoading"
+              :disabled="menuPlacementsFailed"
+              placeholder="Select a position..."
+              style="width: 100%"
+            >
+              <el-option
+                v-for="option in menuPlacementChoices"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <div class="field-tip">
+              FluentCart hides Licenses when Pro or the license module is off, and hides
+              Subscription Plans from customers who have no subscriptions. If the neighbour you
+              pick isn't on screen, the endpoint takes the same slot next to the nearest item that is.
+            </div>
+            <div v-if="menuPlacementsFailed" class="field-tip">
+              Placement options couldn't be loaded. Everything else still saves, and the endpoint
+              keeps the position it already has.
+            </div>
+          </el-form-item>
         </div>
 
         <div class="form-section">
@@ -274,11 +300,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { endpoints as endpointsApi, pages as pagesApi, postTypes as postTypesApi, posts as postsApi } from '@/api/index.js'
+import {
+  endpoints as endpointsApi,
+  menuPlacements as menuPlacementsApi,
+  pages as pagesApi,
+  postTypes as postTypesApi,
+  posts as postsApi,
+} from '@/api/index.js'
 
 const props = defineProps({
   isNew: { type: Boolean, default: false },
@@ -296,6 +328,17 @@ const cptPostOptions = ref([])
 const cptPostsLoading = ref(false)
 const slugManuallyEdited = ref(false)
 
+// Last resort only: the API tells us the real default. These match the PHP
+// defaults so the editor still works when the placements route is unreachable.
+const FALLBACK_MENU_ANCHOR = 'profile'
+const FALLBACK_MENU_PLACEMENT = 'before'
+const FALLBACK_MENU_PLACEMENT_VALUE = `${FALLBACK_MENU_PLACEMENT}:${FALLBACK_MENU_ANCHOR}`
+
+const menuPlacementOptions = ref([])
+const menuPlacementsLoading = ref(false)
+const menuPlacementsFailed = ref(false)
+const defaultMenuPlacementValue = ref(FALLBACK_MENU_PLACEMENT_VALUE)
+
 const form = reactive({
   title: '',
   slug: '',
@@ -312,6 +355,7 @@ const form = reactive({
   icon_type: 'svg',
   icon_value: '',
   statusActive: true,
+  menu_placement_value: FALLBACK_MENU_PLACEMENT_VALUE,
   scroll_enabled: false,
   scroll_mode: 'auto',
   scroll_height: 600,
@@ -439,6 +483,52 @@ function onTitleInput() {
   }
 }
 
+/**
+ * A readable stand-in when the placements route is unavailable, so the select
+ * shows "Before Profile" rather than the raw stored value.
+ */
+function fallbackPlacementOption(value) {
+  const titleCase = (part) => part.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  const [placement, anchor] = String(value || FALLBACK_MENU_PLACEMENT_VALUE).split(':')
+
+  return {
+    value,
+    label: `${titleCase(placement || FALLBACK_MENU_PLACEMENT)} ${titleCase(anchor || FALLBACK_MENU_ANCHOR)}`,
+  }
+}
+
+const menuPlacementChoices = computed(() => {
+  if (menuPlacementOptions.value.length) return menuPlacementOptions.value
+  return [fallbackPlacementOption(form.menu_placement_value || defaultMenuPlacementValue.value)]
+})
+
+async function fetchMenuPlacements() {
+  menuPlacementsLoading.value = true
+  try {
+    const res = await menuPlacementsApi.list()
+    const list = res.placements || []
+
+    if (!list.length) throw new Error('No menu placements returned')
+
+    menuPlacementOptions.value = list
+    menuPlacementsFailed.value = false
+
+    const fallback = res.default || {}
+    if (fallback.anchor && fallback.placement) {
+      defaultMenuPlacementValue.value = `${fallback.placement}:${fallback.anchor}`
+      if (props.isNew) {
+        form.menu_placement_value = defaultMenuPlacementValue.value
+      }
+    }
+  } catch {
+    // Nothing to pick from, but nothing worth blocking the editor over either.
+    menuPlacementOptions.value = []
+    menuPlacementsFailed.value = true
+  } finally {
+    menuPlacementsLoading.value = false
+  }
+}
+
 async function fetchPostTypes() {
   try {
     const res = await postTypesApi.list()
@@ -510,6 +600,10 @@ async function loadEndpoint(id) {
     form.scroll_enabled = !!ep.scroll_enabled
     form.scroll_mode = ep.scroll_mode || 'auto'
     form.scroll_height = ep.scroll_height || 600
+    // Endpoints saved before placement existed have neither field stored.
+    form.menu_placement_value = ep.menu_anchor && ep.menu_placement
+      ? `${ep.menu_placement}:${ep.menu_anchor}`
+      : defaultMenuPlacementValue.value
     slugManuallyEdited.value = true
 
     // Pre-load the selected page into the dropdown
@@ -550,6 +644,10 @@ async function save() {
 
   saving.value = true
 
+  const [menuPlacement, menuAnchor] = (
+    form.menu_placement_value || defaultMenuPlacementValue.value
+  ).split(':')
+
   const payload = {
     title: form.title,
     slug: form.slug,
@@ -566,6 +664,8 @@ async function save() {
     icon_type: form.icon_type,
     icon_value: form.icon_value,
     status: form.statusActive ? 'active' : 'inactive',
+    menu_anchor: menuAnchor || FALLBACK_MENU_ANCHOR,
+    menu_placement: menuPlacement || FALLBACK_MENU_PLACEMENT,
     scroll_enabled: form.type !== 'redirect' ? form.scroll_enabled : false,
     scroll_mode: form.scroll_mode,
     scroll_height: form.scroll_height,
@@ -587,8 +687,11 @@ async function save() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchPostTypes()
+  // Awaited so loadEndpoint() has the real default to fall back on.
+  await fetchMenuPlacements()
+
   if (!props.isNew && route.params.id) {
     loadEndpoint(route.params.id)
   } else {

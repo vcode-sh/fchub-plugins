@@ -74,11 +74,11 @@
       ],
       "docs_path": "/docs/fchub-portal-extender",
       "admin_path": "admin.php?page=fchub-portal-extender",
-      "version": "1.0.4",
+      "version": "1.1.0",
       "docs_url": "https://fchub.co/docs/fchub-portal-extender",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.4",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-portal-extender/v1.0.4/fchub-portal-extender-1.0.4.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-portal-extender/v1.0.4/fchub-portal-extender-1.0.4.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.1.0",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-portal-extender/v1.1.0/fchub-portal-extender-1.1.0.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-portal-extender/v1.1.0/fchub-portal-extender-1.1.0.zip.sha256"
     },
     "fchub-wishlist": {
       "name": "Wishlist",

@@ -52,6 +52,10 @@ export const endpoints = {
   reorder: (ids) => api.post('endpoints/reorder', { ids }),
 }
 
+export const menuPlacements = {
+  list: () => api.get('menu-placements'),
+}
+
 export const pages = {
   search: (search) => api.get('pages', { search }),
 }

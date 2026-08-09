@@ -1,6 +1,6 @@
 {
-  "__plugin-vue_export-helper-YNHJW7-q.js": {
-    "file": "chunks/_plugin-vue_export-helper-YNHJW7-q.js",
+  "__plugin-vue_export-helper-C-5Tye29.js": {
+    "file": "chunks/_plugin-vue_export-helper-C-5Tye29.js",
     "name": "_plugin-vue_export-helper"
   },
   "_message-box-C5q2_fRN.js": {
@@ -22,7 +22,7 @@
     ]
   },
   "resources/admin/main.js": {
-    "file": "fchub-portal-extender-admin-qG4W2vls.js",
+    "file": "fchub-portal-extender-admin-JXJdJTYN.js",
     "name": "main",
     "src": "resources/admin/main.js",
     "isEntry": true,
@@ -37,28 +37,28 @@
     ]
   },
   "resources/admin/pages/EndpointEditor.vue": {
-    "file": "chunks/EndpointEditor-CZ8b0Tz8.js",
+    "file": "chunks/EndpointEditor-mfp1jT7s.js",
     "name": "EndpointEditor",
     "src": "resources/admin/pages/EndpointEditor.vue",
     "isDynamicEntry": true,
     "imports": [
       "_useApi-CROJJdhE-BlQVSHu_.js",
-      "__plugin-vue_export-helper-YNHJW7-q.js"
+      "__plugin-vue_export-helper-C-5Tye29.js"
     ]
   },
   "resources/admin/pages/EndpointList.vue": {
-    "file": "chunks/EndpointList-BsUBkjY9.js",
+    "file": "chunks/EndpointList-cuynx_6w.js",
     "name": "EndpointList",
     "src": "resources/admin/pages/EndpointList.vue",
     "isDynamicEntry": true,
     "imports": [
       "_useApi-CROJJdhE-BlQVSHu_.js",
       "_message-box-C5q2_fRN.js",
-      "__plugin-vue_export-helper-YNHJW7-q.js"
+      "__plugin-vue_export-helper-C-5Tye29.js"
     ]
   },
   "style.css": {
-    "file": "assets/style-hC4eHREP.css",
+    "file": "assets/style-bgyFXCxx.css",
     "src": "style.css"
   }
 }

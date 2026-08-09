@@ -4,6 +4,7 @@ namespace FChubPortalExtender\Http;
 
 defined('ABSPATH') || exit;
 
+use FChubPortalExtender\Portal\MenuPlacement;
 use FChubPortalExtender\Storage\EndpointRepository;
 
 class EndpointController
@@ -60,6 +61,27 @@ class EndpointController
             'methods'             => 'GET',
             'callback'            => [self::class, 'searchPosts'],
             'permission_callback' => [self::class, 'checkPermission'],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/menu-placements', [
+            'methods'             => 'GET',
+            'callback'            => [self::class, 'listMenuPlacements'],
+            'permission_callback' => [self::class, 'checkPermission'],
+        ]);
+    }
+
+    /**
+     * The admin reads its placement choices from here rather than hardcoding
+     * FluentCart's menu, so the two cannot drift apart.
+     */
+    public static function listMenuPlacements(): \WP_REST_Response
+    {
+        return new \WP_REST_Response([
+            'placements' => MenuPlacement::options(),
+            'default'    => [
+                'anchor'    => MenuPlacement::DEFAULT_ANCHOR,
+                'placement' => MenuPlacement::DEFAULT_PLACEMENT,
+            ],
         ]);
     }
 

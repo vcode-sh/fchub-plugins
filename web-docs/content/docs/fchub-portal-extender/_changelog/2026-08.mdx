@@ -1,3 +1,45 @@
+### v1.1.0
+
+*Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.1.0)
+
+Endpoints can now choose where they sit in the customer portal menu, instead of
+always queuing up behind Profile like everybody else.
+
+#### Menu Placement
+
+Requested by @Joe-Bloggs in [#62](https://github.com/vcode-sh/fchub-plugins/issues/62) and tracked in [#141](https://github.com/vcode-sh/fchub-plugins/issues/141). The endpoint editor has a new
+**Menu Placement** field: put an endpoint at the top, directly under Dashboard,
+after any other built-in item, or at the very bottom. Existing endpoints keep
+the slot they already had, so upgrading moves nothing.
+
+FluentCart's API drops every custom endpoint immediately before `profile` and
+offers no position argument, so the finished menu is reordered afterwards on
+`fluent_cart/global_customer_menu_items`. Items belonging to other plugins are
+passed through untouched — this reorders, it never curates.
+
+#### Placement is anchored, not numbered, and that is the interesting part
+
+FluentCart's menu is not the same for every visitor: it hides **Licenses**
+without Pro or with the license module off, and hides **Subscription Plans**
+from customers who have none. An absolute "position 2" would therefore land
+beside a different neighbour for different people — a promise nobody can keep.
+
+So placement anchors to a named item and degrades honestly. Choose "After
+Licenses" on a site with no licenses and the endpoint takes the slot where
+Licenses would have been, by walking up to the nearest visible item. "Before
+Subscription Plans" walks down for the same reason. Either way it lands in the
+same visual gap rather than at the bottom of the menu.
+
+#### Portal Extender has tests now
+
+It had none. It has 57, covering placement resolution, hidden anchors, grouped
+endpoints, third-party items surviving a reorder, and the icon sanitiser
+whitelist from 1.0.4 — including a test that scans every permitted attribute for
+anything shaped like an event handler, so that whitelist cannot quietly widen
+later. The plugin is now in the CI matrix on PHP 8.4 and 8.5.
+
+<Separator className="my-8" />
+
 ### v1.0.4
 
 *Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.4)
