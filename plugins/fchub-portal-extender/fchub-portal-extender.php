@@ -23,8 +23,12 @@ define('FCHUB_PORTAL_EXTENDER_FILE', __FILE__);
 define('FCHUB_PORTAL_EXTENDER_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_PORTAL_EXTENDER_URL', plugin_dir_url(__FILE__));
 
-require_once __DIR__ . '/lib/GitHubUpdater.php';
-FCHub_GitHub_Updater::register('fchub-portal-extender', plugin_basename(__FILE__), FCHUB_PORTAL_EXTENDER_VERSION);
+// A missing updater must mean "no automatic updates", never a fatal on activation —
+// a WordPress.org build omits the file on purpose.
+if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
+    require_once __DIR__ . '/lib/GitHubUpdater.php';
+    FCHub_GitHub_Updater::register('fchub-portal-extender', plugin_basename(__FILE__), FCHUB_PORTAL_EXTENDER_VERSION);
+}
 
 // Autoloader
 spl_autoload_register(function ($class) {

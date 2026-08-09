@@ -93,7 +93,8 @@ No. Administrators download invoice PDFs through an authenticated WordPress endp
 
 = 1.1.2 =
 
-* Moved plugin updates to WordPress.org and declared the FluentCart dependency.
+* Restored GitHub release updates. WordPress.org listing is still pending, so without this the plugin had no update channel at all.
+* Declared the FluentCart dependency.
 * Added WordPress 7.0 and PHP 8.3 requirements.
 * Bounded provider responses, blocked redirects, validated PDF downloads and sanitised failures.
 * Added complete Fakturownia and KSeF service and privacy disclosure.

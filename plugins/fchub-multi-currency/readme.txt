@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, currency, exchange-rates, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.2
+Stable tag: 1.4.3
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -91,6 +91,10 @@ The failed response is not persisted. Customer prices continue to use the last g
 
 == Changelog ==
 
+= 1.4.3 =
+
+* Restored GitHub release updates. WordPress.org listing is still pending, so without this the plugin had no update channel at all.
+
 = 1.4.2 =
 
 * Fixed the FluentCRM automation email editor failing to load whenever Multi-Currency was active.
@@ -102,6 +106,5 @@ The failed response is not persisted. Customer prices continue to use the last g
 
 = 1.4.1 =
 
-* Move updates to WordPress.org.
 * Make Manual the no-network default and require explicit remote-provider configuration.
 * Bound remote rate requests and reject malformed or oversized responses without replacing valid rates.

@@ -4,7 +4,7 @@
  * Plugin Name: FCHub Multi-Currency
  * Plugin URI: https://fchub.co/docs/fchub-multi-currency
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.4.2
+ * Version: 1.4.3
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -14,17 +14,27 @@
  * Tested up to: 7.0
  * Requires PHP: 8.3
  * Requires Plugins: fluent-cart
+ * Update URI: https://fchub.co/fchub-multi-currency
  */
 
 declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.4.2');
+define('FCHUB_MC_VERSION', '1.4.3');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));
 define('FCHUB_MC_DB_VERSION', '1.0.0');
+
+// Updates come from GitHub releases until this plugin is actually listed on
+// WordPress.org. Without it WordPress has no update channel for the plugin at all.
+// Guarded because a WordPress.org build deliberately omits the file, and a missing
+// updater must mean "no automatic updates", never a fatal on activation.
+if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
+    require_once __DIR__ . '/lib/GitHubUpdater.php';
+    FCHub_GitHub_Updater::register('fchub-multi-currency', plugin_basename(__FILE__), FCHUB_MC_VERSION);
+}
 
 // Autoloader
 spl_autoload_register(function ($class) {

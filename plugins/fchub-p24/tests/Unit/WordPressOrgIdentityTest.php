@@ -28,13 +28,12 @@ class WordPressOrgIdentityTest extends TestCase
         $this->assertStringContainsString('Text Domain: fchub-p24', $plugin);
         $this->assertStringNotContainsString('Domain Path:', $plugin);
         $this->assertStringContainsString("define('FCHUB_P24_VERSION', '1.0.4');", $plugin);
-        $this->assertStringNotContainsString('Update URI:', $plugin);
-        $this->assertStringNotContainsString('GitHubUpdater', $plugin);
+        // Update URI and updater registration are governed by tests/repository/updater-presence-contract.test.mjs.
     }
 
     public function testUpdaterAndTestDebrisAreAbsent(): void
     {
-        $this->assertFileDoesNotExist($this->pluginRoot . '/lib/GitHubUpdater.php');
+        // Updater presence is governed by tests/repository/updater-presence-contract.test.mjs.
         $this->assertFileDoesNotExist($this->pluginRoot . '/test-updater.php');
         $this->assertFileDoesNotExist($this->pluginRoot . '/.DS_Store');
     }
@@ -62,7 +61,8 @@ class WordPressOrgIdentityTest extends TestCase
 
         $this->assertIsString($distignore);
         $this->assertStringNotContainsString('*.md', $distignore);
-        foreach (['README.md', 'lib/', 'phpcs.xml', 'phpstan.neon', 'phpstan-bootstrap.php', 'phpstan-functions.php'] as $ignoredFile) {
+        // lib/ must ship now that the guarded updater require is back — see tests/repository/updater-presence-contract.test.mjs.
+        foreach (['README.md', 'phpcs.xml', 'phpstan.neon', 'phpstan-bootstrap.php', 'phpstan-functions.php'] as $ignoredFile) {
             $this->assertStringContainsString($ignoredFile, $distignore);
         }
         $this->assertIsString($gateway);

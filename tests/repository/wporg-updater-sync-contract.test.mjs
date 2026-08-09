@@ -84,9 +84,53 @@ Let customers save FluentCart products and return to them later.
   return root;
 }
 
-test("syncs the shared updater only into non-WordPress.org targets", () => {
+function setSubmissionPaused(root, paused) {
+  const manifestPath = path.join(root, "wporg/plugins.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.submissionPaused = paused;
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+/**
+ * The live state. A plugin that is not yet listed on WordPress.org has no update
+ * channel there, so shipping it without the GitHub updater would leave it unable
+ * to update at all — which is exactly what happened between 1.4.1 and 1.4.2.
+ */
+test("while submission is paused, every plugin receives the shared updater", () => {
   const root = createFixture();
   try {
+    setSubmissionPaused(root, true);
+
+    for (const slug of ["fchub-wishlist", "fchub-portal-extender"]) {
+      const output = execFileSync("bash", ["build.sh", slug], {
+        cwd: root,
+        encoding: "utf8",
+      });
+
+      assert.match(output, /GitHubUpdater synced into 1 plugin/);
+      assert.equal(
+        fs.existsSync(path.join(root, "plugins", slug, "lib/GitHubUpdater.php")),
+        true,
+        `${slug} must receive the shared updater while submission is paused`,
+      );
+    }
+
+    assert.equal(fs.existsSync(path.join(root, "plugins/fchub-stream")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The state to return to once the directory accepts a plugin: a listed plugin
+ * must not carry a self-updater, and WordPress.org would reject the archive if
+ * it did.
+ */
+test("once submission resumes, WordPress.org targets are excluded again", () => {
+  const root = createFixture();
+  try {
+    setSubmissionPaused(root, false);
+
     const wordpressOrgOutput = execFileSync("bash", ["build.sh", "fchub-wishlist"], {
       cwd: root,
       encoding: "utf8",
@@ -112,8 +156,21 @@ test("syncs the shared updater only into non-WordPress.org targets", () => {
       true,
       "maintained non-target must retain the shared updater",
     );
-    assert.equal(fs.existsSync(path.join(root, "plugins/fchub-stream")), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+/**
+ * The flag is the single switch both the builder and the release gates read.
+ * If it ever goes missing, both silently revert to treating plugins as listed.
+ */
+test("the manifest carries the submission-paused flag and its reason", () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(repositoryRoot, "wporg/plugins.json"), "utf8"),
+  );
+
+  assert.equal(typeof manifest.submissionPaused, "boolean");
+  assert.equal(typeof manifest.submissionPausedReason, "string");
+  assert.ok(manifest.submissionPausedReason.length > 0);
 });

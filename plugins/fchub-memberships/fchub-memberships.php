@@ -3,7 +3,7 @@
  * Plugin Name: FCHub Memberships
  * Plugin URI: https://fchub.co/docs/fchub-memberships
  * Description: Membership workspace for FluentCart with guided plans, protected content, member care, automation, integrations, and reporting
- * Version: 1.4.4
+ * Version: 1.4.5
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -14,15 +14,25 @@
  * Tested up to:    7.0
  * Requires PHP: 8.3
  * Requires Plugins: fluent-cart
+ * Update URI: https://fchub.co/fchub-memberships
  */
 
 defined('ABSPATH') || exit;
 
-defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.4.4');
+defined('FCHUB_MEMBERSHIPS_VERSION') || define('FCHUB_MEMBERSHIPS_VERSION', '1.4.5');
 defined('FCHUB_MEMBERSHIPS_FILE') || define('FCHUB_MEMBERSHIPS_FILE', __FILE__);
 defined('FCHUB_MEMBERSHIPS_PATH') || define('FCHUB_MEMBERSHIPS_PATH', plugin_dir_path(__FILE__));
 defined('FCHUB_MEMBERSHIPS_URL') || define('FCHUB_MEMBERSHIPS_URL', plugin_dir_url(__FILE__));
 defined('FCHUB_MEMBERSHIPS_DB_VERSION') || define('FCHUB_MEMBERSHIPS_DB_VERSION', '1.9.0');
+
+// Updates come from GitHub releases until this plugin is actually listed on
+// WordPress.org. Without it WordPress has no update channel for the plugin at all.
+// Guarded because a WordPress.org build deliberately omits the file, and a missing
+// updater must mean "no automatic updates", never a fatal on activation.
+if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
+    require_once __DIR__ . '/lib/GitHubUpdater.php';
+    FCHub_GitHub_Updater::register('fchub-memberships', plugin_basename(__FILE__), FCHUB_MEMBERSHIPS_VERSION);
+}
 
 // Autoloader
 spl_autoload_register(function ($class) {

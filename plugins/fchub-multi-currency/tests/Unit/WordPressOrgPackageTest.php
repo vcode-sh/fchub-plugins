@@ -31,7 +31,7 @@ final class WordPressOrgPackageTest extends TestCase
         self::assertStringContainsString('=== FCHub Multi-Currency ===', $readme);
         self::assertStringContainsString('Contributors: vcodesh', $readme);
         self::assertStringNotContainsString('vcode_sh', $readme);
-        self::assertStringContainsString('Stable tag: 1.4.2', $readme);
+        self::assertStringContainsString('Stable tag: 1.4.3', $readme);
         self::assertStringContainsString('Requires at least: 7.0', $readme);
         self::assertStringContainsString('Tested up to: 7.0', $readme);
         self::assertStringContainsString('Requires PHP: 8.3', $readme);
@@ -71,7 +71,7 @@ final class WordPressOrgPackageTest extends TestCase
         self::assertStringNotContainsString('LICENSE', $distignore);
         self::assertStringContainsString('tests/', $distignore);
         self::assertStringContainsString('.phpunit.result.cache', $distignore);
-        self::assertFileDoesNotExist($this->pluginRoot . '/lib/GitHubUpdater.php');
+        // Updater presence is governed by tests/repository/updater-presence-contract.test.mjs.
     }
 
     #[Test]

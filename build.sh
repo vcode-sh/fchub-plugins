@@ -67,9 +67,35 @@ human_size() {
     fi
 }
 
+# WordPress.org submission is paused while review is pending — see the flag and
+# its reason in wporg/plugins.json. Until a plugin is actually listed there,
+# WordPress offers it no update channel, so treating it as a WordPress.org
+# target would ship it with no way to update at all. While paused, every build
+# is a GitHub build: the updater goes in, and the directory inspection is not
+# run. Flipping the flag back restores both.
+wporg_submission_paused() {
+    local flag=""
+
+    flag=$(node -e '
+        const fs = require("node:fs");
+        try {
+            const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            process.stdout.write(manifest.submissionPaused === true ? "1" : "0");
+        } catch {
+            process.stdout.write("0");
+        }
+    ' "$ROOT_DIR/wporg/plugins.json" 2>/dev/null) || flag="0"
+
+    [ "$flag" = "1" ]
+}
+
 is_wordpress_org_plugin() {
     local candidate="$1"
     local wordpress_org_slug=""
+
+    if [ "$WPORG_SUBMISSION_PAUSED" = "1" ]; then
+        return 1
+    fi
 
     for wordpress_org_slug in "${WORDPRESS_ORG_PLUGINS[@]}"; do
         if [ "$wordpress_org_slug" = "$candidate" ]; then
@@ -79,6 +105,14 @@ is_wordpress_org_plugin() {
 
     return 1
 }
+
+# Resolved once: the flag is read from disk, and is_wordpress_org_plugin() is
+# called per plugin in a loop.
+if wporg_submission_paused; then
+    WPORG_SUBMISSION_PAUSED=1
+else
+    WPORG_SUBMISSION_PAUSED=0
+fi
 
 usage() {
     printf "${BOLD}Usage:${NC} ./build.sh [plugin-slug]\n\n"

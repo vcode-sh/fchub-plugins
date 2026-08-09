@@ -1,15 +1,17 @@
 {
+  "submissionPaused": true,
+  "submissionPausedReason": "Awaiting WordPress.org review. Until a plugin is actually listed there, WordPress has no update channel for it, so every FCHub plugin ships the GitHub updater and no build is treated as a WordPress.org target. Flip this to false when review completes.",
   "plugins": {
     "fchub-memberships": {
       "displayName": "FCHub Memberships",
       "mainFile": "fchub-memberships.php",
-      "firstWpOrgVersion": "1.4.4",
+      "firstWpOrgVersion": "1.4.5",
       "previousRelease": {
-        "version": "1.4.3",
-        "tag": "fchub-memberships/v1.4.3",
-        "commit": "cac777fe19df939fdc4f2b7c27321db5f125a161",
-        "asset": "fchub-memberships-1.4.3.zip",
-        "sha256": "a692436064c1e4791234890064e0d46f5a9bb681e10e073fd1177d21b27daee7"
+        "version": "1.4.4",
+        "tag": "fchub-memberships/v1.4.4",
+        "commit": "541ab795d7b9007bf3db76042ef0a2d3e9840353",
+        "asset": "fchub-memberships-1.4.4.zip",
+        "sha256": "a35a47c49a5cca510730fed3b85da3fbe2b7430535f6bb94ce0b34bb6cb44579"
       },
       "requiresWordPress": "7.0",
       "requiresPhp": "8.3",
@@ -37,13 +39,13 @@
     "fchub-multi-currency": {
       "displayName": "FCHub Multi-Currency",
       "mainFile": "fchub-multi-currency.php",
-      "firstWpOrgVersion": "1.4.2",
+      "firstWpOrgVersion": "1.4.3",
       "previousRelease": {
-        "version": "1.4.0",
-        "tag": "fchub-multi-currency/v1.4.0",
-        "commit": "f92a5f101c719146b06982f8e83acce4393df0ff",
-        "asset": "fchub-multi-currency-1.4.0.zip",
-        "sha256": "c235fc3384eb938008e5cde468a4a242d2aeecf41a2c892f375ca160230d55a0"
+        "version": "1.4.2",
+        "tag": "fchub-multi-currency/v1.4.2",
+        "commit": "541ab795d7b9007bf3db76042ef0a2d3e9840353",
+        "asset": "fchub-multi-currency-1.4.2.zip",
+        "sha256": "76426ed287e9eed6a578948bb36213665356a78a1ec6d87b4f81bb3561a859ec"
       },
       "requiresWordPress": "7.0",
       "requiresPhp": "8.3",

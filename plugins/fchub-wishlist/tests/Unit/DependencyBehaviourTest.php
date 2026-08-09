@@ -19,6 +19,7 @@ final class DependencyBehaviourTest extends TestCase
 define('ABSPATH', '/tmp/wordpress/');
 
 $GLOBALS['registered_actions'] = [];
+$GLOBALS['registered_filters'] = [];
 
 function plugin_dir_path(string $file): string
 {
@@ -28,6 +29,15 @@ function plugin_dir_path(string $file): string
 function plugin_dir_url(string $file): string
 {
     return 'https://example.test/wp-content/plugins/fchub-wishlist/';
+}
+
+// The main file registers the GitHub updater, which needs both of these.
+// WordPress always provides them; this harness boots the file outside WordPress.
+define('HOUR_IN_SECONDS', 3600);
+
+function plugin_basename(string $file): string
+{
+    return 'fchub-wishlist/' . basename($file);
 }
 
 function register_activation_hook(string $file, callable $callback): void
@@ -45,6 +55,24 @@ function add_action(
     int $acceptedArgs = 1
 ): bool {
     $GLOBALS['registered_actions'][] = [
+        'hook' => $hook,
+        'callback' => $callback,
+        'priority' => $priority,
+        'accepted_args' => $acceptedArgs,
+    ];
+
+    return true;
+}
+
+// The updater registers filters as well as actions. Recorded separately so the
+// assertion below still only inspects the plugin's own runtime hooks.
+function add_filter(
+    string $hook,
+    callable $callback,
+    int $priority = 10,
+    int $acceptedArgs = 1
+): bool {
+    $GLOBALS['registered_filters'][] = [
         'hook' => $hook,
         'callback' => $callback,
         'priority' => $priority,

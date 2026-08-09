@@ -14,6 +14,7 @@
  * Tested up to: 7.0
  * Requires PHP: 8.3
  * Requires Plugins: fluent-cart
+ * Update URI: https://fchub.co/fchub-p24
  */
 
 defined('ABSPATH') || exit;
@@ -22,6 +23,15 @@ define('FCHUB_P24_VERSION', '1.0.4');
 define('FCHUB_P24_FILE', __FILE__);
 define('FCHUB_P24_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_P24_URL', plugin_dir_url(__FILE__));
+
+// Updates come from GitHub releases until this plugin is actually listed on
+// WordPress.org. Without it WordPress has no update channel for the plugin at all.
+// Guarded because a WordPress.org build deliberately omits the file, and a missing
+// updater must mean "no automatic updates", never a fatal on activation.
+if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
+    require_once __DIR__ . '/lib/GitHubUpdater.php';
+    FCHub_GitHub_Updater::register('fchub-p24', plugin_basename(__FILE__), FCHUB_P24_VERSION);
+}
 
 // Ensure urlStatus points to the active FluentCart IPN route.
 add_filter('fluent_cart_ipn_url_przelewy24', function () {

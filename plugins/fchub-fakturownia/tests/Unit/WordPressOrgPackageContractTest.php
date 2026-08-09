@@ -41,7 +41,7 @@ final class WordPressOrgPackageContractTest extends TestCase
             self::assertStringContainsString($ignoredPath, $distIgnore);
         }
 
-        self::assertFileDoesNotExist($pluginRoot . '/lib/GitHubUpdater.php');
+        // Updater presence is governed by tests/repository/updater-presence-contract.test.mjs.
         self::assertFileEquals(dirname($pluginRoot, 2) . '/LICENSE', $pluginRoot . '/LICENSE');
     }
 }

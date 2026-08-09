@@ -7,21 +7,20 @@ const readJson = async (path) =>
   JSON.parse(await readFile(new URL(path, root), 'utf8'))
 
 const expectedVersions = {
-  'fchub-memberships': '1.4.4',
+  'fchub-memberships': '1.4.5',
   'fchub-wishlist': '1.0.2',
-  // 1.4.1 was prepared but never tagged, so 1.4.2 is the first version to reach WordPress.org.
-  'fchub-multi-currency': '1.4.2',
+  'fchub-multi-currency': '1.4.3',
   'fchub-p24': '1.0.4',
   'fchub-fakturownia': '1.1.2',
 }
 
 const expectedPreviousReleases = {
   'fchub-memberships': {
-    version: '1.4.3',
-    tag: 'fchub-memberships/v1.4.3',
-    commit: 'cac777fe19df939fdc4f2b7c27321db5f125a161',
-    asset: 'fchub-memberships-1.4.3.zip',
-    sha256: 'a692436064c1e4791234890064e0d46f5a9bb681e10e073fd1177d21b27daee7',
+    version: '1.4.4',
+    tag: 'fchub-memberships/v1.4.4',
+    commit: '541ab795d7b9007bf3db76042ef0a2d3e9840353',
+    asset: 'fchub-memberships-1.4.4.zip',
+    sha256: 'a35a47c49a5cca510730fed3b85da3fbe2b7430535f6bb94ce0b34bb6cb44579',
   },
   'fchub-wishlist': {
     version: '1.0.1',
@@ -31,11 +30,11 @@ const expectedPreviousReleases = {
     sha256: '4a0be059a06c6c56c985b34d61cf6413295a4e58fe8ba550c4e9cd26342d7737',
   },
   'fchub-multi-currency': {
-    version: '1.4.0',
-    tag: 'fchub-multi-currency/v1.4.0',
-    commit: 'f92a5f101c719146b06982f8e83acce4393df0ff',
-    asset: 'fchub-multi-currency-1.4.0.zip',
-    sha256: 'c235fc3384eb938008e5cde468a4a242d2aeecf41a2c892f375ca160230d55a0',
+    version: '1.4.2',
+    tag: 'fchub-multi-currency/v1.4.2',
+    commit: '541ab795d7b9007bf3db76042ef0a2d3e9840353',
+    asset: 'fchub-multi-currency-1.4.2.zip',
+    sha256: '76426ed287e9eed6a578948bb36213665356a78a1ec6d87b4f81bb3561a859ec',
   },
   'fchub-p24': {
     version: '1.0.3',

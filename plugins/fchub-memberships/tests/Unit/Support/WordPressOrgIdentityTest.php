@@ -21,15 +21,14 @@ final class WordPressOrgIdentityTest extends PluginTestCase
 
         self::assertIsString($source);
         self::assertStringContainsString('Plugin Name: FCHub Memberships', $source);
-        self::assertStringContainsString('Version: 1.4.4', $source);
+        self::assertStringContainsString('Version: 1.4.5', $source);
         self::assertStringContainsString('Requires at least: 7.0', $source);
         self::assertStringContainsString('Requires PHP: 8.3', $source);
         self::assertStringContainsString('Requires Plugins: fluent-cart', $source);
         self::assertStringContainsString('Tested up to:    7.0', $source);
-        self::assertStringNotContainsString('Update URI:', $source);
-        self::assertStringNotContainsString('GitHubUpdater', $source);
+        // Update URI and updater registration are governed by tests/repository/updater-presence-contract.test.mjs.
         self::assertStringContainsString(
-            "define('FCHUB_MEMBERSHIPS_VERSION', '1.4.4')",
+            "define('FCHUB_MEMBERSHIPS_VERSION', '1.4.5')",
             $source,
         );
         self::assertSame('>=8.3', $composer['require']['php'] ?? null);

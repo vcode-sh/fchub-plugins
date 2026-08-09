@@ -1,0 +1,19 @@
+### v1.1.2
+
+*Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-fakturownia/v1.1.2)
+
+Invoicing can update itself again.
+
+#### Updates work again
+
+The plugin was prepared for a WordPress.org listing that has not happened yet, and
+the GitHub updater was removed ahead of it. That left a gap nobody wants to be in:
+not on WordPress.org, so no update channel there — and no self-updater either, so
+no update channel at all. Anyone who installed it stayed on the version they
+installed.
+
+The updater is back, and it stays until the directory actually lists the plugin.
+The include is guarded, so a package built without it means no automatic updates
+rather than a fatal on activation, and the whole decision now hangs on one flag in
+`wporg/plugins.json` that the builder and the release gates both read.
+

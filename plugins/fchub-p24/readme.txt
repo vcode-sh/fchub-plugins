@@ -62,6 +62,7 @@ No. Transaction processing requires an active Przelewy24 merchant agreement.
 
 = 1.0.4 =
 
+* Restored GitHub release updates. WordPress.org listing is still pending, so without this the plugin had no update channel at all.
 * Prepare the gateway for WordPress.org distribution.
 * Restrict outbound requests and strengthen callback, refund and renewal validation.
 * Document Przelewy24 data transfer and local storage.

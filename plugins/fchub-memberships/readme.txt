@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, memberships, content-restriction, subscriptions, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.4
+Stable tag: 1.4.5
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -110,6 +110,10 @@ When reporting a problem, include the WordPress, PHP, FluentCart and FCHub Membe
 4. Membership reports and provider health.
 
 == Changelog ==
+
+= 1.4.5 =
+
+* Restored GitHub release updates. WordPress.org listing is still pending, so without this the plugin had no update channel at all.
 
 = 1.4.4 =
 

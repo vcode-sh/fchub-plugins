@@ -72,11 +72,11 @@ final class WordPressOrgPackageContractTest extends PluginTestCase
 
     public function test_archive_excludes_development_and_legacy_distribution_files(): void
     {
+        // Updater presence is governed by tests/repository/updater-presence-contract.test.mjs.
         foreach ([
             'tests',
             'node_modules',
             'vendor',
-            'lib/GitHubUpdater.php',
             '.DS_Store',
         ] as $path) {
             self::assertFileDoesNotExist($this->packageRoot . '/' . $path, $path);
@@ -91,7 +91,7 @@ final class WordPressOrgPackageContractTest extends PluginTestCase
         self::assertLessThan(10_000, filesize($readmePath));
         self::assertStringContainsString('=== FCHub Memberships ===', $readme);
         self::assertStringContainsString('Contributors: vcodesh', $readme);
-        self::assertStringContainsString('Stable tag: 1.4.4', $readme);
+        self::assertStringContainsString('Stable tag: 1.4.5', $readme);
         self::assertStringContainsString('Requires PHP: 8.3', $readme);
         self::assertStringContainsString('== External services ==', $readme);
         self::assertStringContainsString('== Privacy ==', $readme);

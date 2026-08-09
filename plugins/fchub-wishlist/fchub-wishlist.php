@@ -14,6 +14,7 @@
  * Tested up to: 7.0
  * Requires PHP: 8.3
  * Requires Plugins: fluent-cart
+ * Update URI: https://fchub.co/fchub-wishlist
  */
 
 defined('ABSPATH') || exit;
@@ -23,6 +24,15 @@ define('FCHUB_WISHLIST_FILE', __FILE__);
 define('FCHUB_WISHLIST_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_WISHLIST_URL', plugin_dir_url(__FILE__));
 define('FCHUB_WISHLIST_DB_VERSION', '1.0.1');
+
+// Updates come from GitHub releases until this plugin is actually listed on
+// WordPress.org. Without it WordPress has no update channel for the plugin at all.
+// Guarded because a WordPress.org build deliberately omits the file, and a missing
+// updater must mean "no automatic updates", never a fatal on activation.
+if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
+    require_once __DIR__ . '/lib/GitHubUpdater.php';
+    FCHub_GitHub_Updater::register('fchub-wishlist', plugin_basename(__FILE__), FCHUB_WISHLIST_VERSION);
+}
 
 // Autoloader
 spl_autoload_register(function ($class) {

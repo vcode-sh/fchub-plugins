@@ -14,6 +14,7 @@
  * Requires PHP: 8.3
  * Tested up to: 7.0
  * Requires Plugins: fluent-cart
+ * Update URI: https://fchub.co/fchub-fakturownia
  */
 
 defined('ABSPATH') || exit;
@@ -22,6 +23,15 @@ define('FCHUB_FAKTUROWNIA_VERSION', '1.1.2');
 define('FCHUB_FAKTUROWNIA_FILE', __FILE__);
 define('FCHUB_FAKTUROWNIA_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_FAKTUROWNIA_URL', plugin_dir_url(__FILE__));
+
+// Updates come from GitHub releases until this plugin is actually listed on
+// WordPress.org. Without it WordPress has no update channel for the plugin at all.
+// Guarded because a WordPress.org build deliberately omits the file, and a missing
+// updater must mean "no automatic updates", never a fatal on activation.
+if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
+    require_once __DIR__ . '/lib/GitHubUpdater.php';
+    FCHub_GitHub_Updater::register('fchub-fakturownia', plugin_basename(__FILE__), FCHUB_FAKTUROWNIA_VERSION);
+}
 
 register_deactivation_hook(__FILE__, function () {
     wp_clear_scheduled_hook('fchub_fakturownia_check_ksef_status');

@@ -82,7 +82,7 @@ Not by default. Wishlist tables and settings are preserved unless **Remove data 
 
 = 1.0.2 =
 
-* Moved plugin updates to WordPress.org.
+* Restored GitHub release updates. WordPress.org listing is still pending, so without this the plugin had no update channel at all.
 * Declared the FluentCart dependency and the WordPress 7.0 and PHP 8.3 requirements.
 * Added WordPress.org documentation and licensing without changing wishlist data.
 

@@ -26,8 +26,12 @@ define('CARTSHIFT_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CARTSHIFT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CARTSHIFT_PLUGIN_FILE', __FILE__);
 
-require_once __DIR__ . '/lib/GitHubUpdater.php';
-FCHub_GitHub_Updater::register('cartshift', plugin_basename(__FILE__), CARTSHIFT_VERSION);
+// A missing updater must mean "no automatic updates", never a fatal on activation —
+// a WordPress.org build omits the file on purpose.
+if (file_exists(__DIR__ . '/lib/GitHubUpdater.php')) {
+    require_once __DIR__ . '/lib/GitHubUpdater.php';
+    FCHub_GitHub_Updater::register('cartshift', plugin_basename(__FILE__), CARTSHIFT_VERSION);
+}
 
 /**
  * PSR-4 autoloader for the CartShift namespace.

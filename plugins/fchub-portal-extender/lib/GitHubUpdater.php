@@ -23,6 +23,9 @@ class FCHub_GitHub_Updater
     private const CACHE_TTL      = 6 * HOUR_IN_SECONDS;
 
     private const KNOWN_SLUGS = [
+        // The product centre itself. It lives in the private playground but is
+        // released to this same public repository, so it updates like the rest.
+        'fchub',
         'fchub-p24',
         'fchub-fakturownia',
         'fchub-memberships',

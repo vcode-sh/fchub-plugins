@@ -23,6 +23,9 @@ class FCHub_GitHub_Updater
     private const CACHE_TTL      = 6 * HOUR_IN_SECONDS;
 
     private const KNOWN_SLUGS = [
+        // The product centre itself. It lives in the private playground but is
+        // released to this same public repository, so it updates like the rest.
+        'fchub',
         'fchub-p24',
         'fchub-fakturownia',
         'fchub-memberships',
@@ -122,10 +125,6 @@ class FCHub_GitHub_Updater
 
         $release = $releases[$slug];
 
-        // Read the requirements off the installed plugin's own header rather than
-        // hardcoding numbers that go stale the moment anyone bumps anything.
-        $requirements = self::requirements($slug);
-
         $info = (object) [
             'name'          => $release['name'],
             'slug'          => $slug,
@@ -133,8 +132,8 @@ class FCHub_GitHub_Updater
             'author'        => '<a href="https://x.com/vcode_sh">Vibe Code</a>',
             'homepage'      => 'https://fchub.co',
             'download_link' => $release['zip_url'],
-            'requires'      => $requirements['wp'],
-            'requires_php'  => $requirements['php'],
+            'requires'      => '6.4',
+            'requires_php'  => '8.1',
             'sections'      => [
                 'changelog'   => self::markdownToHtml($release['body']),
                 'description' => sprintf('FCHub plugin: %s', $slug),
@@ -144,48 +143,6 @@ class FCHub_GitHub_Updater
         ];
 
         return $info;
-    }
-
-    /**
-     * WordPress and PHP requirements from a registered plugin's header.
-     *
-     * Falls back to the FCHub baseline when the plugin is not registered here or when
-     * get_plugin_data() is out of reach (it lives in wp-admin and is not always loaded).
-     *
-     * @return array{wp: string, php: string}
-     */
-    private static function requirements(string $slug): array
-    {
-        $fallback = ['wp' => '6.8', 'php' => '8.3'];
-
-        $file = self::$plugins[$slug]['file'] ?? null;
-
-        if ($file === null || !defined('WP_PLUGIN_DIR')) {
-            return $fallback;
-        }
-
-        if (!function_exists('get_plugin_data')) {
-            $adminPlugin = ABSPATH . 'wp-admin/includes/plugin.php';
-
-            if (!is_readable($adminPlugin)) {
-                return $fallback;
-            }
-
-            require_once $adminPlugin;
-        }
-
-        $path = WP_PLUGIN_DIR . '/' . $file;
-
-        if (!is_readable($path)) {
-            return $fallback;
-        }
-
-        $data = get_plugin_data($path, false, false);
-
-        return [
-            'wp'  => !empty($data['RequiresWP']) ? (string) $data['RequiresWP'] : $fallback['wp'],
-            'php' => !empty($data['RequiresPHP']) ? (string) $data['RequiresPHP'] : $fallback['php'],
-        ];
     }
 
     /**
@@ -365,28 +322,28 @@ class FCHub_GitHub_Updater
         $html = esc_html($md);
 
         // Code blocks (```...```) — must come before line-level processing
-        $html = self::replace('/```[\s\S]*?```/', '<pre><code>$0</code></pre>', $html);
+        $html = preg_replace('/```[\s\S]*?```/', '<pre><code>$0</code></pre>', $html);
 
         // Headers
-        $html = self::replace('/^#### (.+)$/m', '<h4>$1</h4>', $html);
-        $html = self::replace('/^### (.+)$/m', '<h3>$1</h3>', $html);
-        $html = self::replace('/^## (.+)$/m', '<h2>$1</h2>', $html);
+        $html = preg_replace('/^#### (.+)$/m', '<h4>$1</h4>', $html);
+        $html = preg_replace('/^### (.+)$/m', '<h3>$1</h3>', $html);
+        $html = preg_replace('/^## (.+)$/m', '<h2>$1</h2>', $html);
 
         // Bold
-        $html = self::replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $html);
+        $html = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $html);
 
         // Inline code
-        $html = self::replace('/`([^`]+)`/', '<code>$1</code>', $html);
+        $html = preg_replace('/`([^`]+)`/', '<code>$1</code>', $html);
 
         // Unordered lists
-        $html = self::replace('/^[\-\*] (.+)$/m', '<li>$1</li>', $html);
-        $html = self::replace('/(<li>.*<\/li>\n?)+/s', '<ul>$0</ul>', $html);
+        $html = preg_replace('/^[\-\*] (.+)$/m', '<li>$1</li>', $html);
+        $html = preg_replace('/(<li>.*<\/li>\n?)+/s', '<ul>$0</ul>', $html);
 
         // Links [text](url)
-        $html = self::replace('/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2">$1</a>', $html);
+        $html = preg_replace('/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2">$1</a>', $html);
 
         // Paragraphs: double newlines
-        $html = self::replace('/\n{2,}/', '</p><p>', $html);
+        $html = preg_replace('/\n{2,}/', '</p><p>', $html);
         $html = '<p>' . $html . '</p>';
 
         // Clean up empty paragraphs and misplaced tags
@@ -394,21 +351,6 @@ class FCHub_GitHub_Updater
         $html = str_replace(['<p><ul>', '</ul></p>', '<p><pre>', '</pre></p>'], ['<ul>', '</ul>', '<pre>', '</pre>'], $html);
 
         return wp_kses_post($html);
-    }
-
-    /**
-     * preg_replace() that never hands null to the next call in the chain.
-     *
-     * preg_replace() returns null on a PCRE failure (backtrack limit, bad UTF-8 —
-     * changelogs are user-supplied, so both are live possibilities). Feeding that null
-     * into the next preg_replace() is a deprecation on PHP 8.1+ and a TypeError waiting
-     * to happen. On failure we keep the previous string and move on.
-     */
-    private static function replace(string $pattern, string $replacement, string $subject): string
-    {
-        $result = preg_replace($pattern, $replacement, $subject);
-
-        return is_string($result) ? $result : $subject;
     }
 }
 

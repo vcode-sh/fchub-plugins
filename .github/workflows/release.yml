@@ -44,7 +44,10 @@ jobs:
           VERSION="${TAG#*/v}"
           echo "slug=$PLUGIN_SLUG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          IS_WPORG=$(node -e 'const manifest=require("./wporg/plugins.json"); process.stdout.write(String(Object.hasOwn(manifest.plugins, process.argv[1])))' "$PLUGIN_SLUG")
+          # Paused while WordPress.org review is pending: the plugin is not listed
+          # there yet, so it ships the GitHub updater and the directory gates —
+          # which reject exactly that — must not run. See wporg/plugins.json.
+          IS_WPORG=$(node -e 'const manifest=require("./wporg/plugins.json"); process.stdout.write(String(manifest.submissionPaused !== true && Object.hasOwn(manifest.plugins, process.argv[1])))' "$PLUGIN_SLUG")
           echo "is_wporg=$IS_WPORG" >> "$GITHUB_OUTPUT"
           echo "Plugin: $PLUGIN_SLUG, Version: $VERSION"
 

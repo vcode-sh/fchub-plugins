@@ -23,7 +23,6 @@ final class WordPressOrgIdentityTest extends TestCase
         self::assertStringContainsString('Requires Plugins: fluent-cart', $source);
         self::assertStringContainsString('Plugin URI: https://fchub.co/docs/fchub-wishlist', $source);
         self::assertStringContainsString("define('FCHUB_WISHLIST_VERSION', '1.0.2');", $source);
-        self::assertStringNotContainsString('Update URI:', $source);
-        self::assertStringNotContainsString('GitHubUpdater', $source);
+        // Update URI and updater registration are governed by tests/repository/updater-presence-contract.test.mjs.
     }
 }

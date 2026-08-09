@@ -25,9 +25,9 @@
       "mcpbFilename": null
     },
     "fchub-memberships": {
-      "version": "1.4.4",
-      "tagName": "fchub-memberships/v1.4.4",
-      "zipFilename": "fchub-memberships-1.4.4.zip",
+      "version": "1.4.5",
+      "tagName": "fchub-memberships/v1.4.5",
+      "zipFilename": "fchub-memberships-1.4.5.zip",
       "mcpbFilename": null
     },
     "fchub-portal-extender": {
@@ -43,9 +43,9 @@
       "mcpbFilename": null
     },
     "fchub-multi-currency": {
-      "version": "1.4.2",
-      "tagName": "fchub-multi-currency/v1.4.2",
-      "zipFilename": "fchub-multi-currency-1.4.2.zip",
+      "version": "1.4.3",
+      "tagName": "fchub-multi-currency/v1.4.3",
+      "zipFilename": "fchub-multi-currency-1.4.3.zip",
       "mcpbFilename": null
     },
     "fchub-stream": {

@@ -56,11 +56,11 @@
       ],
       "docs_path": "/docs/fchub-memberships",
       "admin_path": "admin.php?page=fchub-memberships",
-      "version": "1.4.4",
+      "version": "1.4.5",
       "docs_url": "https://fchub.co/docs/fchub-memberships",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.4",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.4/fchub-memberships-1.4.4.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.4/fchub-memberships-1.4.4.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.5",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.5/fchub-memberships-1.4.5.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-memberships/v1.4.5/fchub-memberships-1.4.5.zip.sha256"
     },
     "fchub-portal-extender": {
       "name": "Portal Extender",
@@ -110,11 +110,11 @@
       ],
       "docs_path": "/docs/fchub-multi-currency",
       "admin_path": "admin.php?page=fluent-cart#/settings/multi-currency",
-      "version": "1.4.2",
+      "version": "1.4.3",
       "docs_url": "https://fchub.co/docs/fchub-multi-currency",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.2",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.2/fchub-multi-currency-1.4.2.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.2/fchub-multi-currency-1.4.2.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.3",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.3/fchub-multi-currency-1.4.3.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-multi-currency/v1.4.3/fchub-multi-currency-1.4.3.zip.sha256"
     }
   }
 }
