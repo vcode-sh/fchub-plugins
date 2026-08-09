@@ -8,6 +8,7 @@ use FChubMultiCurrency\Integration\FluentCrmSmartCodes;
 use FChubMultiCurrency\Tests\Support\TestCase;
 use FluentCart\App\Models\Order;
 use FluentCrm\App\Models\FunnelSubscriber;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 
 final class FluentCrmSmartCodesTest extends TestCase
@@ -279,40 +280,188 @@ final class FluentCrmSmartCodesTest extends TestCase
         $this->assertSame('EUR', $result);
     }
 
+    /**
+     * @param array<int|string, mixed> $groups
+     */
+    private function findGroupKeys(array $groups): array
+    {
+        return array_map(static fn($group) => $group['key'] ?? null, $groups);
+    }
+
     #[Test]
     public function testRegisterGlobalSmartCodesAddsGroup(): void
     {
         $groups = [];
         $result = FluentCrmSmartCodes::registerGlobalSmartCodes($groups);
 
-        $this->assertArrayHasKey('mc_order', $result);
-        $this->assertSame('Multi-Currency Order', $result['mc_order']['title']);
-        $this->assertArrayHasKey('shortcodes', $result['mc_order']);
-        $this->assertArrayHasKey('{{mc_order.display_currency}}', $result['mc_order']['shortcodes']);
+        $this->assertTrue(array_is_list($result));
+        $this->assertContains('mc_order', $this->findGroupKeys($result));
+        $this->assertSame('Multi-Currency Order', $result[0]['title']);
+        $this->assertArrayHasKey('shortcodes', $result[0]);
+        $this->assertArrayHasKey('{{mc_order.display_currency}}', $result[0]['shortcodes']);
     }
 
     #[Test]
-    public function testRegisterFunnelSmartCodesAddsGroupForCartFunnel(): void
+    public function testRegisterGlobalSmartCodesPreservesExistingGroups(): void
     {
-        $funnel = new \stdClass();
-        $funnel->trigger_name = 'fluent-cart-order-paid';
+        $groups = [['key' => 'other', 'title' => 'Other', 'shortcodes' => []]];
+        $result = FluentCrmSmartCodes::registerGlobalSmartCodes($groups);
 
-        $groups = [];
-        $result = FluentCrmSmartCodes::registerFunnelSmartCodes($groups, $funnel);
+        $this->assertTrue(array_is_list($result));
+        $this->assertSame(['other', 'mc_order'], $this->findGroupKeys($result));
+    }
 
-        $this->assertArrayHasKey('mc_order', $result);
+    /**
+     * The real FluentCart funnel triggers, as registered by FluentCRM in
+     * app/Services/ExternalIntegrations/FluentCart/Triggers/. Hook names, not
+     * slugs — pinned here so a rename upstream fails loudly instead of
+     * silently hiding the smart-code group.
+     *
+     * @return array<string, array{string}>
+     */
+    public static function cartTriggerProvider(): array
+    {
+        return [
+            'order paid'            => ['fluent_cart/order_paid_done'],
+            'order refunded'        => ['fluent_cart/order_fully_refunded'],
+            'order status changed'  => ['fluent_cart/order_status_changed'],
+            'order canceled'        => ['fluent_cart/order_status_changed_to_canceled'],
+            'order shipped'         => ['fluent_cart/shipping_status_changed_to_shipped'],
+            'order delivered'       => ['fluent_cart/shipping_status_changed_to_delivered'],
+            'sub activated'         => ['fluent_cart/subscription_activated'],
+            'sub renewed'           => ['fluent_cart/subscription_renewed'],
+            'sub canceled'          => ['fluent_cart/subscription_canceled'],
+            'sub end of term'       => ['fluent_cart/subscription_eot'],
+            'sub expired validity'  => ['fluent_cart/subscription_expired_validity'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function nonCartTriggerProvider(): array
+    {
+        return [
+            'fluent forms'    => ['fluentform_submission_inserted'],
+            'abandoned cart'  => ['fc_ab_cart_simulation_fluent_cart'],
+            'woocommerce'     => ['woo_product_purchased'],
+            'dash-style typo' => ['fluent-cart-order-paid'],
+            'empty'           => [''],
+        ];
     }
 
     #[Test]
-    public function testRegisterFunnelSmartCodesSkipsNonCartFunnel(): void
+    #[DataProvider('cartTriggerProvider')]
+    public function testRegisterFunnelSmartCodesAddsGroupForCartTrigger(string $triggerName): void
     {
         $funnel = new \stdClass();
-        $funnel->trigger_name = 'some-other-funnel';
+        $funnel->trigger_name = $triggerName;
 
         $groups = [];
-        $result = FluentCrmSmartCodes::registerFunnelSmartCodes($groups, $funnel);
+        $result = FluentCrmSmartCodes::registerFunnelSmartCodes($groups, $triggerName, $funnel);
 
-        $this->assertArrayNotHasKey('mc_order', $result);
+        $this->assertContains('mc_order', $this->findGroupKeys($result));
+    }
+
+    #[Test]
+    #[DataProvider('nonCartTriggerProvider')]
+    public function testRegisterFunnelSmartCodesSkipsNonCartTrigger(string $triggerName): void
+    {
+        $funnel = new \stdClass();
+        $funnel->trigger_name = $triggerName;
+
+        $groups = [];
+        $result = FluentCrmSmartCodes::registerFunnelSmartCodes($groups, $triggerName, $funnel);
+
+        $this->assertSame([], $result);
+        $this->assertNotContains('mc_order', $this->findGroupKeys($result));
+    }
+
+    #[Test]
+    public function testOrderPaidTriggerIsAccepted(): void
+    {
+        // Pinned separately from the provider: this is the trigger behind #74,
+        // and the one that must never stop working.
+        $result = FluentCrmSmartCodes::registerFunnelSmartCodes([], 'fluent_cart/order_paid_done');
+
+        $this->assertContains('mc_order', $this->findGroupKeys($result));
+    }
+
+    #[Test]
+    public function testCartFunnelsConstantHoldsRealHookStyleTriggerNames(): void
+    {
+        $constant = (new \ReflectionClass(FluentCrmSmartCodes::class))->getConstant('CART_FUNNELS');
+
+        $expected = array_merge(...array_values(self::cartTriggerProvider()));
+
+        $this->assertSame($expected, $constant);
+
+        foreach ($constant as $triggerName) {
+            $this->assertStringStartsWith('fluent_cart/', $triggerName);
+        }
+    }
+
+    #[Test]
+    public function testRegisterFunnelSmartCodesSkipsNonCartTriggerWithoutFunnelObject(): void
+    {
+        $groups = [];
+        $result = FluentCrmSmartCodes::registerFunnelSmartCodes($groups, 'fluentform_submission_inserted');
+
+        $this->assertNotContains('mc_order', $this->findGroupKeys($result));
+    }
+
+    #[Test]
+    public function testRegisterFunnelSmartCodesAddsGroupForCartTriggerWithoutFunnelObject(): void
+    {
+        $groups = [];
+        $result = FluentCrmSmartCodes::registerFunnelSmartCodes($groups, 'fluent_cart/subscription_renewed');
+
+        $this->assertContains('mc_order', $this->findGroupKeys($result));
+    }
+
+    #[Test]
+    public function testRegisterFunnelSmartCodesFallsBackToFunnelObjectTrigger(): void
+    {
+        $funnel = new \stdClass();
+        $funnel->trigger_name = 'fluent_cart/order_paid_done';
+
+        $result = FluentCrmSmartCodes::registerFunnelSmartCodes([], null, $funnel);
+
+        $this->assertContains('mc_order', $this->findGroupKeys($result));
+    }
+
+    #[Test]
+    public function testRegisterFunnelSmartCodesReturnsSequentialListEncodingAsJsonArray(): void
+    {
+        $groups = [
+            ['key' => 'contact', 'title' => 'Contact', 'shortcodes' => []],
+            ['key' => 'order', 'title' => 'Order', 'shortcodes' => []],
+        ];
+
+        $result = FluentCrmSmartCodes::registerFunnelSmartCodes($groups, 'fluent_cart/order_paid_done');
+
+        // The funnel editor does [...window.fcrm_funnel_context_codes]; a string
+        // key would encode as a JSON object and blow up the spread.
+        $this->assertTrue(array_is_list($result));
+        $this->assertSame(['contact', 'order', 'mc_order'], $this->findGroupKeys($result));
+
+        $encoded = wp_json_encode($result);
+        $this->assertIsString($encoded);
+        $this->assertStringStartsWith('[', $encoded);
+    }
+
+    #[Test]
+    public function testFunnelSmartCodesFilterAcceptsThreeArguments(): void
+    {
+        FluentCrmSmartCodes::register();
+
+        $filters = array_values(array_filter(
+            $GLOBALS['wp_filters_registered'],
+            static fn($filter) => $filter['tag'] === 'fluent_crm_funnel_context_smart_codes',
+        ));
+
+        $this->assertCount(1, $filters);
+        $this->assertSame(3, $filters[0]['accepted_args']);
     }
 
     #[Test]

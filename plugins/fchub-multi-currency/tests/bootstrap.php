@@ -2,7 +2,7 @@
 
 define('FCHUB_TESTING', true);
 define('ABSPATH', '/tmp/wordpress/');
-define('FCHUB_MC_VERSION', '1.4.1');
+define('FCHUB_MC_VERSION', '1.4.2');
 define('FCHUB_MC_PATH', dirname(__DIR__) . '/');
 define('FCHUB_MC_URL', 'http://localhost/wp-content/plugins/fchub-multi-currency/');
 define('FCHUB_MC_DB_VERSION', '1.0.0');
@@ -289,7 +289,7 @@ if (!function_exists('apply_filters')) {
 if (!function_exists('add_filter')) {
     function add_filter($tag, $callback, $priority = 10, $accepted_args = 1)
     {
-        $GLOBALS['wp_filters_registered'][] = ['tag' => $tag, 'callback' => $callback, 'priority' => $priority];
+        $GLOBALS['wp_filters_registered'][] = ['tag' => $tag, 'callback' => $callback, 'priority' => $priority, 'accepted_args' => $accepted_args];
         return true;
     }
 }

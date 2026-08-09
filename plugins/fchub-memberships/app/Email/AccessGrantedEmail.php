@@ -14,12 +14,16 @@ class AccessGrantedEmail
     /**
      * Send the welcome/access granted email.
      *
+     * Resources and drip items must already be resolved to presentable values —
+     * see PlanRulePresenter. Raw plan_rules rows will render as nothing, which
+     * is at least honest.
+     *
      * @param int   $userId   WordPress user ID.
      * @param array $grantData {
      *     @type int    $plan_id    Plan ID.
      *     @type string $plan_title Plan name.
-     *     @type array  $resources  Immediately accessible resources [{title, url}].
-     *     @type array  $drip_items Drip schedule items [{title, available_date}].
+     *     @type array  $resources  Immediately accessible resources [{title, url}]; url may be empty.
+     *     @type array  $drip_items Drip schedule items [{title, available_date}]; date may be empty.
      * }
      */
     public function send(int $userId, array $grantData): void
@@ -52,36 +56,54 @@ class AccessGrantedEmail
      */
     private function buildSmartCodes(\WP_User $user, array $data): array
     {
-        $resourcesHtml = '';
-        if (!empty($data['resources'])) {
-            $resourcesHtml = '<ul>';
-            foreach ($data['resources'] as $resource) {
-                $title = esc_html($resource['title'] ?? '');
-                $url   = esc_url($resource['url'] ?? '#');
-                $resourcesHtml .= "<li><a href=\"{$url}\">{$title}</a></li>";
+        $resourceItems = '';
+        foreach ((array) ($data['resources'] ?? []) as $resource) {
+            $title = trim((string) ($resource['title'] ?? ''));
+            if ($title === '') {
+                continue;
             }
-            $resourcesHtml .= '</ul>';
+
+            $url = trim((string) ($resource['url'] ?? ''));
+            $resourceItems .= $url !== ''
+                ? '<li><a href="' . esc_url($url) . '">' . esc_html($title) . '</a></li>'
+                : '<li>' . esc_html($title) . '</li>';
         }
 
-        $dripHtml = '';
-        if (!empty($data['drip_items'])) {
-            $dripHtml = '<h3>' . __('Coming Soon', 'fchub-memberships') . '</h3><ul>';
-            foreach ($data['drip_items'] as $item) {
-                $title = esc_html($item['title'] ?? '');
-                $date  = esc_html($item['available_date'] ?? '');
-                $dripHtml .= "<li>{$title} &mdash; {$date}</li>";
-            }
-            $dripHtml .= '</ul>';
+        $resourcesIntro = '';
+        $resourcesHtml  = '';
+        if ($resourceItems !== '') {
+            $resourcesIntro = '<p>'
+                . esc_html(__('You have immediate access to the following resources:', 'fchub-memberships'))
+                . '</p>';
+            $resourcesHtml = '<ul>' . $resourceItems . '</ul>';
         }
+
+        $dripItems = '';
+        foreach ((array) ($data['drip_items'] ?? []) as $item) {
+            $title = trim((string) ($item['title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+
+            $date = trim((string) ($item['available_date'] ?? ''));
+            $dripItems .= $date !== ''
+                ? '<li>' . esc_html($title) . ' &mdash; ' . esc_html($date) . '</li>'
+                : '<li>' . esc_html($title) . '</li>';
+        }
+
+        $dripHtml = $dripItems === ''
+            ? ''
+            : '<h3>' . esc_html(__('Coming Soon', 'fchub-memberships')) . '</h3><ul>' . $dripItems . '</ul>';
 
         return [
-            '{user_name}'     => $user->display_name ?: $user->user_login,
-            '{user_email}'    => $user->user_email,
-            '{plan_name}'     => $data['plan_title'] ?? '',
-            '{site_name}'     => get_bloginfo('name'),
-            '{account_url}'   => $this->getAccountUrl(),
+            '{user_name}'      => $user->display_name ?: $user->user_login,
+            '{user_email}'     => $user->user_email,
+            '{plan_name}'      => $data['plan_title'] ?? '',
+            '{site_name}'      => get_bloginfo('name'),
+            '{account_url}'    => $this->getAccountUrl(),
+            '{resources_intro}' => $resourcesIntro,
             '{resources_list}' => $resourcesHtml,
-            '{drip_schedule}' => $dripHtml,
+            '{drip_schedule}'  => $dripHtml,
         ];
     }
 
@@ -133,7 +155,8 @@ class AccessGrantedEmail
     {
         return <<<'HTML'
 <h2>Welcome to {plan_name}, {user_name}!</h2>
-<p>Thank you for joining. Your membership is now active and you have immediate access to the following resources:</p>
+<p>Thank you for joining. Your membership is now active.</p>
+{resources_intro}
 {resources_list}
 {drip_schedule}
 <p>You can manage your membership and access all your content from your account:</p>

@@ -364,6 +364,21 @@
     pointer-events: none;
 }
 
+/* ----- Failed switch ----- */
+/* Only widgets currently showing an error wrap, so normal layout is untouched. */
+.fchub-mc-switcher:has(.fchub-mc-switcher__error) {
+    flex-wrap: wrap;
+}
+
+.fchub-mc-switcher__error {
+    flex-basis: 100%;
+    margin-top: 0.35rem;
+    max-width: 22rem;
+    color: #b42318;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
 /* ----- No-JS fallback ----- */
 .fchub-mc-switcher-fallback-form {
     display: inline-flex;

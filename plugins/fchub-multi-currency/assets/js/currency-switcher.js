@@ -3,7 +3,7 @@
  *
  * Custom dropdown with flag emojis, ARIA listbox, keyboard navigation.
  *
- * Fires: fchub_mc:context_changed
+ * Fires: fchub_mc:context_changed, fchub_mc:context_switch_failed
  */
 (() => {
 	const config = window.fchubMcConfig || {};
@@ -37,7 +37,110 @@
 
 	let idCounter = 0;
 
-	function switchCurrency(currencyCode) {
+	const FALLBACK_ERROR = "Currency preference could not be saved.";
+
+	function clearLoadingState(root) {
+		if (root) {
+			root.classList.remove("fchub-mc-switcher--loading");
+		}
+
+		document.querySelectorAll(".fchub-mc-switcher--loading").forEach((el) => {
+			el.classList.remove("fchub-mc-switcher--loading");
+		});
+	}
+
+	function clearError(root) {
+		if (!root) return;
+		const notice = root.querySelector("[data-fchub-mc-error]");
+		if (notice) {
+			notice.remove();
+		}
+	}
+
+	function showError(root, message) {
+		if (!root) return;
+		let notice = root.querySelector("[data-fchub-mc-error]");
+		if (!notice) {
+			notice = document.createElement("span");
+			notice.className = "fchub-mc-switcher__error";
+			notice.setAttribute("role", "status");
+			notice.setAttribute("data-fchub-mc-error", "");
+			root.appendChild(notice);
+		}
+		notice.textContent = message;
+	}
+
+	/**
+	 * Pulls the most useful message out of either envelope: the plugin's own
+	 * `{data: {message}}` or WordPress's REST error `{code, message, data: {status}}`.
+	 */
+	function readMessage(payload, status) {
+		const data = payload && typeof payload === "object" ? payload.data : null;
+
+		if (data && typeof data.message === "string" && data.message !== "") {
+			return data.message;
+		}
+
+		if (payload && typeof payload.message === "string" && payload.message !== "") {
+			return payload.message;
+		}
+
+		return status ? `${FALLBACK_ERROR} (HTTP ${status})` : FALLBACK_ERROR;
+	}
+
+	/**
+	 * The stable outcome slug the server sends alongside the message — e.g.
+	 * "persistence_unavailable", "module_disabled", "rate_limited". Branch on
+	 * this, never on the message, which is translated. Falls back to WordPress's
+	 * own top-level `code` when the REST layer answers before we do.
+	 */
+	function readCode(payload) {
+		const data = payload && typeof payload === "object" ? payload.data : null;
+
+		if (data && typeof data.code === "string" && data.code !== "") {
+			return data.code;
+		}
+
+		if (payload && typeof payload.code === "string" && payload.code !== "") {
+			return payload.code;
+		}
+
+		return "";
+	}
+
+	function failSwitch(currencyCode, message, options, status, code) {
+		const root = options.root || null;
+
+		console.warn("[fchub-mc] Currency switch failed:", message);
+		clearLoadingState(root);
+
+		if (typeof options.onFailure === "function") {
+			options.onFailure();
+		}
+
+		showError(root, message);
+
+		window.dispatchEvent(
+			new CustomEvent("fchub_mc:context_switch_failed", {
+				detail: {
+					currency: currencyCode,
+					message: message,
+					status: status || 0,
+					code: code || "",
+				},
+			}),
+		);
+	}
+
+	/**
+	 * Posts the preference and only reloads once the server confirms it stored something.
+	 * A 403 (plugin disabled), 409 (nothing to persist for this visitor), 422 (bad currency)
+	 * or 429 (rate limited) leaves the page alone and surfaces the server's message.
+	 */
+	function switchCurrency(currencyCode, options) {
+		const settings = options || {};
+		clearError(settings.root || null);
+
 		return fetch(`${restUrl}/context`, {
 			method: "POST",
 			headers: {
@@ -46,20 +149,36 @@
 			},
 			body: JSON.stringify({ currency: currencyCode }),
 		})
-			.then((response) => response.json())
-			.then((data) => {
+			.then((response) =>
+				response
+					.json()
+					.catch(() => null)
+					.then((payload) => ({ response, payload })),
+			)
+			.then(({ response, payload }) => {
+				const data = payload && typeof payload === "object" ? payload.data : null;
+				const persisted = data?.persisted !== false;
+
+				if (!response.ok || !persisted) {
+					failSwitch(
+						currencyCode,
+						readMessage(payload, response.status),
+						settings,
+						response.status,
+						readCode(payload),
+					);
+					return;
+				}
+
 				window.dispatchEvent(
 					new CustomEvent("fchub_mc:context_changed", {
-						detail: { currency: currencyCode, response: data },
+						detail: { currency: currencyCode, response: payload },
 					}),
 				);
 				window.location.reload();
 			})
 			.catch((err) => {
-				console.warn("[fchub-mc] Currency switch failed:", err);
-				document.querySelectorAll(".fchub-mc-switcher--loading").forEach((el) => {
-					el.classList.remove("fchub-mc-switcher--loading");
-				});
+				failSwitch(currencyCode, err?.message || FALLBACK_ERROR, settings, 0, "network_error");
 			});
 	}
 
@@ -212,12 +331,42 @@
 			target.scrollIntoView({ block: "nearest" });
 		}
 
+		const TRIGGER_PART_SELECTORS = [
+			".fchub-mc-switcher__flag",
+			".fchub-mc-switcher__code",
+			".fchub-mc-switcher__symbol",
+			".fchub-mc-switcher__name",
+		];
+
+		function captureTriggerState() {
+			const parts = {};
+			for (const selector of TRIGGER_PART_SELECTORS) {
+				const part = trigger.querySelector(selector);
+				if (part) {
+					parts[selector] = part.innerHTML;
+				}
+			}
+			return parts;
+		}
+
+		// Restores markup this widget captured from itself a moment earlier — server-escaped
+		// option content, never anything the visitor typed.
+		function restoreTriggerState(parts) {
+			for (const selector of Object.keys(parts)) {
+				const part = trigger.querySelector(selector);
+				if (part) {
+					part.innerHTML = parts[selector];
+				}
+			}
+		}
+
 		function selectOption(index) {
 			const items = options().filter((option) => option.style.display !== "none");
 			const target = items[index];
 			if (!target) return;
 
 			const value = target.dataset.value;
+			const previousTriggerState = captureTriggerState();
 			const currentActive = listbox.querySelector(".fchub-mc-switcher__option--active");
 			if (currentActive) {
 				currentActive.classList.remove("fchub-mc-switcher__option--active");
@@ -258,7 +407,19 @@
 
 			close();
 			root.classList.add("fchub-mc-switcher--loading");
-			switchCurrency(value);
+			switchCurrency(value, {
+				root: root,
+				onFailure: () => {
+					target.classList.remove("fchub-mc-switcher__option--active");
+					target.setAttribute("aria-selected", "false");
+					if (currentActive) {
+						currentActive.classList.add("fchub-mc-switcher__option--active");
+						currentActive.setAttribute("aria-selected", "true");
+					}
+					restoreTriggerState(previousTriggerState);
+					trigger.focus();
+				},
+			});
 		}
 
 		// Trigger events
@@ -396,11 +557,20 @@
 				}
 
 				event.preventDefault();
-				root.querySelectorAll(".is-active").forEach((activeButton) => {
+				const previousActive = [...root.querySelectorAll(".is-active")];
+				for (const activeButton of previousActive) {
 					activeButton.classList.remove("is-active");
-				});
+				}
 				button.classList.add("is-active");
-				switchCurrency(button.dataset.value || "");
+				switchCurrency(button.dataset.value || "", {
+					root: root,
+					onFailure: () => {
+						button.classList.remove("is-active");
+						for (const activeButton of previousActive) {
+							activeButton.classList.add("is-active");
+						}
+					},
+				});
 			});
 		});
 	}

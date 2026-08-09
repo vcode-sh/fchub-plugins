@@ -1,0 +1,42 @@
+### v1.0.4
+
+*Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-portal-extender/v1.0.4)
+
+Endpoint icons now appear on the front end, which is where icons are generally
+most useful.
+
+#### Icons survive the trip to the customer portal
+
+Reported by @Joe-Bloggs in [#62](https://github.com/vcode-sh/fchub-plugins/issues/62): the icon showed in the admin, picked correctly,
+saved correctly — and then rendered as nothing at all in the portal.
+
+FluentCart runs every portal menu icon through `wp_kses()` with a whitelist of
+`svg`, `path` and `g`. Nothing else survives. A Dashicon is a `<span>`, so it was
+deleted outright and could never render. Any SVG built from `circle`, `rect`,
+`line` or `polyline` came out as an empty `<svg></svg>`. And `viewBox` was
+stripped from everything, because `wp_kses` lowercases attribute names before
+matching while the whitelist key is camelCase.
+
+Portal Extender now widens that whitelist through FluentCart's own
+`fct_allowed_svg_tags` filter, merging on top of it rather than replacing it, so
+other plugins' entries survive. The shape elements, the stroke and fill
+presentation attributes, lowercase `viewbox` and the Dashicon `<span>` are all
+allowed through.
+
+It remains a whitelist. `script`, `foreignObject`, `use`, `xlink:href`, `href`,
+inline event handlers and `style` on SVG elements are still stripped, and that
+is covered by a test that throws a deliberately hostile icon at it.
+
+#### Dashicons are actually loaded now
+
+Surviving sanitisation is only half of it — WordPress does not load the
+Dashicons stylesheet on the front end for ordinary visitors, so the markup would
+have rendered as an empty box regardless. The stylesheet is now enqueued on the
+portal, and only when an active endpoint genuinely uses a Dashicon.
+
+<Callout>
+Reordering endpoints within the portal menu was requested in the same issue and
+is tracked separately in [#141](https://github.com/vcode-sh/fchub-plugins/issues/141). No FluentCart change is needed for it —
+the interesting part is that FluentCart hides `licenses` and `subscriptions`
+from some visitors, so an absolute "position 2" is not a promise anyone can keep.
+</Callout>

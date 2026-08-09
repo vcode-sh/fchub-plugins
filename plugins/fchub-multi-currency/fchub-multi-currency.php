@@ -4,7 +4,7 @@
  * Plugin Name: FCHub Multi-Currency
  * Plugin URI: https://fchub.co/docs/fchub-multi-currency
  * Description: Display-layer multi-currency for FluentCart with exchange rate management and checkout disclosure
- * Version: 1.4.1
+ * Version: 1.4.2
  * Author: Vibe Code
  * Author URI: https://x.com/vcode_sh
  * License: GPLv2 or later
@@ -20,7 +20,7 @@ declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FCHUB_MC_VERSION', '1.4.1');
+define('FCHUB_MC_VERSION', '1.4.2');
 define('FCHUB_MC_FILE', __FILE__);
 define('FCHUB_MC_PATH', plugin_dir_path(__FILE__));
 define('FCHUB_MC_URL', plugin_dir_url(__FILE__));

@@ -17,6 +17,10 @@ class EndpointRegistrar
             return;
         }
 
+        // Widen FluentCart's icon whitelist and load dashicons where needed,
+        // otherwise wp_kses eats our icons on the portal front end.
+        IconSupport::register($endpoints);
+
         $api = fluent_cart_api();
 
         foreach ($endpoints as $endpoint) {

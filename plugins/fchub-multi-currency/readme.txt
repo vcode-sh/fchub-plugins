@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, currency, exchange-rates, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -90,6 +90,15 @@ No. Manual is the no-network default. A scheduled refresh is created only after 
 The failed response is not persisted. Customer prices continue to use the last good or manually entered rates according to the configured stale-rate fallback.
 
 == Changelog ==
+
+= 1.4.2 =
+
+* Fixed the FluentCRM automation email editor failing to load whenever Multi-Currency was active.
+* Registered the funnel smart-code group against the real FluentCart trigger names.
+* Reported honestly when a currency preference cannot be stored, instead of claiming it was saved.
+* Stopped the switcher reloading the page after a switch the server rejected.
+* Added stable outcome codes to the public context endpoint so clients no longer match on message text.
+* Stated in settings that disabling cookie persistence prevents logged-out visitors keeping a currency.
 
 = 1.4.1 =
 

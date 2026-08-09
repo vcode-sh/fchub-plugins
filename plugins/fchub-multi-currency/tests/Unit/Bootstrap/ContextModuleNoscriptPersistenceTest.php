@@ -76,6 +76,58 @@ final class ContextModuleNoscriptPersistenceTest extends TestCase
     }
 
     #[Test]
+    public function testGuestPostIsNotFakedWhenNothingCanBePersisted(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'enabled'            => 'yes',
+            'cookie_enabled'     => 'no',
+            'base_currency'      => 'EUR',
+            'display_currencies' => [
+                ['code' => 'USD', 'name' => 'US Dollar', 'symbol' => '$', 'decimals' => 2, 'position' => 'left'],
+            ],
+        ]);
+
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_POST = [
+            CurrencySwitcherRenderer::NOSCRIPT_FIELD => 'USD',
+            CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'valid',
+        ];
+
+        ContextModule::persistPostedCurrencyPreference();
+
+        // No cookie faked for the current request, and no "switched" signal for listeners.
+        $this->assertArrayNotHasKey(Constants::COOKIE_KEY, $_COOKIE);
+        $this->assertHookNotFired('fchub_mc/context_switched');
+        $this->assertHookFired('fchub_mc/context_switch_not_persisted');
+    }
+
+    #[Test]
+    public function testLoggedInPostStillPersistsWhenCookiesAreDisabled(): void
+    {
+        $this->setOption('fchub_mc_settings', [
+            'enabled'            => 'yes',
+            'cookie_enabled'     => 'no',
+            'base_currency'      => 'EUR',
+            'display_currencies' => [
+                ['code' => 'USD', 'name' => 'US Dollar', 'symbol' => '$', 'decimals' => 2, 'position' => 'left'],
+            ],
+        ]);
+        $this->setCurrentUserId(42);
+
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_POST = [
+            CurrencySwitcherRenderer::NOSCRIPT_FIELD => 'USD',
+            CurrencySwitcherRenderer::NOSCRIPT_NONCE => 'valid',
+        ];
+
+        ContextModule::persistPostedCurrencyPreference();
+
+        $this->assertSame('USD', $GLOBALS['wp_mock_user_meta'][42][Constants::USER_META_KEY] ?? '');
+        $this->assertHookFired('fchub_mc/context_switched');
+        $this->assertHookNotFired('fchub_mc/context_switch_not_persisted');
+    }
+
+    #[Test]
     public function testGetRequestsDoNotMutatePreferenceState(): void
     {
         $_SERVER['REQUEST_METHOD'] = 'GET';

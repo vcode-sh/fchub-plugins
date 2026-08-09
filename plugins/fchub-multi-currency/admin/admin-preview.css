@@ -5,6 +5,12 @@
  * inside FluentCart's admin shell without clashes.
  */
 
+/* Settings note flagging a choice with visitor-facing consequences */
+.fchub-mc-form-note--warning {
+	margin-top: 6px;
+	color: #b42318;
+}
+
 .fchub-mc-admin-preview {
 	position: sticky;
 	top: 0;

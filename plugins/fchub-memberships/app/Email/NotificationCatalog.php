@@ -29,6 +29,7 @@ final class NotificationCatalog
                 AccessGrantedEmail::getDefaultTemplate(),
                 $common + [
                     '{account_url}' => ['label' => __('Account URL', 'fchub-memberships'), 'type' => 'url', 'sample' => home_url('/account/')],
+                    '{resources_intro}' => ['label' => __('Protected resources intro', 'fchub-memberships'), 'type' => 'rich', 'sample' => '<p>You have immediate access to the following resources:</p>'],
                     '{resources_list}' => ['label' => __('Protected resources', 'fchub-memberships'), 'type' => 'rich', 'sample' => '<ul><li>Getting Started</li><li>Member Library</li></ul>'],
                     '{drip_schedule}' => ['label' => __('Drip schedule', 'fchub-memberships'), 'type' => 'rich', 'sample' => '<h3>Coming Soon</h3><ul><li>Advanced Workshop &mdash; Friday</li></ul>'],
                 ]

@@ -2,6 +2,7 @@
 
 namespace FChubMemberships\Domain;
 
+use FChubMemberships\Domain\Plan\PlanRulePresenter;
 use FChubMemberships\Storage\PlanRepository;
 
 defined('ABSPATH') || exit;
@@ -9,12 +10,17 @@ defined('ABSPATH') || exit;
 final class GrantNotificationService
 {
     private PlanRepository $plans;
+    private PlanRulePresenter $rulePresenter;
 
-    public function __construct(?PlanRepository $plans = null)
+    public function __construct(?PlanRepository $plans = null, ?PlanRulePresenter $rulePresenter = null)
     {
         $this->plans = $plans ?? new PlanRepository();
+        $this->rulePresenter = $rulePresenter ?? new PlanRulePresenter();
     }
 
+    /**
+     * @param array<int, mixed> $rules Raw plan_rules rows for the granted plan.
+     */
     public function sendGranted(int $userId, int $planId, array $rules): void
     {
         $settings = get_option('fchub_memberships_settings', []);
@@ -27,14 +33,11 @@ final class GrantNotificationService
             return;
         }
 
-        $immediateResources = array_filter($rules, static fn(array $rule): bool => $rule['drip_type'] === 'immediate');
-        $dripItems = array_filter($rules, static fn(array $rule): bool => $rule['drip_type'] !== 'immediate');
-
         (new \FChubMemberships\Email\AccessGrantedEmail())->send($userId, [
             'plan_id'    => $planId,
             'plan_title' => $plan['title'],
-            'resources'  => array_values($immediateResources),
-            'drip_items' => array_values($dripItems),
+            'resources'  => $this->rulePresenter->immediateResources($rules),
+            'drip_items' => $this->rulePresenter->dripItems($rules),
         ]);
     }
 

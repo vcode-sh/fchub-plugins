@@ -7,20 +7,21 @@ const readJson = async (path) =>
   JSON.parse(await readFile(new URL(path, root), 'utf8'))
 
 const expectedVersions = {
-  'fchub-memberships': '1.4.3',
+  'fchub-memberships': '1.4.4',
   'fchub-wishlist': '1.0.2',
-  'fchub-multi-currency': '1.4.1',
+  // 1.4.1 was prepared but never tagged, so 1.4.2 is the first version to reach WordPress.org.
+  'fchub-multi-currency': '1.4.2',
   'fchub-p24': '1.0.4',
   'fchub-fakturownia': '1.1.2',
 }
 
 const expectedPreviousReleases = {
   'fchub-memberships': {
-    version: '1.4.2',
-    tag: 'fchub-memberships/v1.4.2',
-    commit: 'df510e2cbc38cf3b8d6c53729156b260c9dd46f4',
-    asset: 'fchub-memberships-1.4.2.zip',
-    sha256: '9c86f33eabe6d47cbbe6128a202243d0050c9c0fca9cf538c6f45bba774dbd09',
+    version: '1.4.3',
+    tag: 'fchub-memberships/v1.4.3',
+    commit: 'cac777fe19df939fdc4f2b7c27321db5f125a161',
+    asset: 'fchub-memberships-1.4.3.zip',
+    sha256: 'a692436064c1e4791234890064e0d46f5a9bb681e10e073fd1177d21b27daee7',
   },
   'fchub-wishlist': {
     version: '1.0.1',

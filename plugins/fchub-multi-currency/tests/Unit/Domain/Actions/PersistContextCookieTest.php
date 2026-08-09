@@ -29,10 +29,13 @@ final class PersistContextCookieTest extends TestCase
         // setcookie() returns false in CLI but doesn't throw.
         $repo = new PreferenceRepository();
         $action = new PersistContextAction($repo, $optionStore);
-        @$action->execute('EUR'); // Suppress setcookie "headers already sent" warning
+        $result = @$action->execute('EUR'); // Suppress setcookie "headers already sent" warning
 
-        // No logged-in user → no user meta saved
+        // No logged-in user → no user meta saved, but the cookie channel carried the preference
         $this->assertEmpty($GLOBALS['wp_mock_user_meta']);
+        $this->assertTrue($result->cookieStored);
+        $this->assertFalse($result->userMetaStored);
+        $this->assertTrue($result->persisted());
     }
 
     #[Test]
@@ -45,11 +48,58 @@ final class PersistContextCookieTest extends TestCase
         $optionStore = new OptionStore();
         $this->assertSame('no', $optionStore->get('cookie_enabled', 'yes'));
 
-        // The cookie_enabled guard should skip saveCookie entirely.
-        // We verify by checking that the code path completes without setcookie being called.
-        // Since we can't intercept setcookie on a final class, we verify the guard condition:
-        $cookieEnabled = $optionStore->get('cookie_enabled', 'yes') === 'yes';
-        $this->assertFalse($cookieEnabled, 'Cookie should be disabled');
+        // The cookie_enabled guard should skip saveCookie entirely. Since we can't intercept
+        // setcookie on a final class, the returned result is the observable proof.
+        $result = (new PersistContextAction(new PreferenceRepository(), $optionStore))->execute('EUR');
+
+        $this->assertFalse($result->cookieStored, 'Cookie should be disabled');
+    }
+
+    #[Test]
+    public function testGuestWithCookiesDisabledPersistsNothing(): void
+    {
+        // The reported bug: a logged-out visitor has no persistence channel at all.
+        $this->setOption('fchub_mc_settings', [
+            'cookie_enabled' => 'no',
+        ]);
+
+        $action = new PersistContextAction(new PreferenceRepository(), new OptionStore());
+        $result = $action->execute('EUR');
+
+        $this->assertFalse($result->cookieStored);
+        $this->assertFalse($result->userMetaStored);
+        $this->assertFalse($result->persisted(), 'Guest preference cannot survive without cookies');
+        $this->assertEmpty($GLOBALS['wp_mock_user_meta']);
+    }
+
+    #[Test]
+    public function testGuestWithCookiesDisabledIsTheOnlyUnpersistableCase(): void
+    {
+        // Same settings, but logged in: user meta keeps the preference alive.
+        $this->setCurrentUserId(7);
+        $this->setOption('fchub_mc_settings', [
+            'cookie_enabled' => 'no',
+        ]);
+
+        $result = (new PersistContextAction(new PreferenceRepository(), new OptionStore()))->execute('EUR');
+
+        $this->assertFalse($result->cookieStored);
+        $this->assertTrue($result->userMetaStored);
+        $this->assertTrue($result->persisted());
+    }
+
+    #[Test]
+    public function testBothChannelsDisabledPersistsNothingEvenWhenLoggedIn(): void
+    {
+        $this->setCurrentUserId(7);
+        $this->setOption('fchub_mc_settings', [
+            'cookie_enabled'              => 'no',
+            'account_persistence_enabled' => 'no',
+        ]);
+
+        $result = (new PersistContextAction(new PreferenceRepository(), new OptionStore()))->execute('EUR');
+
+        $this->assertFalse($result->persisted());
     }
 
     #[Test]

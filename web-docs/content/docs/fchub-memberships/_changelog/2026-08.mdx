@@ -1,4 +1,50 @@
-### v1.4.3 <Badge>Latest</Badge>
+### v1.4.4 <Badge>Latest</Badge>
+
+*Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.4)
+
+The welcome email now names the things it welcomes you to. Previously it
+announced "you have immediate access to the following resources:" and then
+showed a single empty bullet, which is technically a list.
+
+#### The Access Granted email lists actual resources
+
+Reported by @bergy10 in [#73](https://github.com/vcode-sh/fchub-plugins/issues/73), with the root cause already diagnosed — the grant path
+handed the email its raw `plan_rules` database rows, while the email expected
+`{title, url}` pairs. A rule row carries `provider`, `resource_type` and
+`resource_id` and no title at all, so every resource resolved to an empty
+anchor pointing at `#`.
+
+A new `PlanRulePresenter` now sits between the two. Posts and custom post types
+resolve to their title and permalink, taxonomy rules to the term name and its
+archive, and wildcard rules to the same "All Categories" wording the plan editor
+already uses. Rules that are not addressable content — deleted posts, drafts,
+URL patterns, comment rules, CRM segmentation — are dropped rather than
+rendered as a link to nowhere.
+
+#### The drip list was broken in exactly the same way
+
+Nobody reported this one, because everybody had already stopped reading the
+email. Drip items expected an `available_date` that rule rows have never
+carried, so "Coming Soon" listed a row of bare dashes. Delayed rules now read
+"7 days after joining" and fixed-date rules use the site's own date format.
+
+#### Sections that have nothing to say now say nothing
+
+When no resource survives resolution, the list, the "Coming Soon" heading and
+the lead-in sentence all disappear instead of framing an empty space. The
+lead-in moved into a new `{resources_intro}` smart code so it can vanish with
+the list.
+
+<Callout type="warn">
+If you have saved a **custom** Access Granted template, its lead-in sentence is
+part of your own template text and will keep appearing above an empty list.
+Add `{resources_intro}` where the sentence used to be, and delete the hardcoded
+copy.
+</Callout>
+
+<Separator className="my-8" />
+
+### v1.4.3
 
 *Released 6 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-memberships/v1.4.3)
 

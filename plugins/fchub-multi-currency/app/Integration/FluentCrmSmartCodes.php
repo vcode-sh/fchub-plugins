@@ -10,12 +10,27 @@ defined('ABSPATH') || exit;
 
 final class FluentCrmSmartCodes
 {
+    /**
+     * FluentCart funnel triggers registered by FluentCRM. Each one starts its
+     * funnel sequence with `source_ref_id` set to a FluentCart order id, which
+     * is exactly what parse() resolves the currency meta from, so the smart
+     * codes are meaningful in all of them.
+     *
+     * These are hook names, not slugs. A dash-style name ('fluent-cart-...')
+     * matches no trigger and silently disables the whole group.
+     */
     private const CART_FUNNELS = [
-        'fluent-cart-order-paid',
-        'fluent-cart-order-refunded',
-        'fluent-cart-subscription-activated',
-        'fluent-cart-subscription-renewed',
-        'fluent-cart-subscription-canceled',
+        'fluent_cart/order_paid_done',
+        'fluent_cart/order_fully_refunded',
+        'fluent_cart/order_status_changed',
+        'fluent_cart/order_status_changed_to_canceled',
+        'fluent_cart/shipping_status_changed_to_shipped',
+        'fluent_cart/shipping_status_changed_to_delivered',
+        'fluent_cart/subscription_activated',
+        'fluent_cart/subscription_renewed',
+        'fluent_cart/subscription_canceled',
+        'fluent_cart/subscription_eot',
+        'fluent_cart/subscription_expired_validity',
     ];
 
     public static function register(): void
@@ -25,39 +40,45 @@ final class FluentCrmSmartCodes
         }
 
         add_filter('fluent_crm/extended_smart_codes', [self::class, 'registerGlobalSmartCodes']);
-        add_filter('fluent_crm_funnel_context_smart_codes', [self::class, 'registerFunnelSmartCodes'], 10, 2);
+        add_filter('fluent_crm_funnel_context_smart_codes', [self::class, 'registerFunnelSmartCodes'], 10, 3);
         add_filter('fluent_crm/smartcode_group_callback_mc_order', [self::class, 'parse'], 10, 4);
     }
 
     /**
-     * @param array<string, mixed> $groups
-     * @return array<string, mixed>
+     * @param array<int|string, mixed> $groups
+     * @return array<int|string, mixed>
      */
     public static function registerGlobalSmartCodes(array $groups): array
     {
-        $groups['mc_order'] = [
-            'title'     => 'Multi-Currency Order',
-            'shortcodes' => self::getSmartCodeDefinitions(),
-        ];
+        $groups[] = self::buildSmartCodeGroup();
 
         return $groups;
     }
 
     /**
-     * @param array<string, mixed> $groups
+     * The filter dispatches three arguments: the group list, the funnel trigger
+     * name and the funnel model. The list must stay a sequential array — the
+     * funnel editor spreads it in JavaScript, and a string key would turn the
+     * JSON payload into an object.
+     *
+     * @param array<int|string, mixed> $groups
+     * @param string|null $triggerName
      * @param object|null $funnel
-     * @return array<string, mixed>
+     * @return array<int|string, mixed>
      */
-    public static function registerFunnelSmartCodes(array $groups, $funnel = null): array
+    public static function registerFunnelSmartCodes(array $groups, $triggerName = null, $funnel = null): array
     {
-        if ($funnel && isset($funnel->trigger_name) && !in_array($funnel->trigger_name, self::CART_FUNNELS, true)) {
+        $trigger = is_string($triggerName) ? $triggerName : '';
+
+        if ($trigger === '' && is_object($funnel) && isset($funnel->trigger_name)) {
+            $trigger = (string) $funnel->trigger_name;
+        }
+
+        if (!in_array($trigger, self::CART_FUNNELS, true)) {
             return $groups;
         }
 
-        $groups['mc_order'] = [
-            'title'     => 'Multi-Currency Order',
-            'shortcodes' => self::getSmartCodeDefinitions(),
-        ];
+        $groups[] = self::buildSmartCodeGroup();
 
         return $groups;
     }
@@ -147,6 +168,19 @@ final class FluentCrmSmartCodes
             default:
                 return $defaultValue;
         }
+    }
+
+    /**
+     * @return array{key: string, title: string, description: string, shortcodes: array<string, string>}
+     */
+    private static function buildSmartCodeGroup(): array
+    {
+        return [
+            'key'         => 'mc_order',
+            'title'       => 'Multi-Currency Order',
+            'description' => 'Currency and exchange rate values captured on the order.',
+            'shortcodes'  => self::getSmartCodeDefinitions(),
+        ];
     }
 
     /**

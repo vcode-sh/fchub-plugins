@@ -78,10 +78,23 @@ final class ContextModule implements ModuleContract
             return;
         }
 
-        (new PersistContextAction(
+        $result = (new PersistContextAction(
             new PreferenceRepository(),
             $optionStore,
         ))->execute($currencyCode);
+
+        // Nothing was stored — a logged-out visitor with cookie persistence disabled. Faking the
+        // cookie for this one request would only show the chosen currency until the next page load,
+        // so report the failure instead of pretending the switch worked.
+        if (!$result->persisted()) {
+            do_action('fchub_mc/context_switch_not_persisted', $currencyCode, get_current_user_id());
+            EventLogger::log('context_switch_not_persisted_noscript', get_current_user_id(), [
+                'currency' => $currencyCode,
+                'source' => 'noscript',
+            ]);
+
+            return;
+        }
 
         $_COOKIE[Constants::COOKIE_KEY] = $currencyCode;
         CurrencyContextService::reset();

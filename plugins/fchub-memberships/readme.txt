@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, memberships, content-restriction, subscriptions, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.4.3
+Stable tag: 1.4.4
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -110,6 +110,14 @@ When reporting a problem, include the WordPress, PHP, FluentCart and FCHub Membe
 4. Membership reports and provider health.
 
 == Changelog ==
+
+= 1.4.4 =
+
+* Fixed the Access Granted email listing an empty bullet instead of the granted resources.
+* Resolved each membership rule to its real title and permalink before the email is sent.
+* Fixed the drip schedule showing a bare dash instead of a readable unlock date.
+* Skipped resources that no longer exist, are unpublished, or are not addressable content.
+* Omitted the resources and drip sections entirely when nothing can be listed.
 
 = 1.4.3 =
 

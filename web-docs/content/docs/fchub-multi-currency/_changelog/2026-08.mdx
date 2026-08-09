@@ -1,0 +1,69 @@
+### v1.4.2
+
+*Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-multi-currency/v1.4.2)
+
+Two bugs, both reported from production, both of the same family: code that was
+confidently wrong and never said so.
+
+#### FluentCRM's automation email editor no longer refuses to open
+
+Reported by @bergy10 in [#74](https://github.com/vcode-sh/fchub-plugins/issues/74), diagnosed down to the line. Opening the email
+block of *any* FluentCRM automation threw `TypeError: (window.fcrm_funnel_context_codes || []) is not iterable`
+and the editor never loaded. Site-wide, not just automations that touch currency.
+
+`registerFunnelSmartCodes()` added its group under a string key. Every other
+contributor appends to the list. One string key among the integers turns the
+array associative, an associative array encodes to a JSON object, and the
+editor spreads that object — which throws. The group is now appended with a
+proper `key`, so the payload stays a JSON array.
+
+#### The trigger guard was guarding nothing
+
+Found while fixing the above. The filter was registered with `accepted_args = 2`
+while FluentCRM dispatches three, so the callback's `$funnel` parameter was
+receiving the trigger *name* instead of the funnel object. Every `isset($funnel->trigger_name)`
+check failed, and the group leaked into every automation on the site — FluentForms
+triggers included.
+
+Worse, the trigger list it was supposed to match had never contained a real
+trigger name. FluentCRM registers FluentCart triggers as hook names —
+`fluent_cart/order_paid_done` — and the constant held dash-style inventions like
+`fluent-cart-order-paid`, which match nothing. The registration now takes three
+arguments and the list holds all eleven genuine FluentCart triggers, each of
+which carries a real order id for the smart codes to resolve against.
+
+<Callout>
+The group used to appear in the smart-code picker for every automation, purely
+by accident. It is now offered only for FluentCart triggers, which is what it
+always claimed to do.
+</Callout>
+
+#### The currency switcher stopped lying to logged-out visitors
+
+Reported by @ManniGH in [#72](https://github.com/vcode-sh/fchub-plugins/issues/72): guests picked a currency, the page reloaded, and
+the default came straight back — while logged-in users were fine.
+
+The cause was **Cookie Persistence set to Disabled**. With no cookie to write
+and no account to write to, the preference went nowhere — and the endpoint
+answered `200 "Currency preference saved."` anyway. The switcher, which never
+looked at the response, reloaded into a reverted page. Two silent failures
+stacked into one baffling symptom.
+
+- The endpoint now returns **409** with `persisted: false` and an explanation when there is nowhere to store the choice, and no longer fires `fchub_mc/context_switched` for a switch that did not happen.
+- The switcher checks the response before reloading. On failure it keeps the page, restores the previous selection and shows the server's message.
+- The no-JS `<noscript>` path stopped faking a cookie it never set.
+- Every response from the context endpoint now carries a stable `code` — `preference_saved`, `persistence_unavailable`, `module_disabled`, `rate_limited`, `invalid_currency` — so integrations branch on the code rather than on message text, which is translated.
+- The Cookie Persistence setting now admits, in the admin, that turning it off leaves logged-out visitors unable to keep a currency.
+
+<Separator className="my-8" />
+
+### v1.4.1
+
+*Prepared 6 August 2026, superseded by 1.4.2 before release*
+
+Never tagged, so nobody received it on its own; its changes ship inside 1.4.2.
+
+- Updates move to WordPress.org.
+- Manual becomes the no-network default, and remote rate providers require explicit configuration.
+- Remote rate requests are bounded, and malformed or oversized responses are rejected without replacing valid rates.
+- Minimum WordPress raised to 7.0, alongside the existing PHP 8.3 requirement.

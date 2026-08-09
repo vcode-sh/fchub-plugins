@@ -139,13 +139,14 @@
     <div class="fchub-mc-row">\
         <div class="setting-html-wrapper">\
             <span class="setting-label">Cookie Persistence</span>\
-            <div class="form-note">Remember visitor currency preference in browser cookies.</div>\
+            <div class="form-note">Remember visitor currency preference in browser cookies. Disable this and logged-out visitors cannot keep a currency choice at all — the switcher reverts to the default display currency on the very next page load, and the switch is reported as failed rather than silently ignored.</div>\
         </div>\
         <div class="setting-fields-inner">\
             <el-radio-group v-model="settings.cookie_enabled">\
                 <el-radio label="Enabled" value="yes" />\
                 <el-radio label="Disabled" value="no" />\
             </el-radio-group>\
+            <div v-if="settings.cookie_enabled !== \'yes\'" class="form-note fchub-mc-form-note--warning">Currency switching is now a logged-in-only feature. Guests will be told their preference could not be saved.</div>\
         </div>\
     </div>\
     <div v-if="settings.cookie_enabled === \'yes\'">\
