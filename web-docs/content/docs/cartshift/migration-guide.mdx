@@ -77,6 +77,20 @@ This is non-negotiable. Before running any migration — even a dry run — crea
   </Step>
 
   <Step>
+    **Map your products (only if FluentCart already has some)**
+
+    If you have already rebuilt part of your catalogue in FluentCart by hand, this is where you say which product is which. Skip this step entirely if FluentCart is empty — the wizard skips it for you.
+
+    Each WooCommerce product gets a row and three choices: **Link** it to the FluentCart product you already made, **Create** a new one, or **Skip** it. Suggestions are grouped by confidence, and each group has a bulk action, so a large catalogue is not one decision per row.
+
+    A linked product is not duplicated, and every order, subscription and coupon that references it follows the link automatically. If one of its variations has no counterpart, CartShift adds that variation to your product and tells you before you continue.
+
+    <Callout>
+    Nothing you built by hand is deleted by a rollback. CartShift only removes what it created — including any variation it added to one of your products.
+    </Callout>
+  </Step>
+
+  <Step>
     **Run a dry run (recommended)**
 
     Before writing any data, run the migration in dry-run mode. Every record is validated, mapped, and logged — but nothing is written to FluentCart.
