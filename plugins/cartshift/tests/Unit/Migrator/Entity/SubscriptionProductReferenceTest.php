@@ -43,6 +43,7 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
     public function testAllItemsPassWhenEveryProductIsMapped(): void
     {
         $this->mapProducts([101, 202, 303]);
+        $this->mapVariations([101, 202, 303]);
 
         $subscription = new \CartShiftTestSubscription(9001, [
             new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee'),
@@ -58,8 +59,13 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
 
     public function testSecondItemWithAnUnmappedProductIsCaught(): void
     {
-        // Only the first product was migrated.
+        // Only the first product was migrated — and its variation with it,
+        // keyed by the product ID, which is what ProductMigrator writes for a
+        // simple product. Without the variation row the first item is what gets
+        // caught, and this test would pass while proving nothing about the
+        // second.
         $this->mapProducts([101]);
+        $this->mapVariations([101]);
 
         $subscription = new \CartShiftTestSubscription(9002, [
             new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee'),
@@ -75,6 +81,7 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
     public function testThirdItemWithAnUnmappedProductIsCaught(): void
     {
         $this->mapProducts([101, 202]);
+        $this->mapVariations([101, 202]);
 
         $subscription = new \CartShiftTestSubscription(9003, [
             new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee'),
@@ -101,6 +108,7 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
     public function testWarningNamesTheOffendingItem(): void
     {
         $this->mapProducts([101]);
+        $this->mapVariations([101]);
 
         $subscription = new \CartShiftTestSubscription(9005, [
             new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee'),
@@ -117,6 +125,7 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
     public function testWarningFallsBackToThePositionWhenTheItemHasNoName(): void
     {
         $this->mapProducts([101]);
+        $this->mapVariations([101]);
 
         $subscription = new \CartShiftTestSubscription(9006, [
             new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee'),
@@ -129,6 +138,68 @@ final class SubscriptionProductReferenceTest extends PluginTestCase
     public function testAnEmptySubscriptionPasses(): void
     {
         $subscription = new \CartShiftTestSubscription(9007, []);
+
+        $this->assertFalse($this->hasMissingReference($subscription));
+    }
+
+    /**
+     * The hole product mapping put weight on.
+     *
+     * The variation check used to be gated on `$wcVariationId > 0`. A simple
+     * product's line item carries no variation ID, so for every subscription to
+     * a simple product the check never ran at all — and a mapped product whose
+     * ENTITY_VARIATION row never landed sailed through into an *active*
+     * subscription with variation_id = null.
+     */
+    public function testASimpleProductWithNoMigratedVariationIsCaught(): void
+    {
+        // The product resolves; the variation, keyed by the same ID, does not.
+        $this->mapProducts([101]);
+
+        $subscription = new \CartShiftTestSubscription(9008, [
+            new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee'),
+        ]);
+
+        $this->assertTrue(
+            $this->hasMissingReference($subscription),
+            'A simple product with no migrated variation has nothing to bill against.',
+        );
+    }
+
+    /**
+     * The message must name the product, because for a simple product there is
+     * no variation ID to name — "Variation ID 0" is not something anybody can
+     * go and look at.
+     */
+    public function testTheSimpleProductWarningNamesTheProductNotVariationZero(): void
+    {
+        $this->mapProducts([101]);
+
+        $subscription = new \CartShiftTestSubscription(9009, [
+            new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee'),
+        ]);
+
+        $message = (string) $this->describeMissing($subscription);
+
+        $this->assertStringContainsString('101', $message);
+        $this->assertStringContainsString('Monthly Coffee', $message);
+        $this->assertStringNotContainsString('Variation ID 0', $message);
+    }
+
+    /**
+     * A mapped simple product resolves its variant under the *product* ID —
+     * MappingPromoter writes exactly that row, and ProductMigrator writes the
+     * same shape for an unmapped one. Detection has to honour the fallback or
+     * it pauses every healthy subscription in the shop.
+     */
+    public function testASimpleProductResolvedThroughTheProductKeyPasses(): void
+    {
+        $this->mapProducts([101]);
+        $this->mapVariations([101]);
+
+        $subscription = new \CartShiftTestSubscription(9010, [
+            new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee'),
+        ]);
 
         $this->assertFalse($this->hasMissingReference($subscription));
     }

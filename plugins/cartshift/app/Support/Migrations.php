@@ -11,7 +11,7 @@ defined('ABSPATH') || exit;
 final class Migrations
 {
     private const string DB_VERSION_OPTION = 'cartshift_db_version';
-    private const string CURRENT_VERSION = '5';
+    private const string CURRENT_VERSION = '6';
 
     /** Unique index guaranteeing one id-map row per (entity_type, wc_id). Superseded by v5. */
     private const string ID_MAP_UNIQUE_INDEX = 'entity_wc_unique';
@@ -29,6 +29,7 @@ final class Migrations
         '3' => 'v3',
         '4' => 'v4',
         '5' => 'v5',
+        '6' => 'v6',
     ];
 
     public static function run(): void
@@ -53,17 +54,25 @@ final class Migrations
         return version_compare($installed, self::CURRENT_VERSION, '<');
     }
 
+    public static function currentVersion(): string
+    {
+        return self::CURRENT_VERSION;
+    }
+
     public static function dropAll(): void
     {
         global $wpdb;
 
-        $idMapTable = $wpdb->prefix . 'cartshift_id_map';
-        $logTable   = $wpdb->prefix . 'cartshift_migration_log';
+        $idMapTable       = $wpdb->prefix . 'cartshift_id_map';
+        $logTable         = $wpdb->prefix . 'cartshift_migration_log';
+        $productMapTable  = $wpdb->prefix . 'cartshift_product_map';
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->query("DROP TABLE IF EXISTS {$idMapTable}");
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->query("DROP TABLE IF EXISTS {$logTable}");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $wpdb->query("DROP TABLE IF EXISTS {$productMapTable}");
 
         delete_option(self::DB_VERSION_OPTION);
         delete_option('cartshift_migration_state');
@@ -341,6 +350,43 @@ final class Migrations
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             $wpdb->query("ALTER TABLE {$idMapTable} DROP INDEX {$legacyIndex}");
         }
+    }
+
+    /**
+     * v6: the product mapping staging table.
+     *
+     * Deliberately not the ID map. A row in the ID map is a fact the migration
+     * resolves against; a row here is an intention the owner is still free to
+     * change. Keeping them apart is what stops a half-finished mapping session
+     * altering the next run, and what stops `reset` — which clears run state —
+     * from destroying decisions that were never part of a run.
+     */
+    private static function v6(): void
+    {
+        global $wpdb;
+
+        $charset = $wpdb->get_charset_collate();
+        $table   = $wpdb->prefix . 'cartshift_product_map';
+
+        $sql = "CREATE TABLE {$table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            wc_id BIGINT UNSIGNED NOT NULL,
+            wc_type VARCHAR(20) NOT NULL DEFAULT '',
+            decision VARCHAR(10) NOT NULL,
+            fc_post_id BIGINT UNSIGNED NULL,
+            band VARCHAR(10) NOT NULL DEFAULT 'none',
+            variant_map LONGTEXT NULL,
+            decided_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY wc_product_unique (wc_id),
+            KEY decision_lookup (decision)
+        ) {$charset};";
+
+        if (!function_exists('dbDelta')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        dbDelta($sql);
     }
 
     /**

@@ -26,6 +26,32 @@ final class Constants
     public const string ENTITY_ATTRIBUTE_TERM = 'attribute_term';
     public const string ENTITY_SHIPPING_CLASS = 'shipping_class';
 
+    /**
+     * FluentCart's product custom post type.
+     *
+     * Verified against the installed plugin's app/CPT/FluentProducts.php::
+     * CPT_NAME. 'fc_product' is not a value FluentCart has ever registered or
+     * written — a query filtered on it returns zero rows every time. Kept
+     * here as the single source of truth after that exact mistake shipped
+     * once already (MappingController's candidate query, PreflightController's
+     * fc_product_count, and MappingPromoter's existence check all used to
+     * carry their own copy of this literal).
+     */
+    public const string FC_PRODUCT_POST_TYPE = 'fluent-products';
+
+    /**
+     * `fct_product_details.variation_type` for an attribute-driven product.
+     *
+     * FluentCart's Helper::PRODUCT_TYPE_ADVANCE_VARIATION. Named here because
+     * two places have to agree about it and they are not near each other: the
+     * mapping screen keeps such products out of the candidate list, and the
+     * orphan-variant creator refuses to write into one if a decision reaches it
+     * anyway. Both exist because FluentCart regenerates an advanced product's
+     * variants from scratch on every combination save and deletes anything not
+     * in the new cartesian.
+     */
+    public const string FC_ADVANCED_VARIATIONS = 'advanced_variations';
+
     public const int DEFAULT_BATCH_SIZE = 50;
 
     /** Dependency-safe deletion sequence for rollback */

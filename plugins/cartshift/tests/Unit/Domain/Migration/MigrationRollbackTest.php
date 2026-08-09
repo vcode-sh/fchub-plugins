@@ -9,6 +9,9 @@ use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
 use CartShift\Tests\Unit\PluginTestCase;
+use FluentCart\App\Models\ProductVariation;
+
+require_once dirname(__DIR__, 3) . '/stubs/FluentCartModelStubs.php';
 
 final class MigrationRollbackTest extends PluginTestCase
 {
@@ -305,8 +308,174 @@ final class MigrationRollbackTest extends PluginTestCase
     }
 
     // ──────────────────────────────────────────────
+    // Price range on products that survive the rollback
+    // ──────────────────────────────────────────────
+    //
+    // The one way rollback used to leave a hand-built product different from
+    // how it found it. MappingPromoter adds orphan variants inside the owner's
+    // own product and recomputes fct_product_details.min_price/max_price to
+    // take them in; rollback deleted those variants and left the widened range
+    // behind. Reproduced live: a five-variant product priced 1100–1230 took
+    // three migrated variants at 7900, was correctly recomputed to 1100–7900,
+    // and after rollback still advertised "up to £79.00" with nothing dearer
+    // than £12.30 left to buy.
+
+    /**
+     * The range must follow the variants that are still there.
+     */
+    public function testTheRangeOfASurvivingProductFollowsItsRemainingVariants(): void
+    {
+        $detail = $this->seedLinkedProduct();
+        $this->seedSurvivingVariant(1100.0);
+        $this->seedSurvivingVariant(1230.0);
+
+        $this->rollbackDeletingVariantsFrom([900, 901, 902], productWasCreated: false);
+
+        $this->assertSame(1100.0, $detail->min_price);
+        $this->assertSame(
+            1230.0,
+            $detail->max_price,
+            'The dearest surviving variant is 1230; 7900 was the migrated one rollback just deleted.',
+        );
+        $this->assertContains(
+            $detail,
+            $GLOBALS['_cartshift_test_fc_saved'] ?? [],
+            'Mutating the row in memory corrects nothing — it has to be written back.',
+        );
+    }
+
+    /**
+     * Stock availability is refreshed alongside the range, because the add path
+     * refreshes both and the two must not drift apart.
+     */
+    public function testStockAvailabilityIsRefreshedAlongsideTheRange(): void
+    {
+        $detail = $this->seedLinkedProduct(['manage_stock' => 1, 'stock_availability' => 'in-stock']);
+        $this->seedSurvivingVariant(1100.0, 'out-of-stock');
+
+        $this->rollbackDeletingVariantsFrom([900], productWasCreated: false);
+
+        $this->assertSame('out-of-stock', $detail->stock_availability);
+    }
+
+    /**
+     * A product CartShift created is deleted a few lines later, so recomputing
+     * a price range for it is work done on a corpse — and the ID map is what
+     * tells the two apart.
+     */
+    public function testAProductTheMigrationCreatedIsNotRecomputed(): void
+    {
+        $detail = $this->seedLinkedProduct();
+        $this->seedSurvivingVariant(1100.0);
+
+        $this->rollbackDeletingVariantsFrom([900, 901, 902], productWasCreated: true);
+
+        $this->assertSame(7900.0, $detail->max_price, 'Nothing should have touched a product about to be deleted.');
+        $this->assertSame([], $GLOBALS['_cartshift_test_fc_saved'] ?? []);
+    }
+
+    /**
+     * The parent lookup reads `post_id` off the variation rows themselves, so it
+     * has to happen before the deletion loop destroys them.
+     */
+    public function testTheParentProductIsLookedUpBeforeTheVariantsAreDeleted(): void
+    {
+        $this->seedLinkedProduct();
+        $this->seedSurvivingVariant(1100.0);
+
+        $this->rollbackDeletingVariantsFrom([900], productWasCreated: false);
+
+        $lookupIndex = null;
+        $deleteIndex = null;
+
+        foreach (array_values($GLOBALS['_cartshift_test_queries'] ?? []) as $i => $entry) {
+            if ($lookupIndex === null && $entry[0] === 'get_col' && str_contains($entry[1], 'fct_product_variations')) {
+                $lookupIndex = $i;
+            }
+
+            if ($deleteIndex === null && $entry[0] === 'delete' && str_contains($entry[1], 'fct_product_variations')) {
+                $deleteIndex = $i;
+            }
+        }
+
+        $this->assertNotNull($lookupIndex, 'Expected a parent-product lookup against fct_product_variations.');
+        $this->assertNotNull($deleteIndex, 'Expected the variation rows to be deleted.');
+        $this->assertLessThan($deleteIndex, $lookupIndex);
+    }
+
+    // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────
+
+    /**
+     * The owner's hand-built product, as the migration left it: a range widened
+     * to 7900 by the variants CartShift added inside it.
+     */
+    private function seedLinkedProduct(array $overrides = []): object
+    {
+        \CartShiftFcModelStore::install();
+
+        return \CartShiftFcModelStore::seed('ProductDetail', array_merge([
+            'id'                 => 1,
+            'post_id'            => 40,
+            'variation_type'     => 'simple_variations',
+            'min_price'          => 1100.0,
+            'max_price'          => 7900.0,
+            'manage_stock'       => 0,
+            'stock_availability' => 'in-stock',
+        ], $overrides));
+    }
+
+    /**
+     * A variant of that product that rollback does not touch.
+     *
+     * Created rather than seeded because the fake's aggregates read created
+     * rows — which is the right model here: the recompute runs after the
+     * deletes, so what it sees is precisely what survived them.
+     */
+    private function seedSurvivingVariant(float $price, string $stockStatus = 'in-stock'): void
+    {
+        ProductVariation::query()->create([
+            'post_id'      => 40,
+            'item_price'   => $price,
+            'stock_status' => $stockStatus,
+        ]);
+    }
+
+    /**
+     * Roll back a run that created `$fcVariationIds` inside product 40.
+     *
+     * `$productWasCreated` is the only difference between the owner's product
+     * and one of CartShift's: a created product has its own
+     * created_by_migration row in the ID map, a linked one does not.
+     *
+     * @param int[] $fcVariationIds
+     */
+    private function rollbackDeletingVariantsFrom(array $fcVariationIds, bool $productWasCreated): void
+    {
+        $GLOBALS['_cartshift_test_get_results_callback'] =
+            static function (string $query) use ($fcVariationIds, $productWasCreated): array {
+                if (str_contains($query, "entity_type = '" . Constants::ENTITY_VARIATION . "'")) {
+                    return array_map(
+                        static fn (int $fcId): object => (object) ['wc_id' => (string) $fcId, 'fc_id' => $fcId],
+                        $fcVariationIds,
+                    );
+                }
+
+                if ($productWasCreated && str_contains($query, "entity_type = '" . Constants::ENTITY_PRODUCT . "'")) {
+                    return [(object) ['wc_id' => '7', 'fc_id' => 40]];
+                }
+
+                return [];
+            };
+
+        // What `SELECT DISTINCT post_id ... WHERE id IN (…)` answers: every one
+        // of those variants belongs to product 40.
+        $GLOBALS['_cartshift_test_get_col_callback'] = static fn (string $query): array
+            => str_contains($query, 'fct_product_variations') ? ['40'] : [];
+
+        $this->rollback->rollback('test-rollback-price-range');
+    }
 
     /**
      * Make the id-map return the given FC ids for exactly one entity type.

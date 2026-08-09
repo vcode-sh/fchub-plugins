@@ -347,7 +347,13 @@ final class CouponMapper
         foreach ($wcProductIds as $wcProductId) {
             foreach ($this->variationWcIdsForProduct($wcProductId) as $variationWcId) {
                 $fcId = $this->idMap->getFcId(Constants::ENTITY_VARIATION, (string) $variationWcId);
-                if ($fcId !== null) {
+
+                // `> 0`, not merely `!== null`. A zero would be written straight
+                // into `included_products`, and DiscountService compares that
+                // list against each cart item's `object_id` — which is 0 on
+                // every fee line CartShift writes. A coupon restricted to three
+                // clearance items would start discounting surcharges.
+                if ($fcId !== null && $fcId > 0) {
                     $fcIds[] = $fcId;
                 }
             }
@@ -357,14 +363,31 @@ final class CouponMapper
     }
 
     /**
-     * The WC variation IDs belonging to one WC product.
+     * Every key one WC product's FluentCart variations could have been stored
+     * under.
      *
-     * A variable product's children are its variations, and ProductMigrator
-     * stores each one under `Constants::ENTITY_VARIATION` keyed by the
-     * variation's own WC ID (ProductMigrator.php:906). A simple product has no
-     * children — CartShift migrates it as a single FluentCart variation keyed
-     * by the *product's* WC ID instead (ProductMigrator.php:866) — so for a
-     * simple product the product ID doubles as its own variation lookup key.
+     * A union, not a choice, and that is the fix rather than an accident.
+     * ProductMigrator stores a variable product's variations under each
+     * variation's own WC ID and a simple product's single variation under the
+     * *product's* WC ID — so which key applies depends on how CartShift decided
+     * to treat the product, and re-deriving that decision from WooCommerce here
+     * is how the two came to disagree.
+     *
+     * They disagree for exactly one type. `variable-subscription` has children,
+     * so this used to return them and only them; but every site that asks tests
+     * `get_type() === 'variable'` (ProductMapper, ProductMigrator,
+     * MappingController), so such a product is migrated — and promoted — as a
+     * *simple* one, keyed by the product ID. The children resolved to nothing.
+     * For `included_products` that is noisy but safe: guardAgainstWidening()
+     * disables the coupon. For `excluded_products` nothing catches it at all,
+     * because WIDENING_ON_TOTAL_LOSS deliberately omits that key on the
+     * reasoning that an unresolvable product is not in FluentCart to be
+     * discounted — true for a product that failed to migrate, and false for one
+     * that migrated perfectly well under a key this method did not ask about.
+     * The coupon then discounts a product the shop explicitly excluded.
+     *
+     * Asking for both keys costs one extra lookup per product and cannot widen
+     * anything: a key nothing was stored under simply resolves to nothing.
      *
      * @return list<int>
      */
@@ -378,13 +401,14 @@ final class CouponMapper
         $ids     = [$wcProductId];
 
         if ($product instanceof \WC_Product) {
-            $children = array_values(array_map(intval(...), $product->get_children()));
-            if ($children !== []) {
-                $ids = $children;
+            foreach ($product->get_children() as $childId) {
+                $ids[] = (int) $childId;
             }
         }
 
-        return $this->variationIdsByProduct[$wcProductId] = $ids;
+        return $this->variationIdsByProduct[$wcProductId] = array_values(array_unique(
+            array_filter($ids, static fn (int $id): bool => $id > 0),
+        ));
     }
 
     /**

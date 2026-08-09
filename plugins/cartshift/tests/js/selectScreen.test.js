@@ -41,6 +41,7 @@ function context(overrides = {}) {
     refreshPreview: vi.fn(),
     applyRemedy: vi.fn(),
     startMigration: vi.fn(),
+    advanceFromSelect: vi.fn(),
     goToScreen: vi.fn(),
     toggleEntity: vi.fn(),
   };
@@ -251,6 +252,22 @@ describe('SelectScreen', () => {
     await wrapper.findAll('button').find((b) => b.text() === 'Back').trigger('click');
 
     expect(ctx.actions.goToScreen).toHaveBeenCalledWith('preflight');
+  });
+
+  // The primary button used to call startMigration() directly. It now routes
+  // through advanceFromSelect(), which decides whether the wizard needs the
+  // mapping step first — a virgin FluentCart install skips straight to
+  // startMigration() from inside that action, a store with existing products
+  // goes to 'map'. Either way, this button itself must never call
+  // startMigration() directly again, or that routing decision is bypassed.
+  it('the primary button routes through advanceFromSelect, not startMigration directly', async () => {
+    const ctx = context();
+    const wrapper = mountScreen(ctx);
+
+    await wrapper.findAll('button').find((b) => b.text() === 'Start migration').trigger('click');
+
+    expect(ctx.actions.advanceFromSelect).toHaveBeenCalledTimes(1);
+    expect(ctx.actions.startMigration).not.toHaveBeenCalled();
   });
 
   it('surfaces the 422 scope-too-large refusal instead of failing silently', () => {

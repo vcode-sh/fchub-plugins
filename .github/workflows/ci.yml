@@ -59,6 +59,12 @@ jobs:
     strategy:
       matrix:
         include:
+          - plugin: cartshift
+            php_version: '8.4'
+            fetch_depth: 0
+          - plugin: cartshift
+            php_version: '8.5'
+            fetch_depth: 0
           - plugin: fchub-fakturownia
             php_version: '8.4'
             fetch_depth: 0
@@ -181,6 +187,82 @@ jobs:
             dist/${{ matrix.plugin }}-*.zip
             dist/${{ matrix.plugin }}-*.inspection.json
           if-no-files-found: warn
+
+  vite-build-cartshift:
+    name: Vite Build (cartshift)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Depth 0 for the same reason as every other job here: `Check for
+          # changes` diffs against the pull request base, which a depth-1
+          # checkout does not contain, so the count comes back zero and the job
+          # reports green having run nothing.
+          fetch-depth: 0
+
+      - name: Check for changes
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/cartshift/ | wc -l)
+          echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.count > 0
+        uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: 'npm'
+          cache-dependency-path: plugins/cartshift/package-lock.json
+
+      - name: Install dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/cartshift
+        run: npm ci
+
+      - name: Audit JavaScript dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/cartshift
+        run: npm audit --audit-level=high
+
+      - name: Run JavaScript tests
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/cartshift
+        run: npm test
+
+      - name: Build production assets
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/cartshift
+        run: npm run build
+
+      - name: Validate build output
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/cartshift
+        run: |
+          if [ ! -d "resources/admin/dist" ] || [ -z "$(ls -A resources/admin/dist)" ]; then
+            echo "::error::Build produced no output in resources/admin/dist/"
+            exit 1
+          fi
+
+          JS_COUNT=$(find resources/admin/dist -name "*.js" | wc -l)
+          if [ "$JS_COUNT" -eq 0 ]; then
+            echo "::error::No JS files found in resources/admin/dist/"
+            exit 1
+          fi
+
+          echo "Build validation passed: $JS_COUNT JS file(s) in resources/admin/dist/"
+
+      - name: Check the committed bundle matches the source
+        if: steps.changes.outputs.count > 0
+        run: |
+          # The bundle is committed, and the admin loads the committed copy —
+          # so a source change that never got rebuilt ships stale UI while every
+          # test passes against source the user never sees.
+          if [ -n "$(git status --porcelain -- plugins/cartshift/resources/admin/dist)" ]; then
+            echo "::error::resources/admin/dist/ is out of date — run 'npm run build' and commit the result."
+            git status --porcelain -- plugins/cartshift/resources/admin/dist
+            exit 1
+          fi
 
   vite-build-memberships:
     name: Vite Build (fchub-memberships)

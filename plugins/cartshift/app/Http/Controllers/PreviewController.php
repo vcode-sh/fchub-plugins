@@ -7,17 +7,10 @@ namespace CartShift\Http\Controllers;
 defined('ABSPATH') || exit;
 
 use CartShift\Core\Container;
+use CartShift\Domain\Migration\MigrationOrchestratorFactory;
 use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Domain\Scope\ScopePreview;
 use CartShift\Domain\Scope\ScopeResolver;
-use CartShift\Migrator\CouponMigrator;
-use CartShift\Migrator\CustomerMigrator;
-use CartShift\Migrator\OrderMigrator;
-use CartShift\Migrator\ProductMigrator;
-use CartShift\Migrator\SubscriptionMigrator;
-use CartShift\State\MigrationState;
-use CartShift\Storage\IdMapRepository;
-use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\ProductTypes;
 use CartShift\Support\WooStorage;
@@ -108,22 +101,14 @@ final class PreviewController
 
         $entityTypes = $this->resolveEntityTypes($request->get_param('entity_types'));
 
-        /** @var IdMapRepository $idMap */
-        $idMap = $this->container->get(IdMapRepository::class);
-        /** @var MigrationLogRepository $log */
-        $log = $this->container->get(MigrationLogRepository::class);
-        /** @var MigrationState $state */
-        $state = $this->container->get(MigrationState::class);
+        /** @var MigrationOrchestratorFactory $factory */
+        $factory = $this->container->get(MigrationOrchestratorFactory::class);
 
-        $migrators = [
-            new ProductMigrator($idMap, $log, $state),
-            new CustomerMigrator($idMap, $log, $state),
-            new CouponMigrator($idMap, $log, $state),
-            new OrderMigrator($idMap, $log, $state),
-            new SubscriptionMigrator($idMap, $log, $state),
-        ];
-
-        $preview = new ScopePreview($migrators, $resolver);
+        // migratorsForCounting(), not forRun(): this endpoint must stay
+        // read-only, so nothing is promoted. What it does inherit is the skip
+        // list, because a receipt that counts products the run will exclude is
+        // a receipt for a run nobody asked for.
+        $preview = new ScopePreview($factory->migratorsForCounting(), $resolver);
 
         return new WP_REST_Response(['data' => $preview->build($entityTypes)]);
     }

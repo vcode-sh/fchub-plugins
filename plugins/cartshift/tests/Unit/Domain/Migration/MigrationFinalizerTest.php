@@ -6,6 +6,7 @@ namespace CartShift\Tests\Unit\Domain\Migration;
 
 use CartShift\Domain\Migration\MigrationFinalizer;
 use CartShift\Storage\IdMapRepository;
+use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
 use CartShift\Tests\Unit\PluginTestCase;
 
@@ -23,7 +24,7 @@ final class MigrationFinalizerTest extends PluginTestCase
         $GLOBALS['_cartshift_test_cache_flush_runtime_calls'] = 0;
 
         $this->idMap = new IdMapRepository();
-        $this->finalizer = new MigrationFinalizer($this->idMap);
+        $this->finalizer = new MigrationFinalizer($this->idMap, new MigrationLogRepository());
     }
 
     protected function tearDown(): void

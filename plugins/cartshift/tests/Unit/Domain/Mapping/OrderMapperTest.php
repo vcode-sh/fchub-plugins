@@ -721,6 +721,140 @@ final class OrderMapperTest extends PluginTestCase
         $this->assertArrayNotHasKey('nip', $shipping['meta']['other_data'] ?? []);
     }
 
+    // ──────────────────────────────────────────────
+    // A line item that found its product but not its variant
+    // ──────────────────────────────────────────────
+
+    /**
+     * `object_id` falls back to 0, and that used to be completely silent — the
+     * only warning in mapItems() fired on a missing *product*. FluentCart's
+     * product reporting groups by `object_id` (ProductReportService), so a
+     * zeroed line disappears from per-variant sales while the order detail page
+     * goes on showing the right name and the right money.
+     */
+    public function testAnItemWhoseProductResolvesButVariationDoesNotIsWarnedAbout(): void
+    {
+        $this->resolveOnly(['product' => [101]]);
+
+        $result = $this->mapper->map($this->orderWithItem(101, 0, 'Koszulka WordPress Developer'));
+
+        $this->assertSame(0, $result['items'][0]['object_id'], 'The zeroed line is the thing being warned about.');
+        $this->assertSame(
+            [\CartShift\Support\Enums\MigrationErrorCode::VariationLinkMissing],
+            array_column($this->mapper->getCodedWarnings(), 'code'),
+        );
+    }
+
+    /**
+     * The live playground data that reaches this: Woo order 119 carries two
+     * `Koszulka WordPress Developer` lines with `_variation_id = 0` on a
+     * *variable* product, so the variation lookup has nothing to key on and the
+     * product-ID fallback misses too (a variable product's map is keyed by
+     * variation).
+     */
+    public function testTheWarningNamesTheProductWhenTheLineCarriesNoVariationId(): void
+    {
+        $this->resolveOnly(['product' => [101]]);
+
+        $this->mapper->map($this->orderWithItem(101, 0, 'Koszulka WordPress Developer'));
+
+        $message = $this->mapper->getWarnings()[0];
+
+        $this->assertStringContainsString('Koszulka WordPress Developer', $message);
+        $this->assertStringContainsString('WC product 101', $message);
+        $this->assertStringNotContainsString('WC variation 0', $message, 'Variation 0 is not something to go and look at.');
+    }
+
+    public function testTheWarningNamesTheVariationWhenTheLineHasOne(): void
+    {
+        $this->resolveOnly(['product' => [101]]);
+
+        $this->mapper->map($this->orderWithItem(101, 105, 'Koszulka — XL'));
+
+        $this->assertStringContainsString('WC variation 105', $this->mapper->getWarnings()[0]);
+    }
+
+    public function testAFullyResolvedItemWarnsAboutNothing(): void
+    {
+        $this->resolveOnly(['product' => [101], 'variation' => [101]]);
+
+        $this->mapper->map($this->orderWithItem(101, 0, 'Kurs WordPress'));
+
+        $this->assertSame([], $this->mapper->getCodedWarnings());
+    }
+
+    /**
+     * An item whose product did not resolve either already has its own warning,
+     * and a second one saying the variant is missing too would be noise — the
+     * fix is the same fix.
+     */
+    public function testAnItemWithNoProductAtAllRaisesOnlyTheProductWarning(): void
+    {
+        $this->resolveOnly([]);
+
+        $this->mapper->map($this->orderWithItem(101, 0, 'Retired thing'));
+
+        $this->assertSame(
+            [\CartShift\Support\Enums\MigrationErrorCode::ProductLinkMissing],
+            array_column($this->mapper->getCodedWarnings(), 'code'),
+        );
+    }
+
+    /**
+     * Fee lines are written with post_id = 0 and object_id = 0 by design —
+     * they are not products and never were. Warning about them would put a
+     * false positive on every order carrying a surcharge.
+     */
+    public function testFeeLinesAreNotWarnedAbout(): void
+    {
+        $this->resolveOnly(['product' => [101], 'variation' => [101]]);
+
+        $order = $this->orderWithItem(101, 0, 'Kurs WordPress');
+
+        $fee = new \WC_Order_Item_Fee();
+        $ref = new \ReflectionClass(\WC_Order::class);
+        $ref->getProperty('fee_items')->setValue($order, [$fee]);
+
+        $this->mapper->map($order);
+
+        $this->assertSame([], $this->mapper->getCodedWarnings());
+    }
+
+    /**
+     * Teach the ID map which keys resolve, and only those.
+     *
+     * @param array<string, list<int>> $byEntity entity type => WooCommerce IDs
+     */
+    private function resolveOnly(array $byEntity): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use ($byEntity): int|null {
+            if (preg_match("/entity_type = '([^']*)' AND wc_id = '([^']*)'/", $query, $matches) !== 1) {
+                return null;
+            }
+
+            return in_array((int) $matches[2], $byEntity[$matches[1]] ?? [], true)
+                ? (int) $matches[2] + 10_000
+                : null;
+        };
+    }
+
+    private function orderWithItem(int $productId, int $variationId, string $name): \WC_Order
+    {
+        return $this->createOrder([
+            'id'     => 119,
+            'status' => 'completed',
+            'total'  => '50.00',
+            'items'  => [$this->createOrderItem([
+                'product_id'   => $productId,
+                'variation_id' => $variationId,
+                'name'         => $name,
+                'quantity'     => 1,
+                'subtotal'     => '50.00',
+                'total'        => '50.00',
+            ])],
+        ]);
+    }
+
     /**
      * The billing address out of a mapped order.
      *

@@ -149,6 +149,59 @@ final class MigrationLogRepository
     }
 
     /**
+     * Turn a `$wpdb` write that MySQL rejected into a log row. Call it straight
+     * after the write, before any other query runs.
+     *
+     * FluentCart's models throw and are caught per record by
+     * MigrationOrchestrator::processBatch(). `$wpdb` does neither: it stores the
+     * failure in `$wpdb->last_error`, returns false, and carries on. Every place
+     * CartShift writes through `$wpdb` directly was therefore free to fail in
+     * total silence — a real run emitted ten `Unknown column 'item_count'` lines
+     * to the PHP error log and finished with "Success: Migration complete. 25
+     * migrated, 2 skipped", zero errors.
+     *
+     * Immediacy is the whole contract. `wpdb::query()` calls `flush()`, which
+     * blanks `last_error` (wp-includes/class-wpdb.php), so the value belongs to
+     * the last statement and nothing else — read it one query too late and it
+     * says the wrong thing. That is also why this reads before it writes: the
+     * insert below would clear the error it is reporting.
+     *
+     * The MySQL error goes into the message verbatim. It is the only part that
+     * names the column or the constraint, and a shop owner forwarding it is
+     * worth more than any sentence this plugin could compose about it.
+     *
+     * @param  string $operation What was being written, in the owner's terms —
+     *                           "order payment status", not "UPDATE fct_orders".
+     * @return bool              True when a failure was found and recorded.
+     */
+    public function recordWriteFailure(
+        string $migrationId,
+        string $entityType,
+        string|int $wcId,
+        string $operation,
+    ): bool {
+        global $wpdb;
+
+        $error = trim((string) ($wpdb->last_error ?? ''));
+
+        if ($error === '') {
+            return false;
+        }
+
+        $this->write(
+            $migrationId,
+            $entityType,
+            $wcId,
+            'error',
+            sprintf('Could not write %s: %s', $operation, $error),
+            null,
+            MigrationErrorCode::DatabaseWriteFailed,
+        );
+
+        return true;
+    }
+
+    /**
      * Get paginated log entries with optional filters, newest first.
      *
      * Ordered by `id`, not `created_at`. created_at is a DATETIME with one-second
@@ -468,6 +521,82 @@ final class MigrationLogRepository
         ));
 
         return $found !== null && (int) $found > 0;
+    }
+
+    /**
+     * Whether a row already exists for this exact (migration_id, entity_type,
+     * wc_id, error_code) combination.
+     *
+     * Built for a caller that runs more than once per migration and must log
+     * a given fact only the first time it observes it — MappingPromoter's
+     * dead-link check is the first such caller: it re-enters on every batch
+     * tick of a resumed run and keeps reporting the same dead ids each time,
+     * on purpose (promotion itself has nothing to compare against). Without
+     * this check the caller would write a fresh warning row per tick, which
+     * inflates getStats()'s warning count and the code breakdown for what is
+     * really a handful of distinct problems — the list-disagrees-with-summary
+     * failure CODE_COLUMN exists to prevent.
+     *
+     * The code is required, not optional: `wc_id` on this table sometimes
+     * holds an id from a different universe than a WooCommerce object id
+     * (MappedFcProductMissing stores a FluentCart post id there), so a bare
+     * (migration_id, entity_type, wc_id) match could collide with an
+     * unrelated row that happens to share the same numeric value under the
+     * same entity type. Filtering on the indexed error_code column too keeps
+     * the check specific to the one fact being deduplicated.
+     */
+    public function hasEntryFor(
+        string $migrationId,
+        string $entityType,
+        string $wcId,
+        MigrationErrorCode|string $code,
+    ): bool {
+        global $wpdb;
+
+        $found = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$this->table}
+             WHERE migration_id = %s AND entity_type = %s AND wc_id = %s AND " . self::CODE_COLUMN . ' = %s
+             LIMIT 1',
+            $migrationId,
+            $entityType,
+            $wcId,
+            $this->codeValue($code),
+        ));
+
+        return $found !== null && (int) $found > 0;
+    }
+
+    /**
+     * How many error rows this run has written for one entity type.
+     *
+     * The number a reader would give if you sat them in front of the log and
+     * asked how many things went wrong, which is the whole reason it exists.
+     * MigrationOrchestrator::processBatch() counts an error when a record
+     * *throws*, and for a long time that was the only kind there was. It is not:
+     * a `$wpdb` write MySQL refuses does not throw, so a run could write ten
+     * error rows and still report "0 errors — Success". That mismatch is what
+     * hid `fct_orders.item_count` for the life of the feature.
+     *
+     * Exactly `status = 'error'`, and deliberately without a `$status`
+     * parameter. Warnings are a separate, softer thing — a subscription paused
+     * because its product is missing is not a failure — and a method that can be
+     * asked for either is one that will eventually be asked for both and quietly
+     * reclassify half the log. RetryPanel already reads the two apart via
+     * getStats(); nothing needs this one to blur them.
+     *
+     * Served by the `migration_entity (migration_id, entity_type)` index, and
+     * called once per batch rather than once per record.
+     */
+    public function countErrors(string $migrationId, string $entityType): int
+    {
+        global $wpdb;
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->table}
+             WHERE migration_id = %s AND entity_type = %s AND status = 'error'",
+            $migrationId,
+            $entityType,
+        ));
     }
 
     /**

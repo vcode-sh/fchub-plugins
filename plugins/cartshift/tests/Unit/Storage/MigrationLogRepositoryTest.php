@@ -984,6 +984,186 @@ final class MigrationLogRepositoryTest extends PluginTestCase
         $this->assertSame([], $GLOBALS['_cartshift_test_queries']);
     }
 
+    // ── hasEntryFor ────────────────────────────────────────
+
+    public function testHasEntryForIsFalseWhenNothingWasWritten(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): ?string => null;
+
+        $this->assertFalse($this->log->hasEntryFor('m', 'product', '900', MigrationErrorCode::MappedFcProductMissing));
+    }
+
+    public function testHasEntryForIsTrueWhenAMatchingRowExists(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): string => '5';
+
+        $this->assertTrue($this->log->hasEntryFor('m', 'product', '900', MigrationErrorCode::MappedFcProductMissing));
+    }
+
+    /**
+     * The WHERE clause is the whole point of this method — it has to name
+     * all four columns, not just migration_id and wc_id, or a coincidental
+     * id shared with an unrelated warning would look like a duplicate.
+     */
+    public function testHasEntryForQueriesAllFourColumns(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): ?string => null;
+
+        $this->log->hasEntryFor('run-1', 'product', '900', MigrationErrorCode::MappedFcProductMissing);
+
+        $sql = $this->findGetVarContaining('cartshift_migration_log');
+
+        $this->assertStringContainsString("migration_id = 'run-1'", $sql);
+        $this->assertStringContainsString("entity_type = 'product'", $sql);
+        $this->assertStringContainsString("wc_id = '900'", $sql);
+        $this->assertStringContainsString("error_code = 'mapped_fc_product_missing'", $sql);
+    }
+
+    public function testHasEntryForAcceptsABareCodeString(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): string => '1';
+
+        $this->assertTrue($this->log->hasEntryFor('m', 'product', '900', 'mapped_fc_product_missing'));
+    }
+
+    /**
+     * A round trip through the real insert/select path, not a canned return
+     * value: write() the row for real, then confirm hasEntryFor() finds it
+     * by searching the same fake table rather than being told the answer.
+     */
+    public function testHasEntryForFindsARowWriteActuallyWrote(): void
+    {
+        $rows = [];
+
+        $GLOBALS['_cartshift_test_insert_callback'] = static function (string $table, array $data) use (&$rows): int {
+            if (str_contains($table, 'cartshift_migration_log')) {
+                $rows[] = $data;
+            }
+
+            return 1;
+        };
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use (&$rows): ?string {
+            preg_match(
+                "/migration_id = '([^']*)' AND entity_type = '([^']*)' AND wc_id = '([^']*)' AND error_code = '([^']*)'/",
+                $query,
+                $m,
+            );
+
+            if ($m === []) {
+                return null;
+            }
+
+            foreach ($rows as $index => $row) {
+                if (
+                    $row['migration_id'] === $m[1]
+                    && $row['entity_type'] === $m[2]
+                    && $row['wc_id'] === $m[3]
+                    && $row['error_code'] === $m[4]
+                ) {
+                    return (string) ($index + 1);
+                }
+            }
+
+            return null;
+        };
+
+        $this->assertFalse(
+            $this->log->hasEntryFor('run-1', 'product', '900', MigrationErrorCode::MappedFcProductMissing),
+            'Nothing written yet.',
+        );
+
+        $this->log->write(
+            'run-1',
+            'product',
+            '900',
+            'warning',
+            'Mapped FluentCart product 900 no longer exists.',
+            null,
+            MigrationErrorCode::MappedFcProductMissing,
+        );
+
+        $this->assertTrue($this->log->hasEntryFor('run-1', 'product', '900', MigrationErrorCode::MappedFcProductMissing));
+        $this->assertFalse(
+            $this->log->hasEntryFor('run-1', 'product', '901', MigrationErrorCode::MappedFcProductMissing),
+            'A different wc_id must not match.',
+        );
+        $this->assertFalse(
+            $this->log->hasEntryFor('run-2', 'product', '900', MigrationErrorCode::MappedFcProductMissing),
+            'A different migration_id must not match.',
+        );
+    }
+
+    // ── recordWriteFailure ─────────────────────────────────
+    //
+    // `$wpdb` does not throw. It puts the failure in last_error, returns false,
+    // and lets the caller believe the write landed — which is how a live run
+    // wrote a non-existent column for every one of twenty-five orders and still
+    // reported zero errors.
+
+    public function testAWriteTheDatabaseAcceptedRecordsNothing(): void
+    {
+        $GLOBALS['wpdb']->last_error = '';
+
+        $this->assertFalse($this->log->recordWriteFailure('run-1', 'order', '99', 'the payment status'));
+        $this->assertSame([], $this->recordedInserts(), 'A quiet success is not an event.');
+    }
+
+    public function testARefusedWriteBecomesACodedErrorRow(): void
+    {
+        $GLOBALS['wpdb']->last_error = "Unknown column 'item_count' in 'SET'";
+
+        $this->assertTrue($this->log->recordWriteFailure('run-1', 'order', '99', 'the item count'));
+
+        $rows = $this->recordedInserts();
+        $this->assertCount(1, $rows);
+
+        $this->assertSame('run-1', $rows[0]['migration_id']);
+        $this->assertSame('order', $rows[0]['entity_type']);
+        $this->assertSame('99', $rows[0]['wc_id']);
+        $this->assertSame(
+            'error',
+            $rows[0]['status'],
+            'Anything softer and the run still reports itself as clean.',
+        );
+        $this->assertSame(MigrationErrorCode::DatabaseWriteFailed->value, $rows[0][MigrationLogRepository::CODE_COLUMN]);
+    }
+
+    /**
+     * The MySQL text is the only part that names the column or the constraint,
+     * so it is passed through rather than summarised.
+     */
+    public function testTheMysqlErrorSurvivesVerbatim(): void
+    {
+        $GLOBALS['wpdb']->last_error = "Unknown column 'item_count' in 'SET'";
+
+        $this->log->recordWriteFailure('run-1', 'order', '99', 'the item count');
+
+        $message = (string) $this->recordedInserts()[0]['message'];
+
+        $this->assertStringContainsString("Unknown column 'item_count' in 'SET'", $message);
+        $this->assertStringContainsString('the item count', $message);
+    }
+
+    /**
+     * The insert this method performs is itself a statement, and a real wpdb
+     * blanks last_error at the top of every one. Two refusals in a row must
+     * therefore produce two rows rather than one — the second call must be
+     * reading its own write, not the residue of the first.
+     */
+    public function testEachRefusalIsRecordedOnceForTheWriteThatCausedIt(): void
+    {
+        $GLOBALS['wpdb']->last_error = 'Deadlock found when trying to get lock';
+        $this->log->recordWriteFailure('run-1', 'order', '99', 'the payment status');
+
+        $this->assertFalse(
+            $this->log->recordWriteFailure('run-1', 'order', '99', 'the payment status'),
+            'The log insert cleared the error, so there is nothing left to report.',
+        );
+
+        $this->assertCount(1, $this->recordedInserts());
+    }
+
     /**
      * Serve a fixture through the retryable-ids query, emulating the GROUP BY and
      * the success veto the database would apply.
@@ -1059,6 +1239,17 @@ final class MigrationLogRepositoryTest extends PluginTestCase
         }
 
         $this->fail(sprintf('No query containing "%s" was recorded.', $needle));
+    }
+
+    private function findGetVarContaining(string $needle): string
+    {
+        foreach ($GLOBALS['_cartshift_test_queries'] ?? [] as $entry) {
+            if ($entry[0] === 'get_var' && str_contains($entry[1], $needle)) {
+                return $entry[1];
+            }
+        }
+
+        $this->fail(sprintf('No get_var query containing "%s" was recorded.', $needle));
     }
 
     private function findSelectWithLimit(): string

@@ -288,26 +288,34 @@ final class OrderMigrator extends AbstractMigrator
         $this->idMap->store(Constants::ENTITY_ORDER, (string) $wcId, $fcOrder->id, $this->migrationId(), true);
 
         // 2. Create order items with compound keys (FIX C7).
-        $totalQuantity = 0;
         foreach ($mapped['items'] as $index => $itemData) {
             $itemData['order_id'] = $fcOrder->id;
             $fcItem = OrderItem::query()->create($itemData);
-            $totalQuantity += (int) ($itemData['quantity'] ?? 1);
             $itemKey = "{$wcId}_{$index}";
             $this->idMap->store(Constants::ENTITY_ORDER_ITEM, $itemKey, $fcItem->id, $this->migrationId(), true);
         }
 
-        // 2b. Update item_count on the FC order (sum of all item quantities).
-        if ($totalQuantity > 0) {
-            global $wpdb;
-            $wpdb->update(
-                $wpdb->prefix . 'fct_orders',
-                ['item_count' => $totalQuantity],
-                ['id' => $fcOrder->id],
-                ['%d'],
-                ['%d'],
-            );
-        }
+        // There is no step 2b, and there must not be one again.
+        //
+        // This used to sum the line quantities and write them to
+        // `fct_orders.item_count`. That column has never existed. It is absent
+        // from OrdersMigrator::getSqlSchema() and from every ALTER in
+        // OrdersMigrator::migrated() (FluentCart 1.6.0), so no supported version
+        // has ever had it, and a live DESCRIBE confirms it. `item_count` is a
+        // *cart* key in FluentCart — CartLoader, WebCheckoutHandler, the mini
+        // cart — and a derived value everywhere it concerns an order:
+        // OrderParser::getItemCount() counts the relation, and
+        // OrderReportService::getItemCountDistribution() aliases a
+        // SUM(quantity) subquery over `fct_order_items` to that name. Nothing
+        // reads a stored column, because there is nothing to read.
+        //
+        // The write cost every migrated order a "WordPress database error
+        // Unknown column 'item_count' in 'SET'" line in the PHP error log while
+        // the run itself reported success — which is why it survived this long,
+        // and why MigrationLogRepository::recordWriteFailure() now exists.
+        // FluentCart's own WooCommerce importer carries the identical write in
+        // WooCommerceMigrator/Services/OrderMigrationService::updateOrderTotals(),
+        // which is the likeliest place it came from; it is wrong there too.
 
         // 3. Create order addresses with compound keys (FIX C7).
         foreach ($mapped['addresses'] as $addressData) {
@@ -522,6 +530,11 @@ final class OrderMigrator extends AbstractMigrator
                 ['%s'],
                 ['%d'],
             );
+
+            // Silently losing this leaves an order that took a partial refund
+            // reading as fully paid, which is a reporting figure and a refund
+            // button, not a cosmetic detail.
+            $this->recordWriteFailure($wcOrder->get_id(), 'the partial-refund payment status');
         }
     }
 
@@ -639,6 +652,12 @@ final class OrderMigrator extends AbstractMigrator
                 ['%d'],
                 ['%d'],
             );
+
+            // Reported once per line rather than once per order: which line lost
+            // its refund is the only thing that makes the row actionable, and a
+            // refund the order page cannot see is money the owner has already
+            // paid out and can no longer account for.
+            $this->recordWriteFailure($wcOrderId, sprintf('the refund total on line %d', $itemIndex + 1));
         }
     }
 

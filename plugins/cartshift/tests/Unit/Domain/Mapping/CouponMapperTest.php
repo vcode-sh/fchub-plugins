@@ -177,6 +177,87 @@ final class CouponMapperTest extends PluginTestCase
     }
 
     /**
+     * A `variable-subscription` product has children, but every site that asks
+     * tests `get_type() === 'variable'` — ProductMapper, ProductMigrator and
+     * MappingController alike — so CartShift migrates and promotes it as a
+     * *simple* product, keyed by the product ID. Deriving the lookup keys from
+     * WooCommerce's children alone therefore asked for keys nothing was ever
+     * stored under, and the restriction resolved to nothing at all.
+     */
+    public function testARestrictionResolvesThroughTheProductKeyWhenVariationsWereNotKeyedIndividually(): void
+    {
+        $GLOBALS['_cartshift_test_wc_products'][300] = $this->subscriptionProductWithChildren();
+
+        // One FluentCart variation, stored under the product's own WC ID —
+        // exactly what ProductMigrator and MappingPromoter write for this type.
+        $this->idMap->store(Constants::ENTITY_VARIATION, '300', 9500, 'm', true);
+
+        $result = $this->mapper->map($this->couponRestrictedTo([300]));
+
+        $this->assertSame([9500], $result['conditions']['included_products']);
+    }
+
+    /**
+     * The half nothing catches. WIDENING_ON_TOTAL_LOSS deliberately omits
+     * `excluded_products`, on the reasoning that a product resolving to nothing
+     * is not in FluentCart to be discounted — sound for a product that failed
+     * to migrate, and false for one that migrated perfectly well under a key
+     * this lookup never asked about. FluentCart reads an empty exclusion list
+     * as "no exclusion", so the coupon then discounts a product the shop
+     * explicitly excluded, and no guard fires.
+     */
+    public function testAnExclusionSurvivesForAProductKeyedByItsOwnId(): void
+    {
+        $GLOBALS['_cartshift_test_wc_products'][300] = $this->subscriptionProductWithChildren();
+
+        $this->idMap->store(Constants::ENTITY_VARIATION, '300', 9500, 'm', true);
+
+        $result = $this->mapper->map($this->createCoupon([
+            'code'                 => 'NOTONTHESE',
+            'discount_type'        => 'percent',
+            'amount'               => 10.0,
+            'excluded_product_ids' => [300],
+        ]));
+
+        $this->assertSame([9500], $result['conditions']['excluded_products']);
+    }
+
+    /**
+     * Asking for both keys cannot widen anything: a key nothing was stored
+     * under resolves to nothing, so an ordinary variable product still expands
+     * to its variations and to nothing else.
+     */
+    public function testAskingForBothKeysAddsNothingForAnOrdinaryVariableProduct(): void
+    {
+        $variableProduct = new \WC_Product();
+        (new \ReflectionClass($variableProduct))->getProperty('children')->setValue($variableProduct, [201, 202]);
+        $GLOBALS['_cartshift_test_wc_products'][300] = $variableProduct;
+
+        $this->idMap->store(Constants::ENTITY_PRODUCT, '300', 4242, 'm', true);
+        $this->idMap->store(Constants::ENTITY_VARIATION, '201', 9001, 'm', true);
+        $this->idMap->store(Constants::ENTITY_VARIATION, '202', 9002, 'm', true);
+
+        $result = $this->mapper->map($this->couponRestrictedTo([300]));
+
+        $this->assertSame([9001, 9002], $result['conditions']['included_products']);
+    }
+
+    /**
+     * A `variable-subscription` WooCommerce product: children present, and a
+     * type every `get_type() === 'variable'` test in the plugin answers no to.
+     */
+    private function subscriptionProductWithChildren(): \WC_Product
+    {
+        $product = new \WC_Product();
+        $ref     = new \ReflectionClass($product);
+
+        $ref->getProperty('children')->setValue($product, [201, 202]);
+        $ref->getProperty('type')->setValue($product, 'variable-subscription');
+
+        return $product;
+    }
+
+    /**
      * One migrator instance maps every coupon in a batch, and a shop that
      * restricts a lot of coupons to the same few products was paying for the same
      * wc_get_product() round trip once per restriction ID per coupon.

@@ -106,7 +106,7 @@ export function useMigration() {
   let lastFingerprint = '';
 
   const state = reactive({
-    screen: 'preflight', // preflight | select | progress | results
+    screen: 'preflight', // preflight | select | map | progress | results
     preflight: null,
     counts: null,
     selectedEntities: [],
@@ -470,6 +470,21 @@ export function useMigration() {
       state.error = err.message;
       state.batchError = true;
     }
+  }
+
+  /**
+   * Where SelectScreen's primary button actually sends the wizard.
+   *
+   * A virgin FluentCart install has nothing to map to, so the step would be a
+   * screen of 300 rows all saying "will be created". Skip it entirely.
+   */
+  function advanceFromSelect() {
+    if ((state.counts?.fc_product_count || 0) > 0) {
+      state.screen = 'map';
+      return;
+    }
+
+    startMigration();
   }
 
   /**
@@ -929,6 +944,7 @@ export function useMigration() {
       refreshPreview,
       applyRemedy,
       startMigration,
+      advanceFromSelect,
       startRetry,
       probeRetrySupport,
       cancelMigration,

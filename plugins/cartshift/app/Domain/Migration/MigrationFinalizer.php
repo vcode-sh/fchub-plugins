@@ -7,6 +7,7 @@ namespace CartShift\Domain\Migration;
 defined('ABSPATH') || exit;
 
 use CartShift\Storage\IdMapRepository;
+use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
 
 final class MigrationFinalizer
@@ -30,6 +31,7 @@ final class MigrationFinalizer
 
     public function __construct(
         private readonly IdMapRepository $idMap,
+        private readonly MigrationLogRepository $log,
     ) {
     }
 
@@ -100,6 +102,15 @@ final class MigrationFinalizer
 
         $fcIds = array_map(static fn (object $m): int => (int) $m->fc_id, $allMappings);
         $fcIds = array_unique($fcIds);
+
+        // Kept so a refused write below can be reported against the WooCommerce
+        // customer the owner recognises rather than the FluentCart id they have
+        // never seen. First mapping wins, matching the ID map's own read order.
+        $wcIdByFcId = [];
+
+        foreach ($allMappings as $mapping) {
+            $wcIdByFcId[(int) $mapping->fc_id] ??= (string) $mapping->wc_id;
+        }
 
         $ordersTable = $wpdb->prefix . 'fct_orders';
         $customersTable = $wpdb->prefix . 'fct_customers';
@@ -180,6 +191,20 @@ final class MigrationFinalizer
                     ['%d', '%s', '%d', '%d', '%s', '%s'],
                     ['%d'],
                 );
+
+                // Lifetime value, average order value and purchase count drive
+                // the customer list, the segments and the reports. A row that
+                // silently kept its zeroes reads as a customer who has never
+                // bought anything, which is exactly the sort of wrong number
+                // nobody thinks to question.
+                if ($this->log->recordWriteFailure(
+                    $migrationId,
+                    Constants::ENTITY_CUSTOMER,
+                    $wcIdByFcId[$customerId] ?? 0,
+                    'the recalculated purchase stats',
+                )) {
+                    continue;
+                }
 
                 $updated++;
             }

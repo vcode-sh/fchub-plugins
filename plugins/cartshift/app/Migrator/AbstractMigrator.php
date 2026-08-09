@@ -374,6 +374,37 @@ abstract class AbstractMigrator implements MigratorInterface
     }
 
     /**
+     * Convenience: report the `$wpdb` write that just ran, if MySQL refused it.
+     *
+     * Call it immediately after the write — the error `$wpdb` holds belongs to
+     * the last statement only. See MigrationLogRepository::recordWriteFailure().
+     *
+     * Deliberately not a throw. MigrationOrchestrator::processBatch() wraps each
+     * record in a transaction, so a throw would discard an entire order over one
+     * refused column — a worse answer than an order that arrived with a gap and
+     * a log row naming it. The local counter is bumped so a migrator keeping its
+     * own tallies agrees with the log.
+     *
+     * @param  string $operation What was being written, in the owner's terms.
+     * @return bool              True when a failure was found and recorded.
+     */
+    protected function recordWriteFailure(string|int $wcId, string $operation): bool
+    {
+        $failed = $this->log->recordWriteFailure(
+            $this->migrationId(),
+            $this->getEntityType(),
+            $wcId,
+            $operation,
+        );
+
+        if ($failed) {
+            $this->errors++;
+        }
+
+        return $failed;
+    }
+
+    /**
      * Check if the migration has been cancelled.
      */
     protected function shouldCancel(): bool

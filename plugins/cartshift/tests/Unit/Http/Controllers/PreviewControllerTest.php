@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CartShift\Tests\Unit\Http\Controllers;
 
 use CartShift\Core\Container;
+use CartShift\Domain\Migration\MigrationOrchestratorFactory;
 use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Http\Controllers\PreviewController;
 use CartShift\State\MigrationState;
@@ -462,6 +463,18 @@ final class PreviewControllerTest extends PluginTestCase
             static fn (): MigrationLogRepository => new MigrationLogRepository(),
         );
         $container->singleton(MigrationState::class, static fn (): MigrationState => new MigrationState());
+
+        // /preview no longer builds its own migrators: it asks the shared
+        // factory for a counting set, so the skip list the run honours is the
+        // one the receipt counts against.
+        $container->singleton(
+            MigrationOrchestratorFactory::class,
+            static fn (Container $c): MigrationOrchestratorFactory => MigrationOrchestratorFactory::standalone(
+                $c->get(IdMapRepository::class),
+                $c->get(MigrationLogRepository::class),
+                $c->get(MigrationState::class),
+            ),
+        );
 
         return new PreviewController($container);
     }

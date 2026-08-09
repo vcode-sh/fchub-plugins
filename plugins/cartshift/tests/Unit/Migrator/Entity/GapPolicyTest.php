@@ -217,6 +217,12 @@ final class GapPolicyTest extends PluginTestCase
     public function testAnOrderWhoseProductsAllMigratedRaisesNothing(): void
     {
         $this->mapEntity('product', [101]);
+        // And its variation, keyed by the product ID — what ProductMigrator
+        // actually writes for a simple product (ProductMigrator::processRecord()
+        // stores ENTITY_VARIATION under $wcId when the product is not variable).
+        // Mapping the product alone models half a migration, and the order line
+        // it produces carries object_id = 0.
+        $this->mapEntity('variation', [101]);
 
         $order = $this->order(508, [
             'customer_id'     => 0,
@@ -228,6 +234,7 @@ final class GapPolicyTest extends PluginTestCase
         $this->orderMigrator()->processRecord($order);
 
         $this->assertSame(0, $this->countLogged(MigrationErrorCode::ProductLinkMissing));
+        $this->assertSame(0, $this->countLogged(MigrationErrorCode::VariationLinkMissing));
     }
 
     // ──────────────────────────────────────────────
@@ -286,6 +293,11 @@ final class GapPolicyTest extends PluginTestCase
     {
         $this->mapEntity('customer', [1]);
         $this->mapEntity('product', [101]);
+        // The variation too, keyed by the product ID, because that is what a
+        // real migration of a simple product writes. Without it this fixture
+        // describes a subscription with nothing to bill against, which is now
+        // caught rather than waved through.
+        $this->mapEntity('variation', [101]);
 
         $this->subscriptionMigrator()->processRecord(
             new \CartShiftTestSubscription(604, [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')], 1, 'active'),
@@ -295,6 +307,80 @@ final class GapPolicyTest extends PluginTestCase
         $this->assertSame('active', $subscriptions[0]->status);
         $this->assertArrayNotHasKey('cartshift_original_status', (array) $subscriptions[0]->config);
         $this->assertSame(0, $this->countLogged(MigrationErrorCode::SubscriptionPausedMissingProduct));
+        $this->assertSame(0, $this->countLogged(MigrationErrorCode::SubscriptionPausedMissingVariation));
+    }
+
+    /**
+     * The defect this pair of assertions exists for: a simple product's
+     * subscription used to skip the variation check outright, because
+     * missingProductReference() gated it on `$wcVariationId > 0` and a simple
+     * product's line item carries no variation ID. A mapped product whose
+     * ENTITY_VARIATION row never landed therefore migrated *active* pointing at
+     * nothing, and FluentCart billed the customer a blank line for ever
+     * (RenewalService::createRenewalOrders() copies variation_id into the
+     * renewal invoice's object_id and titles the line from the variation).
+     */
+    public function testASubscriptionOnASimpleProductWithNoMigratedVariationMigratesPaused(): void
+    {
+        $this->mapEntity('customer', [1]);
+        // The product resolves and the variation does not — exactly what a
+        // half-finished promotion of a `link` decision leaves behind.
+        $this->mapEntity('product', [101]);
+
+        $result = $this->subscriptionMigrator()->processRecord(
+            new \CartShiftTestSubscription(607, [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')], 1, 'active'),
+        );
+
+        $this->assertNotFalse($result, 'A paying subscriber must not disappear.');
+
+        $subscriptions = \CartShiftFcModelStore::all('Subscription');
+        $this->assertCount(1, $subscriptions);
+        $this->assertSame('paused', $subscriptions[0]->status, 'Nothing bills against a null variant.');
+        $this->assertLogged(MigrationErrorCode::SubscriptionPausedMissingProduct);
+    }
+
+    /**
+     * The belt-and-braces half: a line item with no product ID at all clears
+     * missingProductReference() — both of its checks are gated on
+     * `$wcProductId > 0` — and the mapper then resolves neither reference. The
+     * refusal has to read what the mapper produced, not what WooCommerce said.
+     */
+    public function testASubscriptionThatResolvesToNoVariantAtAllMigratesPaused(): void
+    {
+        $this->mapEntity('customer', [1]);
+
+        $result = $this->subscriptionMigrator()->processRecord(
+            new \CartShiftTestSubscription(608, [new \CartShiftTestOrderItem(0, 0, 'Mystery item')], 1, 'active'),
+        );
+
+        $this->assertNotFalse($result);
+
+        $subscriptions = \CartShiftFcModelStore::all('Subscription');
+        $this->assertSame('paused', $subscriptions[0]->status);
+        $this->assertSame(
+            'variation_not_resolved',
+            ((array) $subscriptions[0]->config)['cartshift_paused_reason'],
+            'The two pause reasons have different fixes and must stay distinguishable.',
+        );
+        $this->assertLogged(MigrationErrorCode::SubscriptionPausedMissingVariation);
+    }
+
+    /**
+     * A subscription WooCommerce had already cancelled is history, not a live
+     * instruction. Forcing it to 'paused' would dress a dead record up as a
+     * resumable one, and nothing renews a cancelled subscription anyway.
+     */
+    public function testACancelledSubscriptionWithNoVariantKeepsItsOwnStatus(): void
+    {
+        $this->mapEntity('customer', [1]);
+
+        $this->subscriptionMigrator()->processRecord(
+            new \CartShiftTestSubscription(609, [new \CartShiftTestOrderItem(0, 0, 'Mystery item')], 1, 'cancelled'),
+        );
+
+        $subscriptions = \CartShiftFcModelStore::all('Subscription');
+        $this->assertSame('canceled', $subscriptions[0]->status);
+        $this->assertSame(0, $this->countLogged(MigrationErrorCode::SubscriptionPausedMissingVariation));
     }
 
     public function testASubscriptionWithNoCustomerIsStillSkippedAndCoded(): void

@@ -7,15 +7,19 @@ namespace CartShift\Tests\Unit\Http\Controllers;
 use CartShift\Core\Container;
 use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
+use CartShift\Domain\Migration\MigrationOrchestratorFactory;
 use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Http\Controllers\MigrationController;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\Constants;
 use CartShift\Tests\Unit\PluginTestCase;
 use WP_REST_Request;
 
 require_once dirname(__DIR__, 3) . '/stubs/HttpCliStubs.php';
+// get_post_status()/get_post_type(), which promotion's dead-link check reads.
+require_once dirname(__DIR__, 3) . '/stubs/PostStatusStubs.php';
 
 /**
  * Covers the reset endpoint and the batch concurrency lock.
@@ -36,6 +40,7 @@ final class MigrationControllerTest extends PluginTestCase
 
         $GLOBALS['_cartshift_test_as_pending'] = [];
         $GLOBALS['_cartshift_test_wc_product_batches'] = [];
+        $GLOBALS['_cartshift_test_posts'] = [];
 
         // PluginTestCase does not clear the query stubs, and other suites leave
         // callbacks behind. Start from a known-empty database rather than
@@ -151,6 +156,116 @@ final class MigrationControllerTest extends PluginTestCase
                     : [];
             }
         };
+    }
+
+    // ── Migrate: product mapping ───────────────────────────
+    //
+    // The test the whole feature turned on. POST /migrate is what the wizard
+    // calls, and it is the path that used to build its own migrators and
+    // therefore promote nothing: every link the owner drew was ignored, every
+    // mapped product duplicated, every skip migrated anyway. Driving the real
+    // endpoint end to end — not MappingPromoter in isolation — is the only
+    // shape that can see that, which is why it lives here rather than beside
+    // the promoter's own tests.
+
+    /**
+     * Make a saved `link` decision visible to the run, and capture what lands
+     * in the ID map.
+     *
+     * Real repositories throughout: ProductMapRepository and IdMapRepository
+     * are both `final`, so they are driven through the $wpdb stub's global
+     * callbacks, the same technique MappingPromoterTest uses. The get_var
+     * callback has to serve three unrelated readers at once — the batch lock,
+     * IdMapRepository::getFcId() (which must answer "not promoted yet", i.e.
+     * null, not the stub's default 0) and everything else — because the stub
+     * exposes exactly one of them.
+     *
+     * @param list<array{0: string, 1: string, 2: int, 3: string, 4: bool}> $stored
+     */
+    private function stubSavedLink(array &$stored, int $wcId, int $fcPostId, array $variantMap): void
+    {
+        $GLOBALS['_cartshift_test_posts'][$fcPostId] = ['status' => 'publish', 'type' => 'fluent-products'];
+
+        $GLOBALS['_cartshift_test_insert_callback'] = static function (string $table, array $data) use (&$stored): int {
+            if (str_contains($table, 'cartshift_id_map')) {
+                $stored[] = [
+                    $data['entity_type'],
+                    $data['wc_id'],
+                    (int) $data['fc_id'],
+                    $data['migration_id'],
+                    (bool) $data['created_by_migration'],
+                ];
+            }
+
+            return 1;
+        };
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query) use ($wcId, $fcPostId, $variantMap): array {
+            if (!str_contains($query, 'cartshift_product_map') || !str_contains($query, "decision = 'link'")) {
+                return [];
+            }
+
+            return [(object) [
+                'wc_id'       => $wcId,
+                'wc_type'     => 'variable',
+                'decision'    => 'link',
+                'fc_post_id'  => $fcPostId,
+                'band'        => 'strong',
+                'variant_map' => (string) wp_json_encode(['map' => $variantMap, 'orphans' => []]),
+            ]];
+        };
+
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string|null {
+            if (str_contains($query, 'GET_LOCK') || str_contains($query, 'RELEASE_LOCK')) {
+                return '1';
+            }
+
+            // Nothing has been promoted yet, and the stub's default of 0 would
+            // read as "fc_id 0", which promotion treats as already done.
+            if (str_contains($query, 'cartshift_id_map')) {
+                return null;
+            }
+
+            return '0';
+        };
+
+        // The linked FluentCart product still owns the variants the decision
+        // maps to. Promotion re-reads `fct_product_variations` at run time and
+        // drops anything that has moved or been deleted since, so a fixture
+        // answering "no variants" would be describing a product the owner had
+        // emptied between mapping and running.
+        $GLOBALS['_cartshift_test_get_col_callback'] = static fn (string $query): array
+            => str_contains($query, 'fct_product_variations')
+                ? array_values(array_map(intval(...), $variantMap))
+                : [];
+    }
+
+    public function testMigratePromotesASavedLinkIntoTheIdMap(): void
+    {
+        $stored = [];
+        $this->stubSavedLink($stored, 42, 900, [11 => 501]);
+
+        $response = $this->controller->migrate($this->request(['entity_types' => ['product']]));
+
+        $this->assertSame(200, $response->get_status());
+
+        $migrationId = (string) $this->state->getMigrationId();
+
+        $this->assertSame(
+            [Constants::ENTITY_VARIATION, '11', 501, $migrationId, false],
+            $stored[0] ?? null,
+            'Order line items resolve through the variation rows, so a promoted link that '
+            . 'stops at the product leaves every historical line pointing at nothing.',
+        );
+
+        // Product last: it is MappingPromoter's marker for "this decision is
+        // finished", and nothing may follow it.
+        $this->assertSame(
+            [Constants::ENTITY_PRODUCT, '42', 900, $migrationId, false],
+            $stored[1] ?? null,
+            'POST /migrate must promote the owner\'s link, under this run\'s own migration id, '
+            . 'with created_by_migration = 0 so rollback leaves their hand-made product alone.',
+        );
     }
 
     // ── Reset ──────────────────────────────────────────────
@@ -569,6 +684,20 @@ final class MigrationControllerTest extends PluginTestCase
             MigrationLogRepository::class,
             static fn (): MigrationLogRepository => new MigrationLogRepository(),
         );
+
+        // The real assembler, not a stand-in: buildOrchestrator() delegating to
+        // it is exactly the thing under test in testMigratePromotesSavedLinks(),
+        // and a container that handed the controller anything simpler would let
+        // the defect back in unnoticed.
+        $container->singleton(
+            MigrationOrchestratorFactory::class,
+            static fn (Container $c): MigrationOrchestratorFactory => MigrationOrchestratorFactory::standalone(
+                $c->get(IdMapRepository::class),
+                $c->get(MigrationLogRepository::class),
+                $c->get(MigrationState::class),
+            ),
+        );
+
         $container->singleton(BatchProcessor::class, static function (Container $c): BatchProcessor {
             $factory = static fn (): MigrationOrchestrator => new MigrationOrchestrator(
                 [],

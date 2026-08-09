@@ -16,8 +16,14 @@ if (!defined('OBJECT')) {
 }
 
 // CartShift constants
+//
+// Kept in step with cartshift.php by hand, because nothing loads the real
+// plugin file during a test run — the same trap CARTSHIFT_DB_VERSION fell into,
+// where a stale stub let a version-agreement test pass against a fiction. If a
+// test ever asserts on this value, have it read cartshift.php's source rather
+// than this constant, as MigrationsTest::testTheTwoVersionConstantsAgree does.
 if (!defined('CARTSHIFT_VERSION')) {
-    define('CARTSHIFT_VERSION', '1.0.3');
+    define('CARTSHIFT_VERSION', '1.4.0');
 }
 
 if (!defined('CARTSHIFT_PLUGIN_PATH')) {
@@ -33,12 +39,17 @@ if (!defined('CARTSHIFT_PLUGIN_FILE')) {
 }
 
 if (!defined('CARTSHIFT_DB_VERSION')) {
-    define('CARTSHIFT_DB_VERSION', '1');
+    define('CARTSHIFT_DB_VERSION', '6');
 }
 
 // ──────────────────────────────────────────────
 // WordPress function stubs
 // ──────────────────────────────────────────────
+
+// remove_accents() and sanitize_title() live apart, because they are the two
+// stubs whose fidelity anything actually depends on and the reasoning behind
+// them does not fit in a one-liner. See the file's own docblock.
+require_once __DIR__ . '/WpFormattingStubs.php';
 
 if (!function_exists('defined')) {
     // already a PHP built-in, no stub needed
@@ -224,6 +235,10 @@ if (!function_exists('wp_delete_term')) {
 if (!function_exists('dbDelta')) {
     function dbDelta(string $sql): array
     {
+        if (isset($GLOBALS['_cartshift_test_dbdelta_callback'])) {
+            return ($GLOBALS['_cartshift_test_dbdelta_callback'])($sql);
+        }
+
         return [];
     }
 }
@@ -377,13 +392,6 @@ if (!function_exists('get_term_by')) {
     function get_term_by(string $field, string $value, string $taxonomy = ''): mixed
     {
         return $GLOBALS['_cartshift_test_terms'][$taxonomy][$value] ?? false;
-    }
-}
-
-if (!function_exists('sanitize_title')) {
-    function sanitize_title(string $title): string
-    {
-        return strtolower(preg_replace('/[^a-z0-9\-]/', '-', strtolower($title)));
     }
 }
 
@@ -822,6 +830,17 @@ if (!class_exists('wpdb')) {
         public string $options = 'wp_options';
         public int $insert_id = 0;
 
+        /**
+         * What MySQL said about the last statement, '' when it was happy.
+         *
+         * Real wpdb clears this at the top of every query() via flush()
+         * (wp-includes/class-wpdb.php), which is the only reason reading it
+         * straight after a write is meaningful. The stub reproduces that
+         * clear-then-maybe-set cycle in failWrites() below, so a test cannot
+         * accidentally leave one write's error hanging over the next.
+         */
+        public string $last_error = '';
+
         public function prepare(string $query, mixed ...$args): string
         {
             // Recorded before the early return, so a prepare() call with no
@@ -847,8 +866,31 @@ if (!class_exists('wpdb')) {
             }, $query);
         }
 
+        /**
+         * The flush()-then-run cycle real wpdb performs for every statement.
+         *
+         * Two things depend on it. A statement always clears the previous
+         * statement's error, so a call site that checks `last_error` one query
+         * too late reads '' here exactly as it would in production. And a test
+         * can make a chosen write fail by installing
+         * `_cartshift_test_db_error_callback`, which is handed the table name
+         * (or the raw SQL, for query()) and answers with a MySQL error string
+         * or '' to let it through.
+         *
+         * @param array<string, mixed> $data
+         */
+        private function runStatement(string $context, array $data = []): void
+        {
+            $this->last_error = '';
+
+            if (isset($GLOBALS['_cartshift_test_db_error_callback'])) {
+                $this->last_error = (string) ($GLOBALS['_cartshift_test_db_error_callback'])($context, $data);
+            }
+        }
+
         public function get_var(string $query): string|int|float|null
         {
+            $this->runStatement($query);
             $GLOBALS['_cartshift_test_queries'][] = ['get_var', $query];
 
             // Allow tests to configure return values via a callback.
@@ -861,6 +903,7 @@ if (!class_exists('wpdb')) {
 
         public function get_col(string $query): array
         {
+            $this->runStatement($query);
             $GLOBALS['_cartshift_test_queries'][] = ['get_col', $query];
 
             // Same escape hatch get_var() and get_results() have had all along.
@@ -878,6 +921,7 @@ if (!class_exists('wpdb')) {
 
         public function get_results(string $query, string $output = OBJECT): array
         {
+            $this->runStatement($query);
             $GLOBALS['_cartshift_test_queries'][] = ['get_results', $query, $output];
 
             if (isset($GLOBALS['_cartshift_test_get_results_callback'])) {
@@ -889,27 +933,44 @@ if (!class_exists('wpdb')) {
 
         public function insert(string $table, array $data, ?array $format = null): int|false
         {
+            $this->runStatement($table, $data);
             $this->insert_id++;
             $GLOBALS['_cartshift_test_queries'][] = ['insert', $table, $data];
-            return 1;
+
+            if (isset($GLOBALS['_cartshift_test_insert_callback'])) {
+                return ($GLOBALS['_cartshift_test_insert_callback'])($table, $data);
+            }
+
+            return $this->last_error === '' ? 1 : false;
+        }
+
+        public function replace(string $table, array $data, ?array $format = null): int|false
+        {
+            return $this->insert($table, $data, $format);
         }
 
         public function update(string $table, array $data, array $where, ?array $format = null, ?array $where_format = null): int|false
         {
+            $this->runStatement($table, $data);
             $GLOBALS['_cartshift_test_queries'][] = ['update', $table, $data, $where];
-            return 1;
+
+            return $this->last_error === '' ? 1 : false;
         }
 
         public function delete(string $table, array $where, ?array $where_format = null): int|false
         {
+            $this->runStatement($table, $where);
             $GLOBALS['_cartshift_test_queries'][] = ['delete', $table, $where];
-            return 1;
+
+            return $this->last_error === '' ? 1 : false;
         }
 
         public function query(string $query): int|false
         {
+            $this->runStatement($query);
             $GLOBALS['_cartshift_test_queries'][] = ['query', $query];
-            return 0;
+
+            return $this->last_error === '' ? 0 : false;
         }
 
         public function get_charset_collate(): string
