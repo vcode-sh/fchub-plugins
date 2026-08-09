@@ -6,8 +6,13 @@ namespace CartShift\Domain\Migration;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Domain\Mapping\ProductMapDecision;
+use CartShift\Domain\Mapping\VariationMapper;
 use CartShift\Domain\Migration\Contracts\MigratorInterface;
 use CartShift\Domain\Scope\ScopeResolver;
+use CartShift\Domain\Subscription\Source\WooSubscriptionDatasetSource;
+use CartShift\Domain\Subscription\SubscriptionHistoryIndex;
+use CartShift\Domain\Subscription\SubscriptionSelection;
 use CartShift\Migrator\CouponMigrator;
 use CartShift\Migrator\CustomerMigrator;
 use CartShift\Migrator\OrderMigrator;
@@ -18,8 +23,10 @@ use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Storage\ProductMapRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\Enums\FcBillingInterval;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\Logger;
+use CartShift\Support\ProductTypes;
 use CartShift\Support\SkuAllocator;
 use FluentCart\App\Models\ProductDetail;
 use FluentCart\App\Models\ProductVariation;
@@ -99,6 +106,9 @@ final class MigrationOrchestratorFactory
      */
     private bool $awaitingRunStart = false;
 
+    /** Memoised per request. See orderRelationships(). */
+    private ?SubscriptionHistoryIndex $orderRelationships = null;
+
     public function __construct(
         private readonly IdMapRepository $idMap,
         private readonly MigrationLogRepository $log,
@@ -152,7 +162,7 @@ final class MigrationOrchestratorFactory
         $this->promoteNowOrAtRunStart();
 
         return new MigrationOrchestrator(
-            $this->migrators($entityTypes, $batchSize),
+            $this->migrators($entityTypes, $batchSize, true),
             $this->state,
             $this->idMap,
             $this->log,
@@ -162,16 +172,18 @@ final class MigrationOrchestratorFactory
     /**
      * The same migrators, for a caller that only wants to count.
      *
-     * Nothing is promoted: /preview and /counts are read-only by construction
-     * and the owner is still choosing. The skip list *is* applied, because a
-     * receipt that counts products the run will not migrate is a receipt for a
-     * different run.
+     * Nothing is promoted and nothing is logged: /preview and /counts are
+     * read-only by construction and the owner is still choosing. The skip list
+     * and the unrepresentable-cadence exclusion *are* applied, because a receipt
+     * that counts products the run will not migrate is a receipt for a different
+     * run — but the refusals reach the migration log only on the run itself,
+     * where there is a migration to attach them to.
      *
      * @return list<MigratorInterface>
      */
     public function migratorsForCounting(): array
     {
-        return $this->migrators();
+        return $this->migrators([], null, false);
     }
 
     /**
@@ -324,7 +336,7 @@ final class MigrationOrchestratorFactory
             return true;
         }
 
-        if ($product->get_type() !== 'variable') {
+        if (!ProductTypes::isVariable($product->get_type())) {
             return false;
         }
 
@@ -389,9 +401,12 @@ final class MigrationOrchestratorFactory
      *    everywhere in FluentCart, and NULL sorts *first* in both MySQL and the
      *    framework's Collection::sortBy(). A migrated variant must not lead the
      *    owner's carefully ordered list.
-     *  - **`payment_type`** stays a one-off sale, matching `other_info`. A
-     *    migrated historical line is not a subscription unless something says
-     *    so, and nothing here does.
+     *  - **`payment_type`** is always `onetime` here, matching `other_info` —
+     *    and that is now an invariant this method enforces on itself rather
+     *    than a fact about its callers. A migrated historical line must not
+     *    silently become a one-off sale when the source was a recurring
+     *    contract, so a subscription source variation is refused before this
+     *    payload is ever built. See the guard at the top of the method.
      *
      * Price is the Woo variation's own, in FluentCart's x100 format, resolved
      * by MoneyHelper back on the mapping screen where the WooCommerce object
@@ -410,11 +425,36 @@ final class MigrationOrchestratorFactory
      * pointing at it dangles. Returning null is already handled — MappingPromoter
      * skips the orphan, reports it, and the factory logs it once.
      *
+     * Refuses just as outright when the WooCommerce source is a subscription.
+     * Reproducing a recurring contract exactly — cadence, trial, length, setup
+     * fee, and the payment strategy that decides who charges the customer next
+     * — is a whole feature this orphan path does not have, and guessing at any
+     * one of those fields is worse than asking: `payment_type=onetime` silently
+     * turns a membership into a single sale, and the shop only finds out when
+     * the customer is never billed again. Lapka never needs this path at all —
+     * both its target variants already exist — so the safe answer is to block
+     * it here rather than build a second, partial subscription writer. See the
+     * `payment_type` bullet above and orphanSourceIsSubscription() below.
+     *
      * @param array{id: int, sku: string, name: string, price?: int|null, fulfillment_type?: string, downloadable?: string} $orphan
      */
     public static function createOrphanVariant(int $fcPostId, array $orphan): ?int
     {
         if (!class_exists(ProductVariation::class)) {
+            return null;
+        }
+
+        if (self::orphanSourceIsSubscription($orphan)) {
+            Logger::error(
+                'Refused to add a one-time variant for a subscription source variation. Automatic '
+                . 'subscription-orphan creation is out of scope — create or select a compatible '
+                . 'FluentCart subscription variation for this product by hand, then re-run.',
+                [
+                    'fc_post_id'      => $fcPostId,
+                    'wc_variation_id' => $orphan['id'],
+                ],
+            );
+
             return null;
         }
 
@@ -504,6 +544,165 @@ final class MigrationOrchestratorFactory
         $detail = ProductDetail::query()->where('post_id', $fcPostId)->first();
 
         return is_object($detail) ? $detail : null;
+    }
+
+    /**
+     * Whether the WooCommerce row this orphan describes is a subscription.
+     *
+     * Read live off WooCommerce rather than threaded through the orphan
+     * descriptor and its JSON round trip through the browser (build() in
+     * MappingController, ProductMapDecision::normalizeOrphans()) — a decision
+     * can sit in the staging table for days before the run that promotes it,
+     * and `$orphan['id']` is already the one identifier createOrphanVariant()
+     * is handed that WooCommerce itself can still answer questions about. It is
+     * also the same object VariationMapper::isSubscription() would be asked
+     * about were this variation migrated normally rather than added as an
+     * orphan, so the two paths cannot reach different verdicts for the same
+     * WooCommerce row.
+     *
+     * `$orphan['id']` is a `WC_Product_Variation` id for a variable-or-
+     * variable-subscription source and the parent product's own id for a
+     * simple-or-subscription one — wooProductPage() keys the descriptor either
+     * way, and wc_get_product() resolves both without this method needing to
+     * know which.
+     *
+     * @param array{id: int, ...} $orphan
+     */
+    /**
+     * Woo subscription products the operator chose to CREATE whose cadence
+     * FluentCart cannot hold.
+     *
+     * The other half of the hazard `orphanSourceIsSubscription()` closes below.
+     * A mapping row with no compatible target variation is reported as blocked
+     * on the mapping screen — and the screen still offers "Create" beside it,
+     * which routes into `ProductMigrator` and `VariationMapper`, and those write
+     * `repeat_interval` through `FcBillingInterval::fromWooCommerce()`. That
+     * reading collapses: `week/2` becomes weekly, `year/2` becomes yearly,
+     * `month/2` and `month/12` become monthly. So the operator's answer to
+     * "CartShift cannot express this contract" would be a FluentCart product
+     * that quietly claims a different one.
+     *
+     * Only `create` decisions are examined. A `link` decision points at a
+     * variation that already exists and whose contract `MappingSetValidator`
+     * has already gated; a `skip` is already excluded. And the subscription
+     * write path does not depend on this at all — `SubscriptionAssessor` blocks
+     * an unrepresentable cadence whatever the catalogue ended up saying — which
+     * is deliberate: this keeps a misleading product out of the shop, and that
+     * gate keeps a customer off the wrong billing schedule.
+     *
+     * READ-ONLY, AND IT HAS TO STAY THAT WAY. `migratorsForCounting()` reaches
+     * this method, and `PreviewController::preview()` calls that inside a GET
+     * whose own comment says nothing may be promoted. So this answers the
+     * question and writes nothing to the migration log; `reportUnrepresentableCadences()`
+     * does the reporting, and only `forRun()` calls it.
+     *
+     * @return array<int, array{period: string, interval: string}> Woo product id => why it was refused.
+     */
+    private function unrepresentableSubscriptionProducts(): array
+    {
+        if (!function_exists('wc_get_product')) {
+            return [];
+        }
+
+        $refused = [];
+
+        foreach ($this->map->all() as $decision) {
+            if ($decision->decision() !== ProductMapDecision::CREATE) {
+                continue;
+            }
+
+            $product = wc_get_product($decision->wcId());
+
+            if (!$product instanceof \WC_Product || self::subscriptionCadenceIsRepresentable($product)) {
+                continue;
+            }
+
+            $refused[$decision->wcId()] = [
+                'period'   => (string) $product->get_meta('_subscription_period'),
+                'interval' => (string) $product->get_meta('_subscription_period_interval'),
+            ];
+        }
+
+        return $refused;
+    }
+
+    /**
+     * Tell the operator which products the run is dropping, and why.
+     *
+     * ON THE RUN PATH ONLY. This writes an `error` row against the current
+     * migration, and it used to sit inside the method above — which
+     * `migratorsForCounting()` calls, which `PreviewController::preview()` calls
+     * inside a read-only GET. Every scope preview on a store with one such
+     * decision therefore appended a row to whatever migration ID happened to be
+     * in state: `''` with no run in flight, or a FINISHED run's own log,
+     * corrupting a completed run's record from a GET.
+     *
+     * `Logger::error()` stays beside it rather than in the reader: reporting a
+     * refusal is one job and it belongs in one place.
+     *
+     * @param array<int, array{period: string, interval: string}> $refused
+     */
+    private function reportUnrepresentableCadences(array $refused): void
+    {
+        foreach ($refused as $wcId => $cadence) {
+            $message = sprintf(
+                'Refused to create a FluentCart product for WooCommerce subscription #%d: its billing '
+                . 'cadence (every %s %s) is not one FluentCart can express. Creating it would write the '
+                . 'nearest interval instead, which is a different contract from the one the subscriber '
+                . 'agreed to. Change the source schedule, or link the product to a compatible FluentCart '
+                . 'subscription variation by hand, then re-run.',
+                $wcId,
+                $cadence['interval'] !== '' ? $cadence['interval'] : '1',
+                $cadence['period'] !== '' ? $cadence['period'] : 'unknown period',
+            );
+
+            // THE MIGRATION LOG, not only `error_log`. This refusal drops a
+            // product from the run, and reporting it through `Logger::error()`
+            // alone put it in a file the operator never opens — while the
+            // mapping screen went on offering "Create" for the row that caused
+            // it. A coded log row is how every other refusal in this plugin
+            // reaches the person who has to act on it.
+            $this->log->write(
+                (string) $this->state->getMigrationId(),
+                Constants::ENTITY_PRODUCT,
+                $wcId,
+                'error',
+                $message,
+                $cadence,
+                MigrationErrorCode::SubscriptionCadenceUnrepresentable,
+            );
+
+            Logger::error($message, ['wc_product_id' => $wcId] + $cadence);
+        }
+    }
+
+    /**
+     * Whether section 7.2's exact table has a row for this product's cadence.
+     *
+     * True for anything that is not a subscription product at all — a one-time
+     * product has no cadence to be wrong about.
+     */
+    public static function subscriptionCadenceIsRepresentable(\WC_Product $product): bool
+    {
+        if (!VariationMapper::isSubscription($product)) {
+            return true;
+        }
+
+        $period   = (string) ($product->get_meta('_subscription_period') ?: 'month');
+        $interval = (int) ($product->get_meta('_subscription_period_interval') ?: 1);
+
+        return FcBillingInterval::tryFromWooCommerce($period, $interval) !== null;
+    }
+
+    private static function orphanSourceIsSubscription(array $orphan): bool
+    {
+        if (!function_exists('wc_get_product')) {
+            return false;
+        }
+
+        $source = wc_get_product((int) $orphan['id']);
+
+        return $source instanceof \WC_Product && VariationMapper::isSubscription($source);
     }
 
     /**
@@ -881,15 +1080,107 @@ final class MigrationOrchestratorFactory
     }
 
     /**
+     * Which orders are subscription parents and which are renewals, read once
+     * per request.
+     *
+     * DEFERRED, and that is not an optimisation. `migratorsForCounting()` builds
+     * every migrator including this one, `PreviewController` calls it inside a
+     * read-only REST request, and the entity-type filter is applied afterwards
+     * by `ScopePreview::build()` — so an eagerly-built index made a
+     * products-only preview page `wcs_get_subscriptions()` in full and hydrate
+     * one `WC_Subscription` per row. 564 hydrations on the reference dataset for
+     * a preview that never maps an order; a timeout on a large store. The index
+     * now costs nothing until an order is actually mapped.
+     *
+     * Memoised on the instance as well, so the deferred build runs at most once
+     * per request rather than once per migrator: `migrators()` is called once
+     * per `forRun()`, `forRun()` once per batch tick, and each tick is its own
+     * PHP process.
+     *
+     * Relationships only — no order payloads. `OrderMapper` asks which
+     * FluentCart type an order takes and which order a renewal hangs off, and
+     * never asks for a payload, so hydrating 5,000 orders to answer 5,000
+     * type questions would be a dataset export wearing a migrator's clothes.
+     * The dependency closure section 6.2 requires is the staging command's
+     * business, not this one's.
+     *
+     * Empty when WooCommerce Subscriptions is not active, which is the honest
+     * answer: a store with no subscriptions has no renewals, and every order
+     * stays a `checkout` exactly as before.
+     */
+    private function orderRelationships(): SubscriptionHistoryIndex
+    {
+        return $this->orderRelationships ??= SubscriptionHistoryIndex::deferred(
+            Constants::DEFAULT_SOURCE_KEY,
+            static function (): array {
+                if (!function_exists('wcs_get_subscriptions')) {
+                    return ['orders' => [], 'relationships' => []];
+                }
+
+                return SubscriptionHistoryIndex::liveRelationships(self::allSourceSubscriptions());
+            },
+        );
+    }
+
+    /**
+     * Every source subscription, one at a time.
+     *
+     * Through `WooSubscriptionDatasetSource`, which already owns the only
+     * verified `wcs_get_subscriptions()` argument vocabulary in the plugin —
+     * `subscriptions_per_page`, `offset`, `orderby`, `order`. WooCommerce
+     * Subscriptions is a paid add-on and is not installed on this machine, so a
+     * second pager written here would be a second guess at an API nobody can
+     * check, and the two would drift.
+     *
+     * A generator rather than a list: the index is 564 lightweight rows on
+     * Lapka but a hydrated `WC_Subscription` each is not, and nothing here needs
+     * more than one at a time.
+     *
+     * Not scoped. A renewal order's type is a fact about that order, not about
+     * whether this run happens to be migrating the subscription that owns it —
+     * a run narrowed to orders alone would otherwise write every renewal as a
+     * `checkout` and leave no trace of why.
+     *
+     * @return \Generator<int, object>
+     */
+    private static function allSourceSubscriptions(): \Generator
+    {
+        $source    = new WooSubscriptionDatasetSource(Constants::DEFAULT_SOURCE_KEY);
+        $selection = SubscriptionSelection::all(Constants::DEFAULT_SOURCE_KEY);
+
+        foreach ($source->selectionIndex($selection) as $row) {
+            $subscription = $source->hydrate((int) $row['id']);
+
+            if ($subscription !== null) {
+                yield $subscription;
+            }
+        }
+    }
+
+    /**
      * @param list<string> $entityTypes
+     * @param bool         $reportRefusals Whether this is a run, and may therefore write to the log.
      *
      * @return list<MigratorInterface>
      */
-    private function migrators(array $entityTypes = [], ?int $batchSize = null): array
-    {
+    private function migrators(
+        array $entityTypes = [],
+        ?int $batchSize = null,
+        bool $reportRefusals = false,
+    ): array {
         $wanted = $entityTypes === [] ? array_keys(self::MIGRATORS) : $entityTypes;
 
         $skipped = $this->map->skippedProductIds();
+
+        // Computed either way — the exclusion is a fact about the run and a
+        // preview that counted products the run will drop is a receipt for a
+        // different run. REPORTED only on the run path: see
+        // `reportUnrepresentableCadences()`.
+        $unrepresentable = $this->unrepresentableSubscriptionProducts();
+
+        if ($reportRefusals) {
+            $this->reportUnrepresentableCadences($unrepresentable);
+        }
 
         $migrators = [];
 
@@ -900,12 +1191,29 @@ final class MigrationOrchestratorFactory
 
             $class = self::MIGRATORS[$type];
 
-            $migrator = $batchSize === null
-                ? new $class($this->idMap, $this->log, $this->state)
-                : new $class($this->idMap, $this->log, $this->state, $batchSize);
+            // The order migrator takes one more argument than its siblings, and
+            // it is not optional in practice: without it every WooCommerce
+            // Subscriptions renewal order is written `type = checkout`, which
+            // `RenewalController`, `CustomerOrderController` and
+            // `Subscription::renewalOrders()` all filter out — the subscriber's
+            // own invoice list loses every renewal they ever paid.
+            $migrator = match (true) {
+                $class === OrderMigrator::class => new OrderMigrator(
+                    $this->idMap,
+                    $this->log,
+                    $this->state,
+                    $batchSize ?? Constants::DEFAULT_BATCH_SIZE,
+                    $this->orderRelationships(),
+                ),
+                $batchSize === null => new $class($this->idMap, $this->log, $this->state),
+                default             => new $class($this->idMap, $this->log, $this->state, $batchSize),
+            };
 
             if ($migrator instanceof ProductMigrator) {
-                $migrator->excludeProductIds($skipped);
+                $migrator->excludeProductIds(array_values(array_unique(array_merge(
+                    $skipped,
+                    array_keys($unrepresentable),
+                ))));
             }
 
             $migrators[] = $migrator;

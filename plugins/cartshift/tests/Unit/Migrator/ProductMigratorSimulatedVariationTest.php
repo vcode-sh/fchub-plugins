@@ -104,12 +104,85 @@ final class ProductMigratorSimulatedVariationTest extends PluginTestCase
         $this->assertNull($this->idMap->getFcId(Constants::ENTITY_VARIATION, '77'));
     }
 
+    /**
+     * P1 regression: a variable-subscription product used to compare its type
+     * against the bare literal 'variable' here too, so $wcVariationIds fell
+     * back to `[$wcId]` — one entry, the parent's own id — regardless of how
+     * many real children the product had. Every index past the first then
+     * resolved through `?? $wcId`, so both of two variations registered a
+     * simulated mapping under the *parent's* id instead of their own: the
+     * second write silently overwrote the first (same key, same computed
+     * value), and neither real WooCommerce variation id ever got an entry at
+     * all. An order line item or subscription referencing either one would
+     * fail to resolve on the very next tick of the same dry run.
+     */
+    public function testAVariableSubscriptionRegistersASimulatedVariationPerRealChildWhenSimulating(): void
+    {
+        $this->idMap->setSimulating(true);
+
+        $migrator = new ProductMigrator($this->idMap, $this->log, $this->state);
+
+        $product = $this->variableSubscriptionProduct(500, 'Yoga Pass', [201, 202]);
+
+        $result = $migrator->validateRecord($product);
+
+        $this->assertTrue($result);
+
+        $this->assertSame(
+            950_000_000 + 201,
+            $this->idMap->getFcId(Constants::ENTITY_VARIATION, '201'),
+            'Each real WooCommerce variation must get its own simulated FluentCart id.',
+        );
+        $this->assertSame(
+            950_000_000 + 202,
+            $this->idMap->getFcId(Constants::ENTITY_VARIATION, '202'),
+        );
+        $this->assertNull(
+            $this->idMap->getFcId(Constants::ENTITY_VARIATION, '500'),
+            "The parent product's own id must never stand in for one of its variations.",
+        );
+    }
+
     private function simpleProduct(int $id, string $name): \WC_Product
     {
         $product = new \WC_Product();
 
         foreach (['id' => $id, 'name' => $name, 'status' => 'publish'] as $property => $value) {
             (new \ReflectionProperty(\WC_Product::class, $property))->setValue($product, $value);
+        }
+
+        return $product;
+    }
+
+    /**
+     * A variable-subscription parent with two real WC_Product_Variation
+     * children, registered with the wc_get_product() stub so
+     * ProductMigrator::loadVariations() can resolve them.
+     *
+     * @param list<int> $variationIds
+     */
+    private function variableSubscriptionProduct(int $id, string $name, array $variationIds): \WC_Product
+    {
+        $product = new \WC_Product();
+
+        foreach ([
+            'id' => $id,
+            'name' => $name,
+            'status' => 'publish',
+            'type' => 'variable-subscription',
+            'children' => $variationIds,
+        ] as $property => $value) {
+            (new \ReflectionProperty(\WC_Product::class, $property))->setValue($product, $value);
+        }
+
+        foreach ($variationIds as $variationId) {
+            $variation = new \WC_Product_Variation();
+
+            foreach (['id' => $variationId, 'status' => 'publish', 'price' => '9.99', 'regular_price' => '9.99'] as $property => $value) {
+                (new \ReflectionProperty(\WC_Product_Variation::class, $property))->setValue($variation, $value);
+            }
+
+            $GLOBALS['_cartshift_test_wc_products'][$variationId] = $variation;
         }
 
         return $product;

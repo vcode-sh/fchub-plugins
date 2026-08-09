@@ -35,7 +35,7 @@
           </label>
           <label class="cartshift-retry-option">
             <input type="checkbox" v-model="dryRun" />
-            <span>Dry run &mdash; work out what would happen, write nothing</span>
+            <span>Dry run &mdash; work out what would happen, write nothing to FluentCart</span>
           </label>
         </div>
 
@@ -85,8 +85,10 @@
         log, and can be rolled back on its own.
       </p>
       <p v-if="dryRun">
-        Nothing will be written. A dry run tells you whether the retry would work; it does
-        not migrate anything.
+        Nothing is written to FluentCart. A dry run tells you whether the retry would work;
+        it does not migrate anything. It does write CartShift simulation rows to
+        CartShift&rsquo;s own ID-map table, which is how it resolves references &mdash; those
+        are cleared with the run.
       </p>
       <p v-else>
         Records that already migrated are not touched and not duplicated. Anything that

@@ -167,4 +167,60 @@ final class WooStorageTest extends PluginTestCase
         update_option('woocommerce_custom_orders_table_enabled', 'no');
         $this->assertFalse(WooStorage::isHposEnabled());
     }
+
+    // ──────────────────────────────────────────────
+    // The boundary this class no longer crosses
+    // ──────────────────────────────────────────────
+
+    /**
+     * WooStorage builds HPOS table scopes, and the subscription dataset path
+     * must not use one.
+     *
+     * That path reads through WooCommerce's public data-store APIs precisely so
+     * WooCommerce chooses its own configured backend — Lapka's is legacy CPT —
+     * and the previous reader's defect was exactly this: `countTotal()` counted
+     * rows in `{prefix}wc_orders` while `fetchBatch()` hydrated through WCS, so
+     * on a legacy-CPT store the total was zero and the fetch was not.
+     *
+     * Asserted on the source text rather than on behaviour because the failure
+     * it guards against is a re-introduction, and by the time a behavioural test
+     * could see it the store would need to be on legacy CPT to notice. The
+     * authority *report* (`isHposEnabled()`) is deliberately still allowed:
+     * saying which backend WooCommerce chose is not the same as choosing one.
+     */
+    public function testTheSubscriptionDatasetPathDoesNotReadThroughWooStorageTables(): void
+    {
+        $root = dirname(__DIR__, 4) . '/app';
+
+        // SubscriptionMigrator is named explicitly because that is where the
+        // defect actually lived — `countTotal()` counting rows in
+        // {prefix}wc_orders while `fetchBatch()` hydrated through WCS. A scan
+        // covering only Domain/Subscription would have let it back in at the
+        // exact address it came from.
+        $paths = [$root . '/Domain/Subscription', $root . '/Migrator/SubscriptionMigrator.php'];
+
+        $offenders = [];
+
+        foreach ($paths as $path) {
+            $files = is_dir($path)
+                ? new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path))
+                : [new \SplFileInfo($path)];
+
+            foreach ($files as $file) {
+                if (!$file->isFile() || $file->getExtension() !== 'php') {
+                    continue;
+                }
+
+                $source = (string) file_get_contents($file->getPathname());
+
+                foreach (['ordersTable', 'subscriptionScopeSql', 'orderScopeSql', 'orderScopeParts'] as $forbidden) {
+                    if (str_contains($source, 'WooStorage::' . $forbidden)) {
+                        $offenders[] = $file->getFilename() . ' -> ' . $forbidden;
+                    }
+                }
+            }
+        }
+
+        $this->assertSame([], $offenders);
+    }
 }

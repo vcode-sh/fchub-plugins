@@ -151,3 +151,47 @@ describe('autoIncludeDependencies — ordering and idempotence', () => {
     expect(sent).toEqual(['product', 'customer', 'coupon', 'order', 'subscription']);
   });
 });
+
+describe('useMigration map focus', () => {
+  it('carries the row the audit sent the operator to re-decide', () => {
+    const { result, unmount } = withSetup(() => useMigration());
+
+    result.actions.goToMapping({ wc_id: 770001, name: 'Monthly subscription' });
+
+    expect(result.state.screen).toBe('map');
+    expect(result.state.mapFocus).toEqual({ wc_id: 770001, name: 'Monthly subscription' });
+
+    result.actions.clearMapFocus();
+
+    expect(result.state.mapFocus).toBe(null);
+    expect(result.state.screen).toBe('map');
+
+    unmount();
+  });
+
+  it('refuses to focus on nothing, rather than parking a null id on the screen', () => {
+    const { result, unmount } = withSetup(() => useMigration());
+
+    result.actions.goToMapping(null);
+
+    expect(result.state.screen).toBe('map');
+    expect(result.state.mapFocus).toBe(null);
+
+    result.actions.goToMapping({ wc_id: 0 });
+
+    expect(result.state.mapFocus).toBe(null);
+
+    unmount();
+  });
+
+  it('forgets the focus when the wizard is reset', () => {
+    const { result, unmount } = withSetup(() => useMigration());
+
+    result.actions.goToMapping({ wc_id: 770002, name: 'Yearly subscription' });
+    result.actions.resetState();
+
+    expect(result.state.mapFocus).toBe(null);
+
+    unmount();
+  });
+});

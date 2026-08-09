@@ -14,14 +14,34 @@
  * Requires at least: 6.8
  * Requires PHP: 8.3
  * Tested up to:    7.0
- * Requires Plugins: woocommerce, fluent-cart
  * Update URI: https://fchub.co/cartshift
+ */
+
+/*
+ * There is deliberately no `Requires Plugins` header.
+ *
+ * It read `woocommerce, fluent-cart`, which WordPress enforces as an AND. That was
+ * right while CartShift only ever ran on one site holding both. It is wrong for a
+ * cross-runtime migration, where by definition neither site holds both: the source
+ * runs WooCommerce and WooCommerce Subscriptions, the destination runs FluentCart,
+ * and CartShift has to boot on each to export from one and stage into the other.
+ * The header is satisfiable on neither, so it blocked the very topology plan
+ * section 3 mandates — found by activating on a real source, not by any test,
+ * because WordPress enforces this itself and every test stubs the environment.
+ *
+ * The header cannot express "either", so the check moved to where it can answer
+ * properly. `CartShift\Domain\Subscription\RuntimeCompatibilityProbe` reports which
+ * runtime this is, which APIs are present and which are missing, each with a stable
+ * reason code; `CartShift\Validator\PreflightCheck` refuses an operation the booted
+ * runtime cannot support. Both are strictly more precise than the header: they can
+ * say "this is a valid source but not a valid target", which is exactly the sentence
+ * an operator needs and the one a plugin header can never write.
  */
 
 defined('ABSPATH') or die;
 
 define('CARTSHIFT_VERSION', '1.4.1');
-define('CARTSHIFT_DB_VERSION', '6');
+define('CARTSHIFT_DB_VERSION', '7');
 define('CARTSHIFT_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CARTSHIFT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CARTSHIFT_PLUGIN_FILE', __FILE__);
@@ -88,4 +108,5 @@ add_action('plugins_loaded', fn() => \CartShift\Core\PluginBootstrap::boot(), 20
 
 if (defined('WP_CLI') && WP_CLI) {
     \CartShift\CLI\MigrateCommand::register();
+    \CartShift\CLI\SubscriptionCommand::register();
 }

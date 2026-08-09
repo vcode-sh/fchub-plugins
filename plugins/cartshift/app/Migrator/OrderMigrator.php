@@ -8,6 +8,8 @@ defined('ABSPATH') || exit;
 
 use CartShift\Domain\Mapping\OrderMapper;
 use CartShift\Domain\Migration\GuestCustomerFactory;
+use CartShift\Domain\Migration\OrderIdentity;
+use CartShift\Domain\Subscription\SubscriptionHistoryIndex;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -31,16 +33,35 @@ final class OrderMigrator extends AbstractMigrator
     /** @var int|null Highest order ID covered by the ID page fetchBatch() last read. */
     private ?int $pageEndCursor = null;
 
+    /**
+     * @param SubscriptionHistoryIndex|null $history What the subscription dataset
+     *     says about these orders' relationships, when one has been loaded.
+     *
+     *     Optional, and absent by default, because the ordinary order run has no
+     *     subscription dataset and must behave exactly as it always has: every
+     *     order a plain `checkout`. When the staging command supplies one, a
+     *     parent order is written `type = subscription` and a renewal
+     *     `type = renewal` with its `parent_id` set — which is what
+     *     `RenewalController`, `CustomerOrderController` and
+     *     `Subscription::renewalOrders()` all filter on. The relationship comes
+     *     from the dataset's typed references, never from `post_parent`, which
+     *     WCS renewal orders do not usefully set (plan section 4.8).
+     */
     public function __construct(
         IdMapRepository $idMap,
         MigrationLogRepository $log,
         MigrationState $migrationState,
         int $batchSize = Constants::DEFAULT_BATCH_SIZE,
+        ?SubscriptionHistoryIndex $history = null,
     ) {
         parent::__construct($idMap, $log, $migrationState, $batchSize);
 
         $currency = get_woocommerce_currency();
-        $this->orderMapper = new OrderMapper($idMap, $currency);
+        $this->orderMapper = new OrderMapper(
+            $idMap,
+            $currency,
+            $history ?? new SubscriptionHistoryIndex(Constants::DEFAULT_SOURCE_KEY),
+        );
         $this->guestCustomers = new GuestCustomerFactory($idMap);
     }
 
@@ -291,7 +312,7 @@ final class OrderMigrator extends AbstractMigrator
         foreach ($mapped['items'] as $index => $itemData) {
             $itemData['order_id'] = $fcOrder->id;
             $fcItem = OrderItem::query()->create($itemData);
-            $itemKey = "{$wcId}_{$index}";
+            $itemKey = OrderIdentity::itemKey($wcId, (int) $index);
             $this->idMap->store(Constants::ENTITY_ORDER_ITEM, $itemKey, $fcItem->id, $this->migrationId(), true);
         }
 
@@ -321,7 +342,7 @@ final class OrderMigrator extends AbstractMigrator
         foreach ($mapped['addresses'] as $addressData) {
             $addressData['order_id'] = $fcOrder->id;
             $fcAddress = OrderAddress::query()->create($addressData);
-            $addressKey = "{$wcId}_{$addressData['type']}";
+            $addressKey = OrderIdentity::addressKey($wcId, (string) $addressData['type']);
             $this->idMap->store(Constants::ENTITY_ORDER_ADDRESS, $addressKey, $fcAddress->id, $this->migrationId(), true);
         }
 
@@ -330,7 +351,7 @@ final class OrderMigrator extends AbstractMigrator
             $transactionData = $mapped['transaction'];
             $transactionData['order_id'] = $fcOrder->id;
             $fcTransaction = OrderTransaction::query()->create($transactionData);
-            $transactionKey = "{$wcId}_charge";
+            $transactionKey = OrderIdentity::transactionKey($wcId);
             $this->idMap->store(Constants::ENTITY_ORDER_TRANSACTION, $transactionKey, $fcTransaction->id, $this->migrationId(), true);
         }
 
@@ -461,14 +482,7 @@ final class OrderMigrator extends AbstractMigrator
      */
     private function findFluentCartImportedOrder(int $wcOrderId): ?int
     {
-        global $wpdb;
-
-        $fcId = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$wpdb->prefix}fct_orders WHERE invoice_no = %s LIMIT 1",
-            'WC-' . $wcOrderId,
-        ));
-
-        return $fcId !== null && (int) $fcId > 0 ? (int) $fcId : null;
+        return OrderIdentity::findImportedOrderId($wcOrderId);
     }
 
     /**
@@ -507,7 +521,7 @@ final class OrderMigrator extends AbstractMigrator
         ];
 
         $fcTransaction = OrderTransaction::query()->create($transactionData);
-        $transactionKey = "{$wcOrderId}_refund_{$refund->get_id()}";
+        $transactionKey = OrderIdentity::refundTransactionKey($wcOrderId, (int) $refund->get_id());
         $this->idMap->store(Constants::ENTITY_ORDER_TRANSACTION, $transactionKey, $fcTransaction->id, $this->migrationId(), true);
     }
 

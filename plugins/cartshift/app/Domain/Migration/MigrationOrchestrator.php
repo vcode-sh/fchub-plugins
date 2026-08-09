@@ -13,6 +13,7 @@ use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\DatabaseTransaction;
 use CartShift\Support\Enums\MigrationErrorCode;
 
 final class MigrationOrchestrator
@@ -444,8 +445,6 @@ final class MigrationOrchestrator
                 ? count($retryIds)
                 : ($entityState['total'] ?? $migrator->count());
 
-            global $wpdb;
-
             foreach ($batch as $record) {
                 if ($this->state->isCancelled()) {
                     $this->state->setCancelled($currentType);
@@ -485,16 +484,25 @@ final class MigrationOrchestrator
                     }
                 } else {
                     // A2: Transaction wrapping prevents partial data on per-record failures.
-                    $wpdb->query('START TRANSACTION');
+                    //
+                    // THE BOUNDARY IS THIS ONE, and it is the only one. Through
+                    // `DatabaseTransaction` an inner `begin()` — the subscription
+                    // writer's — joins this transaction instead of implicitly
+                    // committing it, so everything `processRecord()` does,
+                    // INCLUDING the order/item/transaction history
+                    // `SubscriptionMigrator::linkHistory()` writes after the
+                    // destination row exists, is inside it and is undone
+                    // together.
+                    DatabaseTransaction::begin();
 
                     try {
                         $result = $migrator->processRecord($record);
 
                         if ($result === false) {
-                            $wpdb->query('COMMIT');
+                            DatabaseTransaction::commit();
                             $skipped++;
                         } else {
-                            $wpdb->query('COMMIT');
+                            DatabaseTransaction::commit();
                             $processed++;
 
                             /** @see 'cartshift/migration/record_migrated' */
@@ -507,7 +515,7 @@ final class MigrationOrchestrator
                             );
                         }
                     } catch (\Throwable $e) {
-                        $wpdb->query('ROLLBACK');
+                        DatabaseTransaction::rollback();
                         $errors++;
                         $wcId = $migrator->getRecordId($record);
                         $this->log->write(

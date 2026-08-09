@@ -161,12 +161,18 @@ final class ScopedKeysetTest extends PluginTestCase
 
     public function testASubscriptionSeveralPagesInIsReturnedRatherThanEndingTheEntity(): void
     {
-        // The regression this task exists to prevent. Filtering happens after
-        // the fetch, so a page can filter to nothing while the source still has
-        // rows — and an empty batch is the orchestrator's *only* end-of-entity
-        // signal. Returning [] from the first page would mark subscriptions
-        // complete and lose the one paying subscriber in scope, with no counter
-        // showing it.
+        // The regression this test exists to prevent: an in-scope subscriber
+        // sitting a long way into the source must be returned rather than
+        // silently ending the entity. An empty batch is the orchestrator's
+        // *only* end-of-entity signal, so a page that filtered away to nothing
+        // used to mark subscriptions complete and lose a paying customer with
+        // no counter showing it.
+        //
+        // It cannot happen any more, and the reason is worth stating: the
+        // dataset source applies the scope to the whole selection BEFORE
+        // slicing a page out of it, so there is no such thing as a page that
+        // filters to nothing while the source still has rows. The cursor is
+        // therefore a position in the selected sequence, not in the raw one.
         $GLOBALS['_cartshift_test_wcs_pages'] = [
             new \CartShiftTestSubscription(9001, [], 11),
             new \CartShiftTestSubscription(9002, [], 12),
@@ -181,13 +187,10 @@ final class ScopedKeysetTest extends PluginTestCase
 
         $this->assertCount(1, $batch);
         $this->assertSame(9005, $batch[0]->get_id());
-
-        // Three OFFSET pages of two were consumed to reach it. The cursor is a
-        // position in the *unfiltered* sequence, so it is 5, not 1.
-        $this->assertSame(5, $migrator->cursorFor($batch[0]));
+        $this->assertSame(1, $migrator->cursorFor($batch[0]));
     }
 
-    public function testTheEntityEndsOnlyWhenTheSourceItselfRunsOut(): void
+    public function testTheEntityEndsOnlyWhenTheSelectionItselfRunsOut(): void
     {
         $GLOBALS['_cartshift_test_wcs_pages'] = [
             new \CartShiftTestSubscription(9001, [], 11),
@@ -196,14 +199,15 @@ final class ScopedKeysetTest extends PluginTestCase
 
         $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'customer_ids' => [7]]);
 
-        // Nothing in scope anywhere in the source: the loop walks the whole
-        // sequence and only then returns []. It must terminate, and it must not
-        // rewind the offset on the way out.
+        // Nothing in scope anywhere in the source. The batch is empty because
+        // the selection is empty, which is the one honest reason for it — and
+        // the cursor stays at the start rather than being advanced past rows
+        // that were never in.
         $this->assertSame([], $migrator->fetchBatch(null, 2));
-        $this->assertSame(2, $migrator->cursorFor(null));
+        $this->assertSame(0, $migrator->cursorFor(null));
     }
 
-    public function testTheOffsetAdvancesByRowsFetchedNotRowsKept(): void
+    public function testTheOffsetAdvancesByRowsReturned(): void
     {
         $GLOBALS['_cartshift_test_wcs_pages'] = [
             new \CartShiftTestSubscription(9001, [], 7),
@@ -214,8 +218,97 @@ final class ScopedKeysetTest extends PluginTestCase
 
         $batch = $migrator->fetchBatch(null, 2);
 
+        // One row selected, so the next page starts at one. Advancing by two —
+        // the size of the raw page — would skip the second selected
+        // subscription on a source that had one.
         $this->assertCount(1, $batch);
-        $this->assertSame(2, $migrator->cursorFor($batch[0]));
+        $this->assertSame(1, $migrator->cursorFor($batch[0]));
+    }
+
+    /**
+     * The cursor counts rows consumed, not subscriptions handed back.
+     *
+     * A page of three where the middle row will not hydrate returns two
+     * objects. Advancing by two starts the next page on a row already handed
+     * over, and the orchestrator processes that subscription twice.
+     */
+    public function testTheCursorAdvancesPastARowThatCouldNotBeHydrated(): void
+    {
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 7),
+            new \CartShiftTestSubscription(9002, [], 7),
+            new \CartShiftTestSubscription(9003, [], 7),
+        ];
+        $GLOBALS['_cartshift_test_wcs_unhydratable'] = [9002];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'everything']);
+
+        $batch = $migrator->fetchBatch(null, 3);
+
+        $this->assertCount(2, $batch);
+        $this->assertSame(3, $migrator->cursorFor($batch[0]));
+    }
+
+    /**
+     * A page in which nothing hydrates must not end the entity.
+     *
+     * An empty batch is the orchestrator's ONLY end-of-entity signal, so
+     * returning one here would finish the migration on page one and leave every
+     * later subscriber untouched — with a green run to show for it.
+     */
+    public function testAWholeUnhydratablePageDoesNotEndTheMigrationEarly(): void
+    {
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 7),
+            new \CartShiftTestSubscription(9002, [], 7),
+            new \CartShiftTestSubscription(9003, [], 7),
+        ];
+        $GLOBALS['_cartshift_test_wcs_unhydratable'] = [9001, 9002];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'everything']);
+
+        $batch = $migrator->fetchBatch(null, 2);
+
+        $this->assertCount(1, $batch, 'The subscriber behind the dead page must still arrive.');
+        $this->assertSame(9003, $batch[0]->get_id());
+        $this->assertSame(3, $migrator->cursorFor($batch[0]));
+    }
+
+    /**
+     * A row the source lists and cannot hand back is counted and said out loud.
+     *
+     * countTotal() counts index rows, so an unhydratable one keeps the total
+     * above the processed count. That difference is real — a selected
+     * subscription genuinely did not migrate — so it gets a log line rather
+     * than being quietly written out of the arithmetic.
+     */
+    public function testAnUnhydratableRowIsLoggedRatherThanSilentlyDropped(): void
+    {
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 7),
+            new \CartShiftTestSubscription(9002, [], 7),
+        ];
+        $GLOBALS['_cartshift_test_wcs_unhydratable'] = [9001];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'everything']);
+
+        $this->assertSame(2, $migrator->count(), 'It is still one of the selected subscriptions.');
+
+        $GLOBALS['_cartshift_test_queries'] = [];
+        $migrator->fetchBatch(null, 2);
+
+        $messages = array_map(
+            static fn (array $row): string => (string) ($row[2]['message'] ?? ''),
+            array_filter(
+                $GLOBALS['_cartshift_test_queries'],
+                static fn (array $row): bool => ($row[0] ?? '') === 'insert',
+            ),
+        );
+
+        $this->assertNotEmpty(array_filter(
+            $messages,
+            static fn (string $m): bool => str_contains($m, 'WC-#9001') && str_contains($m, 'could not hydrate'),
+        ));
     }
 
     public function testAnUnscopedRunHandsBackThePageUntouched(): void
@@ -246,57 +339,46 @@ final class ScopedKeysetTest extends PluginTestCase
         $this->assertSame([], $migrator->fetchBatch(null, 2));
     }
 
-    public function testAnUnscopedCountIssuesTheUnpreparedQuery(): void
+    public function testAnUnscopedCountReadsThroughThePublicApiRatherThanTheOrdersTable(): void
     {
-        // isEmpty() branch: subscriptionPredicate() is none() here, so
-        // andSql() contributes nothing and countTotal() must call
-        // $wpdb->get_var() directly rather than routing an empty values list
-        // through prepare().
+        // This used to assert that countTotal() issued a COUNT(*) against
+        // {prefix}wc_orders. It did, and that was the defect: on a store whose
+        // authoritative order storage is the posts table — which is Lapka's —
+        // that table is empty, the count comes back zero, and the migration
+        // reports a total of nothing while fetchBatch() happily hydrates
+        // hundreds of subscriptions through WCS. Counting now goes through the
+        // same dataset source the fetch does, so it issues no SQL at all.
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 7),
+            new \CartShiftTestSubscription(9002, [], 12),
+        ];
+
         $migrator = $this->subscriptionMigrator(['mode' => 'everything']);
-
-        $migrator->count();
-
-        $query = $this->lastGetVarQuery();
-
-        $this->assertNotNull($query, 'countTotal() must issue a COUNT(*) query.');
-        $this->assertStringNotContainsString('1 = 0', $query);
-    }
-
-    public function testAProductOnlyScopeReachesTheCountAsMatchesNothing(): void
-    {
-        // isEmpty() branch: a scope that closes over no customers renders as
-        // '1 = 0', not as "no clause" — the same failure mode Task 5 and
-        // Task 6 guard against for their own count queries, here for
-        // SubscriptionMigrator::countTotal().
-        $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'product_ids' => [12]]);
 
         $GLOBALS['_cartshift_test_queries'] = [];
 
-        $this->assertSame(0, $migrator->count());
-
-        $query = $this->lastGetVarQuery();
-
-        $this->assertNotNull($query, 'countTotal() must issue a COUNT(*) query.');
-        $this->assertStringContainsString('1 = 0', $query);
-
-        // The branch itself, which no assertion on the rendered SQL can see:
-        // '1 = 0' carries no values, and subscriptionScopeSql() is already
-        // prepared, so the query reaches prepare() with neither a placeholder
-        // nor an argument — which real wpdb answers with _doing_it_wrong
-        // (wp-includes/class-wpdb.php). countTotal() therefore branches on
-        // values(), not on isEmpty(), and must not put the COUNT(*) through
-        // prepare() at all here. Matched on the COUNT(*) query specifically:
-        // subscriptionScopeSql() legitimately prepares its own status list on
-        // the way in, and that call is not the one under test.
-        $this->assertSame(
-            [],
-            array_values(array_filter(
-                $GLOBALS['_cartshift_test_queries'],
-                static fn (array $entry): bool => $entry[0] === 'prepare'
-                    && str_contains((string) $entry[1], 'COUNT(*)'),
-            )),
-            'A matches-nothing predicate has no values to bind, so countTotal() must not call prepare().',
+        $this->assertSame(2, $migrator->count());
+        $this->assertNull(
+            $this->lastGetVarQuery(),
+            'The subscription count must not read an order table on any storage backend.',
         );
+    }
+
+    public function testAProductOnlyScopeCountsNoSubscriptionsRatherThanAllOfThem(): void
+    {
+        // The counting half of the resolver guard. An explicit scope that
+        // picked only products closes over no customers, so every subscription
+        // is outside it — and the count has to say so, or the progress bar
+        // promises work the fetch will never do.
+        $GLOBALS['_cartshift_test_wcs_pages'] = [
+            new \CartShiftTestSubscription(9001, [], 7),
+            new \CartShiftTestSubscription(9002, [], 12),
+        ];
+
+        $migrator = $this->subscriptionMigrator(['mode' => 'explicit', 'product_ids' => [12]]);
+
+        $this->assertSame(0, $migrator->count());
+        $this->assertSame([], $migrator->fetchBatch(null, 2));
     }
 
     private function lastGetVarQuery(): ?string
@@ -333,14 +415,19 @@ final class ScopedKeysetTest extends PluginTestCase
 
     public function testAPickedGuestEmailOnARegisteredAccountIsCountedAndMigratedAlike(): void
     {
-        // countTotal() counts through ScopeResolver::seedSubscriptionPredicate(),
-        // which is `customer_id IN (…) OR billing_email IN (…)` with no
+        // The scope is `customer_id IN (…) OR billing_email IN (…)` with no
         // `customer_id = 0` guard on the email side. Owner-typed guest_emails
         // are never filtered against the registered accounts, so an owner who
         // types the email of a registered buyer selects that buyer's
-        // subscription in the count. If the PHP filter read the same scope as
-        // "email only when customer_id is 0", the row would be counted and
-        // never fetched: total above processed, silently and for ever.
+        // subscription. If the count and the fetch read that scope differently
+        // — "email only when customer_id is 0" on one side — the row would be
+        // counted and never fetched: total above processed, silently and for
+        // ever.
+        //
+        // They cannot read it differently any more, because there is one
+        // predicate and both of them apply it. That is the assertion; which way
+        // it reads the scope is the resolver's business, and asserting on the
+        // rendered SQL was only ever a proxy for it.
         $GLOBALS['_cartshift_test_wcs_pages'] = [
             new \CartShiftTestSubscription(9001, [], 42, 'active', 'bob@example.com'),
             new \CartShiftTestSubscription(9002, [], 43, 'active', 'eve@example.com'),
@@ -352,20 +439,11 @@ final class ScopedKeysetTest extends PluginTestCase
             'guest_emails' => ['bob@example.com'],
         ]);
 
-        $GLOBALS['_cartshift_test_queries'] = [];
-
-        $migrator->count();
-
         // The count selects it: the email disjunct is unguarded, so customer 42
         // is inside the counted set on the strength of the address alone.
-        $query = (string) $this->lastGetVarQuery();
+        $this->assertSame(1, $migrator->count());
 
-        $this->assertStringContainsString('customer_id IN (7)', $query);
-        $this->assertStringContainsString("billing_email IN ('bob@example.com')", $query);
-        $this->assertStringNotContainsString('customer_id = 0', $query);
-
-        // And the fetch selects exactly the same row. The two agreeing is the
-        // assertion; which way they agree is the resolver's business.
+        // And the fetch selects exactly the same row.
         $batch = $migrator->fetchBatch(null, 2);
 
         $this->assertCount(1, $batch);

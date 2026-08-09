@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CartShift\Storage;
 
+use CartShift\Support\Constants;
+
 defined('ABSPATH') || exit;
 
 final class IdMapRepository
@@ -25,10 +27,27 @@ final class IdMapRepository
     /** True while this repository is serving a dry run. */
     private bool $simulating = false;
 
-    public function __construct()
+    /**
+     * Which source's mappings this repository speaks for.
+     *
+     * Defaults to `local`, which is what schema v7 backfilled every existing
+     * row to, so a same-site migration behaves exactly as it did before the
+     * column existed. It matters for cross-site runs: two WooCommerce installs
+     * hand out the same small integers, and product 42 from the club site is
+     * not product 42 from the shop site. Every read, write and delete below
+     * carries it — a lookup that forgot to would resolve somebody else's
+     * mapping, which is the one failure mode this column exists to prevent.
+     *
+     * Not to be confused with `is_simulated`. That asks whether a run is a
+     * rehearsal; this asks whose data it is.
+     */
+    private readonly string $sourceKey;
+
+    public function __construct(string $sourceKey = Constants::DEFAULT_SOURCE_KEY)
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'cartshift_id_map';
+        $this->table     = $wpdb->prefix . 'cartshift_id_map';
+        $this->sourceKey = $sourceKey;
     }
 
     /**
@@ -88,6 +107,7 @@ final class IdMapRepository
         $wpdb->insert(
             $this->table,
             [
+                'source_key'           => $this->sourceKey,
                 'entity_type'          => $entityType,
                 'wc_id'                => $wcId,
                 'fc_id'                => $fcId,
@@ -96,7 +116,7 @@ final class IdMapRepository
                 'is_simulated'         => $this->simulating ? 1 : 0,
                 'created_at'           => gmdate('Y-m-d H:i:s'),
             ],
-            ['%s', '%s', '%d', '%s', '%d', '%d', '%s'],
+            ['%s', '%s', '%s', '%d', '%s', '%d', '%d', '%s'],
         );
 
         // A mapping that does not land is the one silent `$wpdb` failure with
@@ -139,9 +159,10 @@ final class IdMapRepository
 
         $result = $wpdb->get_var($wpdb->prepare(
             "SELECT fc_id FROM {$this->table}
-             WHERE entity_type = %s AND wc_id = %s" . $this->realmPredicate() . "
+             WHERE source_key = %s AND entity_type = %s AND wc_id = %s" . $this->realmPredicate() . "
              ORDER BY is_simulated ASC, id ASC
              LIMIT 1",
+            $this->sourceKey,
             $entityType,
             $wcId,
         ));
@@ -181,8 +202,9 @@ final class IdMapRepository
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT wc_id, fc_id FROM {$this->table}
-             WHERE entity_type = %s" . $this->realmPredicate() . "
+             WHERE source_key = %s AND entity_type = %s" . $this->realmPredicate() . "
              ORDER BY is_simulated ASC, id ASC",
+            $this->sourceKey,
             $entityType,
         ));
 
@@ -227,14 +249,17 @@ final class IdMapRepository
         if ($migrationId !== null) {
             return $wpdb->get_results($wpdb->prepare(
                 "SELECT wc_id, fc_id FROM {$this->table}
-                 WHERE entity_type = %s AND migration_id = %s AND is_simulated = 0",
+                 WHERE source_key = %s AND entity_type = %s AND migration_id = %s AND is_simulated = 0",
+                $this->sourceKey,
                 $entityType,
                 $migrationId,
             ));
         }
 
         return $wpdb->get_results($wpdb->prepare(
-            "SELECT wc_id, fc_id FROM {$this->table} WHERE entity_type = %s AND is_simulated = 0",
+            "SELECT wc_id, fc_id FROM {$this->table}
+             WHERE source_key = %s AND entity_type = %s AND is_simulated = 0",
+            $this->sourceKey,
             $entityType,
         ));
     }
@@ -252,8 +277,9 @@ final class IdMapRepository
 
         return $wpdb->get_results($wpdb->prepare(
             "SELECT wc_id, fc_id FROM {$this->table}
-             WHERE entity_type = %s AND migration_id = %s
+             WHERE source_key = %s AND entity_type = %s AND migration_id = %s
                AND created_by_migration = 1 AND is_simulated = 0",
+            $this->sourceKey,
             $entityType,
             $migrationId,
         ));
@@ -298,7 +324,9 @@ final class IdMapRepository
         global $wpdb;
 
         $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$this->table} WHERE migration_id = %s AND created_by_migration = 1",
+            "DELETE FROM {$this->table}
+             WHERE source_key = %s AND migration_id = %s AND created_by_migration = 1",
+            $this->sourceKey,
             $migrationId,
         ));
 
@@ -315,19 +343,31 @@ final class IdMapRepository
     {
         global $wpdb;
 
+        $where['source_key'] = $this->sourceKey;
+        $formats[]           = '%s';
+
         $wpdb->delete($this->table, $where, $formats);
 
         $this->flushMemo();
     }
 
     /**
-     * Truncate the entire table.
+     * Drop every mapping this source owns.
+     *
+     * A DELETE rather than the TRUNCATE it used to be. Once the table is shared
+     * between source namespaces, truncating it to clear one source's mappings
+     * would take every other source's with it — and those are facts a different
+     * run resolves against.
      */
     public function truncate(): void
     {
         global $wpdb;
 
-        $wpdb->query("TRUNCATE TABLE {$this->table}");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$this->table} WHERE source_key = %s",
+            $this->sourceKey,
+        ));
 
         $this->flushMemo();
     }

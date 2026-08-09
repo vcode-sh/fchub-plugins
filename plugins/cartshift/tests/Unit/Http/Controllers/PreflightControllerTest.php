@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace CartShift\Tests\Unit\Http\Controllers;
 
+use CartShift\Core\Container;
+use CartShift\Http\Controllers\PreflightController;
 use CartShift\Validator\PreflightCheck;
 use CartShift\Tests\Unit\PluginTestCase;
+
+require_once dirname(__DIR__, 3) . '/stubs/EntityMigratorStubs.php';
 
 /**
  * Tests for PreflightCheck via direct instantiation.
@@ -131,5 +135,56 @@ final class PreflightControllerTest extends PluginTestCase
         $this->assertArrayHasKey('grouped', $productTypes['unsupported']);
         $this->assertArrayHasKey('external', $productTypes['unsupported']);
         $this->assertStringContainsString('unsupported', $productTypes['message']);
+    }
+
+    // ──────────────────────────────────────────────
+    // The operation the wizard is asking about
+    // ──────────────────────────────────────────────
+
+    public function testTheEndpointDefaultsToGenericMigration(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): string => 'exists';
+        $GLOBALS['_cartshift_test_hpos_enabled'] = false;
+
+        $response = $this->controller()->preflight(new \WP_REST_Request());
+        $data = $response->get_data()['data'];
+
+        $this->assertSame(PreflightCheck::OPERATION_MIGRATION, $data['operation']);
+        $this->assertSame(
+            PreflightCheck::SEVERITY_FAIL,
+            $data['checks']['order_storage']['severity'],
+            'The generic path keeps its HPOS gate.',
+        );
+    }
+
+    public function testTheSubscriptionDatasetOperationPassesOnLegacyStorage(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): string => 'exists';
+        $GLOBALS['_cartshift_test_hpos_enabled'] = false;
+
+        $request = new \WP_REST_Request();
+        $request->set_param('operation', PreflightCheck::OPERATION_SUBSCRIPTION_DATASET);
+
+        $data = $this->controller()->preflight($request)->get_data()['data'];
+
+        $this->assertSame(PreflightCheck::OPERATION_SUBSCRIPTION_DATASET, $data['operation']);
+        $this->assertSame('public_api', $data['checks']['order_storage']['access']);
+        $this->assertSame('posts', $data['checks']['order_storage']['storage_authority']);
+    }
+
+    public function testAnUnknownOperationIsRefusedRatherThanDefaulted(): void
+    {
+        $request = new \WP_REST_Request();
+        $request->set_param('operation', 'whatever-feels-right');
+
+        $response = $this->controller()->preflight($request);
+
+        $this->assertSame(400, $response->get_status());
+        $this->assertSame('cartshift_unknown_operation', $response->get_data()['code']);
+    }
+
+    private function controller(): PreflightController
+    {
+        return new PreflightController(new Container());
     }
 }

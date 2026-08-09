@@ -57,6 +57,21 @@ final class ProductTypes
     private const array SUBSCRIPTION_TYPES = ['subscription', 'variable-subscription'];
 
     /**
+     * The `product_type` slugs that carry children rather than being their own
+     * single implicit variation.
+     *
+     * `variable-subscription` belongs here for exactly the reason `subscription`
+     * does not: WooCommerce Subscriptions gives a variable product's *children*
+     * the recurring configuration (`_subscription_period` and friends live on
+     * each `WC_Product_Variation`, read by VariationMapper), while the parent
+     * behaves structurally like any other variable product — `get_children()`
+     * returns the same list, `get_type()` differs only by this one word.
+     *
+     * @var list<string>
+     */
+    private const array VARIABLE_TYPES = ['variable', 'variable-subscription'];
+
+    /**
      * The `product_type` term slugs a run on THIS site can migrate.
      *
      * The WooCommerce Subscriptions gate is real, not superstition. Nothing
@@ -92,6 +107,32 @@ final class ProductTypes
         }
 
         return [...self::BASE_TYPES, ...self::SUBSCRIPTION_TYPES];
+    }
+
+    /**
+     * Whether a `product_type` slug is structurally variable — carries child
+     * variations rather than being its own single implicit one.
+     *
+     * The one answer to a question five call sites used to ask themselves with
+     * `$type === 'variable'`: ProductMapper (twice), ProductMigrator (twice) and
+     * MappingController (twice) all read the parent's children, or fell through
+     * to treating the whole product as one simple variation, based on that
+     * literal comparison. `variable-subscription` failed every one of them —
+     * ProductTypes::supported() has advertised it as migratable since D2, but a
+     * variable subscription product was silently collapsed to its parent alone,
+     * losing every variation (and, with it, every distinct cadence a shop sold
+     * through them). `get_children()` does not care which of the two slugs the
+     * parent carries, and neither should anything reading it.
+     *
+     * Deliberately independent of supported() — this predicate answers "does
+     * this type have children", not "can this site migrate this type at all".
+     * A store without WooCommerce Subscriptions loaded never reaches a call site
+     * asking this in the first place, because ProductTypes::migratableClause()
+     * has already excluded the row.
+     */
+    public static function isVariable(string $type): bool
+    {
+        return in_array($type, self::VARIABLE_TYPES, true);
     }
 
     /**

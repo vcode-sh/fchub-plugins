@@ -86,14 +86,72 @@ final class MappingControllerTest extends PluginTestCase
             return 1;
         };
 
-        // clear() -> $wpdb->query('TRUNCATE TABLE …'), which the shared stub
-        // does not route anywhere — so a local wpdb subclass below adds a
-        // callback hook for it, mirroring the one insert() already has.
+        // clear() -> $wpdb->query(), which the shared stub does not route
+        // anywhere — so a local wpdb subclass below adds a callback hook for
+        // it, mirroring the one insert() already has. Both verbs are matched:
+        // the repository issued a TRUNCATE until the source-key namespace made
+        // it a scoped DELETE, and a harness that recognised only one would
+        // report an empty table as full without saying why.
+        //
+        // The DELETE's WHERE is honoured rather than ignored, and an
+        // unscoped DELETE deletes everything — which is what MySQL would do,
+        // and is exactly why the fake alone proves nothing. A `clear()` that
+        // lost its WHERE would still empty the fake and
+        // testClearEmptiesTheTable would still pass, because that test's only
+        // row is the one being deleted either way.
+        //
+        // So the fake is honest and the *test* carries the proof:
+        // testClearIsScopedToOneSource seeds a row under a second source key
+        // and asserts it survives. That fails the moment the scoping is
+        // removed, whichever way the fake is written.
         $GLOBALS['_cartshift_test_query_callback'] = function (string $query): void {
-            if (str_contains($query, 'TRUNCATE') && str_contains($query, 'cartshift_product_map')) {
+            if (!str_contains($query, 'cartshift_product_map')) {
+                return;
+            }
+
+            if (str_contains($query, 'TRUNCATE')) {
                 $GLOBALS['_cartshift_test_product_map_rows'] = [];
                 $this->resyncSaved();
+
+                return;
             }
+
+            if (!str_contains($query, 'DELETE FROM')) {
+                return;
+            }
+
+            $sourceKey = preg_match("/source_key = '([^']*)'/", $query, $matches) === 1
+                ? $matches[1]
+                : null;
+
+            $GLOBALS['_cartshift_test_product_map_rows'] = array_filter(
+                $GLOBALS['_cartshift_test_product_map_rows'],
+                // An unscoped DELETE keeps nothing. A scoped one keeps every
+                // row belonging to another source.
+                static fn (array $row): bool
+                    => $sourceKey !== null && ($row['source_key'] ?? null) !== $sourceKey,
+            );
+
+            $this->resyncSaved();
+        };
+
+        // ProductMapRepository::all() reads the table back, and the whole-set
+        // validation added for subscription mapping depends on it seeing what
+        // earlier saves wrote. The shared stub has no read path for the fake
+        // table, so this wraps whatever get_results() callback a fixture
+        // already installed rather than replacing it — seedCatalogue() runs
+        // before controller() in the rows tests and not at all in these.
+        $existing = $GLOBALS['_cartshift_test_get_results_callback'] ?? null;
+
+        $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query) use ($existing): array {
+            if (str_contains($query, 'cartshift_product_map')) {
+                $rows = $GLOBALS['_cartshift_test_product_map_rows'];
+                ksort($rows);
+
+                return array_values(array_map(static fn (array $row): object => (object) $row, $rows));
+            }
+
+            return $existing !== null ? $existing($query) : [];
         };
 
         $GLOBALS['wpdb'] = new class () extends \wpdb {
@@ -146,22 +204,47 @@ final class MappingControllerTest extends PluginTestCase
         return $request;
     }
 
+    /**
+     * Register a plain one-time WooCommerce product.
+     *
+     * The save gate re-reads the source product to verify its contracts, so a
+     * decision about a `wc_id` no WooCommerce product answers to is now refused
+     * with `required_reference_missing` — see
+     * testALinkWhoseWooProductCannotBeReadIsRefused. Tests that are about
+     * something else therefore have to give their product an existence.
+     */
+    private function registerWooProduct(int $id, string $name = 'Test Product'): void
+    {
+        $GLOBALS['_cartshift_test_wc_products'][$id] = $this->createWooProduct(['id' => $id, 'name' => $name]);
+    }
+
+    /**
+     * The variant map is keyed by *source variation*, and for a simple product
+     * that key is the product's own ID — the pseudo-variation shape
+     * ProductMigrator, VariantResolver and the mapping screen all share. This
+     * fixture used to say `11 => 501` against product 42, which is not a shape
+     * WooCommerce can produce; it now says what the screen would actually post,
+     * because the save gate checks that a named source variation belongs to the
+     * product (see testAVariantMapKeyThatIsNotAVariationOfTheProductIsRefused).
+     */
     public function testDecideSavesALink(): void
     {
+        $this->registerWooProduct(42);
+
         $response = $this->controller()->decide($this->request([
             'wc_id'       => 42,
-            'wc_type'     => 'variable',
+            'wc_type'     => 'simple',
             'decision'    => 'link',
             'fc_post_id'  => 900,
             'band'        => 'strong',
-            'variant_map' => ['11' => '501'],
+            'variant_map' => ['42' => '501'],
         ]));
 
         $this->assertSame(200, $response->get_status());
         $this->assertCount(1, $this->saved);
         $this->assertSame('link', $this->saved[0]->decision());
         $this->assertSame(900, $this->saved[0]->fcPostId());
-        $this->assertSame([11 => 501], $this->saved[0]->variantMap());
+        $this->assertSame([42 => 501], $this->saved[0]->variantMap());
     }
 
     public function testALinkWithoutATargetIsRefused(): void
@@ -216,6 +299,9 @@ final class MappingControllerTest extends PluginTestCase
 
     public function testBulkSkipsRowsItCannotUse(): void
     {
+        $this->registerWooProduct(1);
+        $this->registerWooProduct(2);
+
         $response = $this->controller()->bulk($this->request([
             'decision' => 'link',
             'band'     => 'strong',
@@ -237,6 +323,44 @@ final class MappingControllerTest extends PluginTestCase
         $controller->clear($this->request([]));
 
         $this->assertSame([], $this->saved);
+    }
+
+    /**
+     * "Clear all mappings" clears *this* source's mappings.
+     *
+     * The test above cannot tell the difference: its only row is the one being
+     * deleted either way, so it passes whether `clear()` scopes its DELETE or
+     * truncates the table. This one seeds a decision belonging to a second
+     * source — the cross-runtime package route, where both Lapka sites number
+     * their products from one — and asserts it is still there afterwards.
+     *
+     * Read off the fake table rather than off $this->saved, because
+     * ProductMapDecision carries no source key: the thing being asserted is
+     * which *rows* survived, which is a storage fact, not a decision one.
+     */
+    public function testClearIsScopedToOneSource(): void
+    {
+        $controller = $this->controller();
+
+        $controller->decide($this->request(['wc_id' => 1, 'decision' => 'skip']));
+
+        $GLOBALS['_cartshift_test_product_map_rows'][777] = [
+            'source_key'  => 'lapka-klub',
+            'wc_id'       => 777,
+            'wc_type'     => 'simple',
+            'decision'    => 'skip',
+            'fc_post_id'  => null,
+            'band'        => 'none',
+            'variant_map' => null,
+        ];
+
+        $controller->clear($this->request([]));
+
+        $this->assertSame(
+            [777],
+            array_keys($GLOBALS['_cartshift_test_product_map_rows']),
+            "Another source's decisions are not this source's to throw away.",
+        );
     }
 
     // ── rows() ───────────────────────────────────────────────
@@ -293,11 +417,6 @@ final class MappingControllerTest extends PluginTestCase
         };
 
         $GLOBALS['_cartshift_test_get_results_callback'] = static function (string $query) use ($fcProducts, $variantsById): array {
-            // ProductMapRepository::get() — no existing decisions in this fixture.
-            if (str_contains($query, 'cartshift_product_map')) {
-                return [];
-            }
-
             // MappingController::fcCandidates()
             if (str_contains($query, "post_type = 'fluent-products'")) {
                 $out = [];
@@ -319,6 +438,14 @@ final class MappingControllerTest extends PluginTestCase
                                 'variation_title' => $v['name'],
                                 'item_price'      => $v['item_price'],
                                 'sku'             => $v['sku'],
+                                // Nullable in FluentCart's own schema, so the
+                                // fixture leaves them absent unless a test says
+                                // otherwise — a hand-built one-time product is
+                                // the common shape and must keep working.
+                                'payment_type'    => $v['payment_type'] ?? null,
+                                'other_info'      => isset($v['other_info'])
+                                    ? (string) json_encode($v['other_info'])
+                                    : null,
                             ],
                             $variants,
                         );
@@ -866,6 +993,77 @@ final class MappingControllerTest extends PluginTestCase
         $this->assertSame(0, $row['variant']['adds']);
     }
 
+    // ── variable-subscription ────────────────────────────────
+    //
+    // wooProductPage() and anyVariationHasDownloads() both used to decide
+    // "does this product have children" by comparing the bare literal
+    // 'variable', which a variable-subscription product never matches. The
+    // first collapsed every variation into a single "Default" row keyed off
+    // the parent; the second read only the parent's own downloads and missed
+    // whatever lived on the children, understating a warning the owner needs
+    // before they link the product.
+
+    public function testAVariableSubscriptionListsAllItsVariations(): void
+    {
+        $GLOBALS['_cartshift_test_wc_products'][60] = $this->createWooProduct([
+            'id' => 60, 'name' => 'Yoga Pass', 'type' => 'variable-subscription', 'sku' => '', 'price' => '9.99',
+            'children' => [601, 602],
+        ]);
+        $GLOBALS['_cartshift_test_wc_products'][601] = $this->createWooVariation([
+            'id' => 601, 'name' => 'Yoga Pass - Monthly', 'sku' => 'YOGA-M',
+        ]);
+        $GLOBALS['_cartshift_test_wc_products'][602] = $this->createWooVariation([
+            'id' => 602, 'name' => 'Yoga Pass - Yearly', 'sku' => 'YOGA-Y',
+        ]);
+
+        $this->seedCatalogue([], [60], wooTotalCount: 1);
+
+        $row = $this->findRow(
+            $this->controller()->rows($this->request(['page' => 1, 'per_page' => 50]))->get_data()['data']['rows'],
+            60,
+        );
+
+        $this->assertSame(
+            2,
+            $row['variations'],
+            'A variable-subscription product must not collapse to a single pseudo-variation.',
+        );
+    }
+
+    public function testAFileOnAVariableSubscriptionVariationCountsAsAFileOnTheProduct(): void
+    {
+        $GLOBALS['_cartshift_test_wc_products'][61] = $this->createWooProduct([
+            'id' => 61, 'name' => 'Course Pass', 'type' => 'variable-subscription', 'sku' => '', 'price' => '49.00',
+            'children' => [611],
+        ]);
+        $GLOBALS['_cartshift_test_wc_products'][611] = $this->createWooVariation([
+            'id' => 611, 'name' => 'Course Pass - Monthly', 'sku' => 'CP-M',
+            'downloadable' => true,
+            'downloads'    => [(object) ['id' => 'a', 'file' => 'https://example.com/lesson1.pdf']],
+        ]);
+
+        $this->seedCatalogue(
+            [[
+                'id'       => 902,
+                'title'    => 'Course Pass',
+                'variants' => [['id' => 611, 'sku' => 'CP-M', 'name' => 'Default', 'item_price' => 4900]],
+            ]],
+            [61],
+            wooTotalCount: 1,
+        );
+
+        $row = $this->findRow(
+            $this->controller()->rows($this->request(['page' => 1, 'per_page' => 50]))->get_data()['data']['rows'],
+            61,
+        );
+
+        $this->assertSame(902, $row['suggested']);
+        $this->assertTrue(
+            $row['downloads_lost'],
+            'The variation carries the only file this product has — reading only the parent misses it.',
+        );
+    }
+
     // ── Scope and product type ───────────────────────────────
 
     /**
@@ -907,6 +1105,8 @@ final class MappingControllerTest extends PluginTestCase
      */
     public function testBulkReturnsTheDecisionsItSavedNotJustACount(): void
     {
+        $this->registerWooProduct(1);
+
         $response = $this->controller()->bulk($this->request([
             'decision' => 'link',
             'band'     => 'strong',
@@ -920,15 +1120,742 @@ final class MappingControllerTest extends PluginTestCase
         $this->assertSame(1, $data['saved']);
         $this->assertSame(
             [[
-                'wc_id'       => 1,
-                'wc_type'     => 'simple',
-                'decision'    => 'link',
-                'fc_post_id'  => 900,
-                'band'        => 'strong',
-                'variant_map' => [1 => 501],
-                'orphans'     => [],
+                'wc_id'               => 1,
+                'wc_type'             => 'simple',
+                'decision'            => 'link',
+                'fc_post_id'          => 900,
+                'band'                => 'strong',
+                'variant_map'         => [1 => 501],
+                'orphans'             => [],
+                // Added by the subscription mapping work: the operator's
+                // explicit "yes, two source products may land on this one
+                // variation". Off unless they said so.
+                'allow_shared_target' => false,
             ]],
             $data['decisions'],
         );
+    }
+
+    // ──────────────────────────────────────────────
+    // Manual catalogue search — the band=none rescue
+    // ──────────────────────────────────────────────
+    //
+    // ProductMatcher scored both Lapka source products `band=none`, and rows()
+    // drops every `none` candidate before the slice. That is right for a
+    // dropdown of suggestions and wrong as the only way to pick a product: "no
+    // automatic suggestion" is not "cannot be selected". So the whole target
+    // catalogue is searchable, and what comes back carries the billing contract
+    // of every variation, because that is what the operator is choosing between.
+
+    /**
+     * @param list<array{id: int, title: string, variants: list<array<string, mixed>>}> $fcProducts
+     */
+    private function catalogueResponse(array $fcProducts, array $params = []): array
+    {
+        // The shared get_var() stub answers every non-order-count query with
+        // this number, which for catalogue() is its COUNT(*) of target products.
+        $this->seedCatalogue($fcProducts, [], wooTotalCount: count($fcProducts));
+
+        return $this->controller()
+            ->catalogue($this->request(array_merge(['page' => 1, 'per_page' => 50], $params)))
+            ->get_data()['data'];
+    }
+
+    /**
+     * @return list<array{id: int, title: string, variants: list<array<string, mixed>>}>
+     */
+    private function membershipCatalogue(): array
+    {
+        return [[
+            'id'       => 88,
+            'title'    => 'Klubu Przyjaciol Psow',
+            'variants' => [
+                [
+                    'id' => 4101, 'sku' => '', 'name' => 'Miesiecznie', 'item_price' => 2900,
+                    'payment_type' => 'subscription',
+                    'other_info'   => ['repeat_interval' => 'monthly', 'trial_days' => 0, 'times' => 0],
+                ],
+                [
+                    'id' => 4102, 'sku' => '', 'name' => 'Rocznie', 'item_price' => 29000,
+                    'payment_type' => 'subscription',
+                    'other_info'   => ['repeat_interval' => 'yearly', 'trial_days' => 7, 'times' => 3],
+                ],
+            ],
+        ]];
+    }
+
+    public function testTheCatalogueEndpointOffersEveryTargetProductRegardlessOfBand(): void
+    {
+        $data = $this->catalogueResponse($this->membershipCatalogue());
+
+        $this->assertSame(1, $data['total']);
+        $this->assertSame(88, $data['products'][0]['id']);
+        $this->assertSame('Klubu Przyjaciol Psow', $data['products'][0]['name']);
+    }
+
+    public function testTheCatalogueCarriesEveryVariationsBillingContract(): void
+    {
+        $variations = $this->catalogueResponse($this->membershipCatalogue())['products'][0]['variations'];
+
+        $this->assertSame([
+            [
+                'id'              => 4101,
+                'sku'             => '',
+                'name'            => 'Miesiecznie',
+                'price'           => 29.0,
+                'payment_type'    => 'subscription',
+                'repeat_interval' => 'monthly',
+                'trial_days'      => 0,
+                'times'           => 0,
+            ],
+            [
+                'id'              => 4102,
+                'sku'             => '',
+                'name'            => 'Rocznie',
+                'price'           => 290.0,
+                'payment_type'    => 'subscription',
+                'repeat_interval' => 'yearly',
+                'trial_days'      => 7,
+                'times'           => 3,
+            ],
+        ], $variations);
+    }
+
+    public function testTheCatalogueSearchFiltersByTitle(): void
+    {
+        $this->catalogueResponse($this->membershipCatalogue(), ['q' => 'Klub']);
+
+        $queries = array_filter(
+            $GLOBALS['_cartshift_test_queries'],
+            static fn (array $entry): bool
+                => $entry[0] === 'prepare' && str_contains((string) $entry[1], 'post_title LIKE'),
+        );
+
+        $this->assertNotEmpty($queries, 'A search term has to reach the SQL, or the endpoint is paging blindly.');
+    }
+
+    /**
+     * The same exclusion rows() applies: a product using Advanced Variations
+     * regenerates its variants from the attribute cartesian and deletes
+     * everything not in it, so it must not be offered here either.
+     */
+    public function testTheCatalogueExcludesAdvancedVariationProducts(): void
+    {
+        $this->catalogueResponse($this->membershipCatalogue());
+
+        $queries = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'],
+            static fn (array $entry): bool
+                => $entry[0] === 'prepare' && str_contains((string) $entry[1], "post_type = 'fluent-products'"),
+        ));
+
+        $this->assertNotEmpty($queries);
+
+        foreach ($queries as $entry) {
+            $this->assertStringContainsString('d.variation_type IS NULL OR d.variation_type !=', (string) $entry[1]);
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // Saving a decision validates the whole set
+    // ──────────────────────────────────────────────
+    //
+    // VariantResolver's `$claimed` protects one product decision. Two Woo
+    // products decided one after another each get their own, so both can claim
+    // the same FluentCart variation and neither call notices. On Lapka that is
+    // the yearly product landing on the monthly variation.
+
+    private function subscriptionProduct(int $id, string $name, string $period, string $price): \WC_Product
+    {
+        return $this->createWooProduct([
+            'id'    => $id,
+            'name'  => $name,
+            'type'  => 'subscription',
+            'sku'   => '',
+            'price' => $price,
+            'meta'  => [
+                '_subscription_period'          => $period,
+                '_subscription_period_interval' => '1',
+            ],
+        ]);
+    }
+
+    public function testDecideStoresTheSharedTargetFlag(): void
+    {
+        $this->registerWooProduct(42);
+
+        $this->controller()->decide($this->request([
+            'wc_id'               => 42,
+            'wc_type'             => 'subscription',
+            'decision'            => 'link',
+            'fc_post_id'          => 88,
+            'band'                => 'none',
+            'variant_map'         => ['42' => '4101'],
+            'allow_shared_target' => true,
+        ]));
+
+        $this->assertTrue($this->saved[0]->allowSharedTarget());
+    }
+
+    public function testDecideDefaultsTheSharedTargetFlagToOff(): void
+    {
+        $this->registerWooProduct(42);
+
+        $this->controller()->decide($this->request([
+            'wc_id'       => 42,
+            'wc_type'     => 'subscription',
+            'decision'    => 'link',
+            'fc_post_id'  => 88,
+            'variant_map' => ['42' => '4101'],
+        ]));
+
+        $this->assertFalse($this->saved[0]->allowSharedTarget());
+    }
+
+    /**
+     * Two source products of the *same* cadence, neither opting in.
+     *
+     * The per-row gate cannot catch this one — both are genuinely monthly and
+     * the variation genuinely is monthly, so every per-row check passes twice.
+     * It is only visible across the set, which is the whole reason
+     * MappingSetValidator exists. (A monthly and a yearly product colliding is
+     * caught one step earlier, by the contract gate: see
+     * testASubscriptionLinkOntoTheWrongCadenceIsRefusedByTheServer.)
+     */
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testASecondSourceClaimingAnAlreadyClaimedVariationIsRefused(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $GLOBALS['_cartshift_test_wc_products'][901] = $this->subscriptionProduct(901, 'Legacy A', 'month', '29.00');
+        $GLOBALS['_cartshift_test_wc_products'][902] = $this->subscriptionProduct(902, 'Legacy B', 'month', '24.00');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [], wooTotalCount: 0);
+
+        $controller = $this->controller();
+
+        $first = $controller->decide($this->request([
+            'wc_id' => 901, 'wc_type' => 'subscription', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['901' => '4101'],
+        ]));
+
+        $this->assertSame(200, $first->get_status());
+
+        $second = $controller->decide($this->request([
+            'wc_id' => 902, 'wc_type' => 'subscription', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['902' => '4101'],
+        ]));
+
+        $this->assertSame(422, $second->get_status());
+        $this->assertSame(
+            ['target_variation_contract_collision'],
+            array_column($second->get_data()['data']['errors'], 'code'),
+        );
+        $this->assertCount(1, $this->saved, 'The colliding decision must never reach the table.');
+    }
+
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testTheTwoLapkaProductsSaveWhenTheyTakeDifferentVariations(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $GLOBALS['_cartshift_test_wc_products'][770_001] = $this->subscriptionProduct(770_001, 'Monthly', 'month', '29.00');
+        $GLOBALS['_cartshift_test_wc_products'][770_002] = $this->subscriptionProduct(770_002, 'Yearly', 'year', '290.00');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [], wooTotalCount: 0);
+
+        $controller = $this->controller();
+
+        $controller->decide($this->request([
+            'wc_id'       => 770_001,
+            'wc_type'     => 'subscription',
+            'decision'    => 'link',
+            'fc_post_id'  => 88,
+            'variant_map' => ['770001' => '4101'],
+        ]));
+
+        $second = $controller->decide($this->request([
+            'wc_id'       => 770_002,
+            'wc_type'     => 'subscription',
+            'decision'    => 'link',
+            'fc_post_id'  => 88,
+            'variant_map' => ['770002' => '4102'],
+        ]));
+
+        $this->assertSame(200, $second->get_status());
+        $this->assertCount(2, $this->saved);
+        $this->assertSame([770_001 => 4101], $this->saved[0]->variantMap());
+        $this->assertSame([770_002 => 4102], $this->saved[1]->variantMap());
+    }
+
+    /**
+     * Two one-time products landing on one variation is what CartShift has
+     * always done. A subscription fix that broke it would be a regression in
+     * the ninety-nine per cent of catalogues that have no subscriptions at all.
+     */
+    public function testTwoOneTimeProductsMayStillShareOneTargetVariation(): void
+    {
+        $controller = $this->controller();
+
+        $this->registerWooProduct(11, 'A');
+        $this->registerWooProduct(12, 'B');
+
+        $controller->decide($this->request([
+            'wc_id' => 11, 'wc_type' => 'simple', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['11' => '501'],
+        ]));
+
+        $second = $controller->decide($this->request([
+            'wc_id' => 12, 'wc_type' => 'simple', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['12' => '501'],
+        ]));
+
+        $this->assertSame(200, $second->get_status());
+        $this->assertCount(2, $this->saved);
+    }
+
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testTwoEquivalentSubscriptionsMayShareATargetWhenBothOptIn(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $GLOBALS['_cartshift_test_wc_products'][901] = $this->subscriptionProduct(901, 'Legacy A', 'month', '29.00');
+        $GLOBALS['_cartshift_test_wc_products'][902] = $this->subscriptionProduct(902, 'Legacy B', 'month', '24.00');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [], wooTotalCount: 0);
+
+        $controller = $this->controller();
+
+        $controller->decide($this->request([
+            'wc_id' => 901, 'wc_type' => 'subscription', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['901' => '4101'], 'allow_shared_target' => true,
+        ]));
+
+        $second = $controller->decide($this->request([
+            'wc_id' => 902, 'wc_type' => 'subscription', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['902' => '4101'], 'allow_shared_target' => true,
+        ]));
+
+        $this->assertSame(200, $second->get_status());
+        $this->assertCount(2, $this->saved);
+    }
+
+    /**
+     * The response carries the mapping-set fingerprint Tasks 10 and 11 persist
+     * into stage and cutover receipts, so the operator's approved mapping and
+     * the one the run executes can be compared rather than assumed equal.
+     */
+    public function testASavedDecisionReturnsTheMappingSetFingerprint(): void
+    {
+        $this->registerWooProduct(42);
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['42' => '501'],
+        ]));
+
+        $this->assertMatchesRegularExpression(
+            '/^[0-9a-f]{64}$/',
+            $response->get_data()['data']['mapping_fingerprint'],
+        );
+    }
+
+    // ──────────────────────────────────────────────
+    // Saving requires an explicit, compatible variation
+    // ──────────────────────────────────────────────
+    //
+    // The mapping screen hides the Link button while a subscription source has
+    // no compatible target, and a screen is not a gate: the endpoint takes a
+    // variant map from the browser and the browser is the one thing on this
+    // path CartShift does not control. So the contracts are re-derived from
+    // WooCommerce and FluentCart here, and the client's choices are checked
+    // against them rather than trusted.
+
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testASubscriptionLinkWithNoVariationChoiceIsRefused(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $GLOBALS['_cartshift_test_wc_products'][770_002]
+            = $this->subscriptionProduct(770_002, 'Klubu Przyjaciol Psow rocznie', 'year', '290.00');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [770_002], wooTotalCount: 1);
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 770_002, 'wc_type' => 'subscription', 'decision' => 'link', 'fc_post_id' => 88,
+        ]));
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame(
+            ['target_variation_missing'],
+            array_column($response->get_data()['data']['errors'], 'code'),
+        );
+        $this->assertSame([], $this->saved);
+    }
+
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testASubscriptionLinkOntoTheWrongCadenceIsRefusedByTheServer(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $GLOBALS['_cartshift_test_wc_products'][770_002]
+            = $this->subscriptionProduct(770_002, 'Klubu Przyjaciol Psow rocznie', 'year', '290.00');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [770_002], wooTotalCount: 1);
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 770_002, 'wc_type' => 'subscription', 'decision' => 'link', 'fc_post_id' => 88,
+            // The monthly variation, posted for a yearly product.
+            'variant_map' => ['770002' => '4101'],
+        ]));
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame(
+            ['target_variation_contract_mismatch'],
+            array_column($response->get_data()['data']['errors'], 'code'),
+        );
+        $this->assertSame([], $this->saved);
+    }
+
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testACompatibleSubscriptionLinkSaves(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $GLOBALS['_cartshift_test_wc_products'][770_002]
+            = $this->subscriptionProduct(770_002, 'Klubu Przyjaciol Psow rocznie', 'year', '290.00');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [770_002], wooTotalCount: 1);
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 770_002, 'wc_type' => 'subscription', 'decision' => 'link', 'fc_post_id' => 88,
+            'variant_map' => ['770002' => '4102'],
+        ]));
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame([770_002 => 4102], $this->saved[0]->variantMap());
+    }
+
+    /**
+     * A one-time product is not asked for anything it was not asked for
+     * before: no variant map is still a legal link, because the resolver's
+     * name and position passes are a reasonable answer for a size and the
+     * whole of CartShift 1.4.x depends on it.
+     */
+    public function testAOneTimeLinkWithNoVariantMapIsStillAccepted(): void
+    {
+        $GLOBALS['_cartshift_test_wc_products'][42] = $this->createWooProduct(['id' => 42, 'name' => 'Blue Widget']);
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link', 'fc_post_id' => 900,
+        ]));
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertCount(1, $this->saved);
+    }
+
+    /**
+     * The gate's other direction. A one-time source naming a subscription
+     * variation is the same defect as a subscription source naming a one-time
+     * one, and it used to sail through: contractErrors() looked only at
+     * subscription source variations and returned early when there were none.
+     */
+    public function testAOneTimeSourceClaimingASubscriptionVariationIsRefused(): void
+    {
+        $this->registerWooProduct(42, 'Blue Widget');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [], wooTotalCount: 0);
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['42' => '4101'],
+        ]));
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame(
+            ['target_variation_contract_mismatch'],
+            array_column($response->get_data()['data']['errors'], 'code'),
+        );
+        $this->assertSame([], $this->saved);
+    }
+
+    /**
+     * An unreadable WooCommerce source used to make both gates default to
+     * "fine": contractErrors() returned no errors and sourceContract() returned
+     * null, which the set validator read as one-time. The plan's inference
+     * policy says an unresolved load-bearing fact gets a named refusal, and
+     * this is the named refusal.
+     */
+    public function testALinkWhoseWooProductCannotBeReadIsRefused(): void
+    {
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 999_999, 'wc_type' => 'simple', 'decision' => 'link',
+            'fc_post_id' => 88, 'variant_map' => ['999999' => '4101'],
+        ]));
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame(
+            ['required_reference_missing'],
+            array_column($response->get_data()['data']['errors'], 'code'),
+        );
+        $this->assertSame([], $this->saved);
+    }
+
+    /**
+     * A variant map key naming a source variation the product does not have.
+     *
+     * The third member of the family: the gate refused the shape it was
+     * written for — a subscription source with no choice, a choice with the
+     * wrong cadence — and waved through a key that named nothing at all, which
+     * the set validator then saw as one uncontested claim. Reachable by
+     * re-saving a decision after the owner deleted or regenerated a variation.
+     */
+    public function testAVariantMapKeyThatIsNotAVariationOfTheProductIsRefused(): void
+    {
+        $this->registerWooProduct(42, 'Blue Widget');
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
+            // 42 is a simple product: its only source variation is 42 itself.
+            'fc_post_id' => 900, 'variant_map' => ['11' => '501'],
+        ]));
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame(
+            ['required_reference_missing'],
+            array_column($response->get_data()['data']['errors'], 'code'),
+        );
+        $this->assertSame([], $this->saved);
+    }
+
+    /**
+     * The same refusal, read by somebody who has to act on it.
+     *
+     * "Variation 11 is not a variation of WooCommerce product 42. Reload the
+     * mapping screen and choose again." is correct and nearly useless: it does
+     * not say why the variation vanished, which product to look for on a screen
+     * of two thousand rows, or which target choice is being discarded. The
+     * ordinary route to this refusal is catalogue maintenance — somebody deleted
+     * or regenerated a variation of a mapped variable product — so the message
+     * has to name the row and the choice, not just the two integers that
+     * disagree.
+     */
+    public function testTheStaleVariationRefusalNamesTheRowTheTargetAndWhyItVanished(): void
+    {
+        $this->registerWooProduct(42, 'Blue Widget');
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
+            'fc_post_id' => 900, 'variant_map' => ['11' => '501'],
+        ]));
+
+        $message = $response->get_data()['data']['errors'][0]['message'];
+
+        // Which row to go back to, by name and not only by ID.
+        $this->assertStringContainsString('Blue Widget', $message);
+        $this->assertStringContainsString('42', $message);
+        // Which choice is being discarded.
+        $this->assertStringContainsString('501', $message);
+        // Why it vanished, so the owner knows where to look.
+        $this->assertStringContainsString('deleted', $message);
+    }
+
+    /**
+     * And a variable product's real children are still fine, so the check is a
+     * membership test rather than "the map must be keyed by the product ID".
+     */
+    public function testAVariableProductsOwnVariationKeysAreAccepted(): void
+    {
+        $GLOBALS['_cartshift_test_wc_products'][43] = $this->createWooProduct([
+            'id' => 43, 'name' => 'Red Widget', 'type' => 'variable', 'children' => [431, 432],
+        ]);
+        $GLOBALS['_cartshift_test_wc_products'][431] = $this->createWooVariation(['id' => 431]);
+        $GLOBALS['_cartshift_test_wc_products'][432] = $this->createWooVariation(['id' => 432]);
+
+        $response = $this->controller()->decide($this->request([
+            'wc_id' => 43, 'wc_type' => 'variable', 'decision' => 'link',
+            'fc_post_id' => 901, 'variant_map' => ['431' => '601', '432' => '602'],
+        ]));
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame([431 => 601, 432 => 602], $this->saved[0]->variantMap());
+    }
+
+    /**
+     * The set-level half of the same hole, which the per-row gate cannot reach.
+     *
+     * The gate refuses an *incoming* decision whose product is unreadable. It
+     * says nothing about decisions already in the table whose products have
+     * been deleted since — and those used to key as `onetime`, hit the
+     * all-one-time pass, and let a monthly/yearly collision validate clean. The
+     * fixture seeds them directly, because that is exactly the state an
+     * operator reaches by mapping two products and then deleting them.
+     */
+    public function testAlreadySavedDecisionsWithUnreadableSourcesCollideRatherThanPassing(): void
+    {
+        $controller = $this->controller();
+
+        foreach ([770_001, 770_002] as $wcId) {
+            $GLOBALS['_cartshift_test_product_map_rows'][$wcId] = [
+                'source_key'  => 'local',
+                'wc_id'       => $wcId,
+                'wc_type'     => 'subscription',
+                'decision'    => 'link',
+                'fc_post_id'  => 88,
+                'band'        => 'none',
+                'variant_map' => (string) json_encode(['map' => [$wcId => 4101], 'orphans' => []]),
+            ];
+        }
+
+        $this->registerWooProduct(42, 'Something else');
+
+        $response = $controller->decide($this->request([
+            'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
+            'fc_post_id' => 900, 'variant_map' => ['42' => '501'],
+        ]));
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame(
+            ['target_variation_contract_collision'],
+            array_column($response->get_data()['data']['errors'], 'code'),
+        );
+    }
+
+    /**
+     * Create and skip are unaffected: they claim no variation, so there is no
+     * contract to read and nothing to refuse.
+     */
+    public function testAnUnreadableWooProductStillAcceptsCreateAndSkip(): void
+    {
+        $controller = $this->controller();
+
+        $this->assertSame(200, $controller->decide($this->request([
+            'wc_id' => 999_999, 'wc_type' => 'simple', 'decision' => 'create',
+        ]))->get_status());
+
+        $this->assertSame(200, $controller->decide($this->request([
+            'wc_id' => 999_998, 'wc_type' => 'simple', 'decision' => 'skip',
+        ]))->get_status());
+
+        $this->assertCount(2, $this->saved);
+    }
+
+    /**
+     * bulk() drops rows it cannot *build* and refuses the whole batch on a
+     * contract error, which is a deliberate departure from the surrounding
+     * "drop, do not fail" semantics — pinned here so the next reader knows it
+     * was chosen. Silently skipping the yearly product out of a "link all"
+     * would leave 188 subscribers unmapped behind a screen reporting success.
+     */
+    public function testOneContractErrorRefusesTheWholeBatchIncludingTheGoodRows(): void
+    {
+        $this->registerWooProduct(11, 'A');
+        $this->registerWooProduct(12, 'B');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [], wooTotalCount: 0);
+
+        $response = $this->controller()->bulk($this->request([
+            'decision' => 'link',
+            'band'     => 'strong',
+            'rows'     => [
+                ['wc_id' => 11, 'wc_type' => 'simple', 'fc_post_id' => 88, 'variant_map' => ['11' => '4101']],
+                ['wc_id' => 12, 'wc_type' => 'simple', 'fc_post_id' => 88, 'variant_map' => ['12' => '501']],
+            ],
+        ]));
+
+        $this->assertSame(422, $response->get_status());
+        $this->assertSame([], $this->saved, 'The good row is not saved either — the batch is one decision.');
+    }
+
+    /**
+     * The gate does not pay for the order count. describeWooProduct() runs a
+     * COUNT(DISTINCT) over woocommerce_order_itemmeta for the mapping screen,
+     * which the contract gate never reads — and bulk() would run one per row.
+     */
+    public function testTheSaveGateDoesNotCountOrders(): void
+    {
+        $this->registerWooProduct(42, 'Blue Widget');
+
+        $this->controller()->decide($this->request([
+            'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
+            'fc_post_id' => 900, 'variant_map' => ['42' => '501'],
+        ]));
+
+        foreach ($GLOBALS['_cartshift_test_queries'] as $entry) {
+            $this->assertStringNotContainsString(
+                'woocommerce_order_itemmeta',
+                (string) ($entry[1] ?? ''),
+                'Saving a decision must not re-count the orders the mapping screen already counted.',
+            );
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // Subscription rows carry contracts, not positions
+    // ──────────────────────────────────────────────
+
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testAYearlySourceRowSuggestsTheYearlyVariationNotTheFirstOne(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $GLOBALS['_cartshift_test_wc_products'][770_002]
+            = $this->subscriptionProduct(770_002, 'Klubu Przyjaciol Psow rocznie', 'year', '290.00');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [770_002], wooTotalCount: 1);
+
+        $row = $this->findRow(
+            $this->controller()->rows($this->request(['page' => 1, 'per_page' => 50]))->get_data()['data']['rows'],
+            770_002,
+        );
+
+        $this->assertNotNull($row['variant'], 'The row has to offer the membership product to be worth testing.');
+        $this->assertSame(
+            [770_002 => 4102],
+            $row['variant']['map'],
+            'Positional fallback answered 4101 — the monthly variation, because FluentCart lists it first.',
+        );
+    }
+
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testASubscriptionRowDescribesEveryTargetVariationForTheOperator(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $GLOBALS['_cartshift_test_wc_products'][770_002]
+            = $this->subscriptionProduct(770_002, 'Klubu Przyjaciol Psow rocznie', 'year', '290.00');
+
+        $this->seedCatalogue($this->membershipCatalogue(), [770_002], wooTotalCount: 1);
+
+        $row = $this->findRow(
+            $this->controller()->rows($this->request(['page' => 1, 'per_page' => 50]))->get_data()['data']['rows'],
+            770_002,
+        );
+
+        $sources = $row['variant']['sources'];
+
+        $this->assertCount(1, $sources);
+        $this->assertTrue($sources[0]['subscription']);
+        $this->assertSame('yearly', $sources[0]['interval']);
+        $this->assertCount(2, $sources[0]['options'], 'Both target variations are listed, compatible or not.');
+
+        $byId = [];
+
+        foreach ($sources[0]['options'] as $option) {
+            $byId[$option['id']] = $option;
+        }
+
+        $this->assertFalse($byId[4101]['compatible']);
+        $this->assertTrue($byId[4102]['compatible']);
+        $this->assertSame(7, $byId[4102]['trial_days']);
+        $this->assertSame(3, $byId[4102]['times']);
     }
 }

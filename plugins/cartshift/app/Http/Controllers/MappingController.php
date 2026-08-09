@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace CartShift\Http\Controllers;
 
 use CartShift\Core\Container;
+use CartShift\Domain\Mapping\MappingSetValidation;
+use CartShift\Domain\Mapping\MappingSetValidator;
 use CartShift\Domain\Mapping\ProductMapDecision;
 use CartShift\Domain\Mapping\ProductMatcher;
+use CartShift\Domain\Mapping\SubscriptionVariantMatcher;
 use CartShift\Domain\Mapping\VariantResolver;
 use CartShift\Domain\Mapping\VariationMapper;
+use CartShift\Domain\Subscription\NormalizedSubscriptionContract;
 use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Storage\ProductMapRepository;
@@ -34,6 +38,17 @@ final class MappingController
     private const int MAX_PER_PAGE     = 200;
 
     private const int MAX_CANDIDATES = 8;
+
+    /**
+     * The decision's own WooCommerce product cannot be loaded.
+     *
+     * §9.4's `required_reference_missing`, used at its source end: the
+     * reference a mapping decision is *about* is the one reference it cannot
+     * do without. Reusing the plan's code rather than inventing one keeps the
+     * list closed, and keeps commands, receipts and retry logic reading one
+     * vocabulary.
+     */
+    private const string ERROR_SOURCE_UNREADABLE = 'required_reference_missing';
 
     /**
      * post_id => variants, filled once by fcCandidates() and reused by
@@ -85,6 +100,36 @@ final class MappingController
             ],
         ]);
 
+        // The band=none rescue. rows() drops every `none` candidate before the
+        // slice, which is right for a dropdown of suggestions and wrong as the
+        // only route to a product: "no automatic suggestion" is not "cannot be
+        // selected". ProductMatcher scored both Lapka source products `none`,
+        // and they are the two products the whole migration exists for.
+        register_rest_route(self::NAMESPACE, '/mapping/catalogue', [
+            'methods'             => 'GET',
+            'callback'            => [$this, 'catalogue'],
+            'permission_callback' => [$this, 'checkPermission'],
+            'args'                => [
+                'q'        => ['type' => 'string', 'default' => '', 'sanitize_callback' => 'sanitize_text_field'],
+                'page'     => ['type' => 'integer', 'default' => 1, 'sanitize_callback' => 'absint'],
+                'per_page' => ['type' => 'integer', 'default' => self::DEFAULT_PER_PAGE, 'sanitize_callback' => 'absint'],
+            ],
+        ]);
+
+        // What linking this Woo product to that FluentCart product would do,
+        // for a product the matcher never offered. The variation choice is a
+        // billing contract, so it is decided here rather than synthesised in
+        // the browser from a catalogue listing.
+        register_rest_route(self::NAMESPACE, '/mapping/variants', [
+            'methods'             => 'GET',
+            'callback'            => [$this, 'variants'],
+            'permission_callback' => [$this, 'checkPermission'],
+            'args'                => [
+                'wc_id'      => ['type' => 'integer', 'sanitize_callback' => 'absint'],
+                'fc_post_id' => ['type' => 'integer', 'sanitize_callback' => 'absint'],
+            ],
+        ]);
+
         register_rest_route(self::NAMESPACE, '/mapping/decide', [
             'methods'             => 'POST',
             'callback'            => [$this, 'decide'],
@@ -128,14 +173,14 @@ final class MappingController
         // every Woo product would make it O(page x catalogue) queries too.
         $candidates  = $this->fcCandidates();
 
-        $matcher  = new ProductMatcher();
-        $resolver = new VariantResolver();
-        $repo     = $this->repo();
+        $productMatcher = new ProductMatcher();
+        $variantMatcher = $this->variantMatcher();
+        $repo           = $this->repo();
 
         $rows = [];
 
         foreach ($wooProducts as $woo) {
-            $match = $matcher->match($woo['match_fields'], $candidates);
+            $match = $productMatcher->match($woo['match_fields'], $candidates);
 
             // 'none' entries are dropped before the slice, not after. A row the
             // matcher found nothing for must offer no dropdown at all: eight
@@ -161,7 +206,7 @@ final class MappingController
             $variantByCandidate = [];
 
             foreach ($ranked as $entry) {
-                $variantByCandidate[$entry['id']] = $this->variantSummary($woo, $entry['id'], $resolver);
+                $variantByCandidate[$entry['id']] = $this->variantSummary($woo, $entry['id'], $variantMatcher);
             }
 
             // Per candidate, and for the same reason the variant block is: a
@@ -216,19 +261,28 @@ final class MappingController
 
     /**
      * What linking this Woo product to this FluentCart product would do to its
-     * variants: how many pair up, and which have no counterpart at all.
+     * variants: how many pair up, which have no counterpart at all, and — for
+     * the subscriptions among them — every target variation's billing contract
+     * and whether it is compatible.
      *
-     * @param array{variations: list<array{id: int, sku: string, name: string, price: int, fulfillment_type: string, downloadable: string}>, ...} $woo
+     * @param array{variations: list<array<string, mixed>>, ...} $woo
+     * @param array<int, int>                                    $chosen Operator overrides.
      *
-     * @return array{matched: int, total: int, adds: int, map: array<int, int>, orphans: list<array{id: int, sku: string, name: string, price: int, fulfillment_type: string, downloadable: string}>}
+     * @return array{matched: int, total: int, adds: int, map: array<int, int>, orphans: list<array{id: int, sku: string, name: string, price: int, fulfillment_type: string, downloadable: string}>, errors: list<array<string, mixed>>, warnings: list<array<string, mixed>>, sources: list<array<string, mixed>>, subscription: bool}
      */
-    private function variantSummary(array $woo, int $fcPostId, VariantResolver $resolver): array
-    {
-        $resolved = $resolver->resolve($woo['variations'], $this->cachedFcVariants($fcPostId));
+    private function variantSummary(
+        array $woo,
+        int $fcPostId,
+        SubscriptionVariantMatcher $matcher,
+        array $chosen = [],
+    ): array {
+        $resolved = $matcher->match($woo['variations'], $this->cachedFcVariants($fcPostId), $chosen);
 
-        // The resolver returns orphan IDs; promotion needs the whole descriptor
+        // The matcher returns orphan IDs; promotion needs the whole descriptor
         // to name and SKU the variant it will create, so rehydrate here where
-        // the Woo variations are still in hand.
+        // the Woo variations are still in hand — and only the six fields
+        // ProductMapDecision persists, because the rest is matcher input that
+        // would otherwise make a round trip through the browser for nothing.
         $byId = [];
 
         foreach ($woo['variations'] as $variation) {
@@ -239,17 +293,44 @@ final class MappingController
 
         foreach ($resolved['orphans'] as $orphanId) {
             if (isset($byId[$orphanId])) {
-                $orphanDetail[] = $byId[$orphanId];
+                $orphanDetail[] = self::orphanDescriptor($byId[$orphanId]);
             }
         }
 
         return [
-            'matched' => count($resolved['map']),
-            'total'   => count($woo['variations']),
-            'adds'    => count($orphanDetail),
-            'map'     => $resolved['map'],
-            'orphans' => $orphanDetail,
+            'matched'      => count($resolved['map']),
+            'total'        => count($woo['variations']),
+            'adds'         => count($orphanDetail),
+            'map'          => $resolved['map'],
+            'orphans'      => $orphanDetail,
+            'errors'       => $resolved['errors'],
+            'warnings'     => $resolved['warnings'],
+            'sources'      => $resolved['sources'],
+            'subscription' => $resolved['sources'] !== [],
         ];
+    }
+
+    /**
+     * The six fields a saved decision keeps for an orphan variation.
+     *
+     * @param array<string, mixed> $variation
+     * @return array{id: int, sku: string, name: string, price: int, fulfillment_type: string, downloadable: string}
+     */
+    private static function orphanDescriptor(array $variation): array
+    {
+        return [
+            'id'               => (int) $variation['id'],
+            'sku'              => (string) $variation['sku'],
+            'name'             => (string) $variation['name'],
+            'price'            => (int) $variation['price'],
+            'fulfillment_type' => (string) $variation['fulfillment_type'],
+            'downloadable'     => (string) $variation['downloadable'],
+        ];
+    }
+
+    private function variantMatcher(): SubscriptionVariantMatcher
+    {
+        return new SubscriptionVariantMatcher(new VariantResolver());
     }
 
     /**
@@ -282,26 +363,51 @@ final class MappingController
         $band     = sanitize_text_field((string) ($request->get_param('band') ?? ProductMatcher::BAND_NONE));
 
         $built = $this->build($wcId, $wcType, $decision, $band, [
-            'fc_post_id'  => $request->get_param('fc_post_id'),
-            'variant_map' => $request->get_param('variant_map'),
-            'orphans'     => $request->get_param('orphans'),
+            'fc_post_id'          => $request->get_param('fc_post_id'),
+            'variant_map'         => $request->get_param('variant_map'),
+            'orphans'             => $request->get_param('orphans'),
+            'allow_shared_target' => $request->get_param('allow_shared_target'),
         ]);
 
         if ($built === null) {
             return $this->refuse(sprintf('Unusable decision "%s" for product %d.', $decision, $wcId));
         }
 
+        $contractErrors = $this->contractErrors($built);
+
+        if ($contractErrors !== []) {
+            return $this->refuseErrors($contractErrors);
+        }
+
+        $validation = $this->validateSet([$built]);
+
+        if (!$validation->isValid()) {
+            return $this->refuseSet($validation);
+        }
+
         $this->repo()->save($built);
 
-        return new WP_REST_Response(['data' => ['saved' => true, 'decision' => $built->toArray()]]);
+        return new WP_REST_Response(['data' => [
+            'saved'               => true,
+            'decision'            => $built->toArray(),
+            'mapping_fingerprint' => $validation->fingerprint(),
+        ]]);
     }
 
     /**
      * Apply one decision to many rows.
      *
-     * Rows it cannot use are dropped rather than failing the batch: a bulk
+     * Rows it cannot *build* are dropped rather than failing the batch: a bulk
      * "link all" over a band where one row lost its candidate should link the
      * other eighteen, not refuse the lot.
+     *
+     * A row that builds and then fails validation is the opposite, and
+     * deliberately so. Dropping it would leave that product silently unmapped
+     * behind a screen reporting eighteen successes — which on Lapka is the
+     * yearly product and its 188 subscribers. So one contract error or one
+     * collision refuses the whole batch, naming the source variation at fault.
+     * Pinned by MappingControllerTest
+     * ::testOneContractErrorRefusesTheWholeBatchIncludingTheGoodRows.
      */
     public function bulk(WP_REST_Request $request): WP_REST_Response
     {
@@ -332,15 +438,36 @@ final class MappingController
                 $decision,
                 $band,
                 [
-                    'fc_post_id'  => $row['fc_post_id'] ?? null,
-                    'variant_map' => $row['variant_map'] ?? null,
-                    'orphans'     => $row['orphans'] ?? null,
+                    'fc_post_id'          => $row['fc_post_id'] ?? null,
+                    'variant_map'         => $row['variant_map'] ?? null,
+                    'orphans'             => $row['orphans'] ?? null,
+                    'allow_shared_target' => $row['allow_shared_target'] ?? null,
                 ],
             );
 
             if ($one !== null) {
                 $built[] = $one;
             }
+        }
+
+        // Unusable rows are dropped; a colliding *set* is not. Dropping half a
+        // collision would leave whichever row happened to be second silently
+        // unmapped, which is the failure mode this validation exists to remove.
+        // A contract-incompatible row is refused for the same reason: a bulk
+        // "link all" that quietly skipped the yearly product would leave 188
+        // subscribers with nowhere to go and a screen reporting success.
+        foreach ($built as $decision) {
+            $contractErrors = $this->contractErrors($decision);
+
+            if ($contractErrors !== []) {
+                return $this->refuseErrors($contractErrors);
+            }
+        }
+
+        $validation = $this->validateSet($built);
+
+        if (!$validation->isValid()) {
+            return $this->refuseSet($validation);
         }
 
         $this->repo()->saveMany($built);
@@ -357,6 +484,7 @@ final class MappingController
                 static fn (ProductMapDecision $decision): array => $decision->toArray(),
                 $built,
             ),
+            'mapping_fingerprint' => $validation->fingerprint(),
         ]]);
     }
 
@@ -368,7 +496,84 @@ final class MappingController
     }
 
     /**
-     * @param array{fc_post_id: mixed, variant_map: mixed, orphans: mixed} $extra
+     * The whole target catalogue, searchable and paged.
+     *
+     * rows() offers only what ProductMatcher scored above `none`, which is
+     * right — eight implausible products under a heading saying "No candidate"
+     * is an invitation to fuse a Gift Card with a T-shirt. But it left an owner
+     * whose product the matcher could not recognise with no way to map it at
+     * all, and the two Lapka subscription products are exactly that: both
+     * scored `none`, and both must be mapped for the migration to mean
+     * anything.
+     *
+     * Every variation comes with its billing contract, because on a
+     * subscription product that is what the operator is choosing between.
+     */
+    public function catalogue(WP_REST_Request $request): WP_REST_Response
+    {
+        $page    = max(1, (int) $request->get_param('page'));
+        $perPage = min(self::MAX_PER_PAGE, max(1, (int) $request->get_param('per_page')));
+        $search  = trim(sanitize_text_field((string) ($request->get_param('q') ?? '')));
+
+        return new WP_REST_Response(['data' => [
+            'products' => $this->fcCataloguePage($search, $page, $perPage),
+            'page'     => $page,
+            'per_page' => $perPage,
+            'total'    => $this->fcCatalogueCount($search),
+        ]]);
+    }
+
+    /**
+     * What linking this Woo product to that FluentCart product would do.
+     *
+     * The variant block for a product the matcher never offered, computed the
+     * same way rows() computes it for one it did — server-side, because a
+     * subscription's variation is a billing contract and choosing it in the
+     * browser from a catalogue listing would be a second, divergent copy of the
+     * cadence gate.
+     */
+    public function variants(WP_REST_Request $request): WP_REST_Response
+    {
+        $wcId     = absint($request->get_param('wc_id'));
+        $fcPostId = absint($request->get_param('fc_post_id'));
+
+        if ($wcId <= 0 || $fcPostId <= 0) {
+            return $this->refuse('A variant preview needs a WooCommerce product and a FluentCart product.');
+        }
+
+        $product = function_exists('wc_get_product') ? wc_get_product($wcId) : null;
+
+        if (!$product instanceof \WC_Product) {
+            return $this->refuse(sprintf('WooCommerce product %d is not readable.', $wcId));
+        }
+
+        $chosen = [];
+
+        if (is_array($request->get_param('variant_map'))) {
+            foreach ($request->get_param('variant_map') as $sourceId => $targetId) {
+                $sourceId = absint($sourceId);
+                $targetId = absint($targetId);
+
+                if ($sourceId > 0 && $targetId > 0) {
+                    $chosen[$sourceId] = $targetId;
+                }
+            }
+        }
+
+        $mapper = new VariationMapper(
+            function_exists('get_woocommerce_currency') ? (string) get_woocommerce_currency() : '',
+        );
+
+        $woo = $this->describeWooProduct($product, $mapper);
+
+        return new WP_REST_Response(['data' => [
+            'variant' => $this->variantSummary($woo, $fcPostId, $this->variantMatcher(), $chosen),
+            'label'   => (string) get_the_title($fcPostId),
+        ]]);
+    }
+
+    /**
+     * @param array{fc_post_id: mixed, variant_map: mixed, orphans: mixed, allow_shared_target: mixed} $extra
      */
     private function build(int $wcId, string $wcType, string $decision, string $band, array $extra): ?ProductMapDecision
     {
@@ -436,7 +641,347 @@ final class MappingController
             }
         }
 
-        return ProductMapDecision::link($wcId, $wcType, $fcPostId, $band, $variantMap, $orphans);
+        // Identity against the two shapes a JSON body can carry a boolean in,
+        // and nothing else. `'no'`, `'0'` and `'false'` are all truthy strings,
+        // and each would read as the operator having approved a shared billing
+        // contract they were never shown.
+        $allowSharedTarget = in_array($extra['allow_shared_target'] ?? null, [true, 'true'], true);
+
+        return ProductMapDecision::link(
+            $wcId,
+            $wcType,
+            $fcPostId,
+            $band,
+            $variantMap,
+            $orphans,
+            $allowSharedTarget,
+        );
+    }
+
+    /**
+     * Validate the incoming decisions against every decision already saved.
+     *
+     * `VariantResolver::$claimed` protects one product decision, so two Woo
+     * products decided one after the other can each claim the same FluentCart
+     * variation with neither call noticing. This is where that is caught, and
+     * it has to run over the whole set rather than over what just arrived.
+     *
+     * @param list<ProductMapDecision> $incoming
+     */
+    private function validateSet(array $incoming): MappingSetValidation
+    {
+        $set = [];
+
+        foreach ($this->repo()->all() as $existing) {
+            $set[$existing->wcId()] = $existing;
+        }
+
+        // The incoming decisions replace their own rows rather than joining
+        // them: re-deciding a product must not collide with its former self.
+        foreach ($incoming as $decision) {
+            $set[$decision->wcId()] = $decision;
+        }
+
+        $index = $this->contractIndex($set);
+
+        return (new MappingSetValidator($index['contracts'], $index['unreadable']))
+            ->validate(array_values($set));
+    }
+
+    private function refuseSet(MappingSetValidation $validation): WP_REST_Response
+    {
+        return $this->refuseErrors($validation->errors);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $errors
+     */
+    private function refuseErrors(array $errors): WP_REST_Response
+    {
+        return new WP_REST_Response([
+            'data' => [
+                'saved'   => false,
+                'message' => $errors[0]['message'] ?? 'This mapping cannot be saved.',
+                'errors'  => $errors,
+            ],
+        ], 422);
+    }
+
+    /**
+     * Re-derive this link's contracts and check the posted variant map against
+     * them.
+     *
+     * The mapping screen hides the Link button while a subscription source has
+     * no compatible target, and a screen is not a gate: this endpoint takes a
+     * variant map from the browser, which is the one participant on this path
+     * CartShift does not control. Section 7.3 says saving *requires* an
+     * explicit compatible variation for every source variation, so this is
+     * where "requires" happens.
+     *
+     * One-time products keep their freedoms: their variant map may be absent,
+     * partial or resolver-derived exactly as it has always been. Two things
+     * they do not keep, both of which used to pass because this gate only ever
+     * looked at the shape it was written for — claiming a *subscription*
+     * variation, which the matcher refuses below, and naming a source variation
+     * the product does not have, which the membership check refuses first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function contractErrors(ProductMapDecision $decision): array
+    {
+        $fcPostId = $decision->fcPostId();
+
+        if (!$decision->isLink() || $fcPostId === null) {
+            return [];
+        }
+
+        $product = function_exists('wc_get_product') ? wc_get_product($decision->wcId()) : null;
+
+        if (!$product instanceof \WC_Product) {
+            // A named refusal, not a shrug. This used to return no errors —
+            // and sourceContract() separately returned null for the same
+            // reason, which MappingSetValidator read as one-time — so a
+            // decision about a product nobody can read passed both gates and a
+            // monthly/yearly collision between two such decisions validated
+            // clean. The plan's inference policy is explicit: an unresolved
+            // load-bearing fact gets a named branch or a stop, never a
+            // cheerful default.
+            return [[
+                'code'                => self::ERROR_SOURCE_UNREADABLE,
+                'source_variation_id' => $decision->wcId(),
+                'target_variation_id' => null,
+                'message'             => sprintf(
+                    'WooCommerce product %d cannot be read, so nothing can be verified about what it bills. '
+                    . 'Restore it, or skip it.',
+                    $decision->wcId(),
+                ),
+            ]];
+        }
+
+        $mapper = new VariationMapper(
+            function_exists('get_woocommerce_currency') ? (string) get_woocommerce_currency() : '',
+        );
+
+        $woo = $this->describeWooProduct($product, $mapper, withOrderCount: false);
+
+        $subscriptionVariations = array_values(array_filter(
+            $woo['variations'],
+            static fn (array $variation): bool => ($variation['payment_type'] ?? '') === 'subscription',
+        ));
+
+        $variantMap = $decision->variantMap();
+        $errors     = [];
+
+        // A variant map key names a source variation, and the browser chose it.
+        // A key naming something that is not a variation of this product used
+        // to be persisted verbatim and then passed the set validator as a
+        // single, uncontested claim — the third member of the family this gate
+        // has now closed twice: it refused the shape it was written for and
+        // waved through everything else. It is reachable without a hostile
+        // client, by re-saving a decision after the owner deleted or
+        // regenerated a variation.
+        $ownVariationIds = array_map(
+            static fn (array $variation): int => (int) $variation['id'],
+            $woo['variations'],
+        );
+
+        foreach (array_keys($variantMap) as $sourceVariationId) {
+            if (in_array((int) $sourceVariationId, $ownVariationIds, true)) {
+                continue;
+            }
+
+            // Named, not numbered. The two integers are correct and nearly
+            // useless: the ordinary route here is catalogue maintenance —
+            // somebody deleted or regenerated a variation of a mapped variable
+            // product — and an owner meeting this refusal has to find one row
+            // among a few thousand and know which choice is being discarded.
+            // "Reload and choose again" told them neither.
+            $errors[] = [
+                'code'                => self::ERROR_SOURCE_UNREADABLE,
+                'source_variation_id' => (int) $sourceVariationId,
+                'target_variation_id' => (int) $variantMap[$sourceVariationId],
+                'wc_id'               => $decision->wcId(),
+                'wc_name'             => (string) $woo['name'],
+                'message'             => sprintf(
+                    'Variation %d is no longer a variation of "%s" (WooCommerce product %d) — it has '
+                    . 'been deleted or regenerated since this mapping was saved, so the FluentCart '
+                    . 'variation %d it pointed at cannot be honoured. Nothing was saved. Find "%s" on '
+                    . 'the mapping screen, reload it, and choose a variation for each of the ones it '
+                    . 'has now.',
+                    (int) $sourceVariationId,
+                    $woo['name'],
+                    $decision->wcId(),
+                    (int) $variantMap[$sourceVariationId],
+                    $woo['name'],
+                ),
+            ];
+        }
+
+        foreach ($subscriptionVariations as $variation) {
+            if (!isset($variantMap[$variation['id']])) {
+                $errors[] = [
+                    'code'                => SubscriptionVariantMatcher::ERROR_TARGET_MISSING,
+                    'source_variation_id' => (int) $variation['id'],
+                    'target_variation_id' => null,
+                    'message'             => sprintf(
+                        'Choose a FluentCart variation for "%s". A subscription is never paired by position.',
+                        $variation['name'],
+                    ),
+                ];
+            }
+        }
+
+        // The matcher judges the choices that were made; the loop above catches
+        // the ones that were not.
+        return [
+            ...$errors,
+            ...$this->variantMatcher()->match(
+                $woo['variations'],
+                $this->cachedFcVariants($fcPostId),
+                $variantMap,
+            )['errors'],
+        ];
+    }
+
+    /**
+     * Source contracts for the variations that need one.
+     *
+     * Only contested target variations are resolved. A target claimed once
+     * passes on the per-row contract gate the matcher already applied, so
+     * loading a WooCommerce product for every decision in a 2,000-row catalogue
+     * to answer a question nobody asks would be a query storm on every save.
+     *
+     * Unreadable sources are reported separately rather than left absent. An
+     * absent contract is indistinguishable from a one-time product, and the
+     * validator's all-one-time arm passes several claims without asking — so
+     * two decisions whose products had been deleted would key identically and
+     * a monthly/yearly collision would validate clean.
+     *
+     * @param array<int, ProductMapDecision> $set
+     * @return array{contracts: array<int, NormalizedSubscriptionContract>, unreadable: list<int>}
+     */
+    private function contractIndex(array $set): array
+    {
+        $claims = [];
+
+        foreach ($set as $decision) {
+            if (!$decision->isLink()) {
+                continue;
+            }
+
+            foreach ($decision->variantMap() as $sourceVariationId => $targetVariationId) {
+                $claims[$targetVariationId][] = (int) $sourceVariationId;
+            }
+        }
+
+        $contracts  = [];
+        $unreadable = [];
+        $seen       = [];
+
+        foreach ($claims as $sourceVariationIds) {
+            if (count($sourceVariationIds) < 2) {
+                continue;
+            }
+
+            foreach ($sourceVariationIds as $sourceVariationId) {
+                if (isset($seen[$sourceVariationId])) {
+                    continue;
+                }
+
+                $seen[$sourceVariationId] = true;
+
+                if (!self::sourceIsReadable($sourceVariationId)) {
+                    $unreadable[] = $sourceVariationId;
+
+                    continue;
+                }
+
+                $contract = self::sourceContract($sourceVariationId);
+
+                if ($contract !== null) {
+                    $contracts[$sourceVariationId] = $contract;
+                }
+            }
+        }
+
+        return ['contracts' => $contracts, 'unreadable' => $unreadable];
+    }
+
+    private static function sourceIsReadable(int $sourceVariationId): bool
+    {
+        return function_exists('wc_get_product')
+            && wc_get_product($sourceVariationId) instanceof \WC_Product;
+    }
+
+    /**
+     * The normalised contract of one Woo variation — or of a simple product,
+     * whose own ID is its pseudo-variation key.
+     *
+     * Null means "not a subscription", which MappingSetValidator reads as the
+     * one-time behaviour CartShift has always had.
+     */
+    private static function sourceContract(int $sourceVariationId): ?NormalizedSubscriptionContract
+    {
+        $product = function_exists('wc_get_product') ? wc_get_product($sourceVariationId) : null;
+
+        if (!$product instanceof \WC_Product) {
+            return null;
+        }
+
+        $mapper = new VariationMapper(
+            function_exists('get_woocommerce_currency') ? (string) get_woocommerce_currency() : '',
+        );
+
+        $mapped = $product instanceof \WC_Product_Variation
+            ? $mapper->mapVariation($product)
+            : $mapper->mapSimple($product);
+
+        $fields = self::subscriptionFields($product, $mapped);
+
+        if ($fields['payment_type'] !== 'subscription') {
+            return null;
+        }
+
+        return NormalizedSubscriptionContract::fromWooCommerce(
+            $fields['period'],
+            $fields['multiplier'],
+            $fields['trial_days'],
+            $fields['times'],
+        );
+    }
+
+    /**
+     * The raw cadence a Woo row bills on, alongside the trial and term
+     * VariationMapper already derived.
+     *
+     * The period and multiplier are read from WooCommerce Subscriptions' own
+     * meta rather than from the mapped payload, and that is deliberate: the
+     * payload's `repeat_interval` has already been through
+     * FcBillingInterval::fromWooCommerce(), which collapses `week/2` to weekly
+     * and `year/2` to yearly. Reading it back would ask the exact cadence table
+     * a question that had already been answered wrongly. Trial and term come
+     * from the payload, because those the mapper derives without loss and a
+     * second copy of `ceil($length / $interval)` here is how the orphan variant
+     * and the migrated variant start disagreeing.
+     *
+     * @param array<string, mixed> $mapped VariationMapper output for this row.
+     * @return array{payment_type: string, period: string, multiplier: int, trial_days: int, times: int}
+     */
+    private static function subscriptionFields(\WC_Product $product, array $mapped): array
+    {
+        if (($mapped['payment_type'] ?? '') !== 'subscription') {
+            return ['payment_type' => 'onetime', 'period' => '', 'multiplier' => 0, 'trial_days' => 0, 'times' => 0];
+        }
+
+        $otherInfo = is_array($mapped['other_info'] ?? null) ? $mapped['other_info'] : [];
+
+        return [
+            'payment_type' => 'subscription',
+            'period'       => (string) ($product->get_meta('_subscription_period') ?: ''),
+            'multiplier'   => (int) ($product->get_meta('_subscription_period_interval') ?: 1),
+            'trial_days'   => (int) ($otherInfo['trial_days'] ?? 0),
+            'times'        => (int) ($otherInfo['times'] ?? 0),
+        ];
     }
 
     private function refuse(string $message): WP_REST_Response
@@ -564,60 +1109,83 @@ final class MappingController
         foreach ($ids as $id) {
             $product = function_exists('wc_get_product') ? wc_get_product((int) $id) : null;
 
-            if (!$product instanceof \WC_Product) {
-                continue;
+            if ($product instanceof \WC_Product) {
+                $rows[] = $this->describeWooProduct($product, $mapper);
             }
-
-            $variations = [];
-
-            if ($product->get_type() === 'variable') {
-                foreach ($product->get_children() as $childId) {
-                    $child = wc_get_product((int) $childId);
-
-                    if ($child instanceof \WC_Product_Variation) {
-                        $variations[] = self::describeVariation(
-                            (int) $childId,
-                            (string) $child->get_sku(),
-                            $mapper->mapVariation($child),
-                        );
-                    }
-                }
-            } else {
-                // A simple product is one pseudo-variation keyed by the product
-                // ID — the shape ProductMigrator and VariantResolver both expect.
-                // Named for what CartShift itself writes for a simple product
-                // (VariationMapper::mapSimple()), so a hand-built FluentCart
-                // product carrying the same default pairs by name rather than
-                // by falling through to position.
-                $variations[] = self::describeVariation(
-                    (int) $product->get_id(),
-                    (string) $product->get_sku(),
-                    $mapper->mapSimple($product),
-                );
-            }
-
-            $rows[] = [
-                'id'           => (int) $product->get_id(),
-                'name'         => (string) $product->get_name(),
-                'type'         => (string) $product->get_type(),
-                'order_count'  => $this->orderCount((int) $product->get_id()),
-                // Parent files first, then the variations', because a variable
-                // product carries its downloads on the variations rather than
-                // on the parent — the same split ProductMigrator has
-                // migrateSimpleDownloads() and migrateVariableDownloads() for.
-                'has_downloads' => $product->get_downloads() !== []
-                    || self::anyVariationHasDownloads($product),
-                'match_fields' => [
-                    'name'            => (string) $product->get_name(),
-                    'sku'             => (string) $product->get_sku(),
-                    'price'           => (float) $product->get_price(),
-                    'variation_count' => count($variations),
-                ],
-                'variations'   => $variations,
-            ];
         }
 
         return $rows;
+    }
+
+    /**
+     * One WooCommerce product, shaped for the matcher and the variant summary.
+     *
+     * Extracted from wooProductPage() so the manual-selection endpoint can
+     * describe a single product the same way the page does. Two descriptions of
+     * one product is how the row's variant block and the block the operator
+     * actually saved come to disagree.
+     *
+     * `$withOrderCount` exists because `orderCount()` is a COUNT(DISTINCT) over
+     * `woocommerce_order_itemmeta`, and the save gate never reads it. On a
+     * per-row decide that is one wasted query; on a bulk press over a band it
+     * is one per row, and useMapping.js will hold twenty thousand of them.
+     *
+     * @return array{id: int, name: string, type: string, order_count: int, has_downloads: bool, match_fields: array{name: string, sku: string, price: float, variation_count: int}, variations: list<array<string, mixed>>}
+     */
+    private function describeWooProduct(
+        \WC_Product $product,
+        VariationMapper $mapper,
+        bool $withOrderCount = true,
+    ): array {
+        $variations = [];
+
+        if (ProductTypes::isVariable($product->get_type())) {
+            foreach ($product->get_children() as $childId) {
+                $child = wc_get_product((int) $childId);
+
+                if ($child instanceof \WC_Product_Variation) {
+                    $variations[] = self::describeVariation(
+                        (int) $childId,
+                        (string) $child->get_sku(),
+                        $mapper->mapVariation($child),
+                        $child,
+                    );
+                }
+            }
+        } else {
+            // A simple product is one pseudo-variation keyed by the product
+            // ID — the shape ProductMigrator and VariantResolver both expect.
+            // Named for what CartShift itself writes for a simple product
+            // (VariationMapper::mapSimple()), so a hand-built FluentCart
+            // product carrying the same default pairs by name rather than
+            // by falling through to position.
+            $variations[] = self::describeVariation(
+                (int) $product->get_id(),
+                (string) $product->get_sku(),
+                $mapper->mapSimple($product),
+                $product,
+            );
+        }
+
+        return [
+            'id'           => (int) $product->get_id(),
+            'name'         => (string) $product->get_name(),
+            'type'         => (string) $product->get_type(),
+            'order_count'  => $withOrderCount ? $this->orderCount((int) $product->get_id()) : 0,
+            // Parent files first, then the variations', because a variable
+            // product carries its downloads on the variations rather than
+            // on the parent — the same split ProductMigrator has
+            // migrateSimpleDownloads() and migrateVariableDownloads() for.
+            'has_downloads' => $product->get_downloads() !== []
+                || self::anyVariationHasDownloads($product),
+            'match_fields' => [
+                'name'            => (string) $product->get_name(),
+                'sku'             => (string) $product->get_sku(),
+                'price'           => (float) $product->get_price(),
+                'variation_count' => count($variations),
+            ],
+            'variations'   => $variations,
+        ];
     }
 
     /**
@@ -628,7 +1196,7 @@ final class MappingController
      */
     private static function anyVariationHasDownloads(\WC_Product $product): bool
     {
-        if ($product->get_type() !== 'variable') {
+        if (!ProductTypes::isVariable($product->get_type())) {
             return false;
         }
 
@@ -660,11 +1228,17 @@ final class MappingController
      * straight off the mapped payload rather than re-derived, so the orphan and
      * the variant ProductMigrator would have created cannot disagree.
      *
+     * The five subscription fields beyond those exist for
+     * SubscriptionVariantMatcher, which cannot pair a recurring row by name and
+     * position the way the other three passes do. `period` and `multiplier` are
+     * the raw WooCommerce Subscriptions cadence — see subscriptionFields() for
+     * why they cannot be read back out of the mapped payload.
+     *
      * @param array<string, mixed> $mapped VariationMapper output for this variation.
      *
-     * @return array{id: int, sku: string, name: string, price: int, fulfillment_type: string, downloadable: string}
+     * @return array{id: int, sku: string, name: string, price: int, fulfillment_type: string, downloadable: string, payment_type: string, period: string, multiplier: int, trial_days: int, times: int}
      */
-    private static function describeVariation(int $id, string $sku, array $mapped): array
+    private static function describeVariation(int $id, string $sku, array $mapped, \WC_Product $source): array
     {
         return [
             'id'               => $id,
@@ -673,6 +1247,7 @@ final class MappingController
             'price'            => (int) $mapped['item_price'],
             'fulfillment_type' => (string) $mapped['fulfillment_type'],
             'downloadable'     => (string) $mapped['downloadable'],
+            ...self::subscriptionFields($source, $mapped),
         ];
     }
 
@@ -885,7 +1460,7 @@ final class MappingController
         global $wpdb;
 
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT id, variation_title, item_price, sku
+            "SELECT id, variation_title, item_price, sku, payment_type, other_info
              FROM {$wpdb->prefix}fct_product_variations
              WHERE post_id = %d
              ORDER BY serial_index ASC, id ASC",
@@ -895,6 +1470,16 @@ final class MappingController
         $out = [];
 
         foreach ($rows ?: [] as $row) {
+            // FluentCart keeps a variation's recurring configuration in
+            // `other_info` — verified against ProductRequest.php:279, which
+            // requires `other_info.repeat_interval` whenever
+            // `other_info.payment_type` is `subscription`, and
+            // ProductVariationRequest.php:64, which lists the whole
+            // subscription field set. Nullable in the schema, so absent means
+            // one-time rather than broken.
+            $otherInfo = json_decode((string) ($row->other_info ?? ''), true);
+            $otherInfo = is_array($otherInfo) ? $otherInfo : [];
+
             $out[] = [
                 'id'    => (int) $row->id,
                 'sku'   => (string) ($row->sku ?? ''),
@@ -907,10 +1492,95 @@ final class MappingController
                 // read an FC price back out), so this divides inline rather
                 // than inventing a currency-conditional rule that would
                 // disagree with both.
-                'price' => ((int) ($row->item_price ?? 0)) / 100,
+                'price' => (float) (((int) ($row->item_price ?? 0)) / 100),
+                'payment_type'    => (string) ($row->payment_type ?? ''),
+                'repeat_interval' => (string) ($otherInfo['repeat_interval'] ?? ''),
+                'trial_days'      => (int) ($otherInfo['trial_days'] ?? 0),
+                'times'           => (int) ($otherInfo['times'] ?? 0),
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * One page of the target catalogue, each product with every variation's
+     * billing contract.
+     *
+     * Same exclusions as fcCandidates(): Advanced Variations products are not
+     * offered, because FluentCart regenerates their variants from the attribute
+     * cartesian and deletes anything not in it. A LEFT JOIN for the same reason
+     * too — a product with no detail row is broken some other way, and hiding
+     * it turns "I cannot find my product" into a support ticket with no
+     * evidence.
+     *
+     * @return list<array{id: int, name: string, sku: string, variation_count: int, variations: list<array<string, mixed>>}>
+     */
+    private function fcCataloguePage(string $search, int $page, int $perPage): array
+    {
+        global $wpdb;
+
+        [$searchSql, $searchValues] = self::catalogueSearchClause($search);
+
+        $products = $wpdb->get_results($wpdb->prepare(
+            "SELECT p.ID, p.post_title
+             FROM {$wpdb->posts} p
+             LEFT JOIN {$wpdb->prefix}fct_product_details d ON d.post_id = p.ID
+             WHERE p.post_type = '" . Constants::FC_PRODUCT_POST_TYPE . "'
+               AND p.post_status IN ('publish', 'draft', 'private')
+               AND (d.variation_type IS NULL OR d.variation_type != %s)"
+            . $searchSql
+            . ' ORDER BY p.post_title ASC, p.ID ASC
+             LIMIT %d OFFSET %d',
+            ...[Constants::FC_ADVANCED_VARIATIONS, ...$searchValues, $perPage, ($page - 1) * $perPage],
+        ));
+
+        $out = [];
+
+        foreach ($products ?: [] as $product) {
+            $variants = $this->fcVariants((int) $product->ID);
+
+            $out[] = [
+                'id'              => (int) $product->ID,
+                'name'            => (string) $product->post_title,
+                'sku'             => (string) ($variants[0]['sku'] ?? ''),
+                'variation_count' => count($variants),
+                'variations'      => $variants,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function fcCatalogueCount(string $search): int
+    {
+        global $wpdb;
+
+        [$searchSql, $searchValues] = self::catalogueSearchClause($search);
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*)
+             FROM {$wpdb->posts} p
+             LEFT JOIN {$wpdb->prefix}fct_product_details d ON d.post_id = p.ID
+             WHERE p.post_type = '" . Constants::FC_PRODUCT_POST_TYPE . "'
+               AND p.post_status IN ('publish', 'draft', 'private')
+               AND (d.variation_type IS NULL OR d.variation_type != %s)"
+            . $searchSql,
+            ...[Constants::FC_ADVANCED_VARIATIONS, ...$searchValues],
+        ));
+    }
+
+    /**
+     * @return array{0: string, 1: list<string>}
+     */
+    private static function catalogueSearchClause(string $search): array
+    {
+        if ($search === '') {
+            return ['', []];
+        }
+
+        global $wpdb;
+
+        return [' AND p.post_title LIKE %s', ['%' . $wpdb->esc_like($search) . '%']];
     }
 }

@@ -7,15 +7,32 @@ namespace CartShift\Support;
 defined('ABSPATH') || exit;
 
 /**
- * Shared helpers for reading WooCommerce order storage.
+ * Shared helpers for reading WooCommerce order storage — the HPOS way.
  *
- * CartShift reads orders from HPOS ({prefix}wc_orders) only, which is the same
- * stance FluentCart's own WooCommerce migrator takes.
+ * Generic order, customer and coupon migration reads orders from HPOS
+ * ({prefix}wc_orders) only, which is the same stance FluentCart's own
+ * WooCommerce migrator takes, and preflight gates that path on HPOS being the
+ * authoritative backend for exactly that reason.
  *
  * The point of this class is agreement. Every COUNT query and every batch fetch
- * has to look at exactly the same set of rows, otherwise progress bars stop
- * short of 100% and — rather worse — abandoned checkout drafts get imported as
- * real FluentCart customers.
+ * on that path has to look at exactly the same set of rows, otherwise progress
+ * bars stop short of 100% and — rather worse — abandoned checkout drafts get
+ * imported as real FluentCart customers.
+ *
+ * IT IS NOT THE SUBSCRIPTION DATASET PATH'S ANSWER TO ANYTHING. That path —
+ * `WooSubscriptionDatasetSource`, and the audit, export and stage commands
+ * built on it — reads through WooCommerce's public data-store APIs so
+ * WooCommerce chooses its own configured backend. Lapka's authoritative store
+ * is legacy CPT, so a subscription count taken from `ordersTable()` comes back
+ * zero while the fetch happily hydrates 564 records through WCS; that exact
+ * disagreement is one of the plan's P0 defects and is why neither anything
+ * under `app/Domain/Subscription/` nor `SubscriptionMigrator` may call
+ * `ordersTable()`, `orderScopeSql()`, `orderScopeParts()` or
+ * `subscriptionScopeSql()`. `WooStorageTest` scans exactly those two locations
+ * and no others, so the guarantee is precisely that wide — a third file joining
+ * the subscription path would need adding to the scan. Reporting which backend
+ * WooCommerce chose — `isHposEnabled()` — is fine, and is not the same thing as
+ * choosing one.
  */
 final class WooStorage
 {
@@ -240,7 +257,12 @@ final class WooStorage
     }
 
     /**
-     * Prepared scope fragment for subscriptions.
+     * Prepared scope fragment for `shop_subscription` rows in the HPOS table.
+     *
+     * Used only by the scope-consequences preview, which reports on the generic
+     * HPOS-gated migration path. The subscription dataset path does not use it
+     * and must not: it would reintroduce the count-versus-fetch disagreement
+     * that made a legacy-CPT store report zero subscriptions.
      */
     public static function subscriptionScopeSql(): string
     {

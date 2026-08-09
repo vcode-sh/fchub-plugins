@@ -135,6 +135,7 @@ describe('useMapping', () => {
       fc_post_id: 900,
       variant_map: { 1: 501 },
       orphans: [],
+      allow_shared_target: false,
     });
   });
 
@@ -287,7 +288,16 @@ describe('useMapping', () => {
     expect(apiMock).toHaveBeenCalledWith('POST', 'mapping/bulk', {
       band: 'strong',
       decision: 'link',
-      rows: [{ wc_id: 1, wc_type: 'simple', fc_post_id: 900, variant_map: { 1: 501 }, orphans: [] }],
+      rows: [
+        {
+          wc_id: 1,
+          wc_type: 'simple',
+          fc_post_id: 900,
+          variant_map: { 1: 501 },
+          orphans: [],
+          allow_shared_target: false,
+        },
+      ],
     });
   });
 
@@ -497,5 +507,293 @@ describe('useMapping', () => {
 
     expect(state.error).toBe('boom');
     expect(state.loading).toBe(false);
+  });
+
+  // ── Subscription mapping ────────────────────────────────
+  //
+  // ProductMatcher scored both Lapka source products `band=none`, and the row
+  // list drops every `none` candidate — so the only route to the right target
+  // product is a search over the whole catalogue. Once picked, the cadence
+  // decides the variation; nothing falls back to "the first one".
+
+  function subscriptionRow(overrides = {}) {
+    return row({
+      wc_id: 770002,
+      name: 'Klubu Przyjaciol Psow rocznie',
+      wc_type: 'subscription',
+      band: 'none',
+      suggested: null,
+      candidates: [],
+      variant: null,
+      ...overrides,
+    });
+  }
+
+  function membershipProduct() {
+    return {
+      id: 88,
+      name: 'Klubu Przyjaciol Psow',
+      variations: [
+        {
+          id: 4101,
+          sku: '',
+          name: 'Miesiecznie',
+          price: 29,
+          payment_type: 'subscription',
+          repeat_interval: 'monthly',
+          trial_days: 0,
+          times: 0,
+        },
+        {
+          id: 4102,
+          sku: '',
+          name: 'Rocznie',
+          price: 290,
+          payment_type: 'subscription',
+          repeat_interval: 'yearly',
+          trial_days: 0,
+          times: 0,
+        },
+      ],
+    };
+  }
+
+  it('searches the whole target catalogue, so band=none is still selectable', async () => {
+    apiMock.mockResolvedValue({ products: [membershipProduct()], total: 1, page: 1, per_page: 50 });
+
+    const { state, searchCatalogue } = useMapping();
+    await searchCatalogue('Klub');
+
+    expect(apiMock).toHaveBeenCalledWith('GET', 'mapping/catalogue?page=1&per_page=50&q=Klub');
+    expect(state.catalogue.products).toHaveLength(1);
+  });
+
+  it('an empty search asks for the first page rather than nothing', async () => {
+    apiMock.mockResolvedValue({ products: [], total: 0, page: 1, per_page: 50 });
+
+    const { searchCatalogue } = useMapping();
+    await searchCatalogue('');
+
+    expect(apiMock).toHaveBeenCalledWith('GET', 'mapping/catalogue?page=1&per_page=50');
+  });
+
+  it('surfaces a failed catalogue search', async () => {
+    apiMock.mockRejectedValue(new Error('catalogue down'));
+
+    const { state, searchCatalogue } = useMapping();
+    await searchCatalogue('Klub');
+
+    expect(state.catalogue.error).toBe('catalogue down');
+  });
+
+  // The Lapka rescue: a row the matcher gave nothing gets a product anyway,
+  // and the row's variant block comes back from the server rather than being
+  // synthesised locally — the variation choice is a contract decision, not a
+  // client-side guess.
+  it('picking a catalogue product asks the server which variations fit', async () => {
+    apiMock.mockResolvedValue({ rows: [subscriptionRow()], total: 1, fc_product_count: 1 });
+
+    const { state, loadRows, chooseProduct } = useMapping();
+    await loadRows();
+
+    const variant = {
+      matched: 1,
+      total: 1,
+      adds: 0,
+      map: { 770002: 4102 },
+      orphans: [],
+      errors: [],
+      warnings: [],
+      sources: [],
+    };
+
+    apiMock.mockResolvedValue({ variant, label: 'Klubu Przyjaciol Psow' });
+
+    await chooseProduct(state.rows[0], 88);
+
+    expect(apiMock).toHaveBeenCalledWith('GET', 'mapping/variants?wc_id=770002&fc_post_id=88');
+    expect(state.rows[0].suggested).toBe(88);
+    expect(state.rows[0].variant).toEqual(variant);
+  });
+
+  it('a manually picked product becomes a linkable candidate on the row', async () => {
+    apiMock.mockResolvedValue({ rows: [subscriptionRow()], total: 1, fc_product_count: 1 });
+
+    const { state, loadRows, chooseProduct } = useMapping();
+    await loadRows();
+
+    apiMock.mockResolvedValue({
+      variant: { matched: 1, total: 1, adds: 0, map: { 770002: 4102 }, orphans: [], errors: [], warnings: [], sources: [] },
+      label: 'Klubu Przyjaciol Psow',
+    });
+
+    await chooseProduct(state.rows[0], 88);
+
+    expect(state.rows[0].candidates.map((c) => c.id)).toContain(88);
+  });
+
+  it('choosing a variation by hand replaces the suggested one in the saved map', async () => {
+    apiMock.mockResolvedValue({
+      rows: [
+        subscriptionRow({
+          suggested: 88,
+          candidates: [{ id: 88, label: 'Klubu Przyjaciol Psow', band: 'none', score: 0 }],
+          variant: {
+            matched: 1,
+            total: 1,
+            adds: 0,
+            map: { 770002: 4101 },
+            orphans: [],
+            errors: [],
+            warnings: [],
+            sources: [
+              {
+                id: 770002,
+                name: 'Default',
+                subscription: true,
+                interval: 'yearly',
+                selected: 4101,
+                options: membershipProduct().variations.map((v) => ({
+                  ...v,
+                  compatible: v.repeat_interval === 'yearly',
+                  errors: v.repeat_interval === 'yearly' ? [] : ['target_variation_contract_mismatch'],
+                  warnings: [],
+                })),
+              },
+            ],
+          },
+        }),
+      ],
+      total: 1,
+      fc_product_count: 1,
+    });
+
+    const { state, loadRows, chooseVariation, decide } = useMapping();
+    await loadRows();
+
+    chooseVariation(state.rows[0], 770002, 4102);
+
+    expect(state.rows[0].variant.map).toEqual({ 770002: 4102 });
+    expect(state.rows[0].variant.sources[0].selected).toBe(4102);
+
+    apiMock.mockResolvedValue({ saved: true, decision: { decision: 'link' } });
+    await decide(state.rows[0], 'link');
+
+    expect(apiMock.mock.calls.at(-1)[2].variant_map).toEqual({ 770002: 4102 });
+  });
+
+  // "No automatic suggestion" is not "not selectable" — but an incompatible
+  // cadence is genuinely not selectable, and the composable must not pretend
+  // otherwise just because the operator clicked it.
+  it('refuses to select a variation whose contract does not fit', async () => {
+    apiMock.mockResolvedValue({
+      rows: [
+        subscriptionRow({
+          suggested: 88,
+          variant: {
+            matched: 1,
+            total: 1,
+            adds: 0,
+            map: { 770002: 4102 },
+            orphans: [],
+            errors: [],
+            warnings: [],
+            sources: [
+              {
+                id: 770002,
+                name: 'Default',
+                subscription: true,
+                interval: 'yearly',
+                selected: 4102,
+                options: [
+                  { id: 4101, compatible: false, errors: ['target_variation_contract_mismatch'], warnings: [] },
+                  { id: 4102, compatible: true, errors: [], warnings: [] },
+                ],
+              },
+            ],
+          },
+        }),
+      ],
+      total: 1,
+      fc_product_count: 1,
+    });
+
+    const { state, loadRows, chooseVariation } = useMapping();
+    await loadRows();
+
+    chooseVariation(state.rows[0], 770002, 4101);
+
+    expect(state.rows[0].variant.map).toEqual({ 770002: 4102 });
+  });
+
+  it('sends the shared-target opt-in with a link decision', async () => {
+    apiMock.mockResolvedValue({
+      rows: [subscriptionRow({ suggested: 88, variant: { matched: 1, total: 1, adds: 0, map: { 770002: 4101 }, orphans: [] } })],
+      total: 1,
+      fc_product_count: 1,
+    });
+
+    const { state, loadRows, decide } = useMapping();
+    await loadRows();
+
+    state.rows[0].allow_shared_target = true;
+
+    apiMock.mockResolvedValue({ saved: true, decision: { decision: 'link' } });
+    await decide(state.rows[0], 'link');
+
+    expect(apiMock.mock.calls.at(-1)[2].allow_shared_target).toBe(true);
+  });
+
+  it('defaults the shared-target opt-in to off', async () => {
+    apiMock.mockResolvedValue({
+      rows: [subscriptionRow({ suggested: 88, variant: { matched: 1, total: 1, adds: 0, map: { 770002: 4101 }, orphans: [] } })],
+      total: 1,
+      fc_product_count: 1,
+    });
+
+    const { state, loadRows, decide } = useMapping();
+    await loadRows();
+
+    apiMock.mockResolvedValue({ saved: true, decision: { decision: 'link' } });
+    await decide(state.rows[0], 'link');
+
+    expect(apiMock.mock.calls.at(-1)[2].allow_shared_target).toBe(false);
+  });
+
+  // A refused save is the whole point of validating across the set. The row
+  // has to end up undecided and the reason has to be on screen, not swallowed.
+  it('keeps a row undecided and surfaces the reason when the server refuses the set', async () => {
+    apiMock.mockResolvedValue({
+      rows: [subscriptionRow({ suggested: 88, variant: { matched: 1, total: 1, adds: 0, map: { 770002: 4101 }, orphans: [] } })],
+      total: 1,
+      fc_product_count: 1,
+    });
+
+    const { state, loadRows, decide } = useMapping();
+    await loadRows();
+
+    apiMock.mockRejectedValue(new Error('Two source products claim FluentCart variation 4101.'));
+
+    await decide(state.rows[0], 'link');
+
+    expect(state.rows[0].decision).toBeNull();
+    expect(state.error).toContain('4101');
+  });
+
+  it('remembers the mapping-set fingerprint the server returns', async () => {
+    apiMock.mockResolvedValue({ rows: [subscriptionRow({ suggested: 88, variant: { matched: 1, total: 1, adds: 0, map: {}, orphans: [] } })], total: 1, fc_product_count: 1 });
+
+    const { state, loadRows, decide } = useMapping();
+    await loadRows();
+
+    apiMock.mockResolvedValue({
+      saved: true,
+      decision: { decision: 'link' },
+      mapping_fingerprint: 'a'.repeat(64),
+    });
+
+    await decide(state.rows[0], 'link');
+
+    expect(state.mappingFingerprint).toBe('a'.repeat(64));
   });
 });

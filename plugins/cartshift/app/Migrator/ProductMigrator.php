@@ -7,6 +7,7 @@ namespace CartShift\Migrator;
 defined('ABSPATH') || exit;
 
 use CartShift\Domain\Mapping\ProductMapper;
+use CartShift\Domain\Migration\MigrationOrchestratorFactory;
 use CartShift\Domain\Mapping\VariationMapper;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
@@ -899,6 +900,61 @@ final class ProductMigrator extends AbstractMigrator
     }
 
     /**
+     * Whether this WooCommerce product bills on a cadence FluentCart cannot
+     * express — plan section 7.2's exact six-row table.
+     *
+     * The catalogue half of the same hazard the subscription writer closes.
+     * `VariationMapper` writes `repeat_interval` through the lenient reading,
+     * which collapses `week/2` to weekly, `year/2` to yearly, and `month/2` and
+     * `month/12` to monthly. That is not a cosmetic wrong answer when the
+     * product it lands on is one the owner then sells from: the FluentCart
+     * product would quietly claim a contract the WooCommerce one never offered.
+     *
+     * Applied here rather than only to products carrying an explicit `create`
+     * mapping decision, because this migrator brings across every product the
+     * scope selects whether a decision row exists or not.
+     *
+     * A variable subscription is checked child by child: WooCommerce stores the
+     * schedule per variation, so a parent whose own meta reads `month/1` can
+     * still carry a `month/2` variation.
+     */
+    private function unrepresentableCadence(\WC_Product $product): bool
+    {
+        if (!MigrationOrchestratorFactory::subscriptionCadenceIsRepresentable($product)) {
+            return true;
+        }
+
+        if (!ProductTypes::isVariable($product->get_type()) || !function_exists('wc_get_product')) {
+            return false;
+        }
+
+        foreach ($product->get_children() as $childId) {
+            $child = wc_get_product((int) $childId);
+
+            if (
+                $child instanceof \WC_Product
+                && !MigrationOrchestratorFactory::subscriptionCadenceIsRepresentable($child)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function unrepresentableCadenceMessage(\WC_Product $product): string
+    {
+        return sprintf(
+            'Product #%d ("%s") bills on a subscription schedule FluentCart cannot express. Nothing was '
+            . 'migrated: creating it would write the nearest interval instead, which is a different '
+            . 'contract. Change the schedule in WooCommerce, or link the product to a compatible '
+            . 'FluentCart variation on the mapping screen.',
+            $product->get_id(),
+            $product->get_name(),
+        );
+    }
+
+    /**
      * Validate a product without creating any FC records.
      *
      * @param \WC_Product $product
@@ -916,6 +972,17 @@ final class ProductMigrator extends AbstractMigrator
 
         if ($this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcId)) {
             $this->writeLog($wcId, 'dry-run', 'dry-run: already migrated, would skip.', MigrationErrorCode::AlreadyMigrated);
+            return false;
+        }
+
+        if ($this->unrepresentableCadence($product)) {
+            $this->writeLog(
+                $wcId,
+                'dry-run',
+                'dry-run: ' . $this->unrepresentableCadenceMessage($product),
+                MigrationErrorCode::SubscriptionUnsupportedBillingCadence,
+            );
+
             return false;
         }
 
@@ -960,7 +1027,7 @@ final class ProductMigrator extends AbstractMigrator
             // A real run maps one variation per mapped variation row; mirror that so
             // orders and subscriptions validated later resolve their variation
             // references too.
-            $isVariable = $product->get_type() === 'variable';
+            $isVariable = ProductTypes::isVariable($product->get_type());
             $wcVariationIds = $isVariable ? array_keys($this->loadVariations($product)) : [$wcId];
 
             foreach (array_keys($mapped['variations']) as $index) {
@@ -992,6 +1059,17 @@ final class ProductMigrator extends AbstractMigrator
 
         if ($this->idMap->getFcId(Constants::ENTITY_PRODUCT, (string) $wcId)) {
             $this->writeLog($wcId, 'skipped', 'Already migrated.', MigrationErrorCode::AlreadyMigrated);
+            return false;
+        }
+
+        if ($this->unrepresentableCadence($product)) {
+            $this->writeLog(
+                $wcId,
+                'skipped',
+                $this->unrepresentableCadenceMessage($product),
+                MigrationErrorCode::SubscriptionUnsupportedBillingCadence,
+            );
+
             return false;
         }
 
@@ -1035,7 +1113,7 @@ final class ProductMigrator extends AbstractMigrator
         $minPrice = PHP_INT_MAX;
         $maxPrice = 0;
         $firstVariationId = null;
-        $isVariable = $product->get_type() === 'variable';
+        $isVariable = ProductTypes::isVariable($product->get_type());
 
         // Load every WC variation exactly once and pass the objects around; the
         // variation loop, attribute assignment and download migration all need them.

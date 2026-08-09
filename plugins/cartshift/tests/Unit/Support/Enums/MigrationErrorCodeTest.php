@@ -76,9 +76,28 @@ final class MigrationErrorCodeTest extends PluginTestCase
             'coupon_disabled_missing_restrictions',
             'coupon_restrictions_narrowed',
             'multi_item_subscription',
+            'required_reference_missing',
             'subscription_paused_missing_product',
             'subscription_paused_missing_variation',
             'unmapped_subscription_gateway',
+            'unsupported_billing_cadence',
+            'active_next_date_missing',
+            'active_next_date_past',
+            'finite_term_state_conflict',
+            'unsupported_gateway',
+            'subscription_payment_not_ready',
+            'finite_term_undeclared',
+            'finite_term_from_product',
+            'manual_renewal_adopted',
+            'manual_confirmation_required',
+            'customer_email_missing',
+            'target_variation_not_on_product',
+            'invalid_source_record',
+            'history_count_mismatch',
+            'dataset_missing_parent_order',
+            'dataset_missing_related_order',
+            'dataset_ambiguous_order_relationship',
+            'dataset_checksum_mismatch',
             'partial_catalog_visibility',
             'user_not_found',
             'no_order_for_guest',
@@ -94,6 +113,7 @@ final class MigrationErrorCodeTest extends PluginTestCase
             'scope_closure_too_large',
             'mapped_fc_product_missing',
             'orphan_variant_not_created',
+            'subscription_cadence_unrepresentable',
             'mapped_variant_not_on_product',
             'mapped_product_has_no_downloads',
             'mapped_product_out_of_scope',
@@ -139,13 +159,39 @@ final class MigrationErrorCodeTest extends PluginTestCase
                 MigrationErrorCode::CouponRestrictionsNarrowed,
                 MigrationErrorCode::CustomerRebuiltFromOrder,
                 MigrationErrorCode::ProductLinkMissing,
-                MigrationErrorCode::SubscriptionPausedMissingProduct,
-                MigrationErrorCode::MultiItemSubscription,
                 MigrationErrorCode::UnmappedSubscriptionGateway,
                 MigrationErrorCode::PartialCatalogVisibility,
+                // Staged, paused, and its bill count deliberately unwritten.
+                // The subscriber is in FluentCart; what is missing is a number
+                // nobody may guess.
+                MigrationErrorCode::SubscriptionHistoryCountMismatch,
             ] as $case
         ) {
             $this->assertSame(MigrationErrorSeverity::Warning, $case->severity(), $case->value);
+        }
+    }
+
+    /**
+     * The counterpart, and the reason two codes left the list above.
+     *
+     * `multi_item_subscription` and `subscription_paused_missing_product` used
+     * to mean "migrated, with a caveat" — the first item kept and the rest
+     * dropped, or the whole subscription written out paused. Both now mean
+     * nothing was written at all, because `fct_subscriptions` requires
+     * references neither shape can supply. A refusal is not a caveat, and a run
+     * that reports one as a warning tells the owner their subscribers came
+     * across when they did not.
+     */
+    public function testRefusalsAreErrorsRatherThanWarnings(): void
+    {
+        foreach (
+            [
+                MigrationErrorCode::MultiItemSubscription,
+                MigrationErrorCode::SubscriptionRequiredReferenceMissing,
+                MigrationErrorCode::SubscriptionPausedMissingProduct,
+            ] as $case
+        ) {
+            $this->assertSame(MigrationErrorSeverity::Error, $case->severity(), $case->value);
         }
     }
 

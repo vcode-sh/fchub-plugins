@@ -873,6 +873,115 @@ final class OrderMapperTest extends PluginTestCase
         $this->fail('The mapper produced no billing address.');
     }
 
+    // ──────────────────────────────────────────────
+    // Subscription history: parent and renewal order types
+    // ──────────────────────────────────────────────
+
+    /**
+     * The plan's P1 defect: every order was mapped `type = checkout` with
+     * `order_type = order`, so FluentCart never listed a renewal under its
+     * subscription and never counted it towards `bill_count`. The type now
+     * comes from the typed relationship references the dataset carries — never
+     * from `post_parent`, which WCS renewal orders do not usefully set.
+     */
+    public function testAParentOrderNamedByTheDatasetIsMappedAsASubscriptionOrder(): void
+    {
+        $mapper = new OrderMapper($this->idMap, 'USD', $this->historyIndex());
+
+        $mapped = $mapper->map($this->createOrder(['id' => 880_001, 'status' => 'completed']));
+
+        $this->assertSame('subscription', $mapped['order']['type']);
+        $this->assertSame('subscription', $mapped['transaction']['order_type']);
+    }
+
+    public function testARenewalOrderNamedByTheDatasetIsMappedAsARenewalOrder(): void
+    {
+        $GLOBALS['_cartshift_test_get_var_return'] = 6001;
+
+        $mapper = new OrderMapper($this->idMap, 'USD', $this->historyIndex());
+
+        // parent_id 0: a WCS renewal order carries no useful post_parent, which
+        // is exactly why the relationship has to come from somewhere else.
+        $mapped = $mapper->map($this->createOrder([
+            'id'        => 880_501,
+            'status'    => 'completed',
+            'parent_id' => 0,
+        ]));
+
+        $this->assertSame('renewal', $mapped['order']['type']);
+        $this->assertSame('renewal', $mapped['transaction']['order_type']);
+        $this->assertSame(6001, $mapped['order']['parent_id']);
+    }
+
+    public function testAnOrderTheDatasetSaysNothingAboutStaysACheckout(): void
+    {
+        $mapper = new OrderMapper($this->idMap, 'USD', $this->historyIndex());
+
+        $mapped = $mapper->map($this->createOrder(['id' => 424_242, 'status' => 'completed']));
+
+        $this->assertSame('checkout', $mapped['order']['type']);
+        $this->assertSame('order', $mapped['transaction']['order_type']);
+    }
+
+    /**
+     * A disputed order migrates as a checkout AND says so.
+     *
+     * Refusing to guess the type is right; refusing silently is not. On the
+     * live order path no closure validator runs, so without this warning a
+     * disputed order and an order with no subscription at all are
+     * indistinguishable in the log and in the database.
+     */
+    public function testAnOrderTwoRelationshipsClaimMigratesAsACheckoutAndWarns(): void
+    {
+        $mapper = new OrderMapper($this->idMap, 'USD', $this->historyIndex([
+            ['source_order_id' => 880_001, 'relationship' => 'parent'],
+            ['source_order_id' => 880_501, 'relationship' => 'renewal'],
+            ['source_order_id' => 880_501, 'relationship' => 'switch'],
+        ]));
+
+        $mapped = $mapper->map($this->createOrder(['id' => 880_501, 'status' => 'completed']));
+
+        $this->assertSame('checkout', $mapped['order']['type']);
+        $this->assertSame('order', $mapped['transaction']['order_type']);
+
+        $codes = array_map(
+            static fn (array $warning): string => $warning['code']->value,
+            $mapper->getCodedWarnings(),
+        );
+
+        $this->assertContains('dataset_ambiguous_order_relationship', $codes);
+        $this->assertStringContainsString('880501', implode(' ', $mapper->getWarnings()));
+    }
+
+    public function testASettledOrderCarriesNoAmbiguityWarning(): void
+    {
+        $mapper = new OrderMapper($this->idMap, 'USD', $this->historyIndex());
+
+        $mapper->map($this->createOrder(['id' => 880_501, 'status' => 'completed']));
+
+        $codes = array_map(
+            static fn (array $warning): string => $warning['code']->value,
+            $mapper->getCodedWarnings(),
+        );
+
+        $this->assertNotContains('dataset_ambiguous_order_relationship', $codes);
+    }
+
+    /**
+     * @param list<array{source_order_id: int, relationship: string}> $relatedOrders
+     */
+    private function historyIndex(array $relatedOrders = []): \CartShift\Domain\Subscription\SubscriptionHistoryIndex
+    {
+        $factory = new \CartShift\Domain\Subscription\SubscriptionRecordFactory();
+        $shapes  = require dirname(__DIR__, 3) . '/fixtures/lapka-subscription-shapes.php';
+
+        $overrides = $relatedOrders === [] ? [] : ['related_orders' => $relatedOrders];
+
+        return \CartShift\Domain\Subscription\SubscriptionHistoryIndex::fromRecords('local', [
+            $factory->subscriptionFromPayload('local', $shapes['subscriptionPayload']($overrides)),
+        ]);
+    }
+
     private function createOrder(array $overrides = []): \WC_Order
     {
         $order = new \WC_Order();

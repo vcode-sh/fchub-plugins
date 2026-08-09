@@ -12,6 +12,10 @@ const PER_PAGE = 200;
 // would otherwise spin the browser for ever.
 const MAX_PAGES = 100;
 
+// The manual catalogue search is a page the owner reads, not a list the screen
+// walks to completion, so it is a screenful rather than PER_PAGE's 200.
+const CATALOGUE_PER_PAGE = 50;
+
 /**
  * Mapping state for the map screen.
  *
@@ -34,6 +38,14 @@ export function useMapping() {
     // 'create-rest' migrates untouched products as usual; 'only-mapped' turns
     // the decided set into a whitelist via MigrationScope's explicit mode.
     runMode: 'create-rest',
+    // The manual rescue for a row ProductMatcher scored `none` — which is both
+    // Lapka subscription products, and therefore the whole migration.
+    catalogue: { products: [], total: 0, loading: false, error: null, query: '' },
+    // What the server hashed the decision set to on the last save. Tasks 10
+    // and 11 persist this into stage and cutover receipts, so the mapping the
+    // owner approved and the mapping the run executes can be compared rather
+    // than assumed equal.
+    mappingFingerprint: null,
   });
 
   function rowsUrl(page, scope) {
@@ -93,6 +105,95 @@ export function useMapping() {
   }
 
   /**
+   * Every FluentCart product, searchable.
+   *
+   * `band=none` means "nothing here looks like your product", not "your
+   * product cannot be mapped". The row list drops `none` candidates on purpose
+   * — eight implausible products under a "No candidate" heading is an
+   * invitation to fuse a Gift Card with a T-shirt — so this is the other half
+   * of that decision rather than a contradiction of it.
+   *
+   * @param {string} query Free text; empty means the first page of everything.
+   * @param {number} page
+   */
+  async function searchCatalogue(query = '', page = 1) {
+    state.catalogue.loading = true;
+    state.catalogue.error = null;
+    state.catalogue.query = query;
+
+    const suffix = query ? `&q=${encodeURIComponent(query)}` : '';
+
+    try {
+      const data = await api('GET', `mapping/catalogue?page=${page}&per_page=${CATALOGUE_PER_PAGE}${suffix}`);
+
+      state.catalogue.products = data.products || [];
+      state.catalogue.total = data.total || 0;
+    } catch (err) {
+      state.catalogue.error = err.message;
+    } finally {
+      state.catalogue.loading = false;
+    }
+  }
+
+  /**
+   * Point a row at a product the matcher never offered.
+   *
+   * The variant block comes back from the server rather than being assembled
+   * from the catalogue listing here. A subscription's variation is a billing
+   * contract, and deciding it in the browser would be a second copy of the
+   * cadence gate — one that would agree with the real one right up until
+   * somebody edited a repeat interval.
+   */
+  async function chooseProduct(row, fcPostId) {
+    try {
+      const data = await api('GET', `mapping/variants?wc_id=${row.wc_id}&fc_post_id=${fcPostId}`);
+
+      const candidate = {
+        id: fcPostId,
+        label: data.label,
+        band: 'none',
+        score: 0,
+        variant: data.variant,
+        downloads_lost: false,
+      };
+
+      row.candidates = [
+        ...(row.candidates || []).filter((entry) => entry.id !== fcPostId),
+        candidate,
+      ];
+
+      chooseCandidate(row, fcPostId);
+    } catch (err) {
+      state.error = err.message;
+    }
+  }
+
+  /**
+   * Put one source variation on one target variation, by hand.
+   *
+   * Refused rather than corrected when the contract does not fit: the server
+   * would refuse it too, and a UI that silently moved the owner to a different
+   * variation would be choosing between "billed monthly" and "billed yearly"
+   * on their behalf without saying so.
+   */
+  function chooseVariation(row, sourceVariationId, targetVariationId) {
+    const source = (row.variant?.sources || []).find((entry) => entry.id === sourceVariationId);
+
+    if (!source) {
+      return;
+    }
+
+    const option = (source.options || []).find((entry) => entry.id === targetVariationId);
+
+    if (!option || !option.compatible) {
+      return;
+    }
+
+    source.selected = targetVariationId;
+    row.variant.map = { ...row.variant.map, [sourceVariationId]: targetVariationId };
+  }
+
+  /**
    * Point a row at a different FluentCart product.
    *
    * The variant block moves with it, and that is the whole reason this is a
@@ -129,6 +230,10 @@ export function useMapping() {
       // Dropping them here is how "adds XL" becomes a line item pointing at
       // nothing three screens later.
       orphans: row.variant ? row.variant.orphans || [] : [],
+      // The owner's explicit "yes, another product may already use this
+      // variation". Always sent, never inferred: absent would be indistinguishable
+      // from a client that predates the control.
+      allow_shared_target: !!row.allow_shared_target,
     };
   }
 
@@ -153,6 +258,7 @@ export function useMapping() {
     try {
       const data = await api('POST', 'mapping/decide', body);
       row.decision = data.decision;
+      state.mappingFingerprint = data.mapping_fingerprint || null;
     } catch (err) {
       state.error = err.message;
     }
@@ -199,6 +305,8 @@ export function useMapping() {
           row.decision = saved.get(row.wc_id);
         }
       });
+
+      state.mappingFingerprint = data.mapping_fingerprint || null;
     } catch (err) {
       state.error = err.message;
     }
@@ -301,6 +409,9 @@ export function useMapping() {
     bulk,
     clearAll,
     chooseCandidate,
+    searchCatalogue,
+    chooseProduct,
+    chooseVariation,
     applyRunMode,
     runModeAvailable,
     whitelistedProductIds,

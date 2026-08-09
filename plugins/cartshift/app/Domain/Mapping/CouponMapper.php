@@ -373,18 +373,23 @@ final class CouponMapper
      * to treat the product, and re-deriving that decision from WooCommerce here
      * is how the two came to disagree.
      *
-     * They disagree for exactly one type. `variable-subscription` has children,
-     * so this used to return them and only them; but every site that asks tests
-     * `get_type() === 'variable'` (ProductMapper, ProductMigrator,
-     * MappingController), so such a product is migrated — and promoted — as a
-     * *simple* one, keyed by the product ID. The children resolved to nothing.
-     * For `included_products` that is noisy but safe: guardAgainstWidening()
-     * disables the coupon. For `excluded_products` nothing catches it at all,
+     * They used to disagree for exactly one type. `variable-subscription` has
+     * children, so this used to return them and only them; but every site that
+     * decided variable-or-not compared the bare literal `'variable'` (ProductMapper,
+     * ProductMigrator, MappingController — see ProductTypes::isVariable(), added
+     * to end the disagreement), so such a product was migrated — and promoted —
+     * as a *simple* one, keyed by the product ID. The children resolved to
+     * nothing. For `included_products` that was noisy but safe: guardAgainstWidening()
+     * disables the coupon. For `excluded_products` nothing caught it at all,
      * because WIDENING_ON_TOTAL_LOSS deliberately omits that key on the
      * reasoning that an unresolvable product is not in FluentCart to be
      * discounted — true for a product that failed to migrate, and false for one
      * that migrated perfectly well under a key this method did not ask about.
-     * The coupon then discounts a product the shop explicitly excluded.
+     * The coupon then discounted a product the shop explicitly excluded.
+     *
+     * Asking for both keys unconditionally, below, is what kept this class
+     * correct through that whole episode without anyone noticing: it never
+     * needed to know which literal a product's type matched.
      *
      * Asking for both keys costs one extra lookup per product and cannot widen
      * anything: a key nothing was stored under simply resolves to nothing.

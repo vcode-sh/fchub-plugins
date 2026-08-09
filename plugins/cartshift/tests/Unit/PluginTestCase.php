@@ -56,6 +56,11 @@ abstract class PluginTestCase extends TestCase
      */
     private function resetTestGlobals(): void
     {
+        // The transaction depth is connection state, not a `$GLOBALS` entry, and
+        // a test that threw between `begin()` and `commit()` would otherwise
+        // leave the next one thinking it was already inside a transaction.
+        \CartShift\Support\DatabaseTransaction::reset();
+
         foreach (array_keys($GLOBALS) as $key) {
             if (str_starts_with((string) $key, '_cartshift_test_')) {
                 unset($GLOBALS[$key]);

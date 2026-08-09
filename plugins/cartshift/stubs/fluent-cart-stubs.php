@@ -62,6 +62,112 @@ abstract class Model
     public static function booted(): void {}
 
     /**
+     * Mass assignment, with the whitelist actually applied.
+     *
+     * `new Subscription($attributes)` and `fill()` honour `$fillable` here for
+     * the same reason the real ORM does — and because the single most valuable
+     * thing this stub can reproduce is the *omission*. FluentCart 1.6.0 leaves
+     * `created_at` out of `Subscription::$fillable`, so mass assignment
+     * discards an imported subscription's real start time without a word. A
+     * stub that quietly accepted every key would let a test assert that
+     * CartShift "saves" the source timestamp while production stamped today's
+     * date, which is exactly the defect the plan records.
+     *
+     * @param array<string, mixed> $attributes
+     */
+    public function __construct(array $attributes = [])
+    {
+        $this->fill($attributes);
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    public function fill(array $attributes): static
+    {
+        foreach ($attributes as $key => $value) {
+            if (in_array($key, $this->fillable, true)) {
+                $this->attributes[$key] = $value;
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Direct property access, which is how the ORM bypasses `$fillable`.
+     *
+     * `$model->created_at = '2021-...'` sets the attribute whatever the
+     * whitelist says, exactly as Eloquent's `__set` does. That asymmetry is the
+     * whole mechanism `SubscriptionWriter` relies on, so the stub has to have
+     * it or the test proves nothing.
+     */
+    public function __get(string $name): mixed
+    {
+        return $this->attributes[$name] ?? null;
+    }
+
+    public function __set(string $name, mixed $value): void
+    {
+        $this->attributes[$name] = $value;
+    }
+
+    public function __isset(string $name): bool
+    {
+        return isset($this->attributes[$name]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return $this->attributes;
+    }
+
+    /**
+     * Persist, through the same test-supplied handler `__callStatic()` uses.
+     *
+     * Nothing is installed by default, so a suite that never opts in still gets
+     * "there is no FluentCart here" rather than a silent no-op that looks like
+     * a successful write.
+     */
+    public function save(): bool
+    {
+        $handler = $GLOBALS['_cartshift_test_fc_model_handler'] ?? null;
+
+        if (is_callable($handler)) {
+            $handler(static::class, 'save', [$this]);
+
+            return true;
+        }
+
+        throw new \BadMethodCallException(sprintf(
+            '%s::save() is an IDE stub with no implementation. FluentCart is not loaded.',
+            static::class,
+        ));
+    }
+
+    /**
+     * The mass-assignment whitelist, exactly as the real ORM exposes it.
+     *
+     * @see fluent-cart/vendor/wpfluent/framework/src/WPFluent/Database/Orm/Concerns/GuardsAttributes.php:42-45
+     *
+     * Present because it is a public read-only contract the runtime
+     * compatibility probe checks: FluentCart 1.6.0's Subscription excludes
+     * `created_at`, so mass assignment drops an imported subscription's real
+     * start time. Nothing else here reaches a model instance, so this is not a
+     * back door into the fake ORM — it returns a declared array and touches no
+     * database.
+     *
+     * @return list<string>
+     */
+    public function getFillable(): array
+    {
+        return $this->fillable;
+    }
+
+    /**
      * Route a static model call to a test-supplied handler, if one is installed.
      *
      * These stubs exist so the IDE can resolve FluentCart types without the
@@ -473,10 +579,97 @@ class Subscription extends Model
     public function variation() {}
     public function transactions() {}
     public function meta() {}
-    public function getMeta(string $metaKey, $default = null) { return $default; }
-    public function updateMeta(string $metaKey, $metaValue): bool { return true; }
+
+    /**
+     * Subscription meta, recorded so a test can assert what was written.
+     *
+     * FluentCart reads `active_payment_method` from here at charge time rather
+     * than from a column — `Stripe::chargeRenewal()` and
+     * `Processor::chargeVaultedRenewal()` both do — so "the token was saved" is
+     * a statement about meta, and a stub returning `true` and forgetting could
+     * not tell a written token from an unwritten one. Keyed by subscription ID
+     * because the interesting failure is writing it against 0, before the row
+     * has one.
+     */
+    public function getMeta(string $metaKey, $default = null)
+    {
+        return $GLOBALS['_cartshift_test_fc_meta']['Subscription'][(int) $this->id][$metaKey] ?? $default;
+    }
+
+    public function updateMeta(string $metaKey, $metaValue): bool
+    {
+        $GLOBALS['_cartshift_test_fc_meta']['Subscription'][(int) $this->id][$metaKey] = $metaValue;
+
+        return true;
+    }
+
+    /**
+     * FluentCart 1.6.0's own (Subscription.php:590), and the half a stub is
+     * tempted to leave out.
+     *
+     * A correction that can only ever be written is a correction that survives
+     * the operator fixing the source data, so "was it removed" has to be a
+     * question the fake can answer.
+     */
+    public function deleteMeta(string $metaKey): bool
+    {
+        unset($GLOBALS['_cartshift_test_fc_meta']['Subscription'][(int) $this->id][$metaKey]);
+
+        return true;
+    }
+
     public function hasAccessValidity(): bool { return false; }
     public function addLog(string $title, string $description = '', string $type = 'info', string $by = ''): void {}
+
+    /**
+     * FluentCart 1.6.0's canonical bill_count formula, reproduced rather than
+     * approximated (app/Models/Subscription.php:1090-1112).
+     *
+     * A stub that returned a plausible number would let CartShift's reconciler
+     * agree with itself: the whole point of section 10 is that FluentCart's
+     * own count is the one that survives a recompute, so the test double has
+     * to apply FluentCart's own three conditions and FluentCart's own two
+     * corrections — `total > 0` succeeded charges linked by `subscription_id`,
+     * plus `billed_cycles_offset`, minus `billed_cycles_deduction`.
+     */
+    public function calculateBillCount(): int
+    {
+        $count = (int) OrderTransaction::query()
+            ->where('subscription_id', $this->id)
+            ->where('transaction_type', 'charge')
+            ->where('status', 'succeeded')
+            ->where('total', '>', 0)
+            ->count();
+
+        foreach ((array) $this->getMeta('early_payment_history', []) as $earlyPayment) {
+            $paidCount = (int) ($earlyPayment['count'] ?? 1);
+
+            if ($paidCount > 1) {
+                $count += ($paidCount - 1);
+            }
+        }
+
+        $count += (int) $this->getMeta('billed_cycles_offset', 0);
+        $count -= (int) $this->getMeta('billed_cycles_deduction', 0);
+
+        return $count;
+    }
+
+    /**
+     * Records the call and answers nothing useful.
+     *
+     * This is the method plan section 10 exists to keep away from a historical
+     * import: it manufactures a next-billing date for any subscription whose
+     * own date is empty, and 360 of the 564 preserved Lapka subscriptions have
+     * an empty one. A test asserts this list stays empty; a stub that silently
+     * worked would let 360 invented charge dates through unremarked.
+     */
+    public function guessNextBillingDate($forced = false)
+    {
+        $GLOBALS['_cartshift_test_fc_guessed_dates'][] = (int) $this->id;
+
+        return null;
+    }
 }
 
 /**

@@ -54,6 +54,21 @@ final class Constants
 
     public const int DEFAULT_BATCH_SIZE = 50;
 
+    /**
+     * The source namespace a same-site migration lives in (schema v7).
+     *
+     * Every mapping row that predates the column was backfilled to this, so a
+     * repository that says nothing about source keys behaves exactly as it did
+     * before they existed. A cross-site run supplies its own stable slug —
+     * `--source-key=lapka-klub` — which must not be derived from a development
+     * URL, or the same source restored under another hostname stops being
+     * idempotent.
+     *
+     * Not the same question as `is_simulated`: that asks whether a run is a
+     * rehearsal, this asks whose data it is.
+     */
+    public const string DEFAULT_SOURCE_KEY = 'local';
+
     /** Dependency-safe deletion sequence for rollback */
     public const array ROLLBACK_ORDER = [
         self::ENTITY_SUBSCRIPTION,

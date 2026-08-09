@@ -20,18 +20,25 @@ final class IdMapRepositoryTest extends PluginTestCase
 
         $GLOBALS['_cartshift_test_id_map_rows'] = [];
 
-        // The fake honours the realm predicate. Without that the tests below could
-        // not tell "excludes simulated rows" from "there were none".
+        // The fake honours the realm predicate AND the source namespace. Without
+        // the first the tests below could not tell "excludes simulated rows"
+        // from "there were none"; without the second they could not tell
+        // "scoped to this source" from "there was only ever one source".
         $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string|null {
             if (!str_contains($query, 'cartshift_id_map')) {
                 return null;
             }
 
             preg_match("/entity_type = '([^']*)' AND wc_id = '([^']*)'/", $query, $matches);
-            $realOnly = str_contains($query, 'is_simulated = 0');
+            $realOnly  = str_contains($query, 'is_simulated = 0');
+            $sourceKey = self::sourceKeyIn($query);
 
             foreach ($GLOBALS['_cartshift_test_id_map_rows'] as $row) {
                 if ($row['entity_type'] !== $matches[1] || $row['wc_id'] !== $matches[2]) {
+                    continue;
+                }
+
+                if ($sourceKey !== null && $row['source_key'] !== $sourceKey) {
                     continue;
                 }
 
@@ -51,11 +58,16 @@ final class IdMapRepositoryTest extends PluginTestCase
             }
 
             preg_match("/entity_type = '([^']*)'/", $query, $matches);
-            $realOnly = str_contains($query, 'is_simulated = 0');
+            $realOnly  = str_contains($query, 'is_simulated = 0');
+            $sourceKey = self::sourceKeyIn($query);
 
             $rows = [];
             foreach ($GLOBALS['_cartshift_test_id_map_rows'] as $row) {
                 if ($row['entity_type'] !== $matches[1]) {
+                    continue;
+                }
+
+                if ($sourceKey !== null && $row['source_key'] !== $sourceKey) {
                     continue;
                 }
 
@@ -68,6 +80,11 @@ final class IdMapRepositoryTest extends PluginTestCase
 
             return $rows;
         };
+    }
+
+    private static function sourceKeyIn(string $query): string|null
+    {
+        return preg_match("/source_key = '([^']*)'/", $query, $matches) === 1 ? $matches[1] : null;
     }
 
     protected function tearDown(): void
@@ -299,6 +316,11 @@ final class IdMapRepositoryTest extends PluginTestCase
         $this->assertSame(900000042, $repo->getFcId(Constants::ENTITY_PRODUCT, '101'));
     }
 
+    /**
+     * The where clause gained `source_key` when v7 landed: a purge must clear
+     * this source's rehearsal without touching another source's. The realm
+     * assertion is unchanged — that is still the point of the method.
+     */
     public function testPurgeSimulatedDeletesOnlyTheSimulatedRealm(): void
     {
         $repo = new IdMapRepository();
@@ -310,16 +332,128 @@ final class IdMapRepositoryTest extends PluginTestCase
         ));
 
         $this->assertCount(1, $deletes);
-        $this->assertSame(['is_simulated' => 1], $deletes[0][2]);
+        $this->assertSame(['is_simulated' => 1, 'source_key' => 'local'], $deletes[0][2]);
     }
 
-    private function seedRow(string $entityType, string $wcId, int $fcId, bool $simulated = false): void
+    // ──────────────────────────────────────────────
+    // Source namespace (schema v7)
+    // ──────────────────────────────────────────────
+
+    /**
+     * Same-site migration is the overwhelming majority of runs and must not
+     * have to say anything about source keys at all.
+     */
+    public function testTheDefaultSourceKeyIsLocal(): void
     {
+        $repo = new IdMapRepository();
+
+        $repo->store(Constants::ENTITY_PRODUCT, '101', 5001, 'mig-1');
+
+        $inserts = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $q): bool => $q[0] === 'insert',
+        ));
+
+        $this->assertSame('local', $inserts[0][2]['source_key']);
+    }
+
+    public function testAnExplicitSourceKeyIsWritten(): void
+    {
+        $repo = new IdMapRepository('lapka-klub');
+
+        $repo->store(Constants::ENTITY_PRODUCT, '101', 5001, 'mig-1');
+
+        $inserts = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $q): bool => $q[0] === 'insert',
+        ));
+
+        $this->assertSame('lapka-klub', $inserts[0][2]['source_key']);
+    }
+
+    /**
+     * The reason the column exists. Two WooCommerce installs hand out the same
+     * small integers, and product 101 from the club site is not product 101
+     * from the shop site — however much the ID map used to think otherwise.
+     */
+    public function testTheSameNumericIdInTwoSourcesResolvesSeparately(): void
+    {
+        $this->seedRow(Constants::ENTITY_PRODUCT, '101', 11);
+        $this->seedRow(Constants::ENTITY_PRODUCT, '101', 22, sourceKey: 'lapka-klub');
+
+        $this->assertSame(11, (new IdMapRepository())->getFcId(Constants::ENTITY_PRODUCT, '101'));
+        $this->assertSame(22, (new IdMapRepository('lapka-klub'))->getFcId(Constants::ENTITY_PRODUCT, '101'));
+    }
+
+    public function testAReadNeverCrossesIntoAnotherSource(): void
+    {
+        $this->seedRow(Constants::ENTITY_PRODUCT, '101', 22, sourceKey: 'lapka-klub');
+
+        $this->assertNull(
+            (new IdMapRepository())->getFcId(Constants::ENTITY_PRODUCT, '101'),
+            'A local run must not resolve another source\'s mapping.',
+        );
+    }
+
+    public function testBulkRehydrationIsScopedToTheSourceToo(): void
+    {
+        $this->seedRow(Constants::ENTITY_CATEGORY, '10', 100);
+        $this->seedRow(Constants::ENTITY_CATEGORY, '11', 202, sourceKey: 'lapka-klub');
+
+        $this->assertSame(['10' => 100], (new IdMapRepository())->getMapForEntityType(Constants::ENTITY_CATEGORY));
+        $this->assertSame(
+            ['11' => 202],
+            (new IdMapRepository('lapka-klub'))->getMapForEntityType(Constants::ENTITY_CATEGORY),
+        );
+    }
+
+    public function testDeletesAreScopedToTheSource(): void
+    {
+        $repo = new IdMapRepository('lapka-klub');
+
+        $repo->deleteByMigration('mig-1');
+
+        $deletes = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $q): bool => $q[0] === 'delete',
+        ));
+
+        $this->assertSame(
+            ['migration_id' => 'mig-1', 'source_key' => 'lapka-klub'],
+            $deletes[0][2],
+        );
+    }
+
+    public function testRollbackAndFinalisationReadsAreScopedToTheSource(): void
+    {
+        (new IdMapRepository('lapka-klub'))->getAllByEntityType(Constants::ENTITY_PRODUCT, 'mig-1');
+        (new IdMapRepository('lapka-klub'))->getCreatedByMigration(Constants::ENTITY_PRODUCT, 'mig-1');
+
+        $queries = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $q): bool => $q[0] === 'get_results' && str_contains((string) $q[1], 'cartshift_id_map'),
+        ));
+
+        $this->assertCount(2, $queries);
+
+        foreach ($queries as $query) {
+            $this->assertStringContainsString("source_key = 'lapka-klub'", (string) $query[1]);
+        }
+    }
+
+    private function seedRow(
+        string $entityType,
+        string $wcId,
+        int $fcId,
+        bool $simulated = false,
+        string $sourceKey = 'local',
+    ): void {
         $GLOBALS['_cartshift_test_id_map_rows'][] = [
             'entity_type'  => $entityType,
             'wc_id'        => $wcId,
             'fc_id'        => $fcId,
             'is_simulated' => $simulated ? 1 : 0,
+            'source_key'   => $sourceKey,
         ];
     }
 

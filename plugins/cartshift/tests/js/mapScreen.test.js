@@ -96,6 +96,201 @@ describe('MapRow', () => {
 
     expect(wrapper.emitted('suggest')[0]).toEqual([901]);
   });
+
+  // ── Subscription rows ───────────────────────────────────
+  //
+  // A subscription's variation is a billing contract, not a size. The operator
+  // has to see what each target variation would charge, how often, with what
+  // trial and for how many cycles — and why the ones that do not fit do not.
+
+  function subscriptionRow(overrides = {}) {
+    return row({
+      wc_id: 770002,
+      name: 'Klubu Przyjaciol Psow rocznie',
+      wc_type: 'subscription',
+      band: 'none',
+      suggested: 88,
+      candidates: [{ id: 88, label: 'Klubu Przyjaciol Psow', band: 'none', score: 0 }],
+      variant: {
+        matched: 1,
+        total: 1,
+        adds: 0,
+        map: { 770002: 4102 },
+        orphans: [],
+        errors: [],
+        warnings: [],
+        sources: [
+          {
+            id: 770002,
+            name: 'Default',
+            subscription: true,
+            interval: 'yearly',
+            selected: 4102,
+            options: [
+              {
+                id: 4101,
+                name: 'Miesiecznie',
+                payment_type: 'subscription',
+                repeat_interval: 'monthly',
+                price: 29,
+                trial_days: 0,
+                times: 0,
+                compatible: false,
+                errors: ['target_variation_contract_mismatch'],
+                warnings: [],
+              },
+              {
+                id: 4102,
+                name: 'Rocznie',
+                payment_type: 'subscription',
+                repeat_interval: 'yearly',
+                price: 290,
+                trial_days: 14,
+                times: 3,
+                compatible: true,
+                errors: [],
+                warnings: ['target_price_differs_from_source'],
+              },
+            ],
+          },
+        ],
+      },
+      ...overrides,
+    });
+  }
+
+  it('lists every target variation with its billing contract', () => {
+    const wrapper = mount(MapRow, { props: { row: subscriptionRow() } });
+
+    const monthly = wrapper.find('[data-variation="4101"]');
+    const yearly = wrapper.find('[data-variation="4102"]');
+
+    expect(monthly.text()).toContain('Miesiecznie');
+    expect(monthly.text()).toContain('monthly');
+    expect(monthly.text()).toContain('29');
+
+    expect(yearly.text()).toContain('Rocznie');
+    expect(yearly.text()).toContain('yearly');
+    expect(yearly.text()).toContain('290');
+    // Trial and finite-cycle detail, which is the difference between a plan
+    // that bills three times and one that bills for ever. Asserted on the
+    // option itself, because '3' appears elsewhere on every row.
+    expect(yearly.text()).toContain('14');
+    expect(yearly.text()).toContain('3 payments');
+    expect(monthly.text()).toContain('runs until cancelled');
+  });
+
+  it('says why an incompatible variation cannot be chosen', () => {
+    const wrapper = mount(MapRow, { props: { row: subscriptionRow() } });
+
+    const option = wrapper.find('[data-variation="4101"]');
+
+    expect(option.exists()).toBe(true);
+    expect(option.text()).toContain('interval');
+    expect(option.find('input').attributes('disabled')).toBeDefined();
+  });
+
+  // Reserved is not a cadence problem, and saying "this product bills monthly
+  // and the chosen variation bills monthly" is how a screen loses an owner's
+  // trust in one sentence.
+  it('says when a variation is refused because another one already took it', () => {
+    const taken = subscriptionRow();
+
+    taken.variant.sources[0].selected = null;
+    taken.variant.sources[0].options[1].compatible = false;
+    taken.variant.sources[0].options[1].errors = ['target_variation_contract_collision'];
+
+    const wrapper = mount(MapRow, { props: { row: taken } });
+    const option = wrapper.find('[data-variation="4102"]');
+
+    expect(option.text()).toContain('Already used by another variation');
+    expect(option.text()).not.toContain('interval');
+    expect(option.find('input').attributes('disabled')).toBeDefined();
+  });
+
+  it('says the source contract is preserved when the list price differs', () => {
+    const wrapper = mount(MapRow, { props: { row: subscriptionRow() } });
+
+    expect(wrapper.find('[data-variation="4102"]').text()).toContain('preserved');
+  });
+
+  // trigger('change') rather than setValue(): the yearly option is already the
+  // selected one, and Vue Test Utils' setChecked() returns early on a radio
+  // that is checked — which would assert nothing at all.
+  it('emits the chosen variation', async () => {
+    const wrapper = mount(MapRow, { props: { row: subscriptionRow() } });
+
+    await wrapper.find('[data-variation="4102"] input').trigger('change');
+
+    expect(wrapper.emitted('choose-variation')[0]).toEqual([770002, 4102]);
+  });
+
+  it('offers no link button while a source variation has no compatible target', () => {
+    const blocked = subscriptionRow();
+
+    blocked.variant.map = {};
+    blocked.variant.sources[0].selected = null;
+    blocked.variant.errors = [
+      { code: 'target_variation_missing', source_variation_id: 770002, message: 'No compatible variation.' },
+    ];
+
+    const wrapper = mount(MapRow, { props: { row: blocked } });
+
+    expect(wrapper.find('[data-action="link"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('No compatible variation.');
+  });
+
+  /**
+   * And Create is not the way round it.
+   *
+   * The Create route runs ProductMigrator and VariationMapper, which read the
+   * cadence leniently — week/2 becomes weekly, month/2 and month/12 become
+   * monthly — so an operator answering "CartShift cannot express this contract"
+   * with Create would get a FluentCart product quietly claiming a different
+   * one. The run refuses it anyway, which made the button's only possible
+   * outcome a product silently dropped from the migration.
+   */
+  it('offers no create button on a blocked subscription row', () => {
+    const blocked = subscriptionRow();
+
+    blocked.variant.map = {};
+    blocked.variant.sources[0].selected = null;
+    blocked.variant.errors = [
+      { code: 'unsupported_billing_cadence', source_variation_id: 770002, message: 'Cannot express this.' },
+    ];
+
+    const wrapper = mount(MapRow, { props: { row: blocked } });
+
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(false);
+    expect(wrapper.find('[data-action="skip"]').exists()).toBe(true);
+  });
+
+  it('still offers create on a subscription row with nothing blocking it', () => {
+    expect(
+      mount(MapRow, { props: { row: subscriptionRow() } }).find('[data-action="create"]').exists(),
+    ).toBe(true);
+  });
+
+  it('offers the shared-target opt-in only for subscription rows', () => {
+    expect(mount(MapRow, { props: { row: subscriptionRow() } }).find('[data-shared-target]').exists()).toBe(true);
+    expect(mount(MapRow, { props: { row: row() } }).find('[data-shared-target]').exists()).toBe(false);
+  });
+
+  it('emits the shared-target opt-in', async () => {
+    const wrapper = mount(MapRow, { props: { row: subscriptionRow() } });
+
+    await wrapper.find('[data-shared-target] input').setValue(true);
+
+    expect(wrapper.emitted('share-target')[0]).toEqual([true]);
+  });
+
+  it('offers a manual search for a row the matcher gave nothing', () => {
+    const wrapper = mount(MapRow, {
+      props: { row: row({ band: 'none', suggested: null, candidates: [], variant: null }) },
+    });
+
+    expect(wrapper.find('[data-action="search"]').exists()).toBe(true);
+  });
 });
 
 describe('MapScreen', () => {
@@ -145,6 +340,58 @@ describe('MapScreen', () => {
       },
     });
   }
+
+  /**
+   * The subscription audit sends blocked rows here. A bare screen change left
+   * the operator to find one product among two thousand from a number they
+   * were shown on the previous screen — the same complaint the stale-variation
+   * refusal message had, arriving through a button instead of a message.
+   */
+  it('names the row the subscription audit sent the operator here to re-decide', async () => {
+    apiMock.mockResolvedValue({ rows: [row({ wc_id: 770001 })], total: 1, fc_product_count: 4 });
+
+    const clearMapFocus = vi.fn();
+    const wrapper = mountScreen(
+      { startMigration: vi.fn(), goToScreen: vi.fn(), clearMapFocus },
+      { mapFocus: { wc_id: 770001, name: 'Monthly subscription' } }
+    );
+
+    await nextTick();
+    await nextTick();
+
+    const banner = wrapper.find('[data-map-focus]');
+
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toContain('Monthly subscription');
+    expect(banner.text()).toContain('770001');
+
+    await banner.find('[data-action="clear-focus"]').trigger('click');
+
+    expect(clearMapFocus).toHaveBeenCalled();
+  });
+
+  it('shows no focus banner when the operator came here on their own', async () => {
+    apiMock.mockResolvedValue({ rows: [row()], total: 1, fc_product_count: 4 });
+
+    const wrapper = mountScreen();
+    await nextTick();
+    await nextTick();
+
+    expect(wrapper.find('[data-map-focus]').exists()).toBe(false);
+  });
+
+  it('offers a way back to the subscription audit', async () => {
+    apiMock.mockResolvedValue({ rows: [row()], total: 1, fc_product_count: 4 });
+
+    const actions = { startMigration: vi.fn(), goToScreen: vi.fn() };
+    const wrapper = mountScreen(actions);
+    await nextTick();
+    await nextTick();
+
+    await wrapper.find('[data-action="subscription-audit"]').trigger('click');
+
+    expect(actions.goToScreen).toHaveBeenCalledWith('subscription-audit');
+  });
 
   it('renders a band header with a bulk button per populated band', async () => {
     apiMock.mockResolvedValue({
@@ -389,6 +636,55 @@ describe('MapScreen', () => {
     await nextTick();
 
     expect(apiMock).toHaveBeenCalledWith('POST', 'mapping/clear', {});
+  });
+
+  // ── Manual catalogue search ─────────────────────────────
+  //
+  // ProductMatcher scored both Lapka source products `band=none` and rows()
+  // drops every `none` candidate, so without this the only two products the
+  // migration exists for cannot be mapped at all.
+
+  it('opens a catalogue search for a row with no candidate and links what is picked', async () => {
+    const noCandidate = row({
+      wc_id: 770002,
+      name: 'Klubu Przyjaciol Psow rocznie',
+      wc_type: 'subscription',
+      band: 'none',
+      suggested: null,
+      candidates: [],
+      variant: null,
+    });
+
+    apiMock.mockResolvedValue({ rows: [noCandidate], total: 1, fc_product_count: 1 });
+
+    const wrapper = mountScreen();
+    await nextTick();
+    await nextTick();
+
+    apiMock.mockResolvedValue({
+      products: [{ id: 88, name: 'Klubu Przyjaciol Psow', variations: [] }],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+
+    await wrapper.find('[data-action="search"]').trigger('click');
+    await nextTick();
+
+    const dialog = wrapper.find('[data-catalogue-search]');
+
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.text()).toContain('Klubu Przyjaciol Psow');
+
+    apiMock.mockResolvedValue({
+      variant: { matched: 1, total: 1, adds: 0, map: { 770002: 4102 }, orphans: [], errors: [], warnings: [], sources: [] },
+      label: 'Klubu Przyjaciol Psow',
+    });
+
+    await dialog.find('[data-catalogue-product="88"]').trigger('click');
+    await nextTick();
+
+    expect(apiMock).toHaveBeenCalledWith('GET', 'mapping/variants?wc_id=770002&fc_post_id=88');
   });
 
   it('says so when it could not load every product it counted', async () => {

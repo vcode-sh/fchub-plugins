@@ -153,6 +153,52 @@ final class VariantResolverTest extends PluginTestCase
         $this->assertSame([11 => 501], $result['map']);
     }
 
+    // ──────────────────────────────────────────────
+    // Reserved targets
+    // ──────────────────────────────────────────────
+    //
+    // SubscriptionVariantMatcher runs the cadence-gated half first and then
+    // hands the leftovers here. Without a way to say "these are already
+    // spoken for", the name and position passes would happily re-claim a
+    // variation the cadence gate had just assigned to a subscription.
+
+    public function testAReservedFcVariantIsNotClaimedByAnyPass(): void
+    {
+        $result = (new VariantResolver())->resolve(
+            [$this->v(11, 'TS-L', 'Large')],
+            [$this->v(501, 'TS-L', 'Large'), $this->v(502, '', 'Other')],
+            [501],
+        );
+
+        $this->assertSame(
+            [11 => 502],
+            $result['map'],
+            'The SKU pass must skip 501 because it is reserved, and fall through to position.',
+        );
+    }
+
+    public function testReservingEveryVariantLeavesEveryWooVariationAnOrphan(): void
+    {
+        $result = (new VariantResolver())->resolve(
+            [$this->v(11, '', 'Small'), $this->v(12, '', 'Large')],
+            [$this->v(501, '', 'Small'), $this->v(502, '', 'Large')],
+            [501, 502],
+        );
+
+        $this->assertSame([], $result['map']);
+        $this->assertSame([11, 12], $result['orphans']);
+    }
+
+    public function testReservingNothingIsTheExistingBehaviour(): void
+    {
+        $resolver = new VariantResolver();
+
+        $woo = [$this->v(11, '', 'Small'), $this->v(12, '', 'Large')];
+        $fc  = [$this->v(501, '', 'Small'), $this->v(502, '', 'Large')];
+
+        $this->assertSame($resolver->resolve($woo, $fc), $resolver->resolve($woo, $fc, []));
+    }
+
     public function testASimpleProductMapsItsSinglePseudoVariation(): void
     {
         // A Woo simple product is passed as one pseudo-variation keyed by the

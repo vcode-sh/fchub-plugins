@@ -6,6 +6,8 @@ namespace CartShift\Tests\Unit\Domain\Mapping;
 
 use CartShift\Domain\Mapping\ProductMapper;
 use CartShift\Tests\Unit\PluginTestCase;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 
 require_once __DIR__ . '/../../../stubs/MapperStubs.php';
 
@@ -340,6 +342,105 @@ final class ProductMapperTest extends PluginTestCase
             'type' => 'variable',
             'children' => [$variationId],
         ]);
+    }
+
+    // ──────────────────────────────────────────────
+    // P1 regression: variable-subscription must not collapse
+    // ──────────────────────────────────────────────
+    //
+    // ProductTypes::supported() has advertised `variable-subscription` as
+    // migratable ever since WooCommerce Subscriptions was detected, but map()
+    // used to decide "does this product have children" with a bare
+    // `$type === 'variable'` — a comparison variable-subscription never
+    // passes. The product fell to the `else` branch, mapSimple() ran instead
+    // of every child being walked, and every variation but a single
+    // pseudo-one — along with whichever cadence it did not happen to keep —
+    // vanished silently. Two variations with two different cadences is the
+    // smallest fixture that catches both halves of that: the collapse to one
+    // variation, and the loss of a distinct plan even if it hadn't collapsed.
+
+    /**
+     * Isolated because it is the one test in this file that needs
+     * WC_Subscriptions_Product to exist, which the same stub's own docblock
+     * warns must never be require_once'd into the shared process — doing so
+     * would flip VariationMapper's `class_exists()` gate to true for every
+     * later test in the run, including this file's own dimension/weight test
+     * and VariationMapperTest's, both of which document that gate as false on
+     * purpose.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testAVariableSubscriptionKeepsBothVariationsWithTheirOwnCadence(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $monthly = $this->createSubscriptionVariation(201, 'red', 'month', 1);
+        $yearly  = $this->createSubscriptionVariation(202, 'blue', 'year', 1);
+
+        $GLOBALS['_cartshift_test_wc_products'][201] = $monthly;
+        $GLOBALS['_cartshift_test_wc_products'][202] = $yearly;
+
+        $product = $this->createProduct([
+            'id'       => 500,
+            'type'     => 'variable-subscription',
+            'children' => [201, 202],
+        ]);
+
+        $result = $this->mapper->map($product);
+
+        $this->assertNotNull($result);
+        $this->assertCount(
+            2,
+            $result['variations'],
+            'A variable-subscription product must keep every one of its variations, not collapse to a '
+            . 'single pseudo-variation.',
+        );
+
+        [$first, $second] = $result['variations'];
+
+        $this->assertSame('subscription', $first['payment_type']);
+        $this->assertSame('subscription', $second['payment_type']);
+        $this->assertSame('monthly', $first['other_info']['repeat_interval']);
+        $this->assertSame('yearly', $second['other_info']['repeat_interval']);
+        $this->assertNotSame(
+            $first['other_info']['repeat_interval'],
+            $second['other_info']['repeat_interval'],
+            'The two cadences this product sold must stay distinguishable rather than merge into one.',
+        );
+
+        // The detail row's variation_type is the other half of the same
+        // decision — ProductMapper::map() also used to gate this on the bare
+        // literal, so a collapsed product's detail row still called itself
+        // 'simple' even on the rare run where a stray variation survived.
+        $this->assertSame('advanced_variations', $result['detail']['variation_type']);
+    }
+
+    private function createSubscriptionVariation(
+        int $id,
+        string $colorSlug,
+        string $period,
+        int $interval,
+    ): \WC_Product_Variation {
+        $variation = new \WC_Product_Variation();
+        $ref = new \ReflectionClass($variation);
+
+        foreach ([
+            'id' => $id,
+            'status' => 'publish',
+            'price' => '19.99',
+            'regular_price' => '19.99',
+            'attributes' => ['attribute_pa_color' => $colorSlug],
+            'meta' => [
+                '_subscription_period'          => $period,
+                '_subscription_period_interval' => (string) $interval,
+            ],
+        ] as $key => $value) {
+            if ($ref->hasProperty($key)) {
+                $ref->getProperty($key)->setValue($variation, $value);
+            }
+        }
+
+        return $variation;
     }
 
     public function testMapAppliesCartshiftMapperProductFilter(): void

@@ -177,8 +177,11 @@ final class MigrateCommandTest extends PluginTestCase
 
         $this->assertCount(1, $deletes, 'Reset must issue exactly one delete against the id map.');
         $this->assertSame('wp_cartshift_id_map', $deletes[0][1]);
+        // `source_key` joined the where clause with schema v7: a reset clears
+        // this source's rehearsal, not every source's. The realm predicate is
+        // unchanged, and it is still the point of the assertion.
         $this->assertSame(
-            ['is_simulated' => 1],
+            ['is_simulated' => 1, 'source_key' => 'local'],
             $deletes[0][2],
             'Real mappings survive a reset — deleting those is rollback\'s job.',
         );

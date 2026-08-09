@@ -6,6 +6,7 @@ namespace CartShift\Domain\Mapping;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Domain\Subscription\CustomerRecord;
 use CartShift\Storage\IdMapRepository;
 
 final class CustomerMapper
@@ -94,6 +95,53 @@ final class CustomerMapper
 
         /** @see 'cartshift/mapper/guest_customer' */
         return apply_filters('cartshift/mapper/guest_customer', $mapped, $order->get_billing_email(), $order);
+    }
+
+    /**
+     * Map a cross-site `CustomerRecord` to FluentCart customer data.
+     *
+     * The same-site mappers above read a live `\WP_User` or `\WC_Order`; a
+     * dataset record has crossed a site boundary and has neither, only
+     * whatever `SubscriptionRecordFactory` captured into
+     * `CustomerRecord::$billingIdentity` — exactly the field set
+     * `SubscriptionRecordFactory::BILLING_FIELDS` names, one billing address
+     * and no separate shipping one. `$userId` is the destination WordPress
+     * user `CustomerResolver` has already proven is the unique match for this
+     * record's email; pass null for a guest.
+     *
+     * @return array{customer: array, addresses: array}
+     */
+    public function mapFromRecord(CustomerRecord $record, int|null $userId): array
+    {
+        $identity = $record->billingIdentity;
+
+        $customer = [
+            'user_id'    => $userId,
+            'email'      => $record->email,
+            'first_name' => (string) ($identity['first_name'] ?? ''),
+            'last_name'  => (string) ($identity['last_name'] ?? ''),
+            'status'     => 'active',
+            'notes'      => '',
+            'country'    => (string) ($identity['country'] ?? ''),
+            'city'       => (string) ($identity['city'] ?? ''),
+            'state'      => (string) ($identity['state'] ?? ''),
+            'postcode'   => (string) ($identity['postcode'] ?? ''),
+        ];
+
+        $addresses = [];
+
+        $billingAddress = self::buildAddressFromIdentity($identity, $record->email);
+        if ($billingAddress) {
+            $addresses[] = $billingAddress;
+        }
+
+        $mapped = [
+            'customer'  => $customer,
+            'addresses' => $addresses,
+        ];
+
+        /** @see 'cartshift/mapper/cross_site_customer' */
+        return apply_filters('cartshift/mapper/cross_site_customer', $mapped, $record, $userId);
     }
 
     /**
@@ -190,6 +238,57 @@ final class CustomerMapper
             'phone'      => $phone ?: '',
             'email'      => $type === 'billing' ? $order->get_billing_email() : '',
             'meta'       => !empty($meta) ? $meta : null,
+        ];
+    }
+
+    /**
+     * Build a billing address array from a `CustomerRecord::$billingIdentity`.
+     *
+     * There is only ever one such address — the dataset contract has no
+     * separate shipping capture — so this always answers `type => 'billing'`,
+     * unlike buildAddressFromUserMeta()/buildAddressFromOrder() which take a
+     * type because their live sources genuinely carry two.
+     *
+     * @param array<string, mixed> $identity
+     */
+    private static function buildAddressFromIdentity(array $identity, string $email): ?array
+    {
+        $firstName = (string) ($identity['first_name'] ?? '');
+        $lastName  = (string) ($identity['last_name'] ?? '');
+        $address1  = (string) ($identity['address_1'] ?? '');
+        $country   = (string) ($identity['country'] ?? '');
+
+        if ($firstName === '' && $address1 === '' && $country === '') {
+            return null;
+        }
+
+        $name    = trim("{$firstName} {$lastName}");
+        $phone   = (string) ($identity['phone'] ?? '');
+        $company = (string) ($identity['company'] ?? '');
+
+        $meta = [];
+        if ($phone !== '') {
+            $meta['other_data']['phone'] = $phone;
+        }
+        if ($company !== '') {
+            $meta['other_data']['company_name'] = $company;
+        }
+
+        return [
+            'type'       => 'billing',
+            'is_primary' => 1,
+            'status'     => 'active',
+            'label'      => 'Billing',
+            'name'       => $name,
+            'address_1'  => $address1,
+            'address_2'  => (string) ($identity['address_2'] ?? ''),
+            'city'       => (string) ($identity['city'] ?? ''),
+            'state'      => (string) ($identity['state'] ?? ''),
+            'postcode'   => (string) ($identity['postcode'] ?? ''),
+            'country'    => $country,
+            'phone'      => $phone,
+            'email'      => $email,
+            'meta'       => $meta !== [] ? $meta : null,
         ];
     }
 }

@@ -11,10 +11,13 @@ use CartShift\Domain\Migration\MappingPromoter;
 use CartShift\Domain\Migration\MigrationFinalizer;
 use CartShift\Domain\Migration\MigrationOrchestrator;
 use CartShift\Domain\Migration\MigrationOrchestratorFactory;
+use CartShift\Domain\Subscription\DatasetClosureValidator;
+use CartShift\Domain\Subscription\SubscriptionRecordFactory;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Storage\ProductMapRepository;
+use CartShift\Support\Constants;
 
 defined('ABSPATH') || exit();
 
@@ -29,10 +32,33 @@ final class MigrationModule implements ModuleInterface
     #[\Override]
     public function register(Container $container): void
     {
-        $container->singleton(IdMapRepository::class, static fn (): IdMapRepository => new IdMapRepository());
+        // Both mapping repositories are bound at the `local` source namespace,
+        // stated rather than defaulted. A cross-site run resolves its own pair
+        // from the operator-supplied `--source-key`, and that key belongs to the
+        // command that was given it — not to a container singleton shared with
+        // every same-site request in the process.
+        $container->singleton(
+            IdMapRepository::class,
+            static fn (): IdMapRepository => new IdMapRepository(Constants::DEFAULT_SOURCE_KEY),
+        );
         $container->singleton(MigrationLogRepository::class, static fn (): MigrationLogRepository => new MigrationLogRepository());
         $container->singleton(MigrationState::class, static fn (): MigrationState => new MigrationState());
-        $container->singleton(ProductMapRepository::class, static fn (): ProductMapRepository => new ProductMapRepository());
+        $container->singleton(
+            ProductMapRepository::class,
+            static fn (): ProductMapRepository => new ProductMapRepository(Constants::DEFAULT_SOURCE_KEY),
+        );
+
+        // The dataset seam. Both are stateless, both are shared by the live and
+        // package sources Task 3 adds, and both must be the same instance
+        // everywhere so there is exactly one canonicalisation in the process.
+        $container->singleton(
+            SubscriptionRecordFactory::class,
+            static fn (): SubscriptionRecordFactory => new SubscriptionRecordFactory(),
+        );
+        $container->singleton(
+            DatasetClosureValidator::class,
+            static fn (): DatasetClosureValidator => new DatasetClosureValidator(),
+        );
         $container->singleton(MigrationFinalizer::class, static fn (Container $c): MigrationFinalizer => new MigrationFinalizer(
             $c->get(IdMapRepository::class),
             $c->get(MigrationLogRepository::class),
@@ -91,6 +117,13 @@ final class MigrationModule implements ModuleInterface
                 'CartShift\\Http\\Controllers\\FinalizeController',
                 'CartShift\\Http\\Controllers\\LogController',
                 'CartShift\\Http\\Controllers\\MappingController',
+                // The read-only subscription audit and the one package endpoint
+                // that writes. Registered here rather than in a module of their
+                // own because they share this module's container bindings —
+                // ProductMapRepository in particular, which the audit reads the
+                // mapping-set fingerprint out of.
+                'CartShift\\Http\\Controllers\\SubscriptionAuditController',
+                'CartShift\\Http\\Controllers\\SubscriptionPackageController',
             ];
 
             foreach ($controllers as $class) {

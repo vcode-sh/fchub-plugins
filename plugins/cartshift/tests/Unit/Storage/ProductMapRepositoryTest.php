@@ -22,14 +22,17 @@ final class ProductMapRepositoryTest extends PluginTestCase
 
         $GLOBALS['_cartshift_test_product_map_rows'] = [];
 
-        // A fake honouring the UNIQUE(wc_id) the schema declares, so "last write
-        // wins" is tested rather than assumed.
+        // A fake honouring the UNIQUE(source_key, wc_id) the v7 schema declares,
+        // so "last write wins" is tested rather than assumed — and so is "the
+        // club site's product 42 is not this site's product 42".
         $GLOBALS['_cartshift_test_insert_callback'] = static function (string $table, array $data): int {
             if (!str_contains($table, 'cartshift_product_map')) {
                 return 1;
             }
 
-            $GLOBALS['_cartshift_test_product_map_rows'][(int) $data['wc_id']] = $data;
+            $key = ($data['source_key'] ?? 'local') . '|' . (int) $data['wc_id'];
+
+            $GLOBALS['_cartshift_test_product_map_rows'][$key] = $data;
 
             return 1;
         };
@@ -39,9 +42,17 @@ final class ProductMapRepositoryTest extends PluginTestCase
                 return [];
             }
 
+            // Rows seeded directly by a test predate the column; they are
+            // `local`, exactly as v7's backfill leaves them.
+            $wanted = preg_match("/source_key = '([^']*)'/", $query, $matches) === 1 ? $matches[1] : null;
+
             $rows = [];
 
             foreach ($GLOBALS['_cartshift_test_product_map_rows'] as $row) {
+                if ($wanted !== null && ($row['source_key'] ?? 'local') !== $wanted) {
+                    continue;
+                }
+
                 if (str_contains($query, "decision = 'link'") && $row['decision'] !== 'link') {
                     continue;
                 }
@@ -55,6 +66,50 @@ final class ProductMapRepositoryTest extends PluginTestCase
 
             return $rows;
         };
+    }
+
+    // ──────────────────────────────────────────────
+    // Source namespace (schema v7)
+    // ──────────────────────────────────────────────
+
+    public function testTheDefaultSourceKeyIsLocal(): void
+    {
+        (new ProductMapRepository())->save(ProductMapDecision::link(42, 'simple', 900, 'strong', []));
+
+        $inserts = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $q): bool => $q[0] === 'insert',
+        ));
+
+        $this->assertSame('local', $inserts[0][2]['source_key']);
+    }
+
+    /**
+     * Both Lapka sites number their products from one. A decision saved against
+     * the club source must not turn up as a decision about the shop's product
+     * of the same number.
+     */
+    public function testTwoSourcesCanHoldADecisionForTheSameWooProductId(): void
+    {
+        (new ProductMapRepository())->save(ProductMapDecision::link(42, 'simple', 900, 'strong', []));
+        (new ProductMapRepository('lapka-klub'))->save(ProductMapDecision::link(42, 'simple', 901, 'strong', []));
+
+        $local = (new ProductMapRepository())->all();
+        $club  = (new ProductMapRepository('lapka-klub'))->all();
+
+        $this->assertCount(1, $local);
+        $this->assertCount(1, $club);
+        $this->assertSame(900, $local[0]->fcPostId());
+        $this->assertSame(901, $club[0]->fcPostId());
+    }
+
+    public function testAReadForOneSourceDoesNotSeeAnother(): void
+    {
+        (new ProductMapRepository('lapka-klub'))->save(ProductMapDecision::skip(42, 'simple', 'none'));
+
+        $this->assertNull((new ProductMapRepository())->get(42));
+        $this->assertSame([], (new ProductMapRepository())->skippedProductIds());
+        $this->assertSame([42], (new ProductMapRepository('lapka-klub'))->skippedProductIds());
     }
 
     public function testALinkDecisionRoundTrips(): void

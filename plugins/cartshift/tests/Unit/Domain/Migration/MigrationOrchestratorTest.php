@@ -584,6 +584,101 @@ final class MigrationOrchestratorTest extends PluginTestCase
         );
     }
 
+    // ──────────────────────────────────────────────
+    // The record boundary, which used to end early
+    // ──────────────────────────────────────────────
+
+    /**
+     * A record that throws AFTER an inner layer has committed still leaves
+     * nothing behind.
+     *
+     * This is the shape of the subscription path. `SubscriptionWriter::stage()`
+     * opened its own transaction inside this one and committed it — and MySQL
+     * has no nested transactions, so that second `START TRANSACTION` implicitly
+     * committed the orchestrator's and the writer's `COMMIT` ended the only
+     * transaction there was. `SubscriptionMigrator::linkHistory()` then created
+     * orders, order items and transactions outside any transaction at all, and
+     * a throw in there left them committed while the `ROLLBACK` below undid
+     * nothing.
+     */
+    public function testAFailureAfterAnInnerCommitStillRollsTheWholeRecordBack(): void
+    {
+        $migrator = $this->createFakeMigrator(
+            'subscription',
+            1,
+            [(object) ['id' => 1]],
+            null,
+            static function (): void {
+                // `SubscriptionWriter::stage()`: its own boundary, its own commit.
+                \CartShift\Support\DatabaseTransaction::begin();
+                \CartShift\Support\DatabaseTransaction::commit();
+
+                // `SubscriptionMigrator::linkHistory()`, which runs after it.
+                throw new \RuntimeException('The history write failed.');
+            },
+        );
+
+        $orchestrator = new MigrationOrchestrator(
+            [$migrator],
+            $this->state,
+            $this->idMap,
+            $this->log,
+        );
+
+        $orchestrator->startMigration(['subscription']);
+
+        $this->assertSame(
+            ['START TRANSACTION', 'ROLLBACK'],
+            $this->transactionStatements(),
+            'The inner commit ended the record boundary, so the history was written outside it.',
+        );
+
+        $this->assertSame(0, \CartShift\Support\DatabaseTransaction::depth());
+        $this->assertSame(1, $this->state->getCurrent()['entities']['subscription']['errors']);
+    }
+
+    /**
+     * And the ordinary success path still commits exactly once.
+     */
+    public function testASuccessfulRecordCommitsOnceHoweverManyLayersAskedForATransaction(): void
+    {
+        $migrator = $this->createFakeMigrator(
+            'subscription',
+            1,
+            [(object) ['id' => 1]],
+            null,
+            static function (): void {
+                \CartShift\Support\DatabaseTransaction::begin();
+                \CartShift\Support\DatabaseTransaction::commit();
+            },
+        );
+
+        (new MigrationOrchestrator([$migrator], $this->state, $this->idMap, $this->log))
+            ->startMigration(['subscription']);
+
+        $this->assertSame(['START TRANSACTION', 'COMMIT'], $this->transactionStatements());
+        $this->assertSame(0, \CartShift\Support\DatabaseTransaction::depth());
+    }
+
+    /**
+     * Every transaction statement the run issued, in order.
+     *
+     * @return list<string>
+     */
+    private function transactionStatements(): array
+    {
+        $wanted = ['START TRANSACTION', 'COMMIT', 'ROLLBACK'];
+        $seen   = [];
+
+        foreach ((array) ($GLOBALS['_cartshift_test_queries'] ?? []) as $entry) {
+            if (($entry[0] ?? '') === 'query' && in_array($entry[1] ?? '', $wanted, true)) {
+                $seen[] = (string) $entry[1];
+            }
+        }
+
+        return $seen;
+    }
+
     /**
      * Create a fake MigratorInterface implementation for testing.
      *

@@ -290,11 +290,13 @@ const outcome = computed(() => {
   if (dryRun) {
     return {
       noticeClass: 'notice-info',
-      headline: 'Dry run finished — nothing was written',
-      detail: `${processed} records would have been migrated, ${skipped} skipped, ${errors} would have failed.`,
+      headline: 'Dry run finished — nothing was written to FluentCart',
+      detail: `${processed} records would have been migrated, ${skipped} skipped, ${errors} would have failed. `
+        + 'CartShift wrote simulation rows to its own ID-map table so the run could resolve references; '
+        + 'those are cleared with the run and no FluentCart records were created.',
       nextStep: errors > 0
         ? 'Those failures will happen for real unless you deal with them first. The log below says why.'
-        : 'No writes were made. Run it for real when you are ready.',
+        : 'Run it for real when you are ready.',
     };
   }
 

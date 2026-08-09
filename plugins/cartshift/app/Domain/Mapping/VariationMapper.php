@@ -58,7 +58,7 @@ final class VariationMapper
         $paymentType = 'onetime';
         $otherInfo   = [];
 
-        if (class_exists('WC_Subscriptions_Product') && \WC_Subscriptions_Product::is_subscription($variation)) {
+        if (self::isSubscription($variation)) {
             $paymentType = 'subscription';
             $period      = $variation->get_meta('_subscription_period') ?: 'month';
             $interval    = (int) ($variation->get_meta('_subscription_period_interval') ?: 1);
@@ -166,7 +166,7 @@ final class VariationMapper
         $paymentType = 'onetime';
         $otherInfo   = [];
 
-        if (class_exists('WC_Subscriptions_Product') && \WC_Subscriptions_Product::is_subscription($product)) {
+        if (self::isSubscription($product)) {
             $paymentType = 'subscription';
             $period      = $product->get_meta('_subscription_period') ?: 'month';
             $interval    = (int) ($product->get_meta('_subscription_period_interval') ?: 1);
@@ -220,6 +220,28 @@ final class VariationMapper
             'media_id'             => self::getMediaId($product),
             'other_info'           => !empty($otherInfo) ? $otherInfo : null,
         ];
+    }
+
+    /**
+     * Whether WooCommerce Subscriptions considers this product — or this one
+     * variation of it — a subscription.
+     *
+     * The single gate mapVariation() and mapSimple() both apply before reading
+     * any `_subscription_*` meta, and now the one MigrationOrchestratorFactory
+     * asks too, before it would otherwise write a subscription source's orphan
+     * variant into FluentCart as `payment_type=onetime`. One predicate rather
+     * than the same `class_exists() && is_subscription()` pair typed out at each
+     * call site — this class already owns the only correct reading of "is this
+     * WooCommerce row a subscription", and every other caller wants that answer,
+     * not a fresh guess at it.
+     *
+     * `WC_Subscriptions_Product::is_subscription()` accepts a plain product or a
+     * variation interchangeably — it reads whichever one is handed to it — so
+     * this needs no branch of its own for the two callers' different types.
+     */
+    public static function isSubscription(\WC_Product $product): bool
+    {
+        return class_exists('WC_Subscriptions_Product') && \WC_Subscriptions_Product::is_subscription($product);
     }
 
     /**

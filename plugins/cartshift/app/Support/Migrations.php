@@ -11,13 +11,22 @@ defined('ABSPATH') || exit;
 final class Migrations
 {
     private const string DB_VERSION_OPTION = 'cartshift_db_version';
-    private const string CURRENT_VERSION = '6';
+    private const string CURRENT_VERSION = '7';
 
     /** Unique index guaranteeing one id-map row per (entity_type, wc_id). Superseded by v5. */
     private const string ID_MAP_UNIQUE_INDEX = 'entity_wc_unique';
 
-    /** Unique index guaranteeing one id-map row per (entity_type, wc_id) per realm. */
+    /** Unique index guaranteeing one id-map row per (entity_type, wc_id) per realm. Superseded by v7. */
     private const string ID_MAP_REALM_UNIQUE_INDEX = 'entity_wc_realm_unique';
+
+    /** Unique index guaranteeing one id-map row per (source, entity_type, wc_id) per realm. */
+    private const string ID_MAP_SOURCE_UNIQUE_INDEX = 'source_entity_wc_realm_unique';
+
+    /** Unique index guaranteeing one product-map decision per Woo product. Superseded by v7. */
+    private const string PRODUCT_MAP_UNIQUE_INDEX = 'wc_product_unique';
+
+    /** Unique index guaranteeing one product-map decision per (source, Woo product). */
+    private const string PRODUCT_MAP_SOURCE_UNIQUE_INDEX = 'source_wc_product_unique';
 
     /** Index backing per-code log filtering and grouping. */
     private const string LOG_ERROR_CODE_INDEX = 'migration_error_code';
@@ -30,8 +39,32 @@ final class Migrations
         '4' => 'v4',
         '5' => 'v5',
         '6' => 'v6',
+        '7' => 'v7',
     ];
 
+    /**
+     * Apply every outstanding step, and STAMP ONLY WHAT ACTUALLY LANDED.
+     *
+     * The runner used to call the step and then write the version regardless.
+     * Every step returned `void` and discarded every `$wpdb->query()` result, so
+     * a DDL statement that failed without killing the process — and MySQL has
+     * plenty of those — got stamped as applied, `needsUpgrade()` answered false
+     * for ever, and the step never replayed.
+     *
+     * v7 is the first step whose silent failure LOSES DATA rather than merely
+     * leaving a schema behind. If its column lands and `ADD UNIQUE INDEX` fails
+     * — a `COMPACT` row format puts the id-map key over the 767-byte prefix
+     * limit, and a lock wait does the same — the superseded key is correctly
+     * kept and the source-scoped one never arrives. After that,
+     * `ProductMapRepository::save()`'s `$wpdb->replace()` matches the surviving
+     * `wc_product_unique (wc_id)`, and source B's decision about product 42
+     * silently DELETES source A's.
+     *
+     * A failed step stops the chain rather than merely skipping its own stamp:
+     * every later step is written against the schema the earlier ones leave
+     * behind, and running v7 over a table v5 could not alter is how one broken
+     * statement becomes several.
+     */
     public static function run(): void
     {
         $installed = get_option(self::DB_VERSION_OPTION, '0');
@@ -42,7 +75,10 @@ final class Migrations
                 continue;
             }
 
-            self::$method();
+            if (self::$method() !== true) {
+                return;
+            }
+
             update_option(self::DB_VERSION_OPTION, $version);
         }
     }
@@ -78,7 +114,12 @@ final class Migrations
         delete_option('cartshift_migration_state');
     }
 
-    private static function v1(): void
+    /**
+     * `dbDelta()` reports what it did, not whether it worked — it answers a list
+     * of human-readable strings and swallows the error. There is nothing here to
+     * return but success; the steps that issue their own statements check them.
+     */
+    private static function v1(): bool
     {
         global $wpdb;
 
@@ -119,6 +160,8 @@ final class Migrations
         }
 
         dbDelta($sql);
+
+        return true;
     }
 
     /**
@@ -134,7 +177,7 @@ final class Migrations
      * Lowest id wins, matching getFcId()'s "first match" read semantics, so nothing
      * that already resolved changes its answer.
      */
-    private static function v2(): void
+    private static function v2(): bool
     {
         global $wpdb;
 
@@ -160,10 +203,16 @@ final class Migrations
             $indexName = self::ID_MAP_UNIQUE_INDEX;
 
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->query(
+            $added = $wpdb->query(
                 "ALTER TABLE {$idMapTable}
                  ADD UNIQUE INDEX {$indexName} (entity_type, wc_id)",
             );
+
+            // The whole point of the step. Stamping v2 without it would leave
+            // idempotency enforced in PHP alone, which is what v2 exists to stop.
+            if ($added === false) {
+                return false;
+            }
         }
 
         // v1's entity_lookup covers the same columns in the same order, so the new
@@ -176,6 +225,9 @@ final class Migrations
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             $wpdb->query("ALTER TABLE {$idMapTable} DROP INDEX entity_lookup");
         }
+
+        // A redundant index left behind is survivable; the guarantee is in place.
+        return true;
     }
 
     /**
@@ -191,7 +243,7 @@ final class Migrations
      * JSON — is v4; it could not live here because nothing populated the column
      * until the repository was taught to.
      */
-    private static function v3(): void
+    private static function v3(): bool
     {
         global $wpdb;
 
@@ -211,16 +263,26 @@ final class Migrations
             $hasColumn = $added !== false;
         }
 
+        if (!$hasColumn) {
+            return false;
+        }
+
         // Tolerate a partially applied upgrade — the index may already be there.
-        if ($hasColumn && !self::indexExists($logTable, self::LOG_ERROR_CODE_INDEX)) {
+        if (!self::indexExists($logTable, self::LOG_ERROR_CODE_INDEX)) {
             $indexName = self::LOG_ERROR_CODE_INDEX;
 
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->query(
+            $indexed = $wpdb->query(
                 "ALTER TABLE {$logTable}
                  ADD INDEX {$indexName} (migration_id, error_code)",
             );
+
+            if ($indexed === false) {
+                return false;
+            }
         }
+
+        return true;
     }
 
     /**
@@ -246,15 +308,17 @@ final class Migrations
      * the current enum: a code from an older build is real data and still belongs in
      * the `other` bucket, so it is kept, while junk is not.
      */
-    private static function v4(): void
+    private static function v4(): bool
     {
         global $wpdb;
 
         $logTable = $wpdb->prefix . 'cartshift_migration_log';
 
-        // Nothing to backfill into if v3 could not add the column.
+        // Nothing to backfill into. Reported as success rather than failure:
+        // whether the column exists is v3's question and v3 answered it, and a
+        // backfill with no target has not itself gone wrong.
         if (!self::columnExists($logTable, 'error_code')) {
-            return;
+            return true;
         }
 
         $marker = '"' . MigrationLogRepository::DETAILS_CODE_KEY . '":"';
@@ -263,7 +327,7 @@ final class Migrations
         $extract = "SUBSTRING_INDEX(SUBSTRING_INDEX(details, %s, -1), '\"', 1)";
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $wpdb->query($wpdb->prepare(
+        $backfilled = $wpdb->query($wpdb->prepare(
             "UPDATE {$logTable}
              SET error_code = {$extract}
              WHERE error_code IS NULL
@@ -275,6 +339,8 @@ final class Migrations
             $marker,
             $marker,
         ));
+
+        return $backfilled !== false;
     }
 
     /**
@@ -309,7 +375,7 @@ final class Migrations
      * of times per request, whereas inserts run millions of times during a
      * migration. v2 dropped a redundant index for that exact reason.
      */
-    private static function v5(): void
+    private static function v5(): bool
     {
         global $wpdb;
 
@@ -324,7 +390,7 @@ final class Migrations
 
             // Indexing a column the ALTER failed to add would fail too.
             if ($added === false) {
-                return;
+                return false;
             }
         }
 
@@ -333,10 +399,14 @@ final class Migrations
             $indexName = self::ID_MAP_REALM_UNIQUE_INDEX;
 
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->query(
+            $indexed = $wpdb->query(
                 "ALTER TABLE {$idMapTable}
                  ADD UNIQUE INDEX {$indexName} (entity_type, wc_id, is_simulated)",
             );
+
+            if ($indexed === false) {
+                return false;
+            }
         }
 
         // Only once the replacement is definitely in place. Dropping first would
@@ -350,6 +420,8 @@ final class Migrations
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             $wpdb->query("ALTER TABLE {$idMapTable} DROP INDEX {$legacyIndex}");
         }
+
+        return true;
     }
 
     /**
@@ -361,7 +433,7 @@ final class Migrations
      * altering the next run, and what stops `reset` — which clears run state —
      * from destroying decisions that were never part of a run.
      */
-    private static function v6(): void
+    private static function v6(): bool
     {
         global $wpdb;
 
@@ -387,6 +459,148 @@ final class Migrations
         }
 
         dbDelta($sql);
+
+        return true;
+    }
+
+    /**
+     * v7: the source namespace.
+     *
+     * Cross-site migration breaks an assumption both mapping tables were built
+     * on — that a Woo ID identifies a thing. It does not: it identifies a thing
+     * *within one WooCommerce install*, and two installs hand out the same small
+     * integers. Product 42 on the club site and product 42 on the shop site
+     * would collide on the unique key, or, considerably worse, resolve to each
+     * other and point a migrated order at somebody else's product.
+     *
+     * `source_key` is a different question from `is_simulated`, and the two
+     * deliberately coexist in the id-map's key rather than being merged.
+     * `is_simulated` asks "is this a rehearsal"; `source_key` asks "whose data
+     * is this". A dry run of the club import must be invisible to a real local
+     * run for the first reason and invisible to a real club run for the second.
+     *
+     * Order matters. The column is added with a `local` default, then every row
+     * that predates it is backfilled — those rows all came from the site the
+     * plugin is installed on, which is what `local` means — and only then does
+     * the new unique key name the column. Building the index first would index
+     * whatever the ALTER's default happened to leave behind, which is the same
+     * value on MySQL but not a guarantee worth relying on across engines.
+     *
+     * The superseded keys are dropped only once their replacements are
+     * confirmed present, for the reason v2 and v5 give: an install left with no
+     * uniqueness guarantee at all is worse than one carrying a redundant index.
+     * Both replacements keep the old key's columns as a leading prefix in
+     * neither case — `source_key` goes first — so the old indexes genuinely are
+     * superseded rather than merely duplicated, and every lookup this plugin
+     * makes now carries a source key.
+     */
+    private static function v7(): bool
+    {
+        global $wpdb;
+
+        $idMapTable      = $wpdb->prefix . 'cartshift_id_map';
+        $productMapTable = $wpdb->prefix . 'cartshift_product_map';
+
+        $ok = self::addSourceKeyColumn($idMapTable, 'entity_type')
+            && self::replaceUniqueIndex(
+                $idMapTable,
+                self::ID_MAP_SOURCE_UNIQUE_INDEX,
+                '(source_key, entity_type, wc_id, is_simulated)',
+                self::ID_MAP_REALM_UNIQUE_INDEX,
+            );
+
+        // NOT short-circuited across the two tables. Both halves are attempted
+        // so a re-run has less to do, and the verdict is the conjunction: a
+        // product map left on `wc_product_unique (wc_id)` while the id map is
+        // source-scoped is exactly the half-applied state that must replay.
+        $productMapOk = self::addSourceKeyColumn($productMapTable, 'wc_id')
+            && self::replaceUniqueIndex(
+                $productMapTable,
+                self::PRODUCT_MAP_SOURCE_UNIQUE_INDEX,
+                '(source_key, wc_id)',
+                self::PRODUCT_MAP_UNIQUE_INDEX,
+            );
+
+        return $ok && $productMapOk;
+    }
+
+    /**
+     * Add `source_key` to a mapping table and backfill it, idempotently.
+     *
+     * The backfill runs whether or not this call added the column: a half
+     * applied upgrade may have added it and stopped, and re-running must finish
+     * the job rather than assume it was finished. Its predicate makes it a
+     * no-op on a table that is already correct.
+     *
+     * @return bool Whether the column is now there to be indexed.
+     */
+    private static function addSourceKeyColumn(string $table, string $after): bool
+    {
+        global $wpdb;
+
+        if (!self::columnExists($table, 'source_key')) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $added = $wpdb->query(
+                "ALTER TABLE {$table}
+                 ADD COLUMN source_key VARCHAR(64) NOT NULL DEFAULT 'local' AFTER {$after}",
+            );
+
+            // Trust the ALTER rather than re-issuing SHOW COLUMNS, as v3 does:
+            // false means the statement failed, and backfilling or indexing a
+            // column that does not exist would fail too.
+            if ($added === false) {
+                return false;
+            }
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $backfilled = $wpdb->query(
+            "UPDATE {$table}
+             SET source_key = 'local'
+             WHERE source_key IS NULL OR source_key = ''",
+        );
+
+        // A backfill that failed leaves rows the new unique key would index as
+        // an empty namespace, which is not `local` and is not any other source.
+        return $backfilled !== false;
+    }
+
+    /**
+     * Add a unique index, then drop the one it supersedes — in that order.
+     *
+     * @return bool Whether the replacement key is the one now guarding the table.
+     */
+    private static function replaceUniqueIndex(
+        string $table,
+        string $indexName,
+        string $columns,
+        string $supersededIndex,
+    ): bool {
+        global $wpdb;
+
+        // Tolerate a partially applied upgrade — the index may already be there.
+        if (!self::indexExists($table, $indexName)) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $added = $wpdb->query("ALTER TABLE {$table} ADD UNIQUE INDEX {$indexName} {$columns}");
+
+            // THE STATEMENT THAT LOSES DATA WHEN IT FAILS QUIETLY. Without the
+            // source-scoped key the superseded one survives — correctly, since
+            // this method drops it only once the replacement is confirmed — and
+            // `ProductMapRepository::save()`'s REPLACE then matches
+            // `wc_product_unique (wc_id)`, so one source's decision about
+            // product 42 deletes another's.
+            if ($added === false) {
+                return false;
+            }
+        }
+
+        if (self::indexExists($table, $indexName) && self::indexExists($table, $supersededIndex)) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query("ALTER TABLE {$table} DROP INDEX {$supersededIndex}");
+        }
+
+        // A superseded index that would not drop is redundant, not dangerous.
+        return true;
     }
 
     /**

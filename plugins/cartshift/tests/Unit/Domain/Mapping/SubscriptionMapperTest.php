@@ -5,289 +5,291 @@ declare(strict_types=1);
 namespace CartShift\Tests\Unit\Domain\Mapping;
 
 use CartShift\Domain\Mapping\SubscriptionMapper;
-use CartShift\Storage\IdMapRepository;
+use CartShift\Domain\Subscription\InvalidSourceRecord;
+use CartShift\Domain\Subscription\Payment\PaymentMigrationDecision;
+use CartShift\Domain\Subscription\SubscriptionAssessment;
+use CartShift\Domain\Subscription\SubscriptionLifecycleProjector;
+use CartShift\Domain\Subscription\SubscriptionRecord;
+use CartShift\Domain\Subscription\SubscriptionRecordFactory;
 use CartShift\Tests\Unit\PluginTestCase;
 
+/**
+ * The mapper turns a decided subscription into a `fct_subscriptions` payload,
+ * and it decides nothing itself.
+ *
+ * That is the whole of the change. It used to read a live `WC_Subscription`,
+ * branch on the gateway slug, infer a setup fee from `parent total - recurring
+ * total`, read the finite term off the *current* product, hard-code the
+ * quantity, and mark every record `automatic` — six of the plan's P1 defects in
+ * one method. It now takes a `SubscriptionRecord` and a `SubscriptionAssessment`
+ * and copies what they already decided. A fourth payment strategy therefore
+ * needs a strategy class, a registry entry and its tests; it needs nothing here.
+ */
 final class SubscriptionMapperTest extends PluginTestCase
 {
-    private SubscriptionMapper $mapper;
-    private IdMapRepository $idMap;
+    /** @var array<string, callable> */
+    private array $shapes;
 
+    private SubscriptionRecordFactory $factory;
+
+    private SubscriptionMapper $mapper;
+
+    #[\Override]
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Default: getFcId returns null
-        $GLOBALS['_cartshift_test_get_var_return'] = null;
-
-        $this->idMap = new IdMapRepository();
-        $this->mapper = new SubscriptionMapper($this->idMap, 'USD');
+        $this->shapes  = require dirname(__DIR__, 3) . '/fixtures/lapka-subscription-shapes.php';
+        $this->factory = new SubscriptionRecordFactory();
+        $this->mapper  = new SubscriptionMapper();
     }
 
-    protected function tearDown(): void
+    // ──────────────────────────────────────────────
+    // No gateway branch
+    // ──────────────────────────────────────────────
+
+    public function testTheCollectionMethodIsThePaymentDecisionsAndNotTheGatewaySlugs(): void
     {
-        unset($GLOBALS['_cartshift_test_get_var_callback']);
-        unset($GLOBALS['_cartshift_test_get_var_return']);
-        parent::tearDown();
+        $mapped = $this->map('monthlyPln29', $this->manualDecision());
+
+        $this->assertSame('manual', $mapped['collection_method']);
+        $this->assertNotSame(
+            'automatic',
+            $mapped['collection_method'],
+            '`automatic` means a gateway owns a remote schedule. The mapper does not get a vote.',
+        );
     }
 
-    public function testCollectionMethodIsAutomaticNotChargeAutomatically(): void
+    public function testTheVendorIdentifiersComeFromTheDecisionRatherThanFromSourceMeta(): void
     {
-        // H9: collection_method should be 'automatic', not 'charge_automatically'
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '29.99',
-        ]);
+        $mapped = $this->map('stripePaymentMethod', $this->systemDecision());
 
-        $result = $this->mapper->map($sub);
-
-        $this->assertSame('automatic', $result['collection_method']);
-        $this->assertNotSame('charge_automatically', $result['collection_method']);
-    }
-
-    public function testCollectionMethodIsManualForManualSub(): void
-    {
-        // Documents current behavior: mapper always returns 'automatic'.
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '29.99',
-            'payment_method' => 'bacs',
-        ]);
-
-        $result = $this->mapper->map($sub);
-
-        $this->assertSame('automatic', $result['collection_method']);
-    }
-
-    public function testVendorCustomerIdFromStripeMeta(): void
-    {
-        // M1: Stripe customer ID from subscription meta.
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '19.99',
-            'payment_method' => 'stripe',
-            'meta' => [
-                '_stripe_customer_id' => 'cus_abc123',
-                '_stripe_subscription_id' => 'sub_xyz789',
-                '_stripe_plan_id' => 'price_plan456',
-            ],
-        ]);
-
-        $result = $this->mapper->map($sub);
-
-        $this->assertSame('cus_abc123', $result['vendor_customer_id']);
-    }
-
-    public function testVendorSubscriptionIdFromStripeMeta(): void
-    {
-        // M1: Stripe subscription ID from meta.
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '19.99',
-            'payment_method' => 'stripe',
-            'meta' => [
-                '_stripe_customer_id' => 'cus_abc123',
-                '_stripe_subscription_id' => 'sub_xyz789',
-            ],
-        ]);
-
-        $result = $this->mapper->map($sub);
-
-        $this->assertSame('sub_xyz789', $result['vendor_subscription_id']);
-    }
-
-    public function testVendorIdsFallbackToPaypal(): void
-    {
-        // M1: PayPal fallback when no Stripe meta.
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '19.99',
-            'payment_method' => 'ppec_paypal',
-            'meta' => [
-                '_paypal_subscription_id' => 'I-PAYPAL123',
-            ],
-        ]);
-
-        $result = $this->mapper->map($sub);
-
-        $this->assertSame('I-PAYPAL123', $result['vendor_customer_id']);
-        $this->assertSame('I-PAYPAL123', $result['vendor_subscription_id']);
-    }
-
-    public function testMultiItemSubscriptionLogsWarning(): void
-    {
-        // M2: Multi-item subscription produces a warning.
-        $item1 = $this->createOrderItem(['name' => 'Product A', 'product_id' => 1]);
-        $item2 = $this->createOrderItem(['name' => 'Product B', 'product_id' => 2]);
-
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '49.99',
-            'items' => [$item1, $item2],
-        ]);
-
-        $this->mapper->map($sub);
-
-        $warnings = $this->mapper->getWarnings();
-        $this->assertNotEmpty($warnings, 'Multi-item subscription should produce a warning');
-        $this->assertStringContainsString('Product B', $warnings[0]);
-    }
-
-    public function testConfigIsArrayNotJsonString(): void
-    {
-        // C1: config must be an array.
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '29.99',
-        ]);
-
-        $result = $this->mapper->map($sub);
-
-        $this->assertIsArray($result['config']);
-        $this->assertIsNotString($result['config']);
-        $this->assertArrayHasKey('wc_subscription_id', $result['config']);
-        $this->assertTrue($result['config']['migrated']);
-    }
-
-    public function testQuarterlyIntervalFromMonth3(): void
-    {
-        // M13: month + interval 3 = quarterly.
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '89.99',
-            'billing_period' => 'month',
-            'billing_interval' => '3',
-        ]);
-
-        $result = $this->mapper->map($sub);
-
-        $this->assertSame('quarterly', $result['billing_interval']);
-    }
-
-    public function testVendorIdsNullForUnknownGatewayWithWarning(): void
-    {
-        // Unknown gateways should return null vendor IDs and produce a warning.
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '39.99',
-            'payment_method' => 'unknown_gateway_xyz',
-            'meta' => [], // no stripe or paypal meta
-        ]);
-
-        $result = $this->mapper->map($sub);
-
-        $this->assertNull($result['vendor_customer_id']);
-        $this->assertNull($result['vendor_plan_id']);
-        $this->assertNull($result['vendor_subscription_id']);
-
-        $warnings = $this->mapper->getWarnings();
-        $this->assertNotEmpty($warnings, 'Unknown gateway should produce a warning');
-        $this->assertStringContainsString('unknown_gateway_xyz', $warnings[0]);
-        $this->assertStringContainsString('no vendor ID mapping', $warnings[0]);
-    }
-
-    public function testHalfYearlyIntervalFromMonth6(): void
-    {
-        // M13: month + interval 6 = half_yearly.
-        $sub = $this->createSubscription([
-            'status' => 'active',
-            'total' => '149.99',
-            'billing_period' => 'month',
-            'billing_interval' => '6',
-        ]);
-
-        $result = $this->mapper->map($sub);
-
-        $this->assertSame('half_yearly', $result['billing_interval']);
+        $this->assertSame('cus_synthetic_fixture_0001', $mapped['vendor_customer_id']);
+        $this->assertNull($mapped['vendor_subscription_id']);
+        $this->assertSame('stripe', $mapped['current_payment_method']);
     }
 
     /**
-     * Create a WC_Subscription-like stub object.
+     * The confirmed PayPal defect: a subscription ID assigned as the customer
+     * ID. It is now impossible to express — `PaymentMigrationDecision` refuses
+     * the combination at construction — and the mapper simply copies the three
+     * fields it is handed.
      */
-    private function createSubscription(array $overrides = []): object
+    public function testAManualDecisionCarriesNoVendorMandateAtAll(): void
     {
-        $defaults = [
-            'id' => 500,
-            'status' => 'active',
-            'total' => '29.99',
-            'total_tax' => '0',
-            'customer_id' => 1,
-            'parent_id' => 100,
-            'billing_period' => 'month',
-            'billing_interval' => '1',
-            'payment_method' => 'stripe',
-            'payment_count' => 3,
-            'currency' => 'USD',
-            'items' => [],
-            'meta' => [],
-            'dates' => [
-                'start' => '2024-01-01 00:00:00',
-                'trial_end' => '0',
-                'next_payment' => '2024-02-01 00:00:00',
-                'cancelled' => '0',
-                'end' => '0',
-            ],
-            'parent_order' => null,
-        ];
+        $mapped = $this->map('paypalGateway', $this->manualDecision());
 
-        $data = array_merge($defaults, $overrides);
-
-        // Create items if not provided
-        if (empty($data['items'])) {
-            $data['items'] = [$this->createOrderItem(['name' => 'Subscription Product', 'product_id' => 42])];
-        }
-
-        return new class ($data) {
-            public function __construct(private readonly array $data) {}
-
-            public function get_id(): int { return $this->data['id']; }
-            public function get_status(): string { return $this->data['status']; }
-            public function get_total(): string { return $this->data['total']; }
-            public function get_total_tax(): string { return $this->data['total_tax']; }
-            public function get_customer_id(): int { return $this->data['customer_id']; }
-            public function get_parent_id(): int { return $this->data['parent_id']; }
-            public function get_billing_period(): string { return $this->data['billing_period']; }
-            public function get_billing_interval(): string { return $this->data['billing_interval']; }
-            public function get_payment_method(): string { return $this->data['payment_method']; }
-            public function get_payment_count(): int { return $this->data['payment_count']; }
-            public function get_currency(): string { return $this->data['currency']; }
-            public function get_items(): array { return $this->data['items']; }
-            public function get_parent(): ?object { return $this->data['parent_order']; }
-            public function get_date(string $key): string
-            {
-                return $this->data['dates'][$key] ?? '0';
-            }
-            public function get_meta(string $key, bool $single = true): mixed
-            {
-                return $this->data['meta'][$key] ?? '';
-            }
-        };
+        $this->assertNull($mapped['vendor_customer_id']);
+        $this->assertNull($mapped['vendor_plan_id']);
+        $this->assertNull($mapped['vendor_subscription_id']);
+        $this->assertSame(
+            '',
+            $mapped['current_payment_method'],
+            'The invented slug `manual` is not a FluentCart gateway; the neutral value is the empty string.',
+        );
     }
 
-    private function createOrderItem(array $overrides = []): \WC_Order_Item_Product
+    // ──────────────────────────────────────────────
+    // The contract, from the subscription
+    // ──────────────────────────────────────────────
+
+    public function testTheRecurringFieldsAreTheSubscriptionsOwn(): void
     {
-        $item = new \WC_Order_Item_Product();
-        $defaults = [
-            'product_id' => 1,
-            'variation_id' => 0,
-            'quantity' => 1,
-            'total' => '0',
-            'subtotal' => '0',
-            'total_tax' => '0',
-            'name' => 'Test Item',
-            'product' => null,
-        ];
+        $mapped = $this->map('monthlyPln24', $this->manualDecision());
 
-        $data = array_merge($defaults, $overrides);
+        $this->assertSame(2400, $mapped['recurring_total']);
+        $this->assertSame(0, $mapped['recurring_tax_total']);
+        $this->assertSame(2400, $mapped['recurring_amount']);
+        $this->assertSame('monthly', $mapped['billing_interval']);
+    }
 
-        $ref = new \ReflectionClass($item);
-        foreach ($data as $key => $value) {
-            if ($ref->hasProperty($key)) {
-                $prop = $ref->getProperty($key);
-                $prop->setValue($item, $value);
-            }
-        }
+    public function testTheYearlyContractKeepsItsCadenceRatherThanCollapsingToMonthly(): void
+    {
+        $mapped = $this->map('yearlyPln290', $this->manualDecision());
 
-        return $item;
+        $this->assertSame('yearly', $mapped['billing_interval']);
+        $this->assertSame(29000, $mapped['recurring_total']);
+    }
+
+    public function testTheSetupFeeIsTheExplicitMetadataValueAndZeroWhenThereIsNone(): void
+    {
+        $this->assertSame(0, $this->map('monthlyPln29', $this->manualDecision())['signup_fee']);
+
+        $mapped = $this->map(
+            'monthlyPln29',
+            $this->manualDecision(),
+            ['meta' => ['_subscription_sign_up_fee' => '50.00']],
+        );
+
+        $this->assertSame(5000, $mapped['signup_fee']);
+    }
+
+    public function testTheQuantityIsTheLineItemsOwn(): void
+    {
+        $this->assertSame(1, $this->map('monthlyPln29', $this->manualDecision())['quantity']);
+    }
+
+    // ──────────────────────────────────────────────
+    // References and dates come from the assessment
+    // ──────────────────────────────────────────────
+
+    public function testTheRequiredReferencesAreTheResolvedDestinationIds(): void
+    {
+        $mapped = $this->map('monthlyPln29', $this->manualDecision());
+
+        $this->assertSame(501, $mapped['customer_id']);
+        $this->assertSame(601, $mapped['parent_order_id']);
+        $this->assertSame(701, $mapped['product_id']);
+        $this->assertSame(801, $mapped['variation_id']);
+        $this->assertSame('Monthly membership (fixture)', $mapped['item_name']);
+    }
+
+    public function testTheDatesAreTheProjectedOnesIncludingItsNulls(): void
+    {
+        $mapped = $this->map('cancelled', $this->manualDecision());
+
+        $this->assertSame('canceled', $mapped['status']);
+        $this->assertNull($mapped['next_billing_date'], 'Nothing may invent a date for a dead record.');
+        $this->assertSame('2024-02-19 12:41:00', $mapped['canceled_at']);
+    }
+
+    public function testTheStartTimeIsCarriedForTheWriterToSetDirectly(): void
+    {
+        $mapped = $this->map('monthlyPln29', $this->manualDecision());
+
+        $this->assertSame('2023-04-11 09:15:00', $mapped['created_at']);
+    }
+
+    // ──────────────────────────────────────────────
+    // Config
+    // ──────────────────────────────────────────────
+
+    public function testTheConfigIsAnArrayCarryingTheSourceIdentityAndStrategy(): void
+    {
+        $record = $this->record('monthlyPln29');
+        $mapped = $this->mapper->map($record, $this->assessment($record, $this->manualDecision()));
+
+        $this->assertIsArray($mapped['config']);
+        $this->assertSame('lapka', $mapped['config']['source_key']);
+        $this->assertSame($record->sourceSubscriptionId, $mapped['config']['source_subscription_id']);
+        $this->assertSame('stripe', $mapped['config']['source_gateway']);
+        $this->assertSame('manual', $mapped['config']['payment_strategy']);
+        $this->assertSame('active', $mapped['config']['intended_status']);
+    }
+
+    public function testASystemDecisionStampsFluentCartsStoreManagedConfigKey(): void
+    {
+        $mapped = $this->map('monthlyPln29', $this->systemDecision());
+
+        $this->assertSame('store_managed', $mapped['config']['management_mode']);
+    }
+
+    public function testAManualDecisionStampsNoManagementMode(): void
+    {
+        $this->assertArrayNotHasKey(
+            'management_mode',
+            $this->map('monthlyPln29', $this->manualDecision())['config'],
+        );
+    }
+
+    // ──────────────────────────────────────────────
+    // The filter is still the filter
+    // ──────────────────────────────────────────────
+
+    public function testTheMapperFilterStillRunsOverThePayload(): void
+    {
+        add_filter('cartshift/mapper/subscription', static function (array $mapped): array {
+            $mapped['item_name'] = 'renamed by a filter';
+
+            return $mapped;
+        });
+
+        $this->assertSame(
+            'renamed by a filter',
+            $this->map('monthlyPln29', $this->manualDecision())['item_name'],
+        );
+    }
+
+    // ──────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private function map(string $shape, PaymentMigrationDecision $payment, array $overrides = []): array
+    {
+        $record = $this->record($shape, $overrides);
+
+        return $this->mapper->map($record, $this->assessment($record, $payment));
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    private function record(string $shape, array $overrides = []): SubscriptionRecord
+    {
+        $record = $this->factory->subscriptionFromWoo('lapka', $this->shapes[$shape]($overrides));
+
+        $this->assertNotInstanceOf(InvalidSourceRecord::class, $record, $shape);
+
+        /** @var SubscriptionRecord $record */
+        return $record;
+    }
+
+    private function assessment(
+        SubscriptionRecord $record,
+        PaymentMigrationDecision $payment,
+    ): SubscriptionAssessment {
+        $item = $record->items[0];
+
+        return new SubscriptionAssessment(
+            SubscriptionAssessment::OUTCOME_READY,
+            [],
+            [],
+            [
+                'customer_id'     => 501,
+                'parent_order_id' => 601,
+                'product_id'      => 701,
+                'variation_id'    => 801,
+                'item_name'       => (string) $item['name'],
+                'quantity'        => (int) $item['quantity'],
+            ],
+            $payment,
+            (new SubscriptionLifecycleProjector())->project($record, null),
+        );
+    }
+
+    private function manualDecision(): PaymentMigrationDecision
+    {
+        return new PaymentMigrationDecision(
+            strategy: PaymentMigrationDecision::STRATEGY_MANUAL,
+            outcome: PaymentMigrationDecision::OUTCOME_READY,
+            collectionMethod: PaymentMigrationDecision::COLLECTION_MANUAL,
+            currentPaymentMethod: '',
+            nextActionOwner: PaymentMigrationDecision::OWNER_TARGET_MANUAL,
+            vendorCustomerId: null,
+            vendorPlanId: null,
+            vendorSubscriptionId: null,
+            activePaymentMethod: [],
+            reasonCodes: [],
+        );
+    }
+
+    private function systemDecision(): PaymentMigrationDecision
+    {
+        return new PaymentMigrationDecision(
+            strategy: PaymentMigrationDecision::STRATEGY_STRIPE,
+            outcome: PaymentMigrationDecision::OUTCOME_READY,
+            collectionMethod: PaymentMigrationDecision::COLLECTION_SYSTEM,
+            currentPaymentMethod: 'stripe',
+            nextActionOwner: PaymentMigrationDecision::OWNER_TARGET_SYSTEM,
+            vendorCustomerId: 'cus_synthetic_fixture_0001',
+            vendorPlanId: null,
+            vendorSubscriptionId: null,
+            activePaymentMethod: ['vendor_method_id' => 'pm_synthetic_fixture_0001'],
+            reasonCodes: [],
+        );
     }
 }

@@ -15,6 +15,8 @@ use CartShift\Storage\ProductMapRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Tests\Unit\PluginTestCase;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 
 require_once dirname(__DIR__, 3) . '/stubs/PostStatusStubs.php';
 require_once dirname(__DIR__, 3) . '/stubs/FluentCartModelStubs.php';
@@ -314,6 +316,273 @@ final class MigrationOrchestratorFactoryTest extends PluginTestCase
 
         $this->assertNull($result, 'MappingPromoter reads null as "skip this orphan and keep going".');
         $this->assertStringContainsString('Duplicate entry for key sku_unique', $written);
+    }
+
+    // ── The one refusal: a subscription source ──────────────
+    //
+    // 7.4: automatic subscription-orphan creation is out of scope. Reproducing
+    // a recurring contract exactly — cadence, trial, length, setup fee, and
+    // the payment strategy that decides who charges the customer next — is a
+    // whole feature this path does not have, and `payment_type=onetime`
+    // silently turns a membership into a single sale. The shop only finds out
+    // when the customer is never billed again, which is worse than refusing
+    // outright and telling the owner to build the variant by hand.
+
+    /**
+     * Isolated: this is the one test in the file that needs
+     * WC_Subscriptions_Product to exist. Loading it in the shared process
+     * would flip VariationMapper's `class_exists()` gate to true for every
+     * later test in the run — see the stub's own docblock.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testASubscriptionSourceVariationIsNeverCreatedAsAOnetimeOrphan(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        \CartShiftFcModelStore::install();
+        $this->seedDetail();
+
+        $variation = new \WC_Product_Variation();
+        (new \ReflectionProperty(\WC_Product_Variation::class, 'id'))->setValue($variation, 21);
+        (new \ReflectionProperty(\WC_Product_Variation::class, 'meta'))->setValue($variation, [
+            '_subscription_period' => 'month',
+        ]);
+        $GLOBALS['_cartshift_test_wc_products'][21] = $variation;
+
+        $result = MigrationOrchestratorFactory::createOrphanVariant(900, $this->orphan(['id' => 21]));
+
+        $this->assertNull(
+            $result,
+            'MappingPromoter reads null as "could not create this orphan" and reports it in the failed list — '
+            . 'the same outcome a write failure gets.',
+        );
+        $this->assertCount(
+            0,
+            $this->createdVariants(),
+            'No one-time variant may be written into the owner\'s catalogue for a subscription source.',
+        );
+    }
+
+    // ── the other half of the same hazard: the "Create" route ──
+
+    /**
+     * A mapping row CartShift reports as blocked still offers "Create", and
+     * that route runs `ProductMigrator` and `VariationMapper`, which write
+     * `repeat_interval` through the lenient cadence reading — `week/2` becomes
+     * weekly, `year/2` yearly, `month/2` and `month/12` monthly. So an
+     * operator's answer to "CartShift cannot express this contract" would be a
+     * FluentCart product quietly claiming a different one.
+     *
+     * Isolated for the same reason as the orphan test above: this is the other
+     * place in the file that needs `WC_Subscriptions_Product` to exist, and a
+     * class declared in the shared process cannot be undeclared.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testASubscriptionProductWithAnUnrepresentableCadenceIsNotCreatable(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $this->assertFalse(
+            MigrationOrchestratorFactory::subscriptionCadenceIsRepresentable(
+                $this->subscriptionProduct('month', 2),
+            ),
+            'A two-monthly contract is not "roughly monthly".',
+        );
+        $this->assertFalse(
+            MigrationOrchestratorFactory::subscriptionCadenceIsRepresentable(
+                $this->subscriptionProduct('year', 2),
+            ),
+        );
+    }
+
+    /**
+     * And the six pairs section 7.2 does list are created exactly as before —
+     * a gate that refused every subscription product would be a different bug
+     * wearing the same coat.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testTheSixSupportedCadencesRemainCreatable(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        foreach ([['day', 1], ['week', 1], ['month', 1], ['month', 3], ['month', 6], ['year', 1]] as $pair) {
+            [$period, $interval] = $pair;
+
+            $this->assertTrue(
+                MigrationOrchestratorFactory::subscriptionCadenceIsRepresentable(
+                    $this->subscriptionProduct($period, $interval),
+                ),
+                sprintf('%s/%d is in the table.', $period, $interval),
+            );
+        }
+    }
+
+    /**
+     * A one-time product has no cadence to be wrong about, so the gate has
+     * nothing to say and says nothing.
+     */
+    public function testAnOrdinaryProductIsUnaffectedByTheCadenceGate(): void
+    {
+        $this->assertTrue(
+            MigrationOrchestratorFactory::subscriptionCadenceIsRepresentable(new \WC_Product()),
+        );
+    }
+
+    /**
+     * The gate has to be live, not a blanket refusal: a WooCommerce row that
+     * genuinely is not a subscription must be created exactly as it always
+     * was, id looked up or not.
+     */
+    public function testAnOrdinaryWooVariationIsUnaffectedByTheSubscriptionGuard(): void
+    {
+        \CartShiftFcModelStore::install();
+        $this->seedDetail();
+
+        $variation = new \WC_Product_Variation();
+        (new \ReflectionProperty(\WC_Product_Variation::class, 'id'))->setValue($variation, 11);
+        $GLOBALS['_cartshift_test_wc_products'][11] = $variation;
+
+        MigrationOrchestratorFactory::createOrphanVariant(900, $this->orphan(['id' => 11]));
+
+        $this->assertCount(1, $this->createdVariants());
+        $this->assertSame('onetime', $this->createdVariants()[0]->payment_type);
+    }
+
+    /**
+     * A WooCommerce subscription product on one exact cadence.
+     */
+    /**
+     * The refusal has to reach the migration log, not `error_log`.
+     *
+     * A product dropped from the run was reported through `Logger::error()`
+     * alone — PHP's `error_log`, which no operator opens — while the mapping
+     * screen went on offering "Create" for the row that caused it. Every other
+     * refusal in this plugin arrives as a coded log row, and this one now does
+     * too.
+     *
+     * Driven through `forRun()` rather than through the private reader, because
+     * WHICH CALLER REACHES THE WRITE is the whole question — see the counting
+     * test below.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testAnUnrepresentableCadenceIsRefusedIntoTheMigrationLog(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+        require_once dirname(__DIR__, 3) . '/stubs/EntityMigratorStubs.php';
+
+        $this->seedUnrepresentableCreateDecision();
+
+        $state = new MigrationState();
+        $state->start(['product']);
+
+        $GLOBALS['_cartshift_test_queries'] = [];
+
+        $this->factory($state)->forRun(['product']);
+
+        $rows = $this->loggedRows();
+
+        $this->assertNotSame([], $rows, 'The refusal never reached the migration log.');
+        $this->assertSame(
+            MigrationErrorCode::SubscriptionCadenceUnrepresentable->value,
+            $rows[0][MigrationLogRepository::CODE_COLUMN],
+        );
+        $this->assertStringContainsString('every 2 month', (string) $rows[0]['message']);
+    }
+
+    /**
+     * And the counting path writes nothing at all.
+     *
+     * `migratorsForCounting()` is what `PreviewController::preview()` builds
+     * from, under a comment reading "this endpoint must stay read-only, so
+     * nothing is promoted". With the log write inside the reader, every scope
+     * preview on a store carrying one such decision appended an `error` row to
+     * whatever migration ID happened to be in state — `''` with no run in
+     * flight, or a FINISHED run's own log, corrupting a completed run's record
+     * from a GET.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testTheCountingPathExcludesTheProductWithoutWritingALogRow(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+        require_once dirname(__DIR__, 3) . '/stubs/EntityMigratorStubs.php';
+
+        $this->seedUnrepresentableCreateDecision();
+
+        $state = new MigrationState();
+        $state->start(['product']);
+
+        $GLOBALS['_cartshift_test_queries'] = [];
+
+        $migrators = $this->factory($state)->migratorsForCounting();
+
+        $this->assertSame([], $this->loggedRows(), 'A read-only count wrote to the migration log.');
+
+        // And the exclusion still applies: a preview that counted a product the
+        // run will drop is a receipt for a different run.
+        $products = array_values(array_filter(
+            $migrators,
+            static fn (object $migrator): bool => $migrator instanceof ProductMigrator,
+        ));
+
+        $this->assertNotSame([], $products);
+        $this->assertStringContainsString(
+            '770009',
+            (string) json_encode((new \ReflectionProperty(ProductMigrator::class, 'excludedProductIds'))
+                ->getValue($products[0])),
+        );
+    }
+
+    /**
+     * One `create` decision for a subscription product FluentCart cannot express.
+     */
+    private function seedUnrepresentableCreateDecision(): void
+    {
+        $GLOBALS['_cartshift_test_wc_products'][770_009] = $this->subscriptionProduct('month', 2);
+        $GLOBALS['_cartshift_test_get_results_callback'] = static fn (string $query): array
+            => str_contains($query, 'cartshift_product_map')
+                ? [(object) [
+                    'wc_id'       => 770_009,
+                    'wc_type'     => 'subscription',
+                    'decision'    => 'create',
+                    'fc_post_id'  => null,
+                    'band'        => 'none',
+                    'variant_map' => null,
+                ]]
+                : [];
+    }
+
+    /**
+     * Every migration-log row written since the queries were last cleared.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function loggedRows(): array
+    {
+        return array_values(array_map(
+            static fn (array $entry): array => (array) $entry[2],
+            array_filter(
+                $GLOBALS['_cartshift_test_queries'] ?? [],
+                static fn (array $entry): bool => $entry[0] === 'insert'
+                    && str_contains((string) $entry[1], 'cartshift_migration_log'),
+            ),
+        ));
+    }
+
+    private function subscriptionProduct(string $period, int $interval): \WC_Product
+    {
+        $product = new \WC_Product();
+
+        (new \ReflectionProperty(\WC_Product::class, 'meta'))->setValue($product, [
+            '_subscription_period'          => $period,
+            '_subscription_period_interval' => (string) $interval,
+        ]);
+
+        return $product;
     }
 
     // ── The payload the owner has to live with ──────────────
@@ -866,6 +1135,27 @@ final class MigrationOrchestratorFactoryTest extends PluginTestCase
         $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): string => '0';
 
         $this->assertTrue(MigrationOrchestratorFactory::linkLosesDownloads(101, 900));
+    }
+
+    /**
+     * P1 regression: wooHasDownloads() used to compare the bare literal
+     * 'variable', which a variable-subscription parent never matches — so it
+     * never walked the children at all and reported every downloadable
+     * variable-subscription product as carrying nothing to lose, the same way
+     * a plain simple product with no downloads would.
+     */
+    public function testFilesOnAVariationCountAsFilesOnTheProductForVariableSubscription(): void
+    {
+        $parent = new \WC_Product();
+        $ref    = new \ReflectionClass($parent);
+        $ref->getProperty('type')->setValue($parent, 'variable-subscription');
+        $ref->getProperty('children')->setValue($parent, [106]);
+
+        $GLOBALS['_cartshift_test_wc_products'][102] = $parent;
+        $GLOBALS['_cartshift_test_wc_products'][106] = $this->downloadableProduct();
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): string => '0';
+
+        $this->assertTrue(MigrationOrchestratorFactory::linkLosesDownloads(102, 900));
     }
 
     public function testAWooProductThatNoLongerExistsLosesNothing(): void

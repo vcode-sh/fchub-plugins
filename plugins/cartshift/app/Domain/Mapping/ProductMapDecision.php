@@ -44,6 +44,7 @@ final class ProductMapDecision
         private readonly string $band,
         private readonly array $variantMap,
         private readonly array $orphans,
+        private readonly bool $allowSharedTarget,
     ) {
     }
 
@@ -65,6 +66,7 @@ final class ProductMapDecision
         string $band,
         array $variantMap,
         array $orphans = [],
+        bool $allowSharedTarget = false,
     ): self {
         return new self(
             $wcId,
@@ -74,17 +76,18 @@ final class ProductMapDecision
             $band,
             self::normalizeMap($variantMap),
             self::normalizeOrphans($orphans),
+            $allowSharedTarget,
         );
     }
 
     public static function create(int $wcId, string $wcType, string $band): self
     {
-        return new self($wcId, $wcType, self::CREATE, null, $band, [], []);
+        return new self($wcId, $wcType, self::CREATE, null, $band, [], [], false);
     }
 
     public static function skip(int $wcId, string $wcType, string $band): self
     {
-        return new self($wcId, $wcType, self::SKIP, null, $band, [], []);
+        return new self($wcId, $wcType, self::SKIP, null, $band, [], [], false);
     }
 
     /**
@@ -104,16 +107,21 @@ final class ProductMapDecision
             $fcPostId = null;
         }
 
-        $variantMap = [];
-        $orphans    = [];
+        $variantMap  = [];
+        $orphans     = [];
+        $allowShared = false;
 
         if ($decision === self::LINK && is_string($row->variant_map ?? null)) {
             $decoded = json_decode($row->variant_map, true);
 
             if (is_array($decoded)) {
-                // Two shapes live in this column: the legacy bare map, and the
-                // envelope that also carries orphans. Reading both means an
-                // upgrade does not have to rewrite existing rows.
+                // Three shapes live in this column now: the legacy bare map, the
+                // envelope that also carries orphans, and the envelope that
+                // additionally carries the shared-target opt-in. Reading all
+                // three means an upgrade does not have to rewrite existing rows —
+                // and a decision saved before the opt-in existed reads as `false`,
+                // which is the only safe default: it is the operator's explicit
+                // permission, and a row that never gave it never gave it.
                 $variantMap = is_array($decoded['map'] ?? null)
                     ? self::normalizeMap($decoded['map'])
                     : self::normalizeMap($decoded);
@@ -121,6 +129,12 @@ final class ProductMapDecision
                 $orphans = is_array($decoded['orphans'] ?? null)
                     ? self::normalizeOrphans($decoded['orphans'])
                     : [];
+
+                // Identity, not a cast. This value makes a round trip through
+                // the browser, and `'no'`, `'0'` and `'false'` are all truthy
+                // strings — each of which would read as the operator having
+                // approved a shared billing contract they never saw.
+                $allowShared = ($decoded['allow_shared_target'] ?? null) === true;
             }
         }
 
@@ -132,6 +146,7 @@ final class ProductMapDecision
             (string) ($row->band ?? 'none'),
             $variantMap,
             $orphans,
+            $allowShared,
         );
     }
 
@@ -179,6 +194,19 @@ final class ProductMapDecision
         return $this->orphans;
     }
 
+    /**
+     * Whether the operator explicitly allowed other source products to claim
+     * the same FluentCart variations this decision does.
+     *
+     * Off unless they said so. MappingSetValidator needs it on every decision
+     * involved before it will let two sources converge — one product opting in
+     * proves nothing about the other's contract.
+     */
+    public function allowSharedTarget(): bool
+    {
+        return $this->allowSharedTarget;
+    }
+
     public function isLink(): bool
     {
         return $this->decision === self::LINK;
@@ -193,18 +221,19 @@ final class ProductMapDecision
      * The persisted and wire shape. Keys are contract — the repository, the
      * controller and the Vue app all read exactly these.
      *
-     * @return array{wc_id: int, wc_type: string, decision: string, fc_post_id: int|null, band: string, variant_map: array<int, int>, orphans: list<array{id: int, sku: string, name: string, price: int|null, fulfillment_type: string, downloadable: string}>}
+     * @return array{wc_id: int, wc_type: string, decision: string, fc_post_id: int|null, band: string, variant_map: array<int, int>, orphans: list<array{id: int, sku: string, name: string, price: int|null, fulfillment_type: string, downloadable: string}>, allow_shared_target: bool}
      */
     public function toArray(): array
     {
         return [
-            'wc_id'       => $this->wcId,
-            'wc_type'     => $this->wcType,
-            'decision'    => $this->decision,
-            'fc_post_id'  => $this->fcPostId,
-            'band'        => $this->band,
-            'variant_map' => $this->variantMap,
-            'orphans'     => $this->orphans,
+            'wc_id'               => $this->wcId,
+            'wc_type'             => $this->wcType,
+            'decision'            => $this->decision,
+            'fc_post_id'          => $this->fcPostId,
+            'band'                => $this->band,
+            'variant_map'         => $this->variantMap,
+            'orphans'             => $this->orphans,
+            'allow_shared_target' => $this->allowSharedTarget,
         ];
     }
 
@@ -215,11 +244,18 @@ final class ProductMapDecision
      * list too and adding a column for it would mean a second schema version
      * for the same feature.
      *
-     * @return array{map: array<int, int>, orphans: list<array{id: int, sku: string, name: string, price: int|null, fulfillment_type: string, downloadable: string}>}
+     * @return array{map: array<int, int>, orphans: list<array{id: int, sku: string, name: string, price: int|null, fulfillment_type: string, downloadable: string}>, allow_shared_target: bool}
      */
     public function variantEnvelope(): array
     {
-        return ['map' => $this->variantMap, 'orphans' => $this->orphans];
+        return [
+            'map'     => $this->variantMap,
+            'orphans' => $this->orphans,
+            // In the envelope rather than a column of its own: the alternative
+            // is a schema version for one boolean, and fromRow() already reads
+            // two historical shapes of this same JSON.
+            'allow_shared_target' => $this->allowSharedTarget,
+        ];
     }
 
     /**

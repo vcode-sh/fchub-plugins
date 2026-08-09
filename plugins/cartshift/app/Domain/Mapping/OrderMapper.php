@@ -6,6 +6,8 @@ namespace CartShift\Domain\Mapping;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Domain\Migration\OrderIdentity;
+use CartShift\Domain\Subscription\SubscriptionHistoryIndex;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\Enums\FcBillingInterval;
@@ -23,9 +25,18 @@ final class OrderMapper
      */
     private array $warnings = [];
 
+    /**
+     * @param SubscriptionHistoryIndex $history What the dataset says this order's
+     *     relationship to a subscription is. Empty by default, which is what
+     *     "no subscription dataset was loaded" means and leaves every order a
+     *     plain `checkout` exactly as before.
+     */
     public function __construct(
         private readonly IdMapRepository $idMap,
         private readonly string $currency,
+        private readonly SubscriptionHistoryIndex $history = new SubscriptionHistoryIndex(
+            Constants::DEFAULT_SOURCE_KEY,
+        ),
     ) {}
 
     /**
@@ -40,10 +51,19 @@ final class OrderMapper
         $wcStatus   = $order->get_status();
         $customerId = $this->resolveCustomerId($order);
 
+        $this->warnOnDisputedRelationship($order);
+
         $orderData = [
             'customer_id'           => $customerId,
             'parent_id'             => $this->resolveParentOrderId($order),
-            'type'                  => 'checkout',
+            // FluentCart's own vocabulary when the dataset says this order is
+            // part of a subscription's history — `subscription` for the parent,
+            // `renewal` for a renewal (Status::ORDER_TYPE_*). Mapping every
+            // order `checkout` is the plan's P1: `RenewalController`,
+            // `CustomerOrderController` and `Subscription::renewalOrders()` all
+            // filter on the type, so a renewal typed `checkout` disappears from
+            // the subscriber's own invoice list.
+            'type'                  => $this->history->fluentCartOrderType($order->get_id()) ?? 'checkout',
             'status'                => FcOrderStatus::fromWooCommerce($wcStatus)->value,
             'payment_status'        => FcPaymentStatus::fromWooCommerce($wcStatus)->value,
             'payment_method'        => $order->get_payment_method() ?: 'wc_migrated',
@@ -66,7 +86,7 @@ final class OrderMapper
             'mode'                  => 'live',
             'fulfillment_type'      => self::guessFulfillmentType($order),
             'shipping_status'       => 'unshipped',
-            'invoice_no'            => 'WC-' . $order->get_id(),
+            'invoice_no'            => OrderIdentity::invoiceNo($order->get_id()),
             'uuid'                  => wp_generate_uuid4(),
             'config'                => array_filter([
                 'wc_order_id'    => $order->get_id(),
@@ -273,6 +293,36 @@ final class OrderMapper
     }
 
     /**
+     * Say so when two subscription relationships claim this order.
+     *
+     * The order still migrates — it is a real purchase and the money is real —
+     * but as a plain `checkout`, because typing it `renewal` on the strength of
+     * whichever relationship was read first decides whether it counts towards
+     * somebody's paid cycles. That refusal is correct and, without this, utterly
+     * silent: on the live order path no closure validator runs, so a disputed
+     * order and an order that simply has no subscription look identical in the
+     * log and in the database.
+     */
+    private function warnOnDisputedRelationship(\WC_Order $order): void
+    {
+        if (!$this->history->isAmbiguous($order->get_id())) {
+            return;
+        }
+
+        $this->warnings[] = [
+            'message' => sprintf(
+                'Order #%d is claimed by two different subscription relationships, so CartShift will not '
+                . 'decide which it is: it migrated as an ordinary checkout rather than as a renewal. '
+                . 'Whichever relationship is right decides whether this order counts towards a '
+                . 'subscriber\'s paid cycles, which is not a coin toss. Settle it in WooCommerce and '
+                . 're-run.',
+                $order->get_id(),
+            ),
+            'code' => MigrationErrorCode::SubscriptionAmbiguousOrderRelationship,
+        ];
+    }
+
+    /**
      * Warnings collected during the last map() call.
      *
      * Plain sentences, because that is what every existing caller expects.
@@ -452,7 +502,11 @@ final class OrderMapper
         };
 
         return [
-            'order_type'          => 'order',
+            // FluentCart mirrors the order's own type onto its transaction —
+            // `CheckoutProcessor` writes `$this->orderModel->type` and
+            // `SubscriptionService` writes `renewal` — and the transaction type
+            // is half of what `calculateBillCount()` reads.
+            'order_type'          => $this->history->fluentCartOrderType($order->get_id()) ?? 'order',
             'vendor_charge_id'    => $order->get_transaction_id() ?: '',
             'payment_method'      => $order->get_payment_method() ?: 'free',
             'payment_mode'        => 'live',
@@ -515,9 +569,25 @@ final class OrderMapper
 
     /**
      * Resolve parent order ID for renewals.
+     *
+     * The dataset's typed relationship comes first and `post_parent` second,
+     * and the order matters rather more than it looks. WooCommerce Subscriptions
+     * renewal orders carry no useful parent link — plan section 4.8 — so on the
+     * Lapka source `get_parent_id()` answers 0 for all 4,702 of them. FluentCart
+     * parents a renewal on the SUBSCRIPTION'S parent order
+     * (`SubscriptionService::createRenewalOrders()`), and both
+     * `Subscription::guessNextBillingDate()` and `SystemChargeService` read the
+     * history back through `where('parent_id', $subscription->parent_order_id)`.
+     * A renewal with a null parent is invisible to every one of them.
      */
     private function resolveParentOrderId(\WC_Order $order): ?int
     {
+        $declared = $this->history->parentSourceOrderId($order->get_id());
+
+        if ($declared !== null) {
+            return $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $declared);
+        }
+
         $parentId = $order->get_parent_id();
         if ($parentId) {
             return $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $parentId);

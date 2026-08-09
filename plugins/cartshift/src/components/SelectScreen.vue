@@ -104,7 +104,9 @@
         <div class="cartshift-option-box">
           <label>
             <input type="checkbox" class="cartshift-dry-run" v-model="state.dryRun" />
-            <strong>Dry run</strong> &mdash; validate data mapping without writing to FluentCart. Shows what would be migrated.
+            <strong>Dry run</strong> &mdash; simulates the migration and shows what would be created. It writes
+            nothing to FluentCart, but it does write CartShift simulation rows to CartShift&rsquo;s own
+            ID-map table so the run can resolve references the way a real one would.
           </label>
         </div>
 
@@ -124,6 +126,25 @@
             Unavailable: Action Scheduler was not found. It ships with both WooCommerce and FluentCart,
             so this normally means neither is loaded.
           </p>
+        </div>
+
+        <!-- Its own mode, not a variant of the run. The dry run above writes
+             CartShift simulation rows; this writes nothing at all, and the two
+             sitting in one box is how that distinction gets lost. -->
+        <div class="cartshift-option-box">
+          <p>
+            <strong>Subscription audit</strong> &mdash; assess every WooCommerce subscription against
+            this FluentCart install and report what would happen. It writes nothing: no FluentCart row,
+            no CartShift ID-map row, not even a simulated one.
+          </p>
+          <button
+            type="button"
+            class="button"
+            data-action="subscription-audit"
+            @click="actions.goToScreen('subscription-audit')"
+          >
+            Open the subscription audit
+          </button>
         </div>
 
         <p style="margin-top:15px;">

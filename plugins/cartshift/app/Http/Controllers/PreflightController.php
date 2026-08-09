@@ -44,12 +44,39 @@ final class PreflightController
         ]);
     }
 
+    /**
+     * Preflight for one operation.
+     *
+     * The operation matters for exactly one check: generic migration reads the
+     * HPOS table directly and stays gated on it, while the subscription dataset
+     * path reads through WooCommerce's public APIs and takes whichever backend
+     * WooCommerce considers authoritative. An unknown value is refused rather
+     * than defaulted to the permissive one — a gate that can be talked into
+     * standing aside by a query string is not a gate — and an absent one keeps
+     * the behaviour every existing caller already relies on.
+     */
     public function preflight(WP_REST_Request $request): WP_REST_Response
     {
-        $check = new PreflightCheck();
-        $result = $check->run();
+        $operation = (string) ($request->get_param('operation') ?? PreflightCheck::OPERATION_MIGRATION);
 
-        return new WP_REST_Response(['data' => $result]);
+        if (!in_array($operation, PreflightCheck::OPERATIONS, true)) {
+            return new WP_REST_Response(
+                [
+                    'code'    => 'cartshift_unknown_operation',
+                    'message' => sprintf(
+                        'Unknown preflight operation "%s". Use one of: %s.',
+                        $operation,
+                        implode(', ', PreflightCheck::OPERATIONS),
+                    ),
+                ],
+                400,
+            );
+        }
+
+        $check = new PreflightCheck();
+        $result = $check->run($operation);
+
+        return new WP_REST_Response(['data' => $result + ['operation' => $operation]]);
     }
 
     public function counts(WP_REST_Request $request): WP_REST_Response

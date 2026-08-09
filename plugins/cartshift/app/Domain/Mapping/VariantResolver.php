@@ -23,13 +23,26 @@ final class VariantResolver
     /**
      * @param list<array{id: int, sku: string, name: string}> $wooVariations Display order.
      * @param list<array{id: int, sku: string, name: string}> $fcVariants    Display order.
+     * @param list<int>                                       $reserved      FC variant IDs already spoken for.
      *
      * @return array{map: array<int, int>, orphans: list<int>}
      */
-    public function resolve(array $wooVariations, array $fcVariants): array
+    public function resolve(array $wooVariations, array $fcVariants, array $reserved = []): array
     {
-        $map     = [];
+        $map = [];
+
+        // Seeded rather than empty, because this resolver is no longer the only
+        // thing that claims a FluentCart variant. SubscriptionVariantMatcher
+        // runs the cadence-gated half first and hands the leftovers here; without
+        // a way to say "these are taken", the SKU, name and position passes would
+        // all happily re-claim a variation the cadence gate has just assigned,
+        // and two Woo variations would map to one FC variant inside a single
+        // product decision.
         $claimed = [];
+
+        foreach ($reserved as $id) {
+            $claimed[(int) $id] = true;
+        }
 
         $remaining = $wooVariations;
 

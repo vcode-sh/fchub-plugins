@@ -39,7 +39,7 @@ if (!defined('CARTSHIFT_PLUGIN_FILE')) {
 }
 
 if (!defined('CARTSHIFT_DB_VERSION')) {
-    define('CARTSHIFT_DB_VERSION', '6');
+    define('CARTSHIFT_DB_VERSION', '7');
 }
 
 // ──────────────────────────────────────────────
@@ -50,6 +50,12 @@ if (!defined('CARTSHIFT_DB_VERSION')) {
 // stubs whose fidelity anything actually depends on and the reasoning behind
 // them does not fit in a one-liner. See the file's own docblock.
 require_once __DIR__ . '/WpFormattingStubs.php';
+
+// FluentCart's gateway registry and store-wide subscription policy. Loaded for
+// the whole run rather than per test file: the runtime compatibility probe must
+// call FluentCart's own resolveCollectionMethodFor() instead of reimplementing
+// it, so the class has to be there before the first test asks.
+require_once __DIR__ . '/FluentCartGatewayStubs.php';
 
 if (!function_exists('defined')) {
     // already a PHP built-in, no stub needed
@@ -840,6 +846,28 @@ if (!class_exists('wpdb')) {
          * accidentally leave one write's error hanging over the next.
          */
         public string $last_error = '';
+
+        /**
+         * Whether wpdb prints MySQL errors as it goes.
+         *
+         * Real wpdb echoes the raw error straight to output when this is false
+         * and WP_DEBUG_DISPLAY is on, which is how a failed read ends up inside
+         * a `--format=json` stream. Nothing here prints, so the stub carries the
+         * flag only so a caller's suppress-and-restore can be observed.
+         */
+        public bool $suppress_errors = false;
+
+        /**
+         * Byte-for-byte wpdb::suppress_errors() (wp-includes/class-wpdb.php):
+         * set the new value, hand back the old one.
+         */
+        public function suppress_errors(bool $suppress = true): bool
+        {
+            $previous = $this->suppress_errors;
+            $this->suppress_errors = $suppress;
+
+            return $previous;
+        }
 
         public function prepare(string $query, mixed ...$args): string
         {

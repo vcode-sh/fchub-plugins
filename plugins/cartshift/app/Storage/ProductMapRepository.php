@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CartShift\Storage;
 
 use CartShift\Domain\Mapping\ProductMapDecision;
+use CartShift\Support\Constants;
 
 defined('ABSPATH') || exit;
 
@@ -18,11 +19,36 @@ final class ProductMapRepository
 {
     private readonly string $table;
 
-    public function __construct()
+    /**
+     * Which source's decisions this repository speaks for. See schema v7.
+     *
+     * Defaults to `local`, so the existing mapping screen is unaffected. It
+     * matters for the cross-site route, where both Lapka sites number their
+     * products from one and a decision about the club's product 42 must not
+     * surface as a decision about the shop's.
+     */
+    private readonly string $sourceKey;
+
+    public function __construct(string $sourceKey = Constants::DEFAULT_SOURCE_KEY)
     {
         global $wpdb;
 
-        $this->table = $wpdb->prefix . 'cartshift_product_map';
+        $this->table     = $wpdb->prefix . 'cartshift_product_map';
+        $this->sourceKey = $sourceKey;
+    }
+
+    /**
+     * Which source's decisions this repository speaks for.
+     *
+     * Exposed because a caller that was handed a repository rather than
+     * constructing one has to be able to ask. The container binds exactly one,
+     * pinned to `local` (`MigrationModule`), and a cross-site audit reading
+     * `local`'s decisions would report a different namespace's readiness under
+     * this cohort's name.
+     */
+    public function sourceKey(): string
+    {
+        return $this->sourceKey;
     }
 
     /**
@@ -39,6 +65,7 @@ final class ProductMapRepository
         $wpdb->replace(
             $this->table,
             [
+                'source_key'  => $this->sourceKey,
                 'wc_id'       => $decision->wcId(),
                 'wc_type'     => $decision->wcType(),
                 'decision'    => $decision->decision(),
@@ -49,7 +76,7 @@ final class ProductMapRepository
                     : null,
                 'decided_at'  => gmdate('Y-m-d H:i:s'),
             ],
-            ['%d', '%s', '%s', '%d', '%s', '%s', '%s'],
+            ['%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s'],
         );
     }
 
@@ -68,7 +95,8 @@ final class ProductMapRepository
         global $wpdb;
 
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table} WHERE wc_id = %d LIMIT 1",
+            "SELECT * FROM {$this->table} WHERE source_key = %s AND wc_id = %d LIMIT 1",
+            $this->sourceKey,
             $wcId,
         ));
 
@@ -84,7 +112,10 @@ final class ProductMapRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results("SELECT * FROM {$this->table} ORDER BY wc_id ASC");
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table} WHERE source_key = %s ORDER BY wc_id ASC",
+            $this->sourceKey,
+        ));
 
         return array_map(ProductMapDecision::fromRow(...), $rows ?: []);
     }
@@ -94,9 +125,12 @@ final class ProductMapRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results(
-            "SELECT * FROM {$this->table} WHERE decision = 'link' ORDER BY wc_id ASC",
-        );
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE source_key = %s AND decision = 'link'
+             ORDER BY wc_id ASC",
+            $this->sourceKey,
+        ));
 
         // fromRow() downgrades a link with no target to create, so filter after
         // mapping rather than trusting the column.
@@ -111,9 +145,12 @@ final class ProductMapRepository
     {
         global $wpdb;
 
-        $rows = $wpdb->get_results(
-            "SELECT * FROM {$this->table} WHERE decision = 'skip' ORDER BY wc_id ASC",
-        );
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE source_key = %s AND decision = 'skip'
+             ORDER BY wc_id ASC",
+            $this->sourceKey,
+        ));
 
         $ids = array_map(
             static fn (object $row): int => (int) $row->wc_id,
@@ -129,13 +166,27 @@ final class ProductMapRepository
     {
         global $wpdb;
 
-        return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$this->table}");
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->table} WHERE source_key = %s",
+            $this->sourceKey,
+        ));
     }
 
+    /**
+     * Discard this source's decisions, and only this source's.
+     *
+     * A DELETE rather than the TRUNCATE it used to be: once the table is shared
+     * between source namespaces, truncating it to clear one mapping session
+     * would throw away every other source's decisions too.
+     */
     public function clear(): void
     {
         global $wpdb;
 
-        $wpdb->query("TRUNCATE TABLE {$this->table}");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$this->table} WHERE source_key = %s",
+            $this->sourceKey,
+        ));
     }
 }

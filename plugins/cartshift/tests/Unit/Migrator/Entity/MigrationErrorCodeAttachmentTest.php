@@ -7,7 +7,8 @@ namespace CartShift\Tests\Unit\Migrator\Entity;
 use CartShift\Domain\Mapping\CouponMapper;
 use CartShift\Domain\Mapping\OrderMapper;
 use CartShift\Domain\Mapping\ProductMapper;
-use CartShift\Domain\Mapping\SubscriptionMapper;
+use CartShift\Domain\Subscription\Payment\PaymentMigrationDecision;
+use CartShift\Domain\Subscription\SubscriptionAssessment;
 use CartShift\Migrator\CouponMigrator;
 use CartShift\Migrator\CustomerMigrator;
 use CartShift\Migrator\OrderMigrator;
@@ -173,40 +174,82 @@ final class MigrationErrorCodeAttachmentTest extends PluginTestCase
     // Subscriptions
     // ──────────────────────────────────────────────
 
+    /**
+     * A guest subscription — `_customer_user = 0`, which is 349 of the 564
+     * preserved Lapka records — whose FluentCart customer has not been
+     * migrated. Everything else about it resolves, so the code names the one
+     * thing that does not.
+     */
     public function testASubscriptionWithNoCustomerIsLoggedAsCustomerNotFound(): void
     {
+        $GLOBALS['_cartshift_test_id_map'] = [
+            'order'     => ['808' => 8080],
+            'product'   => ['101' => 1010],
+            'variation' => ['101' => 1011],
+        ];
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): int|null {
+            if (preg_match("/entity_type = '([^']*)' AND wc_id = '([^']*)'/", $query, $matches) === 1) {
+                return $GLOBALS['_cartshift_test_id_map'][$matches[1]][$matches[2]] ?? null;
+            }
+
+            return null;
+        };
+
         $migrator = new SubscriptionMigrator($this->idMap, $this->log, $this->state);
 
-        $migrator->validateRecord(new class {
-            public function get_id(): int
-            {
-                return 51;
-            }
-
-            public function get_customer_id(): int
-            {
-                return 0;
-            }
-        });
+        $migrator->validateRecord(new \CartShiftTestSubscription(
+            51,
+            [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')],
+            0,
+            'active',
+            '',
+            null,
+            808,
+            ['next_payment' => '2099-01-01 00:00:00'],
+        ));
 
         $this->assertLogged(MigrationErrorCode::CustomerNotFound);
     }
 
-    public function testTheSubscriptionMapperPairsItsWarningsWithCodes(): void
+    /**
+     * Reason codes travel with their message, and they always have. What has
+     * moved is where they are produced: the mapper used to accumulate warnings
+     * as a side effect of mapping, which meant the payload and the diagnostics
+     * were built by the same pass and a caller had to remember to drain one
+     * after reading the other. The assessment now carries both, as data, before
+     * anything is mapped at all.
+     */
+    public function testTheSubscriptionAssessmentPairsEveryReasonWithItsCode(): void
     {
-        $mapper = new SubscriptionMapper($this->idMap, 'USD');
-
-        $reflection = new \ReflectionProperty(SubscriptionMapper::class, 'warnings');
-        $reflection->setValue($mapper, [
-            ['message' => 'multi item', 'code' => MigrationErrorCode::MultiItemSubscription],
-            ['message' => 'gateway', 'code' => MigrationErrorCode::UnmappedSubscriptionGateway],
-        ]);
-
-        $this->assertSame(['multi item', 'gateway'], $mapper->getWarnings());
-        $this->assertSame(
-            [MigrationErrorCode::MultiItemSubscription, MigrationErrorCode::UnmappedSubscriptionGateway],
-            array_column($mapper->getCodedWarnings(), 'code'),
+        $assessment = new SubscriptionAssessment(
+            SubscriptionAssessment::OUTCOME_BLOCKED,
+            [['code' => SubscriptionAssessment::REASON_MULTI_ITEM, 'message' => 'multi item']],
+            [['code' => SubscriptionAssessment::REASON_VARIATION_NOT_ON_PRODUCT, 'message' => 'wrong product']],
+            [],
+            new PaymentMigrationDecision(
+                strategy: PaymentMigrationDecision::STRATEGY_MANUAL,
+                outcome: PaymentMigrationDecision::OUTCOME_READY,
+                collectionMethod: PaymentMigrationDecision::COLLECTION_MANUAL,
+                currentPaymentMethod: '',
+                nextActionOwner: PaymentMigrationDecision::OWNER_TARGET_MANUAL,
+                vendorCustomerId: null,
+                vendorPlanId: null,
+                vendorSubscriptionId: null,
+                activePaymentMethod: [],
+                reasonCodes: [],
+            ),
         );
+
+        $this->assertSame(['multi_item_subscription'], $assessment->errorCodes());
+        $this->assertSame(['target_variation_not_on_product'], $assessment->warningCodes());
+
+        // And every code the assessment can produce is a code the log can file.
+        foreach (array_merge($assessment->errorCodes(), $assessment->warningCodes()) as $code) {
+            $this->assertNotNull(
+                MigrationErrorCode::tryFrom($code),
+                sprintf('"%s" has no entry in the log vocabulary.', $code),
+            );
+        }
     }
 
     // ──────────────────────────────────────────────

@@ -323,6 +323,136 @@ final class ProductTypePredicateAgreementTest extends PluginTestCase
     }
 
     // ──────────────────────────────────────────────
+    // isVariable() — one predicate for the call sites that used to compare
+    // $type === 'variable' by hand
+    // ──────────────────────────────────────────────
+    //
+    // A second, structurally different disagreement lived alongside the D1/D2
+    // one above: ProductMapper (twice), ProductMigrator (twice) and
+    // MappingController (twice) each decided "does this product have children"
+    // with a bare `$type === 'variable'` or `get_type() !== 'variable'`.
+    // ProductTypes::supported() has advertised `variable-subscription` as
+    // migratable since D2, but none of those six comparisons recognised it, so
+    // a variable subscription product was silently collapsed to a single
+    // pseudo-variation keyed off the parent — every variation, and every
+    // distinct cadence sold through them, lost. isVariable() is the one
+    // predicate all six now share.
+
+    public function testIsVariableIsTrueForBothVariableTypes(): void
+    {
+        $this->assertTrue(ProductTypes::isVariable('variable'));
+        $this->assertTrue(
+            ProductTypes::isVariable('variable-subscription'),
+            'variable-subscription carries its recurring configuration on the children, not the parent '
+            . "type — structurally it has to agree with 'variable'.",
+        );
+    }
+
+    public function testIsVariableIsFalseForEverythingThatIsNotStructurallyVariable(): void
+    {
+        $this->assertFalse(ProductTypes::isVariable('simple'));
+        $this->assertFalse(ProductTypes::isVariable('subscription'), 'A plain subscription has no children.');
+        $this->assertFalse(ProductTypes::isVariable('grouped'));
+        $this->assertFalse(ProductTypes::isVariable('external'));
+        $this->assertFalse(ProductTypes::isVariable(''), 'No product_type term at all is WooCommerce\'s own simple.');
+    }
+
+    /**
+     * The regression this section exists to prevent. A static list of "the six
+     * known sites" would go stale the moment a seventh is added and nobody
+     * remembers to update this file to match — exactly the failure this whole
+     * class exists to catch for the four-caller supported()/migratableClause()
+     * story above. So this runs the same search the brief hands every
+     * implementer, over the live `app/` tree, on every run: any file outside
+     * ProductTypes.php itself that still spells the comparison out by hand
+     * fails this test, no matter how it got there or how many more call sites
+     * exist by then.
+     */
+    public function testNoCallSiteOutsideProductTypesComparesTheBareVariableLiteral(): void
+    {
+        $hits = self::scanForBareVariableComparisons();
+
+        $this->assertSame(
+            [],
+            $hits,
+            "Found a direct 'variable' string comparison outside ProductTypes.php. Use "
+            . 'ProductTypes::isVariable() instead, so variable-subscription is never silently excluded '
+            . 'again:' . "\n" . implode("\n", $hits),
+        );
+    }
+
+    /**
+     * Proof the scan above is not vacuously passing. ProductTypes.php's own
+     * isVariable() docblock spells the historical bug out in prose —
+     * `$type === 'variable'` — on purpose, so re-running the identical scan
+     * without the ProductTypes.php exclusion has to find at least that one
+     * line. If this assertion ever fails, the regex stopped matching anything
+     * at all and the test above would be passing for the wrong reason.
+     */
+    public function testTheScanItselfCanFindAViolationWhenNothingIsExcluded(): void
+    {
+        $hits = self::scanForBareVariableComparisons(excludeProductTypes: false);
+
+        $this->assertNotSame(
+            [],
+            $hits,
+            'The scan matched nothing at all, even including ProductTypes.php — the pattern is broken, '
+            . 'not the codebase.',
+        );
+    }
+
+    /**
+     * The brief's own `rg -n "get_type\(\).*['"]variable['"]|type[^\n]*=== ['"]variable['"]|
+     * type[^\n]*!== ['"]variable['"]" app` command, reimplemented in PHP so this test does not
+     * depend on ripgrep being installed wherever the suite runs — CI's `ubuntu-latest` runners
+     * are not guaranteed to carry it, and nothing else in this harness depends on an external
+     * binary. Same three alternatives, same target directory, applied line by line rather than
+     * as one multiline regex: rg matches per line by default, and PHP's PCRE and Rust's regex
+     * do not agree on `.` closely enough to trust a byte-for-byte multiline port.
+     *
+     * @return list<string> "relative/path:line: content" for every match, sorted for a stable diff.
+     */
+    private static function scanForBareVariableComparisons(bool $excludeProductTypes = true): array
+    {
+        $root = rtrim(CARTSHIFT_PLUGIN_PATH, '/') . '/app';
+
+        $pattern = '/get_type\(\)[^\n]*[\'"]variable[\'"]|type[^\n]*=== [\'"]variable[\'"]|type[^\n]*!== [\'"]variable[\'"]/';
+
+        $files = new \RegexIterator(
+            new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+            ),
+            '/\.php$/',
+        );
+
+        $hits = [];
+
+        foreach ($files as $file) {
+            $path = (string) $file->getPathname();
+
+            if ($excludeProductTypes && basename($path) === 'ProductTypes.php') {
+                continue;
+            }
+
+            $lines = file($path, FILE_IGNORE_NEW_LINES);
+
+            if ($lines === false) {
+                continue;
+            }
+
+            foreach ($lines as $number => $line) {
+                if (preg_match($pattern, $line) === 1) {
+                    $hits[] = sprintf('app%s:%d: %s', substr($path, strlen($root)), $number + 1, trim($line));
+                }
+            }
+        }
+
+        sort($hits);
+
+        return $hits;
+    }
+
+    // ──────────────────────────────────────────────
     // Harness
     // ──────────────────────────────────────────────
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CartShift\Validator;
 
+use CartShift\Domain\Subscription\LoadedRuntimeSymbols;
+use CartShift\Domain\Subscription\RuntimeSymbols;
 use CartShift\Support\ProductTypes;
 use CartShift\Support\WooStorage;
 
@@ -11,6 +13,42 @@ defined('ABSPATH') || exit;
 
 final class PreflightCheck
 {
+    /**
+     * Generic product/customer/order/coupon migration.
+     *
+     * Reads orders straight out of `{prefix}wc_orders`, so it keeps its HPOS
+     * gate until that reader is refactored on its own terms.
+     */
+    public const string OPERATION_MIGRATION = 'migration';
+
+    /**
+     * Subscription audit, export and stage.
+     *
+     * Reads through WooCommerce's public data-store APIs, which means
+     * WooCommerce picks its own configured backend and legacy CPT storage is
+     * not a problem to be gated against. Lapka's authoritative store is legacy
+     * CPT and the plan forbids forcing HPOS to make CartShift convenient.
+     */
+    public const string OPERATION_SUBSCRIPTION_DATASET = 'subscription_dataset';
+
+    /** @var list<string> */
+    public const array OPERATIONS = [
+        self::OPERATION_MIGRATION,
+        self::OPERATION_SUBSCRIPTION_DATASET,
+    ];
+
+    /**
+     * The public lookups the subscription dataset source calls, and no more.
+     *
+     * @var list<string>
+     */
+    private const array SUBSCRIPTION_DATASET_APIS = [
+        'wcs_get_subscriptions',
+        'wcs_get_subscription',
+        'wc_get_order',
+        'wc_get_product',
+    ];
+
     /** Nothing to see here. */
     public const string SEVERITY_PASS = 'pass';
 
@@ -68,6 +106,18 @@ final class PreflightCheck
     ];
 
     /**
+     * The symbol table, asked through a seam so the missing-API branch is testable.
+     *
+     * A function, once declared, cannot be undeclared, so a shared-process suite
+     * that exercises the present-API path can never reach the absent one by any
+     * other route.
+     */
+    public function __construct(
+        private readonly RuntimeSymbols $symbols = new LoadedRuntimeSymbols(),
+    ) {
+    }
+
+    /**
      * Run all preflight checks and return structured results.
      *
      * Readiness is derived from severity, not from vibes: any check marked
@@ -75,15 +125,31 @@ final class PreflightCheck
      * things the admin should know about; failures are for things that would make
      * the migration produce quietly wrong data.
      *
+     * The operation matters for exactly one check. Generic migration reads the
+     * HPOS table directly and is gated on it; the subscription dataset path
+     * reads through WooCommerce's public APIs and is not. Nothing else here
+     * varies, and the default stays what it always was — a caller that has not
+     * heard of operations gets the old behaviour.
+     *
      * @return array{checks: array<string, array<string, mixed>>, ready: bool}
      */
-    public function run(): array
+    public function run(string $operation = self::OPERATION_MIGRATION): array
     {
+        if (!in_array($operation, self::OPERATIONS, true)) {
+            // Refused rather than defaulted. An unrecognised operation
+            // defaulting to the permissive branch is how a gate stops being one.
+            throw new \InvalidArgumentException(sprintf(
+                'Unknown preflight operation "%s". Use one of: %s.',
+                $operation,
+                implode(', ', self::OPERATIONS),
+            ));
+        }
+
         $checks = [];
 
         $checks['woocommerce']        = $this->checkWooCommerce();
         $checks['fluentcart']         = $this->checkFluentCart();
-        $checks['order_storage']      = $this->checkOrderStorage();
+        $checks['order_storage']      = $this->checkOrderStorage($operation);
         $checks['wc_subscriptions']   = $this->checkWcSubscriptions();
         $checks['php_memory']         = $this->checkPhpMemory();
         $checks['max_execution_time'] = $this->checkMaxExecutionTime();
@@ -175,11 +241,22 @@ final class PreflightCheck
      * FluentCart's own WooCommerce migrator requires HPOS for the same reason, so this
      * is not CartShift being precious — it is how the ecosystem reads orders now.
      *
+     * None of that applies to the subscription dataset path, which reads through
+     * WooCommerce's public data-store APIs and therefore gets whichever backend
+     * WooCommerce considers authoritative. Gating that on HPOS would block the
+     * only store this plan was written for: Lapka's authoritative storage is
+     * legacy CPT, its HPOS mirror disagrees about two next-payment dates, and
+     * forcing the mirror would migrate the wrong ones. So the gate is
+     * operation-aware, and generic migration is deliberately left as it was —
+     * fixing it here would be scope creep with a silent failure mode attached.
+     *
      * Sync state is a warning at most. See detectPendingSync() for why.
      */
-    private function checkOrderStorage(): array
+    private function checkOrderStorage(string $operation): array
     {
-        $label = 'Order Storage (HPOS)';
+        $label = $operation === self::OPERATION_SUBSCRIPTION_DATASET
+            ? 'Order Storage (public API)'
+            : 'Order Storage (HPOS)';
 
         if (! class_exists('WooCommerce')) {
             return $this->result(
@@ -188,6 +265,10 @@ final class PreflightCheck
                 'Cannot determine order storage while WooCommerce is inactive.',
                 ['hpos' => null],
             );
+        }
+
+        if ($operation === self::OPERATION_SUBSCRIPTION_DATASET) {
+            return $this->checkSubscriptionDatasetStorage($label);
         }
 
         if (! $this->detectHpos()) {
@@ -221,6 +302,100 @@ final class PreflightCheck
             self::SEVERITY_PASS,
             'High-Performance Order Storage is enabled. Orders, customers and subscriptions are readable.',
             ['hpos' => true, 'pending_sync' => $pendingSync],
+        );
+    }
+
+    /**
+     * Which of the subscription path's public lookups this runtime is missing.
+     *
+     * Public and free of side effects so a CLI command can ask the same
+     * question without running the whole preflight — which reads product types
+     * and, on a store with unsupported ones, caches the answer in a transient.
+     * A zero-write audit calling a check that writes a transient would be an
+     * amusing way to lose the one property the audit exists to have.
+     *
+     * @return list<string>
+     */
+    public function missingSubscriptionDatasetApis(): array
+    {
+        return array_values(array_filter(
+            self::SUBSCRIPTION_DATASET_APIS,
+            fn (string $function): bool => !$this->symbols->functionExists($function),
+        ));
+    }
+
+    /**
+     * The subscription path's gate: are the public lookups here?
+     *
+     * Which backend WooCommerce chose is reported, never required. What is
+     * required is that the API through which WooCommerce would answer exists at
+     * all — without `wcs_get_subscription()` there is nothing to hydrate and the
+     * run would report a cheerful zero, which is the same silent-success failure
+     * the HPOS gate was built to stop, arriving through a different door.
+     *
+     * @return array<string, mixed>
+     */
+    private function checkSubscriptionDatasetStorage(string $label): array
+    {
+        $authority = $this->detectHpos() ? 'hpos' : 'posts';
+
+        $missing = $this->missingSubscriptionDatasetApis();
+
+        if ($missing !== []) {
+            return $this->result(
+                $label,
+                self::SEVERITY_FAIL,
+                sprintf(
+                    'WooCommerce is storing orders in %s, which is fine — CartShift reads subscriptions through '
+                    . 'WooCommerce\'s own APIs and takes whichever backend WooCommerce considers authoritative. '
+                    . 'What is missing is the API itself: %s. Activate WooCommerce Subscriptions and re-run '
+                    . 'preflight.',
+                    $authority === 'hpos' ? 'the HPOS tables' : 'the posts table',
+                    implode(', ', $missing),
+                ),
+                [
+                    'hpos'              => $authority === 'hpos',
+                    'storage_authority' => $authority,
+                    'access'            => 'unavailable',
+                    'missing_apis'      => $missing,
+                ],
+            );
+        }
+
+        $pendingSync = $this->detectPendingSync();
+
+        $extra = [
+            'hpos'              => $authority === 'hpos',
+            'storage_authority' => $authority,
+            'access'            => 'public_api',
+            'missing_apis'      => [],
+            'pending_sync'      => $pendingSync,
+        ];
+
+        if ($pendingSync === true) {
+            // Not a blocker for this path — the mirror is not what gets read —
+            // but a mirror mid-migration is exactly the state in which its
+            // values disagree with the authority, and the audit reports those
+            // disagreements. Worth saying so before somebody reads the report.
+            return $this->result(
+                $label,
+                self::SEVERITY_WARN,
+                'WooCommerce still has orders pending synchronisation between the posts and HPOS tables. '
+                . 'Subscription reads go through the authoritative backend either way, but the audit\'s '
+                . 'mirror comparison will report differences that are simply sync lag.',
+                $extra,
+            );
+        }
+
+        return $this->result(
+            $label,
+            self::SEVERITY_PASS,
+            sprintf(
+                'WooCommerce is storing orders in %s. Subscriptions are read through WooCommerce\'s public '
+                . 'data-store APIs, so that is the backend CartShift will read — no storage change is needed.',
+                $authority === 'hpos' ? 'the HPOS tables' : 'the posts table',
+            ),
+            $extra,
         );
     }
 

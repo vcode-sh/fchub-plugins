@@ -74,9 +74,21 @@ final class MigrationsTest extends PluginTestCase
         $this->assertTrue(Migrations::needsUpgrade());
     }
 
-    public function testNoUpgradeNeededWhenCurrent(): void
+    /**
+     * v6 installs predate the source namespace, so their mapping tables cannot
+     * tell a `local` row from a `lapka-klub` one and would collide on the first
+     * cross-site import.
+     */
+    public function testV6InstallStillNeedsUpgrade(): void
     {
         $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '6';
+
+        $this->assertTrue(Migrations::needsUpgrade());
+    }
+
+    public function testNoUpgradeNeededWhenCurrent(): void
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '7';
 
         $this->assertFalse(Migrations::needsUpgrade());
     }
@@ -95,7 +107,7 @@ final class MigrationsTest extends PluginTestCase
 
         Migrations::run();
 
-        $this->assertSame('6', $GLOBALS['_cartshift_test_options']['cartshift_db_version']);
+        $this->assertSame('7', $GLOBALS['_cartshift_test_options']['cartshift_db_version']);
         $this->assertFalse(Migrations::needsUpgrade());
     }
 
@@ -104,7 +116,7 @@ final class MigrationsTest extends PluginTestCase
      */
     public function testRunIsANoOpWhenAlreadyCurrent(): void
     {
-        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '6';
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '7';
         $GLOBALS['_cartshift_test_get_results_callback'] = fn (): array => [];
 
         Migrations::run();
@@ -370,9 +382,13 @@ final class MigrationsTest extends PluginTestCase
 
         Migrations::run();
 
+        // Scoped to the log table: v7 backfills the mapping tables in the same
+        // run, and this test is about v4 declining to backfill the log.
         $updates = array_filter(
             $GLOBALS['_cartshift_test_queries'],
-            static fn (array $e): bool => $e[0] === 'query' && str_contains($e[1], 'UPDATE'),
+            static fn (array $e): bool => $e[0] === 'query'
+                && str_contains($e[1], 'UPDATE')
+                && str_contains($e[1], 'cartshift_migration_log'),
         );
 
         $this->assertSame([], $updates, 'No column means no backfill.');
@@ -498,7 +514,7 @@ final class MigrationsTest extends PluginTestCase
         $this->assertStringContainsString('decision VARCHAR(10) NOT NULL', $joined);
         $this->assertStringContainsString('variant_map LONGTEXT NULL', $joined);
         $this->assertStringContainsString('UNIQUE KEY wc_product_unique (wc_id)', $joined);
-        $this->assertSame('6', get_option('cartshift_db_version'));
+        $this->assertSame('7', get_option('cartshift_db_version'));
     }
 
     public function testV6IsNotReRunWhenAlreadyAtSix(): void
@@ -513,7 +529,205 @@ final class MigrationsTest extends PluginTestCase
 
         Migrations::run();
 
-        $this->assertFalse($ran, 'A migration at the current version must not re-run.');
+        $this->assertFalse($ran, 'A table that already exists must not be re-created.');
+    }
+
+    // ──────────────────────────────────────────────
+    // v7: source namespace
+    // ──────────────────────────────────────────────
+
+    /**
+     * Cross-site migration means two sources can hand over the same numeric Woo
+     * IDs. Without a namespace column the second import either collides with
+     * the first on the unique key or, worse, silently resolves to it.
+     */
+    public function testV7AddsTheSourceKeyColumnToBothMappingTables(): void
+    {
+        $sqls = $this->runV7();
+
+        $idMap = $this->firstQueryContaining($sqls, 'ADD COLUMN source_key');
+        $this->assertStringContainsString('cartshift_id_map', $idMap);
+        $this->assertStringContainsString("VARCHAR(64) NOT NULL DEFAULT 'local'", $idMap);
+
+        $productMap = $this->firstQueryContaining(
+            array_filter($sqls, static fn (string $sql): bool => str_contains($sql, 'cartshift_product_map')),
+            'ADD COLUMN source_key',
+        );
+        $this->assertStringContainsString("VARCHAR(64) NOT NULL DEFAULT 'local'", $productMap);
+    }
+
+    /**
+     * Every row that predates the namespace came from the site the plugin is
+     * installed on. Backfilling them to `local` is what keeps an existing
+     * migration resolvable — and it has to happen before the unique key names
+     * the column, or the index is built over whatever the ALTER's default
+     * happened to leave behind.
+     */
+    public function testV7BackfillsExistingRowsToLocalBeforeReplacingTheIndexes(): void
+    {
+        $sqls = $this->runV7();
+
+        $backfill = $this->indexOfQueryContaining($sqls, "SET source_key = 'local'");
+        $newIndex = $this->indexOfQueryContaining($sqls, 'ADD UNIQUE INDEX source_entity_wc_realm_unique');
+
+        $this->assertNotNull($backfill, 'v7 must backfill existing rows.');
+        $this->assertNotNull($newIndex);
+        $this->assertLessThan($newIndex, $backfill, 'Backfill must precede the index.');
+    }
+
+    public function testV7BackfillOnlyTouchesRowsThatHaveNoSourceKey(): void
+    {
+        $backfill = $this->firstQueryContaining($this->runV7(), "SET source_key = 'local'");
+
+        $this->assertStringContainsString('WHERE source_key IS NULL', $backfill);
+        $this->assertStringContainsString("source_key = ''", $backfill);
+    }
+
+    public function testV7AddsSourceScopedUniqueIndexes(): void
+    {
+        $sqls = $this->runV7();
+
+        $idMap = $this->firstQueryContaining($sqls, 'ADD UNIQUE INDEX source_entity_wc_realm_unique');
+        $this->assertStringContainsString('(source_key, entity_type, wc_id, is_simulated)', $idMap);
+
+        $productMap = $this->firstQueryContaining($sqls, 'ADD UNIQUE INDEX source_wc_product_unique');
+        $this->assertStringContainsString('(source_key, wc_id)', $productMap);
+    }
+
+    /**
+     * The source namespace and the simulated realm answer different questions —
+     * "whose data is this" and "is this a rehearsal" — and the id-map key needs
+     * both. Merging them would make a dry run of one source invisible to the
+     * other, or worse, resolvable by it.
+     */
+    public function testV7KeepsTheSourceNamespaceSeparateFromTheSimulatedRealm(): void
+    {
+        $idMap = $this->firstQueryContaining($this->runV7(), 'ADD UNIQUE INDEX source_entity_wc_realm_unique');
+
+        $this->assertStringContainsString('source_key', $idMap);
+        $this->assertStringContainsString('is_simulated', $idMap);
+    }
+
+    public function testV7DropsTheSupersededIndexesOnceTheNewOnesExist(): void
+    {
+        $sqls = $this->runV7(static function (string $query): array {
+            if (str_contains($query, 'SHOW INDEX')) {
+                return [(object) ['Key_name' => 'present']];
+            }
+
+            return [];
+        });
+
+        $this->assertNotNull($this->indexOfQueryContaining($sqls, 'DROP INDEX entity_wc_realm_unique'));
+        $this->assertNotNull($this->indexOfQueryContaining($sqls, 'DROP INDEX wc_product_unique'));
+    }
+
+    public function testV7KeepsTheOldIndexesWhenTheNewOnesAreNotConfirmed(): void
+    {
+        $sqls = $this->runV7();
+
+        $this->assertNull(
+            $this->indexOfQueryContaining($sqls, 'DROP INDEX entity_wc_realm_unique'),
+            'Dropping the old key before the new one exists would leave no uniqueness guarantee at all.',
+        );
+        $this->assertNull($this->indexOfQueryContaining($sqls, 'DROP INDEX wc_product_unique'));
+    }
+
+    /**
+     * Running it twice must be a no-op — MySQL rejects both a duplicate column
+     * and a duplicate index name, and a half-applied upgrade is the normal way
+     * an install arrives here.
+     */
+    public function testV7IsIdempotent(): void
+    {
+        $sqls = $this->runV7(static function (string $query): array {
+            if (str_contains($query, 'SHOW COLUMNS') && str_contains($query, 'source_key')) {
+                return [(object) ['Field' => 'source_key']];
+            }
+
+            if (
+                str_contains($query, "Key_name = 'source_entity_wc_realm_unique'")
+                || str_contains($query, "Key_name = 'source_wc_product_unique'")
+            ) {
+                return [(object) ['Key_name' => 'already-there']];
+            }
+
+            return [];
+        });
+
+        $this->assertNull($this->indexOfQueryContaining($sqls, 'ADD COLUMN source_key'));
+        $this->assertNull($this->indexOfQueryContaining($sqls, 'ADD UNIQUE INDEX source_entity_wc_realm_unique'));
+        $this->assertNull($this->indexOfQueryContaining($sqls, 'ADD UNIQUE INDEX source_wc_product_unique'));
+    }
+
+    // ──────────────────────────────────────────────
+    // The runner: a version is stamped only when the step landed
+    // ──────────────────────────────────────────────
+
+    /**
+     * The quiet stranding, and the one that loses data.
+     *
+     * v7's column lands and `ADD UNIQUE INDEX` does not — a `COMPACT` row format
+     * puts the id-map key over the 767-byte prefix limit, and a lock wait does
+     * the same. The superseded `wc_product_unique (wc_id)` is then correctly
+     * kept, because `replaceUniqueIndex()` drops it only once the replacement is
+     * confirmed. The runner used to stamp 7 anyway, `needsUpgrade()` answered
+     * false for ever, and the step never replayed — after which
+     * `ProductMapRepository::save()`'s REPLACE matches the surviving key and
+     * source B's decision about product 42 silently deletes source A's.
+     */
+    public function testAFailedIndexStatementLeavesTheVersionUnstampedSoTheStepReplays(): void
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '6';
+        $GLOBALS['_cartshift_test_get_results_callback'] = fn (): array => [];
+        $GLOBALS['_cartshift_test_db_error_callback'] = static fn (string $query): string
+            => str_contains($query, 'ADD UNIQUE INDEX') ? 'Specified key was too long' : '';
+
+        Migrations::run();
+
+        unset($GLOBALS['_cartshift_test_db_error_callback']);
+
+        $this->assertSame('6', get_option('cartshift_db_version'));
+        $this->assertTrue(Migrations::needsUpgrade(), 'A step that did not land must replay.');
+    }
+
+    /**
+     * A failed step stops the chain rather than letting later ones run against a
+     * schema that was never altered.
+     */
+    public function testAFailedStepStopsTheChainAndStampsNothingAfterIt(): void
+    {
+        unset($GLOBALS['_cartshift_test_options']['cartshift_db_version']);
+        $GLOBALS['_cartshift_test_get_results_callback'] = fn (): array => [];
+        $GLOBALS['_cartshift_test_db_error_callback'] = static fn (string $query): string
+            => str_contains($query, 'ADD UNIQUE INDEX entity_wc_unique') ? 'Lock wait timeout exceeded' : '';
+
+        Migrations::run();
+
+        unset($GLOBALS['_cartshift_test_db_error_callback']);
+
+        // v1 landed; v2 did not, and v3 onwards never ran.
+        $this->assertSame('1', get_option('cartshift_db_version'));
+        $this->assertNull(
+            $this->indexOfQueryContaining($this->issuedStatements(), 'ADD COLUMN error_code'),
+            'v3 must not run over a schema v2 could not finish altering.',
+        );
+    }
+
+    /**
+     * Every statement the run issued, in order.
+     *
+     * @return string[]
+     */
+    private function issuedStatements(): array
+    {
+        return array_values(array_map(
+            static fn (array $entry): string => (string) $entry[1],
+            array_filter(
+                $GLOBALS['_cartshift_test_queries'] ?? [],
+                static fn (array $entry): bool => $entry[0] === 'query',
+            ),
+        ));
     }
 
     // ──────────────────────────────────────────────
@@ -563,6 +777,29 @@ final class MigrationsTest extends PluginTestCase
     // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────
+
+    /**
+     * Run only the v7 step and return the SQL it issued.
+     *
+     * @param (callable(string): array)|null $schemaCallback Fakes SHOW COLUMNS / SHOW INDEX.
+     * @return string[]
+     */
+    private function runV7(callable|null $schemaCallback = null): array
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '6';
+        $GLOBALS['_cartshift_test_queries'] = [];
+        $GLOBALS['_cartshift_test_get_results_callback'] = $schemaCallback ?? fn (): array => [];
+
+        Migrations::run();
+
+        return array_values(array_map(
+            static fn (array $entry): string => $entry[1],
+            array_filter(
+                $GLOBALS['_cartshift_test_queries'],
+                static fn (array $entry): bool => $entry[0] === 'query',
+            ),
+        ));
+    }
 
     /**
      * Run only the v5 step and return the SQL it issued.

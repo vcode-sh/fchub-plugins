@@ -467,6 +467,11 @@ final class SimulationTestWpdb extends \wpdb
     {
         $this->idMapRows[] = [
             'id'                   => $this->nextId++,
+            // Every row in a v7 table has a source key, and every row that
+            // predates the column was backfilled to `local`. A seeded row
+            // without one would model a table state that cannot exist, and
+            // would make the source-scoped delete look broken.
+            'source_key'           => 'local',
             'entity_type'          => $entityType,
             'wc_id'                => $wcId,
             'fc_id'                => $fcId,

@@ -8,6 +8,7 @@ use CartShift\Tests\Unit\PluginTestCase;
 use CartShift\Validator\PreflightCheck;
 
 require_once dirname(__DIR__, 2) . '/stubs/PreflightStubs.php';
+require_once dirname(__DIR__, 2) . '/stubs/EntityMigratorStubs.php';
 
 /**
  * The preflight gate.
@@ -824,5 +825,117 @@ final class PreflightCheckTest extends PluginTestCase
         $check = (new PreflightCheck())->run()['checks']['entitlements'];
 
         $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
+    }
+
+    // ──────────────────────────────────────────────
+    // Operation-aware storage gate
+    // ──────────────────────────────────────────────
+    //
+    // Lapka's authoritative WooCommerce store is legacy CPT, and the plan
+    // forbids forcing HPOS to make CartShift convenient. The subscription
+    // dataset path reads through WooCommerce's public data-store APIs, so
+    // WooCommerce picks its own backend and the gate has nothing to be afraid
+    // of. Generic order migration still reads {prefix}wc_orders directly and
+    // therefore keeps its HPOS gate until it is refactored on its own terms —
+    // being "fixed" as a side effect of this one is how a store on legacy
+    // storage gets a green migration and no orders.
+
+    public function testLegacyCptStillBlocksGenericMigration(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = false;
+
+        $check = (new PreflightCheck())->run(PreflightCheck::OPERATION_MIGRATION)['checks']['order_storage'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_FAIL, $check['severity']);
+    }
+
+    public function testTheDefaultOperationIsStillGenericMigration(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = false;
+
+        $this->assertSame(
+            (new PreflightCheck())->run(),
+            (new PreflightCheck())->run(PreflightCheck::OPERATION_MIGRATION),
+        );
+    }
+
+    public function testLegacyCptPassesTheSubscriptionDatasetOperation(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = false;
+
+        $result = (new PreflightCheck())->run(PreflightCheck::OPERATION_SUBSCRIPTION_DATASET);
+        $check = $result['checks']['order_storage'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
+        $this->assertSame('posts', $check['storage_authority']);
+        $this->assertSame('public_api', $check['access']);
+        $this->assertTrue($result['ready']);
+    }
+
+    public function testHposAlsoPassesTheSubscriptionDatasetOperation(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $check = (new PreflightCheck())
+            ->run(PreflightCheck::OPERATION_SUBSCRIPTION_DATASET)['checks']['order_storage'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_PASS, $check['severity']);
+        $this->assertSame('hpos', $check['storage_authority']);
+        $this->assertSame('public_api', $check['access']);
+    }
+
+    public function testTheSubscriptionDatasetOperationFailsWhenThePublicApisAreAbsent(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled'] = true;
+
+        $symbols = (new \CartShift\Tests\Unit\Domain\Subscription\FakeRuntimeSymbols())
+            ->withoutFunction('wcs_get_subscription');
+
+        $check = (new PreflightCheck($symbols))
+            ->run(PreflightCheck::OPERATION_SUBSCRIPTION_DATASET)['checks']['order_storage'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_FAIL, $check['severity']);
+        $this->assertSame('unavailable', $check['access']);
+        $this->assertContains('wcs_get_subscription', $check['missing_apis']);
+    }
+
+    /**
+     * The API list, askable on its own.
+     *
+     * `wp cartshift subscriptions audit --source=live` needs the same answer
+     * before it reads anything — an absent WCS would otherwise produce an empty
+     * dataset, an empty dataset has no closure failures, and the audit would
+     * report "ready, 0 records" for a shop with 564 subscribers. It cannot get
+     * that answer by running the whole preflight, because the product-type
+     * check writes a transient. Hence a side-effect-free accessor, and one list
+     * rather than two that can drift.
+     */
+    public function testTheRequiredApiListIsAskableWithoutRunningTheWholePreflight(): void
+    {
+        $symbols = (new \CartShift\Tests\Unit\Domain\Subscription\FakeRuntimeSymbols())
+            ->withoutFunction('wc_get_order');
+
+        $this->assertSame(['wc_get_order'], (new PreflightCheck($symbols))->missingSubscriptionDatasetApis());
+        $this->assertSame([], (new PreflightCheck())->missingSubscriptionDatasetApis());
+    }
+
+    public function testAnUnknownOperationIsRefusedRatherThanTreatedAsPermissive(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        (new PreflightCheck())->run('whatever-feels-right');
+    }
+
+    public function testASubscriptionDatasetRunStillReportsAPendingHposSync(): void
+    {
+        $GLOBALS['_cartshift_test_hpos_enabled']      = true;
+        $GLOBALS['_cartshift_test_hpos_sync_enabled'] = true;
+        $GLOBALS['_cartshift_test_hpos_in_sync']      = false;
+
+        $check = (new PreflightCheck())
+            ->run(PreflightCheck::OPERATION_SUBSCRIPTION_DATASET)['checks']['order_storage'];
+
+        $this->assertSame(PreflightCheck::SEVERITY_WARN, $check['severity']);
+        $this->assertTrue($check['pending_sync']);
     }
 }

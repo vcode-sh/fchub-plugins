@@ -144,6 +144,14 @@ export function useMigration() {
     retryUnavailable: null, // why the control is off, in words
     retrying: false,
 
+    // Which mapping row the operator was sent here to re-decide, as
+    // `{wc_id, name}` — set by the subscription audit when it links a blocked
+    // subscription back to the product that blocked it. Null the rest of the
+    // time. A bare goToScreen('map') dropped them on a screen of two thousand
+    // rows with the product ID left behind, which is the same complaint the
+    // stale-variation refusal message just had.
+    mapFocus: null,
+
     // Selective migration scope, and the server-computed preview of it.
     scope: emptyScope(),
     preview: null, // the /preview payload
@@ -874,6 +882,20 @@ export function useMigration() {
     state.screen = screen;
   }
 
+  /**
+   * Go to the mapping screen carrying which row to re-decide.
+   *
+   * @param {{wc_id: number, name?: string}|null} focus
+   */
+  function goToMapping(focus) {
+    state.mapFocus = focus && Number(focus.wc_id) > 0 ? { ...focus, wc_id: Number(focus.wc_id) } : null;
+    state.screen = 'map';
+  }
+
+  function clearMapFocus() {
+    state.mapFocus = null;
+  }
+
   function retryBatch() {
     state.error = null;
     state.batchError = null;
@@ -911,6 +933,7 @@ export function useMigration() {
     state.previousRun = null;
     state.retrying = false;
     // retrySupport is a property of the install, not of the run — keep it.
+    state.mapFocus = null;
     state.scope = emptyScope();
     state.preview = null;
     state.previewLoading = false;
@@ -956,6 +979,8 @@ export function useMigration() {
       rollback,
       loadLog,
       goToScreen,
+      goToMapping,
+      clearMapFocus,
       retryBatch,
       resetState,
       backFromError,

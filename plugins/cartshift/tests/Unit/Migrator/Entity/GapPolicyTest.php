@@ -19,17 +19,26 @@ require_once dirname(__DIR__, 3) . '/stubs/FluentCartModelStubs.php';
 /**
  * One rule, applied to every missing reference:
  *
- *   History migrates complete; live instructions never migrate broken.
+ *   History migrates complete; a subscription migrates whole or not at all.
  *
  * A past order is a record. It happened, the money has to add up, and a missing
  * link to a customer or a product does not make it untrue — so it migrates, and
- * the gap is written down. A subscription is an instruction that will execute
- * against the shop tomorrow, so it must never migrate live with a hole in it —
- * it comes across paused instead of vanishing.
+ * the gap is written down. `fct_orders.customer_id` is nullable and an order
+ * line keeps its name and price with no product behind it, so the loss is a link
+ * rather than the record.
+ *
+ * A subscription has no such room. `fct_subscriptions` declares customer, parent
+ * order, product, variation, item name and quantity NOT NULL, so a record short
+ * of any of them is refused before the write. That used to be a pause — migrate
+ * it anyway, flip the status, note the original in `config` — which sounded
+ * cautious and was not: `paused` is a lifecycle state, it satisfies no NOT NULL
+ * column, and the row it left behind billed against a blank line the moment
+ * anybody pressed resume.
  *
  * Three things used to happen instead, none of them visible: the order was
  * dropped and its revenue with it, the product link was quietly zeroed, and the
- * paying subscriber disappeared. This file is the guard on all three.
+ * paying subscriber was written out pointing at nothing. This file is the guard
+ * on all three.
  */
 final class GapPolicyTest extends PluginTestCase
 {
@@ -50,15 +59,7 @@ final class GapPolicyTest extends PluginTestCase
         \CartShiftFcModelStore::install();
 
         $GLOBALS['_cartshift_test_id_map'] = [];
-        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): int|null {
-            if (preg_match("/entity_type = '([^']*)' AND wc_id = '([^']*)'/", $query, $matches) === 1) {
-                return $GLOBALS['_cartshift_test_id_map'][$matches[1]][$matches[2]] ?? null;
-            }
-
-            // Everything else — the invoice_no adoption lookup, the counts —
-            // misses, which is what an empty FluentCart install looks like.
-            return null;
-        };
+        $GLOBALS['_cartshift_test_get_var_callback'] = cartshift_test_id_map_reader();
 
         $this->idMap = new IdMapRepository();
         $this->log   = new MigrationLogRepository();
@@ -241,57 +242,73 @@ final class GapPolicyTest extends PluginTestCase
     // Case 3 — the subscription's product was never migrated
     // ──────────────────────────────────────────────
 
-    public function testASubscriptionWithAnUnmappedProductMigratesPaused(): void
+    public function testASubscriptionWithAnUnmappedProductIsBlockedRatherThanWrittenPaused(): void
     {
         $this->mapEntity('customer', [1]);
+        $this->mapEntity('order', [701]);
 
         $result = $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(601, [new \CartShiftTestOrderItem(202, 0, 'Monthly Tea')], 1, 'active'),
+            new \CartShiftTestSubscription(
+                601,
+                [new \CartShiftTestOrderItem(202, 0, 'Monthly Tea')],
+                1,
+                'active',
+                '',
+                null,
+                701,
+            ),
         );
 
-        $this->assertNotFalse($result, 'A paying subscriber must not disappear.');
-
-        $subscriptions = \CartShiftFcModelStore::all('Subscription');
-        $this->assertCount(1, $subscriptions);
-        $this->assertSame('paused', $subscriptions[0]->status, 'Nothing charges until a human decides.');
-        $this->assertLogged(MigrationErrorCode::SubscriptionPausedMissingProduct);
-    }
-
-    public function testThePausedSubscriptionKeepsItsCustomer(): void
-    {
-        $this->mapEntity('customer', [1]);
-
-        $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(602, [new \CartShiftTestOrderItem(202, 0, 'Monthly Tea')], 1, 'active'),
-        );
-
-        $subscriptions = \CartShiftFcModelStore::all('Subscription');
+        $this->assertFalse($result, 'FluentCart will not hold a subscription with no product.');
         $this->assertSame(
-            $GLOBALS['_cartshift_test_id_map']['customer']['1'],
-            $subscriptions[0]->customer_id,
-            'The subscriber is the whole point of migrating it at all.',
+            [],
+            \CartShiftFcModelStore::all('Subscription'),
+            'A status has never satisfied a NOT NULL column. Write nothing.',
         );
+        $this->assertLogged(MigrationErrorCode::SubscriptionRequiredReferenceMissing);
     }
 
-    public function testTheOriginalSubscriptionStatusIsRecoverableFromTheConfig(): void
+    /**
+     * The blocked record is not a lost record. The source is untouched, and the
+     * log carries the WooCommerce subscription ID, the product that is missing
+     * and the item it sits on — which is what the owner needs to go and fix it.
+     */
+    public function testABlockedSubscriptionIsTraceableToTheSourceRecordAndTheMissingPiece(): void
     {
         $this->mapEntity('customer', [1]);
+        $this->mapEntity('order', [702]);
 
         $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(603, [new \CartShiftTestOrderItem(202, 0, 'Monthly Tea')], 1, 'active'),
+            new \CartShiftTestSubscription(
+                603,
+                [new \CartShiftTestOrderItem(202, 0, 'Monthly Tea')],
+                1,
+                'active',
+                '',
+                null,
+                702,
+            ),
         );
 
-        $config = \CartShiftFcModelStore::all('Subscription')[0]->config;
+        $message = $this->firstMessageFor(MigrationErrorCode::SubscriptionRequiredReferenceMissing);
 
-        $this->assertIsArray($config);
-        $this->assertSame('active', $config['cartshift_original_status']);
-        $this->assertSame('product_not_migrated', $config['cartshift_paused_reason']);
-        $this->assertSame(603, $config['wc_subscription_id'], 'The existing bookkeeping must survive.');
+        $this->assertNotNull($message);
+        $this->assertStringContainsString('202', $message, 'The missing product must be named.');
+        $this->assertStringContainsString('Monthly Tea', $message);
+        $this->assertSame(603, $this->firstLoggedWcIdFor(MigrationErrorCode::SubscriptionRequiredReferenceMissing));
     }
 
-    public function testASubscriptionWhoseProductsAllMigratedKeepsItsOwnStatus(): void
+    public function testASubscriptionWhoseReferencesAllResolveMigratesWithItsOwnStatus(): void
     {
+        // WooCommerce was renewing this record automatically, and section 8.4
+        // holds such a record at `confirmation_required` until the operator
+        // accepts that FluentCart will invoice its customer instead. This test
+        // is about references, so it accepts explicitly rather than relying on
+        // a default — the migrator has none.
+        cartshift_test_accept_manual_fallback();
+
         $this->mapEntity('customer', [1]);
+        $this->mapEntity('order', [704]);
         $this->mapEntity('product', [101]);
         // The variation too, keyed by the product ID, because that is what a
         // real migration of a simple product writes. Without it this fixture
@@ -299,15 +316,70 @@ final class GapPolicyTest extends PluginTestCase
         // caught rather than waved through.
         $this->mapEntity('variation', [101]);
 
-        $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(604, [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')], 1, 'active'),
+        $result = $this->subscriptionMigrator()->processRecord(
+            new \CartShiftTestSubscription(
+                604,
+                [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')],
+                1,
+                'active',
+                '',
+                null,
+                704,
+                // An active record has to say when it bills next, or section
+                // 9.3 refuses it — nothing would own the charge. This test is
+                // about the references, so the schedule is made unambiguous.
+                ['next_payment' => '2099-01-01 00:00:00'],
+            ),
         );
 
+        $this->assertNotFalse($result, 'A complete subscription must still migrate.');
+
         $subscriptions = \CartShiftFcModelStore::all('Subscription');
-        $this->assertSame('active', $subscriptions[0]->status);
-        $this->assertArrayNotHasKey('cartshift_original_status', (array) $subscriptions[0]->config);
-        $this->assertSame(0, $this->countLogged(MigrationErrorCode::SubscriptionPausedMissingProduct));
-        $this->assertSame(0, $this->countLogged(MigrationErrorCode::SubscriptionPausedMissingVariation));
+
+        // Staged paused with `active` recorded as the status it is destined
+        // for. Plan section 11 Phase B creates every validated live record
+        // paused and Phase D activates it once the source has released
+        // ownership of the next charge — a subscription that arrives already
+        // active is one two systems believe they are billing.
+        $this->assertSame('paused', $subscriptions[0]->status);
+        $this->assertSame('active', $subscriptions[0]->config['intended_status']);
+        $this->assertSame(
+            $GLOBALS['_cartshift_test_id_map']['customer']['1'],
+            $subscriptions[0]->customer_id,
+            'The subscriber is the whole point of migrating it at all.',
+        );
+        $this->assertSame(
+            $GLOBALS['_cartshift_test_id_map']['order']['704'],
+            $subscriptions[0]->parent_order_id,
+        );
+        $this->assertSame(0, $this->countLogged(MigrationErrorCode::SubscriptionRequiredReferenceMissing));
+    }
+
+    /**
+     * The parent order is as NOT NULL as the product, and nothing else on the
+     * record can stand in for it.
+     */
+    public function testASubscriptionWithNoMigratedParentOrderIsBlocked(): void
+    {
+        $this->mapEntity('customer', [1]);
+        $this->mapEntity('product', [101]);
+        $this->mapEntity('variation', [101]);
+
+        $result = $this->subscriptionMigrator()->processRecord(
+            new \CartShiftTestSubscription(
+                610,
+                [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')],
+                1,
+                'active',
+                '',
+                null,
+                705,
+            ),
+        );
+
+        $this->assertFalse($result);
+        $this->assertSame([], \CartShiftFcModelStore::all('Subscription'));
+        $this->assertLogged(MigrationErrorCode::SubscriptionRequiredReferenceMissing);
     }
 
     /**
@@ -320,23 +392,29 @@ final class GapPolicyTest extends PluginTestCase
      * (RenewalService::createRenewalOrders() copies variation_id into the
      * renewal invoice's object_id and titles the line from the variation).
      */
-    public function testASubscriptionOnASimpleProductWithNoMigratedVariationMigratesPaused(): void
+    public function testASubscriptionOnASimpleProductWithNoMigratedVariationIsBlocked(): void
     {
         $this->mapEntity('customer', [1]);
+        $this->mapEntity('order', [706]);
         // The product resolves and the variation does not — exactly what a
         // half-finished promotion of a `link` decision leaves behind.
         $this->mapEntity('product', [101]);
 
         $result = $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(607, [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')], 1, 'active'),
+            new \CartShiftTestSubscription(
+                607,
+                [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')],
+                1,
+                'active',
+                '',
+                null,
+                706,
+            ),
         );
 
-        $this->assertNotFalse($result, 'A paying subscriber must not disappear.');
-
-        $subscriptions = \CartShiftFcModelStore::all('Subscription');
-        $this->assertCount(1, $subscriptions);
-        $this->assertSame('paused', $subscriptions[0]->status, 'Nothing bills against a null variant.');
-        $this->assertLogged(MigrationErrorCode::SubscriptionPausedMissingProduct);
+        $this->assertFalse($result, 'Nothing bills against a null variant, and nothing writes one either.');
+        $this->assertSame([], \CartShiftFcModelStore::all('Subscription'));
+        $this->assertLogged(MigrationErrorCode::SubscriptionRequiredReferenceMissing);
     }
 
     /**
@@ -345,48 +423,109 @@ final class GapPolicyTest extends PluginTestCase
      * `$wcProductId > 0` — and the mapper then resolves neither reference. The
      * refusal has to read what the mapper produced, not what WooCommerce said.
      */
-    public function testASubscriptionThatResolvesToNoVariantAtAllMigratesPaused(): void
+    public function testASubscriptionThatResolvesToNoVariantAtAllIsBlocked(): void
     {
         $this->mapEntity('customer', [1]);
+        $this->mapEntity('order', [707]);
 
         $result = $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(608, [new \CartShiftTestOrderItem(0, 0, 'Mystery item')], 1, 'active'),
+            new \CartShiftTestSubscription(
+                608,
+                [new \CartShiftTestOrderItem(0, 0, 'Mystery item')],
+                1,
+                'active',
+                '',
+                null,
+                707,
+            ),
         );
 
-        $this->assertNotFalse($result);
-
-        $subscriptions = \CartShiftFcModelStore::all('Subscription');
-        $this->assertSame('paused', $subscriptions[0]->status);
-        $this->assertSame(
-            'variation_not_resolved',
-            ((array) $subscriptions[0]->config)['cartshift_paused_reason'],
-            'The two pause reasons have different fixes and must stay distinguishable.',
-        );
-        $this->assertLogged(MigrationErrorCode::SubscriptionPausedMissingVariation);
+        $this->assertFalse($result);
+        $this->assertSame([], \CartShiftFcModelStore::all('Subscription'));
+        $this->assertLogged(MigrationErrorCode::SubscriptionRequiredReferenceMissing);
     }
 
     /**
-     * A subscription WooCommerce had already cancelled is history, not a live
-     * instruction. Forcing it to 'paused' would dress a dead record up as a
-     * resumable one, and nothing renews a cancelled subscription anyway.
+     * A subscription WooCommerce had already cancelled is history rather than a
+     * live instruction, and it used to be allowed through on that reasoning:
+     * nothing renews a cancelled subscription, so a null variant could not hurt
+     * anybody.
+     *
+     * It still cannot bill anybody. It also still cannot be stored:
+     * `fct_subscriptions.variation_id` is NOT NULL whatever the status column
+     * says, and a terminal record with a null variant is a row MySQL refuses —
+     * or, with a permissive SQL mode, silently zeroes. History is admitted in
+     * its own terminal status once its references resolve, and not before.
      */
-    public function testACancelledSubscriptionWithNoVariantKeepsItsOwnStatus(): void
+    public function testACancelledSubscriptionWithNoVariantIsBlockedToo(): void
     {
         $this->mapEntity('customer', [1]);
+        $this->mapEntity('order', [708]);
+
+        $result = $this->subscriptionMigrator()->processRecord(
+            new \CartShiftTestSubscription(
+                609,
+                [new \CartShiftTestOrderItem(0, 0, 'Mystery item')],
+                1,
+                'cancelled',
+                '',
+                null,
+                708,
+            ),
+        );
+
+        $this->assertFalse($result, 'Terminal is not an exemption from the schema.');
+        $this->assertSame([], \CartShiftFcModelStore::all('Subscription'));
+        $this->assertLogged(MigrationErrorCode::SubscriptionRequiredReferenceMissing);
+    }
+
+    public function testACancelledSubscriptionWhoseReferencesResolveIsWrittenTerminal(): void
+    {
+        $this->mapEntity('customer', [1]);
+        $this->mapEntity('order', [709]);
+        $this->mapEntity('product', [101]);
+        $this->mapEntity('variation', [101]);
 
         $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(609, [new \CartShiftTestOrderItem(0, 0, 'Mystery item')], 1, 'cancelled'),
+            new \CartShiftTestSubscription(
+                611,
+                [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')],
+                1,
+                'cancelled',
+                '',
+                null,
+                709,
+            ),
         );
 
         $subscriptions = \CartShiftFcModelStore::all('Subscription');
+        $this->assertCount(1, $subscriptions, 'Complete history is not a hazard.');
         $this->assertSame('canceled', $subscriptions[0]->status);
-        $this->assertSame(0, $this->countLogged(MigrationErrorCode::SubscriptionPausedMissingVariation));
     }
 
+    /**
+     * Everything else resolves, so the customer is provably the one thing
+     * missing. A guest subscription — `_customer_user = 0`, which is 349 of the
+     * 564 preserved Lapka records — still needs a FluentCart customer, and
+     * CartShift files those under the guest namespace keyed by email. Without
+     * one there is nobody to bill.
+     */
     public function testASubscriptionWithNoCustomerIsStillSkippedAndCoded(): void
     {
+        $this->mapEntity('order', [705]);
+        $this->mapEntity('product', [101]);
+        $this->mapEntity('variation', [101]);
+
         $result = $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(605, [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')], 0),
+            new \CartShiftTestSubscription(
+                605,
+                [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')],
+                0,
+                'active',
+                '',
+                null,
+                705,
+            ),
         );
 
         $this->assertFalse($result, 'A subscription with nobody to bill is not recoverable.');
@@ -396,8 +535,20 @@ final class GapPolicyTest extends PluginTestCase
 
     public function testASubscriptionWhoseCustomerWasNotMigratedIsStillSkippedAndCoded(): void
     {
+        $this->mapEntity('order', [706]);
+        $this->mapEntity('product', [101]);
+        $this->mapEntity('variation', [101]);
+
         $result = $this->subscriptionMigrator()->processRecord(
-            new \CartShiftTestSubscription(606, [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')], 9),
+            new \CartShiftTestSubscription(
+                606,
+                [new \CartShiftTestOrderItem(101, 0, 'Monthly Coffee')],
+                9,
+                'active',
+                '',
+                null,
+                706,
+            ),
         );
 
         $this->assertFalse($result);
@@ -464,6 +615,15 @@ final class GapPolicyTest extends PluginTestCase
     {
         foreach ($wcIds as $wcId) {
             $GLOBALS['_cartshift_test_id_map'][$entityType][(string) $wcId] = $wcId + 10_000;
+
+            // The target catalogue, stated rather than derived from the map:
+            // a simple product's variant carries the product's own ID on both
+            // sides, which is what ProductMigrator and MappingPromoter write.
+            // Said separately because a mapping row is not a catalogue row, and
+            // the ownership gate exists to stop treating them as one.
+            if ($entityType === 'variation') {
+                cartshift_test_own_variation($wcId + 10_000, $wcId + 10_000);
+            }
         }
     }
 
@@ -494,6 +654,44 @@ final class GapPolicyTest extends PluginTestCase
             $this->countLogged($code),
             sprintf('Expected a log row coded "%s".', $code->value),
         );
+    }
+
+    /**
+     * The message on the first log row carrying this code, or null.
+     */
+    private function firstMessageFor(MigrationErrorCode $code): ?string
+    {
+        $row = $this->firstRowFor($code);
+
+        return $row === null ? null : (string) ($row['message'] ?? '');
+    }
+
+    /**
+     * The WooCommerce ID the first log row carrying this code was filed under.
+     */
+    private function firstLoggedWcIdFor(MigrationErrorCode $code): ?int
+    {
+        $row = $this->firstRowFor($code);
+
+        return $row === null ? null : (int) ($row['wc_id'] ?? 0);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function firstRowFor(MigrationErrorCode $code): ?array
+    {
+        foreach ($GLOBALS['_cartshift_test_queries'] ?? [] as $query) {
+            if (($query[0] ?? '') !== 'insert') {
+                continue;
+            }
+
+            if ((string) ($query[2][MigrationLogRepository::CODE_COLUMN] ?? '') === $code->value) {
+                return $query[2];
+            }
+        }
+
+        return null;
     }
 
     private function countLogged(MigrationErrorCode $code): int

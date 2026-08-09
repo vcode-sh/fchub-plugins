@@ -1,10 +1,20 @@
 <?php
 
 /**
- * WP-CLI stubs for IDE autocompletion.
+ * WP-CLI stubs for IDE autocompletion, and for the test suite.
  *
  * Provides type information for WP_CLI static methods and utility functions
  * so the IDE can resolve them without requiring WP-CLI as a Composer dependency.
+ *
+ * The output methods additionally RECORD what they were told, in
+ * `$GLOBALS['_cartshift_test_wp_cli']`. That is what lets a command test assert
+ * the stable reason code an operator actually sees rather than only the side
+ * effects of the call — a refusal that returns quietly and a refusal that says
+ * `source_renewal_maintenance_unconfirmed` are not the same command.
+ *
+ * The file is autoload-dev only and is excluded from the distribution, and the
+ * whole of it is skipped when a real WP-CLI is present, so nothing here ever
+ * runs in production.
  *
  * @noinspection PhpMultipleClassDeclarationsInspection
  */
@@ -24,21 +34,30 @@ namespace {
          *
          * @param string $message
          */
-        public static function line(string $message = ''): void {}
+        public static function line(string $message = ''): void
+        {
+            self::record('line', $message);
+        }
 
         /**
          * Display an informational message with "Info:" prefix.
          *
          * @param string $message
          */
-        public static function log(string $message): void {}
+        public static function log(string $message): void
+        {
+            self::record('log', $message);
+        }
 
         /**
          * Display a success message with "Success:" prefix.
          *
          * @param string $message
          */
-        public static function success(string $message): void {}
+        public static function success(string $message): void
+        {
+            self::record('success', $message);
+        }
 
         /**
          * Display an error message and exit.
@@ -47,14 +66,20 @@ namespace {
          * @param bool $exit
          * @return never-return
          */
-        public static function error($message, bool $exit = true): void {}
+        public static function error($message, bool $exit = true): void
+        {
+            self::record('error', is_string($message) ? $message : 'WP_Error');
+        }
 
         /**
          * Display a warning message with "Warning:" prefix.
          *
          * @param string $message
          */
-        public static function warning(string $message): void {}
+        public static function warning(string $message): void
+        {
+            self::record('warning', $message);
+        }
 
         /**
          * Display a debug message (only shown with --debug flag).
@@ -112,6 +137,22 @@ namespace {
         public static function get_config(string $key): mixed
         {
             return null;
+        }
+
+        /**
+         * Remember one message, when a test is watching.
+         *
+         * Guarded on the global already existing so a real WP-CLI run — which
+         * never loads this file anyway — could not start accumulating output in
+         * memory if it somehow did.
+         */
+        private static function record(string $level, string $message): void
+        {
+            if (!isset($GLOBALS['_cartshift_test_wp_cli']) || !is_array($GLOBALS['_cartshift_test_wp_cli'])) {
+                return;
+            }
+
+            $GLOBALS['_cartshift_test_wp_cli'][] = ['level' => $level, 'message' => $message];
         }
     }
 }

@@ -1498,7 +1498,7 @@ body.dark .cartshift-warn-text { color: #f0c78a; }
   font-style: italic;
 }
 
-.cartshift-retry-lineage {
+#cartshift-app .cartshift-retry-lineage {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
@@ -1799,7 +1799,7 @@ body.dark .cartshift-log-severity-error   { background: #2d1f1f; color: #f89898;
 body.dark .cartshift-log-severity-warning { background: #2d2614; color: #f0c78a; }
 body.dark .cartshift-log-severity-info    { background: #2a2e37; color: #9da3ae; }
 
-.cartshift-log-active-filter {
+#cartshift-app .cartshift-log-active-filter {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1812,7 +1812,12 @@ body.dark .cartshift-log-severity-info    { background: #2a2e37; color: #9da3ae;
   color: #3573b8;
 }
 
-body.dark .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
+/* `body.dark #cartshift-app`, not `body.dark` alone. The light rule above
+   carries the app ID at (1,1,0) and a bare `body.dark .class` is (0,2,1) — an
+   ID beats any number of classes, so the dark override was dead and the banner
+   rendered light-blue on a dark background. Same form the notices three hundred
+   lines up already use. */
+body.dark #cartshift-app .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
 
 #cartshift-app .cartshift-log-active-filter code {
   background: transparent;
@@ -1964,7 +1969,7 @@ body.dark .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
   width: 100%;
 }
 
-.cartshift-scope-picker-truncated {
+#cartshift-app .cartshift-scope-picker-truncated {
   margin: 6px 0;
 }
 
@@ -2124,4 +2129,410 @@ body.dark .cartshift-log-active-filter { background: #16232d; color: #8ec5f0; }
    above), so a long list visibly settles as rows are worked through. */
 .cartshift-map-row.is-decided {
   opacity: 0.6;
+}
+
+/* ── Subscription contracts on the map row ───────────────────────────────
+   A subscription's variation is a billing contract, not a size, so the row
+   lists every target variation rather than reporting a count. Indented and
+   ruled off so it reads as detail belonging to the selected product, not as
+   another row. */
+#cartshift-app .cartshift-map-contracts {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 3px solid #dcdcde;
+}
+
+#cartshift-app .cartshift-map-source + .cartshift-map-source {
+  margin-top: 10px;
+}
+
+/* Each option is a <label> wrapping a radio, so the whole block is the hit
+   target — the contract detail is what the owner is reading when they decide,
+   and making them aim at a 16px circle beside it is a needless test of
+   patience. */
+#cartshift-app .cartshift-map-variation {
+  display: block;
+  margin-top: 4px;
+  padding: 4px 6px;
+  border-radius: 3px;
+}
+
+#cartshift-app .cartshift-map-variation:hover {
+  background: #f6f7f7;
+}
+
+/* Refused rather than hidden. An owner who cannot see the monthly variation
+   at all concludes CartShift lost it; one who sees it greyed out with a
+   reason knows what to fix. */
+#cartshift-app .cartshift-map-variation.is-refused {
+  opacity: 0.55;
+}
+
+#cartshift-app .cartshift-map-variation strong {
+  margin-right: 6px;
+}
+
+/* Same red as the downloads warning, and for the same reason: this is a
+   consequence for the shop's customers, not small print. */
+#cartshift-app .cartshift-map-refused {
+  display: block;
+  margin-top: 2px;
+  color: #b32d2e;
+}
+
+#cartshift-app .cartshift-map-shared {
+  display: block;
+  margin-top: 8px;
+}
+
+/* ── Manual catalogue search ─────────────────────────────────────────────
+   The rescue for a row ProductMatcher scored `none`. Panel rather than modal:
+   the owner is comparing it against the row they came from, and a dialog that
+   covers that row makes them remember what they were looking at. */
+#cartshift-app .cartshift-catalogue {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #c3c4c7;
+  border-left: 4px solid #2271b1;
+  background: #fff;
+}
+
+#cartshift-app .cartshift-catalogue-list {
+  max-height: 320px;
+  margin: 0;
+  overflow-y: auto;
+}
+
+#cartshift-app .cartshift-catalogue-list li {
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f1;
+}
+
+#cartshift-app .cartshift-catalogue-list .description {
+  margin-left: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Subscription audit: a read-only report, not a wizard step
+   ═══════════════════════════════════════════════════════════════ */
+
+/* The zero-write banner is the first thing on the screen and the loudest
+   thing on it, because the whole mode is defined by what it does not do —
+   and the operator has just come from a screen whose dry run DOES write
+   CartShift simulation rows. A quiet note would be worse than none. */
+.cartshift-audit-zero-write {
+  margin: 16px 0 20px;
+  padding: 14px 16px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-left: 4px solid #2271b1;
+  border-radius: var(--cartshift-radius-card);
+  font-size: 14px;
+  color: var(--cartshift-text-primary);
+}
+
+.cartshift-audit-zero-write strong {
+  margin-right: 6px;
+}
+
+/* Same card shell as the map screen's summary strip, for the same reason:
+   these are facts about the reading, read as a set. */
+.cartshift-audit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+  font-size: 14px;
+  color: var(--cartshift-text-primary);
+}
+
+#cartshift-app .cartshift-audit-summary code {
+  word-break: break-all;
+}
+
+/* Four counts and the sentence that says whether they add up. The sentence
+   is part of the block rather than a note beneath it: a breakdown that has
+   quietly lost two records is how a migration finishes "successfully" with
+   two subscribers left behind. */
+.cartshift-audit-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 0 0 20px;
+  padding: 16px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+}
+
+.cartshift-audit-count {
+  display: flex;
+  flex-direction: column;
+  min-width: 110px;
+}
+
+.cartshift-audit-count-value {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--cartshift-text-primary);
+}
+
+.cartshift-audit-count-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cartshift-text-secondary);
+}
+
+/* Prefixed with the app ID, like every other rule on this screen that has to
+   beat `#cartshift-app p` at line 238. These are `<p>` elements, and a bare
+   class selector loses to an ID — so the alarm that ends "do not stage this
+   cohort" rendered in the same grey as the body text around it. */
+#cartshift-app .cartshift-audit-reconcile {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--cartshift-text-secondary);
+}
+
+#cartshift-app .cartshift-audit-reconcile[data-reconciles='false'] {
+  color: #b32d2e;
+  font-weight: 600;
+}
+
+.cartshift-audit-panel {
+  margin: 0 0 20px;
+  padding: 16px;
+  background: var(--cartshift-card-bg);
+  border: 1px solid var(--cartshift-border-color);
+  border-radius: var(--cartshift-radius-card);
+}
+
+/* The expected first-run state, and the one an operator must not scroll
+   past: with the manual fallback unaccepted the whole live cohort migrates
+   nothing. Amber rather than red — it is the specification working, not a
+   fault — but never the same weight as an ordinary panel. */
+.cartshift-audit-panel-attention {
+  border-left: 4px solid #dba617;
+}
+
+#cartshift-app .cartshift-audit-panel h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+#cartshift-app .cartshift-audit-panel h3 {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cartshift-text-secondary);
+}
+
+/* Two columns where there is room, one where there is not. The panels are
+   independent readings — nothing in the Stripe split depends on the PayPal
+   one — so they wrap freely rather than being pinned into a grid that
+   pretends they are a sequence. */
+.cartshift-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 0 20px;
+}
+
+#cartshift-app .cartshift-audit-facts,
+#cartshift-app .cartshift-audit-writes {
+  margin: 0;
+  list-style: none;
+}
+
+#cartshift-app .cartshift-audit-facts li,
+#cartshift-app .cartshift-audit-writes li {
+  padding: 3px 0;
+  font-size: 13px;
+  color: var(--cartshift-text-primary);
+}
+
+#cartshift-app .cartshift-audit-writes li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--cartshift-border-color);
+}
+
+#cartshift-app .cartshift-audit-writes li:last-child {
+  border-bottom: 0;
+}
+
+#cartshift-app .cartshift-audit-writes .description {
+  display: block;
+  margin: 2px 0 0;
+}
+
+#cartshift-app .cartshift-audit-tally {
+  margin-bottom: 10px;
+}
+
+/* The one colour on this screen that means "act on this", and it never
+   travels alone — every use of it sits next to the words that say what the
+   problem is. */
+#cartshift-app .cartshift-audit-warn {
+  margin: 8px 0;
+  font-size: 13px;
+  color: #b32d2e;
+}
+
+#cartshift-app .cartshift-audit-warn code,
+#cartshift-app .cartshift-audit-panel td code {
+  margin-right: 4px;
+}
+
+/* A SHA-256 is 64 characters and the operator has to compare it against one
+   they will paste into a command. It wraps rather than truncating: a
+   fingerprint shown as an ellipsis is a fingerprint nobody can check. */
+#cartshift-app .cartshift-audit-fingerprint {
+  word-break: break-all;
+}
+
+#cartshift-app .cartshift-audit-actions {
+  margin: 20px 0 0;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Audit table geometry ────────────────────────────────────────────────
+   Same contract as every other data table on the wizard: fixed layout, with
+   the widths on the thead cells where fixed layout reads them. These four
+   are read side by side down one long report, so a Subscription column that
+   resolved to a different width in each of them would make the page look
+   like four unrelated screens stacked up. */
+#cartshift-app table.cartshift-table-audit-history,
+#cartshift-app table.cartshift-table-audit-mapping,
+#cartshift-app table.cartshift-table-audit-reasons,
+#cartshift-app table.cartshift-table-audit-records {
+  table-layout: fixed;
+}
+
+/* Subscription / Source says / Included */
+#cartshift-app .cartshift-table-audit-history th:nth-child(1) { width: 50%; }
+#cartshift-app .cartshift-table-audit-history th:nth-child(2) { width: 25%; }
+#cartshift-app .cartshift-table-audit-history th:nth-child(3) { width: 25%; }
+
+#cartshift-app .cartshift-table-audit-history th:nth-child(n + 2),
+#cartshift-app .cartshift-table-audit-history td:nth-child(n + 2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Source product / Subscriptions / Cadence / FC product / FC variation */
+#cartshift-app .cartshift-table-audit-mapping th:nth-child(1) { width: 32%; }
+#cartshift-app .cartshift-table-audit-mapping th:nth-child(2) { width: 14%; }
+#cartshift-app .cartshift-table-audit-mapping th:nth-child(3) { width: 18%; }
+#cartshift-app .cartshift-table-audit-mapping th:nth-child(4) { width: 18%; }
+#cartshift-app .cartshift-table-audit-mapping th:nth-child(5) { width: 18%; }
+
+#cartshift-app .cartshift-table-audit-mapping th:nth-child(2),
+#cartshift-app .cartshift-table-audit-mapping td:nth-child(2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Code / Records / Affected. The affected column carries a list of source
+   refs, so it takes what is left rather than being the one that is squeezed. */
+#cartshift-app .cartshift-table-audit-reasons th:nth-child(1) { width: 38%; }
+#cartshift-app .cartshift-table-audit-reasons th:nth-child(2) { width: 10%; }
+#cartshift-app .cartshift-table-audit-reasons th:nth-child(3) { width: 52%; }
+
+#cartshift-app .cartshift-table-audit-reasons th:nth-child(2),
+#cartshift-app .cartshift-table-audit-reasons td:nth-child(2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subscription / Status / Cadence / Strategy / Outcome / Reasons */
+#cartshift-app .cartshift-table-audit-records th:nth-child(1) { width: 18%; }
+#cartshift-app .cartshift-table-audit-records th:nth-child(2) { width: 11%; }
+#cartshift-app .cartshift-table-audit-records th:nth-child(3) { width: 12%; }
+#cartshift-app .cartshift-table-audit-records th:nth-child(4) { width: 11%; }
+#cartshift-app .cartshift-table-audit-records th:nth-child(5) { width: 16%; }
+#cartshift-app .cartshift-table-audit-records th:nth-child(6) { width: 32%; }
+
+/* ── Audit source picker and the one control that writes ─────────────────
+   The package route is the reference deployment's only route — two WordPress
+   installations, two prefixes — so it is a first-class choice on the screen
+   rather than something reachable only from the REST API. */
+#cartshift-app .cartshift-audit-source-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+#cartshift-app .cartshift-audit-source-option .description {
+  display: block;
+  margin: 2px 0 0;
+}
+
+#cartshift-app .cartshift-audit-package {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--cartshift-border-color);
+}
+
+#cartshift-app .cartshift-audit-package label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--cartshift-text-secondary);
+}
+
+/* The readiness counts are buttons: each one filters the record list below,
+   and a count you cannot act on is a dead end. Styled as the plain blocks they
+   were, because they must not read as a toolbar. */
+#cartshift-app button.cartshift-audit-count {
+  padding: 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--cartshift-font-family);
+}
+
+#cartshift-app button.cartshift-audit-count:hover .cartshift-audit-count-label {
+  color: var(--cartshift-text-primary);
+}
+
+/* The active filter is marked by an underline as well as by colour, so the
+   state survives a monochrome screen and a colour-blind reader. */
+#cartshift-app button.cartshift-audit-count-active .cartshift-audit-count-value {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+#cartshift-app button.cartshift-audit-count-active .cartshift-audit-count-label {
+  color: var(--cartshift-text-primary);
+  font-weight: 600;
+}
+
+/* Claimants of a shared target variation wrap rather than truncate: the whole
+   value of naming them is that the operator can read every one. */
+#cartshift-app [data-shared-targets] li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--cartshift-border-color);
+}
+
+#cartshift-app [data-shared-targets] li:last-child {
+  border-bottom: 0;
+}
+
+#cartshift-app [data-shared-targets] code {
+  margin: 0 4px;
 }

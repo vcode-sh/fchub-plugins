@@ -111,33 +111,232 @@ enum MigrationErrorCode: string
     /** Some coupon restriction IDs were lost, so the coupon covers less than it did. */
     case CouponRestrictionsNarrowed = 'coupon_restrictions_narrowed';
 
-    /** WooCommerce subscription with several items; FluentCart takes only one. */
+    /**
+     * A WooCommerce subscription with several line items. FluentCart's
+     * subscription row carries one product/variation contract, so the record is
+     * refused rather than migrated with the first item and a note about the
+     * rest. "Only the first item" is data loss with a log entry attached.
+     */
     case MultiItemSubscription = 'multi_item_subscription';
 
     /**
-     * The subscription's product was not migrated, so it came across paused
-     * rather than being dropped. The subscriber and the billing history survive
-     * and nothing charges until a human decides.
+     * The subscription reached the writer without one of the references
+     * `fct_subscriptions` declares NOT NULL: customer, parent order, product,
+     * variation, item name or quantity (FluentCart 1.6.0,
+     * database/Migrations/SubscriptionsMigrator.php).
+     *
+     * Nothing was written. CartShift used to flip such a record to `paused` and
+     * create it anyway, which produced a row that bills against a blank line the
+     * moment somebody presses resume — FluentCart reads a null `variation_id` as
+     * "no downloads" (Subscription::getDownloads()), hides the upgrade path
+     * (canUpgrade()), and stamps every renewal invoice with a null `object_id`
+     * and a blank line title (RenewalService::createRenewalOrders()). Paused is
+     * a lifecycle state, not a substitute for referential integrity.
+     */
+    case SubscriptionRequiredReferenceMissing = 'required_reference_missing';
+
+    /**
+     * A subscription in the selection sells a product this run will not migrate.
+     *
+     * Raised by ScopeConsequences as a *forecast* — "run this scope and these
+     * subscriptions will not come across" — before anything is migrated. The
+     * migrator no longer produces it: since the required-reference gate landed,
+     * that subscription is blocked at the writer and coded
+     * SubscriptionRequiredReferenceMissing instead. Retained for the forecast
+     * and for log rows written before the gate.
      */
     case SubscriptionPausedMissingProduct = 'subscription_paused_missing_product';
 
     /**
-     * The subscription came across with nothing in `variation_id`, so it was
-     * paused rather than left billing against no variant.
+     * The subscription resolved to no FluentCart variant.
      *
-     * Distinct from SubscriptionPausedMissingProduct because the causes and the
-     * fixes are different: there the product never migrated, here the product is
-     * fine and the line has no resolvable variation — a line item with no
-     * product ID at all, a subscription with no items, or a filter that emptied
-     * the mapped payload. FluentCart reads a null `variation_id` as "no
-     * downloads" (Subscription::getDownloads()), hides the upgrade path
-     * (canUpgrade()), and stamps every renewal invoice with a null `object_id`
-     * and a blank line title (RenewalService::createRenewalOrders()).
+     * Retained for log rows written before the required-reference gate landed;
+     * that outcome is now SubscriptionRequiredReferenceMissing. Kept rather than
+     * deleted so a log written by an earlier release still renders its own
+     * reason instead of a blank cell.
      */
     case SubscriptionPausedMissingVariation = 'subscription_paused_missing_variation';
 
-    /** Subscription gateway with no vendor ID mapping defined. */
+    /**
+     * Subscription gateway with no vendor ID mapping defined.
+     *
+     * Retained for log rows written before the payment strategies landed. The
+     * mapper used to read vendor identifiers straight out of WooCommerce meta
+     * and leave this note when it recognised none of them; who owns the next
+     * charge is now the strategy registry's decision, and an unrecognised
+     * gateway is `unsupported_gateway` — a refusal rather than a note.
+     */
     case UnmappedSubscriptionGateway = 'unmapped_subscription_gateway';
+
+    /**
+     * The source bills on a cadence FluentCart cannot express.
+     *
+     * `week/2`, `year/2`, `month/2` and `month/12` are real WooCommerce
+     * Subscriptions schedules with no FluentCart equivalent. CartShift used to
+     * collapse them — every year multiplier to yearly, every month multiplier
+     * other than 3 or 6 to monthly — which bills a customer on a schedule they
+     * never agreed to. Plan section 7.2's table has six rows and no fallback
+     * arm; everything else blocks.
+     */
+    case SubscriptionUnsupportedBillingCadence = 'unsupported_billing_cadence';
+
+    /**
+     * An active subscription with no next payment date. Nothing owns its next
+     * charge, and 360 of the 564 preserved Lapka records have no date at all —
+     * which is exactly the population a reconciler is tempted to "help" by
+     * inventing one.
+     */
+    case SubscriptionActiveNextDateMissing = 'active_next_date_missing';
+
+    /** An active subscription whose next payment date has already passed. */
+    case SubscriptionActiveNextDatePast = 'active_next_date_past';
+
+    /**
+     * A finite plan whose paid cycles have reached its term while the source
+     * still calls it live. Either the status or the count is wrong, and picking
+     * one is how somebody is billed once more than they agreed to.
+     */
+    case SubscriptionFiniteTermStateConflict = 'finite_term_state_conflict';
+
+    /**
+     * The source gateway has no migration strategy, so nobody can say who would
+     * own the next charge. Plan section 8.1 step 6: blocked, not guessed into
+     * one of the three supported buckets.
+     */
+    case SubscriptionUnsupportedGateway = 'unsupported_gateway';
+
+    /**
+     * The payment strategy could not certify a live mandate and the operator
+     * has not accepted the alternative yet.
+     *
+     * One code for the whole family — an unverified vault, a store mode nobody
+     * approved, a payment method the provider does not own. The log message
+     * carries the exact section 9.4 codes; this is what the UI groups by, and
+     * they all send the operator to the same screen.
+     */
+    case SubscriptionPaymentNotReady = 'subscription_payment_not_ready';
+
+    /**
+     * The subscription recorded no term of its own, so nobody can say how many
+     * charges it has left.
+     *
+     * A refusal, not a note. Writing `bill_times = 0` would tell FluentCart to
+     * bill forever on a question the source never answered, and it would also
+     * disarm the finite-term conflict check, which only examines a positive
+     * term. Deliberately not answered from the current product's
+     * `_subscription_length` either: that value describes today's catalogue,
+     * not what this subscriber agreed to, and substituting it is the plan's P1
+     * defect.
+     */
+    case SubscriptionFiniteTermUndeclared = 'finite_term_undeclared';
+
+    /**
+     * The subscription recorded no term of its own, so the product's declared
+     * length was used instead.
+     *
+     * Section 9.2 permits exactly this and requires it to be said out loud: the
+     * current product describes today's catalogue, not what a subscriber agreed
+     * to when they signed up. Migrated, and flagged.
+     */
+    case SubscriptionFiniteTermFromProduct = 'finite_term_from_product';
+
+    /**
+     * The subscription was renewing automatically, the change was accepted, and
+     * it was migrated as a manual-invoice subscription.
+     *
+     * Its own case rather than sharing the refusal's, which it did for one
+     * round: a record that staged successfully then logged under "Manual
+     * renewal has not been accepted", with a hint reading "Nothing was
+     * migrated", at blocking severity. A code a UI can group by is only worth
+     * having if the group means one thing.
+     */
+    case SubscriptionManualRenewalAdopted = 'manual_renewal_adopted';
+
+    /**
+     * The subscription was renewing automatically and nobody has accepted that
+     * FluentCart will invoice its customer instead.
+     *
+     * Its own case rather than a fall-through to `subscription_payment_not_ready`,
+     * which was minted for provider faults. This is not a fault: it is a
+     * decision nobody has taken yet, it is the reason an entire live cohort
+     * stays where it is, and it needs an entry in the log a UI can group by and
+     * a hint that names the decision.
+     */
+    case SubscriptionManualRenewalNotAccepted = 'manual_confirmation_required';
+
+    /** The subscription has no billing email, so it identifies nobody. */
+    case SubscriptionCustomerEmailMissing = 'customer_email_missing';
+
+    /**
+     * The resolved FluentCart variation is not on the resolved FluentCart
+     * product.
+     *
+     * `fct_product_variations.id` is a global auto-increment and nothing links
+     * `fct_order_items.object_id` back to it, so a stale mapping decision or a
+     * hand-made POST can pair a product with another product's variant.
+     * Section 9.3 requires the pairing to be checked before the subscription is
+     * written, not merely to have been checked when the mapping was promoted.
+     */
+    case SubscriptionVariationNotOnProduct = 'target_variation_not_on_product';
+
+    /**
+     * The source row could not be decoded into a valid record at all.
+     *
+     * It stays in the counts rather than disappearing: a malformed record that
+     * vanishes silently is a subscriber nobody goes looking for.
+     */
+    case SubscriptionInvalidSourceRecord = 'invalid_source_record';
+
+    /**
+     * The three paid-cycle counts disagree, so the subscription stayed paused.
+     *
+     * FluentCart recomputes `bill_count` from succeeded positive charge
+     * transactions carrying the subscription's ID
+     * (`Subscription::calculateBillCount()`), WooCommerce Subscriptions keeps
+     * its own `get_payment_count()`, and the migrated history carries whatever
+     * paid orders came across. When those three do not agree, writing any one
+     * of them would be overwritten by the next recompute — and the difference
+     * is somebody's billing history, not a rounding error.
+     */
+    case SubscriptionHistoryCountMismatch = 'history_count_mismatch';
+
+    /**
+     * A subscription's parent order was named and its payload was not carried.
+     *
+     * Section 6.2 is blunt about this: a reference is not an order. FluentCart
+     * recomputes `bill_count` from succeeded charges, so a parent order that
+     * arrived as a bare integer contributes nothing and the count is wrong in a
+     * way nobody can see.
+     */
+    case SubscriptionDatasetMissingParentOrder = 'dataset_missing_parent_order';
+
+    /** The same, for a renewal, switch or resubscribe order. */
+    case SubscriptionDatasetMissingRelatedOrder = 'dataset_missing_related_order';
+
+    /**
+     * One order is claimed by two different subscription relationships.
+     *
+     * Section 6.2 refuses to break the tie, and so does CartShift: whichever
+     * relationship happened to be read first would decide whether the order
+     * becomes a FluentCart `renewal` or an ordinary purchase, and that decides
+     * whether it counts towards somebody's paid cycles. The order migrates as a
+     * plain checkout, which is the choice that claims nothing, and the dispute
+     * is reported rather than left to be inferred from a type that is missing.
+     */
+    case SubscriptionAmbiguousOrderRelationship = 'dataset_ambiguous_order_relationship';
+
+    /**
+     * A package record's declared fingerprint is not the fingerprint of its own
+     * payload — the line was edited, truncated or re-encoded after export.
+     *
+     * `SubscriptionMigrator::codeFor()` falls back to
+     * `SubscriptionPaymentNotReady` for any section 9.4 code the log has no
+     * heading for, which is right for the provider faults it was written for and
+     * was applied to `reportInvalid()` too. So a tampered package record told the
+     * operator "Payment ownership is not settled" and sent them off to check
+     * their Stripe account, about a file that had been modified.
+     */
+    case SubscriptionDatasetChecksumMismatch = 'dataset_checksum_mismatch';
 
     /** WooCommerce catalog-only or search-only visibility, which FC lacks. */
     case PartialCatalogVisibility = 'partial_catalog_visibility';
@@ -212,6 +411,22 @@ enum MigrationErrorCode: string
      * duplicate a product the owner deliberately built by hand.
      */
     case OrphanVariantNotCreated = 'orphan_variant_not_created';
+
+    /**
+     * A `create` decision named a WooCommerce subscription product whose
+     * billing cadence section 7.2's table has no row for, so no FluentCart
+     * product was created for it and the product was dropped from the run.
+     *
+     * Creating it would write the NEAREST interval FluentCart can express,
+     * which is a different contract from the one the subscriber agreed to —
+     * every-6-weeks quietly becoming monthly is a 15% price rise nobody
+     * authorised.
+     *
+     * This used to be reported through `Logger::error()` alone, which is PHP's
+     * `error_log` and not the migration log, so the operator saw a mapping row
+     * still offering "Create" and a run that silently skipped the product.
+     */
+    case SubscriptionCadenceUnrepresentable = 'subscription_cadence_unrepresentable';
 
     /**
      * A `link` decision mapped a Woo variation onto a FluentCart variant that
@@ -297,10 +512,29 @@ enum MigrationErrorCode: string
             self::UnknownCouponType           => __('Unrecognised discount type', 'cartshift'),
             self::CouponDisabledMissingRestrictions => __('Coupon disabled: restrictions lost', 'cartshift'),
             self::CouponRestrictionsNarrowed  => __('Coupon restrictions partly lost', 'cartshift'),
-            self::MultiItemSubscription       => __('Multi-item subscription truncated', 'cartshift'),
-            self::SubscriptionPausedMissingProduct => __('Subscription paused: product not migrated', 'cartshift'),
-            self::SubscriptionPausedMissingVariation => __('Subscription paused: no variant to bill for', 'cartshift'),
+            self::MultiItemSubscription       => __('Multi-item subscription blocked', 'cartshift'),
+            self::SubscriptionRequiredReferenceMissing => __('Subscription is missing a required reference', 'cartshift'),
+            self::SubscriptionPausedMissingProduct => __('Subscription sells a product this run leaves behind', 'cartshift'),
+            self::SubscriptionPausedMissingVariation => __('Subscription had no variant to bill for', 'cartshift'),
             self::UnmappedSubscriptionGateway => __('Unmapped payment gateway', 'cartshift'),
+            self::SubscriptionUnsupportedBillingCadence => __('Billing cadence has no FluentCart equivalent', 'cartshift'),
+            self::SubscriptionActiveNextDateMissing => __('Active subscription with no next payment date', 'cartshift'),
+            self::SubscriptionActiveNextDatePast => __('Active subscription whose next payment is overdue', 'cartshift'),
+            self::SubscriptionFiniteTermStateConflict => __('Finite plan already paid to its term', 'cartshift'),
+            self::SubscriptionUnsupportedGateway => __('Payment gateway is not supported', 'cartshift'),
+            self::SubscriptionPaymentNotReady => __('Payment ownership is not settled', 'cartshift'),
+            self::SubscriptionFiniteTermUndeclared => __('Subscription records no term of its own', 'cartshift'),
+            self::SubscriptionCustomerEmailMissing => __('Subscription has no billing email', 'cartshift'),
+            self::SubscriptionFiniteTermFromProduct => __('Term taken from the product, not the subscription', 'cartshift'),
+            self::SubscriptionManualRenewalAdopted => __('Renewals move from the gateway to FluentCart invoices', 'cartshift'),
+            self::SubscriptionManualRenewalNotAccepted => __('Manual renewal has not been accepted', 'cartshift'),
+            self::SubscriptionVariationNotOnProduct => __('Variant belongs to another product', 'cartshift'),
+            self::SubscriptionInvalidSourceRecord => __('Source record could not be read', 'cartshift'),
+            self::SubscriptionHistoryCountMismatch => __('Paid-cycle counts disagree', 'cartshift'),
+            self::SubscriptionDatasetMissingParentOrder => __('Parent order missing from the dataset', 'cartshift'),
+            self::SubscriptionDatasetMissingRelatedOrder => __('Related order missing from the dataset', 'cartshift'),
+            self::SubscriptionAmbiguousOrderRelationship => __('Order claimed by two subscription relationships', 'cartshift'),
+            self::SubscriptionDatasetChecksumMismatch => __('Package record does not match its own checksum', 'cartshift'),
             self::PartialCatalogVisibility    => __('Partial catalog visibility lost', 'cartshift'),
             self::UserNotFound                => __('WordPress user missing', 'cartshift'),
             self::NoOrderForGuest             => __('No order for guest customer', 'cartshift'),
@@ -316,6 +550,8 @@ enum MigrationErrorCode: string
             self::ScopeClosureTooLarge        => __('Selection is too large', 'cartshift'),
             self::MappedFcProductMissing      => __('Mapped FluentCart product missing', 'cartshift'),
             self::OrphanVariantNotCreated     => __('Variant could not be added', 'cartshift'),
+            self::SubscriptionCadenceUnrepresentable
+                                              => __('Billing cadence cannot be expressed', 'cartshift'),
             self::MappedVariantNotOnProduct   => __('Mapped variant is on another product', 'cartshift'),
             self::MappedProductHasNoDownloads => __('Linked product has no files', 'cartshift'),
             self::MappedProductOutOfScope     => __('Mapped product is outside this run', 'cartshift'),
@@ -395,19 +631,95 @@ enum MigrationErrorCode: string
                 'cartshift',
             ),
             self::MultiItemSubscription => __(
-                'Only the first item was migrated. Add the remaining items in FluentCart by hand.',
+                'Nothing was migrated. A FluentCart subscription holds one product, so keeping the first item and dropping the rest would quietly halve what the customer pays for. Split the WooCommerce subscription into one subscription per product, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionRequiredReferenceMissing => __(
+                'Nothing was migrated. FluentCart requires a customer, a parent order, a product, a variant, an item name and a quantity on every subscription, and this one is short of at least one of them — the log message says which. Migrate or map the missing piece, or fix the subscription in WooCommerce, then re-run.',
                 'cartshift',
             ),
             self::SubscriptionPausedMissingProduct => __(
-                'The subscriber and their billing history came across, but nothing will be charged while the subscription is paused. Migrate the product, point the subscription at it, then resume it.',
+                'This run will not bring the product those subscriptions sell, so they cannot be migrated at all. Add the product to the selection, or migrate products first, then re-run.',
                 'cartshift',
             ),
             self::SubscriptionPausedMissingVariation => __(
-                'The subscriber and their billing history came across, but nothing will be charged while the subscription is paused. Point it at a product variant in FluentCart, then resume it — an active subscription with no variant bills the customer for a blank line and hands them no downloads.',
+                'Recorded by an earlier CartShift release, which migrated the subscription paused rather than refusing it. Point it at a product variant in FluentCart before resuming it — a subscription with no variant bills the customer for a blank line and hands them no downloads.',
                 'cartshift',
             ),
             self::UnmappedSubscriptionGateway => __(
                 'The vendor ID fields were left empty. Reconnect the subscription to its gateway by hand.',
+                'cartshift',
+            ),
+            self::SubscriptionUnsupportedBillingCadence => __(
+                'Nothing was migrated. FluentCart bills daily, weekly, monthly, quarterly, half-yearly or yearly, and this subscription bills on none of those. Collapsing it to the nearest one would charge the customer on a schedule they never agreed to, so change the source schedule to one FluentCart can hold, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionActiveNextDateMissing => __(
+                'Nothing was migrated. The subscription is active but has no next payment date, so no part of FluentCart would own its next charge. Set the date in WooCommerce and export again, or cancel the subscription if it is no longer live.',
+                'cartshift',
+            ),
+            self::SubscriptionActiveNextDatePast => __(
+                'Nothing was migrated. The subscription is active and its next charge was due in the past, so it is not ready to be activated anywhere. Reconcile the outstanding renewal at the source first, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionFiniteTermStateConflict => __(
+                'Nothing was migrated. The plan has a fixed number of payments, all of them have been taken, and the source still calls the subscription live. Decide which is right — close the subscription or correct the payment count — then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionUnsupportedGateway => __(
+                'Nothing was migrated. CartShift migrates standard Stripe, standard PayPal and manual renewals; this subscription uses something else, and guessing which of the three it resembles would decide how a real customer is charged. Switch it to manual renewal at the source, or wait for a strategy that supports this gateway.',
+                'cartshift',
+            ),
+            self::SubscriptionPaymentNotReady => __(
+                'Nothing was migrated yet. Who charges this customer next has not been settled — the log message names the exact reasons. Either verify the payment details against the target account, or accept that FluentCart will invoice the customer instead of charging them silently, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionFiniteTermUndeclared => __(
+                'Nothing was migrated. Neither the subscription nor the product it sells says how many payments it runs for, and CartShift will not answer that for them — "unlimited" is a contract, not a default. Set the subscription length in WooCommerce, on the subscription or on its product, then run again. If the log says this export was made before CartShift read the product, export the source again with the current version instead.',
+                'cartshift',
+            ),
+            self::SubscriptionCustomerEmailMissing => __(
+                'Nothing was migrated. The subscription carries no billing email, which is the only thing identifying its owner across two sites. Add one in WooCommerce, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionFiniteTermFromProduct => __(
+                'The subscription does not say how many payments it runs for, so the length configured on the product was used. That describes what the product sells today, which is not always what an older subscriber signed up to — check it if the plan has changed since.',
+                'cartshift',
+            ),
+            self::SubscriptionManualRenewalAdopted => __(
+                'The subscription was migrated. WooCommerce was charging this customer automatically and FluentCart will raise an invoice for them instead, which is the change you accepted — nothing charges them off-session. Make sure the renewal emails say what you want them to say before the next invoice goes out.',
+                'cartshift',
+            ),
+            self::SubscriptionManualRenewalNotAccepted => __(
+                'Nothing was migrated. WooCommerce was charging this customer automatically, and FluentCart would raise an invoice for them instead. That is a change the customer will notice, so it has to be accepted before the subscription is created — accept it for this group of subscriptions, then run again.',
+                'cartshift',
+            ),
+            self::SubscriptionVariationNotOnProduct => __(
+                'Nothing was migrated. The variant this subscription would bill against sits on a different FluentCart product — most likely it was deleted or moved after the mapping was saved. Open the mapping screen, pick the variant again, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionInvalidSourceRecord => __(
+                'Nothing was migrated. The source row could not be read as a subscription at all — the log message says which fields are missing or unreadable. Repair it in WooCommerce, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionDatasetMissingParentOrder => __(
+                'The subscription was staged and no order history was imported. The dataset names its parent order and does not carry the order itself, and a reference is not an order — FluentCart counts paid cycles from the charges on those orders, so importing around the hole would produce a payment count that is quietly wrong. Export the dataset again with the parent order included, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionDatasetMissingRelatedOrder => __(
+                'The subscription was staged and no order history was imported. The dataset names a renewal, switch or resubscribe order it does not carry. Export the dataset again with that order included, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionDatasetChecksumMismatch => __(
+                'Nothing was migrated for this record. Its declared fingerprint is not the fingerprint of the payload beside it, which means the package line was edited, truncated or re-encoded after it was exported. Do not repair the file by hand: export it again from the source and re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionAmbiguousOrderRelationship => __(
+                'The order migrated, as an ordinary checkout. Two subscription relationships claim it — a renewal and a switch, say — and CartShift will not pick one: the choice decides whether the order counts towards a subscriber\'s paid cycles. Settle the relationship in WooCommerce, then re-run.',
+                'cartshift',
+            ),
+            self::SubscriptionHistoryCountMismatch => __(
+                'The subscription was staged and left paused, and its payment count was NOT written. WooCommerce, the imported history and FluentCart each counted a different number of paid cycles — the log message gives all three and names the orders involved. Usually a renewal order that did not come across. Migrate the missing orders, then re-run; picking a number here would only be overwritten the next time FluentCart recounted.',
                 'cartshift',
             ),
             self::PartialCatalogVisibility => __(
@@ -466,6 +778,10 @@ enum MigrationErrorCode: string
                 'The linked FluentCart product no longer exists — trashed or deleted after it was chosen on the mapping screen. The WooCommerce product was created fresh instead; relink or merge them by hand if that is not what you wanted.',
                 'cartshift',
             ),
+            self::SubscriptionCadenceUnrepresentable => __(
+                'FluentCart has no interval for this product\'s billing schedule, and creating it would write the nearest one instead — a different contract from the one the subscriber agreed to. Change the source schedule to one FluentCart can express, or link this product to a compatible FluentCart subscription variation by hand, then re-run.',
+                'cartshift',
+            ),
             self::OrphanVariantNotCreated => __(
                 'Add the missing variant to the linked FluentCart product by hand, then run the migration again. Products using Advanced Variations cannot take one: FluentCart rebuilds their variants from the attribute options and would delete it.',
                 'cartshift',
@@ -507,10 +823,23 @@ enum MigrationErrorCode: string
             self::CustomerRebuiltFromOrder,
             self::ProductLinkMissing,
             self::VariationLinkMissing,
-            self::SubscriptionPausedMissingProduct,
             self::SubscriptionPausedMissingVariation,
-            self::MultiItemSubscription,
             self::UnmappedSubscriptionGateway,
+            self::SubscriptionFiniteTermFromProduct,
+            // Migrated, with a change the customer will notice at the next
+            // renewal. A caveat on a record that exists, not a refusal.
+            self::SubscriptionManualRenewalAdopted,
+            // The subscription row exists — staged, paused, and honest about
+            // its unknown payment count. That is a caveat rather than a
+            // refusal: the owner has to go and look, not re-run a migration
+            // that wrote nothing.
+            self::SubscriptionHistoryCountMismatch,
+            // Same shape one step earlier: the subscriber came across, their
+            // invoices did not.
+            self::SubscriptionDatasetMissingParentOrder,
+            self::SubscriptionDatasetMissingRelatedOrder,
+            // The order came across; only its relationship is unsettled.
+            self::SubscriptionAmbiguousOrderRelationship,
             self::PartialCatalogVisibility,
             self::MappedFcProductMissing,
             self::OrphanVariantNotCreated,
@@ -520,6 +849,25 @@ enum MigrationErrorCode: string
             self::CustomerNotFound,
             self::ProductNotMapped,
             self::VariationNotMapped,
+            // Blocked, not migrated-with-a-caveat. Both refuse to write a row.
+            self::MultiItemSubscription,
+            self::SubscriptionCadenceUnrepresentable,
+            // The package line does not match its own fingerprint. Nothing is
+            // written for that record, and the file is not repairable by hand.
+            self::SubscriptionDatasetChecksumMismatch,
+            self::SubscriptionRequiredReferenceMissing,
+            self::SubscriptionPausedMissingProduct,
+            self::SubscriptionUnsupportedBillingCadence,
+            self::SubscriptionActiveNextDateMissing,
+            self::SubscriptionActiveNextDatePast,
+            self::SubscriptionFiniteTermStateConflict,
+            self::SubscriptionUnsupportedGateway,
+            self::SubscriptionPaymentNotReady,
+            self::SubscriptionFiniteTermUndeclared,
+            self::SubscriptionManualRenewalNotAccepted,
+            self::SubscriptionVariationNotOnProduct,
+            self::SubscriptionCustomerEmailMissing,
+            self::SubscriptionInvalidSourceRecord,
             self::UnsupportedProductType,
             self::CouponCodeMissing,
             self::CouponCodeTooLong,
@@ -550,6 +898,7 @@ enum MigrationErrorCode: string
             self::CustomerRebuiltFromOrder,
             self::UserNotFound,
             self::NoOrderForGuest,
+            self::SubscriptionCustomerEmailMissing,
             self::MissingEmail => MigrationErrorCategory::Customer,
 
             self::ProductLinkMissing,
@@ -564,6 +913,7 @@ enum MigrationErrorCode: string
             self::ProductCreationFailed,
             self::MappedFcProductMissing,
             self::OrphanVariantNotCreated,
+            self::SubscriptionCadenceUnrepresentable,
             self::MappedVariantNotOnProduct,
             self::MappedProductHasNoDownloads,
             self::MappedProductOutOfScope => MigrationErrorCategory::Product,
@@ -578,9 +928,27 @@ enum MigrationErrorCode: string
             self::OrderHasNoItems => MigrationErrorCategory::Order,
 
             self::MultiItemSubscription,
+            self::SubscriptionRequiredReferenceMissing,
             self::SubscriptionPausedMissingProduct,
             self::SubscriptionPausedMissingVariation,
-            self::UnmappedSubscriptionGateway => MigrationErrorCategory::Subscription,
+            self::UnmappedSubscriptionGateway,
+            self::SubscriptionUnsupportedBillingCadence,
+            self::SubscriptionActiveNextDateMissing,
+            self::SubscriptionActiveNextDatePast,
+            self::SubscriptionFiniteTermStateConflict,
+            self::SubscriptionUnsupportedGateway,
+            self::SubscriptionPaymentNotReady,
+            self::SubscriptionFiniteTermUndeclared,
+            self::SubscriptionFiniteTermFromProduct,
+            self::SubscriptionManualRenewalAdopted,
+            self::SubscriptionManualRenewalNotAccepted,
+            self::SubscriptionVariationNotOnProduct,
+            self::SubscriptionInvalidSourceRecord,
+            self::SubscriptionHistoryCountMismatch,
+            self::SubscriptionDatasetMissingParentOrder,
+            self::SubscriptionDatasetMissingRelatedOrder,
+            self::SubscriptionAmbiguousOrderRelationship,
+            self::SubscriptionDatasetChecksumMismatch => MigrationErrorCategory::Subscription,
 
             self::TermCreationFailed => MigrationErrorCategory::Taxonomy,
 

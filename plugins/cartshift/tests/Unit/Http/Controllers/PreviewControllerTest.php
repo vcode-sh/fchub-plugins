@@ -454,6 +454,63 @@ final class PreviewControllerTest extends PluginTestCase
         };
     }
 
+    /**
+     * C1: a read-only GET must not write to the migration log.
+     *
+     * `PreviewController::preview()` builds from `migratorsForCounting()`, under
+     * a comment reading "this endpoint must stay read-only, so nothing is
+     * promoted". The unrepresentable-cadence refusal used to log from inside the
+     * reader that path calls, so on any store carrying one such `create`
+     * decision every scope preview appended an `error` row — stamped with `''`
+     * when no run was in flight, or appended to a FINISHED run's log, corrupting
+     * a completed run's record from a GET.
+     */
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testPreviewWritesNoMigrationLogRowForARefusedSubscriptionProduct(): void
+    {
+        require_once dirname(__DIR__, 3) . '/stubs/WcSubscriptionsProductStub.php';
+
+        $product = new \WC_Product();
+        (new \ReflectionProperty(\WC_Product::class, 'meta'))->setValue($product, [
+            '_subscription_period'          => 'month',
+            '_subscription_period_interval' => '2',
+        ]);
+
+        $GLOBALS['_cartshift_test_wc_products'][770_009] = $product;
+        $GLOBALS['_cartshift_test_get_results_callback'] = static fn (string $query): array
+            => str_contains($query, 'cartshift_product_map')
+                ? [(object) [
+                    'wc_id'       => 770_009,
+                    'wc_type'     => 'subscription',
+                    'decision'    => 'create',
+                    'fc_post_id'  => null,
+                    'band'        => 'none',
+                    'variant_map' => null,
+                ]]
+                : [];
+
+        // A finished run in state is the worst case: its log is the one a GET
+        // would have appended to.
+        $state = new MigrationState();
+        $state->start(['product']);
+        $state->complete();
+
+        $GLOBALS['_cartshift_test_queries'] = [];
+
+        $response = $this->controller()->preview($this->request(['scope' => ['mode' => 'everything']]));
+
+        $this->assertSame(200, $response->get_status());
+
+        $logWrites = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $entry): bool => $entry[0] === 'insert'
+                && str_contains((string) $entry[1], 'cartshift_migration_log'),
+        ));
+
+        $this->assertSame([], $logWrites, 'A read-only preview wrote to the migration log.');
+    }
+
     private function controller(): PreviewController
     {
         $container = new Container();

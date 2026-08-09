@@ -16,6 +16,18 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const css = readFileSync(resolve(root, 'src/styles/app.css'), 'utf8');
 
+/**
+ * The stylesheet with its comments removed.
+ *
+ * Selector parsing needs this. A CSS comment sits between the previous rule's
+ * `}` and the next selector, so any regex that captures "everything up to the
+ * next `{`" swallows it — and a comment that happens to mention `#cartshift-app`
+ * (they all do, explaining why the rule is anchored) makes the rule beneath it
+ * look anchored when it is not. That is how the dark-mode check below passed
+ * over the exact regression it was written for.
+ */
+const cssBare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
 /** Body of the first rule whose selector is exactly `selector`. */
 function ruleBody(selector, source = css) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -120,5 +132,92 @@ describe('numeric columns', () => {
     expect(block, 'expected a numeric-column rule anchored on .cartshift-num').toBeTruthy();
     expect(block).toMatch(/text-align:\s*right/);
     expect(block).toMatch(/font-variant-numeric:\s*tabular-nums/);
+  });
+});
+
+describe('paragraph styling outranks the body-paragraph rule', () => {
+  /**
+   * `#cartshift-app p` sets a colour and a margin, and WP admin CSS is
+   * unlayered — so a bare class selector on a `<p>` loses to it on specificity
+   * whatever it declares. That is how `.cartshift-audit-warn` and the
+   * reconciliation alarm ending "do not stage this cohort" came to render in
+   * the same grey as the body text around them.
+   *
+   * Every class that lands on a `<p>` and then declares `color` or `margin`
+   * must therefore carry the `#cartshift-app` prefix, which is what the file's
+   * own convention already does three rules away.
+   */
+  const paragraphClasses = new Set();
+
+  for (const file of componentFiles()) {
+    const source = readFileSync(file, 'utf8');
+
+    for (const [, classes] of source.matchAll(/<p\b[^>]*\bclass="([^"]+)"/g)) {
+      for (const name of classes.split(/\s+/)) {
+        if (name.startsWith('cartshift-')) paragraphClasses.add(name);
+      }
+    }
+  }
+
+  it('finds the paragraph classes it is meant to be checking', () => {
+    expect(paragraphClasses.size).toBeGreaterThan(0);
+  });
+
+  it.each([...paragraphClasses])('.%s is anchored on #cartshift-app', (name) => {
+    const pattern = new RegExp(
+      `(?:^|[},])\\s*([^{}]*\\.${name}(?![a-zA-Z0-9_-])[^{}]*)\\{([^}]*)\\}`,
+      'g',
+    );
+
+    for (const [, selectors, body] of cssBare.matchAll(pattern)) {
+      if (!/(?:^|;)\s*(?:color|margin)\s*:/.test(body)) continue;
+
+      expect(
+        selectors.includes('#cartshift-app'),
+        `"${selectors.trim()}" sets a colour or margin on a <p> and would lose to "#cartshift-app p"`,
+      ).toBe(true);
+    }
+  });
+});
+
+describe('dark-mode overrides outrank their light rules', () => {
+  /**
+   * An ID beats any number of classes. So the moment a light rule is anchored
+   * on `#cartshift-app` (1,1,0), a `body.dark .thing` override (0,2,1) is dead
+   * and the element renders its light colours on a dark background — which is
+   * exactly what happened to the log's active-filter banner when this wave
+   * prefixed its light rule.
+   *
+   * Every dark override for a class that has an ID-anchored light rule must
+   * therefore carry the ID too, the form `body.dark #cartshift-app .notice-*`
+   * already uses.
+   */
+  it('anchors every dark override whose light rule carries the app ID', () => {
+    const anchored = new Set();
+    const darkBare = new Map();
+
+    for (const [, selectors] of cssBare.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+      for (const selector of selectors.split(',')) {
+        const trimmed = selector.trim();
+        if (!trimmed.startsWith('body.dark') && trimmed.includes('#cartshift-app')) {
+          for (const [, name] of trimmed.matchAll(/\.([a-zA-Z0-9_-]+)/g)) anchored.add(name);
+        }
+      }
+    }
+
+    for (const [, selectors] of cssBare.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+      for (const selector of selectors.split(',')) {
+        const trimmed = selector.trim();
+        if (!trimmed.startsWith('body.dark') || trimmed.includes('#cartshift-app')) continue;
+        for (const [, name] of trimmed.matchAll(/\.([a-zA-Z0-9_-]+)/g)) {
+          if (name !== 'dark' && anchored.has(name)) darkBare.set(name, trimmed);
+        }
+      }
+    }
+
+    expect(
+      [...darkBare.entries()].map(([name, selector]) => `${selector} (.${name} has an ID-anchored light rule)`),
+      'these dark overrides lose to their own light rule on specificity',
+    ).toEqual([]);
   });
 });

@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\MoneyHelper;
+use CartShift\Support\ProductTypes;
 
 final class ProductMapper
 {
@@ -47,7 +48,7 @@ final class ProductMapper
             return null;
         }
 
-        $isVariable = $type === 'variable';
+        $isVariable = ProductTypes::isVariable($type);
         $fulfillmentType = self::getFulfillmentType($product);
 
         $dateCreated = $product->get_date_created();
@@ -114,7 +115,7 @@ final class ProductMapper
     public function mapDetail(\WC_Product $product, int $fcProductId): array
     {
         $fulfillmentType = self::getFulfillmentType($product);
-        $isVariable = $product->get_type() === 'variable';
+        $isVariable = ProductTypes::isVariable($product->get_type());
 
         return [
             'product_id'          => $fcProductId,

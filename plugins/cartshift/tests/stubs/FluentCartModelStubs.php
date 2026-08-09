@@ -36,9 +36,18 @@ if (!class_exists('CartShiftFcModelStore')) {
                 string $method,
                 array $arguments,
             ): mixed {
+                // An instance save(), which is how a row that carries a
+                // non-fillable column reaches the database. Recorded under the
+                // same model name create() uses, so a test asserting "one
+                // subscription was written" does not have to know which of the
+                // two routes wrote it.
+                if ($method === 'save') {
+                    return self::persist(self::shortName($class), $arguments[0]);
+                }
+
                 if ($method !== 'query') {
                     throw new BadMethodCallException(sprintf(
-                        'The CartShift model fake implements query() only; %s::%s() was called.',
+                        'The CartShift model fake implements query() and save(); %s::%s() was called.',
                         $class,
                         $method,
                     ));
@@ -46,6 +55,29 @@ if (!class_exists('CartShiftFcModelStore')) {
 
                 return new CartShiftFcQuery(self::shortName($class));
             };
+        }
+
+        /**
+         * Give a saved model an ID if it has none, and remember it.
+         *
+         * Re-saving the same instance updates in place rather than recording a
+         * second row, exactly as an ORM does — otherwise a writer that saves
+         * once and then touches the model again would look like a duplicate.
+         */
+        public static function persist(string $model, object $row): object
+        {
+            if ((int) ($row->id ?? 0) <= 0) {
+                $nextId = (int) ($GLOBALS['_cartshift_test_fc_next_id'] ?? 0) + 1;
+                $GLOBALS['_cartshift_test_fc_next_id'] = $nextId;
+
+                $row->id = $nextId;
+
+                $GLOBALS['_cartshift_test_fc_models'][$model][] = $row;
+            }
+
+            $GLOBALS['_cartshift_test_fc_saved'][] = $row;
+
+            return $row;
         }
 
         /**
@@ -153,7 +185,7 @@ if (!class_exists('CartShiftFcRow')) {
 if (!class_exists('CartShiftFcQuery')) {
     final class CartShiftFcQuery
     {
-        /** @var list<array{0: string, 1: mixed}> Two-argument where() constraints, in order. */
+        /** @var list<array{0: string, 1: string, 2: mixed}> where() constraints as (column, operator, value). */
         private array $wheres = [];
 
         public function __construct(private readonly string $model) {}
@@ -163,13 +195,48 @@ if (!class_exists('CartShiftFcQuery')) {
             return CartShiftFcModelStore::record($this->model, $attributes);
         }
 
+        /**
+         * Two-argument and three-argument forms, because FluentCart uses both.
+         *
+         * `Subscription::calculateBillCount()` is `where('total', '>', 0)`, and
+         * a stub that ignored the operator would count refunds, reversals and
+         * zero-amount rows towards a subscriber's paid cycles — which is
+         * exactly the arithmetic the reconciler exists to get right.
+         */
         public function where(mixed ...$args): self
         {
             if (count($args) === 2 && is_string($args[0])) {
-                $this->wheres[] = [$args[0], $args[1]];
+                $this->wheres[] = [$args[0], '=', $args[1]];
+            }
+
+            if (count($args) === 3 && is_string($args[0]) && is_string($args[1])) {
+                $this->wheres[] = [$args[0], $args[1], $args[2]];
             }
 
             return $this;
+        }
+
+        /**
+         * A created row by primary key.
+         *
+         * `first()` deliberately answers from the SEEDED row and nothing else —
+         * an empty FluentCart install must look empty to every probe — so
+         * reading back something this test run created needs its own door.
+         */
+        public function find(mixed $id): ?object
+        {
+            foreach (CartShiftFcModelStore::all($this->model) as $row) {
+                if ((int) ($row->id ?? 0) === (int) $id) {
+                    return $row;
+                }
+            }
+
+            return null;
+        }
+
+        public function count(): int
+        {
+            return count($this->rows());
         }
 
         /**
@@ -230,8 +297,20 @@ if (!class_exists('CartShiftFcQuery')) {
 
         private function matches(object $row): bool
         {
-            foreach ($this->wheres as [$column, $value]) {
-                if (($row->{$column} ?? null) != $value) { // phpcs:ignore -- '900' from SQL vs 900 in PHP
+            foreach ($this->wheres as [$column, $operator, $value]) {
+                $actual = $row->{$column} ?? null;
+
+                $satisfied = match ($operator) {
+                    '>'     => $actual > $value,
+                    '>='    => $actual >= $value,
+                    '<'     => $actual < $value,
+                    '<='    => $actual <= $value,
+                    '!=',
+                    '<>'    => $actual != $value, // phpcs:ignore -- '900' from SQL vs 900 in PHP
+                    default => $actual == $value, // phpcs:ignore -- same reason
+                };
+
+                if (!$satisfied) {
                     return false;
                 }
             }

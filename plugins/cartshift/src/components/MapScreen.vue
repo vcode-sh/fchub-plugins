@@ -10,6 +10,25 @@
       <p>{{ state.error }}</p>
     </div>
 
+    <!-- Arrived from the subscription audit with a specific row to re-decide.
+         Saying which one is the whole point of the link: a catalogue of two
+         thousand rows and a remembered product ID is not navigation. -->
+    <div
+      v-if="migrationState.mapFocus"
+      class="notice notice-info inline"
+      data-map-focus
+      role="status"
+    >
+      <p>
+        The subscription audit sent you here to map
+        <strong>{{ migrationState.mapFocus.name || 'a product' }}</strong>
+        (WooCommerce product #{{ migrationState.mapFocus.wc_id }}).
+        <button type="button" class="button-link" data-action="clear-focus" @click="clearFocus()">
+          Dismiss
+        </button>
+      </p>
+    </div>
+
     <div class="cartshift-map-summary">
       <span><strong>{{ summary.total }}</strong> Woo products</span>
       <span><strong>{{ summary.decided }}</strong> of {{ summary.loaded }} decided</span>
@@ -91,6 +110,9 @@
               :row="row"
               @decide="(decision) => decide(row, decision)"
               @suggest="(id) => chooseCandidate(row, id)"
+              @search="openSearch(row)"
+              @choose-variation="(sourceId, targetId) => chooseVariation(row, sourceId, targetId)"
+              @share-target="(allowed) => (row.allow_shared_target = allowed)"
             />
           </tbody>
         </table>
@@ -109,6 +131,17 @@
         Continue
       </button>
       <button class="button" @click="actions.goToScreen('select')">Back</button>
+      <!-- The audit sends blocked subscription rows here to be re-decided, and
+           a one-way trip would leave the operator to find their way back by
+           memory. Saving a decision is a CartShift configuration write, so the
+           audit's numbers move when they return — which is the point. -->
+      <button
+        class="button"
+        data-action="subscription-audit"
+        @click="actions.goToScreen('subscription-audit')"
+      >
+        Back to the subscription audit
+      </button>
       <!-- reset() deliberately spares the staging table, so this is the only
            way a stale decision set ever stops governing later runs. -->
       <button class="button button-link-delete" data-action="clear" @click="confirmingClear = true">
@@ -117,6 +150,49 @@
     </p>
 
     <p v-if="state.loading" class="description">Loading products&hellip;</p>
+
+    <!-- The manual rescue. A row the matcher scored `none` has no dropdown, and
+         on Lapka that is both subscription products — so the whole target
+         catalogue is here, searchable, one click from the row. -->
+    <div v-if="searchingRow" class="cartshift-catalogue" data-catalogue-search>
+      <p>
+        <strong>{{ searchingRow.name }}</strong>
+        <span class="description">Pick the FluentCart product this becomes.</span>
+      </p>
+
+      <p>
+        <input
+          type="search"
+          class="regular-text"
+          placeholder="Search FluentCart products"
+          :value="state.catalogue.query"
+          @input="searchCatalogue($event.target.value)"
+        />
+        <button type="button" class="button" data-action="close-search" @click="searchingRow = null">
+          Close
+        </button>
+      </p>
+
+      <p v-if="state.catalogue.error" class="cartshift-map-refused">{{ state.catalogue.error }}</p>
+      <p v-else-if="state.catalogue.loading" class="description">Searching&hellip;</p>
+      <p v-else-if="!state.catalogue.products.length" class="description">
+        Nothing in FluentCart matches that.
+      </p>
+
+      <ul class="cartshift-catalogue-list">
+        <li v-for="product in state.catalogue.products" :key="product.id">
+          <button
+            type="button"
+            class="button-link"
+            :data-catalogue-product="product.id"
+            @click="pickProduct(product.id)"
+          >
+            {{ product.name }}
+          </button>
+          <span class="description">{{ product.variation_count }} variation(s)</span>
+        </li>
+      </ul>
+    </div>
 
     <ConfirmDialog
       :open="confirmingClear"
@@ -158,6 +234,9 @@ const {
   bulk,
   clearAll,
   chooseCandidate,
+  searchCatalogue,
+  chooseProduct,
+  chooseVariation,
   applyRunMode,
   runModeAvailable,
   bandRows,
@@ -166,6 +245,23 @@ const {
 } = useMapping();
 
 const confirmingClear = ref(false);
+
+// Which row the catalogue search is for. One at a time, because the answer is
+// a link for that product and nothing else.
+const searchingRow = ref(null);
+
+async function openSearch(row) {
+  searchingRow.value = row;
+  await searchCatalogue('');
+}
+
+async function pickProduct(fcPostId) {
+  const row = searchingRow.value;
+
+  searchingRow.value = null;
+
+  await chooseProduct(row, fcPostId);
+}
 
 // "Only what I mapped" and "everything since a date" are different modes of the
 // same scope, so one always discards the other. See runModeAvailable().
@@ -219,6 +315,21 @@ function continueToMigration() {
 async function doClear() {
   confirmingClear.value = false;
   await clearAll();
+}
+
+/**
+ * Dismiss the audit's "re-decide this row" pointer.
+ *
+ * Guarded on the action existing so a build whose wizard state predates the
+ * pointer degrades to hiding nothing rather than throwing on click.
+ */
+function clearFocus() {
+  if (actions.clearMapFocus) {
+    actions.clearMapFocus();
+    return;
+  }
+
+  migrationState.mapFocus = null;
 }
 
 // The same scope the run will use, so the screen presents the products that
