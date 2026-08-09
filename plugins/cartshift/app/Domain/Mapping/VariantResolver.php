@@ -125,8 +125,26 @@ final class VariantResolver
         return $remaining;
     }
 
+    /**
+     * Fold accents, lower-case, strip punctuation, collapse whitespace.
+     *
+     * The same fix ProductMatcher::normalizeTitle() carries, and it matters
+     * more here. Variant names are where a Polish shop's diacritics actually
+     * live — `Biały`, `Żółty`, `Zielony` — and this comparison is exact, not
+     * fuzzy: without folding, `Biały` simply is not `Bialy`, the name pass
+     * matches nothing, and every variant silently falls through to the
+     * position pass. Position-pairing an unordered pair of variants is the
+     * "XL revenue on the L row" failure this class exists to prevent, and it
+     * would have happened quietly, on the catalogues most likely to need it.
+     *
+     * remove_accents() is WordPress's own and transliterates rather than
+     * drops. It also ends this class's purity, deliberately — see the note in
+     * ProductMatcher::normalizeTitle().
+     */
     private static function normalizeName(string $name): string
     {
+        $name = remove_accents($name);
+
         $name = function_exists('mb_strtolower') ? mb_strtolower($name, 'UTF-8') : strtolower($name);
 
         $name = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $name) ?? '';

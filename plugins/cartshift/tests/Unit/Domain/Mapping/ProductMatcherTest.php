@@ -112,22 +112,29 @@ final class ProductMatcherTest extends PluginTestCase
     }
 
     /**
-     * The finding this fix round exists for, pinned with the reviewer's exact
-     * fixture: 601 is SKU-verified and STRONG on its own signals (title alone
-     * clears the strong-floor once paired with the SKU match). 602 has no SKU
-     * but a closer title, so its raw additive score is higher than 601's. A
+     * The finding this fix round exists for: 601 is SKU-verified and STRONG on
+     * its own signals (title alone clears the strong-floor once paired with the
+     * SKU match). 602 has no SKU but a closer title and matching price and
+     * variation count, so its raw additive score is higher than 601's. A
      * selector that picks by raw score alone hands the owner the unverified,
      * lower-trust candidate labelled "likely" while the verified STRONG match
      * sits unlabelled in ranked[1] — exactly backwards for a trust tier that
      * drives the mapping screen's bulk "link all N in this band" actions.
+     *
+     * The names moved when TITLE_STRONG_FLOOR rose from 0.50 to 0.55: the
+     * original fixture's 601 title scored 0.5455, which cleared the old floor
+     * and no longer clears the new one, so it stopped testing band precedence
+     * and started testing the floor. Same shape, numbers picked to sit clear of
+     * the boundary — 601 at 0.69 (STRONG via SKU, raw 1.04), 602 at 0.87
+     * (LIKELY, raw 1.07).
      */
     public function testASkuVerifiedStrongCandidateOutranksAHigherScoringLikelyOne(): void
     {
         $result = (new ProductMatcher())->match(
-            $this->woo('Bar Stool Oak Finish', 'BS-OAK-01', 89.0, 2),
+            $this->woo('Bar Stool Oak', 'BS-OAK-01', 89.0, 2),
             [
                 $this->candidate(601, 'Oak Bar Stool', 'BS-OAK-01', 129.0, 1),
-                $this->candidate(602, 'Bar Stool Oak Finish Set', '', 129.0, 1),
+                $this->candidate(602, 'Bar Stool Oak Set', '', 89.0, 2),
             ],
         );
 
@@ -170,6 +177,111 @@ final class ProductMatcherTest extends PluginTestCase
         );
 
         $this->assertSame(ProductMatcher::BAND_STRONG, $result['band']);
+    }
+
+    // ──────────────────────────────────────────────
+    // Polish, which is the catalogue this matcher actually has to work on
+    // ──────────────────────────────────────────────
+
+    /**
+     * The measurement that started this: similar_text() compares bytes, so
+     * before folding, `Żółć gęślą jaźń` against `Zolc gesla jazn` scored 0.00
+     * through normalizeTitle() and 0.308 raw. Folded, it is the same string.
+     *
+     * Price and variation count are deliberately mismatched so the score is the
+     * title similarity and nothing else — 1.0 here is a statement about the
+     * fold, not about the bonuses.
+     */
+    public function testAccentsAreTheOnlyDifferenceAndScoreOne(): void
+    {
+        foreach (
+            [
+                ['Żółć gęślą jaźń', 'Zolc gesla jazn'],
+                ['Żółty kabel USB', 'Zolty kabel USB'],
+                ['Stacja dokująca USB-C', 'Stacja dokujaca USB-C'],
+                ['Ręcznik plażowy duży', 'Recznik plazowy duzy'],
+                ['Zestaw śrubokrętów precyzyjnych', 'Zestaw srubokretow precyzyjnych'],
+            ] as [$wooName, $fcName]
+        ) {
+            $result = (new ProductMatcher())->match(
+                $this->woo($wooName, '', 10.0, 1),
+                [$this->candidate(940, $fcName, '', 99.0, 3)],
+            );
+
+            $this->assertSame(
+                1.0,
+                $result['score'],
+                "'{$wooName}' and '{$fcName}' differ only in accents and must fold to the same string.",
+            );
+        }
+    }
+
+    /**
+     * The whole point, stated as an outcome rather than a number: an accented
+     * Woo name and its unaccented FluentCart twin at the same price is the
+     * strongest evidence the matcher has, and before folding it was not even a
+     * candidate.
+     */
+    public function testAnAccentedNameMatchesItsUnaccentedTwinStrongly(): void
+    {
+        $result = (new ProductMatcher())->match(
+            $this->woo('Stacja dokująca USB-C 12w1', '', 249.0),
+            [$this->candidate(941, 'Stacja dokujaca USB-C 12w1', '', 249.0)],
+        );
+
+        $this->assertSame(ProductMatcher::BAND_STRONG, $result['band']);
+        $this->assertSame(941, $result['candidate_id']);
+    }
+
+    /**
+     * The two guesses the owner actually saw on the mapping screen, both real
+     * pairs from the reference install's 160-pair sweep, both scoring above the
+     * old 0.40 floor and below the measured 0.55 one. Neither product exists in
+     * both catalogues, so `weak` was never a hedge — it was wrong.
+     */
+    public function testTheTwoMeasuredFalsePositivesAreNoLongerCandidates(): void
+    {
+        foreach (
+            [
+                ['Kabel USB-C Premium', 'name your price demo'],          // 0.46, the sweep's ceiling
+                ['Koszulka WordPress Developer', 'name your price demo'], // 0.42
+                ['Ręcznik plażowy duży', 'payment plan product'],         // 0.45, folded corpus
+                ['Żółć gęślą jaźń', 'Fleece Jacket'],                     // 0.43, folded corpus
+            ] as [$wooName, $fcName]
+        ) {
+            $result = (new ProductMatcher())->match(
+                $this->woo($wooName, '', 19.0),
+                [$this->candidate(950, $fcName, '', 25.0)],
+            );
+
+            $this->assertSame(
+                ProductMatcher::BAND_NONE,
+                $result['band'],
+                "'{$wooName}' -> '{$fcName}' is a measured false positive and must not be offered.",
+            );
+            $this->assertNull($result['candidate_id']);
+        }
+    }
+
+    /**
+     * The gap has two sides, and a floor that only refuses things is easy to
+     * get right by refusing everything. The measured true-pair floor was 0.81,
+     * so a genuine pair whose wording differs as well as its accents still has
+     * to survive.
+     */
+    public function testAGenuinePairWithDifferentWordingStillSurvivesTheHigherFloor(): void
+    {
+        $result = (new ProductMatcher())->match(
+            $this->woo('Hosting WordPress Premium (WKRÓTCE)', '', 99.0),
+            [$this->candidate(951, 'Hosting WordPress Premium WKROTCE', '', 149.0)],
+        );
+
+        $this->assertNotSame(
+            ProductMatcher::BAND_NONE,
+            $result['band'],
+            'A real pair differing in punctuation and accents must clear the 0.55 floor comfortably.',
+        );
+        $this->assertSame(951, $result['candidate_id']);
     }
 
     /**

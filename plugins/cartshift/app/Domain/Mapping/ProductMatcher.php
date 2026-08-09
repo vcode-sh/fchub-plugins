@@ -37,10 +37,42 @@ final class ProductMatcher
     private const float PRICE_BONUS     = 0.15;
     private const float VARIATION_BONUS = 0.05;
 
+    /**
+     * Where the bands cut, and which of these numbers were measured.
+     *
+     * TITLE_WEAK is the one with evidence behind it. Every real Woo product
+     * name on the reference install was scored against every real FluentCart
+     * product name — 160 pairs, all genuine true negatives because the two
+     * catalogues share no products — giving max 0.46, p99 0.39, median 0.22.
+     * The two pairs above the old 0.40 floor were `Kabel USB-C Premium` ->
+     * `name your price demo` (0.46) and `Koszulka WordPress Developer` ->
+     * `name your price demo` (0.42), and both were seen on the mapping screen.
+     * Realistic true pairs — the same product with accents or wording
+     * differing — floored at 0.81. 0.55 sits 0.09 above the false ceiling and
+     * 0.26 below the true floor, and admits neither bad guess.
+     *
+     * The sweep was re-run after accent folding landed (see normalizeTitle):
+     * the ceiling stayed at 0.46, and a supplementary sweep over a properly
+     * accented Polish corpus also topped out at 0.46 with nothing above 0.55,
+     * so folding did not cost the gap. Folding does lift middling scores — the
+     * accented sweep went from two pairs over 0.40 to five — which is the
+     * reason 0.55 was re-measured rather than assumed.
+     *
+     * TITLE_STRONG_FLOOR is deliberately the same number: a SKU match is only
+     * corroborated by a title that would have been worth showing on its own,
+     * and a title below the weak floor is noise, not corroboration. Written as
+     * a reference rather than a repeated literal so the two cannot drift apart
+     * silently; give it its own value the day there is evidence they should
+     * differ.
+     *
+     * TITLE_LIKELY and TITLE_NEAR_IDENTICAL are inherited, not measured. They
+     * are left alone on purpose — moving a number without a reason is churn,
+     * and the next reader needs to know which of these four came from data.
+     */
     private const float TITLE_NEAR_IDENTICAL = 0.95;
-    private const float TITLE_STRONG_FLOOR   = 0.50;
+    private const float TITLE_STRONG_FLOOR   = self::TITLE_WEAK;
     private const float TITLE_LIKELY         = 0.70;
-    private const float TITLE_WEAK           = 0.40;
+    private const float TITLE_WEAK           = 0.55;
 
     /**
      * @param array{name: string, sku: string, price: float, variation_count: int}               $woo
@@ -165,13 +197,31 @@ final class ProductMatcher
     }
 
     /**
-     * Lower-case, strip punctuation, collapse whitespace.
+     * Fold accents, lower-case, strip punctuation, collapse whitespace.
      *
-     * Unicode-aware: an em dash and a hyphen are both separators, and a shop
-     * whose product names carry accents must not be reduced to noise.
+     * Folding first, and it is the whole reason this class is no longer pure.
+     * similar_text() compares bytes, so `ż` and `z` are not a near miss to it —
+     * they are two unrelated byte sequences of different lengths. Keeping the
+     * accents, which `\p{L}` happily does, scored `Żółć gęślą jaźń` against
+     * `Zolc gesla jazn` at 0.00 and `Żółty kabel USB` against `Zolty kabel USB`
+     * at 0.73. Folded, both are 1.00. On a Polish catalogue the matcher was not
+     * merely inaccurate, it was useless.
+     *
+     * remove_accents() is WordPress's own, transliterates rather than drops,
+     * and covers far more than Polish. Reaching for it trades this class's
+     * purity for correctness — deliberately, and stated here so the next reader
+     * does not "restore" it. The plugin calls sanitize_title(), get_option()
+     * and wc_get_product() elsewhere; a matcher that cannot be unit-tested
+     * without WordPress is a smaller cost than a matcher that cannot match the
+     * owner's catalogue.
+     *
+     * Unicode-aware after the fold too: an em dash and a hyphen are both
+     * separators, and a name that folds to nothing must not become noise.
      */
     private static function normalizeTitle(string $title): string
     {
+        $title = remove_accents($title);
+
         $title = function_exists('mb_strtolower') ? mb_strtolower($title, 'UTF-8') : strtolower($title);
 
         $title = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $title) ?? '';

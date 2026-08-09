@@ -97,6 +97,62 @@ final class VariantResolverTest extends PluginTestCase
         $this->assertSame([11, 12], $result['orphans']);
     }
 
+    /**
+     * The failure this class exists to prevent, arriving through the back door.
+     *
+     * The name pass is an exact comparison, so without accent folding `Biały`
+     * is simply not `Bialy`, nothing matches, and every variation falls through
+     * to position — which here pairs them in the wrong order, silently, and
+     * puts one colour's revenue on the other's row for ever. The FC variants
+     * are listed in the opposite order to the Woo ones precisely so that
+     * position-pairing gives a different, wrong answer.
+     */
+    public function testPolishVariantNamesMatchTheirUnaccentedTwinsRatherThanFallingToPosition(): void
+    {
+        $result = (new VariantResolver())->resolve(
+            [$this->v(11, '', 'Biały'), $this->v(12, '', 'Żółty')],
+            [$this->v(501, '', 'Zolty'), $this->v(502, '', 'Bialy')],
+        );
+
+        $this->assertSame(
+            [11 => 502, 12 => 501],
+            $result['map'],
+            'Position-pairing would have given [11 => 501, 12 => 502] — the wrong colour on each row.',
+        );
+        $this->assertSame([], $result['orphans']);
+    }
+
+    /**
+     * Both sides accented, differing only in case and punctuation — the normal
+     * case once a shop has been migrated once already and the names came back
+     * with their diacritics intact.
+     */
+    public function testAccentedNamesOnBothSidesStillMatch(): void
+    {
+        $result = (new VariantResolver())->resolve(
+            [$this->v(11, '', 'Rozmiar Duży'), $this->v(12, '', 'Rozmiar Średni')],
+            [$this->v(501, '', 'rozmiar sredni'), $this->v(502, '', 'ROZMIAR-DUŻY')],
+        );
+
+        $this->assertSame([11 => 502, 12 => 501], $result['map']);
+    }
+
+    /**
+     * Folding must not invent matches either. Two genuinely different Polish
+     * colours stay different once their accents are gone, so this falls to
+     * position — the honest answer — rather than pairing them by name.
+     */
+    public function testFoldingDoesNotCollapseTwoDifferentPolishNames(): void
+    {
+        $result = (new VariantResolver())->resolve(
+            [$this->v(11, '', 'Zielony')],
+            [$this->v(501, '', 'Żółty')],
+        );
+
+        // Position, and only because there is nothing else left to try.
+        $this->assertSame([11 => 501], $result['map']);
+    }
+
     public function testASimpleProductMapsItsSinglePseudoVariation(): void
     {
         // A Woo simple product is passed as one pseudo-variation keyed by the

@@ -177,7 +177,34 @@ final class VariationMapperTest extends PluginTestCase
         $result = $this->mapper->mapVariation($variation);
 
         $this->assertSame('Rosso / Large', $result['variation_title']);
-        $this->assertSame('rosso---large', $result['variation_identifier']);
+
+        // Was 'rosso---large', which is what the old byte-oriented sanitize_title()
+        // stub produced and what production never has. Real WordPress answers
+        // 'rosso-large' — verified on a live install — and the stub now agrees.
+        $this->assertSame('rosso-large', $result['variation_identifier']);
+    }
+
+    /**
+     * A Polish variant label has to reach `variation_identifier` transliterated,
+     * not deleted. sanitize_title() folds through remove_accents() before it
+     * strips anything, so 'Biały / Rozmiar XL' keeps every letter it has a Latin
+     * equivalent for. Verified against a live install, which answers
+     * 'bialy-rozmiar-xl' for exactly this input.
+     */
+    public function testAPolishVariationIdentifierIsTransliteratedNotStripped(): void
+    {
+        $GLOBALS['_cartshift_test_terms']['pa_color']['bialy'] = (object) ['name' => 'Biały'];
+        $GLOBALS['_cartshift_test_terms']['pa_size']['xl']     = (object) ['name' => 'Rozmiar XL'];
+
+        $variation = $this->createVariation([
+            'attributes' => ['attribute_pa_color' => 'bialy', 'attribute_pa_size' => 'xl'],
+        ]);
+
+        $result = $this->mapper->mapVariation($variation);
+
+        $this->assertSame('Biały / Rozmiar XL', $result['variation_title']);
+        $this->assertSame('bialy-rozmiar-xl', $result['variation_identifier']);
+        $this->assertStringNotContainsString('--', $result['variation_identifier']);
     }
 
     public function testAttributeTermLookupIsMemoised(): void

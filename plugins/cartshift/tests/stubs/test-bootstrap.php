@@ -46,6 +46,11 @@ if (!defined('CARTSHIFT_DB_VERSION')) {
 // WordPress function stubs
 // ──────────────────────────────────────────────
 
+// remove_accents() and sanitize_title() live apart, because they are the two
+// stubs whose fidelity anything actually depends on and the reasoning behind
+// them does not fit in a one-liner. See the file's own docblock.
+require_once __DIR__ . '/WpFormattingStubs.php';
+
 if (!function_exists('defined')) {
     // already a PHP built-in, no stub needed
 }
@@ -387,13 +392,6 @@ if (!function_exists('get_term_by')) {
     function get_term_by(string $field, string $value, string $taxonomy = ''): mixed
     {
         return $GLOBALS['_cartshift_test_terms'][$taxonomy][$value] ?? false;
-    }
-}
-
-if (!function_exists('sanitize_title')) {
-    function sanitize_title(string $title): string
-    {
-        return strtolower(preg_replace('/[^a-z0-9\-]/', '-', strtolower($title)));
     }
 }
 

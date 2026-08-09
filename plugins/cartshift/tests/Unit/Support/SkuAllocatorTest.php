@@ -121,6 +121,27 @@ final class SkuAllocatorTest extends PluginTestCase
     }
 
     /**
+     * A Polish SKU survives the clamp as characters, not as a severed byte.
+     *
+     * Two claims, both checked against the live schema rather than assumed.
+     * `fct_product_variations.sku` reports CHARACTER_MAXIMUM_LENGTH 30 with
+     * CHARACTER_OCTET_LENGTH 120 under utf8mb4, so varchar(30) counts the same
+     * units mb_substr does — MySQL's own `CAST('ŻÓŁTY-KABEL-USB-C-PREMIUM-XXL-EXTRA'
+     * AS CHAR(30))` returns exactly the string asserted here. And the result is
+     * still valid UTF-8, which a byte-wise substr() of this value would not be:
+     * 35 characters is 38 bytes, so strlen()-based cutting lands inside 'Ż'.
+     */
+    public function testAPolishSkuIsClampedToThirtyCharactersNotThirtyBytes(): void
+    {
+        $granted = (new SkuAllocator())->allocate('ŻÓŁTY-KABEL-USB-C-PREMIUM-XXL-EXTRA', 13);
+
+        $this->assertSame('ŻÓŁTY-KABEL-USB-C-PREMIUM-XXL-', $granted);
+        $this->assertSame(30, mb_strlen($granted));
+        $this->assertTrue(mb_check_encoding($granted, 'UTF-8'), 'The clamp cut inside a multibyte sequence.');
+        $this->assertGreaterThan(30, strlen('ŻÓŁTY-KABEL-USB-C-PREMIUM-XXL-EXTRA'));
+    }
+
+    /**
      * The collision callback is how ProductMigrator writes its SkuCollision log
      * line, and it must fire only when a suffix was actually needed — a
      * warning for every SKU in the catalogue is a warning for none of them.
