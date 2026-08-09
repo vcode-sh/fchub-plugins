@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'plugins/**'
+      - '!plugins/fchub-stream/**'
       - 'web-docs/lib/versions.json'
       - '.github/workflows/ci.yml'
       - '.github/workflows/ci-memberships-contract.test.mjs'

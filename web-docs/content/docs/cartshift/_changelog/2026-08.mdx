@@ -1,0 +1,83 @@
+### v1.4.1
+
+*Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/cartshift/v1.4.1)
+
+Three fixes to the mapping feature that shipped hours earlier, all found by review rather than by anyone's store breaking. Worth taking if you are on 1.4.0.
+
+- **Mappings now respect the run's scope.** If you mapped your whole catalogue and then ran a partial migration, promotion still touched every mapped product — adding variants to FluentCart products the run was never going to migrate. It now skips them and says so.
+- **SKUs no longer need the mbstring extension.** Any non-empty SKU could fatal on a host without it. The fallback is character-safe, so a Polish or accented SKU is not sliced in half.
+- **Variants pair by the order you see.** The fallback that matches variations by position was using creation order, not FluentCart's display order. If you had ever reordered your variants, history could land on the wrong one.
+
+<Separator className="my-8" />
+
+### v1.4.0
+
+*Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/cartshift/v1.4.0)
+
+CartShift used to assume FluentCart was empty. If you had already rebuilt your catalogue by hand — properly, with the pricing model FluentCart actually supports — it cheerfully built you a second one and attached eight years of order history to the copy.
+
+Now you can tell it which product is which.
+
+#### Product mapping
+
+A new step in the wizard, between choosing what to migrate and running it. Every WooCommerce product gets a row: link it to the FluentCart product you already made, let CartShift create it, or skip it entirely.
+
+The matcher suggests candidates and sorts them into confidence bands — same SKU or same name and price lands in **Strong**, a similar name in **Likely**, anything it is not sure about goes to **No candidate** rather than offering you a bad guess. Nothing links itself. Every band has a bulk button, so a catalogue of three hundred is not three hundred clicks.
+
+Orders, subscriptions, coupons and downloads all follow the mapping automatically. Rollback only removes what CartShift created, so a product you built by hand survives untouched.
+
+If a WooCommerce variation has no counterpart, CartShift adds one to your product — priced from the source, and flagged so a rollback takes it back out. The row tells you before you commit. A dry run adds nothing at all.
+
+The step is skipped entirely when FluentCart is empty, which is most first migrations.
+
+#### Accented product names
+
+The matcher compared text byte by byte, so `Żółty kabel` and `Zolty kabel` scored as different products and a Polish catalogue matched nothing at all. Names are now folded before comparison, and the confidence thresholds were re-measured against real catalogues rather than guessed.
+
+The same bug sat in variation matching, where it mattered more: unable to pair `Biały` with `Bialy`, it fell back to matching by position and could put one variation's sales on another's row.
+
+#### Fixes found while testing the above
+
+- Every migrated order tried to write a column FluentCart does not have. Harmless to your data, but it failed silently on all of them.
+- Database write failures never reached the error count, so a run could report *0 errors, Success* while the log filled up. That is how the bug above went unnoticed.
+- Rolling back could leave one of your own products advertising a price none of its variants had.
+
+<Separator className="my-8" />
+
+### v1.3.1
+
+*Released 8 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/cartshift/v1.3.1)
+
+Fixed the admin layout, which had been quietly overflowing sideways on narrower screens, and rebuilt the bundle that ships with it — the previous release had shipped a stale one, so the fix was in the source and not on your screen.
+
+The rest is housekeeping you will never see: one product-type rule where there had been four copies, one column allow-list where there had been three, and a dead method removed. Four copies of the same rule is three chances for the progress bar to disagree with itself.
+
+<Separator className="my-8" />
+
+### v1.3.0
+
+*Released 7 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/cartshift/v1.3.0)
+
+Migration stopped being all-or-nothing.
+
+#### Choose what moves
+
+Three modes: everything, everything from a date, or a hand-picked set of products and customers. The picker searches by name, SKU or email rather than dumping a fifty-thousand-order catalogue on the page.
+
+#### And what that costs you
+
+Picking a subset has consequences, and CartShift now states them before you start instead of letting you discover them afterwards. A receipt panel counts what your choice actually drags in — pick a product and the orders containing it come too, unless you say otherwise — and names what gets left behind.
+
+A run that would migrate nothing is refused outright, with the reason, rather than reporting a cheerful zero.
+
+<Separator className="my-8" />
+
+### v1.2.2
+
+*Released 7 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/cartshift/v1.2.2)
+
+Dry run started telling the truth.
+
+It had been reporting problems the real run would not have had. Each batch runs in its own request, so by the time a dry run reached your orders it had forgotten the products it validated a moment earlier and declared every reference broken. It now remembers, inside its own sandbox, and still writes nothing to FluentCart.
+
+Also in this release: coupons restricted to particular products now resolve those restrictions correctly instead of quietly widening to your whole shop; preflight warns when a WooCommerce entitlement bridge is active; and unsupported product types are reported with the number of orders that reference them, so "we cannot migrate these four products" comes with the number of orders it affects.
