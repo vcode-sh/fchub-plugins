@@ -140,11 +140,36 @@ test("WordPress.org targets never receive the shared updater", () => {
   assert.match(syncStep, /needs\.prepare\.outputs\.is_wporg != 'true'/);
 });
 
-test("Stream is absent from WordPress.org package matrices and path triggers", () => {
+test("Stream is excluded from the path triggers, in the order that makes it work", () => {
   assert.doesNotMatch(job(ci, "wporg-package"), /fchub-stream/);
+
   const pullRequestPaths = ci.match(
-    /pull_request:\n\s+paths:\n([\s\S]*?)(?=\n\njobs:)/,
+    /pull_request:\n\s+paths:\n((?:\s+- .*\n)+)/,
   )?.[1];
-  assert.ok(pullRequestPaths);
-  assert.doesNotMatch(pullRequestPaths, /fchub-stream/);
+  assert.ok(pullRequestPaths, "Expected a paths filter on the pull request trigger");
+
+  const entries = [...pullRequestPaths.matchAll(/^\s+- '([^']+)'$/gm)].map((m) => m[1]);
+  assert.ok(entries.length > 0, "Expected quoted path entries");
+
+  assert.deepEqual(
+    entries.filter((e) => !e.startsWith("!") && e.includes("fchub-stream")),
+    [],
+    "Stream is abandoned: nothing may include it",
+  );
+
+  // GitHub applies these in sequence — a negative pattern excludes only what an
+  // earlier positive one matched, and a later positive one puts it back. So the
+  // exclusion has to sit after plugins/**, and nothing under plugins/ may follow
+  // it. Assert the ordering, not merely the presence: a correct-looking list in
+  // the wrong order silently runs the whole matrix on every Stream commit.
+  const wildcard = entries.indexOf("plugins/**");
+  const exclusion = entries.indexOf("!plugins/fchub-stream/**");
+  assert.notEqual(wildcard, -1, "Expected the plugins/** trigger");
+  assert.notEqual(exclusion, -1, "Expected Stream to be excluded from plugins/**");
+  assert.ok(exclusion > wildcard, "the exclusion must follow the pattern it narrows");
+  assert.deepEqual(
+    entries.slice(exclusion + 1).filter((e) => e.startsWith("plugins/")),
+    [],
+    "a later positive plugins/ pattern would re-include Stream",
+  );
 });
