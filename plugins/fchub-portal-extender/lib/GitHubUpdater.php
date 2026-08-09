@@ -13,6 +13,8 @@
  * @package FCHub
  */
 
+defined('ABSPATH') || exit;
+
 if (!class_exists('FCHub_GitHub_Updater')) {
 
 class FCHub_GitHub_Updater
