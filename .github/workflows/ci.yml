@@ -1,6 +1,14 @@
 name: CI
 
 on:
+  # Pushes to main run the same gates as a pull request.
+  #
+  # Without this the matrix only ever ran on pull requests, so anything landed
+  # directly on main — a release, a hotfix — was verified locally or not at
+  # all. A phpcs breakage lived on main for hours that way, invisible until
+  # somebody happened to run it by hand.
+  push:
+    branches: [main]
   pull_request:
     paths:
       - 'plugins/**'
@@ -136,6 +144,13 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
+          # On a push there is no pull_request.base.sha, so the diff would be
+          # empty and every step below would skip while reporting success. A
+          # push to main runs the lot.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "count=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "${{ matrix.plugin }}" = "fchub-memberships" ]; then
             CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/${{ matrix.plugin }}/ web-docs/lib/versions.json | wc -l)
           else
@@ -235,6 +250,13 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
+          # On a push there is no pull_request.base.sha, so the diff would be
+          # empty and every step below would skip while reporting success. A
+          # push to main runs the lot.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "count=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/cartshift/ | wc -l)
           echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
 
@@ -313,6 +335,13 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
+          # On a push there is no pull_request.base.sha, so the diff would be
+          # empty and every step below would skip while reporting success. A
+          # push to main runs the lot.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "count=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/fchub-memberships/ | wc -l)
           echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
 
@@ -396,6 +425,13 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
+          # On a push there is no pull_request.base.sha, so the diff would be
+          # empty and every step below would skip while reporting success. A
+          # push to main runs the lot.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "count=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/fchub-portal-extender/ | wc -l)
           echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
 
