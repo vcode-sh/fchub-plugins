@@ -96,6 +96,7 @@ final class MigrationErrorCodeTest extends PluginTestCase
             'orphan_variant_not_created',
             'mapped_variant_not_on_product',
             'mapped_product_has_no_downloads',
+            'mapped_product_out_of_scope',
             'database_write_failed',
         ];
 

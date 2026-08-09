@@ -48,6 +48,9 @@ final class ScopeResolver
     /** @var list<int>|null */
     private ?array $closedProductIds = null;
 
+    /** @var array<int, true>|null */
+    private ?array $closedProductIndex = null;
+
     private bool $exceeded = false;
 
     public function __construct(
@@ -121,6 +124,47 @@ final class ScopeResolver
         }
 
         return ScopePredicate::intIn($column, $this->closedProductIds());
+    }
+
+    /**
+     * Is this one WooCommerce product inside the run's catalogue selection?
+     *
+     * productPredicate() in PHP rather than in SQL, and deliberately the same
+     * answer: a caller holding one id in hand — MappingPromoter, deciding
+     * whether to promote a mapping decision — must not grow a second opinion
+     * about what "in scope" means. Anything that widens or narrows
+     * productPredicate() has to move this with it, which is why they live
+     * three lines apart.
+     *
+     * Two of the three modes are answered without touching the database, and
+     * that is not an optimisation, it is what the modes mean:
+     *
+     *  - **Everything** takes the whole catalogue. Filtering would be a pure
+     *    narrowing of a run that asked for no narrowing at all.
+     *  - **Since** also takes the whole catalogue. Products are not selected by
+     *    the date and never were — see productPredicate()'s note, and open
+     *    question 1 in the design spec. A date-limited run migrates every
+     *    product precisely so an in-scope order can never reference one that
+     *    did not arrive, so *every* mapped product is in scope for it, and a
+     *    per-decision "which orders touched this product" query would be
+     *    expensive, and would also be answering the wrong question.
+     *  - **Explicit** is the only mode that bounds the catalogue, and the bound
+     *    is closedProductIds() — memoised, at most two queries per request, and
+     *    already paid for by productPredicate() on any run that reads products.
+     *
+     * Flipped into a lookup table once rather than in_array()'d per call: the
+     * closure runs to MAX_CLOSURE_IDS entries and promotion asks this question
+     * once per staged decision.
+     */
+    public function includesProduct(int $wcProductId): bool
+    {
+        if ($this->scope->mode() !== MigrationScope::MODE_EXPLICIT) {
+            return true;
+        }
+
+        $this->closedProductIndex ??= array_fill_keys($this->closedProductIds(), true);
+
+        return isset($this->closedProductIndex[$wcProductId]);
     }
 
     /**

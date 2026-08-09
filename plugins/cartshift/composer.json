@@ -13,6 +13,9 @@
     "require": {
         "php": ">=8.3"
     },
+    "suggest": {
+        "ext-mbstring": "Character-accurate SKU, coupon-code and variant-name handling. Deliberately not required: every call site falls back to PCRE with /u, which is UTF-8 safe without it."
+    },
     "require-dev": {
         "phpunit/phpunit": "^13.0",
         "php-stubs/wordpress-stubs": "^6.7",

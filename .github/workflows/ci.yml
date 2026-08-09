@@ -28,13 +28,25 @@ on:
       - 'build.sh'
       - 'lib/GitHubUpdater.php'
 
+permissions:
+  contents: read
+
+# Three pushes to a branch used to start three full matrices and let all three
+# run to the end. Only the newest one is telling you anything.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   workflow-contract:
     name: Workflow contract
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -56,6 +68,7 @@ jobs:
   phpunit:
     name: PHPUnit (${{ matrix.plugin }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         include:
@@ -89,12 +102,15 @@ jobs:
           - plugin: fchub-p24
             php_version: '8.5'
             fetch_depth: 0
-          # Retain the discontinued Stream marker for the reversible-hiatus
-          # contract. Its depth-1 checkout deliberately keeps the existing
-          # change detector inert, so this does not resume Stream testing.
-          - plugin: fchub-stream
-            php_version: '8.3'
-            fetch_depth: 1
+          # Twenty-three passing tests that nothing was running. It has a
+          # phpunit.xml and a composer.json and simply never reached this
+          # matrix — the same gap CartShift sat in until #134.
+          - plugin: fchub-thank-you
+            php_version: '8.4'
+            fetch_depth: 0
+          - plugin: fchub-thank-you
+            php_version: '8.5'
+            fetch_depth: 0
           - plugin: fchub-wishlist
             php_version: '8.4'
             fetch_depth: 0
@@ -105,6 +121,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: ${{ matrix.fetch_depth }}
 
       - name: Check for changes
@@ -157,6 +174,7 @@ jobs:
   wporg-package:
     name: WordPress.org package (${{ matrix.plugin }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -169,6 +187,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -191,10 +211,12 @@ jobs:
   vite-build-cartshift:
     name: Vite Build (cartshift)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           # Depth 0 for the same reason as every other job here: `Check for
           # changes` diffs against the pull request base, which a depth-1
           # checkout does not contain, so the count comes back zero and the job
@@ -267,10 +289,12 @@ jobs:
   vite-build-memberships:
     name: Vite Build (fchub-memberships)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           # `Check for changes` below diffs against the pull request base, which
           # a depth-1 checkout does not contain: the diff fails, the count comes
           # back zero, and every gate here skips itself while the job reports
@@ -348,10 +372,12 @@ jobs:
   vite-build-portal-extender:
     name: Vite Build (fchub-portal-extender)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           # `Check for changes` below diffs against the pull request base, which
           # a depth-1 checkout does not contain: the diff fails, the count comes
           # back zero, and every gate here skips itself while the job reports
@@ -396,82 +422,15 @@ jobs:
 
           echo "Build validation passed: $JS_COUNT JS file(s) in assets/dist/"
 
-  vite-build-stream:
-    name: Vite Build (fchub-stream)
-    runs-on: ubuntu-latest
-    steps:
-      # No fetch-depth here, deliberately. Stream is discontinued and must not
-      # be built or tested; a depth-1 checkout cannot reach the pull request
-      # base, so the change count stays zero and every step below skips. The
-      # job remains because the repository asserts Stream is still here for a
-      # possible return, not because anything is expected to run.
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Check for changes
-        id: changes
-        run: |
-          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD -- plugins/fchub-stream/ | wc -l)
-          echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Node.js
-        if: steps.changes.outputs.count > 0
-        uses: actions/setup-node@v7
-        with:
-          node-version: '26'
-
-      - name: Build admin-app
-        if: steps.changes.outputs.count > 0
-        working-directory: plugins/fchub-stream/admin-app
-        run: |
-          npm ci
-          npm run build
-
-      - name: Validate admin-app build
-        if: steps.changes.outputs.count > 0
-        run: |
-          if [ ! -d "plugins/fchub-stream/admin/dist" ] || [ -z "$(ls -A plugins/fchub-stream/admin/dist)" ]; then
-            echo "::error::admin-app build produced no output in admin/dist/"
-            exit 1
-          fi
-
-          JS_COUNT=$(find plugins/fchub-stream/admin/dist -name "*.js" | wc -l)
-          if [ "$JS_COUNT" -eq 0 ]; then
-            echo "::error::No JS files found in admin/dist/"
-            exit 1
-          fi
-
-          echo "admin-app build validation passed: $JS_COUNT JS file(s)"
-
-      - name: Build portal-app
-        if: steps.changes.outputs.count > 0
-        working-directory: plugins/fchub-stream/portal-app
-        run: |
-          npm ci
-          npm run build
-
-      - name: Validate portal-app build
-        if: steps.changes.outputs.count > 0
-        run: |
-          if [ ! -d "plugins/fchub-stream/portal-app/dist" ] || [ -z "$(ls -A plugins/fchub-stream/portal-app/dist)" ]; then
-            echo "::error::portal-app build produced no output in portal-app/dist/"
-            exit 1
-          fi
-
-          JS_COUNT=$(find plugins/fchub-stream/portal-app/dist -name "*.js" | wc -l)
-          if [ "$JS_COUNT" -eq 0 ]; then
-            echo "::error::No JS files found in portal-app/dist/"
-            exit 1
-          fi
-
-          echo "portal-app build validation passed: $JS_COUNT JS file(s)"
-
   repository-contract:
     name: Repository contract (catalogue, docs)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v7

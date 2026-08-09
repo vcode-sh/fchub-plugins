@@ -6,6 +6,7 @@ namespace CartShift\Tests\Unit\Domain\Migration;
 
 use CartShift\Domain\Migration\MappingPromoter;
 use CartShift\Domain\Migration\MigrationOrchestratorFactory;
+use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Migrator\ProductMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
@@ -933,6 +934,28 @@ final class MigrationOrchestratorFactoryTest extends PluginTestCase
         $this->assertCount(2, $rows);
     }
 
+    /**
+     * Skipped, not warned: the owner narrowed the run and promotion obeyed, so
+     * nothing is wrong. Recorded anyway, because a link the owner drafted and
+     * then did not see happen is otherwise indistinguishable from one that
+     * failed — and a stale mapping is the likeliest reason a re-run appears to
+     * "do nothing".
+     */
+    public function testAnOutOfScopeLinkIsLoggedAsHousekeepingNotAsAWarning(): void
+    {
+        $rows = [];
+        $this->driveLogThrough($rows);
+
+        MigrationOrchestratorFactory::logOutOfScopeLinksOnce($this->log(), 'run-1', [77]);
+        MigrationOrchestratorFactory::logOutOfScopeLinksOnce($this->log(), 'run-1', [77]);
+
+        $this->assertCount(1, $rows, 'Promotion re-enters on every batch tick.');
+        $this->assertSame(Constants::ENTITY_PRODUCT, $rows[0]['entity_type']);
+        $this->assertSame('77', $rows[0]['wc_id']);
+        $this->assertSame('skipped', $rows[0]['status']);
+        $this->assertSame(MigrationErrorCode::MappedProductOutOfScope->value, $rows[0]['error_code']);
+    }
+
     // ── Assembly and promotion timing ───────────────────────
 
     /**
@@ -1257,5 +1280,57 @@ final class MigrationOrchestratorFactoryTest extends PluginTestCase
 
         $this->assertSame(1, $this->firstIdMapRealm());
         $this->assertTrue($idMap->isSimulating());
+    }
+
+    // ── Which products promotion covers ─────────────────────
+
+    /**
+     * The run's scope reaches promotion, and it comes from MigrationState.
+     *
+     * This is the wiring MappingPromoterScopeTest cannot see: the promoter is
+     * handed a resolver by whoever calls it, and this class is the only caller.
+     * Built fresh on every promote() rather than held, because a later batch is
+     * a different request reading state for itself — the same rule
+     * AbstractMigrator::scopeResolver() follows.
+     */
+    public function testPromotionCoversOnlyTheProductsTheRunsScopeSelects(): void
+    {
+        $stored = [];
+        $this->stubStagingTable([$this->linkRow(42, 900)], $stored);
+
+        $state = new MigrationState();
+        $state->start(['product'], false, MigrationScope::fromArray([
+            'mode'        => 'explicit',
+            'product_ids' => [99],
+        ]));
+
+        $promotion = $this->factory($state)->promote((string) $state->getMigrationId());
+
+        $this->assertSame([42], $promotion['outOfScope']);
+        $this->assertSame(0, $promotion['linked']);
+        $this->assertSame([], $stored, 'A run that never migrates product 42 must not link it either.');
+    }
+
+    /**
+     * And the other direction, because a filter that is too eager is the
+     * regression this pair exists to catch: the same staged link, the same
+     * explicit mode, this time with the product actually picked.
+     */
+    public function testPromotionStillCoversAProductTheScopeDoesSelect(): void
+    {
+        $stored = [];
+        $this->stubStagingTable([$this->linkRow(42, 900)], $stored);
+
+        $state = new MigrationState();
+        $state->start(['product'], false, MigrationScope::fromArray([
+            'mode'        => 'explicit',
+            'product_ids' => [42],
+        ]));
+
+        $promotion = $this->factory($state)->promote((string) $state->getMigrationId());
+
+        $this->assertSame([], $promotion['outOfScope']);
+        $this->assertSame(1, $promotion['linked']);
+        $this->assertSame([Constants::ENTITY_PRODUCT, '42', 900], array_slice($stored[0], 0, 3));
     }
 }

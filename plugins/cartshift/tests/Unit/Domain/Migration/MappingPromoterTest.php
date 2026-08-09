@@ -6,6 +6,8 @@ namespace CartShift\Tests\Unit\Domain\Migration;
 
 use CartShift\Domain\Mapping\ProductMapDecision;
 use CartShift\Domain\Migration\MappingPromoter;
+use CartShift\Domain\Scope\MigrationScope;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\ProductMapRepository;
 use CartShift\Support\Constants;
@@ -118,6 +120,20 @@ final class MappingPromoterTest extends PluginTestCase
         };
     }
 
+    /**
+     * The scope every test here runs under unless it is about scoping.
+     *
+     * "Everything" is the mode MigrationScope falls back to for any unusable
+     * input, so it is also the one a bug in scope handling is least likely to
+     * be caught by accident under — which is why the scope filter has its own
+     * test class rather than being asserted from here. ScopeResolver issues no
+     * query at all in this mode, so no $wpdb stubbing is needed for it.
+     */
+    private static function everythingScope(): ScopeResolver
+    {
+        return new ScopeResolver(MigrationScope::everything());
+    }
+
     private function idMap(): IdMapRepository
     {
         return new IdMapRepository();
@@ -188,7 +204,7 @@ final class MappingPromoterTest extends PluginTestCase
             $this->mapRepo([ProductMapDecision::link(42, 'simple', 900, 'strong', [42 => 777])]),
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame(1, $result['linked']);
         $this->assertSame(1, $result['variants']);
@@ -215,7 +231,7 @@ final class MappingPromoterTest extends PluginTestCase
             ]),
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame(3, $result['variants']);
         $this->assertCount(4, $this->stored);
@@ -229,7 +245,7 @@ final class MappingPromoterTest extends PluginTestCase
             targetExists: false,
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame(0, $result['linked']);
         $this->assertSame([900], $result['dead']);
@@ -241,7 +257,7 @@ final class MappingPromoterTest extends PluginTestCase
         $map = $this->mapRepo([ProductMapDecision::link(42, 'simple', 900, 'strong', [42 => 777])]);
 
         $first = $this->promoter($map);
-        $first->promote('run-1');
+        $first->promote('run-1', self::everythingScope());
 
         // A resumed run is a fresh REST or Action Scheduler request, not a
         // continuation of the same process — IdMapRepository's own docblock
@@ -256,7 +272,7 @@ final class MappingPromoterTest extends PluginTestCase
         // first promote()'s row, so it must answer "already promoted" from
         // the query itself, not from memory.
         $resumed = $this->promoter($map);
-        $second  = $resumed->promote('run-1');
+        $second  = $resumed->promote('run-1', self::everythingScope());
 
         $this->assertSame(0, $second['linked'], 'A resumed run must not double-promote.');
         $this->assertCount(2, $this->stored);
@@ -271,7 +287,7 @@ final class MappingPromoterTest extends PluginTestCase
             ]),
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame([7, 9], $result['skipped']);
         $this->assertSame([], $this->stored);
@@ -283,7 +299,7 @@ final class MappingPromoterTest extends PluginTestCase
             $this->mapRepo([ProductMapDecision::create(7, 'simple', 'none')]),
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame(0, $result['linked']);
         $this->assertSame([], $result['skipped']);
@@ -310,7 +326,7 @@ final class MappingPromoterTest extends PluginTestCase
             ownVariantIds: [501],
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame(1, $result['variants'], 'Only the variant that belongs to the product may be written.');
         $this->assertSame([12], $result['foreign'], 'Keyed on the WooCommerce variation — the row to go and remap.');
@@ -335,7 +351,7 @@ final class MappingPromoterTest extends PluginTestCase
             ownVariantIds: [],
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame(0, $result['variants']);
         $this->assertSame([42], $result['foreign']);
@@ -353,7 +369,7 @@ final class MappingPromoterTest extends PluginTestCase
             ownVariantIds: [],
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame(1, $result['linked']);
         $this->assertSame(
@@ -369,7 +385,7 @@ final class MappingPromoterTest extends PluginTestCase
             ownVariantIds: [501, 502, 503],
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame(2, $result['variants']);
         $this->assertSame([], $result['foreign']);
@@ -393,7 +409,7 @@ final class MappingPromoterTest extends PluginTestCase
             downloadsLost: true,
         );
 
-        $result = $promoter->promote('run-1');
+        $result = $promoter->promote('run-1', self::everythingScope());
 
         $this->assertSame([99], $result['fileless'], 'Keyed on the WooCommerce product, where the files are.');
         $this->assertSame(1, $result['linked'], 'A warning, not a refusal — the history still has to migrate.');
@@ -405,7 +421,7 @@ final class MappingPromoterTest extends PluginTestCase
             $this->mapRepo([ProductMapDecision::link(99, 'simple', 900, 'strong', [99 => 777])]),
         );
 
-        $this->assertSame([], $promoter->promote('run-1')['fileless']);
+        $this->assertSame([], $promoter->promote('run-1', self::everythingScope())['fileless']);
     }
 
     /**
@@ -418,8 +434,8 @@ final class MappingPromoterTest extends PluginTestCase
     {
         $map = $this->mapRepo([ProductMapDecision::link(99, 'simple', 900, 'strong', [99 => 777])]);
 
-        $this->promoter($map, downloadsLost: true)->promote('run-1');
-        $second = $this->promoter($map, downloadsLost: true)->promote('run-1');
+        $this->promoter($map, downloadsLost: true)->promote('run-1', self::everythingScope());
+        $second = $this->promoter($map, downloadsLost: true)->promote('run-1', self::everythingScope());
 
         $this->assertSame([], $second['fileless']);
         $this->assertSame([], $second['foreign']);

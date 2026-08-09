@@ -6,6 +6,8 @@ namespace CartShift\Tests\Unit\Domain\Migration;
 
 use CartShift\Domain\Mapping\ProductMapDecision;
 use CartShift\Domain\Migration\MappingPromoter;
+use CartShift\Domain\Scope\MigrationScope;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\ProductMapRepository;
 use CartShift\Support\Constants;
@@ -147,6 +149,20 @@ final class MappingPromoterOrphanTest extends PluginTestCase
         return $repo;
     }
 
+    /**
+     * The scope every test here runs under unless it is about scoping.
+     *
+     * "Everything" is the mode MigrationScope falls back to for any unusable
+     * input, so it is also the one a bug in scope handling is least likely to
+     * be caught by accident under — which is why the scope filter has its own
+     * test class rather than being asserted from here. ScopeResolver issues no
+     * query at all in this mode, so no $wpdb stubbing is needed for it.
+     */
+    private static function everythingScope(): ScopeResolver
+    {
+        return new ScopeResolver(MigrationScope::everything());
+    }
+
     /** @param list<ProductMapDecision> $decisions */
     private function promoter(
         array $decisions,
@@ -240,7 +256,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
             [['id' => 13, 'sku' => 'TS-XL', 'name' => 'XL']],
         );
 
-        $result = $this->promoter([$decision])->promote('run-1');
+        $result = $this->promoter([$decision])->promote('run-1', self::everythingScope());
 
         $this->assertSame(1, $result['added']);
         $this->assertSame([[900, 'XL']], $this->created);
@@ -266,7 +282,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
             [['id' => 13, 'sku' => '', 'name' => 'XL']],
         );
 
-        $this->promoter([$decision])->promote('run-1');
+        $this->promoter([$decision])->promote('run-1', self::everythingScope());
 
         $this->assertFalse(
             $this->row(Constants::ENTITY_PRODUCT, '42')[4],
@@ -285,7 +301,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
             [['id' => 13, 'sku' => '', 'name' => 'XL']],
         );
 
-        $result = $this->promoter([$decision], static fn (int $p, array $o): ?int => null)->promote('run-1');
+        $result = $this->promoter([$decision], static fn (int $p, array $o): ?int => null)->promote('run-1', self::everythingScope());
 
         $this->assertSame(0, $result['added']);
         $this->assertCount(1, $this->stored, 'Only the product row; a null variant must not be stored.');
@@ -295,7 +311,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
     {
         $decision = ProductMapDecision::link(42, 'simple', 900, 'strong', [42 => 777]);
 
-        $result = $this->promoter([$decision])->promote('run-1');
+        $result = $this->promoter([$decision])->promote('run-1', self::everythingScope());
 
         $this->assertSame(0, $result['added']);
         $this->assertSame([], $this->created);
@@ -315,7 +331,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
      */
     public function testADryRunNeverCreatesAFluentCartVariant(): void
     {
-        $result = $this->promoter([$this->linkWithOneOrphan()], simulating: true)->promote('run-dry');
+        $result = $this->promoter([$this->linkWithOneOrphan()], simulating: true)->promote('run-dry', self::everythingScope());
 
         $this->assertSame(
             [],
@@ -334,7 +350,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
      */
     public function testADryRunMintsASyntheticVariationIdInstead(): void
     {
-        $this->promoter([$this->linkWithOneOrphan()], simulating: true)->promote('run-dry');
+        $this->promoter([$this->linkWithOneOrphan()], simulating: true)->promote('run-dry', self::everythingScope());
 
         $orphanRow = $this->row(Constants::ENTITY_VARIATION, '13');
 
@@ -344,7 +360,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
 
     public function testEveryRowADryRunPromotesIsFlaggedSimulated(): void
     {
-        $this->promoter([$this->linkWithOneOrphan()], simulating: true)->promote('run-dry');
+        $this->promoter([$this->linkWithOneOrphan()], simulating: true)->promote('run-dry', self::everythingScope());
 
         $this->assertCount(3, $this->stored);
 
@@ -362,14 +378,14 @@ final class MappingPromoterOrphanTest extends PluginTestCase
      */
     public function testARealRunAfterARehearsalStillPromotesAndCreatesForReal(): void
     {
-        $this->promoter([$this->linkWithOneOrphan()], simulating: true)->promote('run-dry');
+        $this->promoter([$this->linkWithOneOrphan()], simulating: true)->promote('run-dry', self::everythingScope());
 
         $this->assertSame([], $this->created);
 
         // The staging table survives a dry run untouched, so the same decision
         // is still there — a fresh promoter reads it exactly as the next
         // request would.
-        $result = $this->promoter([$this->linkWithOneOrphan()])->promote('run-1');
+        $result = $this->promoter([$this->linkWithOneOrphan()])->promote('run-1', self::everythingScope());
 
         $this->assertSame(1, $result['linked'], 'A rehearsal must not convince the real run the work is done.');
         $this->assertSame([[900, 'XL']], $this->created);
@@ -401,7 +417,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
      */
     public function testTheProductRowIsWrittenAfterEverythingTheDecisionImplies(): void
     {
-        $this->promoter([$this->linkWithOneOrphan()])->promote('run-1');
+        $this->promoter([$this->linkWithOneOrphan()])->promote('run-1', self::everythingScope());
 
         $entityTypes = array_column($this->stored, 0);
 
@@ -440,7 +456,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
         };
 
         try {
-            $this->promoter([$decision], $interrupted)->promote('run-1');
+            $this->promoter([$decision], $interrupted)->promote('run-1', self::everythingScope());
             $this->fail('Fixture check: the creator was supposed to blow up.');
         } catch (\RuntimeException) {
             // The tick died. Everything below is the next one.
@@ -451,7 +467,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
             'The product row is the completion marker; an interrupted decision has not completed.',
         );
 
-        $second = $this->promoter([$decision])->promote('run-1');
+        $second = $this->promoter([$decision])->promote('run-1', self::everythingScope());
 
         $this->assertSame(1, $second['linked'], 'A half-finished decision must be re-enterable, not skipped for ever.');
         $this->assertSame(1, $second['added'], 'Only the orphan the first tick never reached.');
@@ -492,7 +508,7 @@ final class MappingPromoterOrphanTest extends PluginTestCase
             ['id' => 13, 'sku' => '', 'name' => 'XL'],
         ]);
 
-        $result = $this->promoter([$decision], static fn (int $p, array $o): ?int => null)->promote('run-1');
+        $result = $this->promoter([$decision], static fn (int $p, array $o): ?int => null)->promote('run-1', self::everythingScope());
 
         $this->assertSame(1, $result['linked'], 'One variant CartShift cannot add is not a reason to duplicate the product.');
         $this->assertSame(0, $result['added']);

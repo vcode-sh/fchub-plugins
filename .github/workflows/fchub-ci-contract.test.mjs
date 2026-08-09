@@ -155,10 +155,9 @@ test('Every job that diffs against the pull request base can actually fail', () 
   // returns zero, and every gate guarded by that count skips itself while the
   // job reports success — a green tick for a suite that never ran.
   //
-  // fchub-stream is the one permitted exception: it is discontinued and must
-  // not be built or tested, so its gate is inert on purpose.
-  const inertByDesign = new Set(['vite-build-stream'])
-
+  // There is no permitted exception any more. Stream used to be one — an inert
+  // gate kept deliberately unable to fail — and it has been removed rather than
+  // preserved, so every remaining diffing job must be able to go red.
   const names = [...ci.matchAll(/^ {2}([a-z0-9-]+):$/gm)].map((m) => m[1])
   assert.ok(names.length > 0, 'Expected to find jobs in ci.yml')
 
@@ -168,11 +167,6 @@ test('Every job that diffs against the pull request base can actually fail', () 
   for (const name of diffing) {
     const checkout = step(job(ci, name), 'Checkout')
     const depth = value(checkout.replace(/^.*?with:\n/s, ''), 'fetch-depth')
-
-    if (inertByDesign.has(name)) {
-      assert.notEqual(depth, '0', `${name} is discontinued and must stay inert`)
-      continue
-    }
 
     assert.ok(
       depth === '0' || depth === '${{ matrix.fetch_depth }}',

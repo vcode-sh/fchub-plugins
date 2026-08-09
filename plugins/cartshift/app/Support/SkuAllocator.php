@@ -123,17 +123,75 @@ final class SkuAllocator
     /**
      * Stem plus suffix, trimmed to what the column holds.
      *
-     * Characters, not bytes: varchar(30) counts characters, and mb_substr on a
-     * multibyte SKU is the difference between 30 characters and a mangled tail.
+     * Characters, not bytes: varchar(30) counts characters, and cutting on a
+     * byte boundary is the difference between 30 characters and a mangled tail.
      */
     private static function clamp(string $sku, string $suffix): string
     {
-        $room = self::MAX_LENGTH - mb_strlen($suffix);
+        $room = self::MAX_LENGTH - self::charLength($suffix);
 
         if ($room <= 0) {
-            return mb_substr($suffix, 0, self::MAX_LENGTH);
+            return self::charSubstr($suffix, self::MAX_LENGTH);
         }
 
-        return mb_substr($sku, 0, $room) . $suffix;
+        return self::charSubstr($sku, $room) . $suffix;
+    }
+
+    /**
+     * Character length, on a host with mbstring or without one.
+     *
+     * `ext-mbstring` is optional in PHP and this plugin does not require it —
+     * composer.json asks for php >= 8.3 and nothing else, and production
+     * autoloads through spl_autoload_register rather than Composer, so a
+     * declared extension would be a promise nothing enforces. The rest of the
+     * codebase already guards its mbstring calls (CouponMigrator
+     * ::collationKey(), ProductMatcher and VariantResolver's name folding);
+     * this used to be the one place that did not, and it fataled on the first
+     * non-empty SKU of any migration.
+     *
+     * The fallback is PCRE with `/u`, not strlen. strlen counts bytes, and a
+     * byte count fed to a varchar(30) clamp truncates a Polish or Japanese SKU
+     * far shorter than the column would have — the same class of wrongness the
+     * mb_ calls were here to avoid. `/u` understands UTF-8 without mbstring;
+     * PCRE is not optional in PHP.
+     *
+     * On a string that is not valid UTF-8, preg_* refuses and returns false.
+     * Bytes are the honest answer there: it over-counts, so the clamp is
+     * stricter than necessary and the value still fits.
+     */
+    private static function charLength(string $value): int
+    {
+        if (function_exists('mb_strlen')) {
+            return mb_strlen($value, 'UTF-8');
+        }
+
+        $length = preg_match_all('/./us', $value);
+
+        return $length === false ? strlen($value) : $length;
+    }
+
+    /**
+     * The first $length characters, on a host with mbstring or without one.
+     *
+     * `.` under `/u` is one UTF-8 code point, so `.{0,N}` is a character-safe
+     * prefix — it can never stop half way through a multibyte sequence, which
+     * substr() can and which would store invalid UTF-8 in a UNIQUE column. `/s`
+     * so a newline in the middle of a SKU truncates rather than terminating the
+     * match early. See charLength() for why the fallback is PCRE rather than
+     * substr, and for the invalid-UTF-8 case.
+     */
+    private static function charSubstr(string $value, int $length): string
+    {
+        if ($length <= 0) {
+            return '';
+        }
+
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, $length, 'UTF-8');
+        }
+
+        return preg_match('/^.{0,' . $length . '}/us', $value, $matches) === 1
+            ? $matches[0]
+            : substr($value, 0, $length);
     }
 }
