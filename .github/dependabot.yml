@@ -31,16 +31,30 @@ updates:
         dependency-type: development
 
   # Ships to users: this is the live documentation site, deployed from main.
-  - package-ecosystem: npm
+  #
+  # `bun`, not `npm`, and that is the whole point. web-docs is the only Bun
+  # project here — a bun.lock since March and no package-lock.json — and the npm
+  # ecosystem cannot write a Bun lockfile. It updated package.json alone and left
+  # the lockfile behind.
+  #
+  # That was harmless right up until Docs CI learnt to build the site (f3db952,
+  # 8 August). `bun install --frozen-lockfile` then refused the mismatch exactly
+  # as it should, and #138 — the first dependency pull request opened after it —
+  # died on `lockfile had changes, but lockfile is frozen`. So would every one
+  # after it. The workflow was never at fault; it is the gate that finally
+  # exposed a five-month-old configuration error.
+  #
+  # No production/development split: `dependency-type` grouping is supported by
+  # bundler, composer, mix, maven, npm and pip, and not by bun. One group, then.
+  - package-ecosystem: bun
     directory: /web-docs
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      production:
-        dependency-type: production
-      development:
-        dependency-type: development
+      all:
+        patterns:
+          - '*'
 
   # Build tooling for the plugins. None of it reaches a WordPress site except
   # where a bundle is committed, so one grouped pull request per plugin is
