@@ -3,7 +3,7 @@ Contributors: vcodesh
 Tags: fluentcart, wishlist, ecommerce
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 Requires PHP: 8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -80,6 +80,12 @@ Not by default. Wishlist tables and settings are preserved unless **Remove data 
 
 == Changelog ==
 
+= 1.0.3 =
+
+* Split bulk deletes and count queries out of the item repository into the collaborators that already held their siblings.
+* Removed five copies of the same count query from the stats overview.
+* Extracted the pagination markup the wishlist page and the customer portal were each carrying their own identical copy of.
+
 = 1.0.2 =
 
 * Restored GitHub release updates. WordPress.org listing is still pending, so without this the plugin had no update channel at all.
@@ -92,6 +98,6 @@ Not by default. Wishlist tables and settings are preserved unless **Remove data 
 
 == Upgrade Notice ==
 
-= 1.0.2 =
+= 1.0.3 =
 
-Updates now come from WordPress.org. Existing wishlist tables, settings, guest lists and account lists are unchanged.
+Internal restructuring only. No change to wishlist data, settings, guest lists or account lists.

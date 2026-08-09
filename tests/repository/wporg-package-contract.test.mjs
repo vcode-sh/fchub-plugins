@@ -9,7 +9,10 @@ import test from "node:test";
 import { inspectZip } from "../../scripts/wporg/check-package.mjs";
 
 const slug = "fchub-wishlist";
-const version = "1.0.2";
+// Must track fchub-wishlist in versions.json: check-package.mjs compares the
+// fixture's plugin header against it, so a stale constant here fails every
+// fixture with a version error rather than the thing it meant to test.
+const version = "1.0.3";
 const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "fchub-wporg-"));
 const zipDirectory = path.join(workspace, "zips");
 fs.mkdirSync(zipDirectory);

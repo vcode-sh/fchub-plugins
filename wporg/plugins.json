@@ -22,13 +22,13 @@
     "fchub-wishlist": {
       "displayName": "FCHub Wishlist",
       "mainFile": "fchub-wishlist.php",
-      "firstWpOrgVersion": "1.0.2",
+      "firstWpOrgVersion": "1.0.3",
       "previousRelease": {
-        "version": "1.0.1",
-        "tag": "fchub-wishlist/v1.0.1",
-        "commit": "23bf80dbd3e0168083e155d7c88116c563af76a2",
-        "asset": "fchub-wishlist-1.0.1.zip",
-        "sha256": "4a0be059a06c6c56c985b34d61cf6413295a4e58fe8ba550c4e9cd26342d7737"
+        "version": "1.0.2",
+        "tag": "fchub-wishlist/v1.0.2",
+        "commit": "08e4e4bd7671b8da379474ae0b49fd839d3d0c3d",
+        "asset": "fchub-wishlist-1.0.2.zip",
+        "sha256": "44ce62f2b8f75def910221ae720791c60803ace786a89a1557de45de9d6f892b"
       },
       "requiresWordPress": "7.0",
       "requiresPhp": "8.3",

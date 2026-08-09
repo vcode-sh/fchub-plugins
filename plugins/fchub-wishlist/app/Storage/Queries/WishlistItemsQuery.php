@@ -58,23 +58,11 @@ class WishlistItemsQuery
 
     public function getItemsWithProductData(int $wishlistId): array
     {
-        return $this->getItemsForWishlist($wishlistId, 1, 0)['items'];
+        // A per-page of zero drops the LIMIT clause, so this is the whole wishlist.
+        return $this->getItemsWithProductDataPaginated($wishlistId, 1, 0)['items'];
     }
 
     public function getItemsWithProductDataPaginated(int $wishlistId, int $page = 1, int $perPage = 20): array
-    {
-        return $this->getItemsForWishlist($wishlistId, $page, $perPage);
-    }
-
-    private function getItemsForListOwner(string $whereClause, array $params, int $page, int $perPage): array
-    {
-        $fromClause = '%i i INNER JOIN %i l ON i.wishlist_id = l.id';
-        $fromTables = [$this->itemsTable, $this->listsTable];
-
-        return $this->runItemsQuery($fromClause, $fromTables, $whereClause, $params, $page, $perPage, false);
-    }
-
-    private function getItemsForWishlist(int $wishlistId, int $page, int $perPage): array
     {
         return $this->runItemsQuery(
             '%i i',
@@ -85,6 +73,14 @@ class WishlistItemsQuery
             $perPage,
             true
         );
+    }
+
+    private function getItemsForListOwner(string $whereClause, array $params, int $page, int $perPage): array
+    {
+        $fromClause = '%i i INNER JOIN %i l ON i.wishlist_id = l.id';
+        $fromTables = [$this->itemsTable, $this->listsTable];
+
+        return $this->runItemsQuery($fromClause, $fromTables, $whereClause, $params, $page, $perPage, false);
     }
 
     private function runItemsQuery(
@@ -107,10 +103,12 @@ class WishlistItemsQuery
             ...$countParams
         ));
 
+        [$variantJoinClause, $variantJoinTables] = $this->getVariantJoin();
+
         $queryParams = array_merge(
             $fromTables,
             [$wpdb->posts],
-            $this->getVariantJoinTables(),
+            $variantJoinTables,
             $whereParams
         );
         $limitClause = '';
@@ -120,8 +118,6 @@ class WishlistItemsQuery
             $queryParams[] = $perPage;
             $queryParams[] = $offset;
         }
-
-        $variantJoinClause = $this->getVariantJoinClause();
 
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Private clauses select a fixed owner mode; item rows must be live.
         $rows = $wpdb->get_results($wpdb->prepare(
@@ -166,9 +162,15 @@ class WishlistItemsQuery
         }, $rows);
     }
 
-    private function getVariantJoinClause(): string
+    /**
+     * The default-variant join, together with the tables its %i placeholders consume.
+     * Clause and table list only work in lockstep, so they are built in one place.
+     *
+     * @return array{0: string, 1: array<int, string>}
+     */
+    private function getVariantJoin(): array
     {
-        return "LEFT JOIN %i pd ON pd.post_id = i.product_id
+        $clause = "LEFT JOIN %i pd ON pd.post_id = i.product_id
              LEFT JOIN (
                  SELECT picked.post_id, MIN(picked.id) AS id
                  FROM %i picked
@@ -188,18 +190,10 @@ class WishlistItemsQuery
                  NULLIF(pd.default_variation_id, 0),
                  dv.id
              )";
-    }
 
-    /**
-     * @return array<int, string>
-     */
-    private function getVariantJoinTables(): array
-    {
         return [
-            $this->detailsTable,
-            $this->variationsTable,
-            $this->variationsTable,
-            $this->variationsTable,
+            $clause,
+            [$this->detailsTable, $this->variationsTable, $this->variationsTable, $this->variationsTable],
         ];
     }
 

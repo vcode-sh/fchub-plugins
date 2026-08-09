@@ -43,6 +43,38 @@ final class WishlistItemBulkOperations
         ));
     }
 
+    public function deleteByProductIds(int $wishlistId, array $productIds): int
+    {
+        global $wpdb;
+
+        if (empty($productIds)) {
+            return 0;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
+        $params = array_merge([$wishlistId], array_map('intval', $productIds));
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no bulk-delete API; no item cache is retained.
+        return (int) $wpdb->query($wpdb->prepare(
+            'DELETE FROM %i WHERE wishlist_id = %d AND product_id IN ('
+            . $placeholders // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Generated %d placeholders.
+            . ')',
+            $this->itemsTable,
+            ...$params
+        ));
+    }
+
+    public function deleteByWishlistId(int $wishlistId): int
+    {
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The plugin owns this bulk-delete table and keeps no cached item rows.
+        return (int) $wpdb->query($wpdb->prepare(
+            "DELETE FROM %i WHERE wishlist_id = %d",
+            $this->itemsTable,
+            $wishlistId
+        ));
+    }
+
     public function deleteByWishlistIds(array $wishlistIds): int
     {
         global $wpdb;

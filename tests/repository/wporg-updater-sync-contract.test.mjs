@@ -48,7 +48,7 @@ function createFixture() {
 /**
  * Plugin Name: FCHub Wishlist
  * Description: Let customers save FluentCart products and return to them later.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Requires at least: 7.0
  * Requires PHP: 8.3
  * Tested up to: 7.0
@@ -66,7 +66,7 @@ Contributors: vcodesh
 Tags: fluentcart, wishlist
 Requires at least: 7.0
 Tested up to: 7.0
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 Requires PHP: 8.3
 License: GPLv2 or later
 

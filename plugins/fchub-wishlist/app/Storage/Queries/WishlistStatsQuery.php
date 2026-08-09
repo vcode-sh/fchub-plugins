@@ -25,29 +25,28 @@ class WishlistStatsQuery
      */
     public function getOverview(): array
     {
-        global $wpdb;
-
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard statistics intentionally reflect current plugin-owned rows.
-        $totalWishlists = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM %i", $this->listsTable));
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard statistics intentionally reflect current plugin-owned rows.
-        $totalItems = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM %i", $this->itemsTable));
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard statistics intentionally reflect current plugin-owned rows.
-        $userWishlists = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM %i WHERE user_id IS NOT NULL",
-            $this->listsTable
-        ));
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard statistics intentionally reflect current plugin-owned rows.
-        $guestWishlists = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM %i WHERE user_id IS NULL",
-            $this->listsTable
-        ));
-
         return [
-            'total_wishlists' => $totalWishlists,
-            'total_items'     => $totalItems,
-            'user_wishlists'  => $userWishlists,
-            'guest_wishlists' => $guestWishlists,
+            'total_wishlists' => $this->countRows($this->listsTable),
+            'total_items'     => $this->totalCount(),
+            'user_wishlists'  => $this->countRows($this->listsTable, 'user_id IS NOT NULL'),
+            'guest_wishlists' => $this->countRows($this->listsTable, 'user_id IS NULL'),
         ];
+    }
+
+    /**
+     * Count every wishlist item row, across every wishlist.
+     */
+    public function totalCount(): int
+    {
+        return $this->countRows($this->itemsTable);
+    }
+
+    /**
+     * Count the wishlist items that reference a single product.
+     */
+    public function countByProductId(int $productId): int
+    {
+        return $this->countRows($this->itemsTable, 'product_id = %d', [$productId]);
     }
 
     /**
@@ -117,8 +116,6 @@ class WishlistStatsQuery
     {
         global $wpdb;
 
-        $postsTable = $wpdb->posts;
-
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard rankings intentionally reflect current plugin-owned rows and titles.
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT
@@ -131,7 +128,7 @@ class WishlistStatsQuery
              ORDER BY wishlist_count DESC
              LIMIT %d",
             $this->itemsTable,
-            $postsTable,
+            $wpdb->posts,
             $limit
         ), ARRAY_A);
 
@@ -197,15 +194,26 @@ class WishlistStatsQuery
      */
     public function getActiveWishlistCount(int $days = 30): int
     {
-        global $wpdb;
-
         $cutoff = gmdate('Y-m-d H:i:s', time() - ($days * DAY_IN_SECONDS));
 
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Dashboard activity intentionally reflects current plugin-owned rows.
+        return $this->countRows($this->listsTable, 'updated_at >= %s AND item_count > 0', [$cutoff]);
+    }
+
+    /**
+     * Count rows in a plugin-owned table, optionally narrowed by a fixed condition
+     * whose placeholders are filled from $params.
+     */
+    private function countRows(string $table, string $condition = '', array $params = []): int
+    {
+        global $wpdb;
+
+        $where = $condition === '' ? '' : " WHERE {$condition}";
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Statistics intentionally reflect current plugin-owned rows; the interpolated condition is a fixed literal from this class and brings the placeholders $params fills.
         return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM %i WHERE updated_at >= %s AND item_count > 0",
-            $this->listsTable,
-            $cutoff
+            "SELECT COUNT(*) FROM %i{$where}",
+            $table,
+            ...$params
         ));
     }
 }

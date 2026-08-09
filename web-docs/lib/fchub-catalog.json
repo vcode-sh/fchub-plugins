@@ -92,11 +92,11 @@
       ],
       "docs_path": "/docs/fchub-wishlist",
       "admin_path": "admin.php?page=fluent-cart#/settings/wishlist",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "docs_url": "https://fchub.co/docs/fchub-wishlist",
-      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-wishlist/v1.0.2",
-      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-wishlist/v1.0.2/fchub-wishlist-1.0.2.zip",
-      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-wishlist/v1.0.2/fchub-wishlist-1.0.2.zip.sha256"
+      "release_url": "https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-wishlist/v1.0.3",
+      "package_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-wishlist/v1.0.3/fchub-wishlist-1.0.3.zip",
+      "checksum_url": "https://github.com/vcode-sh/fchub-plugins/releases/download/fchub-wishlist/v1.0.3/fchub-wishlist-1.0.3.zip.sha256"
     },
     "fchub-multi-currency": {
       "name": "Multi-Currency",

@@ -1,3 +1,30 @@
+### v1.0.3
+
+*Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-wishlist/v1.0.3)
+
+Housekeeping with nothing behind it. No behaviour changed, no data moved.
+
+#### Files that had quietly outgrown their budgets
+
+The repository enforces a line budget per file, and three had drifted over it —
+invisibly, because the check only ran on pull requests touching this plugin.
+Now that it runs on every push, it had something to say.
+
+Fixing it meant finishing moves that were already half made. `WishlistItemRepository`
+was delegating most of its work to three collaborators and keeping four methods
+back: two bulk deletes that belonged next to their siblings, and two counts that
+belonged with the other counts. It reads as single-row CRUD and delegation now.
+
+Two duplications turned up on the way. The stats overview was running the same
+`COUNT(*)` five separate times, each under its own identical suppression comment.
+And the pagination markup in the customer portal was byte-identical to the copy
+in the wishlist page — now one partial, used by both, which took eighteen lines
+off the second view as well.
+
+225 tests, unchanged, before and after.
+
+<Separator className="my-8" />
+
 ### v1.0.2
 
 *Released 9 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/fchub-wishlist/v1.0.2)

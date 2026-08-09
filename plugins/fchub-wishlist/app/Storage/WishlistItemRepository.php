@@ -132,26 +132,29 @@ class WishlistItemRepository
         ]) > 0;
     }
 
-    public function deleteByWishlistId(int $wishlistId): int
+    public function findByProductAndVariant(int $wishlistId, int $productId, int $variantId): ?array
     {
         global $wpdb;
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The plugin owns this bulk-delete table and keeps no cached item rows.
-        return (int) $wpdb->query($wpdb->prepare(
-            "DELETE FROM %i WHERE wishlist_id = %d",
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Toggle operations require the current item row and cannot accept stale cache data.
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM %i WHERE wishlist_id = %d AND product_id = %d AND variant_id = %d",
             $this->table,
-            $wishlistId
-        ));
+            $wishlistId,
+            $productId,
+            $variantId
+        ), ARRAY_A);
+
+        return $row ? $this->hydrate($row) : null;
+    }
+
+    public function deleteByWishlistId(int $wishlistId): int
+    {
+        return $this->bulkOps->deleteByWishlistId($wishlistId);
     }
 
     public function countByProductId(int $productId): int
     {
-        global $wpdb;
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Public counts reflect live wishlist mutations and are intentionally not persisted in object cache.
-        return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM %i WHERE product_id = %d",
-            $this->table,
-            $productId
-        ));
+        return $this->statsQuery->countByProductId($productId);
     }
 
     public function countByProductIds(array $productIds): array
@@ -176,45 +179,12 @@ class WishlistItemRepository
 
     public function deleteByProductIds(int $wishlistId, array $productIds): int
     {
-        global $wpdb;
-
-        if (empty($productIds)) {
-            return 0;
-        }
-
-        $placeholders = implode(',', array_fill(0, count($productIds), '%d'));
-        $params = array_merge([$wishlistId], array_map('intval', $productIds));
-
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- WordPress has no bulk-delete API; no item cache is retained.
-        return (int) $wpdb->query($wpdb->prepare(
-            'DELETE FROM %i WHERE wishlist_id = %d AND product_id IN ('
-            . $placeholders // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Generated %d placeholders.
-            . ')',
-            $this->table,
-            ...$params
-        ));
-    }
-
-    public function findByProductAndVariant(int $wishlistId, int $productId, int $variantId): ?array
-    {
-        global $wpdb;
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Toggle operations require the current item row and cannot accept stale cache data.
-        $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM %i WHERE wishlist_id = %d AND product_id = %d AND variant_id = %d",
-            $this->table,
-            $wishlistId,
-            $productId,
-            $variantId
-        ), ARRAY_A);
-
-        return $row ? $this->hydrate($row) : null;
+        return $this->bulkOps->deleteByProductIds($wishlistId, $productIds);
     }
 
     public function totalCount(): int
     {
-        global $wpdb;
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The administration total reflects live plugin-owned rows.
-        return (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM %i", $this->table));
+        return $this->statsQuery->totalCount();
     }
 
     public function countByWishlistId(int $wishlistId): int
