@@ -11,7 +11,12 @@ parameters:
     bootstrapFiles:
         - vendor/autoload.php
         - phpstan-bootstrap.php
+    # The shared updater is vendored into every plugin and analysed in none of
+    # them. Scanned, not analysed: PHPStan needs to know FCHub_GitHub_Updater
+    # exists, without holding a deliberately global snake_cased class to the
+    # standards of code we actually write.
     scanFiles:
+        - lib/GitHubUpdater.php
         - phpstan-functions.php
     scanDirectories:
         - ../../../fchub-playground/wp-content/plugins/fluent-cart/app

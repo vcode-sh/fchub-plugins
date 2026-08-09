@@ -13,7 +13,12 @@ parameters:
         - phpstan-bootstrap.php
     stubFiles:
         - phpstan-stubs.stub
+    # The shared updater is vendored into every plugin and analysed in none of
+    # them. Scanned, not analysed: PHPStan needs to know FCHub_GitHub_Updater
+    # exists, without holding a deliberately global snake_cased class to the
+    # standards of code we actually write.
     scanFiles:
+        - lib/GitHubUpdater.php
         - ../../../fchub-playground/wp-content/plugins/fluent-cart/boot/globals.php
     scanDirectories:
         - ../../../fchub-playground/wp-content/plugins/fluent-cart/app
