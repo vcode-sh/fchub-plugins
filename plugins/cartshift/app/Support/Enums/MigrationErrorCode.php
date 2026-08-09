@@ -240,6 +240,23 @@ enum MigrationErrorCode: string
     case MappedProductHasNoDownloads = 'mapped_product_has_no_downloads';
 
     /**
+     * A `link` decision exists for a WooCommerce product this run's scope does
+     * not select, so promotion left it alone.
+     *
+     * The staging table outlives a run: decisions drafted against one selection
+     * are still sitting there when the owner runs a narrower one. Promoting
+     * them regardless created variants inside FluentCart products the run never
+     * migrated, and filed them under its migration id — so rolling the run back
+     * deleted variants it had no business creating.
+     *
+     * Info, not a warning. Nothing is broken and nothing is lost: the decision
+     * stays in the staging table and a wider run promotes it. It is recorded so
+     * that a link the owner drafted and then did not see happen is
+     * distinguishable from one that failed.
+     */
+    case MappedProductOutOfScope = 'mapped_product_out_of_scope';
+
+    /**
      * MySQL rejected a statement CartShift sent through `$wpdb` directly.
      *
      * `$wpdb` does not throw. It records the failure in `$wpdb->last_error`,
@@ -301,6 +318,7 @@ enum MigrationErrorCode: string
             self::OrphanVariantNotCreated     => __('Variant could not be added', 'cartshift'),
             self::MappedVariantNotOnProduct   => __('Mapped variant is on another product', 'cartshift'),
             self::MappedProductHasNoDownloads => __('Linked product has no files', 'cartshift'),
+            self::MappedProductOutOfScope     => __('Mapped product is outside this run', 'cartshift'),
             self::DatabaseWriteFailed         => __('Database rejected a write', 'cartshift'),
         };
     }
@@ -460,6 +478,10 @@ enum MigrationErrorCode: string
                 'Attach the files to the linked FluentCart product yourself. CartShift will not write them into a product you built by hand, and until they are there every migrated order for it shows the customer no files.',
                 'cartshift',
             ),
+            self::MappedProductOutOfScope => __(
+                'Nothing to do. The product is mapped to a FluentCart product, but this run\'s selection does not include it, so the link was left for a later run. Widen the selection and re-run if you meant to include it.',
+                'cartshift',
+            ),
             self::DatabaseWriteFailed => __(
                 'The database refused part of this record, so some of it is missing. The log message carries the MySQL error verbatim — send it on if it names a column or a constraint you do not recognise. Fix the cause, then roll back and re-run: a half-written record is not repaired by running again.',
                 'cartshift',
@@ -475,7 +497,8 @@ enum MigrationErrorCode: string
     {
         return match ($this) {
             self::AlreadyMigrated,
-            self::AlreadyExistsInFluentCart => MigrationErrorSeverity::Info,
+            self::AlreadyExistsInFluentCart,
+            self::MappedProductOutOfScope => MigrationErrorSeverity::Info,
 
             self::SkuCollision,
             self::UnknownCouponType,
@@ -542,7 +565,8 @@ enum MigrationErrorCode: string
             self::MappedFcProductMissing,
             self::OrphanVariantNotCreated,
             self::MappedVariantNotOnProduct,
-            self::MappedProductHasNoDownloads => MigrationErrorCategory::Product,
+            self::MappedProductHasNoDownloads,
+            self::MappedProductOutOfScope => MigrationErrorCategory::Product,
 
             self::CouponCodeMissing,
             self::CouponCodeTooLong,

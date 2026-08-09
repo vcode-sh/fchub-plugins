@@ -45,16 +45,11 @@ updates:
   # Build tooling for the plugins. None of it reaches a WordPress site except
   # where a bundle is committed, so one grouped pull request per plugin is
   # plenty.
-  - package-ecosystem: npm
-    directory: /plugins/fchub
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 3
-    groups:
-      all:
-        patterns:
-          - '*'
-
+  #
+  # /plugins/fchub is absent, and not by oversight: FCHub is developed in the
+  # private playground repository and the directory here holds two stray
+  # Playwright result files and nothing else. Dependabot spent a fortnight
+  # opening a job a week against a manifest that does not exist and failing it.
   - package-ecosystem: npm
     directory: /plugins/fchub-memberships
     schedule:
@@ -90,6 +85,32 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 2
+    groups:
+      all:
+        patterns:
+          - '*'
+
+  # Composer, which was configured nowhere at all.
+  #
+  # Security updates arrive from the dependency graph regardless of this file,
+  # and four of them landed here over a fortnight with nothing to open a pull
+  # request — so every one failed, unread, on a constraint nobody was asked to
+  # resolve. Monthly and grouped: this is PHPUnit, PHP_CodeSniffer and the WPCS
+  # ruleset, none of which reaches a customer's site.
+  #
+  # plugins/fchub-stream is excluded for the same reason it is excluded above.
+  - package-ecosystem: composer
+    directories:
+      - /plugins/cartshift
+      - /plugins/fchub-fakturownia
+      - /plugins/fchub-memberships
+      - /plugins/fchub-multi-currency
+      - /plugins/fchub-p24
+      - /plugins/fchub-thank-you
+      - /plugins/fchub-wishlist
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
     groups:
       all:
         patterns:

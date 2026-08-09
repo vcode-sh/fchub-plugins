@@ -79,14 +79,21 @@ test("the website labels Stream as discontinued on listings and every docs page"
   assert.doesNotMatch(streamRoadmap, /Open a GitHub Issue/i);
 });
 
-test("Stream remains available for a possible future return", () => {
+test("Stream is out of continuous integration and out of the release path", () => {
   const buildScript = readRepositoryFile("build.sh");
   const continuousIntegration = readRepositoryFile(".github/workflows/ci.yml");
   const releaseWorkflow = readRepositoryFile(".github/workflows/release.yml");
 
+  // The plugin is abandoned, not merely paused. It used to keep an inert
+  // PHPUnit lane, an inert Vite job and an unreachable release build step —
+  // scaffolding whose only job was to prove the hiatus was reversible. It is
+  // not, so none of it is here.
+  assert.doesNotMatch(continuousIntegration, /fchub-stream/);
+  assert.doesNotMatch(releaseWorkflow, /slug == 'fchub-stream'/);
+
+  // The source stays where it is, and build.sh still knows how to name it, so
+  // whoever forks it has something to fork.
   assert.match(buildScript, /fchub-stream\|fchub-stream\.php/);
-  assert.match(continuousIntegration, /plugin: fchub-stream/);
-  assert.match(releaseWorkflow, /slug == 'fchub-stream'/);
 });
 
 test("nothing builds or publishes Stream unless somebody names it", () => {

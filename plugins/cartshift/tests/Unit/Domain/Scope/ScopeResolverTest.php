@@ -123,6 +123,60 @@ final class ScopeResolverTest extends PluginTestCase
         $this->assertSame([12, 44], $resolver->closedProductIds());
     }
 
+    /**
+     * includesProduct() is productPredicate() for a caller holding one id.
+     *
+     * The two must agree exactly, because they are consulted by the two halves
+     * of the same run: productPredicate() decides what ProductMigrator sources,
+     * includesProduct() decides what MappingPromoter promotes. A disagreement
+     * either duplicates a product the owner mapped by hand, or writes a variant
+     * into a FluentCart product the run never migrates.
+     *
+     * Neither unrestricted mode needs a $wpdb stub, which is the point: an
+     * "Everything" or a date-limited run takes the whole catalogue, so the
+     * answer is true without asking anything.
+     */
+    public function testIncludesProductMatchesTheUnrestrictedCatalogueModes(): void
+    {
+        $everything = new ScopeResolver(MigrationScope::everything());
+
+        $this->assertTrue($everything->productPredicate()->isEmpty());
+        $this->assertTrue($everything->includesProduct(12));
+        $this->assertTrue($everything->includesProduct(9999));
+
+        $since = new ScopeResolver(MigrationScope::fromArray(['mode' => 'since', 'since' => '2024-03-01']));
+
+        $this->assertTrue($since->productPredicate()->isEmpty());
+        $this->assertTrue($since->includesProduct(12), 'A date bound selects orders, never products.');
+        $this->assertTrue($since->includesProduct(9999));
+    }
+
+    /**
+     * The bound an explicit scope applies is the closure, not the raw picks: 44
+     * was never chosen, it arrived because an in-scope order sells it, and
+     * ProductMigrator will migrate it. Anything asking "is this in scope" has to
+     * say yes to it too.
+     */
+    public function testIncludesProductBoundsAnExplicitScopeByTheClosure(): void
+    {
+        $this->stubClosure(
+            buyersOfScopedOrders: [],
+            guestsOfScopedOrders: [],
+            productsInScopedOrders: [44],
+        );
+
+        $resolver = new ScopeResolver(MigrationScope::fromArray([
+            'mode'                        => 'explicit',
+            'product_ids'                 => [12],
+            'include_orders_for_products' => true,
+        ]));
+
+        $this->assertSame([12, 44], $resolver->closedProductIds());
+        $this->assertTrue($resolver->includesProduct(12));
+        $this->assertTrue($resolver->includesProduct(44));
+        $this->assertFalse($resolver->includesProduct(13));
+    }
+
     public function testAClosureBiggerThanTheLimitIsReportedRatherThanTruncated(): void
     {
         $this->stubClosure(

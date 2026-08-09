@@ -834,6 +834,50 @@ final class MappingController
     }
 
     /**
+     * One FluentCart product's variants, in the order FluentCart shows them.
+     *
+     * The ordering is load-bearing and used to be wrong. VariantResolver's
+     * third pass pairs positionally — the nth Woo variation to the nth FC
+     * variant — which is only defensible if "nth" is the position the owner
+     * sees. This was `ORDER BY id ASC`, which is creation order. An owner who
+     * had ever reordered their variants got the first Woo variation attached to
+     * a variant that is no longer first, and every migrated order line and
+     * subscription for it filed against the wrong one, silently.
+     *
+     * `serial_index ASC` is FluentCart's own answer, and it is unanimous:
+     * ProductController::get() (the admin product editor, which is where the
+     * owner does the reordering), ProductResource::find(), ProductDetail
+     * ::variants(), Product::duplicateProduct(), ShopResource, BulkProduct
+     * UpdateService and ProductCardShortCode all order the relation exactly so,
+     * and ProductRenderer sorts the storefront's variant list by the same
+     * column. Nothing anywhere orders variants by id.
+     *
+     * **NULLs first, matching MySQL and matching FluentCart.** `serial_index`
+     * is nullable and NULL is the normal case for a hand-built product: 58 of
+     * the 76 variant rows on the live store are NULL, and only the ones
+     * CartShift itself added carry a number, because ProductAdminHelper only
+     * assigns the index when the owner saves through the editor. FluentCart's
+     * variant *lists* are all plain `orderBy('serial_index', 'ASC')`, so its
+     * NULLs lead — verified against the live store, where product 81 displays
+     * variant 52 (NULL) ahead of variants 50 and 51 (1 and 2), the exact
+     * inversion `ORDER BY id ASC` got wrong.
+     *
+     * FluentCart does have one place that disagrees — ProductRenderer and
+     * PackageDescriptionRenderer sort NULL to PHP_INT_MAX — but that is the
+     * choice of a *default* variant, not the order of the list, and it is
+     * explicitly justified there as "don't let an unordered row become the
+     * default". Copying it here would reorder the list against every screen the
+     * owner actually maps from.
+     *
+     * `id ASC` survives as the tie-break, and it has real work to do: NULLs are
+     * all equal to each other, and duplicate indexes exist in live data
+     * (product 548 has two variants at serial_index 1). MySQL leaves ties
+     * unordered, so without this the pairing could differ between two runs of
+     * the same query — a positional map that is not deterministic is worse than
+     * one that is merely in the wrong order, because it cannot even be
+     * reproduced. It is also what InnoDB returns for ties in practice, so this
+     * pins FluentCart's own effective behaviour rather than inventing one.
+     *
      * @return list<array{id: int, sku: string, name: string, price: float}>
      */
     private function fcVariants(int $fcPostId): array
@@ -844,7 +888,7 @@ final class MappingController
             "SELECT id, variation_title, item_price, sku
              FROM {$wpdb->prefix}fct_product_variations
              WHERE post_id = %d
-             ORDER BY id ASC",
+             ORDER BY serial_index ASC, id ASC",
             $fcPostId,
         ));
 

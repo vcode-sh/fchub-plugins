@@ -76,6 +76,9 @@ concurrency:
   group: docs-ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # The site has to actually build. Every check below this one reads content
   # and compares it against something; none of them run Next, which is how a
@@ -86,11 +89,14 @@ jobs:
   build:
     name: Site builds
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: web-docs
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -119,8 +125,11 @@ jobs:
   consistency:
     name: Version Consistency
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:

@@ -7,6 +7,7 @@ namespace CartShift\Domain\Migration;
 defined('ABSPATH') || exit;
 
 use CartShift\Domain\Migration\Contracts\MigratorInterface;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Migrator\CouponMigrator;
 use CartShift\Migrator\CustomerMigrator;
 use CartShift\Migrator\OrderMigrator;
@@ -192,31 +193,40 @@ final class MigrationOrchestratorFactory
      * for the run either way — the run-start path had already set it to the
      * same thing, and processBatch() re-derives it on every batch regardless.
      *
-     * @return array{linked: int, variants: int, added: int, skipped: list<int>, dead: list<int>, failed: list<int>, foreign: list<int>, fileless: list<int>}
+     * The scope is resolved here, not held on the promoter, and read fresh from
+     * MigrationState on every call. This class is the one place that assembles
+     * a run, so it is the one place that knows what the run covers — and a
+     * resolver built once and kept would be a second, ageing copy of a value
+     * later batches read from state in their own requests. AbstractMigrator
+     * ::scopeResolver() memoises per request for the same reason and no longer.
+     *
+     * @return array{linked: int, variants: int, added: int, skipped: list<int>, outOfScope: list<int>, dead: list<int>, failed: list<int>, foreign: list<int>, fileless: list<int>}
      */
     public function promote(string $migrationId): array
     {
         if ($migrationId === '') {
             return [
-                'linked'   => 0,
-                'variants' => 0,
-                'added'    => 0,
-                'skipped'  => [],
-                'dead'     => [],
-                'failed'   => [],
-                'foreign'  => [],
-                'fileless' => [],
+                'linked'     => 0,
+                'variants'   => 0,
+                'added'      => 0,
+                'skipped'    => [],
+                'outOfScope' => [],
+                'dead'       => [],
+                'failed'     => [],
+                'foreign'    => [],
+                'fileless'   => [],
             ];
         }
 
         $this->idMap->setSimulating($this->state->isDryRun());
 
-        $promotion = $this->promoter->promote($migrationId);
+        $promotion = $this->promoter->promote($migrationId, new ScopeResolver($this->state->getScope()));
 
         self::logDeadLinksOnce($this->log, $migrationId, $promotion['dead']);
         self::logOrphanFailuresOnce($this->log, $migrationId, $promotion['failed']);
         self::logForeignVariantsOnce($this->log, $migrationId, $promotion['foreign']);
         self::logLostDownloadsOnce($this->log, $migrationId, $promotion['fileless']);
+        self::logOutOfScopeLinksOnce($this->log, $migrationId, $promotion['outOfScope']);
 
         return $promotion;
     }
@@ -771,7 +781,35 @@ final class MigrationOrchestratorFactory
     }
 
     /**
-     * One warning row per id per run, and no more.
+     * Log each mapped product this run's scope left out, at most once per run.
+     *
+     * Status 'skipped' and Info severity, unlike its four neighbours, because
+     * nothing has gone wrong: the owner narrowed the run and promotion obeyed.
+     * Recording it anyway is the point — a link the owner drafted and then did
+     * not see happen is otherwise indistinguishable from a link that silently
+     * failed, and they would have no way to tell which without this row.
+     *
+     * @param list<int> $wcProductIds
+     */
+    public static function logOutOfScopeLinksOnce(
+        MigrationLogRepository $log,
+        string $migrationId,
+        array $wcProductIds,
+    ): void {
+        self::logIdsOnce(
+            $log,
+            $migrationId,
+            Constants::ENTITY_PRODUCT,
+            $wcProductIds,
+            MigrationErrorCode::MappedProductOutOfScope,
+            'WooCommerce product %d is mapped to a FluentCart product, but this run\'s selection does not '
+            . 'include it. The mapping was left in place for a later run.',
+            'skipped',
+        );
+    }
+
+    /**
+     * One log row per id per run, and no more.
      *
      * hasEntryFor() is the de-dup: it checks the log itself rather than adding
      * new state, so a resumed run — fresh PHP process, empty memory — still
@@ -786,6 +824,7 @@ final class MigrationOrchestratorFactory
         array $ids,
         MigrationErrorCode $code,
         string $messageFormat,
+        string $status = 'warning',
     ): void {
         foreach ($ids as $id) {
             if ($log->hasEntryFor($migrationId, $entityType, (string) $id, $code)) {
@@ -796,7 +835,7 @@ final class MigrationOrchestratorFactory
                 $migrationId,
                 $entityType,
                 (string) $id,
-                'warning',
+                $status,
                 sprintf($messageFormat, $id),
                 null,
                 $code,

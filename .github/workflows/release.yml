@@ -24,6 +24,7 @@ jobs:
   prepare:
     name: Validate release tag
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       slug: ${{ steps.tag.outputs.slug }}
       version: ${{ steps.tag.outputs.version }}
@@ -32,6 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Parse tag
@@ -99,6 +101,7 @@ jobs:
       - name: Checkout validated tag SHA
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -120,33 +123,6 @@ jobs:
 
           echo "Build output:"
           ls -la assets/dist/
-
-      - name: Build assets (fchub-stream)
-        if: needs.prepare.outputs.slug == 'fchub-stream'
-        run: |
-          cd plugins/fchub-stream/admin-app
-          npm ci
-          npm run build
-
-          if [ ! -d "../admin/dist" ] || [ -z "$(ls -A ../admin/dist)" ]; then
-            echo "::error::admin-app build failed — admin/dist/ is empty"
-            exit 1
-          fi
-
-          echo "admin-app build output:"
-          ls -la ../admin/dist/
-
-          cd ../portal-app
-          npm ci
-          npm run build
-
-          if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
-            echo "::error::portal-app build failed — portal-app/dist/ is empty"
-            exit 1
-          fi
-
-          echo "portal-app build output:"
-          ls -la dist/
 
       - name: Sync GitHubUpdater
         # WordPress.org bridge releases must not restore the updater removed

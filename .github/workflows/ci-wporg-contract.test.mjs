@@ -50,15 +50,13 @@ test("PHPUnit matrix covers every target on the PHPUnit 13 PHP runtimes", () => 
       `${slug} cannot install PHPUnit 13 on PHP 8.3`,
     );
   }
-  const streamEntries = phpunit.match(/- plugin: fchub-stream[\s\S]*?fetch_depth: 1/g);
-  assert.equal(
-    streamEntries?.length,
-    1,
-    "The reversible-hiatus marker must remain a single inert depth-1 entry",
-  );
+  // Stream is abandoned. It used to sit here as an inert depth-1 lane proving
+  // the hiatus was reversible; keeping a lane for a plugin nobody will pick up
+  // again is a job slot and a matrix entry spent on nothing.
   assert.doesNotMatch(
     phpunit,
-    /- plugin: fchub-stream\n\s+php_version: '8\.[45]'/,
+    /fchub-stream/,
+    "Stream is abandoned and must not appear in the PHPUnit matrix",
   );
 });
 

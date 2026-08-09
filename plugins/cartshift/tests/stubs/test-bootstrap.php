@@ -23,7 +23,7 @@ if (!defined('OBJECT')) {
 // test ever asserts on this value, have it read cartshift.php's source rather
 // than this constant, as MigrationsTest::testTheTwoVersionConstantsAgree does.
 if (!defined('CARTSHIFT_VERSION')) {
-    define('CARTSHIFT_VERSION', '1.4.0');
+    define('CARTSHIFT_VERSION', '1.4.1');
 }
 
 if (!defined('CARTSHIFT_PLUGIN_PATH')) {

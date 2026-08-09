@@ -33,6 +33,9 @@ env:
   IMAGE_ARTIFACT: fluentcart-mcp-image
   SMOKE_API_KEY: smoke-test-key-0123456789abcdefghijklmnop
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     if: github.event_name == 'workflow_dispatch'
@@ -40,6 +43,7 @@ jobs:
 
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [validate]
     if: always() && (github.event_name != 'workflow_dispatch' || needs.validate.result == 'success')
     outputs:
@@ -48,6 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           sparse-checkout: |
             fluentcart-mcp/scripts
             fluentcart-mcp/tests/acceptance/docker.test.mjs
@@ -150,6 +155,7 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [verify]
     if: ${{ always() && inputs.publish && needs.verify.result == 'success' }}
     permissions:

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CartShift\Domain\Migration;
 
 use CartShift\Domain\Mapping\ProductMapDecision;
+use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\ProductMapRepository;
 use CartShift\Support\Constants;
@@ -31,6 +32,34 @@ defined('ABSPATH') || exit;
  * single write this whole feature exists to stop anyone making carelessly, and
  * nothing a rehearsal is expected to leave behind would undo it. See
  * addOrphanVariant().
+ *
+ * ## Why a run's scope is a parameter and not a field
+ *
+ * The staging table outlives any one run. An owner maps their catalogue on
+ * Monday and on Tuesday runs "orders since March" or "just these four
+ * products", and the decisions from Monday are all still sitting there. Every
+ * one of them used to be promoted regardless, which meant a narrowed run
+ * created orphan variants inside FluentCart products it was never going to
+ * migrate — real writes into the owner's live catalogue — and filed them under
+ * this run's migration id, so rolling the run back deleted variants it had no
+ * business creating in the first place.
+ *
+ * So promote() takes the run's ScopeResolver and asks it, once per decision,
+ * whether the WooCommerce product is one this run touches. It asks rather than
+ * decides: this class has no notion of scope of its own, and must not grow one
+ * — ScopeResolver::includesProduct() is the same answer productPredicate()
+ * gives ProductMigrator, which is the only way promotion and migration can be
+ * guaranteed to agree about what a run covers.
+ *
+ * A parameter rather than a constructor dependency because the scope is read
+ * from MigrationState, which a later batch — a fresh request — may see
+ * differently from the request that built this object. AbstractMigrator draws
+ * exactly the same line for exactly the same reason.
+ *
+ * Out-of-scope decisions are left in the staging table untouched, never
+ * deleted: the spec's edge-case table says so, and the reason is that the
+ * owner's next run may well be wider. They are reported instead, so a run says
+ * what it declined to do.
  *
  * ## Why the product row is written last
  *
@@ -140,22 +169,38 @@ final class MappingPromoter
     }
 
     /**
-     * @return array{linked: int, variants: int, added: int, skipped: list<int>, dead: list<int>, failed: list<int>, foreign: list<int>, fileless: list<int>}
+     * @param ScopeResolver $scope The run's own resolver, built fresh by the
+     *        caller from MigrationState — see the class docblock for why this
+     *        is a parameter rather than a constructor dependency.
+     *
+     * @return array{linked: int, variants: int, added: int, skipped: list<int>, outOfScope: list<int>, dead: list<int>, failed: list<int>, foreign: list<int>, fileless: list<int>}
      */
-    public function promote(string $migrationId): array
+    public function promote(string $migrationId, ScopeResolver $scope): array
     {
-        $linked   = 0;
-        $variants = 0;
-        $added    = 0;
-        $dead     = [];
-        $failed   = [];
-        $foreign  = [];
-        $fileless = [];
+        $linked     = 0;
+        $variants   = 0;
+        $added      = 0;
+        $outOfScope = [];
+        $dead       = [];
+        $failed     = [];
+        $foreign    = [];
+        $fileless   = [];
 
         foreach ($this->map->linked() as $decision) {
             $fcPostId = $decision->fcPostId();
 
             if ($fcPostId === null) {
+                continue;
+            }
+
+            // First, ahead of every read and every write, because a decision
+            // this run does not cover is one it should not so much as look up:
+            // not dead, not fileless, not an orphan to create. On an
+            // "Everything" or a date-limited run this is a no-op that costs
+            // nothing — both take the whole catalogue — so the only run it
+            // narrows is the one that asked to be narrowed.
+            if (!$scope->includesProduct($decision->wcId())) {
+                $outOfScope[] = $decision->wcId();
                 continue;
             }
 
@@ -282,14 +327,15 @@ final class MappingPromoter
         }
 
         return [
-            'linked'   => $linked,
-            'variants' => $variants,
-            'added'    => $added,
-            'skipped'  => $this->map->skippedProductIds(),
-            'dead'     => $dead,
-            'failed'   => $failed,
-            'foreign'  => $foreign,
-            'fileless' => $fileless,
+            'linked'     => $linked,
+            'variants'   => $variants,
+            'added'      => $added,
+            'skipped'    => $this->map->skippedProductIds(),
+            'outOfScope' => $outOfScope,
+            'dead'       => $dead,
+            'failed'     => $failed,
+            'foreign'    => $foreign,
+            'fileless'   => $fileless,
         ];
     }
 

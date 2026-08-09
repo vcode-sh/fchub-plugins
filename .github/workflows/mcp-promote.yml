@@ -40,9 +40,13 @@ env:
   GHCR_IMAGE: ghcr.io/vcode-sh/fluentcart-mcp
   DOCKERHUB_IMAGE: vcodesh/fluentcart-mcp
 
+permissions:
+  contents: read
+
 jobs:
   promote:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: mcp-production
     permissions:
       actions: read
