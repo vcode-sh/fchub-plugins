@@ -36,9 +36,9 @@ use FluentCart\App\Models\Subscription;
  * because there was no checkout. Both default to zero, both require explicit
  * evidence, and neither is ever reached for to make a mismatched count agree —
  * that is what section 10 step 7 is for. Lapka has no trials and no setup fees,
- * so the deduction is zero on all 564 records; the offset is 1 on the 230 whose
- * parent order settled for nothing, which is a fact about those orders and not
- * a concession to the count.
+ * so the deduction is zero on all 564 records; 230 have at least one paid
+ * zero-total cycle and one has three. Those are facts about the included orders,
+ * not concessions to the count.
  */
 final class SubscriptionHistoryLinker
 {
@@ -75,7 +75,9 @@ final class SubscriptionHistoryLinker
 
         foreach ($history->history($record) as $entry) {
             $order        = $entry['order'];
-            $orderType    = $history->fluentCartOrderType($order->sourceOrderId);
+            $orderType    = SubscriptionHistoryIndex::fluentCartOrderTypeForRelationship(
+                (string) $entry['relationship'],
+            );
             $fcOrderId    = $importedOrders[$order->sourceOrderId] ?? null;
 
             // Only parent and renewal charges are paid cycles of THIS
@@ -166,28 +168,25 @@ final class SubscriptionHistoryLinker
             return [self::META_BILLED_CYCLES_OFFSET => 0, self::META_BILLED_CYCLES_DEDUCTION => 0];
         }
 
-        // Route two, from evidence alone: the parent settled and took nothing.
-        // This subsumes route one's offer arm — a declared trial with a zero
-        // setup fee produces exactly this order — so the trial metadata is only
-        // still load-bearing for the deduction below.
-        if ($parent->isConsumedFreeCycle()) {
-            return [self::META_BILLED_CYCLES_OFFSET => 1, self::META_BILLED_CYCLES_DEDUCTION => 0];
-        }
+        // Evidence from every chargeable order, not only the parent. WCS can
+        // legitimately count several complimentary renewals; FluentCart sees
+        // none of them because there is no positive transaction to link.
+        $offset = $history->consumedFreeCycleCount($record);
 
         $hasTrial   = $contract->trialLength > 0 && $record->dates->trialEndUtc !== null;
         $finiteTerm = $contract->finiteCycles !== null && $contract->finiteCycles > 0;
 
         if (!$hasTrial || !$finiteTerm) {
-            return [self::META_BILLED_CYCLES_OFFSET => 0, self::META_BILLED_CYCLES_DEDUCTION => 0];
+            return [self::META_BILLED_CYCLES_OFFSET => $offset, self::META_BILLED_CYCLES_DEDUCTION => 0];
         }
 
         // A signup fee charged on its own: the parent's charge is the fee, and
         // the recurring item has not been billed yet.
         if ($contract->setupFee > 0 && self::chargeTotal($parent) === $contract->setupFee) {
-            return [self::META_BILLED_CYCLES_OFFSET => 0, self::META_BILLED_CYCLES_DEDUCTION => 1];
+            return [self::META_BILLED_CYCLES_OFFSET => $offset, self::META_BILLED_CYCLES_DEDUCTION => 1];
         }
 
-        return [self::META_BILLED_CYCLES_OFFSET => 0, self::META_BILLED_CYCLES_DEDUCTION => 0];
+        return [self::META_BILLED_CYCLES_OFFSET => $offset, self::META_BILLED_CYCLES_DEDUCTION => 0];
     }
 
     /**

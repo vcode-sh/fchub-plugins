@@ -546,35 +546,48 @@ final class DatasetClosureValidatorTest extends PluginTestCase
     }
 
     /**
-     * THE ONE THAT MUST NOT BE ABSORBED.
+     * The remaining live Lapka mismatch: three completed zero-total cycles.
      *
-     * The live Lapka export has 229 mismatches off by one and exactly one off by
-     * three. The correction is bounded at one per subscription and comes from
-     * the parent order alone, so it closes the 229 and leaves the last one
-     * holding with a residual gap of two — which is right. A correction wide
-     * enough to swallow that record would be a correction reached for to make a
-     * mismatch green, and the count would then be a number CartShift made up.
-     * It keeps its code and its diagnostics, and an operator goes and looks.
+     * Every correction is still earned order by order. The wider offset is not
+     * inferred from the gap: each parent/renewal exists, has a paid date, and
+     * settled for zero. An unpaid zero-total renewal remains worth nothing.
      */
-    public function testAGapWiderThanOneCycleStillBlocksWithItsDiagnostics(): void
+    public function testEveryPaidZeroTotalCycleContributesToTheOffset(): void
     {
         $records = $this->completeDataset(
-            subscriptionOverrides: ['source_payment_count' => 4],
+            subscriptionOverrides: [
+                'source_payment_count' => 3,
+                'related_orders' => [
+                    ['source_order_id' => 880_001, 'relationship' => 'parent'],
+                    ['source_order_id' => 880_501, 'relationship' => 'renewal'],
+                    ['source_order_id' => 880_502, 'relationship' => 'renewal'],
+                ],
+            ],
+            renewalOrderOverrides: [
+                'transactions' => [],
+                'totals'       => ['subtotal' => 0, 'tax' => 0, 'total' => 0, 'refunded' => 0],
+                'dates'        => ['created_utc' => '2024-04-11 09:15:00', 'paid_utc' => '2024-04-11 09:15:00'],
+            ],
             parentOrderOverrides: [
                 'transactions' => [],
                 'totals'       => ['subtotal' => 0, 'tax' => 0, 'total' => 0, 'refunded' => 0],
                 'dates'        => ['created_utc' => '2023-04-11 09:15:00', 'paid_utc' => '2023-04-11 09:15:00'],
             ],
         );
+        $records[] = $this->factory->orderFromPayload('local', $this->shapes['renewalOrderPayload']([
+            'source_ref'      => 'order:880502',
+            'source_order_id' => 880_502,
+            'transactions'    => [],
+            'totals'          => ['subtotal' => 0, 'tax' => 0, 'total' => 0, 'refunded' => 0],
+            'dates'           => ['created_utc' => '2025-04-11 09:15:00', 'paid_utc' => '2025-04-11 09:15:00'],
+        ]));
 
         $report = $this->validator->validate($this->manifestFor($records), $records);
 
-        $this->assertFalse($report->isComplete());
-        $this->assertContains(ClosureReport::CODE_HISTORY_COUNT_MISMATCH, $report->reasonCodes());
-        $this->assertSame(
-            ['billed_cycles_offset' => 1, 'included_paid_orders' => 1, 'source_payment_count' => 4],
-            $this->historyMismatchContext($report),
-            'The correction was earned and applied, and it still does not close a gap of three.',
+        $this->assertNotContains(
+            ClosureReport::CODE_HISTORY_COUNT_MISMATCH,
+            $report->reasonCodes(),
+            'Three independently evidenced free cycles are three consumed cycles, not one guessed correction.',
         );
     }
 

@@ -10,8 +10,15 @@ defined('ABSPATH') || exit;
  * Whether a WooCommerce Subscriptions record may stop owning its own billing —
  * plan section 11 Phase C.
  *
- * WHY `is_manual()` IS NOT THE ANSWER. WooCommerce Subscriptions 8.7.1 is
- * layered, and only the middle layer asks the question everybody quotes:
+ * WHY `is_manual()` IS NOT THE PERSISTED FLAG. WooCommerce Subscriptions 8.7.1
+ * makes it true when the site is a staging duplicate or when the configured
+ * gateway is unavailable, even if `get_requires_manual_renewal()` is false.
+ * Those environment conditions disappear when the source returns to
+ * production. Ownership is therefore released by setting and verifying the
+ * persisted flag; the effective result remains an additional safety check.
+ *
+ * The renewal machinery is layered, and only the middle layer asks the
+ * question everybody quotes:
  *
  *  - `WC_Subscriptions_Manager::process_renewal()` creates a manual renewal
  *    order and sets NO gateway on it;
@@ -71,6 +78,7 @@ final class SourceRenewalGuard
      * @return array{
      *     fingerprint: string,
      *     is_manual: bool,
+     *     requires_manual_renewal: bool,
      *     payment_retry: string,
      *     orders: list<array<string, mixed>>,
      *     open: list<array<string, mixed>>,
@@ -107,20 +115,21 @@ final class SourceRenewalGuard
             // total, payment method, paid date, transaction ID, and the
             // subscription's own `payment_retry` date.
             //
-            // `is_manual` is deliberately NOT in it. The release changes that
-            // flag by design, so including it would make every successful
-            // release look like drift and every drift check vacuous. The flag
-            // is verified on its own, immediately after the save.
-            'fingerprint'   => SubscriptionRecordFactory::digest([
+            // Neither manual value belongs in the drift fingerprint. The
+            // release changes the persisted flag by design, so including it
+            // would make every successful release look like drift. Both are
+            // verified explicitly around the save instead.
+            'fingerprint' => SubscriptionRecordFactory::digest([
                 'orders'        => $orders,
                 'payment_retry' => $retry,
                 'subscription'  => $subscriptionId,
             ]),
-            'is_manual'     => self::boolOf($subscription, 'is_manual'),
-            'payment_retry' => $retry,
-            'orders'        => $orders,
-            'open'          => $open,
-            'failures'      => self::openFailures(
+            'is_manual'              => self::boolOf($subscription, 'is_manual'),
+            'requires_manual_renewal' => self::boolOf($subscription, 'get_requires_manual_renewal'),
+            'payment_retry'          => $retry,
+            'orders'                 => $orders,
+            'open'                   => $open,
+            'failures'               => self::openFailures(
                 $subscriptionId,
                 self::stringOf($subscription, 'get_status'),
                 $open,
@@ -159,7 +168,7 @@ final class SourceRenewalGuard
     public function release(object $subscription): array
     {
         $subscriptionId = self::intOf($subscription, 'get_id');
-        $previous       = self::boolOf($subscription, 'is_manual');
+        $previous       = self::boolOf($subscription, 'get_requires_manual_renewal');
 
         $pre = $this->inspect($subscription);
 
@@ -203,16 +212,18 @@ final class SourceRenewalGuard
 
         // Necessary, and asserted first because everything after it is about
         // what the flag does NOT cover.
-        if (!$post['is_manual']) {
+        if (!$post['requires_manual_renewal'] || !$post['is_manual']) {
             // `true` even though the flag did not take. `save()` was called, so
             // nothing here can prove the source is untouched, and the safe
             // direction for a fact that gates a rebuild is to assume it is.
             return self::blocked($previous, $pre, $post, [[
                 'code'    => self::REASON_RELEASE_UNVERIFIED,
                 'message' => sprintf(
-                    'Subscription WC-#%d still reports is_manual() === false after the save, so WooCommerce '
-                    . 'Subscriptions did not take the change. The source still owns this billing.',
+                    'Subscription WC-#%d did not prove the manual-renewal release after the save '
+                    . '(requires_manual_renewal=%s, is_manual()=%s). The source still owns this billing.',
                     $subscriptionId,
+                    $post['requires_manual_renewal'] ? 'true' : 'false',
+                    $post['is_manual'] ? 'true' : 'false',
                 ),
             ]], true);
         }
@@ -319,7 +330,7 @@ final class SourceRenewalGuard
 
         $post = $this->inspect($subscription);
 
-        if ($post['is_manual'] !== $previousManual) {
+        if ($post['requires_manual_renewal'] !== $previousManual) {
             return [
                 'state'          => self::STATE_BLOCKED,
                 'source_mutated' => true,
@@ -328,10 +339,11 @@ final class SourceRenewalGuard
                 'failures' => [[
                     'code'    => self::REASON_RELEASE_UNVERIFIED,
                     'message' => sprintf(
-                        'Subscription WC-#%d did not take the restored manual flag. Its current state is '
-                        . 'is_manual() === %s; check the source before letting anything renew.',
+                        'Subscription WC-#%d did not take the restored persisted manual-renewal flag. Its '
+                        . 'current requires_manual_renewal value is %s; check the source before letting '
+                        . 'anything renew.',
                         $subscriptionId,
-                        $post['is_manual'] ? 'true' : 'false',
+                        $post['requires_manual_renewal'] ? 'true' : 'false',
                     ),
                 ]],
             ];

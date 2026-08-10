@@ -134,15 +134,60 @@ final class SubscriptionPackageTest extends PluginTestCase
 
     public function testTheHeaderCarriesTheSelectionFingerprintAndTheStorageAuthority(): void
     {
-        $selection = SubscriptionSelection::all(self::SOURCE_KEY);
+        $selection = new SubscriptionSelection(self::SOURCE_KEY, [], [], [910_014]);
         $path = $this->export($selection);
 
         $manifest = (new SubscriptionPackageReader())->manifest($path);
 
         $this->assertSame(DatasetManifest::SCHEMA_VERSION, $manifest->schemaVersion);
         $this->assertSame($selection->fingerprint(), $manifest->selectionFingerprint);
+        $this->assertSame(
+            $selection->toArray(),
+            SubscriptionSelection::fromArray($manifest->selection)->toArray(),
+        );
         $this->assertSame('posts', $manifest->storageAuthority);
         $this->assertSame(['PLN'], $manifest->currencies);
+    }
+
+    public function testASelectionDefinitionThatDisagreesWithItsFingerprintIsRefused(): void
+    {
+        $path = $this->export(
+            new SubscriptionSelection(self::SOURCE_KEY, [], [], [910_030]),
+            'selection-tampered.ndjson',
+        );
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $header = (array) json_decode((string) $lines[0], true);
+        $header['selection']['excluded_subscription_ids'] = [910_031];
+        $lines[0] = SubscriptionRecordFactory::canonicalJson($header);
+        file_put_contents($path, implode("\n", $lines) . "\n");
+
+        $result = (new SubscriptionPackageReader())->validate($path);
+
+        $this->assertFalse($result['ok']);
+        $this->assertContains(
+            SubscriptionPackageReader::REASON_CHECKSUM_MISMATCH,
+            array_column($result['failures'], 'code'),
+        );
+    }
+
+    public function testARewrittenSelectionAndFingerprintCannotDisownRecordsStillInThePackage(): void
+    {
+        $path = $this->export(null, 'selection-rewritten.ndjson');
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $header = (array) json_decode((string) $lines[0], true);
+        $selection = new SubscriptionSelection(self::SOURCE_KEY, [], [], [910_030]);
+        $header['selection'] = $selection->toArray();
+        $header['selection_fingerprint'] = $selection->fingerprint();
+        $lines[0] = SubscriptionRecordFactory::canonicalJson($header);
+        file_put_contents($path, implode("\n", $lines) . "\n");
+
+        $result = (new SubscriptionPackageReader())->validate($path);
+
+        $this->assertFalse($result['ok']);
+        $this->assertContains(
+            SubscriptionPackageReader::REASON_CHECKSUM_MISMATCH,
+            array_column($result['failures'], 'code'),
+        );
     }
 
     // ──────────────────────────────────────────────
@@ -239,7 +284,7 @@ final class SubscriptionPackageTest extends PluginTestCase
 
         $lines = file($path, FILE_IGNORE_NEW_LINES);
         $header = (array) json_decode((string) $lines[0], true);
-        unset($header['storage_mirror']);
+        unset($header['selection'], $header['storage_mirror']);
         $lines[0] = SubscriptionRecordFactory::canonicalJson($header);
         file_put_contents($path, implode("\n", $lines) . "\n");
 
@@ -250,6 +295,7 @@ final class SubscriptionPackageTest extends PluginTestCase
             'The field is additive, so schema_version stays 1 and an older package still reads.',
         );
         $this->assertSame([], $result['manifest']->storageMirror);
+        $this->assertSame([], $result['manifest']->selection);
     }
 
     public function testTheRecordOrderIsDeterministic(): void

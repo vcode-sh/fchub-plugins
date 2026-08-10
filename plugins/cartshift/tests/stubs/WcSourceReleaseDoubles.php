@@ -133,6 +133,7 @@ if (!class_exists('CartShiftSourceSubscriptionDouble')) {
             array $related = [],
             ?callable $onSave = null,
             private readonly bool $saveSucceeds = true,
+            private readonly ?bool $effectiveManual = null,
         ) {
             $this->related = $related + ['parent' => [], 'renewal' => [], 'switch' => [], 'resubscribe' => []];
             $this->onSave  = $onSave === null ? null : $onSave(...);
@@ -149,6 +150,11 @@ if (!class_exists('CartShiftSourceSubscriptionDouble')) {
         }
 
         public function is_manual(): bool
+        {
+            return $this->effectiveManual ?? $this->manual;
+        }
+
+        public function get_requires_manual_renewal(): bool
         {
             return $this->manual;
         }

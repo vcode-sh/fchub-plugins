@@ -153,6 +153,51 @@ final class SubscriptionAuditCommandTest extends PluginTestCase
         $this->assertGreaterThan(0, $GLOBALS['_cartshift_test_wc_order_lookups']);
     }
 
+    public function testLiveAuditAppliesAndReportsTheSameNarrowedSelectionAsExport(): void
+    {
+        $this->seedSource([
+            $this->shapes['monthlyPln29'](['id' => 910_101]),
+            $this->shapes['yearlyPln290'](['id' => 910_102]),
+            $this->shapes['cancelled'](['id' => 910_103]),
+        ]);
+        $GLOBALS['_cartshift_test_wp_cli'] = [];
+
+        SubscriptionCommand::audit([], [
+            'source'                   => 'live',
+            'source-key'               => self::SOURCE_KEY,
+            'exclude-subscription-ids' => '910102',
+            'statuses'                 => 'active,cancelled',
+            'format'                   => 'json',
+        ]);
+
+        $line = array_values(array_filter(
+            $GLOBALS['_cartshift_test_wp_cli'],
+            static fn (array $message): bool => $message['level'] === 'line',
+        ));
+        $document = json_decode((string) ($line[0]['message'] ?? ''), true);
+
+        $this->assertSame(2, $document['manifest']['counts']['subscription']);
+        $this->assertSame([910_102], $document['selection']['excluded_subscription_ids']);
+        $this->assertSame(['active', 'cancelled'], $document['selection']['statuses']);
+    }
+
+    public function testPackageAuditRefusesSelectionFlagsInsteadOfPretendingToReapplyThem(): void
+    {
+        $path = $this->exportPackage();
+        $GLOBALS['_cartshift_test_wp_cli'] = [];
+
+        SubscriptionCommand::audit([], [
+            'file'                     => $path,
+            'exclude-subscription-ids' => '910030',
+            'format'                   => 'json',
+        ]);
+
+        $this->assertStringContainsString(
+            'already carries its frozen selection',
+            implode(' ', array_column($GLOBALS['_cartshift_test_wp_cli'], 'message')),
+        );
+    }
+
     public function testAuditingAPackageWritesNothingAtAll(): void
     {
         $path = $this->exportPackage();
@@ -440,6 +485,83 @@ final class SubscriptionAuditCommandTest extends PluginTestCase
 
         $this->assertSame([], $watched['violations']);
         $this->assertFileExists($path);
+    }
+
+    public function testExportPersistsAndAppliesTheOperatorsNarrowedSelection(): void
+    {
+        $this->seedSource([
+            $this->shapes['monthlyPln29'](['id' => 910_101]),
+            $this->shapes['yearlyPln290'](['id' => 910_102]),
+            $this->shapes['cancelled'](['id' => 910_103]),
+        ]);
+
+        $path = $this->workspace . '/narrowed.ndjson';
+
+        SubscriptionCommand::export([], [
+            'output'                   => $path,
+            'source-key'               => self::SOURCE_KEY,
+            'exclude-subscription-ids' => '910102',
+            'statuses'                 => 'active,cancelled',
+        ]);
+
+        $reader = new \CartShift\Domain\Subscription\Package\SubscriptionPackageReader();
+        $result = $reader->validate($path);
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame(2, $result['manifest']?->countFor('subscription'));
+        $this->assertSame([
+            'excluded_subscription_ids' => [910_102],
+            'source_key'                => self::SOURCE_KEY,
+            'statuses'                  => ['active', 'cancelled'],
+            'subscription_ids'          => [],
+        ], $result['manifest']?->selection);
+
+        $refs = [];
+
+        foreach ($reader->records($path) as $record) {
+            if ($record->kind() === 'subscription') {
+                $refs[] = $record->sourceRef;
+            }
+        }
+
+        $this->assertSame(['subscription:910101', 'subscription:910103'], $refs);
+    }
+
+    public function testExportRefusesAnIdIncludedAndExcludedByTheSameSelection(): void
+    {
+        $GLOBALS['_cartshift_test_wp_cli'] = [];
+        $path = $this->workspace . '/contradictory.ndjson';
+
+        SubscriptionCommand::export([], [
+            'output'                   => $path,
+            'source-key'               => self::SOURCE_KEY,
+            'subscription-ids'         => '910030',
+            'exclude-subscription-ids' => '910030',
+        ]);
+
+        $this->assertFileDoesNotExist($path);
+        $this->assertStringContainsString(
+            'both included and excluded',
+            implode(' ', array_column($GLOBALS['_cartshift_test_wp_cli'], 'message')),
+        );
+    }
+
+    public function testExportRefusesMalformedSubscriptionIdsInsteadOfCastingThemToZero(): void
+    {
+        $GLOBALS['_cartshift_test_wp_cli'] = [];
+        $path = $this->workspace . '/malformed-selection.ndjson';
+
+        SubscriptionCommand::export([], [
+            'output'           => $path,
+            'source-key'       => self::SOURCE_KEY,
+            'subscription-ids' => '910030,banana,-4',
+        ]);
+
+        $this->assertFileDoesNotExist($path);
+        $this->assertStringContainsString(
+            '--subscription-ids accepts positive numeric IDs',
+            implode(' ', array_column($GLOBALS['_cartshift_test_wp_cli'], 'message')),
+        );
     }
 
     public function testExportRefusesAPathInsideAGitRepository(): void

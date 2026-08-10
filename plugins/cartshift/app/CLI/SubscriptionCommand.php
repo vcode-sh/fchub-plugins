@@ -225,6 +225,15 @@ final class SubscriptionCommand
      * default: local
      * ---
      *
+     * [--subscription-ids=<ids>]
+     * : Comma-separated positive subscription IDs to include. Live source only.
+     *
+     * [--exclude-subscription-ids=<ids>]
+     * : Comma-separated positive subscription IDs to exclude. Live source only.
+     *
+     * [--statuses=<statuses>]
+     * : Comma-separated WooCommerce subscription statuses to include. Live source only.
+     *
      * [--format=<format>]
      * : Output format.
      * ---
@@ -272,7 +281,20 @@ final class SubscriptionCommand
             return;
         }
 
-        $document = self::auditDocument($source, self::sourceKey($assocArgs), $file);
+        if ($source === self::SOURCE_PACKAGE && self::hasSelectionArgs($assocArgs)) {
+            \WP_CLI::error('A package already carries its frozen selection. Re-export it to change the cohort.');
+
+            return;
+        }
+
+        $sourceKey = self::sourceKey($assocArgs);
+        $selection = $source === self::SOURCE_LIVE ? self::selection($assocArgs, $sourceKey) : null;
+
+        if ($source === self::SOURCE_LIVE && $selection === null) {
+            return;
+        }
+
+        $document = self::auditDocument($source, $sourceKey, $file, $selection);
 
         self::emit($document, $format);
 
@@ -329,11 +351,20 @@ final class SubscriptionCommand
      *
      * [--source-key=<key>]
      * : The stable slug identifying this source. Use the same one every time —
-     * : a source restored under a different hostname must stay idempotent, so
-     * : this must never be derived from a URL.
+     * a source restored under a different hostname must stay idempotent, so
+     * this must never be derived from a URL.
      * ---
      * default: local
      * ---
+     *
+     * [--subscription-ids=<ids>]
+     * : Comma-separated positive subscription IDs to include.
+     *
+     * [--exclude-subscription-ids=<ids>]
+     * : Comma-separated positive subscription IDs to exclude.
+     *
+     * [--statuses=<statuses>]
+     * : Comma-separated WooCommerce subscription statuses to include.
      *
      * ## EXAMPLES
      *
@@ -357,7 +388,11 @@ final class SubscriptionCommand
         }
 
         $sourceKey = self::sourceKey($assocArgs);
-        $selection = SubscriptionSelection::all($sourceKey);
+        $selection = self::selection($assocArgs, $sourceKey);
+
+        if ($selection === null) {
+            return;
+        }
 
         $result = (new SubscriptionPackageWriter())->write(
             $output,
@@ -677,13 +712,28 @@ final class SubscriptionCommand
      *
      * --receipt=<path>
      * : Where to write the private cutover receipt. Outside the web root and
-     * : outside any Git repository, the same as a package.
+     * outside any Git repository, the same as a package.
      *
      * [--approve-system-settings=<sha256>]
      * : The exact target settings/census fingerprint the audit printed. Required
-     * : before any `system` candidate may be created; a hash that has moved
-     * : since is not an approval. CartShift changes no FluentCart setting to
-     * : make one fit.
+     * before any `system` candidate may be created; a hash that has moved
+     * since is not an approval. CartShift changes no FluentCart setting to
+     * make one fit.
+     *
+     * [--accept-manual-fallback]
+     * : Explicitly accept that subscriptions which cannot carry a verified
+     * off-session mandate will move to manual collection. FluentCart will raise
+     * an invoice and the customer must pay it; this flag never imports an
+     * unverified token and never enables store-wide system charging.
+     *
+     * [--subscription-ids=<ids>]
+     * : Comma-separated positive subscription IDs to include. Live source only; packages are already frozen.
+     *
+     * [--exclude-subscription-ids=<ids>]
+     * : Comma-separated positive subscription IDs to exclude. Live source only; packages are already frozen.
+     *
+     * [--statuses=<statuses>]
+     * : Comma-separated WooCommerce subscription statuses to include. Live source only.
      *
      * [--confirm]
      * : Required. Without it nothing happens.
@@ -691,6 +741,7 @@ final class SubscriptionCommand
      * ## EXAMPLES
      *
      *     wp cartshift subscriptions stage --file=/srv/private/lapka.ndjson --receipt=/srv/private/receipt.ndjson --confirm
+     *     wp cartshift subscriptions stage --file=/srv/private/lapka.ndjson --receipt=/srv/private/receipt.ndjson --accept-manual-fallback --confirm
      *     wp cartshift subscriptions stage --source=live --receipt=/srv/private/receipt.ndjson --confirm
      *
      * @param string[] $args      Positional arguments.
@@ -726,15 +777,29 @@ final class SubscriptionCommand
         $sourceKey = self::sourceKey($assocArgs);
         $dataset   = null;
         $checksum  = '';
+        $selection = null;
 
         if ($source === self::SOURCE_LIVE) {
             if (!self::liveSourceIsReadable()) {
                 return;
             }
 
-            $dataset = new WooSubscriptionDatasetSource($sourceKey, SubscriptionSelection::all($sourceKey));
+            $selection = self::selection($assocArgs, $sourceKey);
+
+            if ($selection === null) {
+                return;
+            }
+
+            $dataset = new WooSubscriptionDatasetSource($sourceKey, $selection);
         } else {
-            $descriptor = $file === null ? (new PackageContextRepository())->get($sourceKey) : null;
+            if (self::hasSelectionArgs($assocArgs)) {
+                \WP_CLI::error('A package already carries its frozen selection. Re-export it to change the cohort.');
+
+                return;
+            }
+
+            $packages   = new PackageContextRepository();
+            $descriptor = $file === null ? $packages->get($sourceKey) : null;
             $path       = $file ?? (string) ($descriptor['path'] ?? '');
 
             if ($path === '') {
@@ -757,6 +822,14 @@ final class SubscriptionCommand
 
                 return;
             }
+
+            $sourceKey = $package['manifest']?->sourceKey ?? $sourceKey;
+
+            // An explicit path changes where the package came from, not which
+            // prepared package the mapping decisions belong to. Resolve the
+            // manifest's source key first, then consult its descriptor even
+            // when `--file` was supplied.
+            $descriptor ??= $packages->get($sourceKey);
 
             // AGAINST THE DESCRIPTOR, NOT ONLY AGAINST ITSELF. §6.5 and
             // `preparePackage()`'s own docblock both promise the file is
@@ -782,9 +855,12 @@ final class SubscriptionCommand
                 return;
             }
 
-            $sourceKey = $package['manifest']?->sourceKey ?? $sourceKey;
             $checksum  = $package['checksum'];
             $dataset   = new PackageSubscriptionDatasetSource($package['path']);
+            $definition = $package['manifest']?->selection ?? [];
+            $selection = $definition === []
+                ? SubscriptionSelection::all($sourceKey)
+                : SubscriptionSelection::fromArray($definition, $sourceKey);
         }
 
         self::report('stage', (new SubscriptionCutover())->stage($dataset, [
@@ -792,7 +868,9 @@ final class SubscriptionCommand
             'receipt_path'            => $receipt,
             'package_checksum'        => $checksum,
             'approve_system_settings' => self::stringArg($assocArgs, 'approve-system-settings'),
+            'accept_manual_fallback'   => self::flag($assocArgs, 'accept-manual-fallback'),
             'migration_id'            => 'cutover-' . gmdate('YmdHis'),
+            'selection'               => $selection,
         ]));
     }
 
@@ -821,8 +899,8 @@ final class SubscriptionCommand
      *
      * [--source-key=<key>]
      * : Optional. The receipt already records the source key it was written
-     * : under and that is what this command uses; pass one only if you want it
-     * : checked, and it must match. It is NOT a reason to re-export.
+     * under and that is what this command uses; pass one only if you want it
+     * checked, and it must match. It is NOT a reason to re-export.
      *
      * [--confirm]
      * : Required. Without it nothing happens.
@@ -880,8 +958,8 @@ final class SubscriptionCommand
      *
      * [--source-key=<key>]
      * : Optional. The receipt already records the source key it was written
-     * : under and that is what this command uses; pass one only if you want it
-     * : checked, and it must match. It is NOT a reason to re-export.
+     * under and that is what this command uses; pass one only if you want it
+     * checked, and it must match. It is NOT a reason to re-export.
      *
      * [--confirm]
      * : Required. Without it nothing happens.
@@ -939,8 +1017,8 @@ final class SubscriptionCommand
      *
      * [--source-key=<key>]
      * : Optional. The receipt already records the source key it was written
-     * : under and that is what this command uses; pass one only if you want it
-     * : checked, and it must match. It is NOT a reason to re-export.
+     * under and that is what this command uses; pass one only if you want it
+     * checked, and it must match. It is NOT a reason to re-export.
      *
      * @param string[] $args      Positional arguments.
      * @param string[] $assocArgs Associative arguments.
@@ -985,8 +1063,8 @@ final class SubscriptionCommand
      *
      * [--source-key=<key>]
      * : Optional. The receipt already records the source key it was written
-     * : under and that is what this command uses; pass one only if you want it
-     * : checked, and it must match. It is NOT a reason to re-export.
+     * under and that is what this command uses; pass one only if you want it
+     * checked, and it must match. It is NOT a reason to re-export.
      *
      * [--confirm]
      * : Required. Without it nothing happens.
@@ -1074,7 +1152,12 @@ final class SubscriptionCommand
      *
      * @return array<string, mixed>
      */
-    private static function auditDocument(string $source, string $sourceKey, ?string $file): array
+    private static function auditDocument(
+        string $source,
+        string $sourceKey,
+        ?string $file,
+        ?SubscriptionSelection $selection = null,
+    ): array
     {
         if ($source === self::SOURCE_PACKAGE) {
             $result = (new SubscriptionPackageReader())->validate((string) $file);
@@ -1092,6 +1175,7 @@ final class SubscriptionCommand
                 ],
                 'source'                => self::SOURCE_PACKAGE,
                 'source_key'            => $manifest?->sourceKey ?? $sourceKey,
+                'selection'             => $manifest?->selection ?? [],
                 'selection_fingerprint' => $manifest?->selectionFingerprint ?? '',
                 'storage_authority'     => $manifest?->storageAuthority ?? '',
                 // The source's finding, carried in the header, and labelled as
@@ -1117,7 +1201,7 @@ final class SubscriptionCommand
             return self::canonical($document);
         }
 
-        $selection = SubscriptionSelection::all($sourceKey);
+        $selection ??= SubscriptionSelection::all($sourceKey);
         $live = new WooSubscriptionDatasetSource($sourceKey, $selection);
 
         $manifest = $live->manifest();
@@ -1130,6 +1214,7 @@ final class SubscriptionCommand
             'package'               => null,
             'source'                => self::SOURCE_LIVE,
             'source_key'            => $sourceKey,
+            'selection'             => $selection->toArray(),
             'selection_fingerprint' => $selection->fingerprint(),
             'storage_authority'     => $manifest->storageAuthority,
             // Reported, never adopted. Lapka's HPOS mirror holds two
@@ -1302,6 +1387,97 @@ final class SubscriptionCommand
     private static function sourceKey(array $assocArgs): string
     {
         return self::stringArg($assocArgs, 'source-key') ?? Constants::DEFAULT_SOURCE_KEY;
+    }
+
+    /**
+     * Build one canonical cohort definition from operator input.
+     *
+     * IDs are deliberately strict here rather than passed through `intval()`:
+     * `banana` becoming zero would silently turn a narrowed migration into an
+     * all-subscriptions migration, which is quite a dramatic typo expansion.
+     *
+     * @param array<string, mixed> $assocArgs
+     */
+    private static function selection(array $assocArgs, string $sourceKey): ?SubscriptionSelection
+    {
+        $included = self::idList($assocArgs, 'subscription-ids');
+        $excluded = self::idList($assocArgs, 'exclude-subscription-ids');
+
+        if ($included === null || $excluded === null) {
+            return null;
+        }
+
+        $overlap = array_values(array_intersect($included, $excluded));
+
+        if ($overlap !== []) {
+            \WP_CLI::error(sprintf(
+                'Subscription IDs cannot be both included and excluded: %s.',
+                implode(', ', $overlap),
+            ));
+
+            return null;
+        }
+
+        $statuses = self::listArg($assocArgs, 'statuses');
+
+        return new SubscriptionSelection($sourceKey, $included, $statuses, $excluded);
+    }
+
+    /**
+     * @param array<string, mixed> $assocArgs
+     */
+    private static function hasSelectionArgs(array $assocArgs): bool
+    {
+        foreach (['subscription-ids', 'exclude-subscription-ids', 'statuses'] as $name) {
+            if (array_key_exists($name, $assocArgs)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, mixed> $assocArgs
+     * @return list<int>|null Null means malformed input; an empty list means no filter.
+     */
+    private static function idList(array $assocArgs, string $name): ?array
+    {
+        $values = self::listArg($assocArgs, $name);
+        $ids = [];
+
+        foreach ($values as $value) {
+            if (!ctype_digit($value) || (int) $value <= 0) {
+                \WP_CLI::error(sprintf('--%s accepts positive numeric IDs separated by commas.', $name));
+
+                return null;
+            }
+
+            $ids[] = (int) $value;
+        }
+
+        $ids = array_values(array_unique($ids));
+        sort($ids);
+
+        return $ids;
+    }
+
+    /**
+     * @param array<string, mixed> $assocArgs
+     * @return list<string>
+     */
+    private static function listArg(array $assocArgs, string $name): array
+    {
+        $value = trim((string) ($assocArgs[$name] ?? ''));
+
+        if ($value === '') {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (string $item): string => trim($item),
+            preg_split('/[\s,]+/', $value) ?: [],
+        ), static fn (string $item): bool => $item !== ''));
     }
 
     /**

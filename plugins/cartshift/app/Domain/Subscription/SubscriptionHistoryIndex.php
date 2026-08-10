@@ -374,7 +374,19 @@ final class SubscriptionHistoryIndex
     {
         $relationship = $this->relationship($sourceOrderId);
 
-        return $relationship === null ? null : (self::FLUENT_CART_ORDER_TYPES[$relationship] ?? null);
+        return $relationship === null ? null : self::fluentCartOrderTypeForRelationship($relationship);
+    }
+
+    /**
+     * Type one order in the context of the subscription currently importing it.
+     *
+     * A WCS resubscribe order is both history of the old subscription and the
+     * parent of the new one. The global index quite properly calls those roles
+     * ambiguous; the new subscription's own typed reference is not ambiguous.
+     */
+    public static function fluentCartOrderTypeForRelationship(string $relationship): ?string
+    {
+        return self::FLUENT_CART_ORDER_TYPES[$relationship] ?? null;
     }
 
     /**
@@ -482,6 +494,29 @@ final class SubscriptionHistoryIndex
     public function paidOrderCount(SubscriptionRecord $record): int
     {
         return count($this->paidOrderIds($record));
+    }
+
+    /**
+     * Chargeable cycles WCS counted but FluentCart cannot see as transactions.
+     *
+     * Each result is evidenced by an included parent/renewal order with a paid
+     * date and zero total. Failed or merely open zero-total orders do not count.
+     */
+    public function consumedFreeCycleCount(SubscriptionRecord $record): int
+    {
+        $count = 0;
+
+        foreach ($this->history($record) as $entry) {
+            if (!in_array($entry['relationship'], self::CHARGEABLE_RELATIONSHIPS, true)) {
+                continue;
+            }
+
+            if ($entry['order']->isConsumedFreeCycle()) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     /**

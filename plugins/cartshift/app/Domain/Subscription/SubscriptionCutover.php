@@ -20,6 +20,7 @@ use CartShift\Domain\Subscription\Source\WooDatasetRecordFactory;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\ProductMapRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\DatabaseTransaction;
 use FluentCart\App\Models\Subscription;
 
 /**
@@ -64,6 +65,9 @@ final class SubscriptionCutover
 
     /** Section 9.4, Contract/mapping. */
     public const string REASON_VARIATION_COLLISION = MappingSetValidator::ERROR_COLLISION;
+
+    /** An unexpected destination write failed inside a per-subscription transaction. */
+    public const string REASON_DATABASE_WRITE_FAILED = 'database_write_failed';
 
     /** A SHA-256, written the one way this plugin writes them. */
     private const string SHA256 = '/^[0-9a-f]{64}$/';
@@ -146,7 +150,24 @@ final class SubscriptionCutover
             return self::refusal($approvalFailures);
         }
 
-        $selection = SubscriptionSelection::all($sourceKey);
+        $selectionOption = $options['selection'] ?? null;
+        $selection = $selectionOption instanceof SubscriptionSelection
+            ? $selectionOption
+            : (is_array($selectionOption)
+                ? SubscriptionSelection::fromArray($selectionOption, $sourceKey)
+                : SubscriptionSelection::all($sourceKey));
+
+        if (!hash_equals($sourceKey, $selection->sourceKey)) {
+            return self::refusal([[
+                'code'    => CutoverReceipt::REASON_SOURCE_FINGERPRINT_CHANGED,
+                'message' => sprintf(
+                    'The stage source key is %s but the selection belongs to %s. Nothing was written.',
+                    $sourceKey,
+                    $selection->sourceKey,
+                ),
+            ]]);
+        }
+
         $records   = self::materialise($dataset->records($selection));
 
         // Section 6.2, step 2, taken across the WHOLE decision set rather than
@@ -175,7 +196,7 @@ final class SubscriptionCutover
             'target_settings_fingerprint' => $settingsFingerprint,
         ];
 
-        $loaded = self::loadOrBegin($receiptPath, $sourceKey, $context);
+        $loaded = self::loadOrBegin($receiptPath, $sourceKey, $context, $selection);
 
         if ($loaded['receipt'] === null) {
             return self::refusal($loaded['failures']);
@@ -241,7 +262,11 @@ final class SubscriptionCutover
 
         $idMap       = new IdMapRepository($sourceKey);
         $history     = SubscriptionHistoryIndex::fromRecords($sourceKey, $records);
-        $environment = self::environment($settingsFingerprint, is_string($approval) ? $approval : null);
+        $environment = self::environment(
+            $settingsFingerprint,
+            is_string($approval) ? $approval : null,
+            ($options['accept_manual_fallback'] ?? false) === true,
+        );
         $assessor    = new SubscriptionAssessor($idMap, PaymentStrategyRegistry::withDefaults(), $environment);
 
         /** @var list<SubscriptionRecord> $subscriptions */
@@ -384,7 +409,7 @@ final class SubscriptionCutover
             return self::refusal($mismatch, $receipt);
         }
 
-        $context = ['selection_fingerprint' => SubscriptionSelection::all($sourceKey)->fingerprint()];
+        $context = ['selection_fingerprint' => $receipt->selection()->fingerprint()];
 
         $failures = $receipt->transitionFailures(CutoverReceipt::STATE_SOURCE_RELEASED, $context);
 
@@ -461,7 +486,7 @@ final class SubscriptionCutover
         }
 
         $context = [
-            'selection_fingerprint'       => SubscriptionSelection::all($sourceKey)->fingerprint(),
+            'selection_fingerprint'       => $receipt->selection()->fingerprint(),
             'mapping_fingerprint'         => (new MappingSetValidator())
                 ->validate($this->decisions($sourceKey))
                 ->fingerprint(),
@@ -578,7 +603,7 @@ final class SubscriptionCutover
         }
 
         $failures = $receipt->transitionFailures(CutoverReceipt::STATE_RECONCILED, [
-            'selection_fingerprint' => SubscriptionSelection::all($sourceKey)->fingerprint(),
+            'selection_fingerprint' => $receipt->selection()->fingerprint(),
         ]);
 
         if ($failures !== []) {
@@ -650,7 +675,7 @@ final class SubscriptionCutover
         }
 
         $failures = $receipt->transitionFailures(CutoverReceipt::STATE_SOURCE_RESTORED, [
-            'selection_fingerprint' => SubscriptionSelection::all($sourceKey)->fingerprint(),
+            'selection_fingerprint' => $receipt->selection()->fingerprint(),
         ]);
 
         if ($failures !== []) {
@@ -805,22 +830,36 @@ final class SubscriptionCutover
             ]);
         }
 
+        // Steps 4 to 6 are one subscription, not three vaguely related writes.
+        // `SubscriptionWriter` opens its own nested boundary, while the linker
+        // updates transactions and the reconciler may update `bill_count` after
+        // the writer returns. Without this outer boundary the writer commits
+        // first and a later exception leaves a subscription with partial
+        // history. `DatabaseTransaction` depth-counts, so the inner commit does
+        // not reach MySQL until all three steps have succeeded.
+        DatabaseTransaction::begin();
+
         try {
             $subscriptionId = (new SubscriptionWriter($idMap))->stage($record, $assessment, $migrationId);
+
+            // Section 6.2, steps 5 and 6. Only now: a transaction cannot name a
+            // subscription that had no ID a moment ago.
+            $linked = (new SubscriptionHistoryLinker($idMap))
+                ->link($record, $history, $subscriptionId, $import['orders'] ?? []);
+
+            $reconciliation = (new SubscriptionReconciler($history, $idMap))
+                ->reconcile($record, $subscriptionId);
+
+            DatabaseTransaction::commit();
         } catch (\Throwable $exception) {
+            DatabaseTransaction::rollback();
+
             return CutoverReceipt::entry($base + [
                 'outcome'      => CutoverReceipt::OUTCOME_BLOCKED,
                 'state'        => CutoverReceipt::STATE_ASSESSED,
-                'reason_codes' => [SubscriptionAssessment::REASON_REQUIRED_REFERENCE_MISSING],
+                'reason_codes' => [self::REASON_DATABASE_WRITE_FAILED],
             ]);
         }
-
-        // Section 6.2, steps 5 and 6. Only now: a transaction cannot name a
-        // subscription that had no ID a moment ago.
-        $linked = (new SubscriptionHistoryLinker($idMap))
-            ->link($record, $history, $subscriptionId, $import['orders'] ?? []);
-
-        $reconciliation = (new SubscriptionReconciler($history, $idMap))->reconcile($record, $subscriptionId);
 
         return CutoverReceipt::entry($base + [
             'outcome'                => $assessment->warningCodes() === []
@@ -1486,7 +1525,11 @@ final class SubscriptionCutover
      * stage that judged a record differently from the audit that previewed it
      * would make the audit decorative.
      */
-    private static function environment(string $settingsFingerprint, ?string $approval): PaymentEnvironment
+    private static function environment(
+        string $settingsFingerprint,
+        ?string $approval,
+        bool $manualFallbackAccepted = false,
+    ): PaymentEnvironment
     {
         $environment = new PaymentEnvironment(
             capabilities: new PaymentCapabilityProbe(),
@@ -1495,7 +1538,7 @@ final class SubscriptionCutover
             verifiers: [],
             verifiedWebhookOwners: [],
             /** @see 'cartshift/subscription/manual_fallback_confirmed' */
-            manualFallbackConfirmed: (bool) apply_filters(
+            manualFallbackConfirmed: $manualFallbackAccepted || (bool) apply_filters(
                 'cartshift/subscription/manual_fallback_confirmed',
                 false,
             ),
@@ -1551,7 +1594,12 @@ final class SubscriptionCutover
      * @param array<string, string> $context
      * @return array{receipt: CutoverReceipt|null, failures: list<array{code: string, message: string}>}
      */
-    private static function loadOrBegin(string $path, string $sourceKey, array $context): array
+    private static function loadOrBegin(
+        string $path,
+        string $sourceKey,
+        array $context,
+        SubscriptionSelection $selection,
+    ): array
     {
         $resolved = \CartShift\Domain\Subscription\Package\PackagePath::resolveForRead($path);
 
@@ -1571,6 +1619,8 @@ final class SubscriptionCutover
                     $context['selection_fingerprint'] ?? '',
                     $context['mapping_fingerprint'] ?? '',
                     $context['target_settings_fingerprint'] ?? '',
+                    '',
+                    $selection->toArray(),
                 ),
                 'failures' => [],
             ];
@@ -1756,7 +1806,7 @@ final class SubscriptionCutover
      */
     private static function remedy(CutoverReceipt $receipt, string $sourceKey): string
     {
-        $context   = ['selection_fingerprint' => SubscriptionSelection::all($sourceKey)->fingerprint()];
+        $context   = ['selection_fingerprint' => $receipt->selection()->fingerprint()];
         $available = [];
 
         foreach ([

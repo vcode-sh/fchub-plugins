@@ -368,11 +368,11 @@ final class DatasetClosureValidator
      * bill count and surface months later as a subscription that stopped
      * billing early.
      *
-     * The correction is bounded at one per subscription and comes from the
-     * parent order alone, so it can close an off-by-one and cannot close an
-     * off-by-three. That is the point rather than a limitation: a residual gap
-     * keeps its `history_count_mismatch` and its diagnostics, which is what
-     * section 10 step 7 asks for.
+     * Every correction comes from one included parent/renewal order that has a
+     * paid date and a zero total. The value is therefore bounded by evidence,
+     * not artificially by one: a subscriber can genuinely receive several
+     * complimentary renewals, while an unpaid zero-total order still adds
+     * nothing.
      *
      * @param array<string, OrderRecord> $orders Keyed by (sourceKey, order ID).
      * @return list<array<string, mixed>>
@@ -395,8 +395,15 @@ final class DatasetClosureValidator
             }
         }
 
-        $parent = $orders[self::scoped($subscription->sourceKey, $subscription->parentOrderId)] ?? null;
-        $offset = $parent !== null && $parent->isConsumedFreeCycle() ? 1 : 0;
+        $offset = 0;
+
+        foreach ($chargeable as $orderId) {
+            $order = $orders[self::scoped($subscription->sourceKey, $orderId)] ?? null;
+
+            if ($order !== null && $order->isConsumedFreeCycle()) {
+                $offset++;
+            }
+        }
 
         if ($evidence + $offset === $subscription->sourcePaymentCount) {
             return [];

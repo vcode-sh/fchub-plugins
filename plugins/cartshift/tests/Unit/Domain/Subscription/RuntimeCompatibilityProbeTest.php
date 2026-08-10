@@ -165,6 +165,19 @@ final class RuntimeCompatibilityProbeTest extends PluginTestCase
         $this->assertFalse($report->isReady());
     }
 
+    public function testThePersistedManualRenewalGetterIsRequiredForSourceRelease(): void
+    {
+        $symbols = $this->symbols()->withoutMethod('WC_Subscription', 'get_requires_manual_renewal');
+
+        $report = $this->probe($symbols)->inspect(RuntimeCompatibilityProbe::ROLE_SOURCE);
+
+        $this->assertContains(
+            'WC_Subscription::get_requires_manual_renewal',
+            $report->wooCommerceSubscriptions['missing_apis'],
+        );
+        $this->assertFalse($report->isReady());
+    }
+
     public function testASameRuntimeTargetIsGatedOnTheSourceHalfToo(): void
     {
         $symbols = $this->symbols()->withoutFunction('wcs_get_subscriptions');

@@ -479,6 +479,46 @@ final class SubscriptionHistoryTest extends SubscriptionHistoryTestCase
         $this->assertCount(2, \CartShiftFcModelStore::all('Order'));
     }
 
+    public function testAResubscribeOrderCanBeTheNewSubscriptionsParentAndFirstCharge(): void
+    {
+        $old = $this->subscriptionRecord([
+            'source_ref'             => 'subscription:910000',
+            'source_subscription_id' => 910_000,
+            'parent_order_id'        => 879_999,
+            'related_orders'         => [
+                ['source_order_id' => 879_999, 'relationship' => 'parent'],
+                ['source_order_id' => 880_001, 'relationship' => 'resubscribe'],
+            ],
+        ]);
+        $current = $this->subscriptionRecord();
+        $index = SubscriptionHistoryIndex::fromRecords(self::SOURCE_KEY, [
+            $old,
+            $current,
+            $this->orderRecord('parentOrderPayload'),
+            $this->orderRecord('renewalOrderPayload'),
+        ]);
+
+        $this->assertTrue(
+            $index->isAmbiguous(880_001),
+            'The standalone order view sees both roles and must remain fail-closed.',
+        );
+
+        $imported = (new SubscriptionOrderImporter($this->idMap()))->import($current, $index);
+        $linked = (new SubscriptionHistoryLinker($this->idMap()))
+            ->link($current, $index, 4242, $imported['orders']);
+
+        $parent = $this->orderRowFor($imported['orders'][880_001]);
+        $parentTransaction = array_values(array_filter(
+            \CartShiftFcModelStore::all('OrderTransaction'),
+            static fn (object $transaction): bool => (int) $transaction->order_id === (int) $parent->id,
+        ))[0] ?? null;
+
+        $this->assertSame('subscription', $parent->type);
+        $this->assertNotNull($parentTransaction);
+        $this->assertSame(4242, $parentTransaction->subscription_id);
+        $this->assertContains((int) $parentTransaction->id, $linked['linked']);
+    }
+
     // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────

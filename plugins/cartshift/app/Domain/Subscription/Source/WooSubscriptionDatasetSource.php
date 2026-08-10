@@ -642,6 +642,7 @@ final class WooSubscriptionDatasetSource implements SubscriptionDatasetSource
             // carried in the header because in cross-runtime mode the operator
             // decides on the target.
             $this->storageMirrorSummary($selection),
+            $selection->toArray(),
         );
     }
 

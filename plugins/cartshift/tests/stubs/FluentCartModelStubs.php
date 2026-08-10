@@ -42,6 +42,12 @@ if (!class_exists('CartShiftFcModelStore')) {
                 // subscription was written" does not have to know which of the
                 // two routes wrote it.
                 if ($method === 'save') {
+                    $beforeSave = $GLOBALS['_cartshift_test_fc_before_save'] ?? null;
+
+                    if (is_callable($beforeSave)) {
+                        $beforeSave($class, $arguments[0]);
+                    }
+
                     return self::persist(self::shortName($class), $arguments[0]);
                 }
 
@@ -175,6 +181,12 @@ if (!class_exists('CartShiftFcRow')) {
          */
         public function save(): bool
         {
+            $beforeSave = $GLOBALS['_cartshift_test_fc_before_save'] ?? null;
+
+            if (is_callable($beforeSave)) {
+                $beforeSave(self::class, $this);
+            }
+
             $GLOBALS['_cartshift_test_fc_saved'][] = $this;
 
             return true;

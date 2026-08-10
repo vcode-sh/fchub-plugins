@@ -302,6 +302,61 @@ final class SubscriptionCommandTest extends PluginTestCase
         $this->assertStringContainsString('not the package that was prepared', $message['message']);
         $this->assertFileDoesNotExist($workspace . '/receipt.ndjson', 'Nothing may be staged.');
 
+        // Naming the same swapped file explicitly must not bypass the prepared
+        // descriptor for this source key.
+        $GLOBALS['_cartshift_test_wp_cli'] = [];
+
+        SubscriptionCommand::stage([], [
+            'receipt'    => $workspace . '/receipt.ndjson',
+            'file'       => $path,
+            'source-key' => 'lapka-club',
+            'confirm'    => true,
+        ]);
+
+        $message = $this->lastCliMessage();
+
+        $this->assertSame('error', $message['level']);
+        $this->assertStringContainsString('not the package that was prepared', $message['message']);
+        $this->assertFileDoesNotExist($workspace . '/receipt.ndjson', 'Explicit --file changes no checksum.');
+
+        foreach ((array) glob($workspace . '/*') as $file) {
+            @unlink((string) $file);
+        }
+
+        @rmdir($workspace);
+    }
+
+    public function testStagingUsesTheSelectionFrozenIntoThePackage(): void
+    {
+        $workspace = realpath(sys_get_temp_dir()) . '/cartshift-cli-' . bin2hex(random_bytes(6));
+        mkdir($workspace, 0700, true);
+        $path = $workspace . '/narrowed.ndjson';
+        $receiptPath = $workspace . '/receipt.ndjson';
+        $selection = new \CartShift\Domain\Subscription\SubscriptionSelection(
+            'lapka-club',
+            [],
+            [],
+            [910_116],
+        );
+
+        $written = (new \CartShift\Domain\Subscription\Package\SubscriptionPackageWriter())->write(
+            $path,
+            $this->emptyDataset('lapka-club'),
+            $selection,
+        );
+        $this->assertSame([], $written['failures']);
+
+        SubscriptionCommand::stage([], [
+            'receipt'    => $receiptPath,
+            'file'       => $path,
+            'source-key' => 'lapka-club',
+            'confirm'    => true,
+        ]);
+
+        $receipt = \CartShift\Domain\Subscription\CutoverReceipt::read($receiptPath)['receipt'];
+        $this->assertNotNull($receipt);
+        $this->assertSame($selection->fingerprint(), $receipt->selection()->fingerprint());
+
         foreach ((array) glob($workspace . '/*') as $file) {
             @unlink((string) $file);
         }

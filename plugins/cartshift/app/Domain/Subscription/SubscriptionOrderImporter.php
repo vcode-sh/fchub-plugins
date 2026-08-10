@@ -98,8 +98,8 @@ final class SubscriptionOrderImporter
             $relationship = $entry['relationship'];
             $sourceId     = $order->sourceOrderId;
 
-            $parentFcId = $this->parentFcIdFor($history, $sourceId, $orders);
-            $type       = $history->fluentCartOrderType($sourceId);
+            $parentFcId = $this->parentFcIdFor($record, $relationship, $orders);
+            $type       = SubscriptionHistoryIndex::fluentCartOrderTypeForRelationship($relationship);
 
             $existing = $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $sourceId);
 
@@ -463,16 +463,18 @@ final class SubscriptionOrderImporter
     /**
      * @param array<int, int> $imported Source order ID => FluentCart order ID.
      */
-    private function parentFcIdFor(SubscriptionHistoryIndex $history, int $sourceOrderId, array $imported): ?int
+    private function parentFcIdFor(
+        SubscriptionRecord $record,
+        string $relationship,
+        array $imported,
+    ): ?int
     {
-        $parentSourceId = $history->parentSourceOrderId($sourceOrderId);
-
-        if ($parentSourceId === null) {
+        if ($relationship !== SubscriptionOrderReference::RENEWAL || $record->parentOrderId <= 0) {
             return null;
         }
 
-        return $imported[$parentSourceId]
-            ?? $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $parentSourceId);
+        return $imported[$record->parentOrderId]
+            ?? $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $record->parentOrderId);
     }
 
     private function resolveCustomerId(OrderRecord $order): ?int

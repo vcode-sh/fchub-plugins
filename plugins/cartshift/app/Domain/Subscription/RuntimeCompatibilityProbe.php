@@ -47,11 +47,11 @@ final class RuntimeCompatibilityProbe
     /**
      * WC_Subscription methods the plan names.
      *
-     * `get_related_orders()` carries the dependency closure, `is_manual()` and
-     * `set_requires_manual_renewal()` carry the source release, and the rest
-     * carry the contract and its history. Nothing speculative: the WCS source
-     * is not on this machine, so this list is exactly what the plan quotes plus
-     * what CartShift already calls.
+     * `get_related_orders()` carries the dependency closure. The persisted
+     * getter/setter pair carries source ownership; `is_manual()` is only the
+     * effective runtime safety check because staging mode and gateway
+     * availability can also make it true. The rest carry the contract and its
+     * history.
      */
     private const array WCS_SUBSCRIPTION_METHODS = [
         'get_related_orders',
@@ -61,6 +61,7 @@ final class RuntimeCompatibilityProbe
         'get_billing_period',
         'get_billing_interval',
         'is_manual',
+        'get_requires_manual_renewal',
         'set_requires_manual_renewal',
         'save',
     ];

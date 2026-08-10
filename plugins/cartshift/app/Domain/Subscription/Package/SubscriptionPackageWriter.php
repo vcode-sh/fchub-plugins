@@ -92,6 +92,7 @@ final class SubscriptionPackageWriter
             // which is taken over the record lines and never over a header
             // containing it.
             $sourceManifest->storageMirror,
+            $selection->toArray(),
         );
 
         // Resolved again, immediately before the open. The first resolution

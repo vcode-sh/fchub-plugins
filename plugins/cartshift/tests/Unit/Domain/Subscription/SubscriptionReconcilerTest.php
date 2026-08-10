@@ -298,6 +298,44 @@ final class SubscriptionReconcilerTest extends SubscriptionHistoryTestCase
         );
     }
 
+    public function testThreePaidZeroTotalCyclesProduceAnOffsetOfThree(): void
+    {
+        $record = $this->subscriptionRecord([
+            'source_payment_count' => 3,
+            'related_orders' => [
+                ['source_order_id' => 880_001, 'relationship' => 'parent'],
+                ['source_order_id' => 880_501, 'relationship' => 'renewal'],
+                ['source_order_id' => 880_502, 'relationship' => 'renewal'],
+            ],
+        ]);
+        $free = static fn (array $ids): array => [
+            'source_ref'      => 'order:' . $ids[0],
+            'source_order_id' => $ids[0],
+            'status'          => 'completed',
+            'transactions'    => [],
+            'totals'          => ['subtotal' => 0, 'tax' => 0, 'total' => 0, 'refunded' => 0],
+            'dates'           => ['created_utc' => $ids[1], 'paid_utc' => $ids[1]],
+        ];
+        $index = SubscriptionHistoryIndex::fromRecords(self::SOURCE_KEY, [
+            $record,
+            $this->orderRecord('parentOrderPayload', $free([880_001, '2023-04-11 09:15:00'])),
+            $this->orderRecord('renewalOrderPayload', $free([880_501, '2024-04-11 09:15:00'])),
+            $this->orderRecord('renewalOrderPayload', $free([880_502, '2025-04-11 09:15:00'])),
+        ]);
+
+        $result = $this->runPipeline($record, $index);
+
+        $this->assertSame(3, $result->billedCyclesOffset);
+        $this->assertSame(0, $result->includedPaidOrderCount);
+        $this->assertSame(3, $result->correctedPaidCycleCount);
+        $this->assertTrue($result->reconciled);
+        $this->assertSame(
+            3,
+            $GLOBALS['_cartshift_test_fc_meta']['Subscription'][$this->stagedSubscription()->id]
+                ['billed_cycles_offset'] ?? 0,
+        );
+    }
+
     /**
      * THE BOUNDARY. Unpaid means no cycle was consumed, and an offset there
      * would invent a billing period that never happened. The mismatch is left

@@ -137,6 +137,37 @@ final class SubscriptionCutoverTest extends SubscriptionHistoryTestCase
     }
 
     /**
+     * The cutover path owns writer + history + reconciliation as one record.
+     * A linker failure after the writer's inner commit must therefore roll the
+     * subscription back instead of leaving a row with half-attached history.
+     */
+    public function testAHistoryLinkFailureRollsBackTheWholeStagedSubscription(): void
+    {
+        $GLOBALS['_cartshift_test_fc_before_save'] = static function (string $class, object $row): void {
+            if ((string) ($row->transaction_type ?? '') === 'charge'
+                && (int) ($row->subscription_id ?? 0) > 0
+            ) {
+                throw new \RuntimeException('The transaction link failed.');
+            }
+        };
+
+        $result = $this->stage();
+
+        $this->assertTrue($result['ok'], json_encode($result['failures']));
+        $entry = $result['receipt']->entryFor('subscription:910001');
+
+        $this->assertSame(CutoverReceipt::OUTCOME_BLOCKED, $entry['outcome']);
+        $this->assertSame(CutoverReceipt::STATE_ASSESSED, $entry['state']);
+        $this->assertSame([SubscriptionCutover::REASON_DATABASE_WRITE_FAILED], $entry['reason_codes']);
+        $this->assertSame(
+            ['START TRANSACTION', 'ROLLBACK'],
+            $this->transactionStatements(),
+            'The writer commit must stay nested inside the cutover record boundary.',
+        );
+        $this->assertSame(0, \CartShift\Support\DatabaseTransaction::depth());
+    }
+
+    /**
      * The receipt exists before the first destination row does. An interruption
      * between the two leaves an `assessed` receipt and a source that still
      * bills, which the next run picks up and completes.
@@ -522,6 +553,18 @@ final class SubscriptionCutoverTest extends SubscriptionHistoryTestCase
         $this->assertSame([], \CartShiftFcModelStore::all('Subscription'));
     }
 
+    public function testTheStageOptionExplicitlyAcceptsManualFallback(): void
+    {
+        unset($GLOBALS['_cartshift_test_filters']['cartshift/subscription/manual_fallback_confirmed']);
+
+        $result = $this->stage(['accept_manual_fallback' => true]);
+        $entry  = $result['receipt']?->entryFor('subscription:910001');
+
+        $this->assertTrue($result['ok'], json_encode($result['failures']));
+        $this->assertSame(CutoverReceipt::STATE_STAGED, $entry['state']);
+        $this->assertSame('manual', $entry['collection_method']);
+    }
+
     // ──────────────────────────────────────────────
     // cutover-source
     // ──────────────────────────────────────────────
@@ -676,6 +719,22 @@ final class SubscriptionCutoverTest extends SubscriptionHistoryTestCase
 
         $this->assertTrue($second['ok'], json_encode($second['failures']));
         $this->assertSame(CutoverReceipt::STATE_SOURCE_RELEASED, $second['state']);
+    }
+
+    public function testANarrowedSelectionSurvivesTheEntireCutover(): void
+    {
+        $selection = new SubscriptionSelection(self::SOURCE_KEY, [], [], [910_116]);
+
+        $staged = $this->stage(['selection' => $selection]);
+        $this->assertTrue($staged['ok'], json_encode($staged['failures']));
+        $this->assertSame($selection->fingerprint(), $staged['receipt']->selection()->fingerprint());
+
+        $this->assertTrue($this->cutover($this->sourceDouble())['ok']);
+        $this->assertTrue($this->activate()['ok']);
+        $this->assertTrue($this->reconcile()['ok']);
+
+        $receipt = CutoverReceipt::read($this->receiptPath())['receipt'];
+        $this->assertSame($selection->fingerprint(), $receipt?->selection()->fingerprint());
     }
 
     // ──────────────────────────────────────────────
@@ -1673,7 +1732,9 @@ final class SubscriptionCutoverTest extends SubscriptionHistoryTestCase
             'receipt_path'            => $this->receiptPath(),
             'package_checksum'        => (string) ($options['package_checksum'] ?? ''),
             'approve_system_settings' => $options['approve_system_settings'] ?? null,
+            'accept_manual_fallback'   => $options['accept_manual_fallback'] ?? false,
             'migration_id'            => 'cutover-test',
+            'selection'               => $options['selection'] ?? null,
         ]);
     }
 
@@ -2017,6 +2078,21 @@ final class SubscriptionCutoverTest extends SubscriptionHistoryTestCase
     private function receiptPath(): string
     {
         return $this->workspace . '/receipt.ndjson';
+    }
+
+    /** @return list<string> */
+    private function transactionStatements(): array
+    {
+        $wanted = ['START TRANSACTION', 'COMMIT', 'ROLLBACK'];
+        $seen   = [];
+
+        foreach ((array) ($GLOBALS['_cartshift_test_queries'] ?? []) as $entry) {
+            if (($entry[0] ?? '') === 'query' && in_array($entry[1] ?? '', $wanted, true)) {
+                $seen[] = (string) $entry[1];
+            }
+        }
+
+        return $seen;
     }
 
     private function targetFingerprint(): string

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CartShift\Tests\Unit\Domain\Subscription;
 
 use CartShift\Domain\Subscription\CutoverReceipt;
+use CartShift\Domain\Subscription\SubscriptionSelection;
 use CartShift\Tests\Unit\PluginTestCase;
 
 /**
@@ -564,6 +565,115 @@ final class CutoverReceiptTest extends PluginTestCase
         $this->assertSame([], $read['failures']);
         $this->assertNotNull($read['receipt']);
         $this->assertSame($receipt->toArray(), $read['receipt']->toArray());
+    }
+
+    public function testAReceiptCarriesItsNarrowedSelectionThroughEveryTransition(): void
+    {
+        $selection = new SubscriptionSelection('lapka', [], ['active'], [910_116]);
+        $receipt = CutoverReceipt::begin(
+            'lapka',
+            self::PACKAGE_CHECKSUM,
+            $selection->fingerprint(),
+            self::MAPPING,
+            self::SETTINGS,
+            self::SETTINGS,
+            $selection->toArray(),
+        )->withState(CutoverReceipt::STATE_STAGED)->withEntry($this->entry(
+            'subscription:910001',
+            ['source_status' => 'active'],
+        ));
+
+        $path = $this->workspace . '/narrowed.ndjson';
+        $this->assertSame([], $receipt->write($path)['failures']);
+
+        $read = CutoverReceipt::read($path);
+
+        $this->assertSame([], $read['failures']);
+        $this->assertNotNull($read['receipt']);
+        $this->assertEquals($selection->toArray(), $read['receipt']->selection);
+        $this->assertSame($selection->fingerprint(), $read['receipt']->selection()->fingerprint());
+    }
+
+    public function testASelectionDefinitionThatDisagreesWithTheReceiptFingerprintIsRefused(): void
+    {
+        $selection = new SubscriptionSelection('lapka', [], [], [910_116]);
+        $receipt = CutoverReceipt::begin(
+            'lapka',
+            self::PACKAGE_CHECKSUM,
+            $selection->fingerprint(),
+            self::MAPPING,
+            self::SETTINGS,
+            self::SETTINGS,
+            $selection->toArray(),
+        );
+        $path = $this->workspace . '/selection-tampered.ndjson';
+        $receipt->write($path);
+
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $header = (array) json_decode((string) $lines[0], true);
+        $header['selection']['excluded_subscription_ids'] = [910_117];
+        $lines[0] = json_encode($header, JSON_UNESCAPED_SLASHES);
+        file_put_contents($path, implode("\n", $lines) . "\n");
+
+        $read = CutoverReceipt::read($path);
+
+        $this->assertNull($read['receipt']);
+        $this->assertContains(CutoverReceipt::REASON_CHECKSUM_MISMATCH, $read['failures']);
+    }
+
+    public function testARewrittenSelectionAndFingerprintCannotDisownReceiptEntries(): void
+    {
+        $sourceKey = 'lapka';
+        $selection = SubscriptionSelection::all($sourceKey);
+        $path = $this->workspace . '/selection-rewritten.ndjson';
+        CutoverReceipt::begin(
+            $sourceKey,
+            self::PACKAGE_CHECKSUM,
+            $selection->fingerprint(),
+            self::MAPPING,
+            self::SETTINGS,
+            self::SETTINGS,
+            $selection->toArray(),
+        )->withEntry($this->entry('subscription:910001'))->write($path);
+
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $header = (array) json_decode((string) $lines[0], true);
+        $rewritten = new SubscriptionSelection($sourceKey, [], [], [910_001]);
+        $header['selection'] = $rewritten->toArray();
+        $header['selection_fingerprint'] = $rewritten->fingerprint();
+        $lines[0] = json_encode($header, JSON_UNESCAPED_SLASHES);
+        file_put_contents($path, implode("\n", $lines) . "\n");
+
+        $read = CutoverReceipt::read($path);
+
+        $this->assertNull($read['receipt']);
+        $this->assertContains(CutoverReceipt::REASON_CHECKSUM_MISMATCH, $read['failures']);
+    }
+
+    public function testALegacyReceiptWithoutASelectionDefinitionStillReadsAsAll(): void
+    {
+        $sourceKey = 'lapka';
+        $selection = SubscriptionSelection::all($sourceKey);
+        $receipt = CutoverReceipt::begin(
+            $sourceKey,
+            self::PACKAGE_CHECKSUM,
+            $selection->fingerprint(),
+            self::MAPPING,
+            self::SETTINGS,
+        );
+        $path = $this->workspace . '/legacy.ndjson';
+        $receipt->write($path);
+
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $header = (array) json_decode((string) $lines[0], true);
+        unset($header['selection']);
+        $lines[0] = json_encode($header, JSON_UNESCAPED_SLASHES);
+        file_put_contents($path, implode("\n", $lines) . "\n");
+
+        $read = CutoverReceipt::read($path);
+
+        $this->assertSame([], $read['failures']);
+        $this->assertSame($selection->fingerprint(), $read['receipt']?->selection()->fingerprint());
     }
 
     public function testTheEntryPayloadChecksumIsCanonicalAndOrderIndependent(): void

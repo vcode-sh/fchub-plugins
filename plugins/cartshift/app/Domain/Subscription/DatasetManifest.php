@@ -80,6 +80,14 @@ final readonly class DatasetManifest
          * @var array<string, mixed>
          */
         public array $storageMirror = [],
+        /**
+         * The complete, non-sensitive cohort definition whose fingerprint is
+         * recorded above. Empty means a package written before definitions
+         * travelled with the header, and therefore the legacy `all` selection.
+         *
+         * @var array<string, mixed>
+         */
+        public array $selection = [],
     ) {
         $normalisedCounts = [];
 
@@ -117,6 +125,7 @@ final readonly class DatasetManifest
             (int) ($header['total_records'] ?? 0),
             (string) ($header['records_checksum'] ?? ''),
             (array) ($header['storage_mirror'] ?? []),
+            (array) ($header['selection'] ?? []),
         );
     }
 
@@ -130,7 +139,7 @@ final readonly class DatasetManifest
      */
     public function toArray(): array
     {
-        return [
+        $header = [
             'counts'                => $this->counts,
             'currencies'            => $this->currencies,
             'exported_at_utc'       => $this->exportedAtUtc,
@@ -144,5 +153,11 @@ final readonly class DatasetManifest
             'total_records'         => $this->totalRecords,
             'versions'              => $this->versions,
         ];
+
+        if ($this->selection !== []) {
+            $header['selection'] = $this->selection;
+        }
+
+        return $header;
     }
 }

@@ -10,7 +10,9 @@ use CartShift\Domain\Subscription\ClosureReport;
 use CartShift\Domain\Subscription\DatasetClosureValidator;
 use CartShift\Domain\Subscription\DatasetManifest;
 use CartShift\Domain\Subscription\InvalidSourceRecord;
+use CartShift\Domain\Subscription\SubscriptionRecord;
 use CartShift\Domain\Subscription\SubscriptionRecordFactory;
+use CartShift\Domain\Subscription\SubscriptionSelection;
 use Generator;
 use RuntimeException;
 
@@ -232,9 +234,60 @@ final class SubscriptionPackageReader
             );
         }
 
+        if ($manifest->selection !== []) {
+            $selection = SubscriptionSelection::fromArray($manifest->selection, $manifest->sourceKey);
+
+            if (
+                $selection->sourceKey !== $manifest->sourceKey
+                || !hash_equals($manifest->selectionFingerprint, $selection->fingerprint())
+            ) {
+                $failures[] = self::failure(
+                    self::REASON_CHECKSUM_MISMATCH,
+                    $manifest->sourceKey,
+                    'package',
+                    'manifest.selection',
+                    [
+                        'reason'   => 'selection_fingerprint_mismatch',
+                        'declared' => $manifest->selectionFingerprint,
+                        'computed' => $selection->fingerprint(),
+                    ],
+                );
+            }
+        }
+
         [$records, $counts, $invalidCount, $lineFailures] = $this->decodeLines($manifest, $lines);
 
         $failures = array_merge($failures, $lineFailures);
+
+        if ($manifest->selection !== []) {
+            $selection ??= SubscriptionSelection::fromArray($manifest->selection, $manifest->sourceKey);
+
+            foreach ($records as $record) {
+                $included = match (true) {
+                    $record instanceof SubscriptionRecord => $selection->includes(
+                        $record->sourceSubscriptionId,
+                        $record->status,
+                    ),
+                    $record instanceof InvalidSourceRecord
+                        && $record->entityKind === SubscriptionRecord::KIND => $selection->includesId(
+                            self::sourceId($record->sourceRef),
+                        ),
+                    default => true,
+                };
+
+                if ($included) {
+                    continue;
+                }
+
+                $failures[] = self::failure(
+                    self::REASON_CHECKSUM_MISMATCH,
+                    $manifest->sourceKey,
+                    SubscriptionRecord::KIND,
+                    $record->sourceRef,
+                    ['reason' => 'record_outside_selection'],
+                );
+            }
+        }
 
         $checksum = SubscriptionPackageWriter::checksum($lines);
 
@@ -261,6 +314,13 @@ final class SubscriptionPackageReader
             'failures' => self::ordered($failures),
             'closure'  => (new DatasetClosureValidator())->validate($manifest, $records),
         ];
+    }
+
+    private static function sourceId(string $sourceRef): int
+    {
+        $separator = strrpos($sourceRef, ':');
+
+        return (int) ($separator === false ? $sourceRef : substr($sourceRef, $separator + 1));
     }
 
     /**

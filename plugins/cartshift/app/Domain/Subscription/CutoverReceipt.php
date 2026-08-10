@@ -129,6 +129,7 @@ final readonly class CutoverReceipt
     /**
      * @param list<array<string, mixed>> $entries Canonical, sorted by source ref.
      * @param array<string, mixed>       $renewalMaintenance
+     * @param array<string, mixed>       $selection
      */
     public function __construct(
         public string $state,
@@ -142,6 +143,7 @@ final readonly class CutoverReceipt
         public string $createdAtUtc,
         public string $updatedAtUtc,
         public array $renewalMaintenance = [],
+        public array $selection = [],
     ) {
     }
 
@@ -152,6 +154,7 @@ final readonly class CutoverReceipt
         string $mappingFingerprint,
         string $targetSettingsFingerprint,
         string $approvedSettingsFingerprint = '',
+        array $selection = [],
     ): self {
         $now = gmdate('Y-m-d H:i:s');
 
@@ -167,6 +170,7 @@ final readonly class CutoverReceipt
             $now,
             $now,
             ['acknowledged' => false, 'acknowledged_at_utc' => null],
+            $selection,
         );
     }
 
@@ -317,6 +321,7 @@ final readonly class CutoverReceipt
             $this->createdAtUtc,
             gmdate('Y-m-d H:i:s'),
             $this->renewalMaintenance,
+            $this->selection,
         );
     }
 
@@ -334,6 +339,7 @@ final readonly class CutoverReceipt
             $this->createdAtUtc,
             gmdate('Y-m-d H:i:s'),
             $this->renewalMaintenance,
+            $this->selection,
         );
     }
 
@@ -358,6 +364,7 @@ final readonly class CutoverReceipt
             $this->createdAtUtc,
             gmdate('Y-m-d H:i:s'),
             ['acknowledged' => true, 'acknowledged_at_utc' => gmdate('Y-m-d H:i:s')],
+            $this->selection,
         );
     }
 
@@ -375,7 +382,21 @@ final readonly class CutoverReceipt
             $this->createdAtUtc,
             gmdate('Y-m-d H:i:s'),
             $this->renewalMaintenance,
+            $this->selection,
         );
+    }
+
+    /**
+     * The exact cohort definition carried by this receipt.
+     *
+     * Receipts written before the definition was added represented the whole
+     * source by construction, so absence deliberately means `all`.
+     */
+    public function selection(): SubscriptionSelection
+    {
+        return $this->selection === []
+            ? SubscriptionSelection::all($this->sourceKey)
+            : SubscriptionSelection::fromArray($this->selection, $this->sourceKey);
     }
 
     /**
@@ -745,7 +766,7 @@ final readonly class CutoverReceipt
      */
     public function header(): array
     {
-        return [
+        $header = [
             'approved_settings_fingerprint' => $this->approvedSettingsFingerprint,
             'created_at_utc'                => $this->createdAtUtc,
             'entry_count'                   => count($this->entries),
@@ -760,6 +781,12 @@ final readonly class CutoverReceipt
             'target_settings_fingerprint'   => $this->targetSettingsFingerprint,
             'updated_at_utc'                => $this->updatedAtUtc,
         ];
+
+        if ($this->selection !== []) {
+            $header['selection'] = $this->selection;
+        }
+
+        return $header;
     }
 
     /**
@@ -790,6 +817,7 @@ final readonly class CutoverReceipt
             (string) ($header['created_at_utc'] ?? ''),
             (string) ($header['updated_at_utc'] ?? ''),
             (array) ($header['renewal_maintenance'] ?? ['acknowledged' => false, 'acknowledged_at_utc' => null]),
+            (array) ($header['selection'] ?? []),
         );
     }
 
@@ -871,6 +899,36 @@ final readonly class CutoverReceipt
         }
 
         $receipt = self::fromArray(['header' => $header, 'entries' => $entries]);
+
+        if (array_key_exists('selection', $header)) {
+            $selection = $receipt->selection();
+
+            if (
+                !hash_equals($receipt->sourceKey, $selection->sourceKey)
+                || !hash_equals($receipt->selectionFingerprint, $selection->fingerprint())
+            ) {
+                return [
+                    'receipt'  => null,
+                    'path'     => $resolved['path'],
+                    'failures' => [self::REASON_CHECKSUM_MISMATCH],
+                ];
+            }
+
+            foreach ($receipt->entries as $entry) {
+                if ($selection->includes(
+                    (int) ($entry['source_subscription_id'] ?? 0),
+                    (string) ($entry['source_status'] ?? ''),
+                )) {
+                    continue;
+                }
+
+                return [
+                    'receipt'  => null,
+                    'path'     => $resolved['path'],
+                    'failures' => [self::REASON_CHECKSUM_MISMATCH],
+                ];
+            }
+        }
 
         // Recomputed rather than believed. A receipt is edited by hand more
         // often than anyone admits — usually to "just fix" a state — and a

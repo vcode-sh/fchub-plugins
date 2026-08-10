@@ -225,6 +225,48 @@ final class SourceRenewalGuardTest extends PluginTestCase
         $this->assertGreaterThan($saveIndex, $scans[count($scans) - 1]);
     }
 
+    /**
+     * WCS makes `is_manual()` true on a duplicate/staging site even when the
+     * persisted renewal flag is false. That runtime safety net disappears when
+     * the source returns to production, so it must never be mistaken for an
+     * already-released subscription.
+     */
+    public function testEffectiveManualModeDoesNotReplaceThePersistedRenewalFlag(): void
+    {
+        $subscription = new \CartShiftSourceSubscriptionDouble(
+            related: ['renewal' => [\CartShiftSourceOrderDouble::paid(880_509)]],
+            effectiveManual: true,
+        );
+
+        $result = (new SourceRenewalGuard())->release($subscription);
+
+        $this->assertSame(SourceRenewalGuard::STATE_RELEASED, $result['state']);
+        $this->assertFalse($result['previous_requires_manual_renewal']);
+        $this->assertTrue($result['source_mutated']);
+        $this->assertTrue($subscription->get_requires_manual_renewal());
+        $this->assertTrue($subscription->is_manual());
+    }
+
+    public function testRestorationVerifiesThePersistedFlagWhenRuntimeModeStaysManual(): void
+    {
+        $subscription = new \CartShiftSourceSubscriptionDouble(
+            manual: true,
+            related: ['renewal' => [\CartShiftSourceOrderDouble::paid(880_510)]],
+            effectiveManual: true,
+        );
+
+        $report = (new SourceRenewalGuard())->inspect($subscription);
+        $result = (new SourceRenewalGuard())->restore(
+            $subscription,
+            false,
+            (string) $report['fingerprint'],
+        );
+
+        $this->assertSame(SourceRenewalGuard::STATE_RESTORED, $result['state']);
+        $this->assertFalse($subscription->get_requires_manual_renewal());
+        $this->assertTrue($subscription->is_manual(), 'The staging environment still forces effective manual mode.');
+    }
+
     public function testReleaseRefusesBeforeAnyMutationWhenAnOpenOrderExists(): void
     {
         $subscription = $this->subscription([
