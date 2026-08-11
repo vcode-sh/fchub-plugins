@@ -6,6 +6,168 @@ in English. For edited prose, follow the tracked `voice-tone.md` where it is
 available. Do not commit, push, tag, publish or create releases: the project
 owner performs publication.
 
+## My Philosophies
+
+I love to build. I focus on building complex things as simple as possible. I love to find ways to reduce complexity when solving problems. 
+
+I like ambitious ideas, simple systems, and software that feels obvious. Do not
+preserve complexity because it already exists, and do not introduce machinery
+because it looks architecturally impressive. Understand the real constraint,
+then fight for the smallest model that makes the correct behavior unsurprising.
+
+Channel both "measure twice, cut once" and YAGNI. Fight scope creep. Honor my
+intent in a way that is both minimal and realistic.
+
+## Language
+
+- All code, documentation, comments, commit messages, schema names, API names, and product/system copy must be written in English.
+- User-facing chat can follow the user's language, but repository artifacts stay in English.
+
+## Think Before Coding
+
+Do not assume, do not hide confusion, and surface tradeoffs. Before
+implementing:
+
+- State your assumptions explicitly. If you are uncertain, ask.
+- If more than one interpretation exists, present them. Never pick silently.
+- If a simpler approach exists, say so. Push back when it is warranted.
+- If something is unclear, stop, name exactly what is confusing, and ask.
+- Propose bold ideas when they would meaningfully improve the work. Ambition is
+  welcome; unrequested complexity is not. They are not the same thing.
+
+## Taste
+
+- Complexity belongs at the adapter boundary. Orchestration stays pure and UI
+  stays dumb.
+- Take advantage of type safety. Prefer inferred types over annotations, and
+  push invariants into the types so illegal states cannot be represented,
+  rather than checking for them at runtime.
+- Comments clarify how code is used. Write a concise one above a function,
+  class, or module instead of narrating line by line, and update or move it in
+  the same change that moves the code. A stale comment is a defect.
+- Members notice a dropped frame, a lying spinner, and a stale label. Report
+  real state rather than decorative progress, and never ship a continuously
+  repainting animation: it pegs the GPU on high-refresh displays.
+
+## Simplicity Contract
+
+Simplicity is a product requirement, not a finishing pass. Making something
+simple takes more work than making it complicated, and real simplicity is only
+available after deep understanding. Reduction performed before understanding is
+amputation, and it ships as a defect.
+
+### Mandatory Ordering
+
+1. **Understand.** Before changing a surface, state the member's job on it in
+   one sentence and enumerate every decision it currently asks them to make.
+   You cannot simplify what you have not enumerated.
+2. **Reduce decisions, never capability.** Remove a decision by choosing a
+   correct default, by deferring it to the moment it actually matters, or by
+   proving nobody needed it.
+3. **Disclose the rest.** Capability that survives but is not primary moves
+   behind progressive disclosure; it does not disappear.
+
+Judge the result by decisions removed, never by elements removed.
+
+### Three States
+
+- **Complicated** — every capability exposed at once.
+- **Simplistic** — capability deleted, or hidden where nobody finds it.
+- **Simple** — capability fully intact, decisions few.
+
+### Simplification Evidence
+
+Before removing, hiding, merging, or defaulting any capability, record three
+facts in the task:
+
+1. **What it does** — the behavior and its owning module.
+2. **Who depends on it** — callers, tests, routes, DTO fields, and copy keys.
+3. **Where it now lives** — how a member reaches it after the change, or an
+   explicit statement that it is removed and why nobody needed it.
+
+If you cannot produce all three, you do not understand the surface well enough
+to simplify it; read the code first. Reducing before understanding is
+prohibited.
+
+A presentation-only simplification must not change API, schema, authorization,
+ranking, persistence, realtime, upload, or routing contracts.
+
+### Scope Discipline
+
+Write the minimum code that solves the problem, and nothing speculative.
+
+- Build only what was asked. No extra features, and no unrequested flexibility
+  or configurability.
+- No error handling for scenarios that cannot occur.
+- If it took 200 lines and 50 would do, rewrite it before shipping.
+- Single-use abstractions are already governed by `Reuse And Package
+  Discipline` and the `Component Structure` guardrail. Follow those rather than
+  inventing a parallel rule.
+
+Ask whether a senior engineer would call the result overcomplicated. If yes,
+simplify before reporting completion.
+
+### Engineering Echo
+
+The same test applies below the surface. Every new option, flag, prop, variant,
+or configuration key is a decision someone must make forever: justify it or
+default it. Complexity that genuinely must exist belongs in one named owner
+rather than spread thin across its callers. Removing an abstraction requires
+the same three facts as removing a control. `Reuse And Package Discipline` and
+`Component Structure` own the mechanics.
+
+### Non-Goals
+
+- This is not a mandate to cut capability, features, or product scope.
+- It does not authorize redesigning surfaces outside the active task.
+- It adds no numeric lint rule. TypeScript rules: The 280-line file cap, the 80-line function
+  cap, and the five-prop decomposition signal already govern mechanical size.
+- It does not reopen accepted Social Core or other completed contracts.
+
+## Goal-Driven Execution
+
+Define success criteria, then loop until they are verified. Strong criteria let
+you work independently; weak criteria such as "make it work" force constant
+clarification.
+
+Turn a task into a verifiable goal:
+
+- "Add validation" becomes "write tests for invalid inputs, then make them
+  pass".
+- "Fix the bug" becomes "write a test that reproduces it, then make it pass".
+- "Refactor X" becomes "prove the tests pass before and after".
+
+For a multi-step task, state the plan before starting:
+
+```text
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+### Verification Boundaries
+
+- Task-required automated browser lanes stay required. When a task's acceptance
+  contract names a Playwright or surface-acceptance lane, run it without
+  asking.
+- Ad-hoc exploratory browsing, MCP browser sessions, and computer-use
+  automation need explicit user approval first. Do not wander through a browser
+  to "check" something.
+
+## Test Value
+
+Tests are good; test slop is not. Write tests that challenge the code rather
+than confirm it.
+
+- Cover boundaries, error paths, and the cases most likely to break. A suite
+  that only walks the happy path proves nothing.
+- Do not pad a suite with endless smoke tests or shallow assertions that
+  restate the implementation.
+- Do not write a regression test for a feature that is being deleted.
+- Delete the tests whose subject is gone. A test kept alive past its subject is
+  maintenance cost carrying no signal.
+
+
 ## Layout and ownership
 
 - `plugins/{slug}/` contains the plugin source. The Docker playground mounts
