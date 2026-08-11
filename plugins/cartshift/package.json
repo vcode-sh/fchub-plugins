@@ -16,7 +16,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/test-utils": "^2.4.11",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^20.11.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"
   },
