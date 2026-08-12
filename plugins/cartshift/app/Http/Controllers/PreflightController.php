@@ -24,8 +24,17 @@ final class PreflightController
 {
     private const string NAMESPACE = 'cartshift/v1';
 
+    /**
+     * The preflight arrives through a seam for the same reason `PreflightCheck`
+     * takes its symbol table through one: `function_exists()` cannot be told a
+     * function is absent, so the missing-API branch of `counts()` is unreachable
+     * from a shared-process suite that also exercises the present-API path.
+     * Controllers are constructed as `new $class($container)`, so the default is
+     * what production gets.
+     */
     public function __construct(
         private readonly Container $container,
+        private readonly PreflightCheck $preflight = new PreflightCheck(),
     ) {
     }
 
@@ -79,6 +88,22 @@ final class PreflightController
         return new WP_REST_Response(['data' => $result + ['operation' => $operation]]);
     }
 
+    /**
+     * How many of each entity this source holds.
+     *
+     * A SUBSCRIPTION COUNT IS ONLY ANSWERABLE WHERE THE API IS. Without
+     * `wcs_get_subscriptions()`, `WooSubscriptionDatasetSource::selectionIndex()`
+     * hands back an empty index, the count comes out 0, and nothing raises its
+     * hand — a shop with 564 subscribers and a shop with none read identically,
+     * which is the exact silent-success failure the HPOS gate and the audit's
+     * 409 both exist to stop, arriving through a third door.
+     *
+     * So the migrator is not built at all when its API is absent, the count is
+     * `null` rather than a number, and `unavailable` says which lookups are
+     * missing. Null is the difference between "none" and "cannot say". Every
+     * other entity is counted exactly as before, because products, customers,
+     * orders and coupons have nothing to do with an optional add-on.
+     */
     public function counts(WP_REST_Request $request): WP_REST_Response
     {
         $counts = [];
@@ -95,8 +120,23 @@ final class PreflightController
             new CustomerMigrator($idMap, $log, $state),
             new CouponMigrator($idMap, $log, $state),
             new OrderMigrator($idMap, $log, $state),
-            new SubscriptionMigrator($idMap, $log, $state),
         ];
+
+        $missingApis = $this->preflight->missingSubscriptionDatasetApis();
+        $unavailable = [];
+
+        if ($missingApis === []) {
+            $migrators[] = new SubscriptionMigrator($idMap, $log, $state);
+        } else {
+            $counts['subscription'] = null;
+            $unavailable['subscription'] = [
+                'reason'       => 'wc_subscriptions_inactive',
+                'missing_apis' => $missingApis,
+                'message'      => 'WooCommerce Subscriptions is not active here, so subscriptions cannot be '
+                    . 'counted. This is not a count of zero. Everything else on this list is unaffected and '
+                    . 'migrates normally.',
+            ];
+        }
 
         foreach ($migrators as $migrator) {
             $counts[$migrator->entityType()] = $migrator->count();
@@ -120,7 +160,10 @@ final class PreflightController
                AND post_status IN ('publish', 'draft', 'private')",
         );
 
-        return new WP_REST_Response(['data' => ['counts' => $counts]]);
+        return new WP_REST_Response(['data' => [
+            'counts'      => $counts,
+            'unavailable' => $unavailable,
+        ]]);
     }
 
     public function checkPermission(): bool

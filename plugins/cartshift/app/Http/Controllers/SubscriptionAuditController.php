@@ -124,8 +124,17 @@ final class SubscriptionAuditController
         self::SEVERITY_WARNING      => 2,
     ];
 
+    /**
+     * The preflight arrives through a seam for the same reason `PreflightCheck`
+     * takes its symbol table through one: `function_exists()` cannot be told a
+     * function is absent, so the live source's fail-closed refusal is
+     * unreachable from a shared-process suite that also exercises the present-API
+     * path. Controllers are constructed as `new $class($container)`, so the
+     * default is what production gets.
+     */
     public function __construct(
         private readonly Container $container,
+        private readonly PreflightCheck $preflight = new PreflightCheck(),
     ) {
     }
 
@@ -272,7 +281,7 @@ final class SubscriptionAuditController
         $selection = SubscriptionSelection::all($sourceKey);
 
         if ($mode === self::SOURCE_LIVE) {
-            $missing = (new PreflightCheck())->missingSubscriptionDatasetApis();
+            $missing = $this->preflight->missingSubscriptionDatasetApis();
 
             if ($missing !== []) {
                 return [

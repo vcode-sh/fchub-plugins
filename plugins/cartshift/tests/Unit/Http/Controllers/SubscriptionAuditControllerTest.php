@@ -879,6 +879,70 @@ final class SubscriptionAuditControllerTest extends PluginTestCase
         $this->assertSame(400, $response->get_status());
     }
 
+    /**
+     * FAIL CLOSED, and the assertion is about what is NOT in the answer.
+     *
+     * A runtime with no `wcs_get_subscriptions()` would hand
+     * `WooSubscriptionDatasetSource` nothing, an empty dataset has no closure
+     * failures, and the document would read "ready, 0 subscriptions" — identical
+     * on screen to a shop with no subscribers, and wrong. So the refusal is
+     * proved by its status AND by the absence of any totals to misread, because
+     * a 409 carrying a cheerful zero would be the same defect wearing a status
+     * code.
+     */
+    public function testALiveAuditRefusesRatherThanReportingZeroWhenTheSubscriptionApisAreAbsent(): void
+    {
+        $response = $this->call(
+            'audit',
+            ['source' => 'live', 'source_key' => self::SOURCE_KEY],
+            null,
+            $this->runtimeWithoutSubscriptionApis(),
+        );
+
+        $this->assertSame(409, $response->get_status());
+
+        $data = $response->get_data()['data'];
+
+        $this->assertStringContainsString('wcs_get_subscriptions', $data['message']);
+        $this->assertStringContainsString('wcs_get_subscription', $data['message']);
+        $this->assertArrayNotHasKey('totals', $data);
+        $this->assertArrayNotHasKey('manifest', $data);
+    }
+
+    /**
+     * The target runtime is the one with no WooCommerce Subscriptions — that is
+     * what makes it a target — and auditing a package is the whole reason the
+     * package mode exists. Gating it on the source-side APIs would close the
+     * only door left open.
+     */
+    public function testAPackageAuditNeedsNoSubscriptionApisAtAll(): void
+    {
+        $path = $this->exportPackage();
+
+        $response = $this->call(
+            'audit',
+            ['source' => 'package', 'file' => $path, 'source_key' => self::SOURCE_KEY],
+            null,
+            $this->runtimeWithoutSubscriptionApis(),
+        );
+
+        $this->assertSame(200, $response->get_status());
+
+        $document = $response->get_data()['data'];
+
+        $this->assertSame('package', $document['source']['mode']);
+        $this->assertGreaterThan(0, $document['totals']['selected']);
+    }
+
+    private function runtimeWithoutSubscriptionApis(): \CartShift\Validator\PreflightCheck
+    {
+        return new \CartShift\Validator\PreflightCheck(
+            (new \CartShift\Tests\Unit\Domain\Subscription\FakeRuntimeSymbols())
+                ->withoutFunction('wcs_get_subscriptions')
+                ->withoutFunction('wcs_get_subscription'),
+        );
+    }
+
     // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────
@@ -937,15 +1001,24 @@ final class SubscriptionAuditControllerTest extends PluginTestCase
     /**
      * @param array<string, mixed> $params
      */
-    private function call(string $method, array $params, ?Container $container = null): \WP_REST_Response
-    {
+    private function call(
+        string $method,
+        array $params,
+        ?Container $container = null,
+        ?\CartShift\Validator\PreflightCheck $preflight = null,
+    ): \WP_REST_Response {
         $request = new WP_REST_Request();
 
         foreach ($params as $key => $value) {
             $request->set_param($key, $value);
         }
 
-        return (new SubscriptionAuditController($container ?? new Container()))->{$method}($request);
+        $controller = new SubscriptionAuditController(
+            $container ?? new Container(),
+            $preflight ?? new \CartShift\Validator\PreflightCheck(),
+        );
+
+        return $controller->{$method}($request);
     }
 
     /**
