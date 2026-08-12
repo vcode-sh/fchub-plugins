@@ -47,7 +47,7 @@ final class LapkaRehearsalScriptsTest extends TestCase
             return $config;
         }];
         yield 'shared production-like bind' => [static function (array $config): array {
-            $config['services']['source-wordpress']['volumes'][0]['source'] = '/Users/tomrobak/_projects_/fchub-playground';
+            $config['services']['source-wordpress']['volumes'][0]['source'] = '/Users/tomrobak/_projects_/fchub-repo/fchub-playground';
             return $config;
         }];
         yield 'routable WordPress URL' => [static function (array $config): array {

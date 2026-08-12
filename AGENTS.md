@@ -1,10 +1,16 @@
-# FCHub Plugins
+# AGENTS.md — fchub-plugins
 
 This repository is the source of truth for the public FCHub plugins and the
-`fluentcart-mcp` package. Write code, tests, comments, commits and public copy
-in English. For edited prose, follow the tracked `voice-tone.md` where it is
-available. Do not commit, push, tag, publish or create releases: the project
-owner performs publication.
+`fluentcart-mcp` package.
+
+> [`../AGENTS.md`](../AGENTS.md) carries the same contract plus the cross-repo
+> layout and Docker-safety rules. This file is self-contained: the engineering
+> contract below is authoritative here and must never be removed from it.
+
+**Non-negotiables, repeated because they are absolute:** you are Vibe Code;
+write code, tests, comments, commits and public copy in English; follow the
+tracked `voice-tone.md` for edited prose; never commit, push, tag, publish or
+create releases — the project owner performs publication.
 
 ## My Philosophies
 
@@ -167,7 +173,6 @@ than confirm it.
 - Delete the tests whose subject is gone. A test kept alive past its subject is
   maintenance cost carrying no signal.
 
-
 ## Layout and ownership
 
 - `plugins/{slug}/` contains the plugin source. The Docker playground mounts
@@ -175,19 +180,26 @@ than confirm it.
 - `web-docs/` is the public documentation source.
 - `fluentcart-mcp/` is a standalone Node.js MCP package, not a WordPress plugin.
 - The private FCHub product-centre source belongs in the sibling
-  `fchub-playground/wp-content/plugins/fchub/`; do not add it to this monorepo.
+  `../fchub-playground/wp-content/plugins/fchub/`; do not add it to this
+  monorepo. The same applies to `fchub-redsys`, `fchub-payment-plans` and
+  `better-oauth-wp`.
 
-## FluentCart MCP 2.1
+The two repositories are siblings under `fchub-repo/`, so `../fchub-playground`
+resolves from here. For the Docker WordPress environment, work from that
+checkout and use `docker compose exec wpcli wp <command>`.
+
+## FluentCart MCP
 
 - Generated release truth lives in `fluentcart-mcp/release-contract.json`, with
   matching MCPB metadata in `manifest.json` and compatibility evidence in
   `compatibility-support.json`. Do not retype their values as release facts.
+  The packaged version is whatever those files say — read them, do not assume.
 - Supported protocol versions are `2025-11-25` and `2026-07-28`.
 - The default is `dynamic` with writes disabled: three read-only meta-tools.
   Reversible mode exposes a fourth executor only for proven reversible writes.
   Refunds, subscription cancellation, deletion and bulk actions remain absent.
-- FluentCart MCP 2.1 is verified against WordPress 7.0.2 with FluentCart Core
-  1.6.0 and FluentCart Pro 1.6.0. It adds renewal list/detail reads and one
+- The 2.1 baseline was verified against WordPress 7.0.2 with FluentCart Core
+  1.6.0 and FluentCart Pro 1.6.0. It added renewal list/detail reads and one
   guarded subscription update: changing `bill_times` for store-billed
   `manual` or `system` subscriptions without linked licences. Automatic
   gateway billing, licensed subscriptions, and lifecycle actions remain absent
@@ -247,9 +259,6 @@ are recovery records, not templates for another attempt.
 ```bash
 cd plugins/fchub-p24 && composer install && ./vendor/bin/phpunit
 cd plugins/fchub-memberships && composer install && ./vendor/bin/phpunit
+cd plugins/cartshift && composer install && ./vendor/bin/phpunit
 ./build.sh fchub-p24
 ```
-
-## FCHub Stream - Discontinued
-
-FCHub Stream is discontinued, with maintenance suspended indefinitely. Do not support, fix, update, test, review, triage, release, or otherwise maintain `plugins/fchub-stream/`. The source and existing tooling stay in the repository because the project may return and others may fork it. Resume work only if the project owner explicitly reactivates the plugin.

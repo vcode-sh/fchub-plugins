@@ -62,7 +62,7 @@ export interface Scenario {
 	budget?: number
 }
 
-const PLAYGROUND = '/Users/tomrobak/_projects_/fchub-playground'
+const PLAYGROUND = '/Users/tomrobak/_projects_/fchub-repo/fchub-playground'
 
 /**
  * Query the store database directly.

@@ -96,7 +96,7 @@ is_within "$candidate_dir" "$fixture_root" || fail 'candidate directory must liv
   || fail 'candidate directory is not an installable CartShift plugin tree'
 
 for shared_root in \
-  '/Users/tomrobak/_projects_/fchub-playground' \
+  '/Users/tomrobak/_projects_/fchub-repo/fchub-playground' \
   '/Users/tomrobak/wp/wesolalapka.com' \
   '/var/www/html' \
   '/var/www/web' \
@@ -153,7 +153,7 @@ while IFS=$'\t' read -r service source _target read_only; do
   if (is_within "$source" "$package_dir" || is_within "$source" "$candidate_dir") && [ "$read_only" != true ]; then
     fail "service ${service} may bind package and verified candidate only read-only"
   fi
-  for shared_root in '/Users/tomrobak/_projects_/fchub-playground' '/Users/tomrobak/wp/wesolalapka.com'; do
+  for shared_root in '/Users/tomrobak/_projects_/fchub-repo/fchub-playground' '/Users/tomrobak/wp/wesolalapka.com'; do
     is_within "$source" "$shared_root" && fail "service ${service} binds known shared root ${shared_root}"
   done
 done < "$bind_file"
