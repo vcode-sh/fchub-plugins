@@ -365,6 +365,59 @@ describe('GuidedMigrationScreen', () => {
     ]);
   });
 
+  it('requires one clear product choice and never offers overwrite', async () => {
+    const item = {
+      review_id: 'product-0123456789ab',
+      kind: 'product_conflict',
+      title: 'Store membership',
+      summary: 'A likely match already exists in FluentCart.',
+      choices: [
+        {
+          choice_id: 'choice-111111111111',
+          label: 'Use existing product',
+          description: 'Use Store membership in FluentCart. It will not be changed.',
+        },
+        {
+          choice_id: 'choice-222222222222',
+          label: 'Skip this product',
+          description: 'Do not migrate this WooCommerce product.',
+        },
+      ],
+    };
+    serve(
+      status({
+        run: {
+          phase: 'awaiting_decisions',
+          completed_steps: 3,
+          total_steps: 12,
+          last_step: 'Review migration decisions',
+          review: { blockers: [], items: [item], proposal_counts: {} },
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="review-decision"]').text()).toContain('Use existing product');
+    expect(wrapper.find('[data-test="review-decision"]').text()).toContain('Skip this product');
+    expect(wrapper.text()).not.toContain('Overwrite');
+    expect(wrapper.find('[data-test="accept-run-decisions"]').attributes('disabled')).toBeDefined();
+
+    await wrapper.find('[data-test="product-choice"] input').setValue(true);
+    expect(wrapper.find('[data-test="accept-run-decisions"]').attributes('disabled')).toBeUndefined();
+    await wrapper.find('[data-test="accept-run-decisions"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMock.mock.calls).toContainEqual([
+      'POST',
+      'migration/decisions',
+      {
+        approved_reviews: [item.review_id],
+        review_answers: [{ review_id: item.review_id, choice_id: 'choice-111111111111' }],
+      },
+    ]);
+  });
+
   it('explains when shop changes replace a review and focuses the new review', async () => {
     const oldItem = {
       review_id: 'decision-old00000001',

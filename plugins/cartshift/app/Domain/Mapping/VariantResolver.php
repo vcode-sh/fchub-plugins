@@ -24,10 +24,16 @@ final class VariantResolver
      * @param list<array{id: int, sku: string, name: string}> $wooVariations Display order.
      * @param list<array{id: int, sku: string, name: string}> $fcVariants    Display order.
      * @param list<int>                                       $reserved      FC variant IDs already spoken for.
+     * @param bool                                            $allowPositionalFallback Pair unmatched rows by display order.
      *
      * @return array{map: array<int, int>, orphans: list<int>}
      */
-    public function resolve(array $wooVariations, array $fcVariants, array $reserved = []): array
+    public function resolve(
+        array $wooVariations,
+        array $fcVariants,
+        array $reserved = [],
+        bool $allowPositionalFallback = true,
+    ): array
     {
         $map = [];
 
@@ -72,25 +78,27 @@ final class VariantResolver
                 && self::normalizeName($woo['name']) === self::normalizeName($fc['name']),
         );
 
-        // Position: the nth unclaimed FC variant for the nth unmatched Woo
-        // variation, in the order the shop displays them.
-        foreach ($remaining as $index => $woo) {
-            $free = null;
+        if ($allowPositionalFallback) {
+            // Position is suitable when the caller can create visible orphans.
+            // Existing-product links disable it because order is not identity evidence.
+            foreach ($remaining as $index => $woo) {
+                $free = null;
 
-            foreach ($fcVariants as $fc) {
-                if (!isset($claimed[$fc['id']])) {
-                    $free = $fc;
-                    break;
+                foreach ($fcVariants as $fc) {
+                    if (!isset($claimed[$fc['id']])) {
+                        $free = $fc;
+                        break;
+                    }
                 }
-            }
 
-            if ($free === null) {
-                continue;
-            }
+                if ($free === null) {
+                    continue;
+                }
 
-            $map[$woo['id']]       = (int) $free['id'];
-            $claimed[$free['id']]  = true;
-            unset($remaining[$index]);
+                $map[$woo['id']]       = (int) $free['id'];
+                $claimed[$free['id']]  = true;
+                unset($remaining[$index]);
+            }
         }
 
         $orphans = array_values(array_map(

@@ -8,6 +8,7 @@ use CartShift\Domain\Transfer\Decision\TransferDecisionSet;
 use CartShift\Domain\Transfer\RecordEnvelope;
 use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedDecisionReview;
+use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Support\CanonicalJson;
 use CartShift\Tests\Unit\PluginTestCase;
@@ -100,6 +101,75 @@ final class GuidedDecisionReviewTest extends PluginTestCase
         self::assertSame('wp-user:9', $rows['shop-alpha:product:10']['operator']);
     }
 
+    public function testProductConflictPresentsPlainChoicesAndRequiresTheExactAnswer(): void
+    {
+        $proposal = $this->proposal();
+        $productRow = $proposal['proposal_decisions'][1];
+        $proposal['proposal_decisions'] = [$proposal['proposal_decisions'][0]];
+        $proposal['decision_set']['decisions'] = [$proposal['decision_set']['decisions'][0]];
+        $proposal['product_questions'] = [[
+            'review_id' => 'product-0123456789ab',
+            'identity' => 'shop-alpha:product:10',
+            'product_name' => 'Store membership',
+            'source_fingerprint' => str_repeat('b', 64),
+            'dependent_orders' => 0,
+            'dependent_subscriptions' => 0,
+            'original_decision' => $productRow,
+            'choices' => [[
+                'choice_id' => 'choice-111111111111',
+                'action' => 'create',
+            ], [
+                'choice_id' => 'choice-222222222222',
+                'action' => 'skip',
+            ]],
+        ]];
+        $review = new GuidedDecisionReview($this->customerBuilder(), $this->productBuilder());
+
+        $presentation = $review->presentation($proposal);
+        $product = array_values(array_filter(
+            $presentation['items'],
+            static fn (array $item): bool => $item['kind'] === 'product_conflict',
+        ))[0];
+
+        self::assertSame('Store membership', $product['title']);
+        self::assertSame(['Create a separate product', 'Skip this product'], array_column($product['choices'], 'label'));
+        self::assertStringNotContainsString('shop-alpha', json_encode($product, JSON_THROW_ON_ERROR));
+        self::assertStringNotContainsString('overwrite', strtolower(json_encode($product, JSON_THROW_ON_ERROR)));
+
+        $reviewIds = array_column($presentation['items'], 'review_id');
+        $resolved = $review->approve(
+            $proposal,
+            $reviewIds,
+            'wp-user:9',
+            '2026-08-12T21:00:00Z',
+            [['review_id' => $product['review_id'], 'choice_id' => 'choice-111111111111']],
+        );
+        $rows = array_column($resolved['decision_set']['decisions'], null, 'identity');
+
+        self::assertSame('activate_catalogue', $rows['shop-alpha:product:10']['action']);
+        self::assertSame('wp-user:9', $rows['shop-alpha:product:10']['operator']);
+    }
+
+    public function testIncompatibleExistingProductExplainsTheSafeStopWithoutInternalCodes(): void
+    {
+        $proposal = $this->proposal();
+        $proposal['status'] = 'blocked';
+        $proposal['blockers'] = [[
+            'code' => 'product_existing_match_unresolvable',
+            'product_name' => 'Store membership',
+        ]];
+        $proposal['product_questions'] = [];
+        $review = new GuidedDecisionReview($this->customerBuilder(), $this->productBuilder());
+
+        $presentation = $review->presentation($proposal);
+
+        self::assertSame([
+            'Store membership has a likely FluentCart match, but its variations do not align. '
+                . 'CartShift will stop rather than create a duplicate or change the existing product.',
+        ], $presentation['blockers']);
+        self::assertStringNotContainsString('unresolvable', json_encode($presentation, JSON_THROW_ON_ERROR));
+    }
+
     private function customerBuilder(): GuidedCustomerDecisionBuilder
     {
         $record = RecordEnvelope::forPayload(2, new SourceIdentity('shop-alpha', 'customer', '7'), [
@@ -112,6 +182,15 @@ final class GuidedDecisionReviewTest extends PluginTestCase
         ]);
 
         return new GuidedCustomerDecisionBuilder(static fn (): RecordEnvelope => $record);
+    }
+
+    private function productBuilder(): GuidedProductDecisionBuilder
+    {
+        return new GuidedProductDecisionBuilder(
+            static fn (): iterable => [],
+            static fn (): array => [],
+            static fn (): array => ['orders' => 0, 'subscriptions' => 0],
+        );
     }
 
     /** @return array<string, mixed> */

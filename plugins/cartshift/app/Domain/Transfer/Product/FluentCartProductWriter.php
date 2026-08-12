@@ -26,8 +26,11 @@ final class FluentCartProductWriter
     ) {
     }
 
-    public function stage(ProductStagePlan $plan, StageContext $context): StageResult
+    public function stage(ProductStagePlan|LinkedProductPlan $plan, StageContext $context): StageResult
     {
+        if ($plan instanceof LinkedProductPlan) {
+            return $this->stageLinked($plan, $context);
+        }
         $existing = $this->maps->get($plan->record->identity);
         if ($existing !== null) {
             DatabaseTransaction::begin();
@@ -280,6 +283,67 @@ final class FluentCartProductWriter
                 false,
                 $filesystemOperationIds,
                 self::sortedMap($targetMap),
+            );
+        } catch (\Throwable $exception) {
+            DatabaseTransaction::rollback($exception);
+            throw $exception;
+        }
+    }
+
+    private function stageLinked(LinkedProductPlan $plan, StageContext $context): StageResult
+    {
+        DatabaseTransaction::begin();
+        try {
+            if (!$this->gateway->exists($plan->targetProductId)) {
+                throw new \RuntimeException('target_linked_product_changed');
+            }
+            $existing = [];
+            foreach ($plan->sourceIdentities() as $identity) {
+                $mapping = $this->maps->get($identity);
+                if ($mapping !== null) {
+                    $existing[] = $mapping;
+                }
+            }
+            if ($existing !== [] && count($existing) !== count($plan->sourceIdentities())) {
+                throw new \RuntimeException('target_reconciliation_failed: partial linked product mapping');
+            }
+            if ($existing === []) {
+                foreach ($plan->sourceTargetIds() as $canonical => $targetId) {
+                    $identity = SourceIdentity::fromCanonical($canonical);
+                    $this->maps->storeOrThrow(
+                        $identity,
+                        $targetId,
+                        $context->migrationId,
+                        $plan->sourceFingerprintFor($identity),
+                        $plan->targetFingerprint,
+                        MapState::Reconciled,
+                        false,
+                        $context->generation,
+                    );
+                }
+            }
+            $reconciliation = $this->reconciler->reconcile(
+                $plan,
+                $plan->targetProductId,
+                $plan->targetFingerprint,
+            );
+            if (!$reconciliation->matches) {
+                throw new \RuntimeException('target_reconciliation_failed: ' . implode(',', $reconciliation->failures));
+            }
+            DatabaseTransaction::commit();
+
+            return new StageResult(
+                $plan->targetProductId,
+                array_values(array_map(
+                    static fn (array $link): int => $link['targetVariationId'],
+                    $plan->variationLinks,
+                )),
+                [],
+                [],
+                $reconciliation->actualFingerprint,
+                true,
+                [],
+                $plan->sourceTargetIds(),
             );
         } catch (\Throwable $exception) {
             DatabaseTransaction::rollback($exception);

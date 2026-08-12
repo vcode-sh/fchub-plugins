@@ -12,11 +12,12 @@ defined('ABSPATH') || exit;
 /** Presents every proposed decision plainly and resolves only the exact review the owner approved. */
 final readonly class GuidedDecisionReview
 {
-    public function __construct(private GuidedCustomerDecisionBuilder $customers = new GuidedCustomerDecisionBuilder())
-    {
-    }
+    public function __construct(
+        private GuidedCustomerDecisionBuilder $customers = new GuidedCustomerDecisionBuilder(),
+        private GuidedProductDecisionBuilder $products = new GuidedProductDecisionBuilder(),
+    ) {}
 
-    /** @param array<string, mixed> $proposal @return array{items:list<array<string,string>>,blockers:list<string>} */
+    /** @param array<string, mixed> $proposal @return array{items:list<array<string,mixed>>,blockers:list<string>} */
     public function presentation(array $proposal): array
     {
         $items = [];
@@ -27,6 +28,21 @@ final readonly class GuidedDecisionReview
                 'kind' => 'migration_decision',
                 'title' => $this->title($identity),
                 'summary' => $this->decisionSummary($row, $this->isRenewal($proposal, $row)),
+            ];
+        }
+        foreach ($this->products->questions($proposal) as $question) {
+            $choices = array_map(fn (array $choice): array => $this->productChoice($choice), $question['choices']);
+            $items[] = [
+                'review_id' => (string) $question['review_id'],
+                'kind' => 'product_conflict',
+                'title' => (string) $question['product_name'],
+                'summary' => array_filter(
+                    $question['choices'],
+                    static fn (array $choice): bool => ($choice['action'] ?? null) === 'link',
+                ) === []
+                    ? 'No likely FluentCart match was found. Choose whether to create or skip this product.'
+                    : 'A likely FluentCart match already exists. Choose what CartShift should do.',
+                'choices' => $choices,
             ];
         }
         foreach ($this->customers->questions($proposal) as $question) {
@@ -46,6 +62,7 @@ final readonly class GuidedDecisionReview
     /**
      * @param array<string, mixed> $proposal
      * @param list<string> $approvedReviewIds
+     * @param list<array{review_id:string,choice_id:string}> $reviewAnswers
      * @return array<string, mixed>
      */
     public function approve(
@@ -53,6 +70,7 @@ final readonly class GuidedDecisionReview
         array $approvedReviewIds,
         string $operator,
         string $decidedAtUtc,
+        array $reviewAnswers = [],
     ): array {
         if (!array_is_list($approvedReviewIds)) {
             throw new \RuntimeException('guided_decision_review_invalid');
@@ -81,8 +99,15 @@ final readonly class GuidedDecisionReview
             $this->customers->questions($proposal),
         );
 
+        $resolvedProducts = $this->products->resolve(
+            $proposal,
+            $reviewAnswers,
+            $operator,
+            $decidedAtUtc,
+        );
+
         return $this->stampApprovedRows(
-            $this->customers->resolve($proposal, $answers, $operator, $decidedAtUtc),
+            $this->customers->resolve($resolvedProducts, $answers, $operator, $decidedAtUtc),
             $proposal,
             $operator,
             $decidedAtUtc,
@@ -187,6 +212,36 @@ final readonly class GuidedDecisionReview
         throw new \RuntimeException('guided_decision_review_unsupported');
     }
 
+    /** @param array<string,mixed> $choice @return array{choice_id:string,label:string,description:string} */
+    private function productChoice(array $choice): array
+    {
+        $choiceId = $choice['choice_id'] ?? null;
+        if (!is_string($choiceId)) {
+            throw new \RuntimeException('guided_product_questions_invalid');
+        }
+        return match ($choice['action'] ?? null) {
+            'link' => [
+                'choice_id' => $choiceId,
+                'label' => 'Use existing product',
+                'description' => sprintf(
+                    'Use %s in FluentCart. CartShift will not change it.',
+                    (string) ($choice['target_name'] ?? 'the matched product'),
+                ),
+            ],
+            'create' => [
+                'choice_id' => $choiceId,
+                'label' => 'Create a separate product',
+                'description' => 'Create a new FluentCart product because no strong duplicate was found.',
+            ],
+            'skip' => [
+                'choice_id' => $choiceId,
+                'label' => 'Skip this product',
+                'description' => 'Do not migrate this WooCommerce product.',
+            ],
+            default => throw new \RuntimeException('guided_product_questions_invalid'),
+        };
+    }
+
     /** @param array<string,mixed> $proposal @param array<string,mixed> $row */
     private function isRenewal(array $proposal, array $row): bool
     {
@@ -212,7 +267,13 @@ final readonly class GuidedDecisionReview
             if (!is_array($blocker) || ($blocker['code'] ?? null) === 'customer_ownership_decision_requires_owner') {
                 continue;
             }
-            $messages[] = 'CartShift cannot safely resolve this source evidence in the guided migration yet.';
+            $messages[] = ($blocker['code'] ?? null) === 'product_existing_match_unresolvable'
+                ? sprintf(
+                    '%s has a likely FluentCart match, but its variations do not align. '
+                        . 'CartShift will stop rather than create a duplicate or change the existing product.',
+                    (string) ($blocker['product_name'] ?? 'This product'),
+                )
+                : 'CartShift cannot safely resolve this source evidence in the guided migration yet.';
         }
 
         return array_values(array_unique($messages));
@@ -237,6 +298,9 @@ final readonly class GuidedDecisionReview
             $approved[$this->decisionKey($row)] = true;
         }
         foreach ($this->customers->questions($displayed) as $question) {
+            $approved['record|' . (string) $question['identity'] . '|'] = true;
+        }
+        foreach ($this->products->questions($displayed) as $question) {
             $approved['record|' . (string) $question['identity'] . '|'] = true;
         }
 

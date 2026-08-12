@@ -2836,11 +2836,18 @@ body.dark #cartshift-app .cartshift-log-active-filter { background: #16232d; col
 .cartshift-suggestions { margin-top: 10px; }
 
 .cartshift-review-list { display: grid; gap: 10px; margin: 20px 0; padding: 0; border: 0; }
-.cartshift-decision { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border: 1px solid var(--cartshift-border-color); border-radius: 11px; cursor: pointer; }
+.cartshift-decision { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 12px; padding: 16px; border: 1px solid var(--cartshift-border-color); border-radius: 11px; }
 .cartshift-decision:has(input:checked) { border-color: var(--cartshift-primary); background: var(--cartshift-primary-soft); }
-.cartshift-decision > span { display: grid; gap: 4px; }
+.cartshift-decision > input { margin: 2px 0 0; accent-color: var(--cartshift-primary); }
+.cartshift-decision-copy { display: grid; gap: 4px; min-width: 0; }
 .cartshift-decision strong { color: var(--cartshift-text-primary); font-size: 13px; }
 .cartshift-decision small { color: var(--cartshift-text-secondary); font-size: 12px; line-height: 1.45; }
+.cartshift-product-choices { grid-column: 1 / -1; display: grid; gap: 8px; margin: 4px 0 0; padding: 0; border: 0; }
+.cartshift-product-choices label { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 11px; padding: 13px 14px; border: 1px solid var(--cartshift-border-color); border-radius: 9px; background: var(--cartshift-card-bg); cursor: pointer; transition: border-color 120ms ease-out, background-color 120ms ease-out; }
+.cartshift-product-choices label:hover { border-color: color-mix(in srgb, var(--cartshift-primary) 45%, var(--cartshift-border-color)); }
+.cartshift-product-choices label:has(input:checked) { border-color: var(--cartshift-primary); background: var(--cartshift-card-bg); box-shadow: inset 3px 0 0 var(--cartshift-primary); }
+.cartshift-product-choices input { margin: 2px 0 0; accent-color: var(--cartshift-primary); }
+.cartshift-product-choices span { display: grid; gap: 3px; min-width: 0; }
 .cartshift-review-blockers { color: var(--cartshift-danger); }
 .cartshift-review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 #cartshift-app .cartshift-review-actions .button + .button { margin-left: 0; }

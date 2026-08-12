@@ -9,6 +9,7 @@ use CartShift\Domain\Transfer\Execution\LoadedTargetRecordPlanFactory;
 use CartShift\Domain\Transfer\Package\TransferPackageReader;
 use CartShift\Domain\Transfer\Package\TransferPackageValidator;
 use CartShift\Domain\Transfer\Product\ProductStagePlan;
+use CartShift\Domain\Transfer\Product\LinkedProductPlan;
 use CartShift\Domain\Transfer\RecordKind;
 use CartShift\Storage\IdMapRepository;
 
@@ -97,8 +98,11 @@ final readonly class GuidedTargetReadinessInspector
     }
 
     /** @param list<array<string,mixed>> $exceptions */
-    private function inspectProductPlan(ProductStagePlan $plan, array &$exceptions): void
+    private function inspectProductPlan(ProductStagePlan|LinkedProductPlan $plan, array &$exceptions): void
     {
+        if ($plan instanceof LinkedProductPlan) {
+            return;
+        }
         foreach ($plan->variations as $variation) {
             $exception = $variation->targetOtherInfo['stock_migration_exception'] ?? null;
             if (!is_array($exception)) {

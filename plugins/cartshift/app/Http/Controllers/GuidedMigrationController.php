@@ -11,6 +11,7 @@ use CartShift\Domain\Transfer\Runtime\TransferRuntimeProbe;
 use CartShift\Domain\Transfer\Runtime\TransferTopology;
 use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedDecisionReview;
+use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedRunCoordinator;
 use CartShift\Domain\Transfer\SameSite\GuidedRunPlan;
 use CartShift\Domain\Transfer\SameSite\GuidedRollback;
@@ -48,9 +49,10 @@ final class GuidedMigrationController
         private readonly ?\Closure $runStep = null,
         private readonly ?GuidedCustomerDecisionBuilder $customerDecisions = null,
         private readonly ?\Closure $rollbackFactory = null,
+        private readonly ?GuidedProductDecisionBuilder $productDecisions = null,
     ) {
         $this->preflightPresentation = new GuidedPreflightPresentation();
-        $this->runProjection = new GuidedRunProjection($customerDecisions, $rollbackFactory);
+        $this->runProjection = new GuidedRunProjection($customerDecisions, $rollbackFactory, $productDecisions);
     }
 
     public function registerRoutes(): void
@@ -235,8 +237,12 @@ final class GuidedMigrationController
             $approvedReviews = is_array($request->get_param('approved_reviews'))
                 ? $request->get_param('approved_reviews')
                 : [];
+            $reviewAnswers = is_array($request->get_param('review_answers'))
+                ? $request->get_param('review_answers')
+                : [];
             $updated = $repository->transaction(function (?GuidedRunState $state) use (
                 $approvedReviews,
+                $reviewAnswers,
                 $sourceKey,
                 $workspace,
                 &$accepted,
@@ -284,6 +290,7 @@ final class GuidedMigrationController
                     $approvedReviews,
                     $this->operatorId(),
                     gmdate('Y-m-d\TH:i:s\Z'),
+                    $reviewAnswers,
                 );
                 $accepted = $runner->acceptProposal($proposal, $workspace . '/decisions.json');
 
@@ -434,7 +441,10 @@ final class GuidedMigrationController
 
     private function decisionReview(): GuidedDecisionReview
     {
-        return new GuidedDecisionReview($this->customerDecisionBuilder());
+        return new GuidedDecisionReview(
+            $this->customerDecisionBuilder(),
+            $this->productDecisions ?? new GuidedProductDecisionBuilder(),
+        );
     }
 
     private function conflict(string $message): WP_REST_Response

@@ -111,6 +111,42 @@ final class LoadedTargetPreparePipelineTest extends PluginTestCase
         }
     }
 
+    public function testOnlyLinkedOrDraftProductsNeedNoCatalogueWriteStep(): void
+    {
+        [$package, $decisions, $selection] = $this->inputs();
+        $record = iterator_to_array((new \CartShift\Domain\Transfer\Package\TransferPackageReader(
+            $package,
+            new TransferPackageValidator(),
+        ))->records(), false)[0];
+        $decisionSet = TransferDecisionSet::fromArray([[
+            'identity' => $record->identity->canonical(),
+            'action' => 'link_existing_product',
+            'target_product_id' => 501,
+            'target_fingerprint' => str_repeat('a', 64),
+            'variation_links' => [[
+                'source_variation' => 'shop-alpha:product:9:variation:1',
+                'target_variation_id' => 901,
+                'source_fingerprint' => str_repeat('b', 64),
+                'target_fingerprint' => str_repeat('c', 64),
+            ]],
+            'source_fingerprint' => $record->sourceContentDigest,
+            'operator' => 'wp-user:1',
+            'reason' => 'The owner chose an existing FluentCart product.',
+            'decided_at' => '2026-08-12T21:00:00Z',
+        ]]);
+        file_put_contents($decisions, $decisionSet->canonicalJson());
+        $pipeline = new LoadedTargetPreparePipeline(
+            new FixedPrepareRuntime(str_repeat('3', 64)),
+            new FixedTargetSettings(str_repeat('4', 64), str_repeat('5', 64)),
+            new RecordingTargetBaselineProbe(new PreparedTargetBaseline('shop-alpha', [], [])),
+            static fn (): string => '2026-08-11T10:11:12Z',
+        );
+
+        $result = $pipeline($this->pipelineInput($package, $decisions, $selection));
+
+        self::assertTrue($result['leave_draft_accepted']);
+    }
+
     public function testCurrentStateRevalidatesRuntimeSettingsAndTheImmutableBaselineButKeepsItsTargetHashStable(): void
     {
         $baseline = new PreparedTargetBaseline('shop-alpha', ['mapped' => []], []);

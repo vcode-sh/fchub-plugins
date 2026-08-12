@@ -58,7 +58,7 @@ final readonly class TransferDecisionSet
                 throw new \InvalidArgumentException('Transfer decision scope is unsupported.');
             }
             if (($scope === 'record' && isset($byIdentity[$canonical]))
-                || !in_array($decision['action'] ?? null, ['approve_mapping', 'approve_subscription_manual', 'excluded_by_policy', 'reuse_explicit_target_customer', 'attach_exact_same_site_user', 'allow_unlinked_downloads', 'activate_catalogue', 'leave_catalogue_draft'], true)
+                || !in_array($decision['action'] ?? null, ['approve_mapping', 'approve_subscription_manual', 'excluded_by_policy', 'reuse_explicit_target_customer', 'attach_exact_same_site_user', 'allow_unlinked_downloads', 'activate_catalogue', 'leave_catalogue_draft', 'link_existing_product'], true)
                 || ($scope === 'record' && !self::validRecordDecision($decision, $identity))
                 || !is_string($decision['source_fingerprint'] ?? null) || preg_match('/\A[a-f0-9]{64}\z/D', $decision['source_fingerprint']) !== 1
                 || !is_string($decision['operator'] ?? null) || $decision['operator'] === ''
@@ -343,12 +343,54 @@ final readonly class TransferDecisionSet
                 && $downloadable === $decision['downloadable_orders']
                 && array_diff($downloadable, $affected) === [];
         }
+        if ($action === 'link_existing_product') {
+            if ($identity->entityType !== 'product'
+                || !is_int($decision['target_product_id'] ?? null)
+                || $decision['target_product_id'] <= 0
+                || !is_string($decision['target_fingerprint'] ?? null)
+                || preg_match('/\A[a-f0-9]{64}\z/D', $decision['target_fingerprint']) !== 1
+                || !is_array($decision['variation_links'] ?? null)
+                || !array_is_list($decision['variation_links'])
+                || $decision['variation_links'] === []) {
+                return false;
+            }
+            $sources = [];
+            $targets = [];
+            foreach ($decision['variation_links'] as $link) {
+                if (!is_array($link)
+                    || !is_string($link['source_variation'] ?? null)
+                    || !is_int($link['target_variation_id'] ?? null)
+                    || $link['target_variation_id'] <= 0
+                    || !is_string($link['source_fingerprint'] ?? null)
+                    || preg_match('/\A[a-f0-9]{64}\z/D', $link['source_fingerprint']) !== 1
+                    || !is_string($link['target_fingerprint'] ?? null)
+                    || preg_match('/\A[a-f0-9]{64}\z/D', $link['target_fingerprint']) !== 1) {
+                    return false;
+                }
+                try {
+                    $source = SourceIdentity::fromCanonical($link['source_variation']);
+                } catch (\Throwable) {
+                    return false;
+                }
+                if ($source->sourceKey !== $identity->sourceKey
+                    || $source->entityType !== 'product'
+                    || !str_starts_with($source->sourceId, $identity->sourceId . ':variation:')
+                    || isset($sources[$source->canonical()])
+                    || isset($targets[$link['target_variation_id']])) {
+                    return false;
+                }
+                $sources[$source->canonical()] = true;
+                $targets[$link['target_variation_id']] = true;
+            }
+            return true;
+        }
 
         return !in_array($action, [
             'approve_subscription_manual',
             'reuse_explicit_target_customer',
             'attach_exact_same_site_user',
             'allow_unlinked_downloads',
+            'link_existing_product',
         ], true);
     }
 

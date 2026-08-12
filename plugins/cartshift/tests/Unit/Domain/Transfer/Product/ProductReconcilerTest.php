@@ -10,6 +10,8 @@ use CartShift\Domain\Transfer\Product\ProductFieldDecisionSet;
 use CartShift\Domain\Transfer\Product\ProductFieldDisposition;
 use CartShift\Domain\Transfer\Product\ProductReconciler;
 use CartShift\Domain\Transfer\Product\ProductStagePlan;
+use CartShift\Domain\Transfer\Product\LinkedProductPlan;
+use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
 use CartShift\Domain\Transfer\Product\StockOwnership;
 use CartShift\Domain\Transfer\Product\StockProfile;
 use CartShift\Domain\Transfer\StageContext;
@@ -81,6 +83,55 @@ final class ProductReconcilerTest extends PluginTestCase
         $result = $writer->stage($plan, $this->context());
         $variationId = $result->variationIds[0];
         $gateway->variations[$variationId]['available'] = 999;
+
+        $reconciled = (new ProductReconciler($gateway, $maps))->reconcile(
+            $plan,
+            $result->targetId,
+            $result->targetFingerprint,
+        );
+
+        self::assertFalse($reconciled->matches);
+        self::assertContains('target_fingerprint_mismatch', $reconciled->failures);
+    }
+
+    public function testLinkedProductDriftAfterApprovalFailsWithoutProjectingSourceFields(): void
+    {
+        $record = ProductAssessmentFixture::product();
+        $envelope = $record->envelope();
+        $variation = $record->variations[0];
+        $gateway = new InMemoryProductTargetGateway();
+        $gateway->products[501] = [
+            'ID' => 501,
+            'post_title' => 'Existing FluentCart product',
+            'post_status' => 'publish',
+        ];
+        $gateway->details[501] = ['post_id' => 501, 'variation_type' => 'simple'];
+        $gateway->variations[901] = [
+            'id' => 901,
+            'post_id' => 501,
+            'variation_title' => 'Default',
+            'sku' => 'EXISTING-1',
+            'item_price' => 2500,
+        ];
+        $snapshot = $gateway->snapshot(501);
+        $sourceMap = [
+            $record->identity->canonical() => 501,
+            $variation->identity->canonical() => 901,
+        ];
+        $plan = LinkedProductPlan::fromDecision($record, $envelope, [
+            'target_product_id' => 501,
+            'target_fingerprint' => (new ProductTargetFingerprint())->fingerprint($snapshot, $sourceMap),
+            'variation_links' => [[
+                'source_variation' => $variation->identity->canonical(),
+                'target_variation_id' => 901,
+                'source_fingerprint' => \CartShift\Support\CanonicalJson::fingerprint($envelope->payload['variations'][0]),
+                'target_fingerprint' => \CartShift\Support\CanonicalJson::fingerprint($snapshot['variations'][0]),
+            ]],
+        ], $snapshot);
+        $maps = new InMemoryCheckedMappingStore();
+        $writer = new FluentCartProductWriter($gateway, $maps, new ProductReconciler($gateway, $maps));
+        $result = $writer->stage($plan, $this->context());
+        $gateway->products[501]['post_title'] = 'Changed after owner approval';
 
         $reconciled = (new ProductReconciler($gateway, $maps))->reconcile(
             $plan,

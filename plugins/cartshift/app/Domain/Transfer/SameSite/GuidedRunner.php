@@ -106,6 +106,8 @@ final class GuidedRunner
         private readonly ?\Closure $packageValidator = null,
         private readonly ?\Closure $probe = null,
         private readonly ?\Closure $targetReadiness = null,
+        private readonly ?\Closure $proposalPipeline = null,
+        private readonly ?GuidedProductDecisionBuilder $productDecisions = null,
     ) {
     }
 
@@ -310,13 +312,22 @@ final class GuidedRunner
     private function runProposal(array $input): array
     {
         $selection = $this->selectionFrom($input);
+        $decisions = $this->decisionsFor($selection, $input);
+        $proposal = $this->proposalPipeline !== null
+            ? ($this->proposalPipeline)(
+                $selection,
+                $decisions,
+                (string) $input['operator'],
+                (string) $input['decided_at'],
+            )
+            : LoadedWooDecisionProposalPipeline::create()->propose(
+                $selection,
+                $decisions,
+                (string) $input['operator'],
+                (string) $input['decided_at'],
+            );
 
-        return LoadedWooDecisionProposalPipeline::create()->propose(
-            $selection,
-            $this->decisionsFor($selection, $input),
-            (string) $input['operator'],
-            (string) $input['decided_at'],
-        );
+        return ($this->productDecisions ?? new GuidedProductDecisionBuilder())->enrich($proposal, $selection);
     }
 
     /**

@@ -12,6 +12,7 @@ use CartShift\Domain\Transfer\Runtime\TransferRuntimeProbe;
 use CartShift\Domain\Transfer\Runtime\TransferRuntimeSymbols;
 use CartShift\Domain\Transfer\RecordEnvelope;
 use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
+use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedRunState;
 use CartShift\Domain\Transfer\SameSite\GuidedRunFailure;
 use CartShift\Domain\Transfer\SameSite\GuidedRollback;
@@ -108,7 +109,8 @@ final class GuidedMigrationControllerTest extends PluginTestCase
 
         self::assertSame([], $watched['violations']);
         self::assertFalse($watched['result']['initialised']);
-        self::assertSame('fail', $checks['Existing FluentCart records']['severity']);
+        self::assertSame('warn', $checks['Existing FluentCart records']['severity']);
+        self::assertStringContainsString('possible match', $checks['Existing FluentCart records']['message']);
         self::assertArrayNotHasKey('cartshift_site_source_key', $GLOBALS['_cartshift_test_options']);
         self::assertArrayNotHasKey(GuidedSetupConfiguration::OPTION, $GLOBALS['_cartshift_test_options']);
     }
@@ -251,7 +253,7 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         self::assertStringContainsString('will not be migrated', $checks['Standalone coupons']['message']);
     }
 
-    public function testExistingFluentCartRecordsBlockStatusAndDirectStart(): void
+    public function testExistingFluentCartProductsEnterGuidedConflictReviewWithoutOverwrite(): void
     {
         $this->nameTheSite();
         $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string {
@@ -264,13 +266,11 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         $checks = array_column($status['preflight']['checks'], null, 'label');
         $response = $this->controller()->start(new WP_REST_Request());
 
-        self::assertFalse($status['preflight']['ready']);
-        self::assertSame('fail', $checks['Existing FluentCart records']['severity']);
-        self::assertStringContainsString('could create duplicates', $checks['Existing FluentCart records']['message']);
-        self::assertStringContainsString('remove them in FluentCart', $checks['Existing FluentCart records']['message']);
-        self::assertStringContainsString('CartShift will not overwrite them', $checks['Existing FluentCart records']['message']);
-        self::assertStringNotContainsString('target matching', $checks['Existing FluentCart records']['message']);
-        self::assertSame(409, $response->get_status());
+        self::assertTrue($status['preflight']['ready']);
+        self::assertSame('warn', $checks['Existing FluentCart records']['severity']);
+        self::assertStringContainsString('use, create, or skip each possible match', $checks['Existing FluentCart records']['message']);
+        self::assertStringContainsString('will not be overwritten', $checks['Existing FluentCart records']['message']);
+        self::assertSame(200, $response->get_status());
     }
 
     public function testThePlanProjectionContainsFriendlyProgressWithoutCommandsOrPaths(): void
@@ -506,6 +506,61 @@ final class GuidedMigrationControllerTest extends PluginTestCase
 
         self::assertSame(200, $accepted->get_status());
         self::assertSame(1, $accepted->get_data()['data']['accepted']);
+    }
+
+    public function testProductChoiceIsAcceptedAsAnOpaqueAnswerWithoutOverwrite(): void
+    {
+        $this->configurePrivateWorkspace();
+        $sourceKey = $this->nameTheSite();
+        $productRow = [
+            'identity' => $sourceKey . ':product:10',
+            'scope' => 'record',
+            'action' => 'activate_catalogue',
+            'target_status' => 'publish',
+            'source_fingerprint' => str_repeat('a', 64),
+            'operator' => 'wp-user:1',
+            'reason' => 'Owner reviewed the product.',
+            'decided_at' => '2026-08-12T12:00:00Z',
+        ];
+        $proposal = $this->proposal();
+        $proposal['proposal_decisions'] = [];
+        $proposal['decision_set'] = ['decisions' => []];
+        $proposal['product_questions'] = [[
+            'review_id' => 'product-0123456789ab',
+            'identity' => $productRow['identity'],
+            'product_name' => 'Store membership',
+            'source_fingerprint' => $productRow['source_fingerprint'],
+            'dependent_orders' => 0,
+            'dependent_subscriptions' => 0,
+            'original_decision' => $productRow,
+            'choices' => [[
+                'choice_id' => 'choice-111111111111',
+                'action' => 'create',
+            ]],
+        ]];
+        $products = new GuidedProductDecisionBuilder(
+            static fn (): iterable => [],
+            static fn (): array => [],
+            static fn (): array => ['orders' => 0, 'subscriptions' => 0],
+        );
+        $controller = $this->controller(static fn (GuidedStep $step): array => match ($step->verb) {
+            'compatibility' => ['ready' => true],
+            'audit' => ['selection_fingerprint' => str_repeat('a', 64)],
+            default => $proposal,
+        }, productDecisions: $products);
+        $reviewResponse = $this->driveToReview($controller);
+        $review = $reviewResponse->get_data()['data']['review'];
+        $request = $this->approvalRequest($reviewResponse);
+        $request->set_param('review_answers', [[
+            'review_id' => $review['items'][0]['review_id'],
+            'choice_id' => 'choice-111111111111',
+        ]]);
+
+        $accepted = $controller->acceptDecisions($request);
+        $decisions = TransferDecisionSet::fromFile($this->privateWorkspace . '/decisions.json');
+
+        self::assertSame(200, $accepted->get_status());
+        self::assertSame('activate_catalogue', $decisions->for(new SourceIdentity($sourceKey, 'product', '10'))['action']);
     }
 
     public function testSourceChangeDuringReviewReplacesTheReviewWithoutWritingTheOldDecision(): void
@@ -865,6 +920,7 @@ final class GuidedMigrationControllerTest extends PluginTestCase
     private function controller(
         ?\Closure $runStep = null,
         ?GuidedCustomerDecisionBuilder $customerDecisions = null,
+        ?GuidedProductDecisionBuilder $productDecisions = null,
         ?\Closure $rollbackFactory = null,
     ): GuidedMigrationController
     {
@@ -874,6 +930,7 @@ final class GuidedMigrationControllerTest extends PluginTestCase
             $runStep,
             $customerDecisions,
             $rollbackFactory,
+            $productDecisions,
         );
     }
 

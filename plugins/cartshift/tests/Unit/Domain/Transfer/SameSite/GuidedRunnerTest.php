@@ -15,6 +15,7 @@ use CartShift\Domain\Transfer\RecordEnvelope;
 use CartShift\Domain\Transfer\SelectionClause;
 use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Domain\Transfer\SameSite\GuidedEvidence;
+use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedRunner;
 use CartShift\Domain\Transfer\SameSite\GuidedRunPlan;
 use CartShift\Domain\Transfer\SameSite\GuidedSetup;
@@ -126,6 +127,66 @@ final class GuidedRunnerTest extends PluginTestCase
 
         self::assertSame(['source'], $probed);
         self::assertTrue($result['ready']);
+    }
+
+    public function testProposalRoutesAnExistingCatalogueThroughProductChoices(): void
+    {
+        $record = RecordEnvelope::forPayload(2, new SourceIdentity(self::SOURCE_KEY, 'product', '10'), [
+            'identity' => self::SOURCE_KEY . ':product:10',
+            'name' => 'Store membership',
+            'sku' => 'MEMBERSHIP',
+            'status' => 'publish',
+            'variations' => [[
+                'identity' => self::SOURCE_KEY . ':product:10:variation:11',
+                'sku' => 'MEMBERSHIP',
+                'attribute_assignments' => [],
+                'price' => ['active_price' => 2500],
+            ]],
+        ]);
+        $row = $this->productDecision($record->identity->canonical());
+        $row['source_fingerprint'] = $record->sourceContentDigest;
+        $proposal = [
+            'status' => 'owner_review_required',
+            'blockers' => [],
+            'base_decision_fingerprint' => TransferDecisionSet::empty()->fingerprint(),
+            'proposal_decisions' => [$row],
+            'proposal_counts' => ['records' => 1, 'total' => 1],
+            'decision_set' => ['decisions' => [$row]],
+        ];
+        $snapshot = [
+            'product' => ['post_title' => 'Store membership', 'post_status' => 'publish'],
+            'detail' => ['variation_type' => 'simple'],
+            'variations' => [[
+                'id' => 901,
+                'post_id' => 501,
+                'variation_title' => 'Default',
+                'sku' => 'MEMBERSHIP',
+                'item_price' => 2500,
+            ]],
+            'taxonomies' => [], 'taxonomy_rows' => [], 'media' => [], 'downloads' => [],
+        ];
+        $products = new GuidedProductDecisionBuilder(
+            static fn (): iterable => [$record],
+            static fn (): array => [[
+                'id' => 501,
+                'name' => 'Store membership',
+                'sku' => 'MEMBERSHIP',
+                'price' => 2500.0,
+                'variation_count' => 1,
+                'snapshot' => $snapshot,
+            ]],
+            static fn (): array => ['orders' => 0, 'subscriptions' => 0],
+        );
+        $runner = $this->runner(
+            proposalPipeline: static fn (): array => $proposal,
+            productDecisions: $products,
+        );
+        $evidence = GuidedEvidence::none()->withSelectionFingerprint(str_repeat('a', 64));
+
+        $result = $runner->run($this->stepFor('propose-decisions', $evidence));
+
+        self::assertCount(1, $result['product_questions']);
+        self::assertSame([], $result['proposal_decisions']);
     }
 
     // ──────────────────────────────────────────────
@@ -555,7 +616,12 @@ final class GuidedRunnerTest extends PluginTestCase
         putenv(ConfiguredTransferEvidence::OPERATOR_ID . '=' . self::OPERATOR);
     }
 
-    private function runner(?\Closure $targetPipeline = null, ?\Closure $probe = null): GuidedRunner
+    private function runner(
+        ?\Closure $targetPipeline = null,
+        ?\Closure $probe = null,
+        ?\Closure $proposalPipeline = null,
+        ?GuidedProductDecisionBuilder $productDecisions = null,
+    ): GuidedRunner
     {
         return new GuidedRunner(
             new GuidedSetup(self::SOURCE_KEY, self::OPERATOR),
@@ -565,6 +631,8 @@ final class GuidedRunnerTest extends PluginTestCase
             packageValidator: null,
             probe: $probe,
             targetReadiness: static function (): void {},
+            proposalPipeline: $proposalPipeline,
+            productDecisions: $productDecisions,
         );
     }
 

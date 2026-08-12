@@ -46,15 +46,14 @@ final class GuidedPreflightPresentationTest extends PluginTestCase
         $payload = (new GuidedPreflightPresentation())->evaluate($preflight);
 
         self::assertSame(['ready', 'checks'], array_keys($payload));
-        self::assertFalse($payload['ready']);
+        self::assertTrue($payload['ready']);
         self::assertTrue(array_is_list($payload['checks']));
         self::assertSame([
             [
                 'label' => 'Existing FluentCart records',
-                'severity' => 'fail',
-                'message' => 'FluentCart already contains records, so continuing could create duplicates. '
-                    . 'If they are test records, remove them in FluentCart and reload this screen. '
-                    . 'If they must be kept, stop here; CartShift will not overwrite them.',
+                'severity' => 'warn',
+                'message' => 'FluentCart already has products. CartShift will ask whether to use, create, or skip each possible match. '
+                    . 'Existing products will not be overwritten.',
             ],
             [
                 'label' => 'WooCommerce Subscriptions',
@@ -68,5 +67,32 @@ final class GuidedPreflightPresentationTest extends PluginTestCase
                     . 'Applied coupon history stays on migrated orders.',
             ],
         ], $payload['checks']);
+    }
+
+    public function testExistingCommerceRecordsRemainAPreciseBlockerUntilTheyHaveReuseDecisions(): void
+    {
+        $payload = (new GuidedPreflightPresentation())->evaluate([
+            'ready' => true,
+            'checks' => [
+                'fc_data' => [
+                    'severity' => 'warn',
+                    'counts' => [
+                        'products' => 2,
+                        'customers' => 4,
+                        'orders' => 3,
+                        'subscriptions' => 0,
+                        'coupons' => 8,
+                    ],
+                ],
+            ],
+        ]);
+
+        self::assertFalse($payload['ready']);
+        self::assertSame('fail', $payload['checks'][0]['severity']);
+        self::assertSame(
+            'FluentCart already has 4 customers and 3 orders. Their safe reuse review is not available yet, '
+                . 'so CartShift will stop rather than create duplicates.',
+            $payload['checks'][0]['message'],
+        );
     }
 }

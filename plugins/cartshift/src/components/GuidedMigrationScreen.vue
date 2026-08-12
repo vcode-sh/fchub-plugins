@@ -102,7 +102,11 @@ const canAcceptRun = computed(() => {
     unresolvedReviewBlockers.value.length === 0 &&
     blockingChecks.value.length === 0 &&
     !currentRun.value?.mode_changed &&
-    items.every((item) => reviewApprovals[item.review_id] === true)
+    items.every((item) =>
+      item.choices?.length
+        ? typeof reviewApprovals[item.review_id] === 'string'
+        : reviewApprovals[item.review_id] === true
+    )
   );
 });
 
@@ -116,8 +120,8 @@ function clearReviewApprovals() {
   Object.keys(reviewApprovals).forEach((key) => delete reviewApprovals[key]);
 }
 
-function toggleReview(reviewId, checked) {
-  reviewApprovals[reviewId] = checked;
+function toggleReview(reviewId, answer) {
+  reviewApprovals[reviewId] = answer;
 }
 
 async function refresh() {
@@ -170,9 +174,14 @@ async function acceptRunDecisions() {
   state.error = null;
   const items = currentRun.value?.review?.items || [];
   try {
-    const accepted = await api('POST', 'migration/decisions', {
+    const payload = {
       approved_reviews: items.map(({ review_id }) => review_id),
-    });
+    };
+    const answers = items
+      .filter((item) => item.choices?.length)
+      .map((item) => ({ review_id: item.review_id, choice_id: reviewApprovals[item.review_id] }));
+    if (answers.length > 0) payload.review_answers = answers;
+    const accepted = await api('POST', 'migration/decisions', payload);
     clearReviewApprovals();
     state.run = accepted.run;
     state.reviewNotice = accepted.review_changed

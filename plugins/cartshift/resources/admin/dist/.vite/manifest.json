@@ -4,12 +4,12 @@
     "src": "resources/admin/fonts/inter-latin.woff2"
   },
   "src/main.js": {
-    "file": "assets/main-CIHq4dqp.js",
+    "file": "assets/main-5VwAkjgT.js",
     "name": "main",
     "src": "src/main.js",
     "isEntry": true,
     "css": [
-      "assets/main-BqYRnGyF.css"
+      "assets/main-CqvmT-gh.css"
     ],
     "assets": [
       "assets/inter-latin-BOOGhInR.woff2"

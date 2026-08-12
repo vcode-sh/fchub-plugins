@@ -358,7 +358,9 @@ final readonly class GuidedRunState
         }
 
         return !is_array($proposal['proposal_decisions'] ?? null)
-            || ($proposal['proposal_decisions'] ?? []) !== [];
+            || ($proposal['proposal_decisions'] ?? []) !== []
+            || (array_key_exists('product_questions', $proposal)
+                && (!is_array($proposal['product_questions']) || $proposal['product_questions'] !== []));
     }
 
     /** @param array<string, mixed> $data */

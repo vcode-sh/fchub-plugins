@@ -18,6 +18,8 @@ use CartShift\Domain\Transfer\Product\ProductAssessmentContext;
 use CartShift\Domain\Transfer\Product\ProductCapabilityAssessor;
 use CartShift\Domain\Transfer\Product\ProductFieldDecisionSet;
 use CartShift\Domain\Transfer\Product\ProductFieldDisposition;
+use CartShift\Domain\Transfer\Product\LinkedProductPlan;
+use CartShift\Domain\Transfer\Product\LoadedFluentCartProductGateway;
 use CartShift\Domain\Transfer\Product\ProductRecord;
 use CartShift\Domain\Transfer\Product\ProductStagePlan;
 use CartShift\Domain\Transfer\RecordEnvelope;
@@ -36,6 +38,8 @@ final class TargetRecordPlanFactory
 
     /** @var \Closure(CustomerRecord):list<array<string,mixed>> */
     private readonly \Closure $customerCandidates;
+    /** @var \Closure(int):array<string,mixed> */
+    private readonly \Closure $productTargetSnapshot;
 
     /**
      * @param list<RecordEnvelope> $records
@@ -44,6 +48,7 @@ final class TargetRecordPlanFactory
      * @param array<string,bool> $productCapabilities
      * @param array<string,int> $targetShippingClasses
      * @param (callable(CustomerRecord):list<array<string,mixed>>)|null $customerCandidates
+     * @param (callable(int):array<string,mixed>)|null $productTargetSnapshot
      */
     public function __construct(
         private readonly TransferDecisionSet $decisions,
@@ -59,6 +64,7 @@ final class TargetRecordPlanFactory
         ?callable $customerCandidates = null,
         private readonly TransferRecordHydrator $hydrator = new TransferRecordHydrator(),
         private readonly ?string $evaluationUtc = null,
+        ?callable $productTargetSnapshot = null,
     ) {
         $package = realpath($packageDirectory);
         if ($package === false || !is_dir($package) || is_link($packageDirectory)) {
@@ -82,12 +88,27 @@ final class TargetRecordPlanFactory
         $this->customerCandidates = $customerCandidates === null
             ? static fn (CustomerRecord $record): array => self::loadedCustomerCandidates($record)
             : $customerCandidates(...);
+        $this->productTargetSnapshot = $productTargetSnapshot === null
+            ? static fn (int $targetId): array => (new LoadedFluentCartProductGateway())->snapshot($targetId)
+            : $productTargetSnapshot(...);
     }
 
-    public function product(RecordEnvelope $envelope): ProductStagePlan
+    public function product(RecordEnvelope $envelope): ProductStagePlan|LinkedProductPlan
     {
         $record = $this->hydrator->product($envelope);
-        $this->assertRecordDecision($envelope, ['activate_catalogue', 'leave_catalogue_draft']);
+        $decision = $this->assertRecordDecision($envelope, [
+            'activate_catalogue',
+            'leave_catalogue_draft',
+            'link_existing_product',
+        ]);
+        if (($decision['action'] ?? null) === 'link_existing_product') {
+            return LinkedProductPlan::fromDecision(
+                $record,
+                $envelope,
+                $decision,
+                ($this->productTargetSnapshot)((int) $decision['target_product_id']),
+            );
+        }
         $context = new ProductAssessmentContext(
             $this->targetTaxClasses,
             $this->productCapabilities,

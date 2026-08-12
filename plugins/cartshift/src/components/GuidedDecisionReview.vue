@@ -10,14 +10,29 @@
     </div>
     <fieldset class="cartshift-review-list">
       <legend class="screen-reader-text">Migration decisions</legend>
-      <label v-for="item in run.review?.items || []" :key="item.review_id" class="cartshift-decision" data-test="review-decision">
+      <div v-for="item in run.review?.items || []" :key="item.review_id" class="cartshift-decision" data-test="review-decision">
         <input
+          v-if="!item.choices?.length"
           type="checkbox"
           :checked="approvals[item.review_id] === true"
+          :aria-label="`Approve ${item.title}`"
           @change="$emit('toggle', item.review_id, $event.target.checked)"
         />
-        <span><strong>{{ item.title }}</strong><small>{{ item.summary }}</small></span>
-      </label>
+        <span class="cartshift-decision-copy"><strong>{{ item.title }}</strong><small>{{ item.summary }}</small></span>
+        <fieldset v-if="item.choices?.length" class="cartshift-product-choices">
+          <legend class="screen-reader-text">Choose what CartShift should do with {{ item.title }}</legend>
+          <label v-for="choice in item.choices" :key="choice.choice_id" data-test="product-choice">
+            <input
+              type="radio"
+              :name="item.review_id"
+              :value="choice.choice_id"
+              :checked="approvals[item.review_id] === choice.choice_id"
+              @change="$emit('toggle', item.review_id, choice.choice_id)"
+            />
+            <span><strong>{{ choice.label }}</strong><small>{{ choice.description }}</small></span>
+          </label>
+        </fieldset>
+      </div>
     </fieldset>
     <ul v-if="run.review?.blockers?.length" class="cartshift-review-blockers">
       <li v-for="blocker in run.review.blockers" :key="blocker">{{ blocker }}</li>

@@ -12,7 +12,9 @@ use CartShift\Domain\Transfer\Identity\CheckedMappingStore;
 use CartShift\Domain\Transfer\Identity\MapState;
 use CartShift\Domain\Transfer\Identity\MappingRecord;
 use CartShift\Domain\Transfer\Order\OrderRecord;
+use CartShift\Domain\Transfer\Product\LinkedProductPlan;
 use CartShift\Domain\Transfer\Product\ProductStagePlan;
+use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
 use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Tests\Unit\Domain\Transfer\Product\ProductAssessmentFixture;
 use CartShift\Tests\Unit\PluginTestCase;
@@ -71,6 +73,102 @@ final class TargetRecordPlanFactoryTest extends PluginTestCase
         self::assertIsArray($capabilities);
         self::assertArrayHasKey('shared_parent_stock', $capabilities);
         self::assertFalse($capabilities['shared_parent_stock']);
+    }
+
+    public function testExistingProductDecisionBuildsAReadOnlyFingerprintBoundPlan(): void
+    {
+        $record = ProductAssessmentFixture::product();
+        $envelope = $record->envelope();
+        $variation = $record->variations[0];
+        $targetId = 501;
+        $targetVariationId = 901;
+        $snapshot = [
+            'product' => ['ID' => $targetId, 'post_title' => 'Existing product', 'post_status' => 'publish'],
+            'detail' => ['post_id' => $targetId, 'variation_type' => 'simple'],
+            'variations' => [[
+                'id' => $targetVariationId,
+                'post_id' => $targetId,
+                'variation_title' => 'Default',
+                'sku' => 'EXISTING-1',
+                'item_price' => 2500,
+            ]],
+            'taxonomies' => [],
+            'taxonomy_rows' => [],
+            'media' => [],
+            'downloads' => [],
+        ];
+        $sourceMap = [
+            $record->identity->canonical() => $targetId,
+            $variation->identity->canonical() => $targetVariationId,
+        ];
+        $decision = [[
+            'identity' => $record->identity->canonical(),
+            'action' => 'link_existing_product',
+            'target_product_id' => $targetId,
+            'target_fingerprint' => (new ProductTargetFingerprint())->fingerprint($snapshot, $sourceMap),
+            'variation_links' => [[
+                'source_variation' => $variation->identity->canonical(),
+                'target_variation_id' => $targetVariationId,
+                'source_fingerprint' => \CartShift\Support\CanonicalJson::fingerprint($envelope->payload['variations'][0]),
+                'target_fingerprint' => \CartShift\Support\CanonicalJson::fingerprint($snapshot['variations'][0]),
+            ]],
+            'source_fingerprint' => $envelope->sourceContentDigest,
+        ]];
+        $factory = $this->factory(
+            [$envelope],
+            $this->decisions($decision),
+            static fn (int $requestedId): array => $requestedId === $targetId ? $snapshot : [],
+        );
+
+        $plan = $factory->product($envelope);
+
+        self::assertInstanceOf(LinkedProductPlan::class, $plan);
+        self::assertSame($targetId, $plan->targetProductId);
+        self::assertSame($sourceMap, $plan->sourceTargetIds());
+        self::assertSame($decision[0]['target_fingerprint'], $plan->targetFingerprint);
+        self::assertSame($envelope->privateContentDigest, $plan->sourceFingerprint);
+    }
+
+    public function testExistingProductDecisionStopsWhenTheReviewedTargetChanged(): void
+    {
+        $record = ProductAssessmentFixture::product();
+        $envelope = $record->envelope();
+        $variation = $record->variations[0];
+        $snapshot = [
+            'product' => ['ID' => 501, 'post_title' => 'Changed after review', 'post_status' => 'publish'],
+            'detail' => ['post_id' => 501, 'variation_type' => 'simple'],
+            'variations' => [[
+                'id' => 901,
+                'post_id' => 501,
+                'variation_title' => 'Default',
+                'sku' => 'EXISTING-1',
+                'item_price' => 2500,
+            ]],
+            'taxonomies' => [],
+            'taxonomy_rows' => [],
+            'media' => [],
+            'downloads' => [],
+        ];
+        $decision = [[
+            'identity' => $record->identity->canonical(),
+            'action' => 'link_existing_product',
+            'target_product_id' => 501,
+            'target_fingerprint' => str_repeat('a', 64),
+            'variation_links' => [[
+                'source_variation' => $variation->identity->canonical(),
+                'target_variation_id' => 901,
+                'source_fingerprint' => \CartShift\Support\CanonicalJson::fingerprint($envelope->payload['variations'][0]),
+                'target_fingerprint' => \CartShift\Support\CanonicalJson::fingerprint($snapshot['variations'][0]),
+            ]],
+            'source_fingerprint' => $envelope->sourceContentDigest,
+        ]];
+
+        $this->expectExceptionMessage('target_linked_product_changed');
+        $this->factory(
+            [$envelope],
+            $this->decisions($decision),
+            static fn (): array => $snapshot,
+        )->product($envelope);
     }
 
     public function testLoadedShippingClassesUseTheInstalledFluentCartNameSchema(): void
@@ -197,7 +295,11 @@ final class TargetRecordPlanFactoryTest extends PluginTestCase
     }
 
     /** @param list<object> $records */
-    private function factory(array $records, TransferDecisionSet $decisions): TargetRecordPlanFactory
+    private function factory(
+        array $records,
+        TransferDecisionSet $decisions,
+        ?callable $productTargetSnapshot = null,
+    ): TargetRecordPlanFactory
     {
         return new TargetRecordPlanFactory(
             $decisions,
@@ -231,6 +333,7 @@ final class TargetRecordPlanFactoryTest extends PluginTestCase
             'live',
             false,
             static fn (): array => [],
+            productTargetSnapshot: $productTargetSnapshot,
         );
     }
 }

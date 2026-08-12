@@ -19,13 +19,16 @@ final class ProductReconciler
     }
 
     public function reconcile(
-        ProductStagePlan $plan,
+        ProductStagePlan|LinkedProductPlan $plan,
         int $targetId,
         string $expectedFingerprint,
         ?string $approvedPostStatus = null,
     ): ReconciliationResult {
         if (!in_array($approvedPostStatus, [null, 'publish'], true)) {
             throw new \InvalidArgumentException('Approved product status is invalid.');
+        }
+        if ($plan instanceof LinkedProductPlan) {
+            return $this->reconcileLinked($plan, $targetId, $expectedFingerprint, $approvedPostStatus);
         }
         $failures = [];
         if (!$this->gateway->exists($targetId)) {
@@ -256,6 +259,44 @@ final class ProductReconciler
         $failures = array_values(array_unique($failures));
         sort($failures);
         return new ReconciliationResult($failures === [], $actualFingerprint, $failures);
+    }
+
+    private function reconcileLinked(
+        LinkedProductPlan $plan,
+        int $targetId,
+        string $expectedFingerprint,
+        ?string $approvedPostStatus,
+    ): ReconciliationResult {
+        $failures = [];
+        if ($approvedPostStatus !== null) {
+            $failures[] = 'linked_product_status_write_forbidden';
+        }
+        if ($targetId !== $plan->targetProductId || !$this->gateway->exists($targetId)) {
+            $actual = $this->fingerprint->fingerprint([], []);
+            return new ReconciliationResult(false, $actual, ['target_product_missing']);
+        }
+        $sourceMap = [];
+        foreach ($plan->sourceIdentities() as $identity) {
+            $mapping = $this->maps->get($identity);
+            $expectedTarget = $plan->sourceTargetIds()[$identity->canonical()] ?? null;
+            if ($mapping === null
+                || !$mapping->isActive()
+                || $mapping->targetId !== $expectedTarget
+                || !hash_equals((string) $mapping->sourceFingerprint, $plan->sourceFingerprintFor($identity))
+                || !hash_equals((string) $mapping->targetFingerprint, $plan->targetFingerprint)) {
+                $failures[] = 'source_map_mismatch';
+                continue;
+            }
+            $sourceMap[$identity->canonical()] = $mapping->targetId;
+        }
+        $actual = $this->fingerprint->fingerprint($this->gateway->snapshot($targetId), $sourceMap);
+        if (!hash_equals($plan->targetFingerprint, $actual)
+            || !hash_equals($expectedFingerprint, $actual)) {
+            $failures[] = 'target_fingerprint_mismatch';
+        }
+        $failures = array_values(array_unique($failures));
+        sort($failures, SORT_STRING);
+        return new ReconciliationResult($failures === [], $actual, $failures);
     }
 
     /** @param array<string, mixed> $actual @param array<string, mixed> $expected */

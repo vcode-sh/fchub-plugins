@@ -119,7 +119,11 @@ final readonly class LoadedTargetPreparePipeline
         ));
         $leaveDraftAccepted = $productRecords !== [] && array_filter(
             $productRecords,
-            static fn ($record): bool => ($decisions->for($record->identity)['action'] ?? null) !== 'leave_catalogue_draft',
+            static fn ($record): bool => !in_array(
+                $decisions->for($record->identity)['action'] ?? null,
+                ['leave_catalogue_draft', 'link_existing_product'],
+                true,
+            ),
         ) === [];
         $prepared = new PreparedTransfer(
             $runId,

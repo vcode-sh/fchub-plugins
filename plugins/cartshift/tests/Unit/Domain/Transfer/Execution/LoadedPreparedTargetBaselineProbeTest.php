@@ -8,6 +8,7 @@ use CartShift\Domain\Transfer\Decision\TransferDecisionSet;
 use CartShift\Domain\Transfer\Execution\LoadedPreparedTargetBaselineProbe;
 use CartShift\Domain\Transfer\Identity\TargetOwnershipReport;
 use CartShift\Domain\Transfer\RecordEnvelope;
+use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
 use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Support\CanonicalJson;
 use CartShift\Tests\Unit\PluginTestCase;
@@ -172,6 +173,51 @@ final class LoadedPreparedTargetBaselineProbeTest extends PluginTestCase
         $rows = ['maps' => [], 'claims' => [], 'shared_links' => []];
         $currentTarget['customer']['status'] = 'inactive';
         $this->expectExceptionMessage('target_baseline_protected_target_changed:shop-alpha:customer:7|reuse_explicit_target_customer');
+        $probe->verify($baseline, 'run-target-22');
+    }
+
+    public function testApprovedExistingProductIsProtectedFromReviewToExecution(): void
+    {
+        $product = $this->record('product', '9');
+        $variation = 'shop-alpha:product:9:variation:1';
+        $target = [
+            'product' => ['ID' => 501, 'post_title' => 'Existing product'],
+            'detail' => ['post_id' => 501],
+            'variations' => [['id' => 901, 'post_id' => 501, 'sku' => 'EXISTING-1']],
+            'taxonomies' => [],
+            'taxonomy_rows' => [],
+            'media' => [],
+            'downloads' => [],
+        ];
+        $sourceMap = [$product->identity->canonical() => 501, $variation => 901];
+        $decisions = TransferDecisionSet::fromArray([[
+            'identity' => $product->identity->canonical(),
+            'action' => 'link_existing_product',
+            'target_product_id' => 501,
+            'target_fingerprint' => (new ProductTargetFingerprint())->fingerprint($target, $sourceMap),
+            'variation_links' => [[
+                'source_variation' => $variation,
+                'target_variation_id' => 901,
+                'source_fingerprint' => str_repeat('b', 64),
+                'target_fingerprint' => CanonicalJson::fingerprint($target['variations'][0]),
+            ]],
+            'source_fingerprint' => $product->sourceContentDigest,
+            'operator' => 'owner',
+            'reason' => 'Use the reviewed existing product.',
+            'decided_at' => '2026-08-12T21:00:00Z',
+        ]]);
+        $currentTarget = $target;
+        $probe = new LoadedPreparedTargetBaselineProbe(
+            fn (string $sourceKey): TargetOwnershipReport => $this->report([]),
+            static fn (): array => ['maps' => [], 'claims' => [], 'shared_links' => []],
+            static function (string $kind, int $targetId) use (&$currentTarget): array { return $currentTarget; },
+        );
+
+        $baseline = $probe->capture('shop-alpha', [$product], $decisions, 'run-target-22');
+
+        self::assertSame(501, $baseline->snapshot['protected_targets']['shop-alpha:product:9|link_existing_product']['target_id']);
+        $currentTarget['product']['post_title'] = 'Changed after review';
+        $this->expectExceptionMessage('target_baseline_protected_target_changed:shop-alpha:product:9|link_existing_product');
         $probe->verify($baseline, 'run-target-22');
     }
 

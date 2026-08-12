@@ -11,6 +11,7 @@ use CartShift\Domain\Transfer\Product\ParentStockExceptionReport;
 use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedDecisionReview;
 use CartShift\Domain\Transfer\SameSite\GuidedEvidence;
+use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedRollback;
 use CartShift\Domain\Transfer\SameSite\GuidedRunPlan;
 use CartShift\Domain\Transfer\SameSite\GuidedRunState;
@@ -30,6 +31,7 @@ final class GuidedRunProjection
     public function __construct(
         private readonly ?GuidedCustomerDecisionBuilder $customerDecisions = null,
         ?callable $rollbackFactory = null,
+        private readonly ?GuidedProductDecisionBuilder $productDecisions = null,
     ) {
         $this->rollbackFactory = $rollbackFactory === null ? null : $rollbackFactory(...);
     }
@@ -320,7 +322,10 @@ final class GuidedRunProjection
 
     private function decisionReview(): GuidedDecisionReview
     {
-        return new GuidedDecisionReview($this->customerDecisions ?? new GuidedCustomerDecisionBuilder());
+        return new GuidedDecisionReview(
+            $this->customerDecisions ?? new GuidedCustomerDecisionBuilder(),
+            $this->productDecisions ?? new GuidedProductDecisionBuilder(),
+        );
     }
 
     private function operatorId(): string

@@ -21,6 +21,8 @@ use CartShift\Domain\Transfer\Product\FluentCartDownloadStager;
 use CartShift\Domain\Transfer\Product\WordPressMediaGateway;
 use CartShift\Domain\Transfer\Product\WordPressMediaStager;
 use CartShift\Domain\Transfer\Product\HistoricalProductPlaceholder;
+use CartShift\Domain\Transfer\Product\LinkedProductPlan;
+use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
 use CartShift\Domain\Transfer\Product\TaxonomyAssignment;
 use CartShift\Domain\Transfer\SourceRecordException;
 use CartShift\Domain\Transfer\RecordKind;
@@ -110,6 +112,71 @@ final class FluentCartProductWriterTest extends PluginTestCase
 
         self::assertSame($writeCount, $gateway->writeCount);
         self::assertSame('Changed by somebody else', $gateway->products[$first->targetId]['post_title']);
+    }
+
+    public function testApprovedExistingProductCreatesOnlyNonOwningMappings(): void
+    {
+        $gateway = new InMemoryProductTargetGateway();
+        $maps = new InMemoryCheckedMappingStore();
+        $sourcePlan = $this->plan();
+        $record = $sourcePlan->record;
+        $envelope = $record->envelope();
+        $gateway->products[501] = [
+            'ID' => 501,
+            'post_title' => 'Existing FluentCart product',
+            'post_status' => 'publish',
+        ];
+        $gateway->details[501] = ['post_id' => 501, 'variation_type' => 'simple'];
+        foreach ($record->variations as $index => $variation) {
+            $targetId = 901 + $index;
+            $gateway->variations[$targetId] = [
+                'id' => $targetId,
+                'post_id' => 501,
+                'variation_title' => 'Existing ' . ($index + 1),
+                'sku' => 'EXISTING-' . ($index + 1),
+                'item_price' => 2500 + $index,
+            ];
+        }
+        $snapshot = $gateway->snapshot(501);
+        $sourceMap = [$record->identity->canonical() => 501];
+        $links = [];
+        foreach ($record->variations as $index => $variation) {
+            $targetId = 901 + $index;
+            $sourcePayload = $envelope->payload['variations'][$index];
+            $targetVariation = $gateway->variations[$targetId];
+            $sourceMap[$variation->identity->canonical()] = $targetId;
+            $links[] = [
+                'source_variation' => $variation->identity->canonical(),
+                'target_variation_id' => $targetId,
+                'source_fingerprint' => \CartShift\Support\CanonicalJson::fingerprint($sourcePayload),
+                'target_fingerprint' => \CartShift\Support\CanonicalJson::fingerprint($targetVariation),
+            ];
+        }
+        $linked = LinkedProductPlan::fromDecision($record, $envelope, [
+            'target_product_id' => 501,
+            'target_fingerprint' => (new ProductTargetFingerprint())->fingerprint($snapshot, $sourceMap),
+            'variation_links' => $links,
+        ], $snapshot);
+        $writer = new FluentCartProductWriter($gateway, $maps, new ProductReconciler($gateway, $maps));
+        $before = $gateway->databaseFingerprint();
+        $writeCount = $gateway->writeCount;
+
+        try {
+            $result = $writer->stage($linked, $this->context());
+        } catch (\TypeError $exception) {
+            self::fail('The product writer cannot execute the approved existing-product plan.');
+        }
+
+        self::assertTrue($result->reused);
+        self::assertSame(501, $result->targetId);
+        self::assertSame([901, 902], $result->variationIds);
+        self::assertSame($sourceMap, $result->sourceTargetIds);
+        self::assertSame($before, $gateway->databaseFingerprint());
+        self::assertSame($writeCount, $gateway->writeCount);
+        foreach ($linked->sourceIdentities() as $identity) {
+            self::assertSame(MapState::Reconciled, $maps->get($identity)?->state);
+            self::assertFalse($maps->createdByMigration[$identity->canonical()] ?? true);
+        }
     }
 
     public function testInitialReadbackRejectsAFieldTheTargetSilentlyDropped(): void
@@ -773,6 +840,8 @@ final class InMemoryCheckedMappingStore implements CheckedMappingStore
 {
     /** @var array<string, MappingRecord> */
     public array $records = [];
+    /** @var array<string,bool> */
+    public array $createdByMigration = [];
     public bool $failForCompoundVariation = false;
     private bool $rollbackRegistered = false;
 
@@ -802,6 +871,7 @@ final class InMemoryCheckedMappingStore implements CheckedMappingStore
             throw new \RuntimeException('identity mapping conflict');
         }
         $this->records[$identity->canonical()] = $record;
+        $this->createdByMigration[$identity->canonical()] = $createdByMigration;
         return $record;
     }
 
@@ -827,9 +897,11 @@ final class InMemoryCheckedMappingStore implements CheckedMappingStore
         if ($this->rollbackRegistered) {
             return;
         }
-        $before = $this->records;
-        DatabaseTransaction::afterRollback(function () use ($before): void {
-            $this->records = $before;
+        $beforeRecords = $this->records;
+        $beforeOwnership = $this->createdByMigration;
+        DatabaseTransaction::afterRollback(function () use ($beforeRecords, $beforeOwnership): void {
+            $this->records = $beforeRecords;
+            $this->createdByMigration = $beforeOwnership;
             $this->rollbackRegistered = false;
         });
         DatabaseTransaction::afterCommit(function (): void {

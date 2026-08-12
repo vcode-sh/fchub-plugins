@@ -16,8 +16,17 @@ final class GuidedPreflightPresentation
     {
         $payload = $this->payload($preflight);
         if (($payload['checks']['fc_data']['severity'] ?? null) === PreflightCheck::SEVERITY_WARN) {
-            $payload['checks']['fc_data']['severity'] = PreflightCheck::SEVERITY_FAIL;
-            $payload['ready'] = false;
+            $counts = $preflight['checks']['fc_data']['counts'] ?? [];
+            $blocking = is_array($counts)
+                ? array_sum(array_map(
+                    static fn (string $kind): int => max(0, (int) ($counts[$kind] ?? 0)),
+                    ['customers', 'orders', 'subscriptions'],
+                ))
+                : 1;
+            if ($blocking > 0) {
+                $payload['checks']['fc_data']['severity'] = PreflightCheck::SEVERITY_FAIL;
+                $payload['ready'] = false;
+            }
         }
         $coupons = $this->standaloneCouponCount();
         $payload['checks']['standalone_coupons'] = [
@@ -96,9 +105,7 @@ final class GuidedPreflightPresentation
                 : 'Server processing time is ready.',
             'product_types' => $this->productTypeMessage($check),
             'fc_data' => $attention
-                ? 'FluentCart already contains records, so continuing could create duplicates. '
-                    . 'If they are test records, remove them in FluentCart and reload this screen. '
-                    . 'If they must be kept, stop here; CartShift will not overwrite them.'
+                ? $this->existingFluentCartMessage($check)
                 : 'FluentCart has no existing records that could conflict with this migration.',
             'migration_tables' => $attention
                 ? 'CartShift storage is not ready. Update or reactivate CartShift, then reload this screen.'
@@ -108,6 +115,31 @@ final class GuidedPreflightPresentation
                 : 'No known access-granting plugin needs separate migration.',
             default => $attention ? 'This shop check needs attention before migration.' : 'This shop check is ready.',
         };
+    }
+
+    /** @param array<string,mixed> $check */
+    private function existingFluentCartMessage(array $check): string
+    {
+        $counts = is_array($check['counts'] ?? null) ? $check['counts'] : [];
+        $blocking = [];
+        foreach (['customers' => 'customer', 'orders' => 'order', 'subscriptions' => 'subscription'] as $key => $label) {
+            $count = max(0, (int) ($counts[$key] ?? 0));
+            if ($count > 0) {
+                $blocking[] = sprintf('%d %s%s', $count, $label, $count === 1 ? '' : 's');
+            }
+        }
+        if ($blocking !== []) {
+            $last = array_pop($blocking);
+            $items = $blocking === [] ? $last : implode(', ', $blocking) . ' and ' . $last;
+            return sprintf(
+                'FluentCart already has %s. Their safe reuse review is not available yet, '
+                    . 'so CartShift will stop rather than create duplicates.',
+                $items,
+            );
+        }
+
+        return 'FluentCart already has products. CartShift will ask whether to use, create, or skip each possible match. '
+            . 'Existing products will not be overwritten.';
     }
 
     /** @param array<string,mixed> $check */

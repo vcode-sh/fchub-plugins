@@ -10,6 +10,7 @@ use CartShift\Domain\Transfer\Identity\LegacyMapAuditor;
 use CartShift\Domain\Transfer\Identity\TargetOwnershipReport;
 use CartShift\Domain\Transfer\Order\LoadedFluentCartOrderGateway;
 use CartShift\Domain\Transfer\Product\LoadedFluentCartProductGateway;
+use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
 use CartShift\Domain\Transfer\RecordEnvelope;
 use CartShift\Support\CanonicalJson;
 
@@ -115,6 +116,34 @@ final class LoadedPreparedTargetBaselineProbe implements PreparedTargetBaselineP
                 continue;
             }
             $protected[$key] = ['kind' => 'customer', 'target_id' => $targetId, 'fingerprint' => $actual];
+        }
+
+        foreach ($records as $record) {
+            $decision = $decisions->for($record->identity);
+            if (($decision['action'] ?? null) !== 'link_existing_product') {
+                continue;
+            }
+            $key = $record->identity->canonical() . '|link_existing_product';
+            $targetId = (int) ($decision['target_product_id'] ?? 0);
+            $snapshot = $targetId > 0 ? ($this->targetReader)('product', $targetId) : [];
+            $sourceMap = [$record->identity->canonical() => $targetId];
+            foreach ((array) ($decision['variation_links'] ?? []) as $link) {
+                if (is_array($link)) {
+                    $sourceMap[(string) ($link['source_variation'] ?? '')] = (int) ($link['target_variation_id'] ?? 0);
+                }
+            }
+            $reviewed = (new ProductTargetFingerprint())->fingerprint($snapshot, $sourceMap);
+            if ($targetId <= 0
+                || !hash_equals($record->sourceContentDigest, (string) ($decision['source_fingerprint'] ?? ''))
+                || !hash_equals((string) ($decision['target_fingerprint'] ?? ''), $reviewed)) {
+                $blockers[] = 'linked_product_target_changed:' . $record->identity->canonical();
+                continue;
+            }
+            $protected[$key] = [
+                'kind' => 'product',
+                'target_id' => $targetId,
+                'fingerprint' => CanonicalJson::fingerprint($snapshot),
+            ];
         }
 
         $preexisting = ($this->preexistingReader)($sourceKey, $runId);
