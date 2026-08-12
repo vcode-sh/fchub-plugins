@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use CartShift\Core\Container;
 use CartShift\Domain\Migration\MigrationFinalizer;
+use CartShift\Domain\Transfer\Legacy\LegacyCommandPolicy;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -31,6 +32,11 @@ final class FinalizeController
 
     public function finalize(WP_REST_Request $request): WP_REST_Response
     {
+        return new WP_REST_Response(
+            ['data' => (new LegacyCommandPolicy())->refusalPayload('rest:POST:cartshift/v1/finalize')],
+            410,
+        );
+
         $migrationId = $request->get_param('migration_id');
 
         if (empty($migrationId) || !is_string($migrationId)) {

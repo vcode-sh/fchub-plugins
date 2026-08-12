@@ -70,7 +70,7 @@ final class ProductMapper
             'post_date_gmt' => self::toUtcString($dateCreated) ?? current_time('mysql', true),
         ];
 
-        $variationType = $isVariable ? 'advanced_variations' : 'simple';
+        $variationType = $isVariable ? 'simple_variations' : 'simple';
 
         $detailData = [
             'fulfillment_type'    => $fulfillmentType,
@@ -120,7 +120,7 @@ final class ProductMapper
         return [
             'product_id'          => $fcProductId,
             'fulfillment_type'    => $fulfillmentType,
-            'variation_type'      => $isVariable ? 'advanced_variations' : 'simple',
+            'variation_type'      => $isVariable ? 'simple_variations' : 'simple',
             'stock_availability'  => $product->is_in_stock() ? 'in-stock' : 'out-of-stock',
             'manage_stock'        => $product->get_manage_stock() ? 1 : 0,
             'manage_downloadable' => $product->is_downloadable() ? 1 : 0,

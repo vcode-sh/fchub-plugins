@@ -412,7 +412,7 @@ final class ProductMapperTest extends PluginTestCase
         // decision — ProductMapper::map() also used to gate this on the bare
         // literal, so a collapsed product's detail row still called itself
         // 'simple' even on the rare run where a stray variation survived.
-        $this->assertSame('advanced_variations', $result['detail']['variation_type']);
+        $this->assertSame('simple_variations', $result['detail']['variation_type']);
     }
 
     private function createSubscriptionVariation(

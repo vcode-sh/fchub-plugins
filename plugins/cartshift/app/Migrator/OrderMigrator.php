@@ -10,12 +10,15 @@ use CartShift\Domain\Mapping\OrderMapper;
 use CartShift\Domain\Migration\GuestCustomerFactory;
 use CartShift\Domain\Migration\OrderIdentity;
 use CartShift\Domain\Subscription\SubscriptionHistoryIndex;
+use CartShift\Domain\Transfer\SourceRecordException;
+use CartShift\Domain\Transfer\Order\WooOrderStage;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\MoneyHelper;
+use CartShift\Support\UtcDateTime;
 use CartShift\Support\WooStorage;
 use FluentCart\App\Models\AppliedCoupon;
 use FluentCart\App\Models\Order;
@@ -53,6 +56,7 @@ final class OrderMigrator extends AbstractMigrator
         MigrationState $migrationState,
         int $batchSize = Constants::DEFAULT_BATCH_SIZE,
         ?SubscriptionHistoryIndex $history = null,
+        private readonly ?WooOrderStage $canonicalStage = null,
     ) {
         parent::__construct($idMap, $log, $migrationState, $batchSize);
 
@@ -269,23 +273,19 @@ final class OrderMigrator extends AbstractMigrator
     {
         $wcId = $wcOrder->get_id();
 
-        if ($this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $wcId)) {
-            $this->writeLog($wcId, 'skipped', 'Already migrated.', MigrationErrorCode::AlreadyMigrated);
-            return false;
+        if ($this->canonicalStage !== null) {
+            $result = $this->canonicalStage->stage($wcOrder, $this->migrationId());
+            $this->writeLog($wcId, $result->reused ? 'skipped' : 'success', sprintf(
+                '%s canonical order #%d (FC ID: %d) through the reconciled graph writer.',
+                $result->reused ? 'Reconciled' : 'Migrated',
+                $wcId,
+                $result->targetId,
+            ));
+            return $result->targetId;
         }
 
-        // FluentCart's own WooCommerce migrator may have imported this order first.
-        // Adopt it rather than creating a duplicate — same convention as the
-        // FIX C9 blocks in CustomerMigrator and CouponMigrator.
-        $adopted = $this->findFluentCartImportedOrder($wcId);
-        if ($adopted !== null) {
-            $this->idMap->store(Constants::ENTITY_ORDER, (string) $wcId, $adopted, $this->migrationId(), false);
-            $this->writeLog($wcId, 'skipped', sprintf(
-                'Order already imported into FluentCart as #%d (invoice_no "WC-%d"). Adopted into the ID map; rollback will leave it alone.',
-                $adopted,
-                $wcId,
-            ), MigrationErrorCode::AlreadyExistsInFluentCart);
-
+        if ($this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $wcId)) {
+            $this->writeLog($wcId, 'skipped', 'Already migrated.', MigrationErrorCode::AlreadyMigrated);
             return false;
         }
 
@@ -303,6 +303,12 @@ final class OrderMigrator extends AbstractMigrator
         foreach ($this->orderMapper->getCodedWarnings() as $warning) {
             $this->writeLog($wcId, 'warning', $warning['message'], $warning['code']);
         }
+
+        // The legacy writer has exactly one charge row. Prove the complete
+        // refund set can attach to it before the first target insert, so a
+        // malformed source graph cannot leave half an order behind when this
+        // method is invoked outside the orchestrator's transaction wrapper.
+        $this->validateLegacyRefundGraph($wcOrder, $mapped);
 
         // 1. Create the FC order.
         $fcOrder = Order::query()->create($mapped['order']);
@@ -347,6 +353,7 @@ final class OrderMigrator extends AbstractMigrator
         }
 
         // 4. Create order transaction with compound key (FIX C7).
+        $fcTransaction = null;
         if ($mapped['transaction']) {
             $transactionData = $mapped['transaction'];
             $transactionData['order_id'] = $fcOrder->id;
@@ -357,8 +364,21 @@ final class OrderMigrator extends AbstractMigrator
 
         // 5. Handle refund transactions (FIX C1: no json_encode on meta).
         $refunds = $wcOrder->get_refunds();
+        if ($refunds !== [] && !$fcTransaction) {
+            throw new SourceRecordException(
+                'refund_parent_ambiguous',
+                'refund_parent_ambiguous: historical refunds have no unique inserted charge parent.',
+            );
+        }
+        $refundedTotal = 0;
         foreach ($refunds as $refund) {
-            $this->processRefund($refund, $fcOrder->id, $wcId);
+            $refundedTotal += $this->processRefund($refund, $fcTransaction, $fcOrder->id, $wcId);
+        }
+        if ($fcTransaction && $refundedTotal > 0) {
+            $meta = (array) ($fcTransaction->meta ?? []);
+            $meta['refunded_total'] = $refundedTotal;
+            $fcTransaction->meta = $meta;
+            $fcTransaction->save();
         }
 
         // 5b. Store per-item refund amounts from WC refunds.
@@ -467,62 +487,132 @@ final class OrderMigrator extends AbstractMigrator
     }
 
     /**
-     * Find a FluentCart order that was already imported from this WC order.
-     *
-     * FluentCart's own WooCommerce migrator stamps imported orders with
-     * `invoice_no LIKE 'WC-%'`, and OrderMapper writes the identical
-     * `'WC-' . $wcOrderId` marker — so an exact match on that column identifies
-     * the same order regardless of which tool did the importing.
-     *
-     * fct_orders.invoice_no is VARCHAR(192) and indexed, so this is a single
-     * index lookup per order.
-     *
-     * @see fluent-cart/database/Migrations/OrdersMigrator.php (lines 19, 51)
-     * @see \CartShift\Domain\Mapping\OrderMapper
-     */
-    private function findFluentCartImportedOrder(int $wcOrderId): ?int
-    {
-        return OrderIdentity::findImportedOrderId($wcOrderId);
-    }
-
-    /**
      * Process a refund as a transaction.
      * FIX C1: meta is an array, not json_encode'd.
      * FIX C7: compound key for refund transactions.
      */
-    private function processRefund(\WC_Order_Refund $refund, int $parentFcOrderId, int $wcOrderId): void
+    private function processRefund(
+        \WC_Order_Refund $refund,
+        object $parentTransaction,
+        int $parentFcOrderId,
+        int $wcOrderId,
+    ): int
     {
         $refundAmount = abs(floatval($refund->get_amount()));
         if ($refundAmount <= 0) {
-            return;
+            return 0;
         }
 
         $currency = $refund->get_currency();
+        if ($currency !== (string) $parentTransaction->currency) {
+            throw new SourceRecordException(
+                'refund_parent_ambiguous',
+                'refund_parent_ambiguous: refund currency differs from its inserted charge parent.',
+            );
+        }
+        $amount = MoneyHelper::toCents($refundAmount, $currency);
+        $providerReference = method_exists($refund, 'get_transaction_id')
+            ? trim((string) $refund->get_transaction_id())
+            : '';
+        $date = $refund->get_date_created();
 
         $transactionData = [
             'order_id'            => $parentFcOrderId,
-            'order_type'          => 'order',
+            'order_type'          => (string) $parentTransaction->order_type,
             'vendor_charge_id'    => '',
-            'payment_method'      => 'wc_migrated',
-            'payment_mode'        => 'live',
-            'payment_method_type' => 'wc_migrated',
-            'currency'            => $currency,
+            'payment_method'      => (string) $parentTransaction->payment_method,
+            'payment_mode'        => (string) $parentTransaction->payment_mode,
+            'payment_method_type' => (string) $parentTransaction->payment_method_type,
+            'currency'            => (string) $parentTransaction->currency,
             'transaction_type'    => 'refund',
             'status'              => 'refunded',
-            'total'               => MoneyHelper::toCents($refundAmount, $currency),
-            'rate'                => 1,
+            'total'               => $amount,
+            'rate'                => (int) $parentTransaction->rate,
             'meta'                => [
-                'wc_refund_id' => $refund->get_id(),
-                'reason'       => $refund->get_reason(),
+                'parent_id' => (int) $parentTransaction->id,
+                'cartshift_source_payment' => [
+                    'gateway' => (string) ($parentTransaction->meta['cartshift_source_payment']['gateway'] ?? ''),
+                    'source_mode' => (string) $parentTransaction->payment_mode,
+                    'provider_reference' => $providerReference,
+                    'evidence_kind' => $providerReference !== ''
+                        ? 'provider_reference'
+                        : 'manual_paid_without_provider',
+                    'source_event_identity' => sprintf(
+                        'legacy-runtime:order:%d:refund:%d',
+                        $wcOrderId,
+                        (int) $refund->get_id(),
+                    ),
+                    'source_refund_id' => (int) $refund->get_id(),
+                    'reason_present' => trim((string) $refund->get_reason()) !== '',
+                ],
             ],
-            'created_at'          => $refund->get_date_created()
-                ? $refund->get_date_created()->date('Y-m-d H:i:s')
-                : gmdate('Y-m-d H:i:s'),
+            'created_at'          => $date
+                ? UtcDateTime::target($date)
+                : UtcDateTime::target(time()),
         ];
 
         $fcTransaction = OrderTransaction::query()->create($transactionData);
         $transactionKey = OrderIdentity::refundTransactionKey($wcOrderId, (int) $refund->get_id());
         $this->idMap->store(Constants::ENTITY_ORDER_TRANSACTION, $transactionKey, $fcTransaction->id, $this->migrationId(), true);
+
+        return $amount;
+    }
+
+    /**
+     * @param array{order: array<string, mixed>, transaction: array<string, mixed>|null} $mapped
+     */
+    private function validateLegacyRefundGraph(\WC_Order $order, array $mapped): void
+    {
+        $refunds = (array) $order->get_refunds();
+        if ($refunds === []) {
+            if ((int) ($mapped['order']['total_refund'] ?? 0) === 0) {
+                return;
+            }
+            throw new SourceRecordException(
+                'order_money_mismatch',
+                'WooCommerce reports refunded money but exposes no immutable refund events.',
+            );
+        }
+        if (!is_array($mapped['transaction'])) {
+            throw new SourceRecordException(
+                'refund_parent_ambiguous',
+                'refund_parent_ambiguous: historical refunds have no unique projected charge parent.',
+            );
+        }
+
+        $seen = [];
+        $sum = 0;
+        $currency = (string) $mapped['transaction']['currency'];
+        foreach ($refunds as $refund) {
+            if (!$refund instanceof \WC_Order_Refund) {
+                throw new SourceRecordException('refund_parent_ambiguous', 'refund_parent_ambiguous: refund did not hydrate.');
+            }
+            $sourceId = (int) $refund->get_id();
+            if ($sourceId <= 0 || isset($seen[$sourceId])) {
+                throw new SourceRecordException('source_identity_conflict', 'Refund source identity is missing or duplicated.');
+            }
+            $seen[$sourceId] = true;
+            if ($refund->get_currency() !== $currency) {
+                throw new SourceRecordException(
+                    'refund_parent_ambiguous',
+                    'refund_parent_ambiguous: refund currency differs from its projected charge parent.',
+                );
+            }
+            $amount = MoneyHelper::toCents(abs(floatval($refund->get_amount())), $currency);
+            if ($amount <= 0 || !$refund->get_date_created()) {
+                throw new SourceRecordException('order_money_mismatch', 'Refund amount or UTC timestamp is unrepresentable.');
+            }
+            $sum += $amount;
+        }
+
+        $header = (int) ($mapped['order']['total_refund'] ?? -1);
+        $charge = (int) ($mapped['transaction']['total'] ?? -1);
+        if ($sum !== $header || $sum > $charge) {
+            throw new SourceRecordException(
+                'order_money_mismatch',
+                'Successful refund events do not equal the header or exceed their sole charge.',
+            );
+        }
     }
 
     /**
@@ -577,7 +667,7 @@ final class OrderMigrator extends AbstractMigrator
 
             AppliedCoupon::query()->create([
                 'order_id'  => $fcOrderId,
-                'coupon_id' => $fcCouponId ?: 0,
+                'coupon_id' => $fcCouponId ?: null,
                 'code'      => $code,
                 'amount'    => $discount,
             ]);

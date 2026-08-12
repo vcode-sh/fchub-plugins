@@ -88,7 +88,7 @@ final class MigrationsTest extends PluginTestCase
 
     public function testNoUpgradeNeededWhenCurrent(): void
     {
-        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '7';
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '8';
 
         $this->assertFalse(Migrations::needsUpgrade());
     }
@@ -108,7 +108,7 @@ final class MigrationsTest extends PluginTestCase
         Migrations::run();
 
         $this->assertSame('7', $GLOBALS['_cartshift_test_options']['cartshift_db_version']);
-        $this->assertFalse(Migrations::needsUpgrade());
+        $this->assertTrue(Migrations::needsUpgrade(), 'V8 is explicit and must remain pending after bootstrap migrations.');
     }
 
     /**
@@ -116,12 +116,65 @@ final class MigrationsTest extends PluginTestCase
      */
     public function testRunIsANoOpWhenAlreadyCurrent(): void
     {
-        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '7';
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '8';
         $GLOBALS['_cartshift_test_get_results_callback'] = fn (): array => [];
 
         Migrations::run();
 
         $this->assertSame([], $GLOBALS['_cartshift_test_queries']);
+    }
+
+    public function testV8AddsFingerprintStateAndUpdateColumnsBeforeStamping(): void
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '7';
+        $GLOBALS['_cartshift_test_get_results_callback'] = $this->v8SchemaCallback();
+
+        self::assertTrue(Migrations::upgradeExplicit('7', '8'));
+        self::assertSame('8', get_option('cartshift_db_version'));
+
+        $sql = implode("\n", $this->issuedStatements());
+        self::assertStringContainsString('ADD COLUMN source_fingerprint CHAR(64)', $sql);
+        self::assertStringContainsString('ADD COLUMN target_fingerprint CHAR(64)', $sql);
+        self::assertStringContainsString("ADD COLUMN record_state VARCHAR(24) NOT NULL DEFAULT 'legacy'", $sql);
+        self::assertStringContainsString('ADD COLUMN updated_at DATETIME NULL', $sql);
+        self::assertStringContainsString('CREATE TABLE', $sql);
+        self::assertStringContainsString('cartshift_transfer_outbox', $sql);
+    }
+
+    public function testV8DoesNotStampWhenAnyRequiredAlterFails(): void
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '7';
+        $GLOBALS['_cartshift_test_get_results_callback'] = static fn (): array => [];
+        $GLOBALS['_cartshift_test_db_error_callback'] = static fn (string $query): string =>
+            str_contains($query, 'ALTER TABLE') && str_contains($query, 'source_fingerprint')
+                ? 'Injected DDL failure'
+                : '';
+
+        self::assertFalse(Migrations::upgradeExplicit('7', '8'));
+        unset($GLOBALS['_cartshift_test_db_error_callback']);
+
+        self::assertSame('7', get_option('cartshift_db_version'));
+    }
+
+    public function testV8RejectsWrongColumnTypeEvenWhenEveryNameExists(): void
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '7';
+        $GLOBALS['_cartshift_test_get_results_callback'] = $this->v8SchemaCallback([
+            'wp_cartshift_id_map.source_fingerprint' => 'varchar(64)',
+        ]);
+
+        self::assertFalse(Migrations::upgradeExplicit('7', '8'));
+        self::assertSame('7', get_option('cartshift_db_version'));
+    }
+
+    public function testBootstrapRunnerNeverExecutesV8Ddl(): void
+    {
+        $GLOBALS['_cartshift_test_options']['cartshift_db_version'] = '7';
+        Migrations::run();
+
+        self::assertSame([], $GLOBALS['_cartshift_test_queries']);
+        self::assertSame('7', get_option('cartshift_db_version'));
+        self::assertTrue(Migrations::needsUpgrade());
     }
 
     /**
@@ -728,6 +781,158 @@ final class MigrationsTest extends PluginTestCase
                 static fn (array $entry): bool => $entry[0] === 'query',
             ),
         ));
+    }
+
+    /**
+     * @param array<string, string> $typeOverrides
+     * @return callable(string): array
+     */
+    private function v8SchemaCallback(array $typeOverrides = []): callable
+    {
+        $columns = [
+            'wp_cartshift_id_map' => [
+                'source_fingerprint' => ['char(64)', 'YES', null],
+                'target_fingerprint' => ['char(64)', 'YES', null],
+                'record_state' => ['varchar(24)', 'NO', 'legacy'],
+                'updated_at' => ['datetime', 'YES', null],
+            ],
+            'wp_cartshift_target_claims' => [
+                'id', 'entity_type', 'target_id', 'source_key', 'source_id', 'run_id',
+                'source_fingerprint', 'target_fingerprint', 'claim_state', 'created_at', 'updated_at',
+            ],
+            'wp_cartshift_shared_links' => [
+                'id', 'source_key', 'entity_type', 'source_id', 'target_id', 'target_fingerprint',
+                'decision_fingerprint', 'created_at', 'updated_at',
+            ],
+            'wp_cartshift_transfer_leases' => [
+                'target_fingerprint', 'holder_id', 'descriptor_hash', 'expires_at', 'heartbeat_at',
+            ],
+            'wp_cartshift_transfer_runs' => [
+                'run_id', 'descriptor_hash', 'package_hash', 'decision_hash', 'runtime_hash',
+                'settings_hash', 'target_hash', 'state', 'resume_state', 'attempt', 'generation', 'created_at', 'updated_at',
+            ],
+            'wp_cartshift_transfer_records' => [
+                'id', 'run_id', 'record_kind', 'source_identity', 'generation', 'source_fingerprint',
+                'target_fingerprint', 'action', 'state', 'target_ids', 'before_hash', 'after_hash',
+                'error_code', 'created_at', 'updated_at',
+            ],
+            'wp_cartshift_transfer_outbox' => [
+                'id', 'run_id', 'record_kind', 'source_identity', 'generation', 'payload',
+                'payload_hash', 'exported_at', 'created_at',
+            ],
+        ];
+        $indexes = [
+            'wp_cartshift_id_map' => [
+                'source_entity_wc_realm_unique' => ['source_key', 'entity_type', 'wc_id', 'is_simulated', 0],
+            ],
+            'wp_cartshift_target_claims' => [
+                'PRIMARY' => ['id', 0],
+                'target_exclusive' => ['entity_type', 'target_id', 0],
+                'source_claim' => ['source_key', 'entity_type', 'source_id', 1],
+            ],
+            'wp_cartshift_shared_links' => [
+                'PRIMARY' => ['id', 0],
+                'source_shared' => ['source_key', 'entity_type', 'source_id', 0],
+            ],
+            'wp_cartshift_transfer_leases' => ['PRIMARY' => ['target_fingerprint', 0]],
+            'wp_cartshift_transfer_runs' => ['PRIMARY' => ['run_id', 0]],
+            'wp_cartshift_transfer_records' => [
+                'PRIMARY' => ['id', 0],
+                'run_record_generation' => ['run_id', 'record_kind', 'source_identity', 'generation', 0],
+                'run_record_state' => ['run_id', 'state', 1],
+            ],
+            'wp_cartshift_transfer_outbox' => [
+                'PRIMARY' => ['id', 0],
+                'run_outbox_generation' => ['run_id', 'record_kind', 'source_identity', 'generation', 0],
+            ],
+        ];
+
+        return static function (string $query) use ($columns, $indexes, $typeOverrides): array {
+            if (preg_match('/SHOW FULL COLUMNS FROM `?([A-Za-z0-9_]+)`?/', $query, $match) === 1) {
+                $table = $match[1];
+                $rows = [];
+
+                foreach ($columns[$table] ?? [] as $key => $definition) {
+                    if (is_int($key)) {
+                        $field = $definition;
+                        $type = match ($field) {
+                            'id', 'target_id' => 'bigint unsigned',
+                            'attempt', 'generation' => 'int unsigned',
+                            'target_ids', 'payload' => 'longtext',
+                            'entity_type', 'record_kind', 'action' => 'varchar(32)',
+                            'claim_state', 'state', 'resume_state' => in_array($field, ['state', 'resume_state'], true) && $table === 'wp_cartshift_transfer_runs'
+                                ? 'varchar(32)'
+                                : 'varchar(24)',
+                            'source_key', 'error_code' => 'varchar(64)',
+                            'run_id' => 'varchar(36)',
+                            'source_id' => 'varchar(191)',
+                            'source_identity' => 'varchar(255)',
+                            'holder_id' => 'varchar(128)',
+                            default => str_ends_with($field, '_at')
+                                ? 'datetime'
+                                : (str_ends_with($field, '_hash') || str_ends_with($field, '_fingerprint')
+                                    ? 'char(64)'
+                                    : 'varchar(255)'),
+                        };
+                        $nullable = [
+                            'updated_at',
+                            'target_ids',
+                            'before_hash',
+                            'after_hash',
+                            'error_code',
+                            'exported_at',
+                            'resume_state',
+                        ];
+                        $null = in_array($field, $nullable, true)
+                            || ($field === 'target_fingerprint' && $table === 'wp_cartshift_transfer_records')
+                            ? 'YES'
+                            : 'NO';
+                        $default = null;
+
+                        if ($table === 'wp_cartshift_transfer_runs' && $field === 'attempt') {
+                            $default = '0';
+                        }
+
+                        if ($table === 'wp_cartshift_transfer_runs' && $field === 'generation') {
+                            $default = '1';
+                        }
+                    } else {
+                        $field = $key;
+                        [$type, $null, $default] = $definition;
+                    }
+
+                    $type = $typeOverrides[$table . '.' . $field] ?? $type;
+                    $rows[] = (object) ['Field' => $field, 'Type' => $type, 'Null' => $null, 'Default' => $default];
+                }
+
+                return $rows;
+            }
+
+            if (preg_match('/SHOW TABLE STATUS LIKE .([A-Za-z0-9_]+)./', $query, $match) === 1) {
+                return [(object) ['Name' => $match[1], 'Engine' => 'InnoDB']];
+            }
+
+            if (preg_match('/SHOW INDEX FROM `?([A-Za-z0-9_]+)`?/', $query, $match) === 1) {
+                $rows = [];
+
+                foreach ($indexes[$match[1]] ?? [] as $name => $definition) {
+                    $nonUnique = array_pop($definition);
+
+                    foreach (array_values($definition) as $offset => $column) {
+                        $rows[] = (object) [
+                            'Key_name' => $name,
+                            'Non_unique' => $nonUnique,
+                            'Seq_in_index' => $offset + 1,
+                            'Column_name' => $column,
+                        ];
+                    }
+                }
+
+                return $rows;
+            }
+
+            return [];
+        };
     }
 
     // ──────────────────────────────────────────────

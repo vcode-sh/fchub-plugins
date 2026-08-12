@@ -176,6 +176,13 @@ if (!function_exists('wc_get_order')) {
     }
 }
 
+if (!function_exists('wc_get_order_item_meta')) {
+    function wc_get_order_item_meta(int $itemId, string $key, bool $single = true): mixed
+    {
+        return $GLOBALS['_cartshift_test_order_item_meta'][$itemId][$key] ?? '';
+    }
+}
+
 // ──────────────────────────────────────────────
 // Test doubles
 // ──────────────────────────────────────────────

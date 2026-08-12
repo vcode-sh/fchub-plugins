@@ -11,7 +11,8 @@ defined('ABSPATH') || exit;
 final class Migrations
 {
     private const string DB_VERSION_OPTION = 'cartshift_db_version';
-    private const string CURRENT_VERSION = '7';
+    private const string CURRENT_VERSION = '8';
+    private const string AUTOMATIC_VERSION = '7';
 
     /** Unique index guaranteeing one id-map row per (entity_type, wc_id). Superseded by v5. */
     private const string ID_MAP_UNIQUE_INDEX = 'entity_wc_unique';
@@ -40,6 +41,7 @@ final class Migrations
         '5' => 'v5',
         '6' => 'v6',
         '7' => 'v7',
+        '8' => 'v8',
     ];
 
     /**
@@ -71,6 +73,11 @@ final class Migrations
 
         foreach (self::VERSIONS as $version => $method) {
             $version = (string) $version;
+
+            if (version_compare($version, self::AUTOMATIC_VERSION, '>')) {
+                break;
+            }
+
             if (version_compare($installed, $version, '>=')) {
                 continue;
             }
@@ -88,6 +95,34 @@ final class Migrations
         $installed = get_option(self::DB_VERSION_OPTION, '0');
 
         return version_compare($installed, self::CURRENT_VERSION, '<');
+    }
+
+    public static function needsAutomaticUpgrade(): bool
+    {
+        $installed = get_option(self::DB_VERSION_OPTION, '0');
+
+        return version_compare($installed, self::AUTOMATIC_VERSION, '<');
+    }
+
+    public static function upgradeExplicit(string $from, string $to): bool
+    {
+        if ($from !== self::AUTOMATIC_VERSION || $to !== self::CURRENT_VERSION) {
+            return false;
+        }
+
+        if ((string) get_option(self::DB_VERSION_OPTION, '0') !== $from) {
+            return false;
+        }
+
+        if (self::v8() !== true) {
+            return false;
+        }
+
+        if (!update_option(self::DB_VERSION_OPTION, $to)) {
+            return false;
+        }
+
+        return (string) get_option(self::DB_VERSION_OPTION, '0') === $to;
     }
 
     public static function currentVersion(): string
@@ -522,6 +557,395 @@ final class Migrations
             );
 
         return $ok && $productMapOk;
+    }
+
+    /**
+     * V8 is explicit-only. run() deliberately stops at v7; callers must pass
+     * through upgradeExplicit() after the backup, maintenance and mutex gates.
+     */
+    private static function v8(): bool
+    {
+        global $wpdb;
+
+        $idMap = $wpdb->prefix . 'cartshift_id_map';
+        $idMapColumns = [
+            'source_fingerprint' => 'CHAR(64) NULL DEFAULT NULL',
+            'target_fingerprint' => 'CHAR(64) NULL DEFAULT NULL',
+            'record_state' => "VARCHAR(24) NOT NULL DEFAULT 'legacy'",
+            'updated_at' => 'DATETIME NULL DEFAULT NULL',
+        ];
+
+        foreach ($idMapColumns as $column => $definition) {
+            if (self::columnExists($idMap, $column)) {
+                continue;
+            }
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            if ($wpdb->query("ALTER TABLE {$idMap} ADD COLUMN {$column} {$definition}") === false) {
+                return false;
+            }
+        }
+
+        foreach (self::v8Tables() as $suffix => $contract) {
+            $table = $wpdb->prefix . $suffix;
+
+            if (!self::ensureV8Table($table, $contract['columns'], $contract['indexes'])) {
+                return false;
+            }
+        }
+
+        return self::verifyV8Postconditions();
+    }
+
+    /**
+     * @return array<string, array{
+     *   columns: array<string, string>,
+     *   indexes: array<string, array{unique: bool, columns: list<string>}>
+     * }>
+     */
+    private static function v8Tables(): array
+    {
+        return [
+            'cartshift_target_claims' => [
+                'columns' => [
+                    'id' => 'BIGINT UNSIGNED NOT NULL AUTO_INCREMENT',
+                    'entity_type' => 'VARCHAR(32) NOT NULL',
+                    'target_id' => 'BIGINT UNSIGNED NOT NULL',
+                    'source_key' => 'VARCHAR(64) NOT NULL',
+                    'source_id' => 'VARCHAR(191) NOT NULL',
+                    'run_id' => 'VARCHAR(36) NOT NULL',
+                    'source_fingerprint' => 'CHAR(64) NOT NULL',
+                    'target_fingerprint' => 'CHAR(64) NOT NULL',
+                    'claim_state' => 'VARCHAR(24) NOT NULL',
+                    'created_at' => 'DATETIME NOT NULL',
+                    'updated_at' => 'DATETIME NULL DEFAULT NULL',
+                ],
+                'indexes' => [
+                    'PRIMARY' => ['unique' => true, 'columns' => ['id']],
+                    'target_exclusive' => ['unique' => true, 'columns' => ['entity_type', 'target_id']],
+                    'source_claim' => ['unique' => false, 'columns' => ['source_key', 'entity_type', 'source_id']],
+                ],
+            ],
+            'cartshift_shared_links' => [
+                'columns' => [
+                    'id' => 'BIGINT UNSIGNED NOT NULL AUTO_INCREMENT',
+                    'source_key' => 'VARCHAR(64) NOT NULL',
+                    'entity_type' => 'VARCHAR(32) NOT NULL',
+                    'source_id' => 'VARCHAR(191) NOT NULL',
+                    'target_id' => 'BIGINT UNSIGNED NOT NULL',
+                    'target_fingerprint' => 'CHAR(64) NOT NULL',
+                    'decision_fingerprint' => 'CHAR(64) NOT NULL',
+                    'created_at' => 'DATETIME NOT NULL',
+                    'updated_at' => 'DATETIME NULL DEFAULT NULL',
+                ],
+                'indexes' => [
+                    'PRIMARY' => ['unique' => true, 'columns' => ['id']],
+                    'source_shared' => ['unique' => true, 'columns' => ['source_key', 'entity_type', 'source_id']],
+                ],
+            ],
+            'cartshift_transfer_leases' => [
+                'columns' => [
+                    'target_fingerprint' => 'CHAR(64) NOT NULL',
+                    'holder_id' => 'VARCHAR(128) NOT NULL',
+                    'descriptor_hash' => 'CHAR(64) NOT NULL',
+                    'expires_at' => 'DATETIME NOT NULL',
+                    'heartbeat_at' => 'DATETIME NOT NULL',
+                ],
+                'indexes' => [
+                    'PRIMARY' => ['unique' => true, 'columns' => ['target_fingerprint']],
+                ],
+            ],
+            'cartshift_transfer_runs' => [
+                'columns' => [
+                    'run_id' => 'VARCHAR(36) NOT NULL',
+                    'descriptor_hash' => 'CHAR(64) NOT NULL',
+                    'package_hash' => 'CHAR(64) NOT NULL',
+                    'decision_hash' => 'CHAR(64) NOT NULL',
+                    'runtime_hash' => 'CHAR(64) NOT NULL',
+                    'settings_hash' => 'CHAR(64) NOT NULL',
+                    'target_hash' => 'CHAR(64) NOT NULL',
+                    'state' => 'VARCHAR(32) NOT NULL',
+                    'resume_state' => 'VARCHAR(32) NULL DEFAULT NULL',
+                    'attempt' => 'INT UNSIGNED NOT NULL DEFAULT 0',
+                    'generation' => 'INT UNSIGNED NOT NULL DEFAULT 1',
+                    'created_at' => 'DATETIME NOT NULL',
+                    'updated_at' => 'DATETIME NULL DEFAULT NULL',
+                ],
+                'indexes' => [
+                    'PRIMARY' => ['unique' => true, 'columns' => ['run_id']],
+                ],
+            ],
+            'cartshift_transfer_records' => [
+                'columns' => [
+                    'id' => 'BIGINT UNSIGNED NOT NULL AUTO_INCREMENT',
+                    'run_id' => 'VARCHAR(36) NOT NULL',
+                    'record_kind' => 'VARCHAR(32) NOT NULL',
+                    'source_identity' => 'VARCHAR(255) NOT NULL',
+                    'generation' => 'INT UNSIGNED NOT NULL',
+                    'source_fingerprint' => 'CHAR(64) NOT NULL',
+                    'target_fingerprint' => 'CHAR(64) NULL DEFAULT NULL',
+                    'action' => 'VARCHAR(32) NOT NULL',
+                    'state' => 'VARCHAR(24) NOT NULL',
+                    'target_ids' => 'LONGTEXT NULL',
+                    'before_hash' => 'CHAR(64) NULL DEFAULT NULL',
+                    'after_hash' => 'CHAR(64) NULL DEFAULT NULL',
+                    'error_code' => 'VARCHAR(64) NULL DEFAULT NULL',
+                    'created_at' => 'DATETIME NOT NULL',
+                    'updated_at' => 'DATETIME NULL DEFAULT NULL',
+                ],
+                'indexes' => [
+                    'PRIMARY' => ['unique' => true, 'columns' => ['id']],
+                    'run_record_generation' => [
+                        'unique' => true,
+                        'columns' => ['run_id', 'record_kind', 'source_identity', 'generation'],
+                    ],
+                    'run_record_state' => ['unique' => false, 'columns' => ['run_id', 'state']],
+                ],
+            ],
+            'cartshift_transfer_outbox' => [
+                'columns' => [
+                    'id' => 'BIGINT UNSIGNED NOT NULL AUTO_INCREMENT',
+                    'run_id' => 'VARCHAR(36) NOT NULL',
+                    'record_kind' => 'VARCHAR(32) NOT NULL',
+                    'source_identity' => 'VARCHAR(255) NOT NULL',
+                    'generation' => 'INT UNSIGNED NOT NULL',
+                    'payload' => 'LONGTEXT NOT NULL',
+                    'payload_hash' => 'CHAR(64) NOT NULL',
+                    'exported_at' => 'DATETIME NULL DEFAULT NULL',
+                    'created_at' => 'DATETIME NOT NULL',
+                ],
+                'indexes' => [
+                    'PRIMARY' => ['unique' => true, 'columns' => ['id']],
+                    'run_outbox_generation' => [
+                        'unique' => true,
+                        'columns' => ['run_id', 'record_kind', 'source_identity', 'generation'],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, string> $columns
+     * @param array<string, array{unique: bool, columns: list<string>}> $indexes
+     */
+    private static function ensureV8Table(string $table, array $columns, array $indexes): bool
+    {
+        global $wpdb;
+
+        $columnSql = [];
+
+        foreach ($columns as $name => $definition) {
+            $columnSql[] = "{$name} {$definition}";
+        }
+
+        foreach ($indexes as $name => $index) {
+            $joined = implode(', ', $index['columns']);
+            $columnSql[] = $name === 'PRIMARY'
+                ? "PRIMARY KEY ({$joined})"
+                : sprintf('%s KEY %s (%s)', $index['unique'] ? 'UNIQUE' : '', $name, $joined);
+        }
+
+        $collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE IF NOT EXISTS {$table} (\n" . implode(",\n", $columnSql) . "\n) ENGINE=InnoDB {$collate}";
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        if ($wpdb->query($sql) === false) {
+            return false;
+        }
+
+        // Heal a partially applied table instead of stamping a permanent trap.
+        foreach ($columns as $name => $definition) {
+            if (!self::columnExists($table, $name)) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                if ($wpdb->query("ALTER TABLE {$table} ADD COLUMN {$name} {$definition}") === false) {
+                    return false;
+                }
+            }
+        }
+
+        foreach ($indexes as $name => $index) {
+            if (self::indexExists($table, $name)) {
+                continue;
+            }
+
+            $joined = implode(', ', $index['columns']);
+            $definition = $name === 'PRIMARY'
+                ? "PRIMARY KEY ({$joined})"
+                : sprintf('%s INDEX %s (%s)', $index['unique'] ? 'UNIQUE' : '', $name, $joined);
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            if ($wpdb->query("ALTER TABLE {$table} ADD {$definition}") === false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function verifyV8Postconditions(): bool
+    {
+        global $wpdb;
+
+        $idMap = $wpdb->prefix . 'cartshift_id_map';
+        $idMapExpected = [
+            'source_fingerprint' => 'char(64)',
+            'target_fingerprint' => 'char(64)',
+            'record_state' => 'varchar(24)',
+            'updated_at' => 'datetime',
+        ];
+
+        if (!self::verifyColumns($idMap, $idMapExpected)) {
+            return false;
+        }
+
+        $idRows = self::fullColumns($idMap);
+
+        if (
+            ($idRows['source_fingerprint']['null'] ?? '') !== 'YES'
+            || ($idRows['target_fingerprint']['null'] ?? '') !== 'YES'
+            || ($idRows['record_state']['null'] ?? '') !== 'NO'
+            || ($idRows['record_state']['default'] ?? null) !== 'legacy'
+            || ($idRows['updated_at']['null'] ?? '') !== 'YES'
+            || !self::verifyIndex(
+                $idMap,
+                self::ID_MAP_SOURCE_UNIQUE_INDEX,
+                ['source_key', 'entity_type', 'wc_id', 'is_simulated'],
+                true,
+            )
+            || !self::verifyEngine($idMap)
+        ) {
+            return false;
+        }
+
+        foreach (self::v8Tables() as $suffix => $contract) {
+            $table = $wpdb->prefix . $suffix;
+            $expected = [];
+
+            foreach ($contract['columns'] as $column => $definition) {
+                $expected[$column] = self::definitionType($definition);
+            }
+
+            if (!self::verifyColumns($table, $expected) || !self::verifyEngine($table)) {
+                return false;
+            }
+
+            $actualColumns = self::fullColumns($table);
+
+            foreach ($contract['columns'] as $column => $definition) {
+                $expectedNull = str_contains($definition, 'NOT NULL') ? 'NO' : 'YES';
+
+                if (($actualColumns[$column]['null'] ?? '') !== $expectedNull) {
+                    return false;
+                }
+
+                if (preg_match("/DEFAULT\\s+'?([^'\\s]+)'?/i", $definition, $match) === 1) {
+                    $expectedDefault = strtoupper($match[1]) === 'NULL' ? null : $match[1];
+
+                    if ((string) ($actualColumns[$column]['default'] ?? '') !== (string) ($expectedDefault ?? '')) {
+                        return false;
+                    }
+                }
+            }
+
+            foreach ($contract['indexes'] as $name => $index) {
+                if (!self::verifyIndex($table, $name, $index['columns'], $index['unique'])) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /** @param array<string, string> $expected */
+    private static function verifyColumns(string $table, array $expected): bool
+    {
+        $actual = self::fullColumns($table);
+
+        foreach ($expected as $column => $type) {
+            if (!isset($actual[$column]) || self::normaliseType($actual[$column]['type']) !== self::normaliseType($type)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return array<string, array{type: string, null: string, default: mixed}> */
+    private static function fullColumns(string $table): array
+    {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results("SHOW FULL COLUMNS FROM {$table}");
+        $columns = [];
+
+        foreach ($rows as $row) {
+            $field = (string) ($row->Field ?? '');
+
+            if ($field === '') {
+                continue;
+            }
+
+            $columns[$field] = [
+                'type' => (string) ($row->Type ?? ''),
+                'null' => (string) ($row->Null ?? ''),
+                'default' => $row->Default ?? null,
+            ];
+        }
+
+        return $columns;
+    }
+
+    private static function definitionType(string $definition): string
+    {
+        if (preg_match('/\A([A-Z]+(?:\(\d+\))?(?:\s+UNSIGNED)?)/i', $definition, $match) !== 1) {
+            return '';
+        }
+
+        return strtolower($match[1]);
+    }
+
+    private static function normaliseType(string $type): string
+    {
+        $type = strtolower(trim($type));
+
+        return preg_replace('/\b(tinyint|smallint|mediumint|int|bigint)\(\d+\)/', '$1', $type) ?? $type;
+    }
+
+    /** @param list<string> $columns */
+    private static function verifyIndex(string $table, string $name, array $columns, bool $unique): bool
+    {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results("SHOW INDEX FROM {$table}");
+        $actual = [];
+        $nonUnique = null;
+
+        foreach ($rows as $row) {
+            if ((string) ($row->Key_name ?? '') !== $name) {
+                continue;
+            }
+
+            $actual[(int) ($row->Seq_in_index ?? 0)] = (string) ($row->Column_name ?? '');
+            $nonUnique = (int) ($row->Non_unique ?? 1);
+        }
+
+        ksort($actual);
+
+        return array_values($actual) === $columns && $nonUnique === ($unique ? 0 : 1);
+    }
+
+    private static function verifyEngine(string $table): bool
+    {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results($wpdb->prepare('SHOW TABLE STATUS LIKE %s', $table));
+
+        return isset($rows[0]) && strcasecmp((string) ($rows[0]->Engine ?? ''), 'InnoDB') === 0;
     }
 
     /**

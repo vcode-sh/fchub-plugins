@@ -57,7 +57,7 @@ test("Memberships publication consumes the package that passed reusable gates", 
     wporgGates,
     /uses:\s*\.\/\.github\/workflows\/wporg-release-gates\.yml/,
   );
-  assert.match(publish, /needs:\s*\[prepare,\s*wporg-gates\]/);
+  assert.match(publish, /needs:\s*\[prepare,\s*wporg-gates,\s*cartshift-contract\]/);
   assert.match(publish, /actions\/download-artifact@v8/);
   assert.match(
     publish,

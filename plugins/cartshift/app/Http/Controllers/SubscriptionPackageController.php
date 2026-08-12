@@ -9,6 +9,7 @@ defined('ABSPATH') || exit;
 use CartShift\Core\Container;
 use CartShift\Domain\Subscription\Package\PackageContextRepository;
 use CartShift\Domain\Subscription\Package\SubscriptionPackageReader;
+use CartShift\Domain\Transfer\Legacy\LegacyCommandPolicy;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -94,6 +95,8 @@ final class SubscriptionPackageController
      */
     public function prepare(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/subscriptions/packages/prepare');
+
         $file = trim((string) ($request->get_param('file') ?? ''));
 
         if ($file === '') {
@@ -139,6 +142,8 @@ final class SubscriptionPackageController
      */
     public function forget(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/subscriptions/packages/forget');
+
         $sourceKey = trim((string) ($request->get_param('source_key') ?? ''));
 
         if ($sourceKey === '') {
@@ -160,6 +165,14 @@ final class SubscriptionPackageController
                 : sprintf('Nothing was prepared for "%s".', $sourceKey),
             'write'      => ['kind' => self::WRITE_KIND],
         ]]);
+    }
+
+    private function refuseLegacyWrite(string $entryPoint): WP_REST_Response
+    {
+        return new WP_REST_Response(
+            ['data' => (new LegacyCommandPolicy())->refusalPayload($entryPoint)],
+            410,
+        );
     }
 
     private function refuse(string $message, int $status): WP_REST_Response

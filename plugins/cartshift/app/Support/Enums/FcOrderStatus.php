@@ -27,7 +27,7 @@ enum FcOrderStatus: string
             'cancelled' => self::Canceled,
             'refunded' => self::Completed,
             'failed' => self::Failed,
-            default => self::OnHold,
+            default => throw new \InvalidArgumentException('unsupported_order_status'),
         };
     }
 }

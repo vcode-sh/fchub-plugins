@@ -16,6 +16,7 @@ on:
       - 'web-docs/lib/versions.json'
       - '.github/workflows/ci.yml'
       - '.github/workflows/ci-memberships-contract.test.mjs'
+      - '.github/workflows/ci-cartshift-contract.test.mjs'
       - '.github/workflows/ci-wporg-contract.test.mjs'
       - '.github/workflows/fchub-ci-contract.test.mjs'
       - '.github/workflows/release.yml'
@@ -63,7 +64,7 @@ jobs:
           node-version: '26'
 
       - name: Run owned workflow contracts
-        run: node --test .github/workflows/ci-memberships-contract.test.mjs .github/workflows/ci-wporg-contract.test.mjs .github/workflows/release-memberships-contract.test.mjs .github/workflows/release-wporg-gates-contract.test.mjs
+        run: node --test .github/workflows/ci-memberships-contract.test.mjs .github/workflows/ci-cartshift-contract.test.mjs .github/workflows/ci-wporg-contract.test.mjs .github/workflows/release-memberships-contract.test.mjs .github/workflows/release-wporg-gates-contract.test.mjs
 
       - name: Run WordPress.org directory asset contracts
         run: node --test tests/repository/wporg-directory-assets-contract.test.mjs tests/repository/wporg-directory-screenshots-contract.test.mjs tests/repository/wporg-asset-approval-contract.test.mjs
@@ -73,6 +74,109 @@ jobs:
 
       - name: Run FCHub workflow contracts
         run: node --test .github/workflows/fchub-ci-contract.test.mjs
+
+  cartshift-installed-contracts:
+    name: CartShift installed candidate contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check for CartShift changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "count=1" >> "$GITHUB_OUTPUT"
+          else
+            CHANGED=$(git diff --name-only "${{ github.event.pull_request.base.sha }}"..HEAD -- plugins/cartshift/ build.sh tests/build-reproducibility.sh .github/workflows/ci.yml .github/workflows/release.yml | wc -l)
+            echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup PHP
+        if: steps.changes.outputs.count > 0
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.count > 0
+        uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+
+      - name: Install candidate test dependencies
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/cartshift
+        run: |
+          composer install --no-interaction --prefer-dist
+          npm ci
+
+      - name: Build checksum-pinned candidate
+        if: steps.changes.outputs.count > 0
+        run: |
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) ./build.sh cartshift
+          VERSION=$(node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync("web-docs/lib/versions.json", "utf8")).plugins.cartshift.version)')
+          CANDIDATE="$GITHUB_WORKSPACE/dist/cartshift-${VERSION}.zip"
+          test -f "$CANDIDATE"
+          {
+            echo "CARTSHIFT_CANDIDATE_ZIP=$CANDIDATE"
+            echo "CARTSHIFT_CANDIDATE_SHA256=$(sha256sum "$CANDIDATE" | awk '{print $1}')"
+            echo "CARTSHIFT_EXPECT_CANDIDATE_VERSION=$VERSION"
+          } >> "$GITHUB_ENV"
+
+      - name: Download and verify private vendor artifacts
+        if: steps.changes.outputs.count > 0
+        env:
+          WOO_URL: ${{ secrets.CARTSHIFT_WOO_ARTIFACT_URL }}
+          WOO_SHA256: ${{ vars.CARTSHIFT_WOO_SHA256 }}
+          WCS_URL: ${{ secrets.CARTSHIFT_WCS_ARTIFACT_URL }}
+          WCS_SHA256: ${{ vars.CARTSHIFT_WCS_SHA256 }}
+          FLUENTCART_URL: ${{ secrets.CARTSHIFT_FLUENTCART_ARTIFACT_URL }}
+          FLUENTCART_SHA256: ${{ vars.CARTSHIFT_FLUENTCART_SHA256 }}
+        run: |
+          set -euo pipefail
+          mkdir -m 0700 "$RUNNER_TEMP/cartshift-vendors"
+          fetch() {
+            local name="$1" url="$2" digest="$3" destination="$RUNNER_TEMP/cartshift-vendors/$1.zip"
+            test -n "$url" || { echo "::error::${name} private artifact URL is unavailable"; exit 1; }
+            [[ "$digest" =~ ^[a-f0-9]{64}$ ]] || { echo "::error::${name} SHA-256 is unavailable or invalid"; exit 1; }
+            curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$url" --output "$destination"
+            echo "${digest}  ${destination}" | sha256sum --check --status
+            printf '%s\n' "$destination"
+          }
+          WOO_PATH=$(fetch woocommerce "$WOO_URL" "$WOO_SHA256")
+          WCS_PATH=$(fetch woocommerce-subscriptions "$WCS_URL" "$WCS_SHA256")
+          FLUENTCART_PATH=$(fetch fluent-cart "$FLUENTCART_URL" "$FLUENTCART_SHA256")
+          {
+            echo "CARTSHIFT_WOO_ZIP=$WOO_PATH"
+            echo "CARTSHIFT_WOO_SHA256=$WOO_SHA256"
+            echo "CARTSHIFT_WCS_ZIP=$WCS_PATH"
+            echo "CARTSHIFT_WCS_SHA256=$WCS_SHA256"
+            echo "CARTSHIFT_FLUENTCART_ZIP=$FLUENTCART_PATH"
+            echo "CARTSHIFT_FLUENTCART_SHA256=$FLUENTCART_SHA256"
+          } >> "$GITHUB_ENV"
+
+      - name: Run installed candidate contracts
+        if: steps.changes.outputs.count > 0
+        working-directory: plugins/cartshift
+        env:
+          CARTSHIFT_CONTRACT_RETAIN_EVIDENCE_DIR: ${{ runner.temp }}/cartshift-installed-evidence
+        run: tests/Integration/scripts/run-installed-contracts.sh
+
+      - name: Upload installed-contract evidence
+        if: always() && steps.changes.outputs.count > 0
+        uses: actions/upload-artifact@v7
+        with:
+          name: cartshift-installed-contract-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/cartshift-installed-evidence
+          if-no-files-found: warn
+          retention-days: 14
 
   phpunit:
     name: PHPUnit (${{ matrix.plugin }})

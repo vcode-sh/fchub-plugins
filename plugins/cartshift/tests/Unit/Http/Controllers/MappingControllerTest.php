@@ -174,6 +174,21 @@ final class MappingControllerTest extends PluginTestCase
         return new MappingController($container);
     }
 
+    private function legacyMutation(string $method, WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->legacyMutationOn($this->controller(), $method, $request);
+    }
+
+    private function legacyMutationOn(
+        MappingController $controller,
+        string $method,
+        WP_REST_Request $request,
+    ): \WP_REST_Response {
+        $reflection = new \ReflectionMethod($controller, $method);
+
+        return $reflection->invoke($controller, $request);
+    }
+
     /**
      * Rebuild $this->saved from the fake table, in the same shape
      * ProductMapRepository::all() itself would produce: ORDER BY wc_id ASC,
@@ -231,7 +246,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $this->registerWooProduct(42);
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id'       => 42,
             'wc_type'     => 'simple',
             'decision'    => 'link',
@@ -249,7 +264,7 @@ final class MappingControllerTest extends PluginTestCase
 
     public function testALinkWithoutATargetIsRefused(): void
     {
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id'    => 42,
             'decision' => 'link',
         ]));
@@ -260,7 +275,7 @@ final class MappingControllerTest extends PluginTestCase
 
     public function testAnUnknownDecisionIsRefused(): void
     {
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id'    => 42,
             'decision' => 'obliterate',
         ]));
@@ -271,7 +286,7 @@ final class MappingControllerTest extends PluginTestCase
 
     public function testAMissingProductIsRefused(): void
     {
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id'    => 0,
             'decision' => 'skip',
         ]));
@@ -282,7 +297,7 @@ final class MappingControllerTest extends PluginTestCase
 
     public function testBulkSavesEveryRow(): void
     {
-        $response = $this->controller()->bulk($this->request([
+        $response = $this->legacyMutation('legacyBulk', $this->request([
             'decision' => 'create',
             'band'     => 'none',
             'rows'     => [
@@ -302,7 +317,7 @@ final class MappingControllerTest extends PluginTestCase
         $this->registerWooProduct(1);
         $this->registerWooProduct(2);
 
-        $response = $this->controller()->bulk($this->request([
+        $response = $this->legacyMutation('legacyBulk', $this->request([
             'decision' => 'link',
             'band'     => 'strong',
             'rows'     => [
@@ -319,8 +334,8 @@ final class MappingControllerTest extends PluginTestCase
     {
         $controller = $this->controller();
 
-        $controller->decide($this->request(['wc_id' => 1, 'decision' => 'skip']));
-        $controller->clear($this->request([]));
+        $this->legacyMutationOn($controller, 'legacyDecide', $this->request(['wc_id' => 1, 'decision' => 'skip']));
+        $this->legacyMutationOn($controller, 'legacyClear', $this->request([]));
 
         $this->assertSame([], $this->saved);
     }
@@ -342,7 +357,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $controller = $this->controller();
 
-        $controller->decide($this->request(['wc_id' => 1, 'decision' => 'skip']));
+        $this->legacyMutationOn($controller, 'legacyDecide', $this->request(['wc_id' => 1, 'decision' => 'skip']));
 
         $GLOBALS['_cartshift_test_product_map_rows'][777] = [
             'source_key'  => 'lapka-klub',
@@ -354,7 +369,7 @@ final class MappingControllerTest extends PluginTestCase
             'variant_map' => null,
         ];
 
-        $controller->clear($this->request([]));
+        $this->legacyMutationOn($controller, 'legacyClear', $this->request([]));
 
         $this->assertSame(
             [777],
@@ -1107,7 +1122,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $this->registerWooProduct(1);
 
-        $response = $this->controller()->bulk($this->request([
+        $response = $this->legacyMutation('legacyBulk', $this->request([
             'decision' => 'link',
             'band'     => 'strong',
             'rows'     => [
@@ -1284,7 +1299,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $this->registerWooProduct(42);
 
-        $this->controller()->decide($this->request([
+        $this->legacyMutation('legacyDecide', $this->request([
             'wc_id'               => 42,
             'wc_type'             => 'subscription',
             'decision'            => 'link',
@@ -1301,7 +1316,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $this->registerWooProduct(42);
 
-        $this->controller()->decide($this->request([
+        $this->legacyMutation('legacyDecide', $this->request([
             'wc_id'       => 42,
             'wc_type'     => 'subscription',
             'decision'    => 'link',
@@ -1335,14 +1350,14 @@ final class MappingControllerTest extends PluginTestCase
 
         $controller = $this->controller();
 
-        $first = $controller->decide($this->request([
+        $first = $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 901, 'wc_type' => 'subscription', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['901' => '4101'],
         ]));
 
         $this->assertSame(200, $first->get_status());
 
-        $second = $controller->decide($this->request([
+        $second = $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 902, 'wc_type' => 'subscription', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['902' => '4101'],
         ]));
@@ -1368,7 +1383,7 @@ final class MappingControllerTest extends PluginTestCase
 
         $controller = $this->controller();
 
-        $controller->decide($this->request([
+        $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id'       => 770_001,
             'wc_type'     => 'subscription',
             'decision'    => 'link',
@@ -1376,7 +1391,7 @@ final class MappingControllerTest extends PluginTestCase
             'variant_map' => ['770001' => '4101'],
         ]));
 
-        $second = $controller->decide($this->request([
+        $second = $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id'       => 770_002,
             'wc_type'     => 'subscription',
             'decision'    => 'link',
@@ -1402,12 +1417,12 @@ final class MappingControllerTest extends PluginTestCase
         $this->registerWooProduct(11, 'A');
         $this->registerWooProduct(12, 'B');
 
-        $controller->decide($this->request([
+        $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 11, 'wc_type' => 'simple', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['11' => '501'],
         ]));
 
-        $second = $controller->decide($this->request([
+        $second = $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 12, 'wc_type' => 'simple', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['12' => '501'],
         ]));
@@ -1429,12 +1444,12 @@ final class MappingControllerTest extends PluginTestCase
 
         $controller = $this->controller();
 
-        $controller->decide($this->request([
+        $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 901, 'wc_type' => 'subscription', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['901' => '4101'], 'allow_shared_target' => true,
         ]));
 
-        $second = $controller->decide($this->request([
+        $second = $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 902, 'wc_type' => 'subscription', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['902' => '4101'], 'allow_shared_target' => true,
         ]));
@@ -1452,7 +1467,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $this->registerWooProduct(42);
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['42' => '501'],
         ]));
@@ -1485,7 +1500,7 @@ final class MappingControllerTest extends PluginTestCase
 
         $this->seedCatalogue($this->membershipCatalogue(), [770_002], wooTotalCount: 1);
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 770_002, 'wc_type' => 'subscription', 'decision' => 'link', 'fc_post_id' => 88,
         ]));
 
@@ -1508,7 +1523,7 @@ final class MappingControllerTest extends PluginTestCase
 
         $this->seedCatalogue($this->membershipCatalogue(), [770_002], wooTotalCount: 1);
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 770_002, 'wc_type' => 'subscription', 'decision' => 'link', 'fc_post_id' => 88,
             // The monthly variation, posted for a yearly product.
             'variant_map' => ['770002' => '4101'],
@@ -1533,7 +1548,7 @@ final class MappingControllerTest extends PluginTestCase
 
         $this->seedCatalogue($this->membershipCatalogue(), [770_002], wooTotalCount: 1);
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 770_002, 'wc_type' => 'subscription', 'decision' => 'link', 'fc_post_id' => 88,
             'variant_map' => ['770002' => '4102'],
         ]));
@@ -1552,7 +1567,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $GLOBALS['_cartshift_test_wc_products'][42] = $this->createWooProduct(['id' => 42, 'name' => 'Blue Widget']);
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link', 'fc_post_id' => 900,
         ]));
 
@@ -1572,7 +1587,7 @@ final class MappingControllerTest extends PluginTestCase
 
         $this->seedCatalogue($this->membershipCatalogue(), [], wooTotalCount: 0);
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['42' => '4101'],
         ]));
@@ -1594,7 +1609,7 @@ final class MappingControllerTest extends PluginTestCase
      */
     public function testALinkWhoseWooProductCannotBeReadIsRefused(): void
     {
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 999_999, 'wc_type' => 'simple', 'decision' => 'link',
             'fc_post_id' => 88, 'variant_map' => ['999999' => '4101'],
         ]));
@@ -1620,7 +1635,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $this->registerWooProduct(42, 'Blue Widget');
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
             // 42 is a simple product: its only source variation is 42 itself.
             'fc_post_id' => 900, 'variant_map' => ['11' => '501'],
@@ -1650,7 +1665,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $this->registerWooProduct(42, 'Blue Widget');
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
             'fc_post_id' => 900, 'variant_map' => ['11' => '501'],
         ]));
@@ -1678,7 +1693,7 @@ final class MappingControllerTest extends PluginTestCase
         $GLOBALS['_cartshift_test_wc_products'][431] = $this->createWooVariation(['id' => 431]);
         $GLOBALS['_cartshift_test_wc_products'][432] = $this->createWooVariation(['id' => 432]);
 
-        $response = $this->controller()->decide($this->request([
+        $response = $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 43, 'wc_type' => 'variable', 'decision' => 'link',
             'fc_post_id' => 901, 'variant_map' => ['431' => '601', '432' => '602'],
         ]));
@@ -1715,7 +1730,7 @@ final class MappingControllerTest extends PluginTestCase
 
         $this->registerWooProduct(42, 'Something else');
 
-        $response = $controller->decide($this->request([
+        $response = $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
             'fc_post_id' => 900, 'variant_map' => ['42' => '501'],
         ]));
@@ -1735,11 +1750,11 @@ final class MappingControllerTest extends PluginTestCase
     {
         $controller = $this->controller();
 
-        $this->assertSame(200, $controller->decide($this->request([
+        $this->assertSame(200, $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 999_999, 'wc_type' => 'simple', 'decision' => 'create',
         ]))->get_status());
 
-        $this->assertSame(200, $controller->decide($this->request([
+        $this->assertSame(200, $this->legacyMutationOn($controller, 'legacyDecide', $this->request([
             'wc_id' => 999_998, 'wc_type' => 'simple', 'decision' => 'skip',
         ]))->get_status());
 
@@ -1760,7 +1775,7 @@ final class MappingControllerTest extends PluginTestCase
 
         $this->seedCatalogue($this->membershipCatalogue(), [], wooTotalCount: 0);
 
-        $response = $this->controller()->bulk($this->request([
+        $response = $this->legacyMutation('legacyBulk', $this->request([
             'decision' => 'link',
             'band'     => 'strong',
             'rows'     => [
@@ -1782,7 +1797,7 @@ final class MappingControllerTest extends PluginTestCase
     {
         $this->registerWooProduct(42, 'Blue Widget');
 
-        $this->controller()->decide($this->request([
+        $this->legacyMutation('legacyDecide', $this->request([
             'wc_id' => 42, 'wc_type' => 'simple', 'decision' => 'link',
             'fc_post_id' => 900, 'variant_map' => ['42' => '501'],
         ]));

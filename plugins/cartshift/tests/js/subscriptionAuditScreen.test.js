@@ -637,7 +637,7 @@ describe('SubscriptionAuditScreen', () => {
     expect(apiMock.mock.calls[0][1]).toContain(encodeURIComponent('/srv/private/source.ndjson'));
   });
 
-  it('labels preparing a package as a configuration write, on the control itself', async () => {
+  it('refuses the retired package writer locally', async () => {
     const { wrapper } = mountScreen();
     await settle(wrapper);
 
@@ -660,12 +660,8 @@ describe('SubscriptionAuditScreen', () => {
     await prepare.trigger('click');
     await settle(wrapper);
 
-    expect(apiMock.mock.calls[0]).toEqual([
-      'POST',
-      'subscriptions/packages/prepare',
-      { file: '/srv/private/source.ndjson' },
-    ]);
-    expect(wrapper.find('[data-configuration-write]').text().toLowerCase()).toContain('configuration');
+    expect(apiMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('legacy_subscription_v1_package_write_closed');
   });
 
   it('deep-links a blocked mapping row to the product that blocked it', async () => {

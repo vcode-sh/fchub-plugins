@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace CartShift\Tests\Unit\Migrator\Entity;
 
+use CartShift\Domain\Transfer\Identity\MapState;
+use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Migrator\OrderMigrator;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
+use CartShift\Support\DatabaseTransaction;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Tests\Unit\PluginTestCase;
 
@@ -186,6 +189,59 @@ final class DirectDatabaseWriteTest extends PluginTestCase
         $this->assertSame(0, $this->countLogged(MigrationErrorCode::DatabaseWriteFailed));
     }
 
+    public function testLegacyRefundRowInheritsItsInertChargeAndExactTargetParent(): void
+    {
+        $this->migrateRefundedOrder(607);
+
+        $transactions = \CartShiftFcModelStore::all('OrderTransaction');
+        self::assertCount(2, $transactions);
+        [$charge, $refund] = $transactions;
+
+        self::assertSame('succeeded', $charge->status);
+        self::assertSame(1000, $charge->meta['refunded_total']);
+        self::assertSame('refund', $refund->transaction_type);
+        self::assertSame('refunded', $refund->status);
+        self::assertSame($charge->id, $refund->meta['parent_id']);
+        self::assertSame($charge->order_type, $refund->order_type);
+        self::assertSame($charge->payment_mode, $refund->payment_mode);
+        self::assertSame('wc_migrated', $refund->payment_method);
+        self::assertSame('historical_provenance', $refund->payment_method_type);
+        self::assertSame('', $refund->vendor_charge_id);
+        self::assertSame(
+            're_legacy_source',
+            $refund->meta['cartshift_source_payment']['provider_reference'],
+        );
+    }
+
+    public function testTargetEntityRollsBackWhenCheckedIdentityInsertFails(): void
+    {
+        $database = new TransactionalWriteWpdb();
+        $GLOBALS['wpdb'] = $database;
+        $GLOBALS['_cartshift_test_db_error_callback'] = static fn (string $context): string =>
+            str_contains($context, 'cartshift_id_map') ? 'injected identity-map failure' : '';
+        $repository = new IdMapRepository('lapka-web');
+
+        try {
+            DatabaseTransaction::begin();
+            $database->insert('wp_fct_orders', ['invoice_no' => 'private-test-value']);
+            $repository->storeOrThrow(
+                new SourceIdentity('lapka-web', 'order', '605'),
+                91,
+                'run-1',
+                str_repeat('a', 64),
+                str_repeat('b', 64),
+                MapState::Staged,
+                true,
+            );
+            DatabaseTransaction::commit();
+            self::fail('Expected the checked identity write to abort the record.');
+        } catch (\RuntimeException $exception) {
+            DatabaseTransaction::rollback($exception);
+            self::assertSame([], $database->targetRows);
+            self::assertSame(0, DatabaseTransaction::depth());
+        }
+    }
+
     // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────
@@ -197,6 +253,18 @@ final class DirectDatabaseWriteTest extends PluginTestCase
     private function migrateRefundedOrder(int $wcId): void
     {
         $order = new \WC_Order();
+        $refund = new \WC_Order_Refund();
+        $refundProperties = [
+            'id' => $wcId + 100_000,
+            'amount' => '10.00',
+            'currency' => 'USD',
+            'reason' => 'Source reason remains private',
+            'transaction_id' => 're_legacy_source',
+            'date_created' => new \DateTimeImmutable('2026-08-01 10:00:00 UTC'),
+        ];
+        foreach ($refundProperties as $property => $value) {
+            (new \ReflectionProperty(\WC_Order_Refund::class, $property))->setValue($refund, $value);
+        }
 
         $properties = [
             'id'              => $wcId,
@@ -206,6 +274,7 @@ final class DirectDatabaseWriteTest extends PluginTestCase
             'billing_country' => 'GB',
             'total'           => '99.00',
             'total_refunded'  => '10.00',
+            'refunds'         => [$refund],
         ];
 
         foreach ($properties as $property => $value) {
@@ -276,5 +345,40 @@ final class DirectDatabaseWriteTest extends PluginTestCase
         }
 
         return $rows;
+    }
+}
+
+final class TransactionalWriteWpdb extends \CartShiftTestWpdb
+{
+    /** @var list<array<string, mixed>> */
+    public array $targetRows = [];
+    private int $transactionStart = 0;
+
+    public function insert(string $table, array $data, ?array $format = null): int|false
+    {
+        $result = parent::insert($table, $data, $format);
+
+        if ($result !== false && str_ends_with($table, 'fct_orders')) {
+            $this->targetRows[] = $data;
+        }
+
+        return $result;
+    }
+
+    public function query(string $query): int|false
+    {
+        $result = parent::query($query);
+
+        if ($result === false) {
+            return false;
+        }
+
+        if ($query === 'START TRANSACTION') {
+            $this->transactionStart = count($this->targetRows);
+        } elseif ($query === 'ROLLBACK') {
+            $this->targetRows = array_slice($this->targetRows, 0, $this->transactionStart);
+        }
+
+        return $result;
     }
 }

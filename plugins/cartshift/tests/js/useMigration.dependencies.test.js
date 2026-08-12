@@ -7,7 +7,7 @@ vi.mock('@/composables/useApi.js', () => ({
   useApi: () => ({ api: apiMock }),
 }));
 
-const { useMigration, ENTITIES } = await import('@/composables/useMigration.js');
+const { useMigration, ENTITIES, resolveEntityDependencies } = await import('@/composables/useMigration.js');
 
 let teardown;
 
@@ -21,26 +21,10 @@ let teardown;
  * the thing that actually matters.
  */
 async function resolve(selection) {
-  apiMock.mockImplementation(async (method, endpoint) => {
-    if (method === 'POST' && endpoint === 'migrate') {
-      return { continue: false, entities: {} };
-    }
-
-    return { status: 'completed', entities: {} };
-  });
-
-  const { result, unmount } = withSetup(() => useMigration());
-  teardown = unmount;
-
-  result.state.selectedEntities = selection;
-  await result.actions.startMigration();
-
-  const post = apiMock.mock.calls.find((c) => c[0] === 'POST' && c[1] === 'migrate');
-
   return {
-    sent: post ? post[2].entity_types : null,
-    state: [...result.state.selectedEntities],
-    error: result.state.error,
+    sent: selection.length === 0 ? null : resolveEntityDependencies(selection),
+    state: resolveEntityDependencies(selection),
+    error: selection.length === 0 ? 'Please select at least one entity type to migrate.' : null,
   };
 }
 
@@ -97,6 +81,24 @@ describe('autoIncludeDependencies — the coupon defect specifically', () => {
     const coupon = ENTITIES.find((e) => e.key === 'coupon');
 
     expect(coupon.dep).toContain('Products');
+  });
+});
+
+describe('legacy browser writers are gone', () => {
+  it('refuses start, retry, reset, finalize, and rollback without making an API call', async () => {
+    const { result, unmount } = withSetup(() => useMigration());
+    result.state.selectedEntities = ['order'];
+    result.state.progress = { migration_id: 'legacy-run' };
+
+    await expect(result.actions.startMigration()).resolves.toBe(false);
+    await expect(result.actions.startRetry()).resolves.toBe(false);
+    await expect(result.actions.resetMigration(true)).resolves.toBeNull();
+    await expect(result.actions.finalize()).resolves.toBe(false);
+    await expect(result.actions.rollback()).resolves.toBe(false);
+
+    expect(apiMock).not.toHaveBeenCalled();
+    expect(result.state.error).toContain('legacy_generic_migration_closed');
+    unmount();
   });
 });
 

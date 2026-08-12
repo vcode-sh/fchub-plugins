@@ -10,6 +10,7 @@ use CartShift\Domain\Migration\BatchProcessor;
 use CartShift\Domain\Migration\MigrationOrchestrator;
 use CartShift\Domain\Migration\MigrationOrchestratorFactory;
 use CartShift\Domain\Migration\MigrationRollback;
+use CartShift\Domain\Transfer\Legacy\LegacyCommandPolicy;
 use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Domain\Scope\ScopeResolver;
 use CartShift\State\MigrationState;
@@ -97,6 +98,12 @@ final class MigrateCommand
      * @param string[] $assocArgs  Associative arguments.
      */
     public static function migrate(array $args, array $assocArgs): void
+    {
+        self::refuseLegacyWrite('cli:cartshift migrate');
+    }
+
+    /** Retained solely to characterise why the old dry-run is not an audit. */
+    private static function legacyMigrate(array $args, array $assocArgs): void
     {
         $startTime = microtime(true);
 
@@ -435,6 +442,9 @@ final class MigrateCommand
      */
     public static function retry(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift retry');
+        return;
+
         $startTime = microtime(true);
 
         $sourceMigrationId = self::resolveRetrySource($assocArgs);
@@ -556,6 +566,9 @@ final class MigrateCommand
      */
     public static function rollback(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift rollback');
+        return;
+
         if (empty($args[0])) {
             \WP_CLI::error('Migration ID is required.');
         }
@@ -635,6 +648,9 @@ final class MigrateCommand
      */
     public static function reset(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift reset');
+        return;
+
         $force = (bool) \WP_CLI\Utils\get_flag_value($assocArgs, 'force', false);
         $skipConfirm = (bool) \WP_CLI\Utils\get_flag_value($assocArgs, 'yes', false);
 
@@ -877,6 +893,9 @@ final class MigrateCommand
      */
     public static function finalize(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift finalize');
+        return;
+
         $state = new MigrationState();
         $progress = $state->getProgress();
 
@@ -1208,6 +1227,12 @@ final class MigrateCommand
      * have to be equally honest about failing — a stats row that silently kept
      * its zeroes reads as a customer who has never bought anything.
      */
+    private static function refuseLegacyWrite(string $entryPoint): void
+    {
+        $payload = (new LegacyCommandPolicy())->refusalPayload($entryPoint);
+        \WP_CLI::error(sprintf('[%s] %s', $payload['code'], $payload['message']));
+    }
+
     private static function recalculateCustomerStats(int $fcCustomerId, string $migrationId, string $wcId): void
     {
         global $wpdb;

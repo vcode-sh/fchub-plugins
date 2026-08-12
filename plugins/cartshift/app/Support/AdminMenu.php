@@ -86,6 +86,9 @@ final class AdminMenu
             'restUrl'  => esc_url_raw(rest_url('cartshift/v1/')),
             'nonce'    => wp_create_nonce('wp_rest'),
             'version'  => CARTSHIFT_VERSION,
+            // Read-only routing hint for the safety screen. The CLI remains
+            // authoritative and rejects the retired `local` namespace.
+            'sourceKey' => sanitize_key((string) apply_filters('cartshift/transfer/source_key', 'local')),
             'features' => $this->flags->all(),
         ], JSON_HEX_TAG | JSON_HEX_AMP);
         wp_add_inline_script('cartshift-admin', "window.cartshift = {$config};", 'before');

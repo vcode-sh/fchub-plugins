@@ -580,7 +580,7 @@ final class GapPolicyTest extends PluginTestCase
     {
         $order = new \WC_Order();
 
-        foreach (['id' => $id] + $properties as $property => $value) {
+        foreach (['id' => $id, 'status' => 'completed'] + $properties as $property => $value) {
             (new \ReflectionProperty(\WC_Order::class, $property))->setValue($order, $value);
         }
 

@@ -44,9 +44,10 @@ final class FcOrderStatusTest extends PluginTestCase
         $this->assertSame(FcOrderStatus::Failed, FcOrderStatus::fromWooCommerce('failed'));
     }
 
-    public function testUnknownMapsToOnHold(): void
+    public function testUnknownStatusDoesNotSilentlyBecomeOnHold(): void
     {
-        $this->assertSame(FcOrderStatus::OnHold, FcOrderStatus::fromWooCommerce('some-random-status'));
+        $this->expectException(\InvalidArgumentException::class);
+        FcOrderStatus::fromWooCommerce('some-random-status');
     }
 
     public function testFromWooCommerceAllStatuses(): void

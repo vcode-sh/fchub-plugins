@@ -41,7 +41,7 @@
 defined('ABSPATH') or die;
 
 define('CARTSHIFT_VERSION', '1.5.0');
-define('CARTSHIFT_DB_VERSION', '7');
+define('CARTSHIFT_DB_VERSION', '8');
 define('CARTSHIFT_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CARTSHIFT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CARTSHIFT_PLUGIN_FILE', __FILE__);
@@ -109,4 +109,5 @@ add_action('plugins_loaded', fn() => \CartShift\Core\PluginBootstrap::boot(), 20
 if (defined('WP_CLI') && WP_CLI) {
     \CartShift\CLI\MigrateCommand::register();
     \CartShift\CLI\SubscriptionCommand::register();
+    \CartShift\CLI\TransferCommand::register();
 }

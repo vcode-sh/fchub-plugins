@@ -115,20 +115,22 @@ else
 fi
 
 usage() {
-    printf "${BOLD}Usage:${NC} ./build.sh [plugin-slug]\n\n"
+    printf '%b' "${BOLD}Usage:${NC} ./build.sh [plugin-slug]\n\n"
     printf "Build distribution ZIPs for FCHub plugins, each with a SHA-256 sidecar.\n\n"
-    printf "${BOLD}Arguments:${NC}\n"
+    printf '%b' "${BOLD}Arguments:${NC}\n"
     printf "  plugin-slug    Build only the specified plugin (optional)\n"
     printf "                 Valid slugs: fchub, fchub-p24, fchub-fakturownia, fchub-memberships, fchub-portal-extender, fchub-wishlist, fchub-multi-currency, cartshift\n"
     printf "                 Archived (built only when named): fchub-stream\n\n"
-    printf "${BOLD}Examples:${NC}\n"
+    printf '%b' "${BOLD}Examples:${NC}\n"
     printf "  ./build.sh                    Build all plugins except the archived ones\n"
     printf "  ./build.sh fchub-p24          Build only fchub-p24\n"
     printf "  ./build.sh fchub-memberships  Build only fchub-memberships (runs npm build)\n"
     printf "  ./build.sh fchub              Build only the FCHub product centre (runs npm build)\n\n"
-    printf "${BOLD}Environment:${NC}\n"
+    printf '%b' "${BOLD}Environment:${NC}\n"
     printf "  FCHUB_BUILD_LOCK_TIMEOUT  Seconds to wait for a concurrent build of the\n"
     printf "                            same plugin to finish (default: 900)\n"
+    printf "  SOURCE_DATE_EPOCH         UTC archive timestamp. Defaults to the checked-out\n"
+    printf "                            commit timestamp when Git metadata is available.\n"
     exit 0
 }
 
@@ -305,6 +307,43 @@ write_checksum() {
     fi
 }
 
+# ── Reproducible archive metadata ───────────────────────────────────────────
+#
+# ZIP records paths in caller order and stores DOS timestamps and Unix mode
+# bits. rsync's source mtimes therefore make byte equality accidental unless we
+# normalise every copied entry and feed zip one sorted list. Git's commit time is
+# a stable default for a checkout; source archives without .git must supply the
+# same SOURCE_DATE_EPOCH explicitly.
+if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
+    SOURCE_DATE_EPOCH=$(git -C "$ROOT_DIR" log -1 --format=%ct 2>/dev/null || true)
+fi
+if ! [[ "$SOURCE_DATE_EPOCH" =~ ^[0-9]+$ ]] || [ "$SOURCE_DATE_EPOCH" -lt 315532800 ]; then
+    error "SOURCE_DATE_EPOCH must be an integer timestamp on or after 1980-01-01"
+fi
+export SOURCE_DATE_EPOCH
+
+archive_touch_timestamp() {
+    local timestamp=""
+
+    timestamp=$(date -u -r "$SOURCE_DATE_EPOCH" '+%Y%m%d%H%M.%S' 2>/dev/null || true)
+    if [ -z "$timestamp" ]; then
+        timestamp=$(date -u -d "@$SOURCE_DATE_EPOCH" '+%Y%m%d%H%M.%S' 2>/dev/null || true)
+    fi
+    [ -n "$timestamp" ] || error "cannot convert SOURCE_DATE_EPOCH with the installed date command"
+    printf '%s\n' "$timestamp"
+}
+
+normalise_archive_tree() {
+    local root="$1"
+    local timestamp
+
+    [ -d "$root" ] && [ ! -L "$root" ] || error "archive staging root is missing or is a symlink"
+    timestamp=$(archive_touch_timestamp)
+    find "$root" -type d -exec chmod 0755 {} +
+    find "$root" -type f -exec chmod 0644 {} +
+    find "$root" -exec touch -t "$timestamp" {} +
+}
+
 # ── Parse arguments ──────────────────────────────────────────────────────────
 FILTER_SLUG=""
 
@@ -346,7 +385,7 @@ else
 fi
 
 # ── Clean dist/ ─────────────────────────────────────────────────────────────
-printf "\n${BOLD}Building FCHub plugin ZIPs${NC}\n"
+printf '%b' "\n${BOLD}Building FCHub plugin ZIPs${NC}\n"
 printf "%s\n\n" "──────────────────────────────────────"
 
 if [ -n "$FILTER_SLUG" ]; then
@@ -529,11 +568,14 @@ for entry in "${PLUGINS[@]}"; do
     # rsync plugin files
     rsync -a "${exclude_args[@]}" "$plugin_dir/" "$tmp_dir/$slug/"
 
-    # Create ZIP (from tmp_dir so the root inside the ZIP is the slug directory)
+    # Create ZIP from normalised metadata and a locale-independent path order.
+    # -X strips host-specific extra fields; feeding an explicit list avoids the
+    # filesystem enumeration order leaking into the central directory.
     zip_name="${slug}-${version}.zip"
     zip_path="$DIST_DIR/$zip_name"
     rm -f "$zip_path"
-    (cd "$tmp_dir" && zip -qr "$zip_path" "$slug/")
+    normalise_archive_tree "$tmp_dir/$slug"
+    (cd "$tmp_dir" && LC_ALL=C find "$slug" -print | LC_ALL=C sort | zip -X -q "$zip_path" -@)
 
     success "Created $zip_name"
 
@@ -570,7 +612,7 @@ if [ ${#BUILT_ZIPS[@]} -eq 0 ]; then
     error "No plugins were built."
 fi
 
-printf "${BOLD}Build Summary${NC}\n"
+printf '%b' "${BOLD}Build Summary${NC}\n"
 printf "%s\n" "──────────────────────────────────────"
 printf "%-35s %10s  %-34s  %s\n" "File" "Size" "MD5" "Files"
 printf "%s\n" "──────────────────────────────────────────────────────────────────────────────────────────────────"
@@ -584,4 +626,4 @@ for zip_path in "${BUILT_ZIPS[@]}"; do
     printf "%-35s %10s  %s  %s files\n" "$fname" "$fsize_h" "$md5" "$file_count"
 done
 
-printf "\n${GREEN}${BOLD}Done!${NC} ZIPs are in ${CYAN}dist/${NC}\n\n"
+printf '%b' "\n${GREEN}${BOLD}Done!${NC} ZIPs are in ${CYAN}dist/${NC}\n\n"

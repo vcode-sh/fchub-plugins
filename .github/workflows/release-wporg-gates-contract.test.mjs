@@ -67,7 +67,7 @@ test("WordPress.org tags call the reusable gate workflow before publication", ()
     /tagged_version:\s*\$\{\{\s*needs\.prepare\.outputs\.version\s*\}\}/,
   );
 
-  assert.match(publish, /needs:\s*\[prepare,\s*wporg-gates\]/);
+  assert.match(publish, /needs:\s*\[prepare,\s*wporg-gates,\s*cartshift-contract\]/);
   assert.match(publish, /needs\.wporg-gates\.result == 'success'/);
   assert.match(publish, /needs\.wporg-gates\.result == 'skipped'/);
   assert.match(publish, /actions\/download-artifact@v8/);

@@ -65,28 +65,23 @@ final class SubscriptionPackageControllerTest extends PluginTestCase
         parent::tearDown();
     }
 
-    public function testPreparingAPackageIsLabelledAConfigurationWriteAndStoresFourStrings(): void
+    public function testLegacyPreparingRefusesWithoutStoringADescriptor(): void
     {
         $path = $this->exportPackage();
 
         $response = $this->call('prepare', ['file' => $path]);
 
-        $this->assertSame(200, $response->get_status());
+        $this->assertSame(410, $response->get_status());
 
         $data = $response->get_data()['data'];
 
-        $this->assertTrue($data['prepared']);
-        $this->assertSame('cartshift_configuration', $data['write']['kind']);
-        $this->assertStringNotContainsStringIgnoringCase('audit', $data['write']['kind']);
+        $this->assertSame('legacy_subscription_v1_package_write_closed', $data['code']);
+        $this->assertSame('wp cartshift transfer validate-package', $data['next_command']);
+        $this->assertSame(['nothing' => true], $data['writes']);
 
         $descriptor = (new PackageContextRepository())->get(self::SOURCE_KEY);
 
-        $this->assertNotNull($descriptor);
-        $this->assertSame(
-            ['checksum', 'path', 'selection_fingerprint', 'source_key'],
-            array_keys($descriptor),
-            'The descriptor is four strings. It is not a copy of the package.',
-        );
+        $this->assertNull($descriptor);
     }
 
     public function testPreparingRefusesAPackageThatDoesNotValidate(): void
@@ -96,18 +91,24 @@ final class SubscriptionPackageControllerTest extends PluginTestCase
 
         $response = $this->call('prepare', ['file' => $path]);
 
-        $this->assertSame(422, $response->get_status());
+        $this->assertSame(410, $response->get_status());
         $this->assertNull((new PackageContextRepository())->get(self::SOURCE_KEY));
     }
 
     public function testPreparingRefusesWithoutAFile(): void
     {
-        $this->assertSame(400, $this->call('prepare', [])->get_status());
+        $this->assertSame(410, $this->call('prepare', [])->get_status());
     }
 
     public function testListingPreparedPackagesWritesNothing(): void
     {
-        $this->call('prepare', ['file' => $this->exportPackage()]);
+        $path = $this->exportPackage();
+        (new PackageContextRepository())->remember(
+            self::SOURCE_KEY,
+            $path,
+            hash_file('sha256', $path),
+            str_repeat('a', 64),
+        );
 
         $watched = \CartShiftZeroWriteGuard::watch(fn (): array => $this->call('index', [])->get_data()['data']);
 
@@ -115,18 +116,23 @@ final class SubscriptionPackageControllerTest extends PluginTestCase
         $this->assertArrayHasKey(self::SOURCE_KEY, $watched['result']['packages']);
     }
 
-    public function testForgettingRequiresConfirmationAndLeavesTheFileAlone(): void
+    public function testLegacyForgettingAlwaysRefusesAndLeavesTheFileAlone(): void
     {
         $path = $this->exportPackage();
-        $this->call('prepare', ['file' => $path]);
+        (new PackageContextRepository())->remember(
+            self::SOURCE_KEY,
+            $path,
+            hash_file('sha256', $path),
+            str_repeat('a', 64),
+        );
 
-        $this->assertSame(400, $this->call('forget', ['source_key' => self::SOURCE_KEY])->get_status());
+        $this->assertSame(410, $this->call('forget', ['source_key' => self::SOURCE_KEY])->get_status());
         $this->assertNotNull((new PackageContextRepository())->get(self::SOURCE_KEY));
 
         $response = $this->call('forget', ['source_key' => self::SOURCE_KEY, 'confirm' => true]);
 
-        $this->assertSame(200, $response->get_status());
-        $this->assertNull((new PackageContextRepository())->get(self::SOURCE_KEY));
+        $this->assertSame(410, $response->get_status());
+        $this->assertNotNull((new PackageContextRepository())->get(self::SOURCE_KEY));
         $this->assertFileExists($path, 'Forgetting a descriptor must not delete the package.');
     }
 

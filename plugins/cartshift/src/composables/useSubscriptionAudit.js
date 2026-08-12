@@ -176,32 +176,11 @@ export function useSubscriptionAudit() {
    * @return {Promise<boolean>} Whether the descriptor was written.
    */
   async function preparePackage(file) {
-    state.error = null;
     state.configurationWrite = null;
-
-    let response;
-
-    try {
-      response = await api('POST', 'subscriptions/packages/prepare', { file });
-    } catch (err) {
-      state.error = err.message;
-      return false;
-    }
-
-    state.configurationWrite =
-      'Prepared. That was a CartShift configuration write, not part of the audit: four strings ' +
-      '(source key, private path, checksum, selection fingerprint) and nothing else.';
-
-    state.source = 'package';
-    state.file = response?.path || file;
-
-    if (response?.source_key) {
-      state.sourceKey = response.source_key;
-    }
-
-    await load();
-
-    return true;
+    state.error =
+      'legacy_subscription_v1_package_write_closed: validate the immutable v2 package with ' +
+      '`wp cartshift transfer validate-package --role=target --package=<absolute-path>`.';
+    return false;
   }
 
   return {

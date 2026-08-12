@@ -56,6 +56,52 @@ final class MoneyHelper
             return 0;
         }
 
-        return intval(round(floatval($price) * 100));
+        return self::decimalToCents(is_float($price) ? (string) $price : (string) $price);
+    }
+
+    /**
+     * Parse source-owned decimal text without passing through binary floats.
+     *
+     * The source ledger calls this strict entry point. More than two decimal
+     * places are rounded half away from zero to match FluentCart's x100 helper;
+     * malformed text and values outside PHP's integer range are refused.
+     */
+    public static function decimalToCents(string $price): int
+    {
+        if (preg_match('/\A(-?)([0-9]+)(?:\.([0-9]+))?\z/D', $price, $matches) !== 1) {
+            throw new \InvalidArgumentException('Money must be canonical decimal text.');
+        }
+
+        $negative = $matches[1] === '-';
+        $whole = ltrim($matches[2], '0');
+        $whole = $whole === '' ? '0' : $whole;
+        $fraction = $matches[3] ?? '';
+        $hundredths = str_pad(substr($fraction, 0, 2), 2, '0');
+        $digits = ltrim($whole . $hundredths, '0');
+        $digits = $digits === '' ? '0' : $digits;
+
+        if (isset($fraction[2]) && $fraction[2] >= '5') {
+            $digits = self::incrementDecimalDigits($digits);
+        }
+
+        $limit = (string) PHP_INT_MAX;
+        if (strlen($digits) > strlen($limit) || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) {
+            throw new \OverflowException('Money exceeds the target integer range.');
+        }
+
+        $amount = (int) $digits;
+        return $negative && $amount !== 0 ? -$amount : $amount;
+    }
+
+    private static function incrementDecimalDigits(string $digits): string
+    {
+        $carry = 1;
+        for ($index = strlen($digits) - 1; $index >= 0 && $carry === 1; --$index) {
+            $next = ((int) $digits[$index]) + 1;
+            $digits[$index] = (string) ($next % 10);
+            $carry = $next > 9 ? 1 : 0;
+        }
+
+        return $carry === 1 ? '1' . $digits : $digits;
     }
 }

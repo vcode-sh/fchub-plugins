@@ -12,6 +12,7 @@ use CartShift\Domain\Migration\MigrationOrchestrator;
 use CartShift\Domain\Migration\MigrationOrchestratorFactory;
 use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Domain\Scope\ScopeResolver;
+use CartShift\Domain\Transfer\Legacy\LegacyCommandPolicy;
 use CartShift\State\MigrationState;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
@@ -123,6 +124,8 @@ final class MigrationController
      */
     public function migrate(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/migrate');
+
         $entityTypes = $request->get_param('entity_types') ?? [];
         $dryRun = (bool) $request->get_param('dry_run');
         $background = (bool) $request->get_param('background');
@@ -215,6 +218,8 @@ final class MigrationController
      */
     public function retry(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/retry');
+
         $sourceMigrationId = trim((string) ($request->get_param('migration_id') ?? ''));
         $dryRun = (bool) $request->get_param('dry_run');
         $background = (bool) $request->get_param('background');
@@ -328,6 +333,8 @@ final class MigrationController
      */
     public function batch(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/migrate/batch');
+
         /** @var MigrationState $state */
         $state = $this->container->get(MigrationState::class);
 
@@ -369,6 +376,8 @@ final class MigrationController
 
     public function cancel(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/cancel');
+
         /** @var MigrationState $state */
         $state = $this->container->get(MigrationState::class);
 
@@ -399,6 +408,8 @@ final class MigrationController
      */
     public function reset(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/reset');
+
         $force = (bool) $request->get_param('force');
 
         /** @var MigrationState $state */
@@ -462,6 +473,14 @@ final class MigrationController
     public function checkPermission(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    private function refuseLegacyWrite(string $entryPoint): WP_REST_Response
+    {
+        return new WP_REST_Response(
+            ['data' => (new LegacyCommandPolicy())->refusalPayload($entryPoint)],
+            410,
+        );
     }
 
     /**

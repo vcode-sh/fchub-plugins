@@ -152,6 +152,7 @@ final class MigrationErrorCodeAttachmentTest extends PluginTestCase
 
         $order = new \WC_Order();
         (new \ReflectionProperty(\WC_Order::class, 'id'))->setValue($order, 71);
+        (new \ReflectionProperty(\WC_Order::class, 'status'))->setValue($order, 'completed');
         (new \ReflectionProperty(\WC_Order::class, 'items'))->setValue($order, [
             new \CartShiftTestOrderItem(202, 0, 'Retired thing'),
             new \CartShiftTestOrderItem(303, 0, 'Discontinued thing'),

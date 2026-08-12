@@ -46,6 +46,12 @@ final class VariationMapper
      */
     public function mapVariation(\WC_Product_Variation $variation, int $index = 0): array
     {
+        if ($variation->get_manage_stock() === 'parent') {
+            throw new \RuntimeException(
+                'Installed FluentCart simple variations have no proved shared parent stock quantity path.',
+            );
+        }
+
         $regularPrice = $variation->get_regular_price();
         $salePrice    = $variation->get_sale_price();
         $price        = $variation->get_price();
@@ -98,7 +104,10 @@ final class VariationMapper
         return [
             'serial_index'         => $index,
             'variation_title'      => $variationTitle,
-            'variation_identifier' => sanitize_title($variationTitle),
+            // FluentCart's installed Woo migrator uses the immutable Woo variation ID.
+            // The v2 transfer planner adds the source namespace and a bounded digest;
+            // this retained legacy path at least no longer keys identity by mutable title.
+            'variation_identifier' => (string) $variation->get_id(),
             'sku'                  => $sku ?: null,
             'payment_type'         => $paymentType,
             'fulfillment_type'     => $fulfillmentType,

@@ -36,7 +36,7 @@ test('CI runs both workflow contracts for every owned workflow input', () => {
   const workflowContract = job('workflow-contract')
   assert.match(
     workflowContract,
-    /node --test \.github\/workflows\/ci-memberships-contract\.test\.mjs \.github\/workflows\/ci-wporg-contract\.test\.mjs \.github\/workflows\/release-memberships-contract\.test\.mjs/,
+    /node --test \.github\/workflows\/ci-memberships-contract\.test\.mjs \.github\/workflows\/ci-cartshift-contract\.test\.mjs \.github\/workflows\/ci-wporg-contract\.test\.mjs \.github\/workflows\/release-memberships-contract\.test\.mjs/,
   )
 })
 

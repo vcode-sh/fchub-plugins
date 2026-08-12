@@ -178,10 +178,7 @@ final class VariationMapperTest extends PluginTestCase
 
         $this->assertSame('Rosso / Large', $result['variation_title']);
 
-        // Was 'rosso---large', which is what the old byte-oriented sanitize_title()
-        // stub produced and what production never has. Real WordPress answers
-        // 'rosso-large' — verified on a live install — and the stub now agrees.
-        $this->assertSame('rosso-large', $result['variation_identifier']);
+        $this->assertSame('500', $result['variation_identifier']);
     }
 
     /**
@@ -203,8 +200,7 @@ final class VariationMapperTest extends PluginTestCase
         $result = $this->mapper->mapVariation($variation);
 
         $this->assertSame('Biały / Rozmiar XL', $result['variation_title']);
-        $this->assertSame('bialy-rozmiar-xl', $result['variation_identifier']);
-        $this->assertStringNotContainsString('--', $result['variation_identifier']);
+        $this->assertSame('500', $result['variation_identifier']);
     }
 
     public function testAttributeTermLookupIsMemoised(): void
@@ -275,6 +271,18 @@ final class VariationMapperTest extends PluginTestCase
         $result = $this->mapper->mapVariation($this->createVariation(['attributes' => []]));
 
         $this->assertSame('Default', $result['variation_title']);
+    }
+
+    public function testParentManagedStockIsNotCopiedIntoAnIndependentChildPool(): void
+    {
+        $variation = $this->createVariation([
+            'manage_stock' => 'parent',
+            'stock_quantity' => 12,
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('shared parent stock');
+        $this->mapper->mapVariation($variation);
     }
 
     private function createVariation(array $overrides = [], int $id = 0): \WC_Product_Variation

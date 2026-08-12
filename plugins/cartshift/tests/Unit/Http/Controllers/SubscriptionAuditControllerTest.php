@@ -219,13 +219,12 @@ final class SubscriptionAuditControllerTest extends PluginTestCase
         $this->assertTrue($document['writes']['nothing']);
         $this->assertStringContainsString('writes nothing', strtolower($document['writes']['statement']));
 
-        // The three legitimate configuration writes are named as such, so
-        // nothing that does write can hide under the word "audit".
-        $actions = array_column($document['writes']['configuration_writes'], 'action');
-
-        $this->assertContains('prepare-package', $actions);
-        $this->assertContains('mapping-decisions', $actions);
-        $this->assertContains('manual-fallback-confirmation', $actions);
+        $this->assertSame([], $document['writes']['configuration_writes']);
+        $this->assertSame([
+            'prepare-package' => 'legacy_subscription_v1_package_write_closed',
+            'mapping-decisions' => 'legacy_mapping_write_closed',
+            'manual-fallback-confirmation' => 'legacy_subscription_v1_write_closed',
+        ], $document['writes']['retired_write_routes']);
     }
 
     public function testTheSourceModeAndSourceKeyAreReported(): void
@@ -234,6 +233,7 @@ final class SubscriptionAuditControllerTest extends PluginTestCase
 
         $this->assertSame('live', $document['source']['mode']);
         $this->assertSame(self::SOURCE_KEY, $document['source']['source_key']);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $document['source']['source_fingerprint']);
         $this->assertNotSame('', $document['source']['selection_fingerprint']);
     }
 

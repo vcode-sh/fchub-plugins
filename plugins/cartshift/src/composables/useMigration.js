@@ -1,62 +1,49 @@
 import { reactive } from 'vue';
 import { useApi } from './useApi.js';
-import { usePolling } from './usePolling.js';
 
-// Entity definitions with SINGULAR keys (matching backend).
+/** Retained for read-only previews rendered by legacy components and tests. */
 export const ENTITIES = [
   { key: 'product', label: 'Products', dep: '' },
   { key: 'customer', label: 'Customers', dep: '' },
-  // CouponMapper resolves product and category restrictions through the id-map,
-  // so coupons migrated without products silently lose every restriction.
   { key: 'coupon', label: 'Coupons', dep: 'Requires: Products' },
   { key: 'order', label: 'Orders', dep: 'Requires: Products, Customers' },
-  {
-    key: 'subscription',
-    label: 'Subscriptions',
-    dep: 'Requires: Products, Customers, Orders',
-  },
+  { key: 'subscription', label: 'Subscriptions', dep: 'Requires: Products, Customers, Orders' },
 ];
 
-// Poll cadence for background runs, and how many still polls count as a stall.
-const POLL_INTERVAL = 2000;
-const STALL_POLLS = 15;
-
-// Remembers which finished run the admin has already been shown.
-const ACK_KEY = 'cartshift_ack_migration';
-
-const FINISHED_STATUSES = ['completed', 'failed', 'cancelled'];
-
-/**
- * Map the UI's scope shape onto the wire shape `MigrationScope::toArray()`
- * expects. This is the single place the two vocabularies meet — the UI keeps
- * products and customers as `{id, label, sublabel}`/`{id, kind, label,
- * sublabel}` for the picker, the backend wants flat id arrays split by kind.
- *
- * Exported so the tests can reach it without driving the whole composable.
- *
- * @param {Object} scope UI-shaped scope (state.scope).
- * @return {Object} Wire-shaped scope for `POST /preview` and `POST /migrate`.
- */
 export function serializeScope(scope) {
   return {
     mode: scope.mode,
     since: scope.mode === 'since' ? scope.since : null,
-    product_ids: scope.mode === 'explicit' ? scope.products.map((p) => Number(p.id)) : [],
+    product_ids: scope.mode === 'explicit' ? scope.products.map((product) => Number(product.id)) : [],
     customer_ids:
       scope.mode === 'explicit'
-        ? scope.customers.filter((c) => c.kind === 'registered').map((c) => Number(c.id))
+        ? scope.customers.filter((customer) => customer.kind === 'registered').map((customer) => Number(customer.id))
         : [],
     guest_emails:
       scope.mode === 'explicit'
-        ? scope.customers.filter((c) => c.kind === 'guest').map((c) => String(c.id))
+        ? scope.customers.filter((customer) => customer.kind === 'guest').map((customer) => String(customer.id))
         : [],
     include_orders_for_products: scope.mode === 'explicit' && !!scope.includeOrdersForProducts,
   };
 }
 
-/**
- * The empty scope a fresh run (or a reset one) starts from.
- */
+export function resolveEntityDependencies(selected) {
+  const requested = new Set(selected);
+  const known = new Set(ENTITIES.map((entity) => entity.key));
+  for (const key of [...requested]) if (!known.has(key)) requested.delete(key);
+  if (requested.has('coupon')) requested.add('product');
+  if (requested.has('order')) {
+    requested.add('product');
+    requested.add('customer');
+  }
+  if (requested.has('subscription')) {
+    requested.add('product');
+    requested.add('customer');
+    requested.add('order');
+  }
+  return ['product', 'customer', 'coupon', 'order', 'subscription'].filter((key) => requested.has(key));
+}
+
 function emptyScope() {
   return {
     mode: 'everything',
@@ -67,46 +54,10 @@ function emptyScope() {
   };
 }
 
-function readAck() {
-  try {
-    return window.localStorage.getItem(ACK_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeAck(migrationId) {
-  try {
-    window.localStorage.setItem(ACK_KEY, migrationId);
-  } catch {
-    // Private mode or a locked-down browser — nagging once more is survivable.
-  }
-}
-
-/**
- * Cheap signature of the per-entity counters, used to tell a slow background
- * run apart from a stalled one.
- */
-function progressFingerprint(data) {
-  if (!data || !data.entities) return '';
-
-  return Object.keys(data.entities)
-    .map((key) => {
-      const e = data.entities[key];
-      return `${key}:${e.status}:${e.processed}:${e.skipped}:${e.errors}`;
-    })
-    .join('|');
-}
-
 export function useMigration() {
   const { api } = useApi();
-  const { startPolling, stopPolling } = usePolling();
-
-  let batchTimer = null;
-  let lastFingerprint = '';
-
   const state = reactive({
-    screen: 'preflight', // preflight | select | map | progress | results
+    screen: 'preflight',
     preflight: null,
     counts: null,
     selectedEntities: [],
@@ -122,753 +73,136 @@ export function useMigration() {
     logPage: 1,
     logPages: 1,
     loading: false,
-
-    // Background processing.
-    useBackground: false, // what the admin asked for on the select screen
-    background: false, // what the server actually did
+    useBackground: false,
+    background: false,
     backgroundAvailable: false,
     backgroundPending: false,
-
-    // Recovery from an abandoned run.
-    interrupted: false, // status is 'running' but nothing is driving it
+    interrupted: false,
     stalledPolls: 0,
     stalled: false,
     resetBlocked: null,
     resetMessage: null,
-    previousRun: null, // finished run the admin has not seen yet
-
-    // Retry — re-running only the records that failed. The endpoint is newer
-    // than this screen, so support is a tri-state: 'unknown' until something
-    // tells us otherwise, and the UI stays optimistic while it is unknown.
-    retrySupport: 'unknown', // unknown | yes | no
-    retryUnavailable: null, // why the control is off, in words
+    previousRun: null,
+    retrySupport: 'no',
+    retryUnavailable: 'Legacy retry is closed. Use `wp cartshift transfer stage` with a prepared descriptor.',
     retrying: false,
-
-    // Which mapping row the operator was sent here to re-decide, as
-    // `{wc_id, name}` — set by the subscription audit when it links a blocked
-    // subscription back to the product that blocked it. Null the rest of the
-    // time. A bare goToScreen('map') dropped them on a screen of two thousand
-    // rows with the product ID left behind, which is the same complaint the
-    // stale-variation refusal message just had.
     mapFocus: null,
-
-    // Selective migration scope, and the server-computed preview of it.
     scope: emptyScope(),
-    preview: null, // the /preview payload
+    preview: null,
     previewLoading: false,
-    previewSupport: 'unknown', // unknown | yes | no
+    previewSupport: 'unknown',
   });
 
-  // ── Internal helpers ──
-
-  function clearBatchTimer() {
-    if (batchTimer !== null) {
-      clearTimeout(batchTimer);
-      batchTimer = null;
-    }
-  }
-
-  function stopEverything() {
-    clearBatchTimer();
-    stopPolling();
+  function refuseLegacyWrite(nextCommand) {
     state.migrating = false;
+    state.retrying = false;
+    state.finalizing = false;
+    state.error = `legacy_generic_migration_closed: continue with \`${nextCommand}\`.`;
+    return false;
   }
 
-  function adoptProgress(data) {
-    state.progress = data;
-
-    if (typeof data.background_available === 'boolean') {
-      state.backgroundAvailable = data.background_available;
-    }
-    if (typeof data.background_pending === 'boolean') {
-      state.backgroundPending = data.background_pending;
-    }
-  }
-
-  // ── Actions ──
-
-  /**
-   * Boot the app. Before anything else, find out whether a migration is already
-   * in flight — a run whose browser tab was closed leaves the server on
-   * 'running' forever, and landing straight on the preflight screen hides both
-   * the problem and every control that could fix it.
-   */
   async function bootstrap() {
-    state.loading = true;
-
-    try {
-      const data = await api('GET', 'progress');
-      adoptProgress(data);
-
-      if (data.status === 'running') {
-        state.screen = 'progress';
-        state.selectedEntities = data.entity_types || [];
-        state.dryRun = !!data.dry_run;
-        lastFingerprint = progressFingerprint(data);
-        state.stalledPolls = 0;
-        state.stalled = false;
-
-        if (data.background_pending) {
-          // Action Scheduler still has work queued: follow along, don't drive.
-          state.background = true;
-          state.migrating = true;
-          state.interrupted = false;
-          startPolling(pollProgress, POLL_INTERVAL);
-        } else {
-          // Nobody is driving this run. Offer resume, cancel or reset.
-          state.background = false;
-          state.migrating = false;
-          state.interrupted = true;
-        }
-
-        state.loading = false;
-        return;
-      }
-
-      state.progress = null;
-
-      if (
-        FINISHED_STATUSES.indexOf(data.status) !== -1 &&
-        data.migration_id &&
-        readAck() !== data.migration_id
-      ) {
-        state.previousRun = data;
-      }
-    } catch {
-      // Progress is a courtesy at boot. Preflight is the real gate — carry on.
-    }
-
     await runPreflight();
   }
 
   async function runPreflight() {
     state.loading = true;
     state.error = null;
-
     try {
-      const [preflightData, countsData] = await Promise.all([
-        api('GET', 'preflight'),
-        api('GET', 'counts'),
-      ]);
-      state.preflight = preflightData;
-      state.counts = countsData.counts || countsData;
-    } catch (err) {
-      state.error = err.message;
+      const [preflight, counts] = await Promise.all([api('GET', 'preflight'), api('GET', 'counts')]);
+      state.preflight = preflight;
+      state.counts = counts.counts || counts;
+    } catch (error) {
+      state.error = error.message;
     } finally {
       state.loading = false;
     }
   }
 
-  function autoIncludeDependencies(selected) {
-    const set = new Set(selected);
-
-    // Coupons carry product and category restrictions that are remapped through
-    // the id-map — without products they migrate stripped of every restriction.
-    if (set.has('coupon')) {
-      set.add('product');
-    }
-
-    // Orders require products + customers
-    if (set.has('order')) {
-      set.add('product');
-      set.add('customer');
-    }
-
-    // Subscriptions require products + customers + orders
-    if (set.has('subscription')) {
-      set.add('product');
-      set.add('customer');
-      set.add('order');
-    }
-
-    // Return in canonical dependency order
-    const canonicalOrder = ['product', 'customer', 'coupon', 'order', 'subscription'];
-    return canonicalOrder.filter((e) => set.has(e));
-  }
-
-  /**
-   * Switch the scope's mode. Kept as an action (rather than letting the UI
-   * write `state.scope.mode` directly) so every mode change has one place to
-   * grow behaviour later — right now it just assigns.
-   *
-   * @param {string} mode 'everything' | 'since' | 'explicit'
-   */
   function setScopeMode(mode) {
     state.scope.mode = mode;
   }
 
-  /**
-   * Ask the server what the current scope resolves to: counts, consequence
-   * descriptors, closure info, and whether the closure is too large to run.
-   *
-   * Debounced by the caller, not here — the composable stays predictable and
-   * the screen decides when to ask.
-   *
-   * A 404 or 501 means this build of CartShift predates the endpoint: that is
-   * a degraded screen, not a failed migration, so it leaves `state.error`
-   * alone and just flips `previewSupport` to 'no' so the caller can fall back
-   * to `autoIncludeDependencies()` and the old counts.
-   *
-   * `{silent: true}` is for a speculative call the owner did not ask for —
-   * currently just the one the select screen fires on arrival to prime the
-   * receipt. A speculative call failing (a 500, a timeout, a dropped
-   * connection) must not greet the owner with an error banner about
-   * something they have not done yet, so it skips the `state.error`
-   * assignment and leaves the receipt simply unprimed. The 404/501
-   * `previewSupport` handling is unaffected either way — that is a feature
-   * detection outcome, not an error, and every caller needs to see it.
-   * Owner-initiated refreshes (the debounced one on every scope edit) never
-   * pass this, so a real failure is still reported exactly as before.
-   *
-   * The entity list sent is the *resolved* one, not the owner's raw ticks.
-   * startMigration() runs autoIncludeDependencies() on the way out, so ticking
-   * Orders alone migrates products and customers too — a preview built from
-   * the raw ticks described a run that was never going to happen. And an empty
-   * list is not asked at all: the server reads it as "no narrowing" and
-   * answers for all five entities, which is how an arrival with nothing ticked
-   * came to show whole-shop figures under a heading promising the opposite.
-   *
-   * @param {{silent?: boolean}} [options]
-   */
   async function refreshPreview(options = {}) {
-    const silent = options.silent === true;
-    const entityTypes = autoIncludeDependencies(state.selectedEntities);
-
+    const entityTypes = resolveEntityDependencies(state.selectedEntities);
     if (entityTypes.length === 0) {
       state.preview = null;
       state.previewLoading = false;
-
       return;
     }
-
     state.previewLoading = true;
-
     try {
-      const data = await api('POST', 'preview', {
+      state.preview = await api('POST', 'preview', {
         entity_types: entityTypes,
         scope: serializeScope(state.scope),
       });
-
-      state.preview = data;
       state.previewSupport = 'yes';
-    } catch (err) {
-      // Whatever went wrong, the preview on hand — if any — answers the
-      // previous question, not this one. Keeping it would leave the receipt
-      // quoting a wider selection's figures under the narrower one the owner
-      // is now looking at, which is precisely the class of confident wrong
-      // number 1.2.2 existed to stop.
+    } catch (error) {
       state.preview = null;
-
-      if (err.status === 404 || err.status === 501) {
-        state.previewSupport = 'no';
-      } else if (!silent) {
-        state.error = err.message;
-      }
+      if (error.status === 404 || error.status === 501) state.previewSupport = 'no';
+      else if (options.silent !== true) state.error = error.message;
     } finally {
       state.previewLoading = false;
     }
   }
 
-  /**
-   * Apply a remedy suggested by the preview (e.g. "add these products to the
-   * scope to keep an included order's line items resolvable").
-   *
-   * Merges the remedy's product ids into the scope (deduplicated on id),
-   * switches to explicit mode if the scope was not already explicit, then
-   * refreshes the preview so the owner sees the new closure.
-   *
-   * The picker labels arrive on the next search; a remedy-added product may
-   * show as its bare ID until then, which is acceptable and better than
-   * blocking on a lookup.
-   *
-   * @param {{action: string, product_ids?: (number|string)[]}} remedy
-   */
   async function applyRemedy(remedy) {
-    if (!remedy || !Array.isArray(remedy.product_ids)) {
-      return;
-    }
-
-    if (state.scope.mode !== 'explicit') {
-      state.scope.mode = 'explicit';
-    }
-
-    const known = new Set(state.scope.products.map((p) => String(p.id)));
-
+    if (!Array.isArray(remedy?.product_ids)) return;
+    state.scope.mode = 'explicit';
+    const known = new Set(state.scope.products.map((product) => String(product.id)));
     for (const id of remedy.product_ids) {
-      const key = String(id);
-      if (!known.has(key)) {
-        known.add(key);
-        state.scope.products.push({ id });
-      }
+      if (!known.has(String(id))) state.scope.products.push({ id });
+      known.add(String(id));
     }
-
     await refreshPreview();
   }
 
   async function startMigration() {
     if (state.selectedEntities.length === 0) {
       state.error = 'Please select at least one entity type to migrate.';
-      return;
+      return false;
     }
-
-    state.migrating = true;
-    state.selectedEntities = autoIncludeDependencies(state.selectedEntities);
-
-    state.screen = 'progress';
-    state.progress = null;
-    state.error = null;
-    state.batchError = null;
-    state.interrupted = false;
-    state.stalledPolls = 0;
-    state.stalled = false;
-    state.resetBlocked = null;
-    state.resetMessage = null;
-
-    try {
-      const data = await api('POST', 'migrate', {
-        entity_types: state.selectedEntities,
-        dry_run: state.dryRun,
-        background: state.useBackground,
-        scope: serializeScope(state.scope),
-      });
-
-      driveRun(data);
-    } catch (err) {
-      state.migrating = false;
-
-      // 422 with this code means the closure was refused and nothing was
-      // started. startMigration() already switched to the progress screen
-      // before the request went out, so send the owner back to the selection
-      // they still need to narrow — a progress bar for a run that does not
-      // exist is worse than the error.
-      //
-      // `err.payload` is the *unwrapped* body: useApi.js strips one `data`
-      // level before it builds the error (`data.data !== undefined ? data.data
-      // : data`), so the controller's `['data' => ['code' => …]]` arrives here
-      // as `{code, message, scope}`. Reading `err.payload.data.code` made this
-      // branch unreachable, and the test that covered it hand-built a payload
-      // useApi cannot produce, so it passed either way. Same shape as the 409
-      // branch below, which has always been right.
-      if (err.status === 422 && err.payload?.code === 'scope_closure_too_large') {
-        state.screen = 'select';
-        state.error = err.payload.message;
-        state.batchError = false;
-
-        return;
-      }
-
-      // 409 means a run is already in flight or was abandoned. That is a
-      // recoverable situation, not an error — show it with the resume, cancel
-      // and reset controls rather than a dead end.
-      if (err.status === 409 && err.payload?.progress) {
-        const existing = err.payload.progress;
-
-        adoptProgress(existing);
-        state.background = !!existing.background_pending;
-        state.interrupted = existing.status === 'running' && !existing.background_pending;
-
-        if (state.background) {
-          state.migrating = true;
-          startPolling(pollProgress, POLL_INTERVAL);
-        }
-
-        return;
-      }
-
-      state.error = err.message;
-      state.batchError = true;
-    }
+    state.selectedEntities = resolveEntityDependencies(state.selectedEntities);
+    return refuseLegacyWrite('wp cartshift transfer prepare');
   }
 
-  /**
-   * Where SelectScreen's primary button actually sends the wizard.
-   *
-   * A virgin FluentCart install has nothing to map to, so the step would be a
-   * screen of 300 rows all saying "will be created". Skip it entirely.
-   */
   function advanceFromSelect() {
-    if ((state.counts?.fc_product_count || 0) > 0) {
-      state.screen = 'map';
-      return;
-    }
-
-    startMigration();
+    return refuseLegacyWrite('wp cartshift transfer prepare');
   }
 
-  /**
-   * Take the response from whichever endpoint started a run and drive it.
-   *
-   * /migrate and /retry answer with the same envelope on purpose, so a retry
-   * gets the same batch loop, the same polling and the same finish handling as
-   * any other migration. Nothing downstream needs to know which one it was.
-   */
-  function driveRun(data) {
-    adoptProgress(data);
-    state.background = !!data.background;
-    lastFingerprint = progressFingerprint(data);
-
-    if (!data.continue) {
-      migrationFinished();
-    } else if (state.background) {
-      // Action Scheduler owns the run now — poll for progress and let the admin
-      // close the tab if they like.
-      startPolling(pollProgress, POLL_INTERVAL);
-    } else {
-      // Foreground: the browser drives the batches, which is what gives
-      // real-time progress.
-      runNextBatch();
-    }
+  async function startRetry() {
+    state.retrySupport = 'no';
+    return refuseLegacyWrite('wp cartshift transfer stage');
   }
 
-  /**
-   * Ask the REST namespace index whether /retry exists.
-   *
-   * Cheaper and quieter than finding out by firing a POST at a route that is not
-   * there, and it lets the results screen decide whether to offer the control
-   * before the admin clicks anything. A failed or unrecognised probe leaves the
-   * answer at 'unknown', which the UI treats as "offer it and handle a 404".
-   */
   async function probeRetrySupport() {
-    if (state.retrySupport !== 'unknown') {
-      return state.retrySupport;
-    }
-
-    try {
-      const index = await api('GET', '');
-      const routes = index && typeof index === 'object' ? index.routes : null;
-
-      if (routes && typeof routes === 'object') {
-        const found = Object.keys(routes).some((route) => /\/retry$/.test(route));
-
-        state.retrySupport = found ? 'yes' : 'no';
-        state.retryUnavailable = found
-          ? null
-          : 'This build of CartShift cannot re-run failed records — the retry endpoint is not installed. Update the plugin, or fix the causes and run a fresh migration.';
-      }
-    } catch {
-      // The index is a courtesy. Leave it unknown and let the POST decide.
-    }
-
-    return state.retrySupport;
-  }
-
-  /**
-   * Re-run only the records that did not make it.
-   *
-   * This starts a brand new migration — its own id, its own log, its own
-   * rollback — that happens to carry `retry_of` pointing at the run it came
-   * from. The source run is never modified.
-   *
-   * @param {{statuses?: string[], dryRun?: boolean, entityTypes?: string[], codes?: string[]}} options
-   * @return {Promise<boolean>} Whether a run actually started.
-   */
-  async function startRetry(options = {}) {
-    const sourceId = state.progress?.migration_id;
-
-    if (!sourceId) {
-      state.error = 'No migration to retry — this run has no ID.';
-      return false;
-    }
-
-    const statuses =
-      Array.isArray(options.statuses) && options.statuses.length > 0
-        ? options.statuses
-        : ['error'];
-
-    const body = {
-      migration_id: sourceId,
-      statuses,
-      dry_run: !!options.dryRun,
-    };
-
-    if (Array.isArray(options.entityTypes) && options.entityTypes.length > 0) {
-      body.entity_types = options.entityTypes;
-    }
-
-    // Narrowing to one reason is a nicety, not a contract. A backend that does
-    // not know the parameter drops it and retries everything matching the
-    // statuses — which is why the dialog says so before you press the button.
-    if (Array.isArray(options.codes) && options.codes.length > 0) {
-      body.codes = options.codes;
-    }
-
-    state.retrying = true;
-    state.error = null;
-    state.batchError = null;
-
-    try {
-      const data = await api('POST', 'retry', body);
-
-      state.retrySupport = 'yes';
-      state.retryUnavailable = null;
-
-      state.screen = 'progress';
-      // Read the resolved flag off the response, not off what we asked for. The
-      // two can differ, and when they do the response is the one telling the
-      // truth about what the run is doing.
-      state.dryRun = !!(data.dry_run ?? body.dry_run);
-      state.selectedEntities = data.entity_types || state.selectedEntities;
-      state.finalized = false;
-      state.finalizeStats = null;
-      state.interrupted = false;
-      state.stalled = false;
-      state.stalledPolls = 0;
-      state.resetBlocked = null;
-      state.resetMessage = null;
-      state.migrating = true;
-
-      driveRun(data);
-
-      return true;
-    } catch (err) {
-      state.migrating = false;
-
-      // The endpoint is not there. Say so once and stop offering the button,
-      // rather than throwing something cryptic at the admin.
-      if (err.status === 404 || err.status === 501) {
-        state.retrySupport = 'no';
-        state.retryUnavailable =
-          'This build of CartShift cannot re-run failed records — the retry endpoint is not installed. Update the plugin, or fix the causes and run a fresh migration.';
-        return false;
-      }
-
-      // Same 409 story as a normal start: a run is already in flight, which is
-      // recoverable and belongs on the progress screen with its controls.
-      if (err.status === 409 && err.payload?.progress) {
-        const existing = err.payload.progress;
-
-        state.screen = 'progress';
-        adoptProgress(existing);
-        state.background = !!existing.background_pending;
-        state.interrupted = existing.status === 'running' && !existing.background_pending;
-
-        if (state.background) {
-          state.migrating = true;
-          startPolling(pollProgress, POLL_INTERVAL);
-        }
-
-        return false;
-      }
-
-      state.error = err.message;
-      return false;
-    } finally {
-      state.retrying = false;
-    }
-  }
-
-  async function runNextBatch() {
-    if (!state.migrating) {
-      return;
-    }
-
-    try {
-      const data = await api('POST', 'migrate/batch');
-      adoptProgress(data);
-
-      if (data.continue) {
-        batchTimer = setTimeout(runNextBatch, 50);
-      } else {
-        migrationFinished();
-      }
-    } catch (err) {
-      // 409 from the batch lock means another request got there first. Wait for
-      // it rather than treating a healthy race as a failure.
-      if (err.status === 409 && err.payload?.locked) {
-        if (err.payload.progress) {
-          adoptProgress(err.payload.progress);
-        }
-        batchTimer = setTimeout(runNextBatch, 1000);
-        return;
-      }
-
-      state.error = err.message;
-      state.batchError = true;
-      state.migrating = false;
-
-      // Fetch latest progress so the UI is up to date.
-      try {
-        const data = await api('GET', 'progress');
-        adoptProgress(data);
-      } catch {
-        // Network blip — nothing more we can do.
-      }
-    }
-  }
-
-  /**
-   * Poll loop for background runs.
-   */
-  async function pollProgress() {
-    try {
-      const data = await api('GET', 'progress');
-      adoptProgress(data);
-
-      if (data.status !== 'running') {
-        migrationFinished();
-        return;
-      }
-
-      const fingerprint = progressFingerprint(data);
-
-      if (fingerprint !== lastFingerprint) {
-        lastFingerprint = fingerprint;
-        state.stalledPolls = 0;
-      } else if (!data.background_pending) {
-        state.stalledPolls += 1;
-      }
-
-      state.stalled = state.stalledPolls >= STALL_POLLS;
-    } catch {
-      // Network blip — keep polling, don't blow up.
-    }
-  }
-
-  /**
-   * Re-enter the foreground batch loop. The orchestrator resumes from the
-   * persisted current_entity_index and current_offset, so there is nothing to
-   * restore beyond restarting the loop.
-   */
-  function resumeMigration() {
-    stopPolling();
-    clearBatchTimer();
-
-    state.error = null;
-    state.batchError = null;
-    state.interrupted = false;
-    state.stalled = false;
-    state.stalledPolls = 0;
-    state.background = false;
-    state.migrating = true;
-    state.screen = 'progress';
-
-    runNextBatch();
-  }
-
-  async function migrationFinished() {
-    stopEverything();
-    state.interrupted = false;
-    state.stalled = false;
-
-    try {
-      const data = await api('GET', 'progress');
-      adoptProgress(data);
-    } catch {
-      // Best-effort refresh.
-    }
+    state.retrySupport = 'no';
+    return 'no';
   }
 
   async function cancelMigration() {
-    try {
-      await api('POST', 'cancel');
-      stopEverything();
-      state.interrupted = false;
-      state.stalled = false;
-
-      const data = await api('GET', 'progress');
-      adoptProgress(data);
-    } catch {
-      // Swallow — cancel is best-effort.
-    }
+    return refuseLegacyWrite('wp cartshift transfer status');
   }
 
-  /**
-   * Clear the stored migration state so a new run can start.
-   *
-   * Deliberately not rollback: the migrated records and their id-map entries
-   * survive. Rollback is the button that deletes them.
-   */
-  async function resetMigration(force = false) {
-    state.loading = true;
-    state.resetBlocked = null;
-
-    try {
-      const data = await api('POST', 'reset', { force: !!force });
-
-      stopEverything();
-      resetState();
-      state.resetMessage = data.message || 'Migration state cleared.';
-
-      await runPreflight();
-
-      return data;
-    } catch (err) {
-      if (err.status === 409) {
-        state.resetBlocked = err.payload?.message || err.message;
-        if (err.payload?.progress) {
-          adoptProgress(err.payload.progress);
-        }
-      } else {
-        state.error = err.message;
-      }
-
-      return null;
-    } finally {
-      state.loading = false;
-    }
+  function resumeMigration() {
+    return refuseLegacyWrite('wp cartshift transfer stage');
   }
 
-  function viewPreviousRun() {
-    const previous = state.previousRun;
-    if (!previous) return;
-
-    adoptProgress(previous);
-    dismissPreviousRun();
-    state.screen = 'results';
-  }
-
-  function dismissPreviousRun() {
-    const id = state.previousRun?.migration_id;
-    if (id) {
-      writeAck(id);
-    }
-    state.previousRun = null;
+  async function resetMigration() {
+    refuseLegacyWrite('wp cartshift transfer status');
+    return null;
   }
 
   async function finalize() {
-    if (!state.progress || !state.progress.migration_id) {
-      state.error = 'No migration ID found. Cannot finalize.';
-      return;
-    }
-
-    state.finalizing = true;
-
-    try {
-      const data = await api('POST', 'finalize', {
-        migration_id: state.progress.migration_id,
-      });
-      state.finalized = true;
-      state.finalizeStats = data.stats || data;
-    } catch (err) {
-      state.error = 'Finalization failed: ' + err.message;
-    } finally {
-      state.finalizing = false;
-    }
+    return refuseLegacyWrite('wp cartshift transfer promote');
   }
 
   async function rollback() {
-    state.loading = true;
-
-    try {
-      const data = await api('POST', 'rollback', {
-        migration_id: state.progress ? state.progress.migration_id : null,
-      });
-
-      resetState();
-      return data;
-    } catch (err) {
-      state.error = 'Rollback failed: ' + err.message;
-      throw err;
-    } finally {
-      state.loading = false;
-    }
+    return refuseLegacyWrite('wp cartshift transfer rollback');
   }
 
   async function loadLog(page) {
-    if (page !== undefined) {
-      state.logPage = page;
-    }
-
+    if (page !== undefined) state.logPage = page;
     try {
       const data = await api('GET', `log?page=${state.logPage}`);
       state.log = data.data || data.entries || [];
@@ -882,11 +216,6 @@ export function useMigration() {
     state.screen = screen;
   }
 
-  /**
-   * Go to the mapping screen carrying which row to re-decide.
-   *
-   * @param {{wc_id: number, name?: string}|null} focus
-   */
   function goToMapping(focus) {
     state.mapFocus = focus && Number(focus.wc_id) > 0 ? { ...focus, wc_id: Number(focus.wc_id) } : null;
     state.screen = 'map';
@@ -897,15 +226,10 @@ export function useMigration() {
   }
 
   function retryBatch() {
-    state.error = null;
-    state.batchError = null;
-    state.migrating = true;
-    runNextBatch();
+    return refuseLegacyWrite('wp cartshift transfer stage');
   }
 
   function resetState() {
-    stopEverything();
-
     state.screen = 'preflight';
     state.preflight = null;
     state.counts = null;
@@ -915,47 +239,21 @@ export function useMigration() {
     state.migrating = false;
     state.error = null;
     state.batchError = null;
-    state.finalized = false;
-    state.finalizing = false;
-    state.finalizeStats = null;
-    state.dryRun = false;
-    state.logPage = 1;
-    state.logPages = 1;
-    state.loading = false;
-    state.useBackground = false;
-    state.background = false;
-    state.backgroundPending = false;
-    state.interrupted = false;
-    state.stalledPolls = 0;
-    state.stalled = false;
-    state.resetBlocked = null;
-    state.resetMessage = null;
-    state.previousRun = null;
-    state.retrying = false;
-    // retrySupport is a property of the install, not of the run — keep it.
     state.mapFocus = null;
     state.scope = emptyScope();
     state.preview = null;
-    state.previewLoading = false;
-    // previewSupport is a property of the install, not of the run — keep it.
-    lastFingerprint = '';
   }
 
   function backFromError() {
-    stopEverything();
+    resetState();
+  }
 
-    state.screen = 'preflight';
-    state.error = null;
-    state.batchError = null;
-    state.progress = null;
-    state.preflight = null;
-    state.migrating = false;
-    state.finalized = false;
-    state.finalizing = false;
-    state.finalizeStats = null;
-    state.interrupted = false;
-    state.stalled = false;
-    state.stalledPolls = 0;
+  function viewPreviousRun() {
+    state.screen = 'results';
+  }
+
+  function dismissPreviousRun() {
+    state.previousRun = null;
   }
 
   return {

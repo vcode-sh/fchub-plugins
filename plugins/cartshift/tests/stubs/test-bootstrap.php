@@ -23,7 +23,7 @@ if (!defined('OBJECT')) {
 // test ever asserts on this value, have it read cartshift.php's source rather
 // than this constant, as MigrationsTest::testTheTwoVersionConstantsAgree does.
 if (!defined('CARTSHIFT_VERSION')) {
-    define('CARTSHIFT_VERSION', '1.4.1');
+    define('CARTSHIFT_VERSION', '1.5.0');
 }
 
 if (!defined('CARTSHIFT_PLUGIN_PATH')) {
@@ -39,7 +39,7 @@ if (!defined('CARTSHIFT_PLUGIN_FILE')) {
 }
 
 if (!defined('CARTSHIFT_DB_VERSION')) {
-    define('CARTSHIFT_DB_VERSION', '7');
+    define('CARTSHIFT_DB_VERSION', '8');
 }
 
 // ──────────────────────────────────────────────
@@ -401,6 +401,13 @@ if (!function_exists('get_term_by')) {
     }
 }
 
+if (!function_exists('get_term')) {
+    function get_term(int $termId, string $taxonomy = ''): mixed
+    {
+        return $GLOBALS['_cartshift_test_terms_by_id'][$taxonomy][$termId] ?? null;
+    }
+}
+
 if (!function_exists('get_user_meta')) {
     function get_user_meta(int $userId, string $key = '', bool $single = false): mixed
     {
@@ -492,7 +499,7 @@ if (!class_exists('WC_Product')) {
         protected array $gallery_image_ids = [];
         protected array $category_ids = [];
         protected bool $in_stock = true;
-        protected bool $manage_stock = false;
+        protected bool|string $manage_stock = false;
         protected bool $sold_individually = false;
         protected array $children = [];
         protected ?int $stock_quantity = null;
@@ -524,7 +531,7 @@ if (!class_exists('WC_Product')) {
         public function get_gallery_image_ids(): array { return $this->gallery_image_ids; }
         public function get_category_ids(): array { return $this->category_ids; }
         public function is_in_stock(): bool { return $this->in_stock; }
-        public function get_manage_stock(): bool { return $this->manage_stock; }
+        public function get_manage_stock(): bool|string { return $this->manage_stock; }
         public function is_sold_individually(): bool { return $this->sold_individually; }
         public function get_children(): array { return $this->children; }
         public function get_stock_quantity(): ?int { return $this->stock_quantity; }
@@ -556,6 +563,7 @@ if (!class_exists('WC_Order')) {
         protected string $shipping_total = '0';
         protected string $shipping_tax = '0';
         protected string $discount_total = '0';
+        protected string $discount_tax = '0';
         protected string $total_refunded = '0';
         protected array $items = [];
         protected array $shipping_items = [];
@@ -595,7 +603,14 @@ if (!class_exists('WC_Order')) {
         protected int $parent_id = 0;
         protected bool $prices_include_tax = false;
         protected string $currency = 'USD';
-        protected array $meta = [];
+        /**
+         * Order fixtures are historical test records, so their reporting mode
+         * is explicit by default. Individual boundary tests replace this value
+         * with unknown/missing evidence to challenge the production blocker.
+         *
+         * @var array<string, mixed>
+         */
+        protected array $meta = ['_cartshift_historical_payment_mode' => 'test'];
 
         public function get_id(): int { return $this->id; }
         public function get_status(): string { return $this->status; }
@@ -606,6 +621,7 @@ if (!class_exists('WC_Order')) {
         public function get_shipping_total(): string { return $this->shipping_total; }
         public function get_shipping_tax(): string { return $this->shipping_tax; }
         public function get_discount_total(): string { return $this->discount_total; }
+        public function get_discount_tax(): string { return $this->discount_tax; }
         public function get_total_refunded(): string { return $this->total_refunded; }
         public function get_items(string $type = ''): array
         {
@@ -752,6 +768,27 @@ if (!class_exists('WC_Order_Item_Product')) {
     }
 }
 
+if (!class_exists('WC_Order_Refund')) {
+    class WC_Order_Refund
+    {
+        protected int $id = 0;
+        protected string $amount = '0';
+        protected string $currency = 'USD';
+        protected string $reason = '';
+        protected string $transaction_id = '';
+        protected ?object $date_created = null;
+        protected array $items = [];
+
+        public function get_id(): int { return $this->id; }
+        public function get_amount(): string { return $this->amount; }
+        public function get_currency(): string { return $this->currency; }
+        public function get_reason(): string { return $this->reason; }
+        public function get_transaction_id(): string { return $this->transaction_id; }
+        public function get_date_created(): ?object { return $this->date_created; }
+        public function get_items(string $type = ''): array { return $this->items; }
+    }
+}
+
 if (!class_exists('WC_Order_Item_Shipping')) {
     class WC_Order_Item_Shipping
     {
@@ -775,6 +812,19 @@ if (!class_exists('WC_Order_Item_Fee')) {
         public function get_name(): string { return $this->name; }
         public function get_total(): string { return $this->total; }
         public function get_total_tax(): string { return $this->total_tax; }
+    }
+}
+
+if (!function_exists('wc_get_product_terms')) {
+    function wc_get_product_terms(int $productId, string $taxonomy, array $args = []): array|WP_Error
+    {
+        $GLOBALS['_cartshift_test_wc_product_term_calls'][] = [$productId, $taxonomy, $args];
+
+        if (isset($GLOBALS['_cartshift_test_wc_product_terms_callback'])) {
+            return ($GLOBALS['_cartshift_test_wc_product_terms_callback'])($productId, $taxonomy, $args);
+        }
+
+        return $GLOBALS['_cartshift_test_wc_product_terms_return'][$taxonomy] ?? [];
     }
 }
 
@@ -981,6 +1031,10 @@ if (!class_exists('wpdb')) {
         {
             $this->runStatement($table, $data);
             $GLOBALS['_cartshift_test_queries'][] = ['update', $table, $data, $where];
+
+            if (isset($GLOBALS['_cartshift_test_update_callback'])) {
+                return ($GLOBALS['_cartshift_test_update_callback'])($table, $data, $where);
+            }
 
             return $this->last_error === '' ? 1 : false;
         }

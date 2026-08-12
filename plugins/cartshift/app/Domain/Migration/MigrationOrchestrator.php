@@ -515,7 +515,7 @@ final class MigrationOrchestrator
                             );
                         }
                     } catch (\Throwable $e) {
-                        DatabaseTransaction::rollback();
+                        DatabaseTransaction::rollback($e);
                         $errors++;
                         $wcId = $migrator->getRecordId($record);
                         $this->log->write(

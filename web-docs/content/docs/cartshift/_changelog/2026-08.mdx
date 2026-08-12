@@ -2,25 +2,11 @@
 
 *Released 10 August 2026* — [GitHub Release](https://github.com/vcode-sh/fchub-plugins/releases/tag/cartshift/v1.5.0)
 
-Subscriptions can now move from WooCommerce Subscriptions to FluentCart without becoming a spreadsheet project followed by a small prayer.
+CartShift can now move a complete WooCommerce store to FluentCart — products, variations, categories, media, downloads, customers, orders, refunds, discounts, taxes, payment history and subscriptions — while preserving their relationships and exact amounts.
 
-#### It moves the subscription, not merely its row
+A read-only audit catches missing or ambiguous data before anything is written. Transfers between separate sites use a sealed package, explicit mapping decisions and a staged cutover, so subscription renewals do not switch owners on optimism alone.
 
-CartShift carries over the customer, mapped product and variation, billing cadence, dates, finite billing count, current status, renewal orders and payment history. It understands Stripe, PayPal and manual renewals, and it keeps the original WooCommerce relationships available for audit rather than flattening eight years of commerce into one cheerful record.
-
-The same migration can run between two separate WordPress sites. The source creates a canonical package; the destination validates its identity and contents before writing anything. A saved selection remains the same selection through staging, reconciliation, source release and restoration — apparently a detail worth specifying when money is involved.
-
-#### A cutover with brakes
-
-The new subscription audit separates records that are ready from records that need attention. Open renewal orders, payment retries, stale schedules, ambiguous customers, missing mappings, unsupported contracts and source drift stop only the affected subscriptions. They do not get waved through because the progress bar would look nicer.
-
-Staging is deliberately manual in 1.5.0 because CartShift cannot prove that a destination gateway owns the source site's stored provider reference and webhooks. Stripe and PayPal history still moves, but automatic provider billing is never guessed; the operator must explicitly accept manual fallback. The source stops automatic renewals only after the destination has been staged and reconciled, with a receipt recording every decision.
-
-#### Recoverable by design
-
-Every cutover has a durable receipt and can be resumed, reconciled or restored. Destination writes for one subscription are transactional, source renewal flags are verified after saving, and restoration puts the persisted WooCommerce setting back rather than trusting an environment-dependent `is_manual()` result. The final review also closed partial-selection drift, multi-zero-payment history, resubscribe lineage and package-file validation gaps found during the live rehearsal.
-
-This release was rehearsed against the Wesoła Łapka migration shape, including separate source and destination sites. Records with unresolved source data stay excluded with a reason; CartShift does not improve bad billing data by pretending not to notice it.
+Repeat runs do not create duplicates, existing FluentCart data is protected by ownership checks, and rollback removes only CartShift-owned records while restoring the source subscription settings. The full workflow was rehearsed on empty and populated destinations, including an exact rollback. Apparently, “100% complete” is not an accounting method.
 
 <Separator className="my-8" />
 

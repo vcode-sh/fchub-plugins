@@ -8,13 +8,17 @@ defined('ABSPATH') || exit;
 
 use CartShift\Domain\Migration\OrderIdentity;
 use CartShift\Domain\Subscription\SubscriptionHistoryIndex;
+use CartShift\Domain\Transfer\Order\AddressProjection;
+use CartShift\Domain\Transfer\Order\AddressRecord;
+use CartShift\Domain\Transfer\Order\OrderStatusPolicy;
+use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\Enums\FcBillingInterval;
-use CartShift\Support\Enums\FcOrderStatus;
-use CartShift\Support\Enums\FcPaymentStatus;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Support\MoneyHelper;
+use CartShift\Support\UtcDateTime;
+use CartShift\Domain\Transfer\SourceRecordException;
 
 final class OrderMapper
 {
@@ -37,6 +41,7 @@ final class OrderMapper
         private readonly SubscriptionHistoryIndex $history = new SubscriptionHistoryIndex(
             Constants::DEFAULT_SOURCE_KEY,
         ),
+        private readonly OrderStatusPolicy $statusPolicy = new OrderStatusPolicy(),
     ) {}
 
     /**
@@ -50,6 +55,8 @@ final class OrderMapper
 
         $wcStatus   = $order->get_status();
         $customerId = $this->resolveCustomerId($order);
+        $historicalPaymentMode = $this->historicalPaymentMode($order);
+        $statusProjection = $this->statusPolicy->project($wcStatus);
 
         $this->warnOnDisputedRelationship($order);
 
@@ -64,18 +71,21 @@ final class OrderMapper
             // filter on the type, so a renewal typed `checkout` disappears from
             // the subscriber's own invoice list.
             'type'                  => $this->history->fluentCartOrderType($order->get_id()) ?? 'checkout',
-            'status'                => FcOrderStatus::fromWooCommerce($wcStatus)->value,
-            'payment_status'        => FcPaymentStatus::fromWooCommerce($wcStatus)->value,
-            'payment_method'        => $order->get_payment_method() ?: 'wc_migrated',
-            'payment_method_title'  => $order->get_payment_method_title() ?: 'WooCommerce (migrated)',
+            'status'                => $statusProjection->orderStatus,
+            'payment_status'        => $statusProjection->paymentStatus,
+            'payment_method'        => 'wc_migrated',
+            'payment_method_title'  => 'WooCommerce (historical import)',
             'currency'              => $order->get_currency(),
             'subtotal'              => MoneyHelper::toCents($order->get_subtotal(), $this->currency),
-            'discount_tax'          => 0,
+            'discount_tax'          => MoneyHelper::toCents($order->get_discount_tax(), $this->currency),
             'manual_discount_total' => 0,
             'coupon_discount_total' => MoneyHelper::toCents($order->get_discount_total(), $this->currency),
             'shipping_tax'          => MoneyHelper::toCents($order->get_shipping_tax(), $this->currency),
             'shipping_total'        => MoneyHelper::toCents($order->get_shipping_total(), $this->currency),
-            'tax_total'             => MoneyHelper::toCents($order->get_total_tax(), $this->currency),
+            // Woo's total tax includes shipping tax; FluentCart stores the two
+            // ledgers separately and its total equation adds both columns.
+            'tax_total'             => $this->getCartTax($order),
+            'fee_total'             => $this->getFeeTotal($order),
             'tax_behavior'          => $this->getTaxBehavior($order),
             'total_amount'          => MoneyHelper::toCents($order->get_total(), $this->currency),
             'total_paid'            => $this->getTotalPaid($order),
@@ -83,7 +93,7 @@ final class OrderMapper
             'rate'                  => self::getExchangeRate($order),
             'note'                  => $order->get_customer_note() ?: '',
             'ip_address'            => $order->get_customer_ip_address() ?: '',
-            'mode'                  => 'live',
+            'mode'                  => $historicalPaymentMode,
             'fulfillment_type'      => self::guessFulfillmentType($order),
             'shipping_status'       => 'unshipped',
             'invoice_no'            => OrderIdentity::invoiceNo($order->get_id()),
@@ -101,7 +111,7 @@ final class OrderMapper
             // site-local, which mixed local and UTC values into one column depending on whether
             // the WC date happened to be set.
             'created_at'            => self::toUtcString($order->get_date_created())
-                ?? gmdate('Y-m-d H:i:s'),
+                ?? UtcDateTime::target(time()),
             'completed_at'          => self::toUtcString($order->get_date_completed()),
         ];
 
@@ -236,7 +246,7 @@ final class OrderMapper
                 'other_info'       => !empty($otherInfo) ? $otherInfo : [],
                 'line_meta'        => self::extractItemMeta($item),
                 'created_at'       => self::toUtcString($order->get_date_created())
-                    ?? gmdate('Y-m-d H:i:s'),
+                    ?? UtcDateTime::target(time()),
             ];
         }
 
@@ -375,19 +385,21 @@ final class OrderMapper
                 'title'            => $fee->get_name(),
                 'fulfillment_type' => 'digital',
                 'quantity'         => 1,
-                'unit_price'       => $feeTotal,
+                'unit_price'       => $order->get_prices_include_tax() ? $feeTotal : $feeAmount,
                 'cost'             => 0,
-                'subtotal'         => $feeAmount,
-                'tax_amount'       => $feeTax,
+                'subtotal'         => $order->get_prices_include_tax() ? $feeTotal : $feeAmount,
+                // FluentCart CheckoutProcessor keeps fee tax on the order and
+                // tax-rate rows, not on the fee item itself.
+                'tax_amount'       => 0,
                 'discount_total'   => 0,
                 'refund_total'     => 0,
-                'line_total'       => $feeTotal,
+                'line_total'       => $order->get_prices_include_tax() ? $feeTotal : $feeAmount,
                 'rate'             => self::getExchangeRate($order),
-                'payment_type'     => 'onetime',
+                'payment_type'     => 'fee',
                 'other_info'       => ['is_custom' => true],
                 'line_meta'        => [],
                 'created_at'       => self::toUtcString($order->get_date_created())
-                    ?? gmdate('Y-m-d H:i:s'),
+                    ?? UtcDateTime::target(time()),
             ];
         }
 
@@ -420,61 +432,47 @@ final class OrderMapper
     {
         $addresses = [];
 
-        $billingName = trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
-        $billingMeta = [];
-        if ($order->get_billing_phone()) {
-            $billingMeta['other_data']['phone'] = $order->get_billing_phone();
-        }
-        if ($order->get_billing_company()) {
-            $billingMeta['other_data']['company_name'] = $order->get_billing_company();
-        }
-
-        // Polish tax ID. Not decoration: fchub-fakturownia decides business
-        // versus consumer invoice purely on whether this is present
-        // (app/Handler/InvoiceHandler.php:124, reading
-        // Arr::get($billingAddress->meta, 'other_data.nip')), and Polish B2B
-        // invoicing legally requires the number. Dropping it means no migrated
-        // order can ever be invoiced to a company.
-        //
-        // `_billing_nip` is what the WooCommerce-side checkout plugins store it
-        // under; get_meta() reads it through the order's own data store, so it
-        // works under HPOS and legacy post meta alike.
         $nip = self::stringMeta($order, '_billing_nip');
-        if ($nip !== '') {
-            $billingMeta['other_data']['nip'] = $nip;
-        }
-
-        $addresses[] = [
-            'type'      => 'billing',
-            'name'      => $billingName,
-            'address_1' => $order->get_billing_address_1(),
-            'address_2' => $order->get_billing_address_2(),
-            'city'      => $order->get_billing_city(),
-            'state'     => $order->get_billing_state(),
-            'postcode'  => $order->get_billing_postcode(),
-            'country'   => $order->get_billing_country(),
-            'meta'      => !empty($billingMeta) ? $billingMeta : [],
-        ];
-
-        $shippingFirst = $order->get_shipping_first_name();
-        if ($shippingFirst) {
-            $shippingName = trim($shippingFirst . ' ' . $order->get_shipping_last_name());
-            $shippingMeta = [];
-            if ($order->get_shipping_company()) {
-                $shippingMeta['other_data']['company_name'] = $order->get_shipping_company();
+        $vat = self::stringMeta($order, '_billing_vat_number');
+        if ($nip !== '' && $vat !== '') {
+            $normalize = static fn (string $value): string => preg_replace('/[^A-Z0-9]/', '', strtoupper($value)) ?? '';
+            $normalizedNip = preg_replace('/\APL/', '', $normalize($nip)) ?? '';
+            $normalizedVat = preg_replace('/\APL/', '', $normalize($vat)) ?? '';
+            if ($normalizedNip !== $normalizedVat) {
+                throw new SourceRecordException('source_identity_conflict', 'Billing NIP and VAT-number evidence disagree.');
             }
+        }
+        $businessTaxId = $vat !== '' ? $vat : $nip;
 
-            $addresses[] = [
-                'type'      => 'shipping',
-                'name'      => $shippingName,
-                'address_1' => $order->get_shipping_address_1(),
-                'address_2' => $order->get_shipping_address_2(),
-                'city'      => $order->get_shipping_city(),
-                'state'     => $order->get_shipping_state(),
-                'postcode'  => $order->get_shipping_postcode(),
-                'country'   => $order->get_shipping_country(),
-                'meta'      => !empty($shippingMeta) ? $shippingMeta : [],
-            ];
+        foreach (['billing', 'shipping'] as $index => $type) {
+            $getter = static fn (string $field): string => (string) $order->{'get_' . $type . '_' . $field}();
+            $record = new AddressRecord(
+                new SourceIdentity(
+                    'legacy-runtime',
+                    'order',
+                    $order->get_id() . ':address:' . ($index + 1),
+                ),
+                $type,
+                $getter('first_name'),
+                $getter('last_name'),
+                $getter('company'),
+                $getter('address_1'),
+                $getter('address_2'),
+                $getter('city'),
+                $getter('state'),
+                $getter('postcode'),
+                $getter('country'),
+                $type === 'billing' ? $order->get_billing_email() : '',
+                $getter('phone'),
+                $type === 'billing' ? $businessTaxId : '',
+            );
+            $projection = AddressProjection::project($record);
+            if ($projection === null) {
+                continue;
+            }
+            $row = $projection->row;
+            unset($row['source_identity']);
+            $addresses[] = $row;
         }
 
         return $addresses;
@@ -495,8 +493,7 @@ final class OrderMapper
         }
 
         $status = match (true) {
-            in_array($wcStatus, ['processing', 'completed'], true) => 'succeeded',
-            $wcStatus === 'refunded'                               => 'refunded',
+            in_array($wcStatus, ['processing', 'completed', 'refunded'], true) => 'succeeded',
             in_array($wcStatus, ['failed', 'cancelled'], true)    => 'failed',
             default                                                => 'pending',
         };
@@ -507,22 +504,29 @@ final class OrderMapper
             // `SubscriptionService` writes `renewal` — and the transaction type
             // is half of what `calculateBillCount()` reads.
             'order_type'          => $this->history->fluentCartOrderType($order->get_id()) ?? 'order',
-            'vendor_charge_id'    => $order->get_transaction_id() ?: '',
-            'payment_method'      => $order->get_payment_method() ?: 'free',
-            'payment_mode'        => 'live',
-            'payment_method_type' => 'wc_migrated',
+            'vendor_charge_id'    => '',
+            'payment_method'      => 'wc_migrated',
+            'payment_mode'        => $this->historicalPaymentMode($order),
+            'payment_method_type' => 'historical_provenance',
             'currency'            => $order->get_currency(),
             'transaction_type'    => 'charge',
             'status'              => $status,
             'total'               => $total,
             'rate'                => self::getExchangeRate($order),
             'meta'                => [
-                'wc_order_id'    => $order->get_id(),
-                'wc_transaction' => $order->get_transaction_id(),
+                'wc_order_id' => $order->get_id(),
+                'cartshift_source_payment' => [
+                    'gateway' => $order->get_payment_method(),
+                    'source_mode' => $this->historicalPaymentMode($order),
+                    'provider_reference' => $order->get_transaction_id(),
+                    'evidence_kind' => $order->get_transaction_id() !== ''
+                        ? 'provider_reference'
+                        : ($total === 0 ? 'free_no_charge' : 'manual_paid_without_provider'),
+                ],
             ],
             'created_at'          => self::toUtcString($order->get_date_paid())
                 ?? self::toUtcString($order->get_date_created())
-                ?? gmdate('Y-m-d H:i:s'),
+                ?? UtcDateTime::target(time()),
         ];
     }
 
@@ -535,11 +539,19 @@ final class OrderMapper
      */
     private static function toUtcString(?object $date): ?string
     {
-        if (!$date || !method_exists($date, 'getTimestamp')) {
-            return null;
-        }
+        return UtcDateTime::target($date);
+    }
 
-        return gmdate('Y-m-d H:i:s', $date->getTimestamp());
+    private function historicalPaymentMode(\WC_Order $order): string
+    {
+        $mode = (string) $order->get_meta('_cartshift_historical_payment_mode', true);
+        if (!in_array($mode, ['live', 'test'], true)) {
+            throw new SourceRecordException(
+                'target_schema_unrepresentable',
+                'Legacy order mapping requires explicit historical payment-mode evidence.',
+            );
+        }
+        return $mode;
     }
 
     /**
@@ -603,12 +615,51 @@ final class OrderMapper
     {
         $wcStatus = $order->get_status();
 
-        if (in_array($wcStatus, ['processing', 'completed'], true)) {
-            return MoneyHelper::toCents($order->get_total(), $this->currency)
-                - MoneyHelper::toCents($order->get_total_refunded(), $this->currency);
+        if (in_array($wcStatus, ['processing', 'completed', 'refunded'], true)) {
+            return MoneyHelper::toCents($order->get_total(), $this->currency);
         }
 
         return 0;
+    }
+
+    /**
+     * Woo get_total_tax() includes shipping tax; FluentCart does not.
+     */
+    private function getCartTax(\WC_Order $order): int
+    {
+        $totalTax = MoneyHelper::toCents($order->get_total_tax(), $this->currency);
+        $shippingTax = MoneyHelper::toCents($order->get_shipping_tax(), $this->currency);
+
+        if ($shippingTax > $totalTax) {
+            throw new SourceRecordException(
+                'order_money_mismatch',
+                'WooCommerce shipping tax exceeds the order total-tax ledger.',
+            );
+        }
+
+        return $totalTax - $shippingTax;
+    }
+
+    /**
+     * FluentCart's fee_total is gross for both tax behaviours, even though an
+     * exclusive fee item stores only its net subtotal.
+     */
+    private function getFeeTotal(\WC_Order $order): int
+    {
+        $total = 0;
+        foreach ($order->get_items('fee') as $fee) {
+            $amount = MoneyHelper::toCents($fee->get_total(), $this->currency);
+            $tax = MoneyHelper::toCents($fee->get_total_tax(), $this->currency);
+            if ($amount < 0 || $tax < 0) {
+                throw new SourceRecordException(
+                    'target_schema_unrepresentable',
+                    'Negative or credit-like WooCommerce fees have no proved FluentCart parity.',
+                );
+            }
+            $total += $amount + $tax;
+        }
+
+        return $total;
     }
 
     /**

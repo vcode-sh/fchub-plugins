@@ -44,6 +44,7 @@ final class SubscriptionAuditCommandTest extends PluginTestCase
         $this->shapes = require dirname(__DIR__, 2) . '/fixtures/lapka-subscription-shapes.php';
 
         $GLOBALS['_cartshift_test_hpos_enabled'] = false;
+        $GLOBALS['_cartshift_test_wp_cli'] = [];
         $GLOBALS['_cartshift_test_get_results_callback'] = static fn (): array => [];
         $GLOBALS['_cartshift_test_get_var_callback'] = static fn (): string => '';
 
@@ -581,7 +582,7 @@ final class SubscriptionAuditCommandTest extends PluginTestCase
     // prepare-package / forget-package
     // ──────────────────────────────────────────────
 
-    public function testPreparePackageStoresTheDescriptorAndNothingElse(): void
+    public function testLegacyPreparePackageRefusesAndStoresNothing(): void
     {
         $path = $this->exportPackage();
 
@@ -589,14 +590,11 @@ final class SubscriptionAuditCommandTest extends PluginTestCase
 
         $descriptor = (new PackageContextRepository())->get(self::SOURCE_KEY);
 
-        $this->assertNotNull($descriptor);
-        $this->assertSame(
-            ['checksum', 'path', 'selection_fingerprint', 'source_key'],
-            array_keys($descriptor),
-            'The descriptor is four strings. It is not a copy of the package.',
+        $this->assertNull($descriptor);
+        $this->assertStringContainsString(
+            'legacy_subscription_v1_package_write_closed',
+            implode(' ', array_column($GLOBALS['_cartshift_test_wp_cli'], 'message')),
         );
-        $this->assertSame($path, $descriptor['path']);
-        $this->assertSame(64, strlen((string) $descriptor['checksum']));
     }
 
     public function testPreparePackageRefusesAPackageThatDoesNotValidate(): void
@@ -612,7 +610,12 @@ final class SubscriptionAuditCommandTest extends PluginTestCase
     public function testForgetPackageRequiresConfirmationAndThenRemovesOnlyTheDescriptor(): void
     {
         $path = $this->exportPackage();
-        SubscriptionCommand::preparePackage([], ['file' => $path]);
+        (new PackageContextRepository())->remember(
+            self::SOURCE_KEY,
+            $path,
+            hash_file('sha256', $path),
+            str_repeat('a', 64),
+        );
 
         SubscriptionCommand::forgetPackage([], ['source-key' => self::SOURCE_KEY]);
 
@@ -623,7 +626,7 @@ final class SubscriptionAuditCommandTest extends PluginTestCase
 
         SubscriptionCommand::forgetPackage([], ['source-key' => self::SOURCE_KEY, 'confirm' => true]);
 
-        $this->assertNull((new PackageContextRepository())->get(self::SOURCE_KEY));
+        $this->assertNotNull((new PackageContextRepository())->get(self::SOURCE_KEY));
         $this->assertFileExists($path, 'Forgetting a descriptor must not delete the package.');
     }
 
@@ -664,17 +667,22 @@ final class SubscriptionAuditCommandTest extends PluginTestCase
         $this->assertFileExists($path);
     }
 
-    public function testDeletePackageRemovesTheExactPreparedFile(): void
+    public function testLegacyDeletePackageCannotRemoveEvenAnExactPreparedFile(): void
     {
         $path = $this->exportPackage();
-        SubscriptionCommand::preparePackage([], ['file' => $path]);
+        (new PackageContextRepository())->remember(
+            self::SOURCE_KEY,
+            $path,
+            hash_file('sha256', $path),
+            str_repeat('a', 64),
+        );
 
         SubscriptionCommand::deletePackage([], ['file' => $path, 'confirm' => true]);
 
-        $this->assertFileDoesNotExist($path);
-        $this->assertNull(
+        $this->assertFileExists($path);
+        $this->assertNotNull(
             (new PackageContextRepository())->get(self::SOURCE_KEY),
-            'A descriptor pointing at a file that is gone is worse than no descriptor.',
+            'A closed legacy route must leave both the evidence and its descriptor alone.',
         );
     }
 

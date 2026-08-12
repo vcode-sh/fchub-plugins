@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use CartShift\Core\Container;
 use CartShift\Domain\Migration\MigrationRollback;
+use CartShift\Domain\Transfer\Legacy\LegacyCommandPolicy;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\MigrationLogRepository;
 use WP_REST_Request;
@@ -33,6 +34,11 @@ final class RollbackController
 
     public function rollback(WP_REST_Request $request): WP_REST_Response
     {
+        return new WP_REST_Response(
+            ['data' => (new LegacyCommandPolicy())->refusalPayload('rest:POST:cartshift/v1/rollback')],
+            410,
+        );
+
         $migrationId = $request->get_param('migration_id');
 
         if (empty($migrationId) || !is_string($migrationId)) {

@@ -18,6 +18,7 @@ use CartShift\Domain\Subscription\Source\PackageSubscriptionDatasetSource;
 use CartShift\Domain\Subscription\Source\WooSubscriptionDatasetSource;
 use CartShift\Domain\Subscription\SubscriptionCutover;
 use CartShift\Domain\Subscription\SubscriptionSelection;
+use CartShift\Domain\Transfer\Legacy\LegacyCommandPolicy;
 use CartShift\Support\Constants;
 use CartShift\Validator\PreflightCheck;
 
@@ -503,6 +504,9 @@ final class SubscriptionCommand
      */
     public static function preparePackage(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift subscriptions prepare-package');
+        return;
+
         $file = self::stringArg($assocArgs, 'file');
 
         if ($file === null) {
@@ -557,6 +561,9 @@ final class SubscriptionCommand
      */
     public static function forgetPackage(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift subscriptions forget-package');
+        return;
+
         $sourceKey = self::stringArg($assocArgs, 'source-key');
 
         if ($sourceKey === null) {
@@ -603,6 +610,9 @@ final class SubscriptionCommand
      */
     public static function deletePackage(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift subscriptions delete-package');
+        return;
+
         $file = self::stringArg($assocArgs, 'file');
 
         if ($file === null) {
@@ -749,6 +759,9 @@ final class SubscriptionCommand
      */
     public static function stage(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift subscriptions stage');
+        return;
+
         $receipt = self::stringArg($assocArgs, 'receipt');
 
         if ($receipt === null) {
@@ -913,6 +926,9 @@ final class SubscriptionCommand
      */
     public static function cutoverSource(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift subscriptions cutover-source');
+        return;
+
         $receipt = self::stringArg($assocArgs, 'receipt');
 
         if ($receipt === null) {
@@ -969,6 +985,9 @@ final class SubscriptionCommand
      */
     public static function activate(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift subscriptions activate');
+        return;
+
         $receipt = self::stringArg($assocArgs, 'receipt');
 
         if ($receipt === null) {
@@ -1025,6 +1044,9 @@ final class SubscriptionCommand
      */
     public static function reconcile(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift subscriptions reconcile');
+        return;
+
         $receipt = self::stringArg($assocArgs, 'receipt');
 
         if ($receipt === null) {
@@ -1074,6 +1096,9 @@ final class SubscriptionCommand
      */
     public static function restoreSource(array $args, array $assocArgs): void
     {
+        self::refuseLegacyWrite('cli:cartshift subscriptions restore-source');
+        return;
+
         $receipt = self::stringArg($assocArgs, 'receipt');
 
         if ($receipt === null) {
@@ -1582,5 +1607,11 @@ final class SubscriptionCommand
             is_array($value) => '[]',
             default          => (string) $value,
         };
+    }
+
+    private static function refuseLegacyWrite(string $entryPoint): void
+    {
+        $payload = (new LegacyCommandPolicy())->refusalPayload($entryPoint);
+        \WP_CLI::error(sprintf('[%s] %s', $payload['code'], $payload['message']));
     }
 }

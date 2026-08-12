@@ -85,4 +85,22 @@ final class PluginHeaderTest extends TestCase
             );
         }
     }
+
+    public function testPluginHeaderConstantAndTestRuntimeUseTheSameVersion(): void
+    {
+        $plugin = self::header();
+        $bootstrap = file_get_contents(dirname(__DIR__, 2) . '/stubs/test-bootstrap.php');
+
+        self::assertIsString($bootstrap, 'The PHPUnit bootstrap must be readable.');
+
+        preg_match('/^\s*\*\s*Version:\s*([^\s]+)\s*$/mi', $plugin, $headerMatch);
+        preg_match("/define\\('CARTSHIFT_VERSION',\\s*'([^']+)'\\)/", $plugin, $constantMatch);
+        preg_match("/define\\('CARTSHIFT_VERSION',\\s*'([^']+)'\\)/", $bootstrap, $testMatch);
+
+        self::assertArrayHasKey(1, $headerMatch, 'The plugin header version must be parseable.');
+        self::assertArrayHasKey(1, $constantMatch, 'CARTSHIFT_VERSION must be parseable.');
+        self::assertArrayHasKey(1, $testMatch, 'The test runtime version must be parseable.');
+        self::assertSame($headerMatch[1], $constantMatch[1]);
+        self::assertSame($headerMatch[1], $testMatch[1]);
+    }
 }

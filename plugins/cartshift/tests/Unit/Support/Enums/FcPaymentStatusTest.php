@@ -44,9 +44,10 @@ final class FcPaymentStatusTest extends PluginTestCase
         $this->assertSame(FcPaymentStatus::Refunded, FcPaymentStatus::fromWooCommerce('refunded'));
     }
 
-    public function testUnknownMapsToPending(): void
+    public function testUnknownStatusDoesNotSilentlyBecomePending(): void
     {
-        $this->assertSame(FcPaymentStatus::Pending, FcPaymentStatus::fromWooCommerce('something-weird'));
+        $this->expectException(\InvalidArgumentException::class);
+        FcPaymentStatus::fromWooCommerce('something-weird');
     }
 
     public function testFromWooCommerceAllStatuses(): void

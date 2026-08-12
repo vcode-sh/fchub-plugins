@@ -89,6 +89,14 @@ defined('ABSPATH') || exit;
  * therefore only find a row that is already spoken for, and adopting it puts XL
  * revenue on the L row — the exact failure this feature exists to prevent. The
  * ID map is an exact key and needs no such argument.
+ *
+ * This remains a legacy-v1 entry point. V2 product decisions are immutable
+ * ProductTransferDecision values and are staged by FluentCartProductWriter;
+ * no v2 extraction or mutation behaviour belongs in this promoter. It stays
+ * available only so the final route-convergence phase can explicitly delegate
+ * or refuse every old caller without deleting historical evidence code first.
+ *
+ * @deprecated Use the v2 transfer coordinator and product writer.
  */
 final class MappingPromoter
 {

@@ -136,7 +136,7 @@ final class SubscriptionWriter
 
             return $id;
         } catch (\Throwable $exception) {
-            DatabaseTransaction::rollback();
+            DatabaseTransaction::rollback($exception);
 
             throw $exception;
         }

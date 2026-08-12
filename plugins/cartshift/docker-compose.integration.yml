@@ -1,0 +1,68 @@
+services:
+  db:
+    image: ${CARTSHIFT_MARIADB_IMAGE:-mariadb@sha256:78a5047d3ba33975f183f183c2464cc7f1eab13ec8667e57cc9a5821d6da7577}
+    environment:
+      MARIADB_DATABASE: cartshift_contract
+      MARIADB_USER: cartshift_contract
+      MARIADB_PASSWORD: cartshift_contract
+      MARIADB_ROOT_PASSWORD: cartshift_contract_root
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    networks: [contract]
+    volumes:
+      - database:/var/lib/mysql
+
+  wordpress:
+    image: ${CARTSHIFT_WORDPRESS_IMAGE:-wordpress@sha256:ffef0dca1f0fc4357bfef3856ebd1ba18f7b394378277122eaa4524ca2619d43}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: cartshift_contract
+      WORDPRESS_DB_USER: cartshift_contract
+      WORDPRESS_DB_PASSWORD: cartshift_contract
+      WORDPRESS_DEBUG: "1"
+      WORDPRESS_CONFIG_EXTRA: |
+        define('DISABLE_WP_CRON', true);
+        define('WP_HTTP_BLOCK_EXTERNAL', true);
+        define('CARTSHIFT_CONTRACT_EVIDENCE_DIR', '/cartshift-evidence');
+    networks: [contract]
+    volumes:
+      - wordpress:/var/www/html
+      - ${CARTSHIFT_SOURCE_DIR:?CartShift source is required}:/cartshift-source:ro
+      - ${CARTSHIFT_ARTIFACT_DIR:?Artifact directory is required}:/cartshift-artifacts:ro
+      - ${CARTSHIFT_EVIDENCE_DIR:?Evidence directory is required}:/cartshift-evidence
+
+  wpcli:
+    image: ${CARTSHIFT_WPCLI_IMAGE:-wordpress@sha256:c9ecfd0ef73102cdc6666f20ccc3a0ae16c9a170160ef70bad4e9141ae856054}
+    depends_on:
+      db:
+        condition: service_healthy
+      wordpress:
+        condition: service_started
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command: ["while :; do sleep 3600; done"]
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: cartshift_contract
+      WORDPRESS_DB_USER: cartshift_contract
+      WORDPRESS_DB_PASSWORD: cartshift_contract
+    networks: [contract]
+    volumes:
+      - wordpress:/var/www/html
+      - ${CARTSHIFT_SOURCE_DIR:?CartShift source is required}:/cartshift-source:ro
+      - ${CARTSHIFT_ARTIFACT_DIR:?Artifact directory is required}:/cartshift-artifacts:ro
+      - ${CARTSHIFT_EVIDENCE_DIR:?Evidence directory is required}:/cartshift-evidence
+
+networks:
+  contract:
+    internal: true
+
+volumes:
+  database:
+  wordpress:

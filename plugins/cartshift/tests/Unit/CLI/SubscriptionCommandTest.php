@@ -183,7 +183,8 @@ final class SubscriptionCommandTest extends PluginTestCase
         ]);
 
         $this->assertSame([], $GLOBALS['_cartshift_test_queries']);
-        $this->assertStringContainsString('--confirm', $this->lastCliMessage()['message']);
+        $this->assertStringContainsString('legacy_subscription_v1_write_closed', $this->lastCliMessage()['message']);
+        $this->assertStringContainsString('wp cartshift transfer', $this->lastCliMessage()['message']);
     }
 
     /**
@@ -202,7 +203,7 @@ final class SubscriptionCommandTest extends PluginTestCase
             $GLOBALS['_cartshift_test_wp_cli'],
             static fn (array $entry): bool => str_contains(
                 $entry['message'],
-                \CartShift\Domain\Subscription\SourceRenewalGuard::REASON_MAINTENANCE_UNCONFIRMED,
+                'legacy_subscription_v1_write_closed',
             ),
         ));
     }
@@ -233,7 +234,7 @@ final class SubscriptionCommandTest extends PluginTestCase
             $GLOBALS['_cartshift_test_wp_cli'],
             static fn (array $entry): bool => str_contains(
                 $entry['message'],
-                \CartShift\Domain\Subscription\SourceRenewalGuard::REASON_MAINTENANCE_UNCONFIRMED,
+                'legacy_subscription_v1_write_closed',
             ),
         ));
     }
@@ -299,7 +300,8 @@ final class SubscriptionCommandTest extends PluginTestCase
         $message = $this->lastCliMessage();
 
         $this->assertSame('error', $message['level']);
-        $this->assertStringContainsString('not the package that was prepared', $message['message']);
+        $this->assertStringContainsString('legacy_subscription_v1_write_closed', $message['message']);
+        $this->assertStringContainsString('wp cartshift transfer stage', $message['message']);
         $this->assertFileDoesNotExist($workspace . '/receipt.ndjson', 'Nothing may be staged.');
 
         // Naming the same swapped file explicitly must not bypass the prepared
@@ -316,7 +318,7 @@ final class SubscriptionCommandTest extends PluginTestCase
         $message = $this->lastCliMessage();
 
         $this->assertSame('error', $message['level']);
-        $this->assertStringContainsString('not the package that was prepared', $message['message']);
+        $this->assertStringContainsString('legacy_subscription_v1_write_closed', $message['message']);
         $this->assertFileDoesNotExist($workspace . '/receipt.ndjson', 'Explicit --file changes no checksum.');
 
         foreach ((array) glob($workspace . '/*') as $file) {
@@ -353,9 +355,9 @@ final class SubscriptionCommandTest extends PluginTestCase
             'confirm'    => true,
         ]);
 
-        $receipt = \CartShift\Domain\Subscription\CutoverReceipt::read($receiptPath)['receipt'];
-        $this->assertNotNull($receipt);
-        $this->assertSame($selection->fingerprint(), $receipt->selection()->fingerprint());
+        $this->assertFileDoesNotExist($receiptPath);
+        $this->assertStringContainsString('legacy_subscription_v1_write_closed', $this->lastCliMessage()['message']);
+        $this->assertStringContainsString('wp cartshift transfer stage', $this->lastCliMessage()['message']);
 
         foreach ((array) glob($workspace . '/*') as $file) {
             @unlink((string) $file);

@@ -12,6 +12,16 @@ require_once __DIR__ . '/../../../stubs/MapperStubs.php';
 
 final class OrderMapperTest extends PluginTestCase
 {
+    public function testInvoiceLookupRemainsProvenanceOnlyAndIsNotCalledByEitherWriter(): void
+    {
+        $root = dirname(__DIR__, 4);
+
+        foreach (['app/Migrator/OrderMigrator.php', 'app/Domain/Subscription/SubscriptionOrderImporter.php'] as $path) {
+            $source = file_get_contents($root . '/' . $path);
+            self::assertIsString($source);
+            self::assertStringNotContainsString('findImportedOrderId(', $source, $path);
+        }
+    }
     private OrderMapper $mapper;
     private IdMapRepository $idMap;
 
@@ -355,27 +365,44 @@ final class OrderMapperTest extends PluginTestCase
         $this->assertMatchesRegularExpression('/^WC-\d+$/', $result['order']['invoice_no']);
     }
 
-    public function testModeIsLive(): void
+    public function testModeUsesExactHistoricalEvidence(): void
     {
-        // Migrated orders are real historical data — mode must always be 'live'.
         $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
 
         $result = $this->mapper->map($order);
 
         $this->assertSame('live', $result['order']['mode']);
-        $this->assertNotSame('test', $result['order']['mode']);
-        $this->assertNotSame('sandbox', $result['order']['mode']);
+        $test = $this->createOrder(['meta' => ['_cartshift_historical_payment_mode' => 'test']]);
+        $this->assertSame('test', $this->mapper->map($test)['order']['mode']);
     }
 
     public function testTransactionPaymentModeIsLive(): void
     {
-        // Transaction payment_mode must also be 'live' for migrated orders.
         $order = $this->createOrder(['status' => 'completed', 'total' => '50.00']);
 
         $result = $this->mapper->map($order);
 
         $this->assertNotNull($result['transaction']);
         $this->assertSame('live', $result['transaction']['payment_mode']);
+    }
+
+    public function testHistoricalPaymentColumnsAreInertAndSourceReferenceLivesOnlyInProvenance(): void
+    {
+        $order = $this->createOrder(['transaction_id' => 'ch_source_123', 'payment_method' => 'stripe']);
+        $mapped = $this->mapper->map($order);
+
+        self::assertSame('wc_migrated', $mapped['order']['payment_method']);
+        self::assertSame('wc_migrated', $mapped['transaction']['payment_method']);
+        self::assertSame('historical_provenance', $mapped['transaction']['payment_method_type']);
+        self::assertSame('', $mapped['transaction']['vendor_charge_id']);
+        self::assertSame('stripe', $mapped['transaction']['meta']['cartshift_source_payment']['gateway']);
+        self::assertSame('ch_source_123', $mapped['transaction']['meta']['cartshift_source_payment']['provider_reference']);
+    }
+
+    public function testUnknownHistoricalPaymentModeBlocksLegacyMapper(): void
+    {
+        $this->expectException(\CartShift\Domain\Transfer\SourceRecordException::class);
+        $this->mapper->map($this->createOrder(['meta' => ['_cartshift_historical_payment_mode' => '']]));
     }
 
     public function testConfigContainsMigratedFlag(): void
@@ -400,36 +427,46 @@ final class OrderMapperTest extends PluginTestCase
         $this->assertSame(999, $result['order']['config']['wc_order_id']);
     }
 
-    public function testMoneyFieldsAreInCentsNotDecimals(): void
+    public function testMoneyFieldsSeparateShippingAndFeeTaxWithoutDoubleCounting(): void
     {
-        // All money fields must be integers (cents), not floats or string decimals.
+        $fee = new \WC_Order_Item_Fee();
+        $feeReflection = new \ReflectionClass($fee);
+        $feeReflection->getProperty('name')->setValue($fee, 'Handling');
+        $feeReflection->getProperty('total')->setValue($fee, '5.00');
+        $feeReflection->getProperty('total_tax')->setValue($fee, '1.15');
+
         $order = $this->createOrder([
             'status' => 'completed',
-            'total' => '123.45',
+            'total' => '141.45',
             'subtotal' => '100.00',
-            'shipping_total' => '10.00',
-            'total_tax' => '13.45',
-            'discount_total' => '5.00',
+            'shipping_total' => '20.00',
+            'shipping_tax' => '4.60',
+            // Woo get_total_tax() includes both cart and shipping tax.
+            'total_tax' => '26.45',
+            'discount_total' => '10.00',
+            'discount_tax' => '2.30',
+            'fee_items' => [$fee],
         ]);
 
         $result = $this->mapper->map($order);
 
-        $this->assertSame(12345, $result['order']['total_amount']);
+        $this->assertSame(14145, $result['order']['total_amount']);
         $this->assertSame(10000, $result['order']['subtotal']);
-        $this->assertSame(1000, $result['order']['shipping_total']);
-        $this->assertSame(1345, $result['order']['tax_total']);
-        $this->assertSame(500, $result['order']['coupon_discount_total']);
+        $this->assertSame(2000, $result['order']['shipping_total']);
+        $this->assertSame(460, $result['order']['shipping_tax']);
+        $this->assertSame(2185, $result['order']['tax_total']);
+        $this->assertSame(615, $result['order']['fee_total']);
+        $this->assertSame(230, $result['order']['discount_tax']);
+        $this->assertSame(1000, $result['order']['coupon_discount_total']);
 
-        // Verify they are integers, not floats.
         $this->assertIsInt($result['order']['total_amount']);
         $this->assertIsInt($result['order']['subtotal']);
         $this->assertIsInt($result['order']['shipping_total']);
         $this->assertIsInt($result['order']['tax_total']);
     }
 
-    public function testTotalPaidIsNetOfRefundsForCompletedOrders(): void
+    public function testCompletedOrderKeepsGrossSucceededChargeAndRefundSeparate(): void
     {
-        // total_paid = total - refunded for completed orders.
         $order = $this->createOrder([
             'status' => 'completed',
             'total' => '100.00',
@@ -438,7 +475,23 @@ final class OrderMapperTest extends PluginTestCase
 
         $result = $this->mapper->map($order);
 
-        $this->assertSame(7500, $result['order']['total_paid']); // 10000 - 2500
+        $this->assertSame(10000, $result['order']['total_paid']);
+        $this->assertSame(2500, $result['order']['total_refund']);
+    }
+
+    public function testFullyRefundedOrderStillKeepsItsOriginalChargeSucceededAndGross(): void
+    {
+        $order = $this->createOrder([
+            'status' => 'refunded',
+            'total' => '100.00',
+            'total_refunded' => '100.00',
+        ]);
+
+        $result = $this->mapper->map($order);
+
+        $this->assertSame(10000, $result['order']['total_paid']);
+        $this->assertSame(10000, $result['order']['total_refund']);
+        $this->assertSame('succeeded', $result['transaction']['status']);
     }
 
     public function testTotalPaidIsZeroForPendingOrders(): void
@@ -661,11 +714,15 @@ final class OrderMapperTest extends PluginTestCase
      */
     public function testTheBillingNipTravelsToTheBillingAddressMeta(): void
     {
-        $order = $this->createOrder(['meta' => ['_billing_nip' => '5291831115']]);
+        $order = $this->createOrder([
+            'billing_country' => 'PL',
+            'meta' => ['_billing_nip' => '5291831115'],
+        ]);
 
         $billing = $this->billingAddress($this->mapper->map($order));
 
         $this->assertSame('5291831115', $billing['meta']['other_data']['nip']);
+        $this->assertSame('5291831115', $billing['meta']['other_data']['vat_number']);
     }
 
     public function testAnOrderWithNoNipGetsNoNipKeyAtAll(): void
@@ -691,6 +748,7 @@ final class OrderMapperTest extends PluginTestCase
         $order = $this->createOrder([
             'billing_phone'   => '+48 500 100 200',
             'billing_company' => 'Analytical Engines sp. z o.o.',
+            'billing_country' => 'PL',
             'meta'            => ['_billing_nip' => '5291831115'],
         ]);
 
@@ -707,6 +765,7 @@ final class OrderMapperTest extends PluginTestCase
             'shipping_first_name' => 'John',
             'shipping_address_1'  => '123 Main St',
             'shipping_country'    => 'PL',
+            'billing_country'     => 'PL',
             'meta'                => ['_billing_nip' => '5291831115'],
         ]);
 
@@ -719,6 +778,26 @@ final class OrderMapperTest extends PluginTestCase
 
         $this->assertNotNull($shipping);
         $this->assertArrayNotHasKey('nip', $shipping['meta']['other_data'] ?? []);
+    }
+
+    public function testShippingAddressWithNoFirstNameStillCarriesCityAndCanonicalPhone(): void
+    {
+        $order = $this->createOrder([
+            'shipping_first_name' => '',
+            'shipping_city' => 'Warsaw',
+            'shipping_phone' => '+48 600 000 000',
+        ]);
+
+        $shipping = null;
+        foreach ($this->mapper->map($order)['addresses'] as $address) {
+            if ($address['type'] === 'shipping') {
+                $shipping = $address;
+            }
+        }
+
+        self::assertNotNull($shipping);
+        self::assertSame('Warsaw', $shipping['city']);
+        self::assertSame('+48 600 000 000', $shipping['meta']['other_data']['phone']);
     }
 
     // ──────────────────────────────────────────────
@@ -1018,10 +1097,11 @@ final class OrderMapperTest extends PluginTestCase
             'prices_include_tax' => false,
             'currency' => 'USD',
             'items' => [],
-            'meta' => [],
+            'meta' => ['_cartshift_historical_payment_mode' => 'live'],
         ];
 
         $data = array_merge($defaults, $overrides);
+        $data['meta'] = array_merge($defaults['meta'], (array) ($overrides['meta'] ?? []));
 
         $ref = new \ReflectionClass($order);
         foreach ($data as $key => $value) {

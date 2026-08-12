@@ -29,6 +29,7 @@ final class MigrateCommandTest extends PluginTestCase
         parent::setUp();
 
         $GLOBALS['_cartshift_test_as_pending'] = [];
+        $GLOBALS['_cartshift_test_wp_cli'] = [];
         $this->state = new MigrationState();
 
         // Lock is free unless a test says otherwise.
@@ -57,11 +58,12 @@ final class MigrateCommandTest extends PluginTestCase
 
     // ── migrate: scope ─────────────────────────────────────
 
-    public function testMigrateStoresTheScopeItWasGiven(): void
+    public function testMigrateRefusesBeforeParsingOrStoringScope(): void
     {
         MigrateCommand::migrate([], ['entities' => 'order', 'since' => '2024-03-01']);
 
-        $this->assertSame('since', $this->freshState()->getScope()->mode());
+        $this->assertSame('idle', $this->freshState()->getProgress()['status']);
+        $this->assertLegacyRefusal('legacy_generic_migration_closed', 'wp cartshift transfer prepare');
     }
 
     public function testMigrateWithNoScopeFlagsMigratesEverything(): void
@@ -69,6 +71,7 @@ final class MigrateCommandTest extends PluginTestCase
         MigrateCommand::migrate([], ['entities' => 'order']);
 
         $this->assertTrue($this->freshState()->getScope()->isEverything());
+        $this->assertLegacyRefusal('legacy_generic_migration_closed', 'wp cartshift transfer prepare');
     }
 
     /**
@@ -90,6 +93,7 @@ final class MigrateCommandTest extends PluginTestCase
         ]);
 
         $this->assertSame('idle', $this->freshState()->getProgress()['status']);
+        $this->assertLegacyRefusal('legacy_generic_migration_closed', 'wp cartshift transfer prepare');
     }
 
     /**
@@ -105,6 +109,7 @@ final class MigrateCommandTest extends PluginTestCase
         ]);
 
         $this->assertSame('idle', $this->freshState()->getProgress()['status']);
+        $this->assertLegacyRefusal('legacy_generic_migration_closed', 'wp cartshift transfer prepare');
     }
 
     /**
@@ -135,6 +140,7 @@ final class MigrateCommandTest extends PluginTestCase
         ]);
 
         $this->assertSame('idle', $this->freshState()->getProgress()['status']);
+        $this->assertLegacyRefusal('legacy_generic_migration_closed', 'wp cartshift transfer prepare');
     }
 
     public function testResetIsANoopWhenThereIsNoMigrationState(): void
@@ -151,12 +157,10 @@ final class MigrateCommandTest extends PluginTestCase
 
         MigrateCommand::reset([], []);
 
-        $this->assertNull($this->freshState()->getCurrent(), 'Reset must clear the stored state');
-        $this->assertFalse($this->freshState()->isRunning());
-
-        $unscheduled = $GLOBALS['_cartshift_test_as_unscheduled'];
-        $this->assertCount(1, $unscheduled, 'Pending background batches must be cancelled');
-        $this->assertSame([$migrationId], $unscheduled[0]['args']);
+        $this->assertSame($migrationId, $this->freshState()->getMigrationId());
+        $this->assertTrue($this->freshState()->isRunning());
+        $this->assertSame([], $GLOBALS['_cartshift_test_as_unscheduled']);
+        $this->assertLegacyRefusal('legacy_generic_migration_closed', 'wp cartshift transfer status');
     }
 
     /**
@@ -175,18 +179,9 @@ final class MigrateCommandTest extends PluginTestCase
             static fn (array $entry): bool => ($entry[0] ?? '') === 'delete',
         ));
 
-        $this->assertCount(1, $deletes, 'Reset must issue exactly one delete against the id map.');
-        $this->assertSame('wp_cartshift_id_map', $deletes[0][1]);
-        // `source_key` joined the where clause with schema v7: a reset clears
-        // this source's rehearsal, not every source's. The realm predicate is
-        // unchanged, and it is still the point of the assertion.
-        $this->assertSame(
-            ['is_simulated' => 1, 'source_key' => 'local'],
-            $deletes[0][2],
-            'Real mappings survive a reset — deleting those is rollback\'s job.',
-        );
-
+        $this->assertSame([], $deletes, 'A closed route must not touch even simulated legacy mappings.');
         $this->assertSame([], $GLOBALS['_cartshift_test_deleted_posts']);
+        $this->assertLegacyRefusal('legacy_generic_migration_closed', 'wp cartshift transfer status');
     }
 
     /**
@@ -197,6 +192,18 @@ final class MigrateCommandTest extends PluginTestCase
     private function freshState(): MigrationState
     {
         return new MigrationState();
+    }
+
+    private function assertLegacyRefusal(string $code, string $nextCommand): void
+    {
+        $errors = array_values(array_filter(
+            $GLOBALS['_cartshift_test_wp_cli'],
+            static fn (array $message): bool => $message['level'] === 'error',
+        ));
+        $this->assertNotEmpty($errors);
+        $message = (string) end($errors)['message'];
+        $this->assertStringContainsString('[' . $code . ']', $message);
+        $this->assertStringContainsString($nextCommand, $message);
     }
 
     // ── retry: argument parsing ────────────────────────────
@@ -375,6 +382,7 @@ final class MigrateCommandTest extends PluginTestCase
 
         MigrateCommand::reset([], []);
 
-        $this->assertNull($this->freshState()->getCurrent());
+        $this->assertSame('completed', $this->freshState()->getProgress()['status']);
+        $this->assertLegacyRefusal('legacy_generic_migration_closed', 'wp cartshift transfer status');
     }
 }

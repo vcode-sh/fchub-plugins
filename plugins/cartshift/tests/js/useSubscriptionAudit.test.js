@@ -139,7 +139,7 @@ describe('useSubscriptionAudit', () => {
    * audit, so it is the one call in this composable that is not a GET and the
    * only one that reloads the audit afterwards.
    */
-  it('prepares a package with a POST and says so', async () => {
+  it('refuses legacy package preparation without a POST', async () => {
     apiMock.mockImplementation((method, endpoint) => {
       if (endpoint === 'subscriptions/packages/prepare') {
         return { prepared: true, write: { kind: 'cartshift_configuration' } };
@@ -152,22 +152,20 @@ describe('useSubscriptionAudit', () => {
     const { state, preparePackage } = useSubscriptionAudit();
     const ok = await preparePackage('/srv/private/lapka.ndjson');
 
-    expect(ok).toBe(true);
-    expect(apiMock.mock.calls[0]).toEqual([
-      'POST',
-      'subscriptions/packages/prepare',
-      { file: '/srv/private/lapka.ndjson' },
-    ]);
-    expect(state.configurationWrite).toContain('configuration');
+    expect(ok).toBe(false);
+    expect(apiMock).not.toHaveBeenCalled();
+    expect(state.error).toContain('legacy_subscription_v1_package_write_closed');
+    expect(state.error).toContain('wp cartshift transfer validate-package');
   });
 
-  it('surfaces a refused prepare rather than silently doing nothing', async () => {
+  it('refuses before a backend-specific package error can be observed', async () => {
     apiMock.mockRejectedValue(new Error('That file is not a valid package'));
 
     const { state, preparePackage } = useSubscriptionAudit();
     const ok = await preparePackage('/srv/private/broken.ndjson');
 
     expect(ok).toBe(false);
-    expect(state.error).toContain('not a valid package');
+    expect(apiMock).not.toHaveBeenCalled();
+    expect(state.error).toContain('legacy_subscription_v1_package_write_closed');
   });
 });

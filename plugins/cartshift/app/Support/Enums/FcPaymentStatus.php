@@ -24,7 +24,7 @@ enum FcPaymentStatus: string
             'processing', 'completed' => self::Paid,
             'cancelled', 'failed' => self::Failed,
             'refunded' => self::Refunded,
-            default => self::Pending,
+            default => throw new \InvalidArgumentException('unsupported_order_status'),
         };
     }
 }

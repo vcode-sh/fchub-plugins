@@ -45,6 +45,10 @@ final class OrderIdentity
      * previous CartShift run, which is the point: adopting somebody else's row
      * is what stops a second import creating a twin.
      */
+    /**
+     * @deprecated Invoice numbers are reconciliation signals, never identity.
+     * @internal Final legacy-route removal deletes this compatibility probe.
+     */
     public static function findImportedOrderId(int $sourceOrderId): ?int
     {
         global $wpdb;

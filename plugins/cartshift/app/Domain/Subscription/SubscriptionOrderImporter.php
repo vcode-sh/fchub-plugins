@@ -45,6 +45,7 @@ final class SubscriptionOrderImporter
 {
     public function __construct(
         private readonly IdMapRepository $idMap,
+        private readonly ?SubscriptionOrderStage $canonicalStage = null,
     ) {
     }
 
@@ -101,22 +102,26 @@ final class SubscriptionOrderImporter
             $parentFcId = $this->parentFcIdFor($record, $relationship, $orders);
             $type       = SubscriptionHistoryIndex::fluentCartOrderTypeForRelationship($relationship);
 
+            if ($this->canonicalStage !== null) {
+                $result = $this->canonicalStage->stage(
+                    $order,
+                    $relationship,
+                    $this->resolveCustomerId($order),
+                    $this->canonicalParentFcIdFor($record, $relationship, $orders),
+                    $migrationId,
+                );
+                $orders[$sourceId] = $result->targetId;
+                if ($result->reused) {
+                    $adopted[] = $sourceId;
+                } else {
+                    $created[] = $sourceId;
+                }
+                continue;
+            }
+
             $existing = $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $sourceId);
 
-            if ($existing === null) {
-                $existing = OrderIdentity::findImportedOrderId($sourceId);
-
-                if ($existing !== null) {
-                    $this->idMap->store(
-                        Constants::ENTITY_ORDER,
-                        (string) $sourceId,
-                        $existing,
-                        $migrationId,
-                        false,
-                    );
-                    $adopted[] = $sourceId;
-                }
-            } else {
+            if ($existing !== null) {
                 $adopted[] = $sourceId;
             }
 
@@ -470,6 +475,26 @@ final class SubscriptionOrderImporter
     ): ?int
     {
         if ($relationship !== SubscriptionOrderReference::RENEWAL || $record->parentOrderId <= 0) {
+            return null;
+        }
+
+        return $imported[$record->parentOrderId]
+            ?? $this->idMap->getFcId(Constants::ENTITY_ORDER, (string) $record->parentOrderId);
+    }
+
+    /**
+     * Canonical order records preserve every typed WCS relationship. Unlike the
+     * v1 repair path, switch and resubscribe rows therefore require the same
+     * checked parent dependency as renewals.
+     *
+     * @param array<int, int> $imported
+     */
+    private function canonicalParentFcIdFor(
+        SubscriptionRecord $record,
+        string $relationship,
+        array $imported,
+    ): ?int {
+        if ($relationship === SubscriptionOrderReference::PARENT || $record->parentOrderId <= 0) {
             return null;
         }
 

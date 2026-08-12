@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace CartShift\Storage;
 
+use CartShift\Domain\Transfer\Identity\IdentityConflict;
+use CartShift\Domain\Transfer\Identity\CheckedMappingStore;
+use CartShift\Domain\Transfer\Identity\MapState;
+use CartShift\Domain\Transfer\Identity\MappingRecord;
+use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Support\Constants;
+use CartShift\Support\DatabaseTransaction;
 
 defined('ABSPATH') || exit;
 
-final class IdMapRepository
+final class IdMapRepository implements CheckedMappingStore
 {
     private readonly string $table;
 
@@ -23,6 +29,9 @@ final class IdMapRepository
      * @var array<string, array<string, int|null>>
      */
     private array $memo = [];
+
+    /** @var array<string, MappingRecord|null> */
+    private array $recordMemo = [];
 
     /** True while this repository is serving a dry run. */
     private bool $simulating = false;
@@ -89,6 +98,10 @@ final class IdMapRepository
      * Nothing outside CartShift's own table is written either way, and every read
      * a real migration makes excludes the simulated realm — see getFcId().
      */
+    /**
+     * @deprecated V2 transfer code must use storeOrThrow().
+     * @internal Legacy migration compatibility only.
+     */
     public function store(
         string $entityType,
         string $wcId,
@@ -96,15 +109,9 @@ final class IdMapRepository
         string $migrationId = '',
         bool $createdByMigration = true,
     ): void {
-        // isset() is false for a memoised miss, so a miss is replaced while an
-        // earlier hit is kept — matching the "first match wins" read semantics.
-        if (!isset($this->memo[$entityType][$wcId])) {
-            $this->memo[$entityType][$wcId] = $fcId;
-        }
-
         global $wpdb;
 
-        $wpdb->insert(
+        $inserted = $wpdb->insert(
             $this->table,
             [
                 'source_key'           => $this->sourceKey,
@@ -129,12 +136,246 @@ final class IdMapRepository
         // constructor arguments, this path runs only when MySQL has already
         // refused a write, and threading a second repository through the six
         // call sites that say `new IdMapRepository()` would buy nothing.
-        (new MigrationLogRepository())->recordWriteFailure(
-            $migrationId,
-            $entityType,
-            $wcId,
-            'the ID map entry (rollback will not be able to remove this record)',
+        if ($inserted === false) {
+            (new MigrationLogRepository())->recordWriteFailure(
+                $migrationId,
+                $entityType,
+                $wcId,
+                'the ID map entry (rollback will not be able to remove this record)',
+            );
+
+            return;
+        }
+
+        // isset() is false for a memoised miss, so a verified write replaces it
+        // while an earlier hit keeps legacy "first match wins" semantics.
+        if (!isset($this->memo[$entityType][$wcId])) {
+            $this->memo[$entityType][$wcId] = $fcId;
+        }
+    }
+
+    public function storeOrThrow(
+        SourceIdentity $identity,
+        int $targetId,
+        string $migrationId,
+        string $sourceFingerprint,
+        string $targetFingerprint,
+        MapState $state,
+        bool $createdByMigration,
+        int $generation = 1,
+    ): MappingRecord {
+        $this->assertMigrationId($migrationId);
+        $candidate = new MappingRecord(
+            $identity,
+            $targetId,
+            $sourceFingerprint,
+            $targetFingerprint,
+            $state,
         );
+
+        global $wpdb;
+
+        $inserted = $wpdb->insert(
+            $this->table,
+            [
+                'source_key' => $identity->sourceKey,
+                'entity_type' => $identity->entityType,
+                'wc_id' => $identity->sourceId,
+                'fc_id' => $targetId,
+                'migration_id' => $migrationId,
+                'created_by_migration' => $createdByMigration ? 1 : 0,
+                'is_simulated' => 0,
+                'source_fingerprint' => $sourceFingerprint,
+                'target_fingerprint' => $targetFingerprint,
+                'record_state' => $state->value,
+                'created_at' => gmdate('Y-m-d H:i:s'),
+                'updated_at' => gmdate('Y-m-d H:i:s'),
+            ],
+            ['%s', '%s', '%s', '%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s'],
+        );
+
+        $stored = $this->readStoredMapping($identity, false);
+
+        if ($inserted === false) {
+            if ($stored !== null && $this->storedMappingIsCompatible(
+                $stored,
+                $candidate,
+                $migrationId,
+                $createdByMigration,
+            )) {
+                return $this->remember($stored['record']);
+            }
+
+            if ($stored !== null && $stored['record']->state === MapState::RolledBack) {
+                return $this->reclaimRolledBack(
+                    $stored,
+                    $candidate,
+                    $migrationId,
+                    $createdByMigration,
+                    $generation,
+                );
+            }
+
+            if ($stored !== null) {
+                throw IdentityConflict::forIdentity($identity);
+            }
+
+            throw new \RuntimeException('Checked identity-map insert failed.');
+        }
+
+        if ($stored === null || !$this->storedMappingIsCompatible(
+            $stored,
+            $candidate,
+            $migrationId,
+            $createdByMigration,
+        )) {
+            throw IdentityConflict::forIdentity($identity);
+        }
+
+        return $this->remember($stored['record']);
+    }
+
+    /** @param array{record: MappingRecord, migration_id: string, created_by_migration: bool} $stored */
+    private function reclaimRolledBack(
+        array $stored,
+        MappingRecord $candidate,
+        string $migrationId,
+        bool $createdByMigration,
+        int $generation,
+    ): MappingRecord {
+        if ($generation < 2) {
+            throw new \RuntimeException('identity_map_reclaim_requires_new_generation');
+        }
+        if (DatabaseTransaction::depth() < 1) {
+            throw new \RuntimeException('identity_map_reclaim_requires_transaction');
+        }
+        if (hash_equals($stored['migration_id'], $migrationId) || !$candidate->isActive()) {
+            throw IdentityConflict::forIdentity($candidate->identity);
+        }
+        global $wpdb;
+        $now = gmdate('Y-m-d H:i:s');
+        $claimed = $wpdb->update($this->table, [
+            'fc_id' => $candidate->targetId,
+            'migration_id' => $migrationId,
+            'created_by_migration' => $createdByMigration ? 1 : 0,
+            'source_fingerprint' => $candidate->sourceFingerprint,
+            'target_fingerprint' => $candidate->targetFingerprint,
+            'record_state' => MapState::Claimed->value,
+            'updated_at' => $now,
+        ], [
+            'source_key' => $candidate->identity->sourceKey,
+            'entity_type' => $candidate->identity->entityType,
+            'wc_id' => $candidate->identity->sourceId,
+            'fc_id' => $stored['record']->targetId,
+            'migration_id' => $stored['migration_id'],
+            'is_simulated' => 0,
+            'record_state' => MapState::RolledBack->value,
+            'target_fingerprint' => $stored['record']->targetFingerprint,
+        ]);
+        if ($claimed === false) {
+            throw new \RuntimeException('Checked identity-map reclaim failed.');
+        }
+        if ($claimed !== 1) {
+            throw IdentityConflict::forIdentity($candidate->identity);
+        }
+        if ($candidate->state !== MapState::Claimed) {
+            $advanced = $wpdb->update($this->table, [
+                'record_state' => $candidate->state->value,
+                'updated_at' => $now,
+            ], [
+                'source_key' => $candidate->identity->sourceKey,
+                'entity_type' => $candidate->identity->entityType,
+                'wc_id' => $candidate->identity->sourceId,
+                'fc_id' => $candidate->targetId,
+                'migration_id' => $migrationId,
+                'is_simulated' => 0,
+                'record_state' => MapState::Claimed->value,
+                'source_fingerprint' => $candidate->sourceFingerprint,
+                'target_fingerprint' => $candidate->targetFingerprint,
+            ]);
+            if ($advanced === false) {
+                throw new \RuntimeException('Checked identity-map reclaim transition failed.');
+            }
+            if ($advanced !== 1) {
+                throw IdentityConflict::forIdentity($candidate->identity);
+            }
+        }
+        $reclaimed = $this->readStoredMapping($candidate->identity, false);
+        if ($reclaimed === null || !$this->storedMappingIsCompatible($reclaimed, $candidate, $migrationId, $createdByMigration)) {
+            throw IdentityConflict::forIdentity($candidate->identity);
+        }
+        return $this->remember($reclaimed['record']);
+    }
+
+    public function transitionOrThrow(
+        SourceIdentity $identity,
+        MapState $expected,
+        MapState $next,
+        string $expectedTargetFingerprint,
+        string $nextTargetFingerprint,
+    ): MappingRecord {
+        if ($expected === $next) {
+            throw new \InvalidArgumentException('A mapping transition must change state.');
+        }
+
+        $this->assertFingerprint($expectedTargetFingerprint);
+        $this->assertFingerprint($nextTargetFingerprint);
+
+        global $wpdb;
+
+        $updated = $wpdb->update(
+            $this->table,
+            [
+                'record_state' => $next->value,
+                'target_fingerprint' => $nextTargetFingerprint,
+                'updated_at' => gmdate('Y-m-d H:i:s'),
+            ],
+            [
+                'source_key' => $identity->sourceKey,
+                'entity_type' => $identity->entityType,
+                'wc_id' => $identity->sourceId,
+                'is_simulated' => 0,
+                'record_state' => $expected->value,
+                'target_fingerprint' => $expectedTargetFingerprint,
+            ],
+            ['%s', '%s', '%s'],
+            ['%s', '%s', '%s', '%d', '%s', '%s'],
+        );
+
+        if ($updated === false) {
+            throw new \RuntimeException('Checked identity-map transition failed.');
+        }
+
+        if ($updated !== 1) {
+            throw IdentityConflict::forIdentity($identity);
+        }
+
+        $stored = $this->readStoredMapping($identity, false);
+
+        if (
+            $stored === null
+            || $stored['record']->state !== $next
+            || $stored['record']->targetFingerprint !== $nextTargetFingerprint
+        ) {
+            throw IdentityConflict::forIdentity($identity);
+        }
+
+        return $this->remember($stored['record']);
+    }
+
+    public function get(SourceIdentity $identity): ?MappingRecord
+    {
+        $key = $identity->canonical();
+
+        if (array_key_exists($key, $this->recordMemo)) {
+            return $this->recordMemo[$key];
+        }
+
+        $stored = $this->readStoredMapping($identity, true);
+        $record = $stored['record'] ?? null;
+        $this->recordMemo[$key] = $record;
+
+        return $record;
     }
 
     /**
@@ -231,6 +472,102 @@ final class IdMapRepository
     public function flushMemo(): void
     {
         $this->memo = [];
+        $this->recordMemo = [];
+    }
+
+    /**
+     * @return array{record: MappingRecord, migration_id: string, created_by_migration: bool}|null
+     */
+    private function readStoredMapping(SourceIdentity $identity, bool $activeOnly): ?array
+    {
+        global $wpdb;
+
+        $active = $activeOnly ? " AND record_state <> 'rolled_back'" : '';
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT source_key, entity_type, wc_id, fc_id, migration_id,
+                    created_by_migration, source_fingerprint, target_fingerprint, record_state
+             FROM {$this->table}
+             WHERE source_key = %s AND entity_type = %s AND wc_id = %s
+               AND is_simulated = 0{$active}
+             ORDER BY id ASC
+             LIMIT 1",
+            $identity->sourceKey,
+            $identity->entityType,
+            $identity->sourceId,
+        ));
+
+        if (trim((string) ($wpdb->last_error ?? '')) !== '') {
+            throw new \RuntimeException('Checked identity-map read failed.');
+        }
+
+        if (!isset($rows[0])) {
+            return null;
+        }
+
+        $row = (array) $rows[0];
+        $state = MapState::tryFrom((string) ($row['record_state'] ?? ''));
+
+        if ($state === null) {
+            throw new \RuntimeException('Identity-map row has an unknown record state.');
+        }
+
+        try {
+            $record = new MappingRecord(
+                $identity,
+                (int) ($row['fc_id'] ?? 0),
+                isset($row['source_fingerprint']) ? (string) $row['source_fingerprint'] : null,
+                isset($row['target_fingerprint']) ? (string) $row['target_fingerprint'] : null,
+                $state,
+            );
+        } catch (\InvalidArgumentException $exception) {
+            throw new \RuntimeException('Identity-map row violates the v8 mapping contract.', 0, $exception);
+        }
+
+        return [
+            'record' => $record,
+            'migration_id' => (string) ($row['migration_id'] ?? ''),
+            'created_by_migration' => (int) ($row['created_by_migration'] ?? 0) === 1,
+        ];
+    }
+
+    /**
+     * @param array{record: MappingRecord, migration_id: string, created_by_migration: bool} $stored
+     */
+    private function storedMappingIsCompatible(
+        array $stored,
+        MappingRecord $candidate,
+        string $migrationId,
+        bool $createdByMigration,
+    ): bool {
+        return $stored['record']->isCompatibleWith($candidate)
+            && hash_equals($stored['migration_id'], $migrationId)
+            && $stored['created_by_migration'] === $createdByMigration;
+    }
+
+    private function remember(MappingRecord $record): MappingRecord
+    {
+        $key = $record->identity->canonical();
+        $this->recordMemo[$key] = $record;
+
+        DatabaseTransaction::afterRollback(function () use ($key): void {
+            unset($this->recordMemo[$key]);
+        });
+
+        return $record;
+    }
+
+    private function assertMigrationId(string $migrationId): void
+    {
+        if ($migrationId === '' || strlen($migrationId) > 36) {
+            throw new \InvalidArgumentException('Migration ID must be between 1 and 36 bytes.');
+        }
+    }
+
+    private function assertFingerprint(string $fingerprint): void
+    {
+        if (preg_match('/\A[a-f0-9]{64}\z/D', $fingerprint) !== 1) {
+            throw new \InvalidArgumentException('Target fingerprint must be a lowercase SHA-256 value.');
+        }
     }
 
     /**

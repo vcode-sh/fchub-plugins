@@ -106,6 +106,12 @@ namespace {
          */
         public static function add_command(string $name, callable|string $callable, array $args = []): bool
         {
+            if (isset($GLOBALS['_cartshift_test_wp_cli_commands']) && is_array($GLOBALS['_cartshift_test_wp_cli_commands'])) {
+                $GLOBALS['_cartshift_test_wp_cli_commands'][$name] = [
+                    'callable' => $callable,
+                    'args' => $args,
+                ];
+            }
             return true;
         }
 

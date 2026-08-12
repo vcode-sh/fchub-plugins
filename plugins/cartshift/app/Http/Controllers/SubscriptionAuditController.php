@@ -35,6 +35,7 @@ use CartShift\Domain\Subscription\SubscriptionSelection;
 use CartShift\Storage\IdMapRepository;
 use CartShift\Storage\ProductMapRepository;
 use CartShift\Support\Constants;
+use CartShift\Support\CanonicalJson;
 use CartShift\Support\Enums\MigrationErrorCode;
 use CartShift\Validator\PreflightCheck;
 use WP_REST_Request;
@@ -396,8 +397,16 @@ final class SubscriptionAuditController
 
         $rows     = [];
         $products = [];
+        $sourceFingerprints = [];
 
         foreach ($dataset->records($selection) as $record) {
+            if (property_exists($record, 'sourceRef') && property_exists($record, 'fingerprint')) {
+                $sourceFingerprints[] = [
+                    'identity' => $record->sourceKey . ':' . $record->kind() . ':' . $record->sourceRef,
+                    'fingerprint' => $record->fingerprint,
+                ];
+            }
+
             if ($record instanceof ProductRecord) {
                 $products[$record->sourceProductId] = $record;
 
@@ -420,6 +429,7 @@ final class SubscriptionAuditController
         }
 
         usort($rows, static fn (array $a, array $b): int => $a['source_ref'] <=> $b['source_ref']);
+        usort($sourceFingerprints, static fn (array $a, array $b): int => strcmp($a['identity'], $b['identity']));
 
         return [
             'closure'     => $closure,
@@ -427,6 +437,7 @@ final class SubscriptionAuditController
             'manifest'    => $manifest,
             'products'    => $products,
             'rows'        => $rows,
+            'source_fingerprint' => CanonicalJson::fingerprint($sourceFingerprints),
             'target'      => $target,
         ];
     }
@@ -706,6 +717,7 @@ final class SubscriptionAuditController
                 'selection_fingerprint' => $manifest->selectionFingerprint !== ''
                     ? $manifest->selectionFingerprint
                     : $context['selection']->fingerprint(),
+                'source_fingerprint'    => $analysis['source_fingerprint'],
                 'storage_authority'     => $manifest->storageAuthority,
             ],
             'manifest'     => [
@@ -771,28 +783,11 @@ final class SubscriptionAuditController
             'dry_run_note' => 'The dry run on the migration screens is a different promise: it writes '
                 . 'CartShift simulation rows to CartShift\'s own ID-map table so the run can resolve '
                 . 'references the way a real one would.',
-            'configuration_writes' => [
-                [
-                    'action' => 'prepare-package',
-                    'label'  => 'Prepare a package',
-                    'writes' => 'Four strings in one CartShift option: source key, absolute private '
-                        . 'path, records checksum, selection fingerprint. It does not copy the package '
-                        . 'and it creates no customer, order or subscription.',
-                ],
-                [
-                    'action' => 'mapping-decisions',
-                    'label'  => 'Save mapping decisions',
-                    'writes' => 'Rows in CartShift\'s mapping staging table. Nothing is promoted into '
-                        . 'the ID map until a run starts.',
-                ],
-                [
-                    'action' => 'manual-fallback-confirmation',
-                    'label'  => 'Accept the manual fallback',
-                    'writes' => 'Nothing yet. Acceptance is expressed through the '
-                        . '`cartshift/subscription/manual_fallback_confirmed` filter and, at cutover, '
-                        . 'through the stage command. It is a decision about behaviour, not an audit '
-                        . 'finding.',
-                ],
+            'configuration_writes' => [],
+            'retired_write_routes' => [
+                'prepare-package' => 'legacy_subscription_v1_package_write_closed',
+                'mapping-decisions' => 'legacy_mapping_write_closed',
+                'manual-fallback-confirmation' => 'legacy_subscription_v1_write_closed',
             ],
         ];
     }

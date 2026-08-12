@@ -40,6 +40,12 @@ final class DatabaseTransaction
 {
     private static int $depth = 0;
 
+    /** @var list<callable(): void> */
+    private static array $rollbackCallbacks = [];
+
+    /** @var list<callable(): void> */
+    private static array $commitCallbacks = [];
+
     /**
      * Open a transaction, or join the one that is already open.
      */
@@ -48,7 +54,12 @@ final class DatabaseTransaction
         if (self::$depth === 0) {
             global $wpdb;
 
-            $wpdb->query('START TRANSACTION');
+            if ($wpdb->query('START TRANSACTION') === false) {
+                throw new \RuntimeException('Database transaction could not be started.');
+            }
+
+            self::$rollbackCallbacks = [];
+            self::$commitCallbacks = [];
         }
 
         self::$depth++;
@@ -67,29 +78,81 @@ final class DatabaseTransaction
             return;
         }
 
-        self::$depth--;
-
-        if (self::$depth === 0) {
+        if (self::$depth === 1) {
             global $wpdb;
 
-            $wpdb->query('COMMIT');
+            if ($wpdb->query('COMMIT') === false) {
+                throw new \RuntimeException('Database transaction commit failed; the transaction remains blocked.');
+            }
+
+            self::$depth = 0;
+            self::$rollbackCallbacks = [];
+            $callbacks = self::$commitCallbacks;
+            self::$commitCallbacks = [];
+            $failures = [];
+            foreach ($callbacks as $callback) {
+                try {
+                    $callback();
+                } catch (\Throwable $exception) {
+                    $failures[] = $exception;
+                }
+            }
+            if ($failures !== []) {
+                throw new DatabaseAfterCommitException(count($failures), $failures[0]);
+            }
+            return;
         }
+
+        self::$depth--;
     }
 
     /**
      * Abandon the whole transaction, from any depth.
      */
-    public static function rollback(): void
+    public static function rollback(?\Throwable $original = null): void
     {
         if (self::$depth === 0) {
             return;
         }
 
-        self::$depth = 0;
-
         global $wpdb;
 
-        $wpdb->query('ROLLBACK');
+        $rolledBack = $wpdb->query('ROLLBACK') !== false;
+        $callbacks = self::$rollbackCallbacks;
+        self::$rollbackCallbacks = [];
+        self::$commitCallbacks = [];
+
+        foreach ($callbacks as $callback) {
+            $callback();
+        }
+
+        if (!$rolledBack) {
+            throw new \RuntimeException(
+                'Database rollback failed; the transaction outcome is unknown and remains blocked.',
+                0,
+                $original,
+            );
+        }
+
+        self::$depth = 0;
+    }
+
+    /**
+     * Invalidate transaction-derived in-request state if the database work is undone.
+     */
+    public static function afterRollback(callable $callback): void
+    {
+        if (self::$depth > 0) {
+            self::$rollbackCallbacks[] = $callback;
+        }
+    }
+
+    /** Run only after the outermost database commit succeeds. */
+    public static function afterCommit(callable $callback): void
+    {
+        if (self::$depth > 0) {
+            self::$commitCallbacks[] = $callback;
+        }
     }
 
     /**
@@ -110,5 +173,7 @@ final class DatabaseTransaction
     public static function reset(): void
     {
         self::$depth = 0;
+        self::$rollbackCallbacks = [];
+        self::$commitCallbacks = [];
     }
 }

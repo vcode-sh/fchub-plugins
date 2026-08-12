@@ -25,6 +25,16 @@ use FluentCart\App\Models\ProductMeta;
 use FluentCart\App\Models\ProductVariation;
 use FluentCart\App\Models\ShippingClass;
 
+/**
+ * Legacy v1 product mutation path, retained only until route convergence.
+ *
+ * V2 source extraction belongs to ProductRecordFactory and v2 persistence to
+ * FluentCartProductWriter. New transfer behaviour must not be added here: the
+ * coordinator phase will make this entry point delegate or refuse once the v2
+ * graph is complete.
+ *
+ * @deprecated Use the v2 transfer catalogue pipeline.
+ */
 final class ProductMigrator extends AbstractMigrator
 {
     /** @var int|null Highest product ID covered by the ID page fetchBatch() last read. */

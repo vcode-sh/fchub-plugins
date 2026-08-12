@@ -162,68 +162,35 @@ final class KeysetSourceQueryTest extends PluginTestCase
         $this->assertSame(0, $migrator->count());
     }
 
-    public function testAnOrderFluentCartAlreadyImportedIsAdoptedNotDuplicated(): void
-    {
-        $this->recordingWpdb([]);
-
-        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string|int|null {
-            // The ID-map lookup misses; the invoice_no lookup hits.
-            if (str_contains($query, 'fct_orders')) {
-                return 4242;
-            }
-
-            return null;
-        };
-
-        $result = $this->orderMigrator()->processRecord($this->wcOrder(77));
-
-        $this->assertFalse($result, 'An adopted order is a skip, not a fresh migration.');
-
-        $inserts = $this->recordedInserts();
-
-        $idMapRow = $this->firstInsertInto($inserts, 'cartshift_id_map');
-        $this->assertNotNull($idMapRow);
-        $this->assertSame('order', $idMapRow['entity_type']);
-        $this->assertSame('77', $idMapRow['wc_id']);
-        $this->assertSame(4242, $idMapRow['fc_id']);
-        $this->assertSame(
-            0,
-            $idMapRow['created_by_migration'],
-            'Rollback must never delete an order CartShift did not create.',
-        );
-
-        $logRow = $this->firstInsertInto($inserts, 'cartshift_migration_log');
-        $this->assertNotNull($logRow);
-        $this->assertSame('skipped', $logRow['status']);
-        $this->assertStringContainsString('WC-77', $logRow['message']);
-    }
-
-    public function testTheAdoptionLookupIsAnExactIndexedMatchOnInvoiceNo(): void
+    public function testInvoiceCollisionIsNeverQueriedOrAdoptedAsSourceIdentity(): void
     {
         $db = $this->recordingWpdb([]);
 
         $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query) use ($db): string|int|null {
             $db->varQueries[] = $query;
 
-            return null;
+            return str_contains($query, 'fct_orders') ? 4242 : null;
         };
 
-        // Without an adoption hit this falls through to the mapper, which needs
-        // more of FluentCart than a unit test has. The lookup query is the point.
         try {
             $this->orderMigrator()->processRecord($this->wcOrder(77));
         } catch (\Throwable) {
-            // Expected: the real migration path is not exercised here.
+            // Expected: this unit fixture has no loaded FluentCart target model.
+            // Reaching it proves the invoice signal did not short-circuit identity.
         }
 
-        $lookup = array_values(array_filter(
+        $invoiceLookups = array_values(array_filter(
             $db->varQueries,
             static fn (string $sql): bool => str_contains($sql, 'fct_orders'),
         ));
+        $adoptedMaps = array_values(array_filter(
+            $this->recordedInserts(),
+            static fn (array $insert): bool => str_contains((string) ($insert[0] ?? ''), 'cartshift_id_map')
+                && (int) ($insert[1]['created_by_migration'] ?? 1) === 0,
+        ));
 
-        $this->assertNotEmpty($lookup);
-        $this->assertStringContainsString("invoice_no = 'WC-77'", $lookup[0]);
-        $this->assertStringNotContainsString('LIKE', $lookup[0], 'An exact match, not a scan.');
+        self::assertSame([], $invoiceLookups);
+        self::assertSame([], $adoptedMaps);
     }
 
     public function testMigratedCountIsASingleCountQuery(): void
@@ -322,21 +289,6 @@ final class KeysetSourceQueryTest extends PluginTestCase
         }
 
         return $inserts;
-    }
-
-    /**
-     * @param list<array{0: string, 1: array<string, mixed>}> $inserts
-     * @return array<string, mixed>|null
-     */
-    private function firstInsertInto(array $inserts, string $table): ?array
-    {
-        foreach ($inserts as [$name, $row]) {
-            if (str_contains($name, $table)) {
-                return $row;
-            }
-        }
-
-        return null;
     }
 
     /**

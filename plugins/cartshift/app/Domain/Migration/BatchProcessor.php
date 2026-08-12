@@ -6,6 +6,8 @@ namespace CartShift\Domain\Migration;
 
 defined('ABSPATH') || exit;
 
+use CartShift\Domain\Transfer\TransferLock;
+use CartShift\Domain\Transfer\Legacy\LegacyCommandPolicy;
 use CartShift\State\MigrationState;
 
 /**
@@ -21,11 +23,10 @@ final class BatchProcessor
     private const string HOOK = 'cartshift/migration/process_batch';
     private const string GROUP = 'cartshift';
 
-    /** Prefix for the MySQL advisory lock name. */
-    private const string LOCK_PREFIX = 'cartshift_batch_';
-
     /** Seconds to wait before retrying a background batch that lost the lock race. */
     private const int LOCK_RETRY_DELAY = 10;
+
+    private static ?TransferLock $activeLock = null;
 
     /**
      * @param \Closure(): MigrationOrchestrator $orchestratorFactory Builds a fresh orchestrator with current-state migrators.
@@ -44,6 +45,11 @@ final class BatchProcessor
         add_action(self::HOOK, [$this, 'handleBatch']);
     }
 
+    public static function hookName(): string
+    {
+        return self::HOOK;
+    }
+
     /**
      * Called by Action Scheduler to process one batch.
      *
@@ -52,6 +58,12 @@ final class BatchProcessor
      */
     public function handleBatch(string $migrationId): void
     {
+        // The legacy action carries only a migration ID. It cannot present the
+        // v2 prepared descriptor, active lease, generation or mutex context, so
+        // it is structurally incapable of resuming a transfer safely.
+        (new LegacyCommandPolicy())->refusal('action:' . self::HOOK);
+        return;
+
         if (!$this->state->isRunning() || $this->state->getMigrationId() !== $migrationId) {
             return;
         }
@@ -81,7 +93,7 @@ final class BatchProcessor
      */
     public function scheduleFirst(string $migrationId): void
     {
-        $this->scheduleNext($migrationId);
+        (new LegacyCommandPolicy())->refusal('action:' . self::HOOK);
     }
 
     /**
@@ -130,23 +142,21 @@ final class BatchProcessor
      */
     public static function acquireLock(): bool
     {
-        global $wpdb;
-
-        if (!is_object($wpdb)) {
-            return true;
+        if (self::$activeLock !== null) {
+            return false;
         }
 
-        $result = $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, 0)', self::lockName()));
+        $lock = new TransferLock();
 
-        // NULL means the lock could not be evaluated at all (an error, or a
-        // database that does not implement GET_LOCK). Fail open: the per-record
-        // id-map check still makes double writes idempotent, and refusing every
-        // batch would break migration outright on those hosts.
-        if ($result === null) {
-            return true;
+        try {
+            $lock->acquireTargetMutex(self::targetFingerprint());
+        } catch (\RuntimeException) {
+            return false;
         }
 
-        return (int) $result === 1;
+        self::$activeLock = $lock;
+
+        return true;
     }
 
     /**
@@ -154,13 +164,12 @@ final class BatchProcessor
      */
     public static function releaseLock(): void
     {
-        global $wpdb;
-
-        if (!is_object($wpdb)) {
+        if (self::$activeLock === null) {
             return;
         }
 
-        $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', self::lockName()));
+        self::$activeLock->release();
+        self::$activeLock = null;
     }
 
     /**
@@ -172,12 +181,17 @@ final class BatchProcessor
      */
     public static function lockName(): string
     {
+        return TransferLock::nameFor(self::targetFingerprint());
+    }
+
+    public static function targetFingerprint(): string
+    {
         global $wpdb;
 
         $scope = (defined('DB_NAME') ? (string) DB_NAME : '')
             . '|' . (is_object($wpdb) ? (string) $wpdb->prefix : '');
 
-        return self::LOCK_PREFIX . substr(md5($scope), 0, 16);
+        return hash('sha256', $scope);
     }
 
     /**

@@ -852,7 +852,7 @@ final class SubscriptionCutover
 
             DatabaseTransaction::commit();
         } catch (\Throwable $exception) {
-            DatabaseTransaction::rollback();
+            DatabaseTransaction::rollback($exception);
 
             return CutoverReceipt::entry($base + [
                 'outcome'      => CutoverReceipt::OUTCOME_BLOCKED,

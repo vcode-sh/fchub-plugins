@@ -6,8 +6,10 @@ namespace CartShift\Tests\Unit\Domain\Subscription;
 
 use CartShift\Domain\Subscription\SubscriptionHistoryIndex;
 use CartShift\Domain\Subscription\SubscriptionHistoryLinker;
+use CartShift\Domain\Subscription\OrderRecord;
 use CartShift\Domain\Subscription\SubscriptionOrderReference;
 use CartShift\Domain\Subscription\SubscriptionOrderImporter;
+use CartShift\Domain\Subscription\SubscriptionOrderStage;
 use CartShift\Support\Constants;
 
 /**
@@ -341,6 +343,43 @@ final class SubscriptionHistoryTest extends SubscriptionHistoryTestCase
     // Linking
     // ──────────────────────────────────────────────
 
+    public function testCanonicalStageReceivesParentBeforeRenewalAndBypassesLegacyModelWrites(): void
+    {
+        $record = $this->subscriptionRecord();
+        $stage = new RecordingSubscriptionOrderStage();
+
+        $result = (new SubscriptionOrderImporter($this->idMap(), $stage))->import(
+            $record,
+            $this->completeIndex($record),
+            'subscription-canonical-run',
+        );
+
+        $this->assertSame([880_001 => 91_001, 880_501 => 91_002], $result['orders']);
+        $this->assertSame([880_001, 880_501], $result['created']);
+        $this->assertSame([], $result['adopted']);
+        $this->assertSame([], $result['retyped']);
+        $this->assertSame([], $result['relinked']);
+        $this->assertSame([
+            [
+                'source_order_id' => 880_001,
+                'relationship' => 'parent',
+                'customer_target_id' => 501,
+                'parent_target_id' => null,
+                'migration_id' => 'subscription-canonical-run',
+            ],
+            [
+                'source_order_id' => 880_501,
+                'relationship' => 'renewal',
+                'customer_target_id' => 501,
+                'parent_target_id' => 91_001,
+                'migration_id' => 'subscription-canonical-run',
+            ],
+        ], $stage->calls);
+        $this->assertSame([], \CartShiftFcModelStore::all('Order'));
+        $this->assertSame([], \CartShiftFcModelStore::all('OrderItem'));
+        $this->assertSame([], \CartShiftFcModelStore::all('OrderTransaction'));
+    }
+
     public function testSucceededPositiveChargesAreLinkedToTheDestinationSubscription(): void
     {
         $record   = $this->subscriptionRecord();
@@ -532,5 +571,34 @@ final class SubscriptionHistoryTest extends SubscriptionHistoryTestCase
         }
 
         $this->fail(sprintf('No FluentCart order #%d was written.', $fcOrderId));
+    }
+}
+
+final class RecordingSubscriptionOrderStage implements SubscriptionOrderStage
+{
+    /** @var list<array<string, mixed>> */
+    public array $calls = [];
+
+    public function stage(
+        OrderRecord $source,
+        string $relationship,
+        ?int $customerTargetId,
+        ?int $parentTargetId,
+        string $migrationId,
+    ): \CartShift\Domain\Transfer\Order\OrderStageResult {
+        $targetId = 91_001 + count($this->calls);
+        $this->calls[] = [
+            'source_order_id' => $source->sourceOrderId,
+            'relationship' => $relationship,
+            'customer_target_id' => $customerTargetId,
+            'parent_target_id' => $parentTargetId,
+            'migration_id' => $migrationId,
+        ];
+        return new \CartShift\Domain\Transfer\Order\OrderStageResult(
+            $targetId,
+            [$source->sourceRef => $targetId],
+            str_repeat(dechex(count($this->calls)), 64),
+            false,
+        );
     }
 }

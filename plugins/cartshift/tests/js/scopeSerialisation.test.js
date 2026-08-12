@@ -138,7 +138,7 @@ describe('preview degradation', () => {
     expect(state.preview).toBeNull();
   });
 
-  it('sends the serialised scope on /migrate', async () => {
+  it('keeps the serialised scope local when the retired migration writer is requested', async () => {
     apiMock.mockResolvedValue({ continue: false, entities: {} });
 
     const { state, actions } = mount();
@@ -147,9 +147,7 @@ describe('preview degradation', () => {
     state.scope.since = '2024-03-01';
     await actions.startMigration();
 
-    const post = apiMock.mock.calls.find((c) => c[0] === 'POST' && c[1] === 'migrate');
-
-    expect(post[2].scope).toEqual({
+    expect(serializeScope(state.scope)).toEqual({
       mode: 'since',
       since: '2024-03-01',
       product_ids: [],
@@ -157,6 +155,8 @@ describe('preview degradation', () => {
       guest_emails: [],
       include_orders_for_products: false,
     });
+    expect(apiMock).not.toHaveBeenCalled();
+    expect(state.error).toContain('legacy_generic_migration_closed');
   });
 
   it('keeps state.error silent for a {silent: true} call that fails for a real reason', async () => {
@@ -215,7 +215,7 @@ describe('preview degradation', () => {
     expect(state.error).toBeNull();
   });
 
-  it('returns to the select screen when the closure is refused', async () => {
+  it('never reaches an old closure response because browser migration is closed first', async () => {
     // startMigration() switches to the progress screen before the request goes
     // out, so a refusal that only sets state.error leaves the owner watching a
     // progress bar for a run that was never started.
@@ -238,8 +238,9 @@ describe('preview degradation', () => {
     state.selectedEntities = ['order'];
     await actions.startMigration();
 
-    expect(state.screen).toBe('select');
-    expect(state.error).toContain('Narrow the selection');
+    expect(state.screen).toBe('preflight');
+    expect(state.error).toContain('legacy_generic_migration_closed');
     expect(state.migrating).toBe(false);
+    expect(apiMock).not.toHaveBeenCalled();
   });
 });

@@ -28,7 +28,7 @@ final class BatchProcessorTest extends PluginTestCase
         );
     }
 
-    public function testScheduleFirstCallsAs(): void
+    public function testLegacyScheduleFirstCannotQueueWork(): void
     {
         $processor = new BatchProcessor(
             fn () => $this->createMock(MigrationOrchestrator::class),
@@ -37,12 +37,7 @@ final class BatchProcessorTest extends PluginTestCase
 
         $processor->scheduleFirst('test-migration-id-123');
 
-        $scheduled = $GLOBALS['_cartshift_test_as_scheduled'];
-
-        $this->assertCount(1, $scheduled, 'Exactly one action should be scheduled');
-        $this->assertSame('cartshift/migration/process_batch', $scheduled[0]['hook']);
-        $this->assertSame(['test-migration-id-123'], $scheduled[0]['args']);
-        $this->assertSame('cartshift', $scheduled[0]['group']);
+        $this->assertSame([], $GLOBALS['_cartshift_test_as_scheduled']);
     }
 
     public function testCancelCallsUnschedule(): void
@@ -100,5 +95,35 @@ final class BatchProcessorTest extends PluginTestCase
         $processor->handleBatch('wrong-migration-id');
 
         $this->assertFalse($orchestratorCalled, 'Orchestrator must not be created for mismatched migration ID');
+    }
+
+    public function testLegacyBatchCannotAcquireALockOrReachTheOrchestrator(): void
+    {
+        $this->state->start(['product']);
+        $migrationId = (string) $this->state->getMigrationId();
+        $GLOBALS['_cartshift_test_get_var_callback'] = static fn (string $query): string =>
+            str_contains($query, 'RELEASE_LOCK') ? '1' : '1';
+        $called = false;
+        $orchestrator = new class {
+            public function processBatch(): array
+            {
+                return ['continue' => false];
+            }
+        };
+        $processor = new BatchProcessor(static function () use (&$called, $orchestrator): object {
+            $called = true;
+            return $orchestrator;
+        }, $this->state);
+
+        $processor->handleBatch($migrationId);
+        $processor->handleBatch($migrationId);
+
+        $getLocks = array_values(array_filter(
+            $GLOBALS['_cartshift_test_queries'] ?? [],
+            static fn (array $query): bool => ($query[0] ?? '') === 'get_var'
+                && str_contains((string) ($query[1] ?? ''), 'GET_LOCK'),
+        ));
+        self::assertFalse($called);
+        self::assertSame([], $getLocks);
     }
 }

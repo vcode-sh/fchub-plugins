@@ -123,11 +123,8 @@ final class MoneyHelperTest extends PluginTestCase
 
     public function testToCentsWithCommaDecimalSeparator(): void
     {
-        // PHP's floatval() treats comma as end-of-number, so "19,99" becomes 19.0
-        // This documents the actual behavior — comma-separated values don't work correctly.
-        $result = MoneyHelper::toCents('19,99', 'USD');
-        // floatval('19,99') = 19.0, so 19.0 * 100 = 1900
-        $this->assertSame(1900, $result);
+        $this->expectException(\InvalidArgumentException::class);
+        MoneyHelper::toCents('19,99', 'USD');
     }
 
     public function testToCentsMaxIntBoundary(): void
@@ -146,8 +143,24 @@ final class MoneyHelperTest extends PluginTestCase
 
     public function testToCentsWithWhitespace(): void
     {
-        // Whitespace around the number — floatval handles leading whitespace.
-        $result = MoneyHelper::toCents(' 19.99 ', 'USD');
-        $this->assertSame(1999, $result);
+        $this->expectException(\InvalidArgumentException::class);
+        MoneyHelper::toCents(' 19.99 ', 'USD');
+    }
+
+    public function testStrictDecimalParserDoesNotLoseLargeIntegerPrecision(): void
+    {
+        self::assertSame(900719925474099101, MoneyHelper::decimalToCents('9007199254740991.01'));
+    }
+
+    public function testStrictDecimalParserRoundsWithoutBinaryFloatArithmetic(): void
+    {
+        self::assertSame(2000, MoneyHelper::decimalToCents('19.995'));
+        self::assertSame(-2000, MoneyHelper::decimalToCents('-19.995'));
+    }
+
+    public function testStrictDecimalParserRejectsOverflow(): void
+    {
+        $this->expectException(\OverflowException::class);
+        MoneyHelper::decimalToCents('92233720368547758.08');
     }
 }

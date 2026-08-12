@@ -15,6 +15,7 @@ use CartShift\Domain\Mapping\VariationMapper;
 use CartShift\Domain\Subscription\NormalizedSubscriptionContract;
 use CartShift\Domain\Scope\MigrationScope;
 use CartShift\Domain\Scope\ScopeResolver;
+use CartShift\Domain\Transfer\Legacy\LegacyCommandPolicy;
 use CartShift\Storage\ProductMapRepository;
 use CartShift\Support\Constants;
 use CartShift\Support\ProductTypes;
@@ -352,6 +353,12 @@ final class MappingController
 
     public function decide(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/mapping/decide');
+    }
+
+    /** Retained only so v1 mapping evidence can still be regression-tested. */
+    private function legacyDecide(WP_REST_Request $request): WP_REST_Response
+    {
         $wcId = absint($request->get_param('wc_id'));
 
         if ($wcId <= 0) {
@@ -410,6 +417,12 @@ final class MappingController
      * ::testOneContractErrorRefusesTheWholeBatchIncludingTheGoodRows.
      */
     public function bulk(WP_REST_Request $request): WP_REST_Response
+    {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/mapping/bulk');
+    }
+
+    /** Retained only so v1 mapping evidence can still be regression-tested. */
+    private function legacyBulk(WP_REST_Request $request): WP_REST_Response
     {
         $decision = sanitize_text_field((string) $request->get_param('decision'));
         $band     = sanitize_text_field((string) ($request->get_param('band') ?? ProductMatcher::BAND_NONE));
@@ -490,9 +503,23 @@ final class MappingController
 
     public function clear(WP_REST_Request $request): WP_REST_Response
     {
+        return $this->refuseLegacyWrite('rest:POST:cartshift/v1/mapping/clear');
+    }
+
+    /** Retained only so v1 mapping evidence can still be regression-tested. */
+    private function legacyClear(WP_REST_Request $request): WP_REST_Response
+    {
         $this->repo()->clear();
 
         return new WP_REST_Response(['data' => ['cleared' => true]]);
+    }
+
+    private function refuseLegacyWrite(string $entryPoint): WP_REST_Response
+    {
+        return new WP_REST_Response(
+            ['data' => (new LegacyCommandPolicy())->refusalPayload($entryPoint)],
+            410,
+        );
     }
 
     /**

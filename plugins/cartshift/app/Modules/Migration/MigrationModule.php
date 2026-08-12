@@ -23,6 +23,19 @@ defined('ABSPATH') || exit();
 
 final class MigrationModule implements ModuleInterface
 {
+    /** @var list<class-string> */
+    private const array CONTROLLERS = [
+        \CartShift\Http\Controllers\PreflightController::class,
+        \CartShift\Http\Controllers\PreviewController::class,
+        \CartShift\Http\Controllers\MigrationController::class,
+        \CartShift\Http\Controllers\RollbackController::class,
+        \CartShift\Http\Controllers\FinalizeController::class,
+        \CartShift\Http\Controllers\LogController::class,
+        \CartShift\Http\Controllers\MappingController::class,
+        \CartShift\Http\Controllers\SubscriptionAuditController::class,
+        \CartShift\Http\Controllers\SubscriptionPackageController::class,
+    ];
+
     #[\Override]
     public function key(): string
     {
@@ -109,28 +122,17 @@ final class MigrationModule implements ModuleInterface
         $batchProcessor->register();
 
         add_action('rest_api_init', static function () use ($container): void {
-            $controllers = [
-                'CartShift\\Http\\Controllers\\PreflightController',
-                'CartShift\\Http\\Controllers\\PreviewController',
-                'CartShift\\Http\\Controllers\\MigrationController',
-                'CartShift\\Http\\Controllers\\RollbackController',
-                'CartShift\\Http\\Controllers\\FinalizeController',
-                'CartShift\\Http\\Controllers\\LogController',
-                'CartShift\\Http\\Controllers\\MappingController',
-                // The read-only subscription audit and the one package endpoint
-                // that writes. Registered here rather than in a module of their
-                // own because they share this module's container bindings —
-                // ProductMapRepository in particular, which the audit reads the
-                // mapping-set fingerprint out of.
-                'CartShift\\Http\\Controllers\\SubscriptionAuditController',
-                'CartShift\\Http\\Controllers\\SubscriptionPackageController',
-            ];
-
-            foreach ($controllers as $class) {
+            foreach (self::CONTROLLERS as $class) {
                 if (class_exists($class)) {
                     (new $class($container))->registerRoutes();
                 }
             }
         });
+    }
+
+    /** @return list<class-string> */
+    public static function controllerClasses(): array
+    {
+        return self::CONTROLLERS;
     }
 }

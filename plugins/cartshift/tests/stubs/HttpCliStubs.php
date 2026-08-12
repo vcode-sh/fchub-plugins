@@ -98,6 +98,8 @@ if (!function_exists('wc_get_products')) {
      */
     function wc_get_products(array $args = []): array
     {
+        $GLOBALS['_cartshift_test_wc_get_products_calls'][] = $args;
+
         if (
             !isset($GLOBALS['_cartshift_test_wc_product_batches'])
             || !is_array($GLOBALS['_cartshift_test_wc_product_batches'])
