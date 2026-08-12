@@ -22,6 +22,11 @@ on:
       - '.github/workflows/mcp-docker.yml'
       - '.github/workflows/mcp-promote.yml'
   workflow_call:
+    inputs:
+      persist_release_artifact:
+        description: 'Upload the validated package for a consuming release workflow.'
+        type: boolean
+        default: false
     outputs:
       version:
         description: 'Validated package version.'
@@ -213,6 +218,7 @@ jobs:
             echo "artifact_name=${RELEASE_ARTIFACT_NAME}-${{ github.run_id }}"
           } >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
+        if: inputs.persist_release_artifact == true
         with:
           name: ${{ steps.identity.outputs.artifact_name }}
           path: |

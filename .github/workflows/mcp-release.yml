@@ -13,6 +13,8 @@ permissions:
 jobs:
   validate:
     uses: ./.github/workflows/mcp-ci.yml
+    with:
+      persist_release_artifact: true
 
   sdk-current:
     runs-on: ubuntu-latest

@@ -116,63 +116,26 @@ function paths(workflow, event) {
     .map((line) => unquote(line.replace(/^-[ \t]*/, '')))
 }
 
-/** Every entry of the PHPUnit matrix, in order. */
-const matrix = (jobBody) =>
-  entries(jobBody, 'include').map((entry) => ({ ...entry, plugin: value(entry.body, 'plugin') }))
-
-function matrixEntry(jobBody, plugin) {
-  const found = matrix(jobBody).find((entry) => entry.plugin === plugin)
-
-  assert.ok(found, `Expected a "${plugin}" entry in the PHPUnit matrix`)
-  return found.body
-}
-
-test('Every PHPUnit matrix entry declares the history its change detector needs', () => {
+test('PHPUnit consumes the plugin list selected before matrix expansion', () => {
   const phpunit = job(ci, 'phpunit')
 
-  assert.match(
-    step(phpunit, 'Checkout'),
-    /fetch-depth: \$\{\{ matrix\.fetch_depth \}\}/,
-    'Checkout depth must come from the matrix, so a job that diffs against the base can ask for the base',
-  )
-
-  const declared = matrix(phpunit)
-  assert.ok(declared.length > 0, 'Expected a PHPUnit matrix')
-
-  for (const entry of declared) {
-    assert.notEqual(
-      value(entry.body, 'fetch_depth'),
-      null,
-      `${entry.plugin} must declare fetch_depth — an undeclared one resolves to an empty checkout depth`,
-    )
-  }
-
+  assert.match(phpunit, /needs: changes/)
+  assert.match(phpunit, /if: needs\.changes\.outputs\.php_plugins != '\[\]'/)
+  assert.match(phpunit, /plugin: \$\{\{ fromJSON\(needs\.changes\.outputs\.php_plugins\) \}\}/)
+  assert.doesNotMatch(phpunit, /Check for changes/)
 })
 
-test('Every job that diffs against the pull request base can actually fail', () => {
-  // The class of bug this pins: `actions/checkout` defaults to depth 1, which
-  // does not contain the pull request base. The diff then errors, `wc -l`
-  // returns zero, and every gate guarded by that count skips itself while the
-  // job reports success — a green tick for a suite that never ran.
-  //
-  // There is no permitted exception any more. Stream used to be one — an inert
-  // gate kept deliberately unable to fail — and it has been removed rather than
-  // preserved, so every remaining diffing job must be able to go red.
+test('Only the scope job diffs commits, with full history and a full-run fallback', () => {
   const names = [...ci.matchAll(/^ {2}([a-z0-9-]+):$/gm)].map((m) => m[1])
   assert.ok(names.length > 0, 'Expected to find jobs in ci.yml')
 
-  const diffing = names.filter((name) => job(ci, name).includes('pull_request.base.sha'))
-  assert.ok(diffing.length > 0, 'Expected at least one job to diff against the base')
+  const diffing = names.filter((name) => job(ci, name).includes('git diff --name-only'))
+  assert.deepEqual(diffing, ['changes'])
 
-  for (const name of diffing) {
-    const checkout = step(job(ci, name), 'Checkout')
-    const depth = value(checkout.replace(/^.*?with:\n/s, ''), 'fetch-depth')
-
-    assert.ok(
-      depth === '0' || depth === '${{ matrix.fetch_depth }}',
-      `${name} diffs against the pull request base, so it must fetch the history that diff needs — found fetch-depth ${depth}`,
-    )
-  }
+  const changes = job(ci, 'changes')
+  assert.match(step(changes, 'Checkout'), /fetch-depth: 0/)
+  assert.match(changes, /git cat-file -e/)
+  assert.match(changes, /node scripts\/ci-scope\.mjs --all/)
 })
 
 test('The repository contract job checks the catalogue and the documentation', () => {

@@ -40,6 +40,8 @@ jobs:
   validate:
     if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/mcp-ci.yml
+    with:
+      persist_release_artifact: true
 
   verify:
     runs-on: ubuntu-latest
@@ -152,6 +154,7 @@ jobs:
           name: ${{ env.IMAGE_ARTIFACT }}
           path: image.tar
           if-no-files-found: error
+          retention-days: 7
 
   publish:
     runs-on: ubuntu-latest

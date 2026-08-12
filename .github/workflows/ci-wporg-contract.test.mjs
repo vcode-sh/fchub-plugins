@@ -9,6 +9,7 @@ const releaseGates = readFileSync(
   "utf8",
 );
 const build = readFileSync(new URL("../../build.sh", import.meta.url), "utf8");
+const scope = readFileSync(new URL("../../scripts/ci-scope.mjs", import.meta.url), "utf8");
 
 const targetSlugs = [
   "fchub-fakturownia",
@@ -33,23 +34,11 @@ function job(workflow, name) {
 test("PHPUnit matrix covers every target on the PHPUnit 13 PHP runtimes", () => {
   const phpunit = job(ci, "phpunit");
   for (const slug of targetSlugs) {
-    for (const phpVersion of phpVersions) {
-      assert.match(
-        phpunit,
-        new RegExp(
-          `- plugin: ${slug}\\n\\s+php_version: '${phpVersion.replace(".", "\\.")}'\\n\\s+fetch_depth: 0`,
-        ),
-        `Missing ${slug} PHP ${phpVersion} matrix entry`,
-      );
-    }
+    assert.match(scope, new RegExp(`'${slug}'`));
   }
-  for (const slug of targetSlugs) {
-    assert.doesNotMatch(
-      phpunit,
-      new RegExp(`- plugin: ${slug}\\n\\s+php_version: '8\\.3'`),
-      `${slug} cannot install PHPUnit 13 on PHP 8.3`,
-    );
-  }
+  assert.match(phpunit, /plugin: \$\{\{ fromJSON\(needs\.changes\.outputs\.php_plugins\) \}\}/);
+  assert.match(phpunit, /php_version: \['8\.4', '8\.5'\]/);
+  assert.doesNotMatch(phpunit, /8\.3/, "PHPUnit 13 requires PHP 8.4.1 or newer");
   // Stream is abandoned. It used to sit here as an inert depth-1 lane proving
   // the hiatus was reversible; keeping a lane for a plugin nobody will pick up
   // again is a job slot and a matrix entry spent on nothing.
@@ -113,8 +102,11 @@ test("genuine previous-release and update lifecycle contracts run in CI", () => 
 test("every target builds and inspects its WordPress.org archive", () => {
   const packages = job(ci, "wporg-package");
   for (const slug of targetSlugs) {
-    assert.match(packages, new RegExp(`- plugin: ${slug}(?:\\n|$)`));
+    assert.match(scope, new RegExp(`'${slug}'`));
   }
+  assert.match(packages, /needs: changes/);
+  assert.match(packages, /if: needs\.changes\.outputs\.wporg_plugins != '\[\]'/);
+  assert.match(packages, /plugin: \$\{\{ fromJSON\(needs\.changes\.outputs\.wporg_plugins\) \}\}/);
   assert.match(packages, /bash build\.sh "\$\{\{ matrix\.plugin \}\}"/);
   assert.match(build, /scripts\/wporg\/check-package\.mjs/);
   assert.match(packages, /upload-artifact@v7/);
@@ -127,17 +119,14 @@ test("WordPress.org targets never receive the shared updater", () => {
   }
   assert.match(build, /is_wordpress_org_plugin/);
 
-  const syncStep = release.match(
-    /- name: Sync GitHubUpdater[\s\S]*?(?=\n      - name:)/,
-  )?.[0];
-  assert.ok(syncStep, "Release workflow must retain updater sync for non-targets");
+  assert.doesNotMatch(release, /- name: Sync GitHubUpdater/);
   const tagClassifier = release.match(
     /- name: Parse tag[\s\S]*?(?=\n      - name:)/,
   )?.[0];
   assert.ok(tagClassifier, "Release workflow must classify WordPress.org tags");
   assert.match(tagClassifier, /wporg\/plugins\.json/);
   assert.match(tagClassifier, /Object\.hasOwn\(manifest\.plugins/);
-  assert.match(syncStep, /needs\.prepare\.outputs\.is_wporg != 'true'/);
+  assert.match(build, /updater_sync_count/);
 });
 
 test("Stream is excluded from the path triggers, in the order that makes it work", () => {

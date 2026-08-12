@@ -73,6 +73,16 @@ describe('single-build candidate graph', () => {
 		assert.match(ci, /smoke-public-stdio\.mjs/)
 		assert.match(artifactBuilder, /'scripts\/smoke-public-stdio\.mjs'/)
 	})
+
+	it('persists the release handoff only when a consuming workflow requests it', () => {
+		assert.match(
+			ci,
+			/workflow_call:\s*\n\s+inputs:\s*\n\s+persist_release_artifact:[\s\S]*?type:\s*boolean[\s\S]*?default:\s*false/,
+		)
+		assert.match(job(ci, 'package'), /if:\s*inputs\.persist_release_artifact == true/)
+		assert.match(job(stage, 'validate'), /persist_release_artifact:\s*true/)
+		assert.match(job(docker, 'validate'), /persist_release_artifact:\s*true/)
+	})
 })
 
 describe('tag-triggered publication', () => {
@@ -166,6 +176,7 @@ describe('versioned Docker candidate', () => {
 
 	it('hands a saved image to publication and pushes no mutable or short-SHA tags', () => {
 		assert.match(job(docker, 'verify'), /docker save/)
+		assert.match(job(docker, 'verify'), /retention-days:\s*7/)
 		const publish = job(docker, 'publish')
 		assert.match(publish, /if:\s*\$\{\{\s*always\(\)/)
 		assert.match(publish, /inputs\.publish/)

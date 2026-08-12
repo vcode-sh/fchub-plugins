@@ -30,25 +30,21 @@ function step(jobBody, name) {
 test('CI runs both workflow contracts for every owned workflow input', () => {
   assert.match(
     workflow,
-    /pull_request:\n\s+paths:\n[\s\S]*?- 'plugins\/\*\*'[\s\S]*?- 'web-docs\/lib\/versions\.json'[\s\S]*?- '\.github\/workflows\/ci\.yml'[\s\S]*?- '\.github\/workflows\/ci-memberships-contract\.test\.mjs'[\s\S]*?- '\.github\/workflows\/release\.yml'[\s\S]*?- '\.github\/workflows\/release-memberships-contract\.test\.mjs'/,
+    /pull_request:\n\s+paths:\n[\s\S]*?- 'plugins\/\*\*'[\s\S]*?- 'web-docs\/lib\/versions\.json'[\s\S]*?- '\.github\/workflows\/ci\.yml'[\s\S]*?- '\.github\/workflows\/ci-memberships-contract\.test\.mjs'[\s\S]*?- 'scripts\/ci-scope\.mjs'[\s\S]*?- 'scripts\/ci-scope\.test\.mjs'/,
   )
 
   const workflowContract = job('workflow-contract')
   assert.match(
     workflowContract,
-    /node --test \.github\/workflows\/ci-memberships-contract\.test\.mjs \.github\/workflows\/ci-cartshift-contract\.test\.mjs \.github\/workflows\/ci-wporg-contract\.test\.mjs \.github\/workflows\/release-memberships-contract\.test\.mjs/,
+    /node --test [^\n]*scripts\/ci-scope\.test\.mjs/,
   )
 })
 
 for (const name of ['Install dependencies', 'Audit Composer dependencies', 'Run PHPUnit']) {
-  test(`${name} retains its matrix-plugin guard and working directory`, () => {
+  test(`${name} runs inside the selected matrix plugin`, () => {
     const phpunit = job('phpunit')
     const phpStep = step(phpunit, name)
-    assert.match(
-      phpStep,
-      /if: steps\.changes\.outputs\.count > 0/,
-      `${name} must retain the matrix-plugin changed-path guard`,
-    )
+    assert.doesNotMatch(phpStep, /steps\.changes/)
     assert.match(
       phpStep,
       /working-directory: plugins\/\$\{\{ matrix\.plugin \}\}/,
@@ -60,17 +56,11 @@ for (const name of ['Install dependencies', 'Audit Composer dependencies', 'Run 
 test('Memberships remains in the shared PHPUnit 13 PHP 8.4 and 8.5 gate sequence', () => {
   const phpunit = job('phpunit')
 
-  for (const version of ['8.4', '8.5']) {
-    assert.match(
-      phpunit,
-      new RegExp(`- plugin: fchub-memberships\\n\\s+php_version: '${version.replace('.', '\\.')}'`),
-    )
-  }
-  assert.doesNotMatch(
-    phpunit,
-    /- plugin: fchub-memberships\n\s+php_version: '8\.3'/,
-    'PHPUnit 13 requires PHP 8.4.1 or newer',
-  )
+  assert.match(phpunit, /needs: changes/)
+  assert.match(phpunit, /if: needs\.changes\.outputs\.php_plugins != '\[\]'/)
+  assert.match(phpunit, /plugin: \$\{\{ fromJSON\(needs\.changes\.outputs\.php_plugins\) \}\}/)
+  assert.match(phpunit, /php_version: \['8\.4', '8\.5'\]/)
+  assert.doesNotMatch(phpunit, /8\.3/, 'PHPUnit 13 requires PHP 8.4.1 or newer')
   assert.match(
     step(phpunit, 'Setup PHP'),
     /php-version: \$\{\{ matrix\.php_version \}\}/,
@@ -89,34 +79,23 @@ test('Memberships remains in the shared PHPUnit 13 PHP 8.4 and 8.5 gate sequence
   )
 })
 
-test('Memberships change detection inspects the Memberships plugin path', () => {
-  const membershipsVite = job('vite-build-memberships')
-  assert.match(
-    step(membershipsVite, 'Check for changes'),
-    /git diff --name-only [^\n]+ -- plugins\/fchub-memberships\/ \| wc -l/,
-    'Memberships change detection must inspect the Memberships plugin path',
-  )
-})
+test('one owned selector computes every dynamic CI scope', () => {
+  const changes = job('changes')
 
-test('Memberships PHP change detection includes the shared version registry', () => {
-  const phpunit = job('phpunit')
-  const changeDetector = step(phpunit, 'Check for changes')
-
-  assert.match(
-    changeDetector,
-    /if \[ "\$\{\{ matrix\.plugin \}\}" = "fchub-memberships" \]; then/,
-    'The shared version registry must only extend the Memberships detector',
-  )
-  assert.match(
-    changeDetector,
-    /-- plugins\/\$\{\{ matrix\.plugin \}\}\/ web-docs\/lib\/versions\.json \| wc -l/,
-    'A versions.json-only change must set the Memberships matrix count',
-  )
+  assert.match(changes, /fetch-depth: 0/)
+  assert.match(changes, /node scripts\/ci-scope\.mjs --all/)
+  assert.match(changes, /git diff --name-only [^\n]+ \| node scripts\/ci-scope\.mjs/)
+  for (const output of ['php_plugins', 'wporg_plugins', 'cartshift', 'memberships', 'portal_extender']) {
+    assert.match(changes, new RegExp(`${output}: \\$\\{\\{ steps\\.scope\\.outputs\\.${output} \\}\\}`))
+  }
 })
 
 test('Memberships pull requests run every required JavaScript, smoke, and build gate', () => {
   const membershipsVite = job('vite-build-memberships')
 
+  assert.match(membershipsVite, /needs: changes/)
+  assert.match(membershipsVite, /if: needs\.changes\.outputs\.memberships == 'true'/)
+  assert.doesNotMatch(membershipsVite, /Check for changes/)
   assert.match(membershipsVite, /run: npm ci/)
   assert.match(membershipsVite, /name: Audit JavaScript dependencies[\s\S]*?run: npm audit --audit-level=high/)
   assert.match(membershipsVite, /name: Run JavaScript tests[\s\S]*?run: npm test/)
@@ -137,11 +116,7 @@ test('Memberships pull requests run every required JavaScript, smoke, and build 
   ]
 
   for (const name of guardedMembershipsSteps) {
-    assert.match(
-      step(membershipsVite, name),
-      /if: steps\.changes\.outputs\.count > 0/,
-      `${name} must retain the Memberships changed-path guard`,
-    )
+    assert.doesNotMatch(step(membershipsVite, name), /steps\.changes/)
   }
 
   const membershipsWorkingDirectorySteps = guardedMembershipsSteps.filter(

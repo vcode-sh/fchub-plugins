@@ -4,17 +4,6 @@ import test from 'node:test'
 
 const ci = readFileSync(new URL('./ci.yml', import.meta.url), 'utf8')
 const release = readFileSync(new URL('./release.yml', import.meta.url), 'utf8')
-const compose = readFileSync(
-  new URL('../../plugins/cartshift/docker-compose.integration.yml', import.meta.url),
-  'utf8',
-)
-const createStack = readFileSync(
-  new URL(
-    '../../plugins/cartshift/tests/Integration/scripts/create-disposable-stack.sh',
-    import.meta.url,
-  ),
-  'utf8',
-)
 
 function job(workflow, name) {
   const match = workflow.match(
@@ -24,10 +13,8 @@ function job(workflow, name) {
   return match[1]
 }
 
-test('CI installs the checksum-pinned CartShift candidate with every mandatory vendor', () => {
-  const installed = job(ci, 'cartshift-installed-contracts')
+test('public workflows never require private CartShift vendor archives', () => {
   for (const contract of [
-    'CARTSHIFT_CANDIDATE_SHA256',
     'CARTSHIFT_WOO_ARTIFACT_URL',
     'CARTSHIFT_WOO_SHA256',
     'CARTSHIFT_WCS_ARTIFACT_URL',
@@ -36,31 +23,30 @@ test('CI installs the checksum-pinned CartShift candidate with every mandatory v
     'CARTSHIFT_FLUENTCART_SHA256',
     'run-installed-contracts.sh',
   ]) {
-    assert.match(installed, new RegExp(contract), `Missing installed contract boundary: ${contract}`)
+    assert.doesNotMatch(ci, new RegExp(contract), `CI must not require ${contract}`)
+    assert.doesNotMatch(release, new RegExp(contract), `Release must not require ${contract}`)
   }
-  assert.match(installed, /curl --fail[\s\S]*?--proto '=https'[\s\S]*?sha256sum --check --status/)
-  assert.match(installed, /CARTSHIFT_CONTRACT_RETAIN_EVIDENCE_DIR/)
+  assert.doesNotMatch(ci, /^  cartshift-installed-contracts:\n/m)
+  assert.doesNotMatch(release, /^  cartshift-contract:\n/m)
 })
 
-test('private CartShift vendor artifacts only reach trusted main pushes', () => {
-  const installed = job(ci, 'cartshift-installed-contracts')
+test('CartShift CI verifies the distributable archive from public source', () => {
+  const frontend = job(ci, 'vite-build-cartshift')
 
-  assert.match(ci, /push:\n\s+branches: \[main\]/)
-  assert.match(installed, /^    if: github\.event_name == 'push'$/m)
+  assert.match(frontend, /needs: changes/)
+  assert.match(frontend, /if: needs\.changes\.outputs\.cartshift == 'true'/)
+  assert.doesNotMatch(frontend, /Check for changes/)
+  assert.doesNotMatch(frontend, /steps\.changes/)
+  assert.match(frontend, /bash tests\/build-reproducibility\.sh/)
+  assert.match(frontend, /working-directory: \$\{\{ github\.workspace \}\}/)
 })
 
-test('the disposable runtime does not overlay source over the installed candidate', () => {
-  assert.doesNotMatch(compose, /wp-content\/plugins\/cartshift:ro/)
-  assert.match(compose, /CARTSHIFT_SOURCE_DIR[^\n]*:\/cartshift-source:ro/)
-  assert.match(createStack, /plugin install \/cartshift-artifacts\/cartshift-candidate\.zip --force --activate/)
-  assert.match(createStack, /CARTSHIFT_WCS_ZIP CARTSHIFT_WCS_SHA256/)
-  assert.doesNotMatch(createStack, /if \[ -f "\$\{artifact_dir\}\/woocommerce-subscriptions\.zip" \]/)
-})
-
-test('CartShift release publication is contract-gated and consumes the tested candidate', () => {
+test('CartShift release uses the standard public-source package path', () => {
   const publish = job(release, 'release')
-  assert.match(release, /^  cartshift-contract:\n/m)
-  assert.match(publish, /needs:\s*\[prepare,\s*wporg-gates,\s*cartshift-contract\]/)
-  assert.match(publish, /cartshift-candidate-/)
-  assert.match(publish, /if: needs\.prepare\.outputs\.is_wporg != 'true' && needs\.prepare\.outputs\.slug != 'cartshift'/)
+
+  assert.match(publish, /needs:\s*\[prepare,\s*wporg-gates\]/)
+  assert.match(publish, /if: needs\.prepare\.outputs\.is_wporg != 'true'/)
+  assert.match(publish, /bash build\.sh "\$\{\{ needs\.prepare\.outputs\.slug \}\}"/)
+  assert.doesNotMatch(publish, /cartshift-candidate-/)
+  assert.doesNotMatch(publish, /slug != 'cartshift'/)
 })

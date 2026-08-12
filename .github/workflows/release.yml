@@ -90,112 +90,14 @@ jobs:
       tagged_slug: ${{ needs.prepare.outputs.slug }}
       tagged_version: ${{ needs.prepare.outputs.version }}
 
-  cartshift-contract:
-    name: CartShift tagged candidate contracts
-    needs: prepare
-    if: needs.prepare.outputs.slug == 'cartshift'
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    steps:
-      - name: Checkout validated tag SHA
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          tools: composer:v2
-          coverage: none
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: '26'
-
-      - name: Install candidate test dependencies
-        working-directory: plugins/cartshift
-        run: |
-          composer install --no-interaction --prefer-dist
-          npm ci
-
-      - name: Build tagged candidate
-        run: |
-          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) ./build.sh cartshift
-          CANDIDATE="$GITHUB_WORKSPACE/dist/cartshift-${{ needs.prepare.outputs.version }}.zip"
-          test -f "$CANDIDATE"
-          {
-            echo "CARTSHIFT_CANDIDATE_ZIP=$CANDIDATE"
-            echo "CARTSHIFT_CANDIDATE_SHA256=$(sha256sum "$CANDIDATE" | awk '{print $1}')"
-            echo "CARTSHIFT_EXPECT_CANDIDATE_VERSION=${{ needs.prepare.outputs.version }}"
-          } >> "$GITHUB_ENV"
-
-      - name: Download and verify private vendor artifacts
-        env:
-          WOO_URL: ${{ secrets.CARTSHIFT_WOO_ARTIFACT_URL }}
-          WOO_SHA256: ${{ vars.CARTSHIFT_WOO_SHA256 }}
-          WCS_URL: ${{ secrets.CARTSHIFT_WCS_ARTIFACT_URL }}
-          WCS_SHA256: ${{ vars.CARTSHIFT_WCS_SHA256 }}
-          FLUENTCART_URL: ${{ secrets.CARTSHIFT_FLUENTCART_ARTIFACT_URL }}
-          FLUENTCART_SHA256: ${{ vars.CARTSHIFT_FLUENTCART_SHA256 }}
-        run: |
-          set -euo pipefail
-          mkdir -m 0700 "$RUNNER_TEMP/cartshift-vendors"
-          fetch() {
-            local name="$1" url="$2" digest="$3" destination="$RUNNER_TEMP/cartshift-vendors/$1.zip"
-            test -n "$url" || { echo "::error::${name} private artifact URL is unavailable"; exit 1; }
-            [[ "$digest" =~ ^[a-f0-9]{64}$ ]] || { echo "::error::${name} SHA-256 is unavailable or invalid"; exit 1; }
-            curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$url" --output "$destination"
-            echo "${digest}  ${destination}" | sha256sum --check --status
-            printf '%s\n' "$destination"
-          }
-          WOO_PATH=$(fetch woocommerce "$WOO_URL" "$WOO_SHA256")
-          WCS_PATH=$(fetch woocommerce-subscriptions "$WCS_URL" "$WCS_SHA256")
-          FLUENTCART_PATH=$(fetch fluent-cart "$FLUENTCART_URL" "$FLUENTCART_SHA256")
-          {
-            echo "CARTSHIFT_WOO_ZIP=$WOO_PATH"
-            echo "CARTSHIFT_WOO_SHA256=$WOO_SHA256"
-            echo "CARTSHIFT_WCS_ZIP=$WCS_PATH"
-            echo "CARTSHIFT_WCS_SHA256=$WCS_SHA256"
-            echo "CARTSHIFT_FLUENTCART_ZIP=$FLUENTCART_PATH"
-            echo "CARTSHIFT_FLUENTCART_SHA256=$FLUENTCART_SHA256"
-          } >> "$GITHUB_ENV"
-
-      - name: Run installed tagged candidate contracts
-        working-directory: plugins/cartshift
-        env:
-          CARTSHIFT_CONTRACT_RETAIN_EVIDENCE_DIR: ${{ runner.temp }}/cartshift-installed-evidence
-        run: tests/Integration/scripts/run-installed-contracts.sh
-
-      - name: Upload tested CartShift candidate
-        uses: actions/upload-artifact@v7
-        with:
-          name: cartshift-candidate-${{ github.sha }}
-          path: ${{ env.CARTSHIFT_CANDIDATE_ZIP }}
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload installed-contract evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cartshift-installed-contract-evidence-${{ github.sha }}
-          path: ${{ runner.temp }}/cartshift-installed-evidence
-          if-no-files-found: warn
-          retention-days: 14
-
   release:
     name: Publish release
-    needs: [prepare, wporg-gates, cartshift-contract]
+    needs: [prepare, wporg-gates]
     if: >-
       always() &&
       needs.prepare.result == 'success' &&
       (needs.wporg-gates.result == 'success' ||
-      needs.wporg-gates.result == 'skipped') &&
-      ((needs.prepare.outputs.slug == 'cartshift' && needs.cartshift-contract.result == 'success') ||
-      (needs.prepare.outputs.slug != 'cartshift' && needs.cartshift-contract.result == 'skipped'))
+      needs.wporg-gates.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -225,28 +127,10 @@ jobs:
           echo "Build output:"
           ls -la assets/dist/
 
-      - name: Sync GitHubUpdater
-        # WordPress.org bridge releases must not restore the updater removed
-        # from their source. Non-directory products retain the existing feed.
-        if: needs.prepare.outputs.is_wporg != 'true' && needs.prepare.outputs.slug != 'cartshift'
-        run: |
-          SLUG="${{ needs.prepare.outputs.slug }}"
-          PLUGIN_DIR="plugins/${SLUG}"
-          mkdir -p "${PLUGIN_DIR}/lib"
-          cp lib/GitHubUpdater.php "${PLUGIN_DIR}/lib/GitHubUpdater.php"
-          echo "Synced GitHubUpdater into ${SLUG}"
-
       - name: Build non-WordPress.org ZIP
-        if: needs.prepare.outputs.is_wporg != 'true' && needs.prepare.outputs.slug != 'cartshift'
+        if: needs.prepare.outputs.is_wporg != 'true'
         run: |
           bash build.sh "${{ needs.prepare.outputs.slug }}"
-
-      - name: Download tested CartShift candidate
-        if: needs.prepare.outputs.slug == 'cartshift'
-        uses: actions/download-artifact@v8
-        with:
-          name: cartshift-candidate-${{ github.sha }}
-          path: dist
 
       - name: Download validated WordPress.org ZIP
         if: needs.prepare.outputs.is_wporg == 'true'
