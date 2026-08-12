@@ -9,6 +9,7 @@ use CartShift\Domain\Transfer\Execution\TransferJournalRepository;
 use CartShift\Domain\Transfer\Product\LoadedFluentCartProductGateway;
 use CartShift\Domain\Transfer\Product\ParentStockExceptionReport;
 use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
+use CartShift\Domain\Transfer\SameSite\GuidedCollisionDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedDecisionReview;
 use CartShift\Domain\Transfer\SameSite\GuidedEvidence;
 use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
@@ -18,6 +19,7 @@ use CartShift\Domain\Transfer\SameSite\GuidedRunState;
 use CartShift\Domain\Transfer\SameSite\GuidedRunStateRepository;
 use CartShift\Domain\Transfer\SameSite\GuidedSetup;
 use CartShift\Domain\Transfer\SameSite\PrivateWorkspace;
+use CartShift\Domain\Transfer\Subscription\SubscriptionCutoverEvidenceRepository;
 
 defined('ABSPATH') || exit;
 
@@ -32,6 +34,7 @@ final class GuidedRunProjection
         private readonly ?GuidedCustomerDecisionBuilder $customerDecisions = null,
         ?callable $rollbackFactory = null,
         private readonly ?GuidedProductDecisionBuilder $productDecisions = null,
+        private readonly ?GuidedCollisionDecisionBuilder $collisionDecisions = null,
     ) {
         $this->rollbackFactory = $rollbackFactory === null ? null : $rollbackFactory(...);
     }
@@ -51,7 +54,12 @@ final class GuidedRunProjection
             }
             $activeRun = $run instanceof GuidedRunState && in_array(
                 $run->phase,
-                [GuidedRunState::READY, GuidedRunState::RUNNING, GuidedRunState::AWAITING_DECISIONS],
+                [
+                    GuidedRunState::READY,
+                    GuidedRunState::RUNNING,
+                    GuidedRunState::AWAITING_DECISIONS,
+                    GuidedRunState::AWAITING_RENEWAL_PAUSE,
+                ],
                 true,
             );
             $plan = GuidedRunPlan::rehearsal(
@@ -108,7 +116,12 @@ final class GuidedRunProjection
 
     public function modeChanged(GuidedRunState $state, bool $subscriptionsActive): bool
     {
-        return in_array($state->phase, [GuidedRunState::READY, GuidedRunState::RUNNING, GuidedRunState::AWAITING_DECISIONS], true)
+        return in_array($state->phase, [
+            GuidedRunState::READY,
+            GuidedRunState::RUNNING,
+            GuidedRunState::AWAITING_DECISIONS,
+            GuidedRunState::AWAITING_RENEWAL_PAUSE,
+        ], true)
             && $state->includesSubscriptions !== $subscriptionsActive;
     }
 
@@ -129,18 +142,21 @@ final class GuidedRunProjection
             }
         }
 
-        $legacyCompletion = $state->phase === GuidedRunState::COMPLETED;
-
         return [
-            'phase' => $legacyCompletion ? 'unsafe_completion' : $state->phase,
+            'phase' => $state->phase,
             'completed_steps' => $state->nextStep,
-            'total_steps' => 12,
+            'total_steps' => GuidedRunPlan::stepCount($state->includesSubscriptions),
             'last_step' => $state->lastVerb === null ? null : $this->stepLabel($state->lastVerb),
-            'failure' => $legacyCompletion ? [
-                'message' => 'This older rehearsal completed without rollback proof. Cutover remains unavailable.',
-                'can_restart' => false,
-            ] : $this->failurePayload($state),
+            'failure' => $this->failurePayload($state),
             'review' => $review,
+            'renewal_pause' => $state->phase === GuidedRunState::AWAITING_RENEWAL_PAUSE
+                ? [
+                    'title' => 'Pause WooCommerce renewals',
+                    'message' => 'Pause checkout, subscription changes and scheduled renewal jobs, then continue. '
+                        . 'CartShift will immediately hand renewal ownership to FluentCart.',
+                    'action' => 'I have paused renewals — continue',
+                ]
+                : null,
             'migration_exceptions' => $this->migrationExceptionPayload($this->migrationExceptionsFor($state)),
             'rollback' => $this->rollbackPreview($state),
         ];
@@ -149,6 +165,9 @@ final class GuidedRunProjection
     /** @return array<string, mixed>|null */
     private function rollbackPreview(GuidedRunState $state): ?array
     {
+        if ($this->canResumeForward($state)) {
+            return null;
+        }
         if ($state->phase === GuidedRunState::ROLLING_BACK) {
             return [
                 'safe' => true,
@@ -185,11 +204,18 @@ final class GuidedRunProjection
         }
     }
 
-    /** @return array{message:string,can_restart:bool}|null */
+    /** @return array{message:string,can_restart:bool,can_resume_forward?:bool}|null */
     private function failurePayload(GuidedRunState $state): ?array
     {
         if ($state->failure === null) {
             return null;
+        }
+        if ($this->canResumeForward($state)) {
+            return [
+                'message' => 'WooCommerce renewal ownership was already released safely. Resume the migration to finish activating FluentCart.',
+                'can_restart' => false,
+                'can_resume_forward' => true,
+            ];
         }
         $message = str_contains($state->failure, 'guided_subscription_mode_changed')
             ? 'Subscription availability changed after this check started. '
@@ -198,16 +224,34 @@ final class GuidedRunProjection
                 ? 'Orders and subscriptions depend on target links that CartShift cannot prove before preparing records. '
                     . 'The guided check stopped before writing target records.'
             : (str_contains($state->failure, 'guided_completed_rehearsal_rollback_unavailable')
-                ? 'This CartShift core cannot yet roll back a completed rehearsal, so the guided run stopped '
-                    . 'before preparing any target records.'
+                ? 'CartShift could not prove that this migration could be rolled back safely, so it stopped '
+                    . 'before preparing any FluentCart records.'
             : ($state->evidence->descriptor === null
-                ? 'The rehearsal stopped before any target records were prepared. You can safely try again.'
-                : 'The rehearsal stopped after target preparation. Roll back this run before starting another one.')));
+                ? 'The migration stopped before any target records were prepared. You can safely try again.'
+                : 'The migration stopped after target preparation. Roll back this run before starting another one.')));
 
         return [
             'message' => $message,
             'can_restart' => $state->canRestart(),
         ];
+    }
+
+    private function canResumeForward(GuidedRunState $state): bool
+    {
+        if ($state->phase !== GuidedRunState::FAILED
+            || !$state->includesSubscriptions
+            || $state->evidence->descriptor === null) {
+            return false;
+        }
+        try {
+            $evidence = (new SubscriptionCutoverEvidenceRepository(
+                (new PrivateWorkspace($state->sourceKey))->path(),
+            ))->get($state->evidence->descriptor);
+
+            return $evidence->releaseStarted();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function stepLabel(string $verb): string
@@ -216,16 +260,19 @@ final class GuidedRunProjection
             'compatibility' => 'Check compatibility',
             'audit' => 'Inspect source records',
             'propose-decisions' => 'Review migration decisions',
-            'export' => 'Create the private rehearsal package',
-            'validate-package' => 'Validate the rehearsal package',
+            'export' => 'Create the private migration package',
+            'validate-package' => 'Validate the migration package',
             'prepare' => 'Prepare target records',
             'stage' => 'Stage target records',
             'reconcile' => 'Verify staged records',
             'promote' => 'Promote staged records',
+            'prepare-subscription-cutover' => 'Prepare subscription transfer',
+            'release-subscription-source' => 'Stop WooCommerce subscription renewals',
+            'activate-subscriptions' => 'Activate FluentCart subscriptions',
             'activate-catalogue' => 'Activate the FluentCart catalogue',
-            'complete' => 'Finish the rehearsal',
-            'rollback' => 'Roll back the failed rehearsal',
-            default => 'Advance the rehearsal',
+            'complete' => 'Finish the migration',
+            'rollback' => 'Roll back the failed migration',
+            default => 'Advance the migration',
         };
     }
 
@@ -234,7 +281,36 @@ final class GuidedRunProjection
     {
         $groups = [];
         foreach ($exceptions as $exception) {
-            if (!is_array($exception) || ($exception['kind'] ?? null) !== 'shared_parent_stock') {
+            if (!is_array($exception)) {
+                continue;
+            }
+            if (in_array($exception['kind'] ?? null, ['skipped_product', 'skipped_order', 'skipped_subscription'], true)) {
+                $kind = (string) $exception['kind'];
+                $orders = max(0, (int) ($exception['dependent_orders'] ?? 0));
+                $subscriptions = max(0, (int) ($exception['dependent_subscriptions'] ?? 0));
+                $groups[] = [
+                    'type' => 'skipped_record',
+                    'title' => $kind === 'skipped_product'
+                        ? trim((string) ($exception['title'] ?? 'Skipped product'))
+                        : ($kind === 'skipped_subscription' ? 'Skipped subscription' : 'Skipped order'),
+                    'message' => match ($kind) {
+                        'skipped_product' => sprintf(
+                            'This WooCommerce product stayed in WooCommerce. CartShift also skipped %d related order%s and %d related subscription%s so no incomplete records were created.',
+                            $orders,
+                            $orders === 1 ? '' : 's',
+                            $subscriptions,
+                            $subscriptions === 1 ? '' : 's',
+                        ),
+                        'skipped_subscription' => 'FluentCart already had this subscription. CartShift kept it unchanged and left the WooCommerce subscription managed in WooCommerce.',
+                        default => sprintf(
+                            'FluentCart already had this order. CartShift kept it unchanged and skipped the WooCommerce copy%s.',
+                            $subscriptions > 0 ? sprintf(' together with %d dependent subscription%s', $subscriptions, $subscriptions === 1 ? '' : 's') : '',
+                        ),
+                    },
+                ];
+                continue;
+            }
+            if (($exception['kind'] ?? null) !== 'shared_parent_stock') {
                 continue;
             }
             $title = trim((string) ($exception['product_name'] ?? 'Product'));
@@ -242,6 +318,7 @@ final class GuidedRunProjection
             $quantity = is_int($exception['source_quantity'] ?? null) ? $exception['source_quantity'] : null;
             $quantityState = $quantity === null ? 'unknown' : ($quantity < 0 ? 'below_zero' : 'known');
             $groups[$key] ??= [
+                'type' => 'shared_stock',
                 'title' => $title,
                 'variations' => [],
                 'source_quantity' => $quantity,
@@ -271,6 +348,9 @@ final class GuidedRunProjection
         }
 
         foreach ($groups as &$group) {
+            if (($group['type'] ?? null) !== 'shared_stock') {
+                continue;
+            }
             $verification = $group['_target_verification'];
             unset($group['_target_verification']);
             $group['target_state'] = in_array(false, $verification, true)
@@ -325,6 +405,7 @@ final class GuidedRunProjection
         return new GuidedDecisionReview(
             $this->customerDecisions ?? new GuidedCustomerDecisionBuilder(),
             $this->productDecisions ?? new GuidedProductDecisionBuilder(),
+            $this->collisionDecisions ?? new GuidedCollisionDecisionBuilder(),
         );
     }
 

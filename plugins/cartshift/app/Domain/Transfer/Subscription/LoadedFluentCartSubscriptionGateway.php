@@ -14,6 +14,20 @@ final class LoadedFluentCartSubscriptionGateway implements SubscriptionCutoverTa
     public function create(array $row): int
     {
         global $wpdb;
+        $uuid = $row['uuid'] ?? null;
+        if (!is_string($uuid) || trim($uuid) === '') {
+            throw new \RuntimeException('target_subscription_identity_invalid');
+        }
+        $collision = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$wpdb->prefix}fct_subscriptions WHERE uuid = %s LIMIT 1",
+            $uuid,
+        ));
+        if (trim((string) ($wpdb->last_error ?? '')) !== '') {
+            throw new \RuntimeException('target_subscription_collision_read_failed');
+        }
+        if ($collision !== null) {
+            throw new \RuntimeException('target_subscription_identity_conflict');
+        }
         foreach (['config', 'original_plan', 'vendor_response'] as $field) {
             if (is_array($row[$field] ?? null)) {
                 $row[$field] = CanonicalJson::encode($row[$field]);

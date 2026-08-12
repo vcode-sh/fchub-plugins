@@ -15,6 +15,8 @@ use CartShift\Domain\Transfer\RecordEnvelope;
 use CartShift\Domain\Transfer\SelectionClause;
 use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Domain\Transfer\SameSite\GuidedEvidence;
+use CartShift\Domain\Transfer\SameSite\GuidedCollisionDecisionBuilder;
+use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedRunner;
 use CartShift\Domain\Transfer\SameSite\GuidedRunPlan;
@@ -186,6 +188,8 @@ final class GuidedRunnerTest extends PluginTestCase
         $result = $runner->run($this->stepFor('propose-decisions', $evidence));
 
         self::assertCount(1, $result['product_questions']);
+        self::assertSame([], $result['customer_questions']);
+        self::assertSame([], $result['collision_questions']);
         self::assertSame([], $result['proposal_decisions']);
     }
 
@@ -199,15 +203,15 @@ final class GuidedRunnerTest extends PluginTestCase
      * The plan speaks CLI (`execution-context`, `decision-set`); the pipelines
      * read snake_case (`execution_context`, `decision_set`). A key that falls
      * between the two does not fail loudly — the pipeline simply runs with a
-     * default nobody chose, which for `execution_context` means a rehearsal
-     * quietly becoming something else. So the test walks the entire plan rather
+     * default nobody chose, which for `execution_context` means a guided run
+     * quietly becoming a CLI mode. So the test walks the entire plan rather
      * than one step, and fails on any option the runner cannot name.
      */
     public function testNoOptionIsLostBetweenThePlanAndThePipelines(): void
     {
         $this->configure();
 
-        foreach ($this->plan($this->completeEvidence())->steps() as $step) {
+        foreach ($this->plan($this->completeEvidence(), true)->steps() as $step) {
             foreach (array_keys($step->arguments) as $option) {
                 self::assertTrue(
                     GuidedRunner::translates($option),
@@ -235,7 +239,7 @@ final class GuidedRunnerTest extends PluginTestCase
         self::assertSame('descriptor-0001', $seen['descriptor']);
         self::assertSame(self::WORKSPACE . '/package.ndjson', $seen['package']);
         self::assertSame(str_repeat('a', 64), $seen['confirm']);
-        self::assertSame('rehearsal', $seen['execution_context']);
+        self::assertSame('guided', $seen['execution_context']);
 
         // The CLI spellings must not survive alongside their translations, or a
         // pipeline reading `execution_context` and a reader reading
@@ -262,7 +266,7 @@ final class GuidedRunnerTest extends PluginTestCase
     {
         $emitted = array_values(array_unique(array_map(
             static fn (object $step): string => $step->verb,
-            $this->plan($this->completeEvidence())->steps(),
+            $this->plan($this->completeEvidence(), true)->steps(),
         )));
 
         sort($emitted);
@@ -330,7 +334,13 @@ final class GuidedRunnerTest extends PluginTestCase
         // The subset with an injectable seam. `audit`, `propose-decisions` and
         // `prepare` reach live WooCommerce and FluentCart composition roots and
         // are covered against the mounted runtime instead.
-        $stubbable = ['compatibility', 'validate-package', 'export', ...['stage', 'reconcile', 'promote', 'activate-catalogue', 'complete']];
+        $stubbable = ['compatibility', 'validate-package', 'export', ...[
+            'stage',
+            'reconcile',
+            'promote',
+            'activate-catalogue',
+            'complete',
+        ]];
 
         foreach ($this->plan($this->completeEvidence())->steps() as $step) {
             if (in_array($step->verb, $stubbable, true)) {
@@ -343,6 +353,60 @@ final class GuidedRunnerTest extends PluginTestCase
             $this->sorted(array_unique($reached)),
             'A verb the runner claims to handle never reached a seam.',
         );
+    }
+
+    public function testSubscriptionOwnershipVerbsReachTheirSharedDomainServices(): void
+    {
+        $this->configure();
+        $target = [];
+        $source = [];
+        $runner = new GuidedRunner(
+            new GuidedSetup(self::SOURCE_KEY, self::OPERATOR),
+            targetPipeline: static function (array $input) use (&$target): array {
+                $target[] = $input;
+                return ['state' => $input['command']];
+            },
+            subscriptionSourceRelease: static function (array $input) use (&$source): array {
+                $source[] = $input;
+                return ['state' => 'source_released'];
+            },
+        );
+
+        foreach ($this->plan($this->completeEvidence(), true)->steps() as $step) {
+            if (in_array($step->verb, [
+                'prepare-subscription-cutover',
+                'release-subscription-source',
+                'activate-subscriptions',
+            ], true)) {
+                $runner->run($step);
+            }
+        }
+
+        self::assertSame(
+            ['prepare-subscription-cutover', 'activate-subscriptions'],
+            array_column($target, 'command'),
+        );
+        foreach ($target as $input) {
+            self::assertSame('descriptor-0001', $input['descriptor']);
+            self::assertSame(self::WORKSPACE . '/package.ndjson', $input['package']);
+            self::assertSame(str_repeat('a', 64), $input['confirm']);
+            self::assertSame('guided', $input['execution_context']);
+        }
+        self::assertCount(1, $source);
+        self::assertSame('descriptor-0001', $source[0]['descriptor']);
+        self::assertSame(self::WORKSPACE, $source[0]['private_dir']);
+        self::assertSame('guided', $source[0]['execution_context']);
+        self::assertArrayNotHasKey('command', $source[0]);
+
+        $runner->run(new GuidedStep('release-subscription-source', [
+            'role' => 'source',
+            'private-dir' => self::WORKSPACE,
+            'descriptor' => 'descriptor-0001',
+            'execution-context' => 'guided',
+            'renewals-paused' => true,
+        ]));
+
+        self::assertTrue($source[1]['renewals_paused']);
     }
 
     public function testPrepareReadsTheValidatedPackageBeforeDispatchingItsPayload(): void
@@ -440,15 +504,14 @@ final class GuidedRunnerTest extends PluginTestCase
             ])],
         ]);
 
-        $this->assertDefaultReadinessStopsBeforePrepare(
+        $this->assertDefaultReadinessValidatesWithoutPrepare(
             [$product->envelope()],
             [$this->recordDecision($product->identity, $product->envelope()->sourceContentDigest)],
-            'guided_completed_rehearsal_rollback_unavailable',
             'shared_parent_stock',
         );
     }
 
-    public function testDefaultTargetReadinessStopsDependencyBoundOrdersBeforePrepare(): void
+    public function testDefaultTargetReadinessDefersDependencyBoundOrdersToStage(): void
     {
         $order = new OrderRecord(
             new SourceIdentity('lapka-web', 'order', '9'),
@@ -468,21 +531,19 @@ final class GuidedRunnerTest extends PluginTestCase
             [], [], [], [], [], [], [], [], [],
         );
 
-        $this->assertDefaultReadinessStopsBeforePrepare(
+        $this->assertDefaultReadinessValidatesWithoutPrepare(
             [$order->envelope()],
             [],
-            'guided_dependency_bound_target_readiness_unavailable',
         );
     }
 
-    public function testDefaultTargetReadinessStopsARepresentablePackageUntilCompletedRollbackExists(): void
+    public function testDefaultTargetReadinessAcceptsARepresentablePackage(): void
     {
         $product = ProductAssessmentFixture::product();
 
-        $this->assertDefaultReadinessStopsBeforePrepare(
+        $this->assertDefaultReadinessValidatesWithoutPrepare(
             [$product->envelope()],
             [$this->recordDecision($product->identity, $product->envelope()->sourceContentDigest)],
-            'guided_completed_rehearsal_rollback_unavailable',
         );
     }
 
@@ -495,10 +556,9 @@ final class GuidedRunnerTest extends PluginTestCase
             ['dependencies' => []],
         );
 
-        $this->assertDefaultReadinessStopsBeforePrepare(
+        $this->assertDefaultReadinessValidatesWithoutPrepare(
             [$term, $product->envelope()],
             [$this->recordDecision($product->identity, $product->envelope()->sourceContentDigest)],
-            'guided_completed_rehearsal_rollback_unavailable',
         );
     }
 
@@ -621,6 +681,8 @@ final class GuidedRunnerTest extends PluginTestCase
         ?\Closure $probe = null,
         ?\Closure $proposalPipeline = null,
         ?GuidedProductDecisionBuilder $productDecisions = null,
+        ?GuidedCustomerDecisionBuilder $customerDecisions = null,
+        ?GuidedCollisionDecisionBuilder $collisionDecisions = null,
     ): GuidedRunner
     {
         return new GuidedRunner(
@@ -633,10 +695,17 @@ final class GuidedRunnerTest extends PluginTestCase
             targetReadiness: static function (): void {},
             proposalPipeline: $proposalPipeline,
             productDecisions: $productDecisions,
+            customerDecisions: $customerDecisions ?? new GuidedCustomerDecisionBuilder(
+                targetCandidates: static fn (): array => [],
+            ),
+            collisionDecisions: $collisionDecisions ?? new GuidedCollisionDecisionBuilder(
+                static fn (): iterable => [],
+                static fn (): array => [],
+            ),
         );
     }
 
-    private function plan(GuidedEvidence $evidence): GuidedRunPlan
+    private function plan(GuidedEvidence $evidence, bool $includesSubscriptions = false): GuidedRunPlan
     {
         return GuidedRunPlan::rehearsal(
             sourceKey: self::SOURCE_KEY,
@@ -644,7 +713,7 @@ final class GuidedRunnerTest extends PluginTestCase
             operator: self::OPERATOR,
             decidedAtUtc: '2026-08-12T11:00:00Z',
             evidence: $evidence,
-            includesSubscriptions: false,
+            includesSubscriptions: $includesSubscriptions,
         );
     }
 
@@ -683,10 +752,9 @@ final class GuidedRunnerTest extends PluginTestCase
     }
 
     /** @param list<\CartShift\Domain\Transfer\RecordEnvelope> $records @param list<array<string,mixed>> $decisions */
-    private function assertDefaultReadinessStopsBeforePrepare(
+    private function assertDefaultReadinessValidatesWithoutPrepare(
         array $records,
         array $decisions,
-        string $expected,
         ?string $expectedException = null,
     ): void {
         [$root, $package, $decisionPath] = $this->package($records, $decisions);
@@ -700,19 +768,16 @@ final class GuidedRunnerTest extends PluginTestCase
         );
 
         try {
-            $runner->run(new GuidedStep('validate-package', [
+            $result = $runner->run(new GuidedStep('validate-package', [
                 'role' => 'target',
                 'package' => $package,
                 'decision-set' => $decisionPath,
             ]));
-            self::fail('Target readiness advanced into prepare.');
-        } catch (\RuntimeException $failure) {
-            self::assertStringContainsString($expected, $failure->getMessage());
+            self::assertSame('validated', $result['status']);
             if ($expectedException !== null) {
-                self::assertInstanceOf(\CartShift\Domain\Transfer\SameSite\GuidedRunFailure::class, $failure);
                 self::assertSame(
                     $expectedException,
-                    $failure->context['migration_exceptions'][0]['kind'] ?? null,
+                    $result['migration_exceptions'][0]['kind'] ?? null,
                 );
             }
             self::assertSame(0, $prepareCalls);

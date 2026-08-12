@@ -273,6 +273,27 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         self::assertSame(200, $response->get_status());
     }
 
+    public function testOccupiedTargetCountsWarnButDoNotBlockTheMappingReview(): void
+    {
+        $this->nameTheSite();
+        $GLOBALS['_cartshift_test_get_var_callback'] = static function (string $query): string {
+            if (str_contains($query, 'SHOW TABLES LIKE')) return 'exists';
+            if (str_contains($query, 'fct_customers')) return '97';
+            if (str_contains($query, 'fct_orders')) return '34';
+            if (str_contains($query, 'fct_subscriptions')) return '4';
+            return '0';
+        };
+
+        $status = $this->guidedStatus();
+        $response = $this->controller()->start(new WP_REST_Request());
+        $check = array_column($status['preflight']['checks'], null, 'label')['Existing FluentCart records'];
+
+        self::assertTrue($status['preflight']['ready']);
+        self::assertSame('warn', $check['severity']);
+        self::assertStringContainsString('97 customers, 34 orders and 4 subscriptions', $check['message']);
+        self::assertSame(200, $response->get_status());
+    }
+
     public function testThePlanProjectionContainsFriendlyProgressWithoutCommandsOrPaths(): void
     {
         $this->nameTheSite();
@@ -327,15 +348,17 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         self::assertSame(409, $response->get_status());
     }
 
-    public function testCutoverIsReportedUnavailableBeforeAnybodyStarts(): void
+    public function testTheGuidedMoveExplainsVerificationAndActivationBeforeAnybodyStarts(): void
     {
         $this->nameTheSite();
 
         $cutover = $this->guidedStatus()['setup']['cutover'];
 
-        self::assertFalse($cutover['available']);
+        self::assertTrue($cutover['available']);
         self::assertArrayNotHasKey('reason', $cutover);
-        self::assertStringContainsString('roll back a completed rehearsal', $cutover['message']);
+        self::assertStringContainsString('verify', strtolower($cutover['message']));
+        self::assertStringContainsString('activate', strtolower($cutover['message']));
+        self::assertStringNotContainsString('rehearsal', strtolower($cutover['message']));
     }
 
     public function testStartPersistsEveryCompletedStepAndResumesPastPrepare(): void
@@ -369,12 +392,12 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         self::assertSame(200, $accepted->get_status());
 
         $finished = $this->driveToTerminal($controller);
-        self::assertSame('unsafe_completion', $finished->get_data()['data']['phase']);
+        self::assertSame(GuidedRunState::COMPLETED, $finished->get_data()['data']['phase']);
         self::assertSame(1, count(array_filter($calls, static fn (string $verb): bool => $verb === 'prepare')));
 
         $status = $controller->status(new WP_REST_Request())->get_data()['data'];
-        self::assertSame('unsafe_completion', $status['run']['phase']);
-        self::assertFalse($status['run']['failure']['can_restart']);
+        self::assertSame(GuidedRunState::COMPLETED, $status['run']['phase']);
+        self::assertNull($status['run']['failure']);
         self::assertSame(12, $status['run']['completed_steps']);
     }
 
@@ -715,7 +738,7 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         $failed = $controller->start(new WP_REST_Request())->get_data()['data'];
 
         self::assertFalse($failed['failure']['can_restart']);
-        self::assertStringContainsString('cannot yet roll back', $failed['failure']['message']);
+        self::assertStringContainsString('could be rolled back safely', $failed['failure']['message']);
         self::assertStringNotContainsString('guided_completed', json_encode($failed, JSON_THROW_ON_ERROR));
     }
 
@@ -794,7 +817,7 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         self::assertStringNotContainsString('Allocate', json_encode($reports, JSON_THROW_ON_ERROR));
     }
 
-    public function testNonReversibleCompletedRehearsalStopsBeforeTargetPreparation(): void
+    public function testNonReversibleMigrationExplainsTheSafetyStopWithoutLegacyTerminology(): void
     {
         $this->configurePrivateWorkspace();
         $this->nameTheSite();
@@ -807,7 +830,10 @@ final class GuidedMigrationControllerTest extends PluginTestCase
         $failed = $controller->start(new WP_REST_Request())->get_data()['data'];
 
         self::assertFalse($failed['failure']['can_restart']);
-        self::assertStringContainsString('cannot yet roll back a completed rehearsal', $failed['failure']['message']);
+        self::assertStringContainsString('could be rolled back safely', $failed['failure']['message']);
+        self::assertStringContainsString('before preparing any FluentCart records', $failed['failure']['message']);
+        self::assertStringNotContainsString('rehearsal', strtolower($failed['failure']['message']));
+        self::assertStringNotContainsString('core', strtolower($failed['failure']['message']));
         self::assertSame(0, $failed['completed_steps']);
     }
 

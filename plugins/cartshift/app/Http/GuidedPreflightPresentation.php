@@ -15,19 +15,6 @@ final class GuidedPreflightPresentation
     public function evaluate(array $preflight): array
     {
         $payload = $this->payload($preflight);
-        if (($payload['checks']['fc_data']['severity'] ?? null) === PreflightCheck::SEVERITY_WARN) {
-            $counts = $preflight['checks']['fc_data']['counts'] ?? [];
-            $blocking = is_array($counts)
-                ? array_sum(array_map(
-                    static fn (string $kind): int => max(0, (int) ($counts[$kind] ?? 0)),
-                    ['customers', 'orders', 'subscriptions'],
-                ))
-                : 1;
-            if ($blocking > 0) {
-                $payload['checks']['fc_data']['severity'] = PreflightCheck::SEVERITY_FAIL;
-                $payload['ready'] = false;
-            }
-        }
         $coupons = $this->standaloneCouponCount();
         $payload['checks']['standalone_coupons'] = [
             'label' => 'Standalone coupons',
@@ -132,8 +119,8 @@ final class GuidedPreflightPresentation
             $last = array_pop($blocking);
             $items = $blocking === [] ? $last : implode(', ', $blocking) . ' and ' . $last;
             return sprintf(
-                'FluentCart already has %s. Their safe reuse review is not available yet, '
-                    . 'so CartShift will stop rather than create duplicates.',
+                'FluentCart already has %s. CartShift will check for safe matches during review. '
+                    . 'Unrelated records will stay untouched, and existing records will not be overwritten.',
                 $items,
             );
         }

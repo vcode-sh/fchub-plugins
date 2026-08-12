@@ -4,7 +4,7 @@
       <div>
         <p class="cartshift-eyebrow">Saved progress</p>
         <h2>{{ runTitle }}</h2>
-        <p v-if="run.phase !== 'unsafe_completion'">
+        <p>
           {{ run.completed_steps }} of {{ run.total_steps }} checks complete<template v-if="run.last_step"> · {{ run.last_step }}</template>
         </p>
       </div>
@@ -28,6 +28,22 @@
       {{ busy ? 'Stopping…' : 'Stop this outdated check' }}
     </button>
 
+    <section v-if="run.renewal_pause" class="cartshift-rollback-card" data-test="renewal-pause">
+      <span class="dashicons dashicons-controls-pause" aria-hidden="true"></span>
+      <div>
+        <h3>{{ run.renewal_pause.title }}</h3>
+        <p>{{ run.renewal_pause.message }}</p>
+        <button
+          class="button button-primary"
+          data-test="confirm-renewals-paused"
+          :disabled="busy"
+          @click="$emit('confirm-renewals')"
+        >
+          {{ busy ? 'Continuing…' : run.renewal_pause.action }}
+        </button>
+      </div>
+    </section>
+
     <div v-if="run.rollback" class="cartshift-rollback-card" data-test="rollback-preview">
       <template v-if="run.rollback.safe">
         <span class="dashicons dashicons-undo" aria-hidden="true"></span>
@@ -46,17 +62,20 @@
     </div>
 
     <section v-if="run.migration_exceptions?.length" class="cartshift-stock-report" data-test="migration-exceptions">
-      <header><span class="dashicons dashicons-archive" aria-hidden="true"></span><div><h3>Shared stock needs manual setup</h3><p>Affected variations stay unavailable, preventing accidental overselling.</p></div></header>
+      <header><span class="dashicons dashicons-archive" aria-hidden="true"></span><div><h3>Migration follow-up</h3><p>CartShift lists anything that stayed in WooCommerce or needs manual setup.</p></div></header>
       <article v-for="(item, itemIndex) in run.migration_exceptions" :key="itemIndex">
         <h4>{{ item.title }}</h4>
         <p>{{ item.message }}</p>
-        <p v-if="item.target_state === 'confirmed'"><strong>CartShift verified the safe unavailable state in FluentCart.</strong></p>
-        <p v-else-if="item.target_state === 'needs_review'"><strong>Keep these variations unavailable and inspect them before selling.</strong></p>
-        <p v-if="item.source_quantity_state === 'known'">Original product-wide shared quantity: {{ item.source_quantity }}.</p>
-        <p v-else-if="item.source_quantity_state === 'below_zero'">WooCommerce reported stock below zero. Count physical stock before enabling it.</p>
-        <p v-else>WooCommerce did not provide a shared quantity. Count physical stock before enabling it.</p>
-        <ul><li v-for="(variation, variationIndex) in item.variations" :key="variationIndex">{{ variation.title }}<template v-if="variation.sku"> — SKU {{ variation.sku }}</template></li></ul>
-        <ul class="cartshift-suggestions"><li v-for="suggestion in item.suggestions" :key="suggestion">{{ suggestion }}</li></ul>
+        <template v-if="item.type === 'shared_stock'">
+          <p><strong>Shared stock needs manual setup. Affected variations stay unavailable, preventing accidental overselling.</strong></p>
+          <p v-if="item.target_state === 'confirmed'"><strong>CartShift verified the safe unavailable state in FluentCart.</strong></p>
+          <p v-else-if="item.target_state === 'needs_review'"><strong>Keep these variations unavailable and inspect them before selling.</strong></p>
+          <p v-if="item.source_quantity_state === 'known'">Original product-wide shared quantity: {{ item.source_quantity }}.</p>
+          <p v-else-if="item.source_quantity_state === 'below_zero'">WooCommerce reported stock below zero. Count physical stock before enabling it.</p>
+          <p v-else>WooCommerce did not provide a shared quantity. Count physical stock before enabling it.</p>
+          <ul><li v-for="(variation, variationIndex) in item.variations" :key="variationIndex">{{ variation.title }}<template v-if="variation.sku"> — SKU {{ variation.sku }}</template></li></ul>
+          <ul class="cartshift-suggestions"><li v-for="suggestion in item.suggestions" :key="suggestion">{{ suggestion }}</li></ul>
+        </template>
       </article>
     </section>
   </section>
@@ -66,14 +85,16 @@
 import { computed } from 'vue';
 
 const props = defineProps({ run: { type: Object, required: true }, busy: { type: Boolean, required: true } });
-defineEmits(['continue', 'rollback']);
+defineEmits(['continue', 'confirm-renewals', 'rollback']);
 
 const progress = computed(() => Math.min(100, Math.round((props.run.completed_steps / props.run.total_steps) * 100) || 0));
 const runTitle = computed(() => {
   if (props.run.phase === 'awaiting_decisions') return 'Waiting for your review';
-  if (props.run.phase === 'failed' || props.run.phase === 'unsafe_completion') return 'The review stopped safely';
+  if (props.run.phase === 'awaiting_renewal_pause') return 'Ready to move subscription renewals';
+  if (props.run.phase === 'completed') return 'Migration complete';
+  if (props.run.phase === 'failed') return 'Migration stopped safely';
   if (props.run.phase === 'rolled_back') return 'Rollback complete';
   if (props.run.phase === 'cancelled') return 'Review cancelled';
-  return 'Reviewing your store';
+  return 'Moving your store';
 });
 </script>

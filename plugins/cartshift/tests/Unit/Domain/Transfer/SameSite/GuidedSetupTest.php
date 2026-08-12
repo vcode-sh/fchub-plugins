@@ -213,25 +213,18 @@ final class GuidedSetupTest extends PluginTestCase
         self::assertSame($modeBefore, $modeAfter);
     }
 
-    /**
-     * THE PART SETUP CANNOT UNLOCK, STATED RATHER THAN DISCOVERED.
-     *
-     * `assertCutoverApproval()` needs a sha256 constant matching a manifest file
-     * on disk whose operator matches — per run, not once. A browser cannot
-     * define a PHP constant, which is the property that makes the approval mean
-     * anything. So the screen says so up front instead of letting somebody
-     * complete a rehearsal and then find the last button missing.
-     */
-    public function testCutoverIsReportedUnavailableFromTheBrowserEvenWhenSetupIsComplete(): void
+    public function testTheGuidedMoveOwnsActivationAfterTheOwnerReview(): void
     {
         $this->guidedSetup()->ensure();
 
         $cutover = $this->guidedSetup()->cutover();
 
         self::assertTrue($this->guidedSetup()->isComplete());
-        self::assertFalse($cutover['available']);
-        self::assertSame('cutover_approval_is_per_run_evidence', $cutover['reason']);
-        self::assertStringContainsString('rehearsal', strtolower($cutover['message']));
+        self::assertTrue($cutover['available']);
+        self::assertSame('guided_same_site_move', $cutover['reason']);
+        self::assertStringContainsString('verify', strtolower($cutover['message']));
+        self::assertStringContainsString('activate', strtolower($cutover['message']));
+        self::assertStringNotContainsString('rehearsal', strtolower($cutover['message']));
     }
 
     private function guidedSetup(): GuidedSetup

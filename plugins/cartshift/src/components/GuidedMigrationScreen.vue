@@ -29,14 +29,15 @@
           :start-label="startLabel"
           @initialise="initialise"
           @refresh="refresh"
-          @start="startRehearsal"
+          @start="startMigration"
         />
 
         <GuidedRunPanel
           v-if="currentRun"
           :run="currentRun"
           :busy="state.busy"
-          @continue="startRehearsal"
+          @continue="startMigration"
+          @confirm-renewals="confirmRenewalsPaused"
           @rollback="rollbackRun"
         />
 
@@ -85,13 +86,16 @@ const canStart = computed(
     !currentRun.value?.mode_changed &&
     (!currentRun.value ||
       ['ready', 'running', 'cancelled', 'rolled_back'].includes(currentRun.value.phase) ||
-      (currentRun.value.phase === 'failed' && currentRun.value.failure?.can_restart === true))
+      (currentRun.value.phase === 'failed' &&
+        (currentRun.value.failure?.can_restart === true || currentRun.value.failure?.can_resume_forward === true)))
 );
 
 const startLabel = computed(() => {
   if (!currentRun.value) return 'Review my store';
   if (['cancelled', 'rolled_back'].includes(currentRun.value.phase)) return 'Start a new check';
-  if (currentRun.value.phase === 'failed') return 'Try the check again';
+  if (currentRun.value.phase === 'failed') {
+    return currentRun.value.failure?.can_resume_forward ? 'Resume migration' : 'Try the check again';
+  }
   return 'Continue the check';
 });
 
@@ -152,13 +156,13 @@ async function initialise() {
   }
 }
 
-async function startRehearsal() {
+async function startMigration() {
   state.busy = true;
   state.error = null;
   clearReviewApprovals();
   state.reviewNotice = null;
   try {
-    await driveRehearsal();
+    await driveMigration();
   } catch {
     await refresh();
     if (!currentRun.value || currentRun.value.phase === 'running') {
@@ -191,10 +195,26 @@ async function acceptRunDecisions() {
       await nextTick();
       decisionReview.value?.focusHeading();
     }
-    if (state.run?.phase === 'running') await driveRehearsal();
+    if (state.run?.phase === 'running') await driveMigration();
   } catch {
     await refresh();
     if (currentRun.value?.phase === 'awaiting_decisions') state.error = 'CartShift could not save those choices.';
+  } finally {
+    state.busy = false;
+  }
+}
+
+async function confirmRenewalsPaused() {
+  state.busy = true;
+  state.error = null;
+  try {
+    state.run = await api('POST', 'migration/start', { renewals_paused: true });
+    if (state.run?.phase === 'running') await driveMigration();
+  } catch {
+    await refresh();
+    if (currentRun.value?.phase === 'awaiting_renewal_pause') {
+      state.error = 'CartShift could not confirm the renewal pause. Nothing was released.';
+    }
   } finally {
     state.busy = false;
   }
@@ -228,12 +248,13 @@ async function rollbackRun() {
   }
 }
 
-async function driveRehearsal() {
-  for (let step = 0; step < 12; step += 1) {
+async function driveMigration() {
+  const maximumRequests = Math.max(1, Number(state.data?.plan?.length || 12) + 1);
+  for (let step = 0; step < maximumRequests; step += 1) {
     state.run = await api('POST', 'migration/start');
     if (state.run?.phase !== 'running') return;
   }
-  throw new Error('The readiness review did not reach a safe pause.');
+  throw new Error('The migration did not reach a saved pause.');
 }
 
 onMounted(refresh);

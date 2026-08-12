@@ -13,6 +13,8 @@ use CartShift\Domain\Transfer\Execution\RollbackPlanner;
 use CartShift\Domain\Transfer\Execution\RollbackPlanRepository;
 use CartShift\Domain\Transfer\Execution\TransferJournalRepository;
 use CartShift\Domain\Transfer\Execution\TransferRunState;
+use CartShift\Domain\Transfer\Subscription\SubscriptionCutoverEvidenceRepository;
+use CartShift\Domain\Transfer\Subscription\SubscriptionRollbackGate;
 
 defined('ABSPATH') || exit;
 
@@ -86,6 +88,7 @@ final readonly class GuidedRollback
     /** @param array<string,mixed> $sealed @return array<string,mixed> */
     public function executeSealed(array $sealed): array
     {
+        $this->assertAvailable();
         $path = $sealed['rollback_plan'] ?? null;
         $fingerprint = $sealed['rollback_plan_fingerprint'] ?? null;
         $recovery = $sealed['lease_recovery'] ?? null;
@@ -105,7 +108,7 @@ final readonly class GuidedRollback
             'package' => $this->state->evidence->packagePath,
             'descriptor' => $this->state->evidence->descriptor,
             'confirm' => $this->state->evidence->selectionFingerprint,
-            'execution_context' => 'rehearsal',
+            'execution_context' => 'guided',
             'rollback_plan' => $path,
             'rollback_plan_fingerprint' => $fingerprint,
             'lease_recovery' => $recovery,
@@ -114,16 +117,16 @@ final readonly class GuidedRollback
             return ($this->execute)($input);
         }
         $prepared = (new PreparedTransferRepository($this->workspace))->get((string) $this->state->evidence->descriptor);
-        $state = (new TransferJournalRepository(new PreparedTransferRepository($this->workspace)))
-            ->state($prepared->runId);
+        $journal = new TransferJournalRepository(new PreparedTransferRepository($this->workspace));
+        $pipeline = LoadedTargetTransferPipeline::create();
+        $pipeline->prepareGuidedRollback($prepared, $journal, $this->workspace);
+        $state = $journal->state($prepared->runId);
         if ($state === TransferRunState::RolledBack) {
             return ['state' => GuidedRunState::ROLLED_BACK];
         }
         if (!in_array($state, [TransferRunState::Failed, TransferRunState::RollingBack], true)) {
             throw new \RuntimeException('guided_rollback_unavailable');
         }
-        $pipeline = LoadedTargetTransferPipeline::create();
-
         return $pipeline($input);
     }
 
@@ -163,6 +166,10 @@ final readonly class GuidedRollback
             || $this->state->evidence->packagePath === null
             || $this->state->evidence->descriptor === null) {
             throw new \RuntimeException('guided_rollback_unavailable');
+        }
+        if ($this->state->includesSubscriptions) {
+            (new SubscriptionRollbackGate(new SubscriptionCutoverEvidenceRepository($this->workspace)))
+                ->assertAllowed($this->state->evidence->descriptor);
         }
     }
 }

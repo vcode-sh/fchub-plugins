@@ -32,7 +32,7 @@ final readonly class PreparedTransfer
         if (!hash_equals($packageHash, $targetState->packageHash)) {
             throw new \InvalidArgumentException('Prepared package hashes disagree.');
         }
-        if (!in_array($executionContext, ['rehearsal', 'cutover'], true)) {
+        if (!in_array($executionContext, ['rehearsal', 'cutover', 'guided'], true)) {
             throw new \InvalidArgumentException('Prepared execution context is invalid.');
         }
         if (!array_is_list($blockingFindings) || array_filter($blockingFindings, 'is_string') !== $blockingFindings) {

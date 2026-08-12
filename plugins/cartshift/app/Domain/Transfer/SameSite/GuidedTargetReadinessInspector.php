@@ -71,30 +71,21 @@ final readonly class GuidedTargetReadinessInspector
             $records,
             $evaluationUtc,
         );
-        $dependencyBound = false;
         $exceptions = [];
         foreach ($records as $record) {
             match ($record->identity->kind()) {
                 RecordKind::Product => $this->inspectProductPlan($plans->product($record), $exceptions),
                 RecordKind::Customer => $plans->customer($record),
-                RecordKind::Order, RecordKind::Subscription => $dependencyBound = true,
+                // Their exact plans need dependency target IDs created during stage.
+                RecordKind::Order, RecordKind::Subscription => null,
                 RecordKind::TaxonomyGroup,
                 RecordKind::TaxonomyTerm,
                 RecordKind::MediaAsset,
                 RecordKind::DownloadAsset => null,
             };
         }
-        if ($dependencyBound) {
-            throw new GuidedRunFailure(
-                'guided_dependency_bound_target_readiness_unavailable',
-                ['migration_exceptions' => $exceptions],
-            );
-        }
 
-        throw new GuidedRunFailure(
-            'guided_completed_rehearsal_rollback_unavailable',
-            ['migration_exceptions' => $exceptions],
-        );
+        return $exceptions;
     }
 
     /** @param list<array<string,mixed>> $exceptions */

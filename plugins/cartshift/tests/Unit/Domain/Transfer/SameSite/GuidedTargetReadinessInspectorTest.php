@@ -10,7 +10,6 @@ use CartShift\Domain\Transfer\Package\TransferPackageValidator;
 use CartShift\Domain\Transfer\Package\TransferPackageWriter;
 use CartShift\Domain\Transfer\Product\StockOwnership;
 use CartShift\Domain\Transfer\Product\StockProfile;
-use CartShift\Domain\Transfer\SameSite\GuidedRunFailure;
 use CartShift\Domain\Transfer\SameSite\GuidedTargetReadinessInspector;
 use CartShift\Domain\Transfer\SelectionClause;
 use CartShift\Domain\Transfer\SourceIdentity;
@@ -64,7 +63,7 @@ final class GuidedTargetReadinessInspectorTest extends PluginTestCase
         ], $result);
     }
 
-    public function testDependencyBoundRecordStopsWithPreviouslyCollectedParentStockContext(): void
+    public function testDependencyBoundRecordsValidateWithoutPreparingOrWritingTargetRecords(): void
     {
         $parent = ProductAssessmentFixture::identity('42');
         $product = ProductAssessmentFixture::product([
@@ -96,19 +95,17 @@ final class GuidedTargetReadinessInspectorTest extends PluginTestCase
             [$this->productDecision($product->identity, $product->envelope()->sourceContentDigest)],
         );
 
-        try {
-            (new GuidedTargetReadinessInspector())->inspect([
-                'package' => $package,
-                'decision_set' => $decisionPath,
-            ]);
-            self::fail('Dependency-bound records advanced beyond target readiness.');
-        } catch (GuidedRunFailure $failure) {
-            self::assertSame('guided_dependency_bound_target_readiness_unavailable', $failure->getMessage());
-            self::assertSame('shared_parent_stock', $failure->context['migration_exceptions'][0]['kind']);
-            self::assertSame('lapka-web:product:42:variation:101', $failure->context['migration_exceptions'][0]['source_variation']);
-            self::assertSame(7, $failure->context['migration_exceptions'][0]['source_quantity']);
-            self::assertSame('parent', $failure->context['migration_exceptions'][0]['source_stock']['ownership']);
-        }
+        $result = (new GuidedTargetReadinessInspector())->inspect([
+            'package' => $package,
+            'decision_set' => $decisionPath,
+        ]);
+
+        self::assertSame('validated', $result['status']);
+        self::assertSame(['order' => 1, 'product' => 1], $result['record_counts']);
+        self::assertSame('shared_parent_stock', $result['migration_exceptions'][0]['kind']);
+        self::assertSame('lapka-web:product:42:variation:101', $result['migration_exceptions'][0]['source_variation']);
+        self::assertSame(7, $result['migration_exceptions'][0]['source_quantity']);
+        self::assertSame('parent', $result['migration_exceptions'][0]['source_stock']['ownership']);
     }
 
     /** @param list<\CartShift\Domain\Transfer\RecordEnvelope> $records @param list<array<string,mixed>> $decisions */

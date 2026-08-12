@@ -69,7 +69,7 @@ final class GuidedPreflightPresentationTest extends PluginTestCase
         ], $payload['checks']);
     }
 
-    public function testExistingCommerceRecordsRemainAPreciseBlockerUntilTheyHaveReuseDecisions(): void
+    public function testExistingCommerceRecordsAreAReviewWarningInsteadOfAnAggregateBlocker(): void
     {
         $payload = (new GuidedPreflightPresentation())->evaluate([
             'ready' => true,
@@ -78,21 +78,23 @@ final class GuidedPreflightPresentationTest extends PluginTestCase
                     'severity' => 'warn',
                     'counts' => [
                         'products' => 2,
-                        'customers' => 4,
-                        'orders' => 3,
-                        'subscriptions' => 0,
+                        'customers' => 97,
+                        'orders' => 34,
+                        'subscriptions' => 4,
                         'coupons' => 8,
                     ],
                 ],
             ],
         ]);
 
-        self::assertFalse($payload['ready']);
-        self::assertSame('fail', $payload['checks'][0]['severity']);
+        self::assertTrue($payload['ready']);
+        self::assertSame('warn', $payload['checks'][0]['severity']);
         self::assertSame(
-            'FluentCart already has 4 customers and 3 orders. Their safe reuse review is not available yet, '
-                . 'so CartShift will stop rather than create duplicates.',
+            'FluentCart already has 97 customers, 34 orders and 4 subscriptions. '
+                . 'CartShift will check for safe matches during review. Unrelated records will stay untouched, '
+                . 'and existing records will not be overwritten.',
             $payload['checks'][0]['message'],
         );
+        self::assertArrayNotHasKey('counts', $payload['checks'][0]);
     }
 }

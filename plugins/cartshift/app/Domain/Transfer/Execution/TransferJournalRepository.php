@@ -95,6 +95,7 @@ final readonly class TransferJournalRepository implements TransferJournal
         if ($state === null || !in_array($state, [
             TransferRunState::Staging,
             TransferRunState::Reconciling,
+            TransferRunState::Promoted,
             TransferRunState::CatalogueActivating,
             TransferRunState::RollingBack,
         ], true)) {
@@ -222,6 +223,9 @@ final readonly class TransferJournalRepository implements TransferJournal
         if (DatabaseTransaction::depth() < 1) {
             throw new \RuntimeException('transfer_record_rollback_requires_active_transaction');
         }
+        if (!in_array($receipt->action, ['created', 'reused'], true)) {
+            throw new \InvalidArgumentException('Only created or reused receipts may be rolled back.');
+        }
         $updated = $this->db()->update($this->recordsTable(), [
             'state' => 'rolled_back',
             'updated_at' => $this->now(),
@@ -254,15 +258,22 @@ final readonly class TransferJournalRepository implements TransferJournal
                 'wc_id' => $identity->sourceId,
                 'fc_id' => $targetId,
                 'migration_id' => $receipt->runId,
+                'created_by_migration' => $receipt->action === 'created' ? 1 : 0,
                 'is_simulated' => 0,
                 'target_fingerprint' => $receipt->afterFingerprint,
             ]);
             if ($mapUpdate === false) throw new \RuntimeException('transfer_record_rollback_map_failure');
+            if ($receipt->action === 'reused') {
+                if ($mapUpdate !== 1 && $this->runCreatedNonOwningMapExists($identity, $targetId, $receipt)) {
+                    throw new \RuntimeException('transfer_record_rollback_map_conflict');
+                }
+                continue;
+            }
             if ($mapUpdate !== 1 && !$this->sharedMapBelongsToAnotherReceipt($identity, $targetId, $receipt)) {
                 throw new \RuntimeException('transfer_record_rollback_map_conflict');
             }
         }
-        if (in_array($receipt->recordKind, ['order', 'subscription'], true)) {
+        if ($receipt->action === 'created' && in_array($receipt->recordKind, ['order', 'subscription'], true)) {
             $claimUpdate = $this->db()->update($this->db()->prefix . 'cartshift_target_claims', [
                 'claim_state' => 'rolled_back',
                 'updated_at' => $this->now(),
@@ -280,6 +291,26 @@ final readonly class TransferJournalRepository implements TransferJournal
         }
     }
 
+    private function runCreatedNonOwningMapExists(
+        \CartShift\Domain\Transfer\SourceIdentity $identity,
+        int $targetId,
+        TransferReceipt $receipt,
+    ): bool {
+        $db = $this->db();
+        $maps = $db->get_results($db->prepare(
+            "SELECT target_fingerprint, record_state FROM {$db->prefix}cartshift_id_map
+             WHERE source_key = %s AND entity_type = %s AND wc_id = %s AND fc_id = %d
+               AND migration_id = %s AND created_by_migration = 0 AND is_simulated = 0
+             ORDER BY id ASC LIMIT 2",
+            $identity->sourceKey, $identity->entityType, $identity->sourceId, $targetId, $receipt->runId,
+        ));
+        if (trim((string) ($db->last_error ?? '')) !== '' || !is_array($maps)) {
+            throw new \RuntimeException('transfer_record_rollback_map_failure');
+        }
+
+        return $maps !== [];
+    }
+
     private function sharedMapBelongsToAnotherReceipt(
         \CartShift\Domain\Transfer\SourceIdentity $identity,
         int $targetId,
@@ -289,7 +320,7 @@ final readonly class TransferJournalRepository implements TransferJournal
         $maps = $db->get_results($db->prepare(
             "SELECT target_fingerprint, record_state FROM {$db->prefix}cartshift_id_map
              WHERE source_key = %s AND entity_type = %s AND wc_id = %s AND fc_id = %d
-               AND migration_id = %s AND is_simulated = 0 ORDER BY id ASC LIMIT 2",
+               AND migration_id = %s AND created_by_migration = 1 AND is_simulated = 0 ORDER BY id ASC LIMIT 2",
             $identity->sourceKey, $identity->entityType, $identity->sourceId, $targetId, $receipt->runId,
         ));
         if (trim((string) ($db->last_error ?? '')) !== '' || !is_array($maps) || count($maps) !== 1) return false;

@@ -26,6 +26,7 @@ final readonly class LoadedTargetPreparePipeline
         private PreparedTargetBaselineProbe $baselineProbe,
         callable $clock,
         private TransferPackageValidator $validator = new TransferPackageValidator(),
+        private bool $allowGuidedContext = false,
     ) {
         $this->clock = $clock(...);
     }
@@ -37,6 +38,18 @@ final readonly class LoadedTargetPreparePipeline
             new LoadedTargetSettingsInspector(),
             new LoadedPreparedTargetBaselineProbe(),
             static fn (): string => gmdate('Y-m-d\TH:i:s\Z'),
+        );
+    }
+
+    /** Same-site composition root; `guided` is never accepted by the CLI adapter. */
+    public static function createGuided(): self
+    {
+        return new self(
+            new TransferRuntimeProbe(),
+            new LoadedTargetSettingsInspector(),
+            new LoadedPreparedTargetBaselineProbe(),
+            static fn (): string => gmdate('Y-m-d\TH:i:s\Z'),
+            allowGuidedContext: true,
         );
     }
 
@@ -73,8 +86,11 @@ final readonly class LoadedTargetPreparePipeline
                 throw new \RuntimeException('target_prepare_sealed_input_changed:' . $field);
             }
         }
+        $executionContexts = $this->allowGuidedContext
+            ? ['rehearsal', 'cutover', 'guided']
+            : ['rehearsal', 'cutover'];
         if ($input['source_key'] !== $manifest->sourceKey
-            || !in_array($input['execution_context'], ['rehearsal', 'cutover'], true)) {
+            || !in_array($input['execution_context'], $executionContexts, true)) {
             throw new \RuntimeException('target_prepare_context_changed');
         }
         $runtime = $this->runtime->inspect(TransferRuntimeProbe::ROLE_TARGET);

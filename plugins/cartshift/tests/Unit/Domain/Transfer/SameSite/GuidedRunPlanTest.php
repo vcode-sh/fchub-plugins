@@ -233,14 +233,14 @@ final class GuidedRunPlanTest extends PluginTestCase
     }
 
     // ──────────────────────────────────────────────
-    // Rehearsal is not a question
+    // Same-site execution context is internal, not an operator question
     // ──────────────────────────────────────────────
 
-    public function testARehearsalPlanRunsEveryWritingVerbAsARehearsal(): void
+    public function testASameSitePlanRunsEveryWritingVerbInTheInternalGuidedContext(): void
     {
         foreach ($this->rehearsal($this->completeEvidence())->steps() as $step) {
             if (isset($step->arguments['execution-context'])) {
-                self::assertSame('rehearsal', $step->arguments['execution-context']);
+                self::assertSame('guided', $step->arguments['execution-context']);
             }
         }
     }
@@ -304,30 +304,45 @@ final class GuidedRunPlanTest extends PluginTestCase
         self::assertSame('none', $audit->arguments['subscriptions']);
     }
 
-    /**
-     * FAIL CLOSED ON THE PART THAT IS NOT WRITTEN YET.
-     *
-     * `TransferRunState` fixes the commerce ordering exactly; it says nothing
-     * about where the three subscription verbs slot in, and no other source in
-     * this repository does either. Emitting a plausible order would be an
-     * invention that migrates real subscribers, and omitting them silently
-     * would be the empty-dataset defect wearing a wizard. So a shop that has
-     * subscriptions is refused, by name, until the ordering is established
-     * from evidence.
-     */
-    public function testAShopWithSubscriptionsIsRefusedRatherThanGivenAnInventedOrdering(): void
+    public function testAShopWithSubscriptionsUsesTheExactOwnershipCutoverSequence(): void
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('guided_subscription_sequence_unplanned');
-
-        GuidedRunPlan::rehearsal(
+        $plan = GuidedRunPlan::rehearsal(
             sourceKey: self::SOURCE_KEY,
             workspace: self::WORKSPACE,
             operator: self::OPERATOR,
             decidedAtUtc: self::DECIDED_AT,
-            evidence: GuidedEvidence::none(),
+            evidence: $this->completeEvidence(),
             includesSubscriptions: true,
-        )->steps();
+        );
+
+        $lifecycle = array_values(array_filter(
+            array_map(static fn (object $step): string => $step->verb, $plan->steps()),
+            static fn (string $verb): bool => in_array($verb, [
+                'stage',
+                'reconcile',
+                'promote',
+                'prepare-subscription-cutover',
+                'release-subscription-source',
+                'activate-subscriptions',
+                'activate-catalogue',
+                'complete',
+            ], true),
+        ));
+
+        self::assertSame([
+            'stage',
+            'reconcile',
+            'promote',
+            'prepare-subscription-cutover',
+            'release-subscription-source',
+            'activate-subscriptions',
+            'activate-catalogue',
+            'complete',
+        ], $lifecycle);
+        self::assertSame('target', $this->stepFor('prepare-subscription-cutover', $plan)->arguments['role']);
+        self::assertSame('source', $this->stepFor('release-subscription-source', $plan)->arguments['role']);
+        self::assertSame(self::WORKSPACE, $this->stepFor('release-subscription-source', $plan)->arguments['private-dir']);
+        self::assertSame('target', $this->stepFor('activate-subscriptions', $plan)->arguments['role']);
     }
 
     // ──────────────────────────────────────────────

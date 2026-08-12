@@ -31,7 +31,11 @@ final readonly class ParentStockExceptionReport
         $report = [];
 
         foreach ($expected as $item) {
-            if (!is_array($item) || ($item['kind'] ?? null) !== 'shared_parent_stock') {
+            if (!is_array($item)) {
+                continue;
+            }
+            if (($item['kind'] ?? null) !== 'shared_parent_stock') {
+                $report[] = $item;
                 continue;
             }
             $sourceVariation = (string) ($item['source_variation'] ?? '');

@@ -74,6 +74,7 @@ final class CustomerWriterTest extends PluginTestCase
         self::assertTrue($result->reused);
         self::assertSame($before, $gateway->snapshot($targetId));
         self::assertNotNull($maps->get($this->record()->identity));
+        self::assertFalse($maps->createdByMigration[$this->record()->identity->canonical()]);
         self::assertNull($maps->get($this->record()->addresses[0]->identity), 'Saved addresses require their own decision and are not silently claimed.');
     }
 
@@ -139,7 +140,8 @@ final class MemoryCustomerGateway implements CustomerTargetGateway
 final class MemoryCustomerMaps implements CheckedMappingStore
 {
     public array $records = [];
+    public array $createdByMigration = [];
     public function get(SourceIdentity $identity): ?MappingRecord { return $this->records[$identity->canonical()] ?? null; }
-    public function storeOrThrow(SourceIdentity $identity, int $targetId, string $migrationId, string $sourceFingerprint, string $targetFingerprint, MapState $state, bool $createdByMigration, int $generation = 1): MappingRecord { $record = new MappingRecord($identity, $targetId, $sourceFingerprint, $targetFingerprint, $state); $this->records[$identity->canonical()] = $record; DatabaseTransaction::afterRollback(function () use ($identity): void { unset($this->records[$identity->canonical()]); }); return $record; }
+    public function storeOrThrow(SourceIdentity $identity, int $targetId, string $migrationId, string $sourceFingerprint, string $targetFingerprint, MapState $state, bool $createdByMigration, int $generation = 1): MappingRecord { $record = new MappingRecord($identity, $targetId, $sourceFingerprint, $targetFingerprint, $state); $this->records[$identity->canonical()] = $record; $this->createdByMigration[$identity->canonical()] = $createdByMigration; DatabaseTransaction::afterRollback(function () use ($identity): void { unset($this->records[$identity->canonical()], $this->createdByMigration[$identity->canonical()]); }); return $record; }
     public function transitionOrThrow(SourceIdentity $identity, MapState $expected, MapState $next, string $expectedTargetFingerprint, string $nextTargetFingerprint): MappingRecord { $current = $this->records[$identity->canonical()]; $record = new MappingRecord($identity, $current->targetId, $current->sourceFingerprint, $nextTargetFingerprint, $next); $this->records[$identity->canonical()] = $record; return $record; }
 }

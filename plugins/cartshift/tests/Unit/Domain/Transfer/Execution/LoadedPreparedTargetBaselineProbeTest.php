@@ -221,6 +221,78 @@ final class LoadedPreparedTargetBaselineProbeTest extends PluginTestCase
         $probe->verify($baseline, 'run-target-22');
     }
 
+    public function testSkippedCollisionTargetIsProtectedThroughPreparationAndExecution(): void
+    {
+        $subscription = $this->record('subscription', '40');
+        $target = ['subscription' => ['id' => 800, 'uuid' => 'existing-subscription', 'status' => 'active']];
+        $decisions = TransferDecisionSet::fromArray([[
+            'identity' => $subscription->identity->canonical(),
+            'action' => 'excluded_by_policy',
+            'source_fingerprint' => $subscription->sourceContentDigest,
+            'operator' => 'owner',
+            'reason' => 'Keep the existing FluentCart subscription and skip this WooCommerce copy.',
+            'decided_at' => '2026-08-13T10:00:00Z',
+            'protected_collision_target' => [
+                'kind' => 'subscription',
+                'target_id' => 800,
+                'target_fingerprint' => CanonicalJson::fingerprint($target),
+            ],
+        ]]);
+        $currentTarget = $target;
+        $probe = new LoadedPreparedTargetBaselineProbe(
+            fn (): TargetOwnershipReport => $this->report([]),
+            static fn (): array => ['maps' => [], 'claims' => [], 'shared_links' => []],
+            static function () use (&$currentTarget): array { return $currentTarget; },
+        );
+
+        $baseline = $probe->capture(
+            'shop-alpha',
+            [],
+            $decisions,
+            'run-target-22',
+        );
+
+        self::assertSame([], $baseline->blockingFindings);
+        self::assertSame(800, $baseline->snapshot['protected_targets'][
+            'shop-alpha:subscription:40|protected_collision_target'
+        ]['target_id']);
+        $currentTarget = [];
+        $this->expectExceptionMessage(
+            'target_baseline_protected_target_changed:shop-alpha:subscription:40|protected_collision_target',
+        );
+        $probe->verify($baseline, 'run-target-22');
+    }
+
+    public function testMissingSkippedCollisionTargetBlocksBaselineCapture(): void
+    {
+        $order = $this->record('order', '9');
+        $decisions = TransferDecisionSet::fromArray([[
+            'identity' => $order->identity->canonical(),
+            'action' => 'excluded_by_policy',
+            'source_fingerprint' => $order->sourceContentDigest,
+            'operator' => 'owner',
+            'reason' => 'Keep the existing FluentCart order and skip this WooCommerce copy.',
+            'decided_at' => '2026-08-13T10:00:00Z',
+            'protected_collision_target' => [
+                'kind' => 'order',
+                'target_id' => 91,
+                'target_fingerprint' => hash('sha256', 'reviewed-target'),
+            ],
+        ]]);
+        $probe = new LoadedPreparedTargetBaselineProbe(
+            fn (): TargetOwnershipReport => $this->report([]),
+            static fn (): array => ['maps' => [], 'claims' => [], 'shared_links' => []],
+            static fn (): array => [],
+        );
+
+        $baseline = $probe->capture('shop-alpha', [], $decisions, 'run-target-22');
+
+        self::assertSame(
+            ['skipped_collision_target_changed:shop-alpha:order:9'],
+            $baseline->blockingFindings,
+        );
+    }
+
     private function record(string $kind, string $id): RecordEnvelope
     {
         $identity = new SourceIdentity('shop-alpha', $kind, $id);

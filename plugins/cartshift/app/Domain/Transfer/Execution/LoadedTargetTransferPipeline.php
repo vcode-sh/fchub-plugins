@@ -40,6 +40,30 @@ final class LoadedTargetTransferPipeline
 {
     public static function create(): self { return new self(); }
 
+    /** Reconciles a safe pre-release guided failure with the rollback state machine. */
+    public function prepareGuidedRollback(
+        PreparedTransfer $prepared,
+        TransferJournalRepository $journal,
+        string $private,
+    ): void {
+        if ($prepared->executionContext !== 'guided') {
+            throw new \RuntimeException('guided_rollback_execution_context_changed');
+        }
+        $state = $journal->state($prepared->runId);
+        if ($state !== TransferRunState::Promoted) {
+            return;
+        }
+        $hasSubscriptions = array_filter(
+            $journal->receipts($prepared->runId),
+            static fn (TransferReceipt $receipt): bool => $receipt->recordKind === 'subscription',
+        ) !== [];
+        if ($hasSubscriptions) {
+            (new SubscriptionRollbackGate(new SubscriptionCutoverEvidenceRepository($private)))
+                ->assertAllowed($prepared->runId);
+        }
+        $journal->transition($prepared->runId, TransferRunState::Promoted, TransferRunState::Failed);
+    }
+
     /** @param array<string,mixed> $input @return array<string,mixed> */
     public function __invoke(array $input): array
     {
@@ -124,8 +148,7 @@ final class LoadedTargetTransferPipeline
                         $manifest->sourceInstanceFingerprint, $manifest->sourceRuntimeFingerprint,
                         gmdate('Y-m-d\TH:i:s\Z'),
                     );
-                    if ($evidence === null) throw new \RuntimeException('subscription_cutover_has_no_records');
-                    (new SubscriptionCutoverEvidenceRepository($private))->createPreparedIdempotently($evidence);
+                    (new SubscriptionCutoverEvidenceRepository($private))->createPreparedIfPresent($evidence);
                 },
                 $recovery,
             ),
@@ -249,7 +272,8 @@ final class LoadedTargetTransferPipeline
         if ($hasSubscriptions) {
             $failedFrom = $state === TransferRunState::Failed ? $journal->failedFrom($prepared->runId) : null;
             $missingIsAmbiguous = $state === TransferRunState::Failed
-                && !in_array($failedFrom, [TransferRunState::Staging, TransferRunState::Reconciling], true);
+                && !in_array($failedFrom, [TransferRunState::Staging, TransferRunState::Reconciling], true)
+                && !($prepared->executionContext === 'guided' && $failedFrom === TransferRunState::Promoted);
             (new SubscriptionRollbackGate(new SubscriptionCutoverEvidenceRepository($private)))
                 ->assertAllowed($prepared->runId, $missingIsAmbiguous);
         }
@@ -283,9 +307,12 @@ final class LoadedTargetTransferPipeline
         }
         ksort($counts, SORT_STRING);
         $subscriptionCutover = null;
+        $subscriptionReleaseRequired = false;
         if (($counts['subscription'] ?? 0) > 0) {
             try {
-                $subscriptionCutover = (new SubscriptionCutoverEvidenceRepository($private))->get($prepared->runId)->state;
+                $evidence = (new SubscriptionCutoverEvidenceRepository($private))->get($prepared->runId);
+                $subscriptionCutover = $evidence->state;
+                $subscriptionReleaseRequired = $evidence->requiresSourceRelease();
             } catch (\RuntimeException $exception) {
                 if ($exception->getMessage() !== 'subscription_cutover_evidence_missing') throw $exception;
             }
@@ -296,6 +323,8 @@ final class LoadedTargetTransferPipeline
             'attempt' => $attempt,
             'generation' => $prepared->generation,
             'receipt_counts' => $counts,
+            'subscription_cutover_required' => ($counts['subscription'] ?? 0) > 0,
+            'subscription_release_required' => $subscriptionReleaseRequired,
             'subscription_cutover_state' => $subscriptionCutover,
             'next_legal_actions' => $this->nextActions($state, $prepared->leaveDraftAccepted, ($counts['subscription'] ?? 0) > 0, $subscriptionCutover),
         ];

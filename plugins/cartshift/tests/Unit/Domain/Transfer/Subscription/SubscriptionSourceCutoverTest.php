@@ -145,6 +145,22 @@ final class SubscriptionSourceCutoverTest extends PluginTestCase
         );
     }
 
+    public function testMarkedEntryProvesThatTheOneWaySourceReleaseHasStarted(): void
+    {
+        $entry = $this->entry();
+        $entry['release_state'] = 'marked';
+        $entry['pre_renewal_fingerprint'] = str_repeat('3', 64);
+        $entry['pre_release_comparison_fingerprint'] = str_repeat('5', 64);
+        $entry['previous_requires_manual_renewal'] = false;
+
+        self::assertTrue($this->evidence([$entry])->releaseStarted());
+    }
+
+    public function testPendingEntryKeepsRollbackAvailableBeforeSourceReleaseStarts(): void
+    {
+        self::assertFalse($this->evidence([$this->entry()])->releaseStarted());
+    }
+
     /** @param list<array<string,mixed>> $entries */
     private function evidence(array $entries): SubscriptionCutoverEvidence
     {

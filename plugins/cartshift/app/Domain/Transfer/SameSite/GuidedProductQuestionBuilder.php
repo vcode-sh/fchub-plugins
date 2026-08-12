@@ -31,8 +31,18 @@ final readonly class GuidedProductQuestionBuilder
             : $dependencyCounts(...);
     }
 
-    /** @param array<string,mixed> $row @param list<array<string,mixed>> $targets @return array<string,mixed>|null */
-    public function build(RecordEnvelope $record, array $row, array $targets): ?array
+    /**
+     * @param array<string,mixed> $row
+     * @param list<array<string,mixed>> $targets
+     * @param list<RecordEnvelope>|null $dependencyClosure
+     * @return array<string,mixed>|null
+     */
+    public function build(
+        RecordEnvelope $record,
+        array $row,
+        array $targets,
+        ?array $dependencyClosure = null,
+    ): ?array
     {
         $payload = $record->payload;
         $sourceVariations = $this->sourceVariations($payload);
@@ -83,11 +93,22 @@ final readonly class GuidedProductQuestionBuilder
         $choices = $strongCandidateFound
             ? $strongLinks
             : [...$otherLinks, $this->choice(['action' => 'create'])];
-        $dependencies = ($this->dependencyCounts)($record->identity);
-        $orders = max(0, (int) ($dependencies['orders'] ?? 0));
-        $subscriptions = max(0, (int) ($dependencies['subscriptions'] ?? 0));
+        $closure = $dependencyClosure === null ? null : $this->closureFacts($record, $dependencyClosure);
+        if ($closure === null) {
+            $dependencies = ($this->dependencyCounts)($record->identity);
+            $orders = max(0, (int) ($dependencies['orders'] ?? 0));
+            $subscriptions = max(0, (int) ($dependencies['subscriptions'] ?? 0));
+        } else {
+            $orders = $this->dependentCount($dependencyClosure, 'order', $record);
+            $subscriptions = $this->dependentCount($dependencyClosure, 'subscription', $record);
+        }
         if ($orders === 0 && $subscriptions === 0) {
-            $choices[] = $this->choice(['action' => 'skip']);
+            $choices[] = $this->skipChoice($closure ?? [[
+                'identity' => $record->identity->canonical(),
+                'source_fingerprint' => $record->sourceContentDigest,
+            ]]);
+        } elseif ($strongCandidateFound && $strongLinks === [] && $closure !== null) {
+            $choices[] = $this->skipChoice($closure);
         }
         if ($choices === []) {
             return [
@@ -107,6 +128,7 @@ final readonly class GuidedProductQuestionBuilder
             'choices' => $choices,
             'dependent_orders' => $orders,
             'dependent_subscriptions' => $subscriptions,
+            'closure' => $closure ?? [],
         ];
         return $facts + [
             'review_id' => 'product-' . substr(CanonicalJson::fingerprint($facts), 0, 12),
@@ -188,6 +210,46 @@ final readonly class GuidedProductQuestionBuilder
     private function choice(array $choice): array
     {
         return ['choice_id' => 'choice-' . substr(CanonicalJson::fingerprint($choice), 0, 12)] + $choice;
+    }
+
+    /** @param list<array{identity:string,source_fingerprint:string}> $closure */
+    private function skipChoice(array $closure): array
+    {
+        return $this->choice([
+            'action' => 'skip',
+            'closure_fingerprint' => CanonicalJson::fingerprint($closure),
+        ]);
+    }
+
+    /**
+     * @param list<RecordEnvelope> $closure
+     * @return list<array{identity:string,source_fingerprint:string}>
+     */
+    private function closureFacts(RecordEnvelope $root, array $closure): array
+    {
+        $facts = [];
+        foreach ($closure as $record) {
+            if (!$record instanceof RecordEnvelope
+                || $record->identity->sourceKey !== $root->identity->sourceKey) {
+                throw new \RuntimeException('guided_product_dependency_closure_invalid');
+            }
+            $facts[] = [
+                'identity' => $record->identity->canonical(),
+                'source_fingerprint' => $record->sourceContentDigest,
+            ];
+        }
+        if (($facts[0]['identity'] ?? null) !== $root->identity->canonical()) {
+            throw new \RuntimeException('guided_product_dependency_closure_invalid');
+        }
+        return $facts;
+    }
+
+    /** @param list<RecordEnvelope> $closure */
+    private function dependentCount(array $closure, string $kind, RecordEnvelope $root): int
+    {
+        return count(array_filter($closure, static fn (RecordEnvelope $record): bool =>
+            $record->identity->entityType === $kind
+            && $record->identity->canonical() !== $root->identity->canonical()));
     }
 
     /** @param array<string,mixed> $payload @return list<array{identity:string,sku:string,name:string,price:int,payload:array<string,mixed>}> */

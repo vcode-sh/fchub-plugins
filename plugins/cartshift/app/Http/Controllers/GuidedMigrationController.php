@@ -10,6 +10,7 @@ use CartShift\Core\Container;
 use CartShift\Domain\Transfer\Runtime\TransferRuntimeProbe;
 use CartShift\Domain\Transfer\Runtime\TransferTopology;
 use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
+use CartShift\Domain\Transfer\SameSite\GuidedCollisionDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedDecisionReview;
 use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedRunCoordinator;
@@ -21,6 +22,7 @@ use CartShift\Domain\Transfer\SameSite\GuidedRunner;
 use CartShift\Domain\Transfer\SameSite\GuidedSetup;
 use CartShift\Domain\Transfer\SameSite\PrivateWorkspace;
 use CartShift\Domain\Transfer\SameSite\SiteSourceIdentity;
+use CartShift\Domain\Transfer\Subscription\SubscriptionCutoverEvidenceRepository;
 use CartShift\Http\GuidedPreflightPresentation;
 use CartShift\Http\GuidedRunProjection;
 use CartShift\Validator\PreflightCheck;
@@ -50,9 +52,15 @@ final class GuidedMigrationController
         private readonly ?GuidedCustomerDecisionBuilder $customerDecisions = null,
         private readonly ?\Closure $rollbackFactory = null,
         private readonly ?GuidedProductDecisionBuilder $productDecisions = null,
+        private readonly ?GuidedCollisionDecisionBuilder $collisionDecisions = null,
     ) {
         $this->preflightPresentation = new GuidedPreflightPresentation();
-        $this->runProjection = new GuidedRunProjection($customerDecisions, $rollbackFactory, $productDecisions);
+        $this->runProjection = new GuidedRunProjection(
+            $customerDecisions,
+            $rollbackFactory,
+            $productDecisions,
+            $collisionDecisions,
+        );
     }
 
     public function registerRoutes(): void
@@ -118,6 +126,7 @@ final class GuidedMigrationController
 
         if ($sourceKey === null) {
             $setup = new GuidedSetup(self::STATUS_SOURCE_KEY, $this->operatorId());
+            $cutover = $setup->cutover();
             $data = [
                 'guided_available' => true,
                 'initialised' => false,
@@ -126,7 +135,7 @@ final class GuidedMigrationController
                 'subscriptions' => ['available' => $subscriptionsActive],
                 'setup' => [
                     'complete' => false,
-                    'cutover' => ['available' => false, 'message' => $setup->cutover()['message']],
+                    'cutover' => ['available' => $cutover['available'], 'message' => $cutover['message']],
                 ],
             ];
 
@@ -138,6 +147,7 @@ final class GuidedMigrationController
         }
 
         $setup = new GuidedSetup($sourceKey, $this->operatorId());
+        $cutover = $setup->cutover();
 
         $data = [
             'guided_available' => true,
@@ -148,7 +158,7 @@ final class GuidedMigrationController
             ],
             'setup' => [
                 'complete' => $setup->isComplete(),
-                'cutover' => ['available' => false, 'message' => $setup->cutover()['message']],
+                'cutover' => ['available' => $cutover['available'], 'message' => $cutover['message']],
             ],
         ];
 
@@ -190,7 +200,9 @@ final class GuidedMigrationController
 
                 return new WP_REST_Response(['data' => $this->runProjection->run($stopped)]);
             }
-            $state = $this->coordinator($sourceKey, $subscriptions)->start();
+            $state = $this->coordinator($sourceKey, $subscriptions)->start(
+                $request->get_param('renewals_paused') === true,
+            );
 
             return new WP_REST_Response(['data' => $this->runProjection->run($state)]);
         } catch (\Throwable) {
@@ -260,7 +272,7 @@ final class GuidedMigrationController
                     || count(array_unique($approvedReviews)) !== count($approvedReviews)) {
                     throw new \RuntimeException('guided_decision_review_invalid');
                 }
-                $runner = new GuidedRunner(new GuidedSetup($sourceKey, $state->operator));
+                $runner = $this->runner($sourceKey, $state->operator);
                 $plan = GuidedRunPlan::rehearsal(
                     $state->sourceKey,
                     $workspace,
@@ -293,6 +305,9 @@ final class GuidedMigrationController
                     $reviewAnswers,
                 );
                 $accepted = $runner->acceptProposal($proposal, $workspace . '/decisions.json');
+                $accepted['migration_exceptions'] = is_array($proposal['migration_exceptions'] ?? null)
+                    ? array_values($proposal['migration_exceptions'])
+                    : [];
 
                 return $state->afterDecisionAcceptance($accepted, count($steps));
             });
@@ -398,7 +413,7 @@ final class GuidedMigrationController
     private function coordinator(string $sourceKey, bool $subscriptions): GuidedRunCoordinator
     {
         $workspace = (new PrivateWorkspace($sourceKey))->path();
-        $runner = new GuidedRunner(new GuidedSetup($sourceKey, $this->operatorId()));
+        $runner = $this->runner($sourceKey, $this->operatorId());
 
         return new GuidedRunCoordinator(
             new GuidedRunStateRepository($workspace, $sourceKey),
@@ -417,6 +432,29 @@ final class GuidedMigrationController
                 gmdate('Y-m-d\TH:i:s\Z'),
                 $subscriptions,
             ),
+            static function (GuidedRunState $state) use ($workspace): bool {
+                if (!$state->includesSubscriptions || $state->evidence->descriptor === null) {
+                    return false;
+                }
+                try {
+                    $evidence = (new SubscriptionCutoverEvidenceRepository($workspace))
+                        ->get($state->evidence->descriptor);
+
+                    return $evidence->releaseStarted();
+                } catch (\Throwable) {
+                    return false;
+                }
+            },
+        );
+    }
+
+    private function runner(string $sourceKey, string $operator): GuidedRunner
+    {
+        return new GuidedRunner(
+            new GuidedSetup($sourceKey, $operator),
+            productDecisions: $this->productDecisions,
+            customerDecisions: $this->customerDecisions,
+            collisionDecisions: $this->collisionDecisions,
         );
     }
 
@@ -444,6 +482,7 @@ final class GuidedMigrationController
         return new GuidedDecisionReview(
             $this->customerDecisionBuilder(),
             $this->productDecisions ?? new GuidedProductDecisionBuilder(),
+            $this->collisionDecisions ?? new GuidedCollisionDecisionBuilder(),
         );
     }
 

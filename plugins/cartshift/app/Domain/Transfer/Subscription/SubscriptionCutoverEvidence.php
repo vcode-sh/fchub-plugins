@@ -32,7 +32,7 @@ final readonly class SubscriptionCutoverEvidence
         public string $updatedAtUtc,
     ) {
         if (preg_match('/\A[a-z0-9][a-z0-9-]{2,35}\z/D', $runId) !== 1
-            || !in_array($executionContext, ['rehearsal', 'cutover'], true)
+            || !in_array($executionContext, ['rehearsal', 'cutover', 'guided'], true)
             || !in_array($state, [self::PREPARED, self::SOURCE_RELEASED, self::TARGET_ACTIVATED, self::RECONCILED], true)
             || preg_match('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/D', $updatedAtUtc) !== 1) {
             throw new \InvalidArgumentException('subscription_cutover_evidence_header_invalid');
@@ -127,6 +127,31 @@ final readonly class SubscriptionCutoverEvidence
             'entries' => $this->entries,
             'updated_at_utc' => $this->updatedAtUtc,
         ]);
+    }
+
+    public function requiresSourceRelease(): bool
+    {
+        return array_filter(
+            $this->entries,
+            static fn (array $entry): bool => ($entry['source_release_required'] ?? false) === true,
+        ) !== [];
+    }
+
+    /** Mark-before-act makes any marked entry as irreversible as the cohort state. */
+    public function releaseStarted(): bool
+    {
+        if ($this->state !== self::PREPARED) {
+            return true;
+        }
+
+        return array_filter(
+            $this->entries,
+            static fn (array $entry): bool => in_array(
+                $entry['release_state'] ?? null,
+                ['marked', 'released'],
+                true,
+            ),
+        ) !== [];
     }
 
     public function fingerprint(): string { return CanonicalJson::fingerprint($this->toArray()); }

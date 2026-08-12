@@ -43,8 +43,8 @@ function status(overrides = {}) {
       complete: true,
       missing: [],
       cutover: {
-        available: false,
-        message: 'Cutover remains unavailable until CartShift can roll back a completed rehearsal.',
+        available: true,
+        message: 'CartShift will stage the new records safely, verify them, then activate the FluentCart store after your review.',
       },
     },
     plan: [
@@ -71,7 +71,7 @@ function serve(payload) {
     if (method === 'POST' && endpoint === 'migration/decisions') {
       return payload.acceptResult || {
         accepted: 27,
-        run: { phase: 'completed', completed_steps: 12, total_steps: 12, last_step: 'Finishing the rehearsal' },
+        run: { phase: 'completed', completed_steps: 12, total_steps: 12, last_step: 'Finish the migration' },
       };
     }
     if (method === 'POST' && endpoint === 'migration/start') {
@@ -242,6 +242,29 @@ describe('GuidedMigrationScreen', () => {
     expect(wrapper.text()).not.toContain('Inspect the source first');
   });
 
+  it('keeps an occupied FluentCart store reviewable without hiding the warning', async () => {
+    serve(
+      status({
+        preflight: {
+          ready: true,
+          checks: {
+            fc_data: {
+              label: 'Existing FluentCart records',
+              severity: 'warn',
+              message: 'FluentCart already has 97 customers, 34 orders and 4 subscriptions. CartShift will check for safe matches during review. Unrelated records will stay untouched, and existing records will not be overwritten.',
+            },
+          },
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="preflight-warnings"]').text()).toContain('97 customers');
+    expect(wrapper.find('[data-test="start"]').attributes('disabled')).toBeUndefined();
+    expect(wrapper.findAll('.button-primary')).toHaveLength(1);
+  });
+
   it('turns blockers into one clear next step and keeps warnings secondary', async () => {
     const payload = status({
       preflight: {
@@ -289,7 +312,7 @@ describe('GuidedMigrationScreen', () => {
     expect(wrapper.find('[data-test="check-again"]').exists()).toBe(true);
   });
 
-  it('starts the durable rehearsal and shows persisted progress', async () => {
+  it('starts the durable migration and shows persisted progress', async () => {
     const payload = status();
     payload.startResult = {
       phase: 'failed',
@@ -481,7 +504,42 @@ describe('GuidedMigrationScreen', () => {
     expect(wrapper.find('[data-test="run-review"]').exists()).toBe(true);
   });
 
-  it('lets a cancelled review start a fresh rehearsal', async () => {
+  it('uses one explicit action to confirm paused renewals and continue the saved migration', async () => {
+    const payload = status({
+      run: {
+        phase: 'awaiting_renewal_pause',
+        completed_steps: 11,
+        total_steps: 15,
+        last_step: 'Prepare subscription transfer',
+        renewal_pause: {
+          title: 'Pause WooCommerce renewals',
+          message: 'Pause checkout, subscription changes and scheduled renewal jobs, then continue.',
+          action: 'I have paused renewals — continue',
+        },
+      },
+    });
+    payload.startResults = [
+      { phase: 'running', completed_steps: 12, total_steps: 15, last_step: 'Stop WooCommerce subscription renewals' },
+      { phase: 'completed', completed_steps: 15, total_steps: 15, last_step: 'Finish the migration' },
+    ];
+    serve(payload);
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    const action = wrapper.find('[data-test="confirm-renewals-paused"]');
+    expect(action.text()).toContain('I have paused renewals');
+    await action.trigger('click');
+    await flushPromises();
+
+    expect(apiMock.mock.calls).toContainEqual([
+      'POST',
+      'migration/start',
+      { renewals_paused: true },
+    ]);
+    expect(wrapper.text()).toContain('Migration complete');
+  });
+
+  it('lets a cancelled review start a fresh migration', async () => {
     serve(
       status({
         run: {
@@ -503,12 +561,14 @@ describe('GuidedMigrationScreen', () => {
     expect(apiMock.mock.calls).toContainEqual(['POST', 'migration/start']);
   });
 
-  it('keeps cutover in the GUI and unavailable until rollback proof exists', async () => {
+  it('explains the complete guided move without exposing commands', async () => {
     serve(status());
     const wrapper = mountScreen();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="cutover"]').text()).toContain('roll back a completed rehearsal');
+    expect(wrapper.find('[data-test="cutover"]').text()).toContain('verify');
+    expect(wrapper.find('[data-test="cutover"]').text()).toContain('activate');
+    expect(wrapper.find('[data-test="cutover"]').text()).not.toContain('rehearsal');
     expect(wrapper.find('[data-test="cutover"]').text()).not.toContain('WP-CLI');
     expect(wrapper.text()).not.toContain('command');
   });
@@ -520,13 +580,14 @@ describe('GuidedMigrationScreen', () => {
           phase: 'failed',
           completed_steps: 5,
           total_steps: 12,
-          last_step: 'Validate the rehearsal package',
+          last_step: 'Validate the migration package',
           failure: {
-            message: 'This CartShift core cannot yet roll back a completed rehearsal.',
+            message: 'The migration stopped before target preparation.',
             can_restart: false,
           },
           migration_exceptions: [
             {
+              type: 'shared_stock',
               title: 'Trail harness',
               variations: [
                 { title: 'Harness size: Large', sku: 'HARNESS-L' },
@@ -567,6 +628,7 @@ describe('GuidedMigrationScreen', () => {
           failure: { message: 'The safe check stopped.', can_restart: false },
           migration_exceptions: [
             {
+              type: 'shared_stock',
               title: 'Mystery stock',
               variations: [{ title: 'Large', sku: '' }],
               source_quantity: null,
@@ -588,26 +650,51 @@ describe('GuidedMigrationScreen', () => {
     expect(report.text()).not.toContain('Original product-wide shared quantity');
   });
 
-  it('does not present an older unsafe completion as successful progress', async () => {
+  it('shows skipped records as follow-up instead of pretending they migrated', async () => {
     serve(
       status({
         run: {
-          phase: 'unsafe_completion',
+          phase: 'completed',
           completed_steps: 12,
           total_steps: 12,
-          last_step: 'Finish the rehearsal',
-          failure: {
-            message: 'This older rehearsal completed without rollback proof. Cutover remains unavailable.',
-            can_restart: false,
-          },
+          migration_exceptions: [
+            {
+              type: 'skipped_record',
+              title: 'Store membership',
+              message: 'This WooCommerce product stayed in WooCommerce. CartShift also skipped 1 related order.',
+            },
+          ],
         },
       })
     );
     const wrapper = mountScreen();
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain('12 of 12 steps complete');
-    expect(wrapper.find('[data-test="run-failure"]').text()).toContain('without rollback proof');
+    const report = wrapper.find('[data-test="migration-exceptions"]');
+    expect(report.text()).toContain('Migration follow-up');
+    expect(report.text()).toContain('Store membership');
+    expect(report.text()).toContain('stayed in WooCommerce');
+    expect(report.text()).not.toContain('shared quantity');
+  });
+
+  it('presents a completed migration as finished', async () => {
+    serve(
+      status({
+        run: {
+          phase: 'completed',
+          completed_steps: 12,
+          total_steps: 12,
+          last_step: 'Finish the migration',
+          failure: null,
+        },
+      })
+    );
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('12 of 12 checks complete');
+    expect(wrapper.text()).toContain('Migration complete');
+    expect(wrapper.find('[data-test="run-failure"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="start"]').exists()).toBe(false);
   });
 

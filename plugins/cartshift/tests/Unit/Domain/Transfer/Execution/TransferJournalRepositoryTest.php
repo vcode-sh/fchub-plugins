@@ -195,6 +195,7 @@ final class TransferJournalRepositoryTest extends PluginTestCase
                 'wc_id' => $identity->sourceId,
                 'fc_id' => $targetId,
                 'migration_id' => $receipt->runId,
+                'created_by_migration' => 1,
                 'is_simulated' => 0,
                 'target_fingerprint' => $receipt->afterFingerprint,
                 'record_state' => 'reconciled',
@@ -218,7 +219,7 @@ final class TransferJournalRepositoryTest extends PluginTestCase
         self::assertSame('rolled_back', $database->claims['order|801']['claim_state']);
     }
 
-    public function testRollbackRefusesAReceiptWhoseExactMappingEvidenceIsMissing(): void
+    public function testCreatedRollbackRefusesNonOwningMappingEvidence(): void
     {
         $database = new ExecutionJournalDatabase();
         $GLOBALS['wpdb'] = $database;
@@ -239,16 +240,29 @@ final class TransferJournalRepositoryTest extends PluginTestCase
         DatabaseTransaction::begin();
         $journal->commitReceipt($receipt);
         DatabaseTransaction::commit();
+        $identity = SourceIdentity::fromCanonical($receipt->sourceIdentity);
+        $database->maps[$receipt->sourceIdentity] = [
+            'source_key' => $identity->sourceKey,
+            'entity_type' => $identity->entityType,
+            'wc_id' => $identity->sourceId,
+            'fc_id' => 901,
+            'migration_id' => $receipt->runId,
+            'created_by_migration' => 0,
+            'is_simulated' => 0,
+            'target_fingerprint' => $receipt->afterFingerprint,
+            'record_state' => 'reconciled',
+        ];
 
         DatabaseTransaction::begin();
         try {
             $journal->markRecordRolledBack($receipt);
-            self::fail('Rollback accepted a receipt whose exact ID map was absent.');
+            self::fail('Rollback accepted a non-owning ID map as evidence for deleting a created target.');
         } catch (\RuntimeException $exception) {
             self::assertSame('transfer_record_rollback_map_conflict', $exception->getMessage());
         } finally {
             DatabaseTransaction::rollback();
         }
+        self::assertSame('reconciled', $database->maps[$receipt->sourceIdentity]['record_state']);
     }
 
     public function testRollbackJournalMutationRequiresTheTargetTransaction(): void
@@ -271,6 +285,64 @@ final class TransferJournalRepositoryTest extends PluginTestCase
 
         $this->expectExceptionMessage('transfer_record_rollback_requires_active_transaction');
         $journal->markRecordRolledBack($receipt);
+    }
+
+    public function testReusedRollbackRetiresOnlyNonOwningMapsCreatedByThisRun(): void
+    {
+        $database = new ExecutionJournalDatabase();
+        $GLOBALS['wpdb'] = $database;
+        $prepared = new PreparedTransfer(
+            'run-reused-map-22', '/srv/private/package', str_repeat('1', 64),
+            new TargetStateFingerprint(...array_map(static fn (string $digit): string => str_repeat($digit, 64), ['1', '2', '3', '4', '5', '6', '7'])),
+            'rehearsal', [], false, '2026-08-10T12:00:00Z', 'shop-alpha',
+        );
+        $descriptors = new PreparedTransferRepository($this->directory);
+        $descriptors->save($prepared);
+        $journal = new TransferJournalRepository($descriptors, $database);
+        $receipt = new TransferReceipt(
+            $prepared->runId,
+            'product',
+            'shop-alpha:product:41',
+            1,
+            str_repeat('b', 64),
+            'reused',
+            ['primary' => 901, 'shop-alpha:product:41' => 901, 'shop-alpha:taxonomy_term:42:product-cat' => 902],
+            str_repeat('c', 64),
+            str_repeat('c', 64),
+            1,
+            '2026-08-10T12:00:00Z',
+            '2026-08-10T12:00:01Z',
+        );
+        $journal->start($prepared);
+        DatabaseTransaction::begin();
+        $journal->commitReceipt($receipt);
+        DatabaseTransaction::commit();
+
+        foreach ([
+            'shop-alpha:product:41' => [$prepared->runId, 901],
+            'shop-alpha:taxonomy_term:42:product-cat' => ['older-map-22', 902],
+        ] as $canonical => [$migrationId, $targetId]) {
+            $identity = SourceIdentity::fromCanonical($canonical);
+            $database->maps[$canonical] = [
+                'source_key' => $identity->sourceKey,
+                'entity_type' => $identity->entityType,
+                'wc_id' => $identity->sourceId,
+                'fc_id' => $targetId,
+                'migration_id' => $migrationId,
+                'created_by_migration' => 0,
+                'is_simulated' => 0,
+                'target_fingerprint' => $receipt->afterFingerprint,
+                'record_state' => 'reconciled',
+            ];
+        }
+
+        DatabaseTransaction::begin();
+        $journal->markRecordRolledBack($receipt);
+        DatabaseTransaction::commit();
+
+        self::assertSame('rolled_back', $database->records['run-reused-map-22|product|shop-alpha:product:41|1']['state']);
+        self::assertSame('rolled_back', $database->maps['shop-alpha:product:41']['record_state']);
+        self::assertSame('reconciled', $database->maps['shop-alpha:taxonomy_term:42:product-cat']['record_state']);
     }
 
     public function testReverseRollbackKeepsASharedTaxonomyMapUntilItsOwningProductIsRolledBack(): void
@@ -310,7 +382,7 @@ final class TransferJournalRepositoryTest extends PluginTestCase
             $database->maps[$canonical] = [
                 'source_key' => $identity->sourceKey, 'entity_type' => $identity->entityType,
                 'wc_id' => $identity->sourceId, 'fc_id' => $targetId,
-                'migration_id' => $prepared->runId, 'is_simulated' => 0,
+                'migration_id' => $prepared->runId, 'created_by_migration' => 1, 'is_simulated' => 0,
                 'target_fingerprint' => $fingerprint, 'record_state' => 'reconciled',
             ];
         }
@@ -389,6 +461,8 @@ final class ExecutionJournalDatabase extends \wpdb
         }
         if (str_contains($query, 'cartshift_id_map')) {
             $rows = array_values(array_filter($this->maps, static function (array $row) use ($query): bool {
+                if (str_contains($query, 'created_by_migration = 1') && ($row['created_by_migration'] ?? null) !== 1) return false;
+                if (str_contains($query, 'created_by_migration = 0') && ($row['created_by_migration'] ?? null) !== 0) return false;
                 return str_contains($query, "'" . $row['source_key'] . "'")
                     && str_contains($query, "'" . $row['entity_type'] . "'")
                     && str_contains($query, "'" . $row['wc_id'] . "'")

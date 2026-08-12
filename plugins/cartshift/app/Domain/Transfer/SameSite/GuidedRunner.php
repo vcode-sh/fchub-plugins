@@ -15,8 +15,11 @@ use CartShift\Domain\Transfer\Graph\TransferDependencyGraph;
 use CartShift\Domain\Transfer\Package\LoadedWooExportPipeline;
 use CartShift\Domain\Transfer\Package\TransferPackageReader;
 use CartShift\Domain\Transfer\Package\TransferPackageValidator;
+use CartShift\Domain\Transfer\RecordEnvelope;
+use CartShift\Domain\Transfer\RecordKind;
 use CartShift\Domain\Transfer\Runtime\TransferRuntimeProbe;
 use CartShift\Domain\Transfer\SelectionClause;
+use CartShift\Domain\Transfer\SourceIdentity;
 use CartShift\Domain\Transfer\TransferSelection;
 
 defined('ABSPATH') || exit;
@@ -34,7 +37,7 @@ defined('ABSPATH') || exit;
  * that is the vocabulary an operator would have typed and the one a support
  * ticket quotes. The pipelines read snake_case. A key lost between the two does
  * not fail loudly — the pipeline runs with a default nobody chose, and for
- * `execution_context` that is a rehearsal quietly becoming something else. So
+ * `execution_context` that is a guided move quietly becoming a CLI mode. So
  * the map is exhaustive, it lives in exactly one place, and a test walks every
  * step of a full plan asserting the runner can name every option it emits.
  */
@@ -66,6 +69,7 @@ final class GuidedRunner
         'customers' => 'customers',
         'orders' => 'orders',
         'subscriptions' => 'subscriptions',
+        'renewals-paused' => 'renewals_paused',
     ];
 
     /** Options the pipelines never see. */
@@ -76,6 +80,8 @@ final class GuidedRunner
         'stage',
         'reconcile',
         'promote',
+        'prepare-subscription-cutover',
+        'activate-subscriptions',
         'activate-catalogue',
         'complete',
     ];
@@ -108,6 +114,10 @@ final class GuidedRunner
         private readonly ?\Closure $targetReadiness = null,
         private readonly ?\Closure $proposalPipeline = null,
         private readonly ?GuidedProductDecisionBuilder $productDecisions = null,
+        private readonly ?GuidedCustomerDecisionBuilder $customerDecisions = null,
+        private readonly ?GuidedCollisionDecisionBuilder $collisionDecisions = null,
+        private readonly ?\Closure $subscriptionSourceRelease = null,
+        private readonly ?\Closure $sourceDependencyIndex = null,
     ) {
     }
 
@@ -115,7 +125,16 @@ final class GuidedRunner
     public static function wiredVerbs(): array
     {
         $wired = array_diff(
-            ['compatibility', 'audit', 'propose-decisions', 'export', 'validate-package', 'prepare', ...self::TARGET_LIFECYCLE],
+            [
+                'compatibility',
+                'audit',
+                'propose-decisions',
+                'export',
+                'validate-package',
+                'prepare',
+                'release-subscription-source',
+                ...self::TARGET_LIFECYCLE,
+            ],
             self::UNWIRED,
         );
 
@@ -144,7 +163,7 @@ final class GuidedRunner
             ));
         }
 
-        if (in_array($step->verb, self::TARGET_LIFECYCLE, true)) {
+        if (in_array($step->verb, [...self::TARGET_LIFECYCLE, 'release-subscription-source'], true)) {
             $this->assertConfigured($step->verb);
         }
 
@@ -167,6 +186,7 @@ final class GuidedRunner
             $step->verb === 'audit' => $this->runAudit($input),
             $step->verb === 'propose-decisions' => $this->runProposal($input),
             $step->verb === 'prepare' => $this->runPrepare($input),
+            $step->verb === 'release-subscription-source' => $this->runSubscriptionSourceRelease($input),
             in_array($step->verb, self::TARGET_LIFECYCLE, true) => $this->runTargetLifecycle($step->verb, $input),
             default => throw new \RuntimeException('guided_step_unknown: ' . $step->verb),
         };
@@ -327,7 +347,30 @@ final class GuidedRunner
                 (string) $input['decided_at'],
             );
 
-        return ($this->productDecisions ?? new GuidedProductDecisionBuilder())->enrich($proposal, $selection);
+        $index = null;
+        if ($this->productDecisions === null || $this->customerDecisions === null || $this->collisionDecisions === null) {
+            $index = $this->sourceDependencyIndex === null
+                ? GuidedSourceDependencyIndex::forLoadedSelection($selection, $decisions)
+                : ($this->sourceDependencyIndex)($selection, $decisions);
+            if (!$index instanceof GuidedSourceDependencyIndex) {
+                throw new \RuntimeException('guided_source_dependency_index_invalid');
+            }
+        }
+        $products = $this->productDecisions ?? new GuidedProductDecisionBuilder(
+            sourceRecords: static fn (): iterable => $index->records(RecordKind::Product),
+            sourceDependencyRecords: static fn (): iterable => $index->records(),
+        );
+        $customers = $this->customerDecisions ?? new GuidedCustomerDecisionBuilder(
+            recordLoader: static fn (SourceIdentity $identity): RecordEnvelope => $index->record($identity),
+        );
+        $collisions = $this->collisionDecisions ?? new GuidedCollisionDecisionBuilder(
+            sourceRecords: static fn (): iterable => $index->records(),
+        );
+
+        return $collisions->enrich(
+            $customers->enrich($products->enrich($proposal, $selection), $selection),
+            $selection,
+        );
     }
 
     /**
@@ -399,7 +442,17 @@ final class GuidedRunner
             return $pipeline($payload);
         }
 
-        return LoadedTargetPreparePipeline::create()($payload);
+        return LoadedTargetPreparePipeline::createGuided()($payload);
+    }
+
+    /** @param array<string, mixed> $input @return array<string, mixed> */
+    private function runSubscriptionSourceRelease(array $input): array
+    {
+        if ($this->subscriptionSourceRelease !== null) {
+            return ($this->subscriptionSourceRelease)($input);
+        }
+
+        return (new GuidedSubscriptionSourceRelease())($input);
     }
 
     /**

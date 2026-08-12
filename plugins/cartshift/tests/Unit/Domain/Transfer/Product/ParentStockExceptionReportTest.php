@@ -52,6 +52,22 @@ final class ParentStockExceptionReportTest extends PluginTestCase
         self::assertNull($unowned[0]['target_verified']);
     }
 
+    public function testNonStockFollowUpItemsSurviveStockConfirmationUnchanged(): void
+    {
+        $skipped = [
+            'kind' => 'skipped_product',
+            'title' => 'Store membership',
+            'dependent_orders' => 1,
+            'dependent_subscriptions' => 2,
+        ];
+
+        $report = (new ParentStockExceptionReport(new InMemoryProductTargetGateway()))
+            ->confirm([], [$skipped, $this->expected()]);
+
+        self::assertSame($skipped, $report[0]);
+        self::assertNull($report[1]['target_verified']);
+    }
+
     /** @return array<string,mixed> */
     private function expected(): array
     {

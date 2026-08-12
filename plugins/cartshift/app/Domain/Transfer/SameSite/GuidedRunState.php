@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace CartShift\Domain\Transfer\SameSite;
 
 use CartShift\Domain\Transfer\SourceIdentity;
+use CartShift\Support\CanonicalJson;
 
 defined('ABSPATH') || exit;
 
-/** Durable adapter state for one same-site rehearsal. */
+/** Durable adapter state for one same-site migration. */
 final readonly class GuidedRunState
 {
     public const string READY = 'ready';
     public const string RUNNING = 'running';
     public const string AWAITING_DECISIONS = 'awaiting_decisions';
+    public const string AWAITING_RENEWAL_PAUSE = 'awaiting_renewal_pause';
     public const string FAILED = 'failed';
     public const string COMPLETED = 'completed';
     public const string CANCELLED = 'cancelled';
@@ -37,7 +39,7 @@ final readonly class GuidedRunState
         SourceIdentity::assertValidSourceKey($sourceKey);
         if (trim($operator) === ''
             || preg_match('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/D', $decidedAtUtc) !== 1
-            || $nextStep < 0 || $nextStep > 12
+            || $nextStep < 0 || $nextStep > GuidedRunPlan::stepCount(true)
             || !array_is_list($migrationExceptions)
             || !in_array($phase, self::phases(), true)
             || ($failure !== null && trim($failure) === '')) {
@@ -143,7 +145,18 @@ final readonly class GuidedRunState
             ),
             default => $this->evidence,
         };
-        $next = $this->nextStep + 1;
+        if ($verb === 'prepare-subscription-cutover'
+            && (!is_bool($result['subscription_cutover_required'] ?? null)
+                || !is_bool($result['subscription_release_required'] ?? null))) {
+            throw new \RuntimeException('guided_subscription_cutover_result_invalid');
+        }
+        $skipEmptyCutover = $verb === 'prepare-subscription-cutover'
+            && $result['subscription_cutover_required'] === false;
+        $next = $this->nextStep + ($skipEmptyCutover ? 3 : 1);
+        $phase = $verb === 'prepare-subscription-cutover'
+            && $result['subscription_release_required'] === true
+            ? self::AWAITING_RENEWAL_PAUSE
+            : ($next === $stepCount ? self::COMPLETED : self::RUNNING);
 
         return new self(
             $this->sourceKey,
@@ -153,9 +166,12 @@ final readonly class GuidedRunState
             $next,
             $evidence,
             is_array($result['migration_exceptions'] ?? null)
-                ? array_values($result['migration_exceptions'])
+                ? self::mergeMigrationExceptions(
+                    $this->migrationExceptions,
+                    array_values($result['migration_exceptions']),
+                )
                 : $this->migrationExceptions,
-            $next === $stepCount ? self::COMPLETED : self::RUNNING,
+            $phase,
             $verb,
             $result,
             null,
@@ -177,7 +193,9 @@ final readonly class GuidedRunState
             $this->includesSubscriptions,
             $next,
             $this->evidence,
-            $this->migrationExceptions,
+            is_array($acceptance['migration_exceptions'] ?? null)
+                ? array_values($acceptance['migration_exceptions'])
+                : $this->migrationExceptions,
             $next === $stepCount ? self::COMPLETED : self::RUNNING,
             'propose-decisions',
             $acceptance,
@@ -199,6 +217,17 @@ final readonly class GuidedRunState
         }
 
         return $this->afterDecisionAcceptance(['accepted' => 0], $stepCount);
+    }
+
+    /** Record the owner's immediate maintenance assertion without advancing evidence. */
+    public function afterRenewalsPaused(): self
+    {
+        if ($this->phase !== self::AWAITING_RENEWAL_PAUSE
+            || $this->lastVerb !== 'prepare-subscription-cutover') {
+            throw new \LogicException('guided_run_not_awaiting_renewal_pause');
+        }
+
+        return $this->copy(phase: self::RUNNING);
     }
 
     public function afterFailure(string $verb, \Throwable $failure): self
@@ -290,6 +319,27 @@ final readonly class GuidedRunState
             && !str_contains((string) $this->failure, 'guided_subscription_mode_changed');
     }
 
+    /** A pre-target stop from the former rehearsal gate is safe to replace with a current review. */
+    public function canReplaceBeforeTarget(): bool
+    {
+        if ($this->phase !== self::FAILED || $this->evidence->descriptor !== null) {
+            return false;
+        }
+
+        return str_contains((string) $this->failure, 'guided_dependency_bound_target_readiness_unavailable')
+            || str_contains((string) $this->failure, 'guided_completed_rehearsal_rollback_unavailable');
+    }
+
+    /** Resume only after durable subscription evidence proves rollback is no longer the safe direction. */
+    public function resumeForward(): self
+    {
+        if ($this->phase !== self::FAILED || !$this->includesSubscriptions || $this->evidence->descriptor === null) {
+            throw new \LogicException('guided_run_forward_resume_invalid');
+        }
+
+        return $this->copy(phase: self::RUNNING, failure: null);
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {
@@ -342,6 +392,7 @@ final readonly class GuidedRunState
             self::READY,
             self::RUNNING,
             self::AWAITING_DECISIONS,
+            self::AWAITING_RENEWAL_PAUSE,
             self::FAILED,
             self::COMPLETED,
             self::CANCELLED,
@@ -357,10 +408,58 @@ final readonly class GuidedRunState
             return true;
         }
 
-        return !is_array($proposal['proposal_decisions'] ?? null)
-            || ($proposal['proposal_decisions'] ?? []) !== []
-            || (array_key_exists('product_questions', $proposal)
-                && (!is_array($proposal['product_questions']) || $proposal['product_questions'] !== []));
+        if (!is_array($proposal['proposal_decisions'] ?? null)
+            || ($proposal['proposal_decisions'] ?? []) !== []) {
+            return true;
+        }
+        foreach (['product_questions', 'customer_questions', 'collision_questions'] as $key) {
+            if (array_key_exists($key, $proposal)
+                && (!is_array($proposal[$key]) || $proposal[$key] !== [])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Keep every owner-accepted follow-up while adding each target stock exception once.
+     *
+     * @param list<array<string,mixed>> $existing
+     * @param list<array<string,mixed>> $targetReadiness
+     * @return list<array<string,mixed>>
+     */
+    private static function mergeMigrationExceptions(array $existing, array $targetReadiness): array
+    {
+        $merged = $existing;
+        $stockKeys = [];
+        foreach ($existing as $exception) {
+            if (($exception['kind'] ?? null) === 'shared_parent_stock') {
+                $stockKeys[self::stockExceptionKey($exception)] = true;
+            }
+        }
+        foreach ($targetReadiness as $exception) {
+            if (($exception['kind'] ?? null) !== 'shared_parent_stock') {
+                $merged[] = $exception;
+                continue;
+            }
+            $key = self::stockExceptionKey($exception);
+            if (isset($stockKeys[$key])) {
+                continue;
+            }
+            $stockKeys[$key] = true;
+            $merged[] = $exception;
+        }
+
+        return $merged;
+    }
+
+    /** @param array<string,mixed> $exception */
+    private static function stockExceptionKey(array $exception): string
+    {
+        $variation = trim((string) ($exception['source_variation'] ?? ''));
+
+        return $variation !== '' ? $variation : CanonicalJson::fingerprint($exception);
     }
 
     /** @param array<string, mixed> $data */

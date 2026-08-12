@@ -11,7 +11,7 @@ use CartShift\Tests\Unit\PluginTestCase;
 
 final class RollbackPlannerTest extends PluginTestCase
 {
-    public function testOneDriftedCreatedRowBlocksEveryDeletionAndReusedRowsAreNeverCandidates(): void
+    public function testOneDriftedCreatedRowBlocksEveryDeletionAndReusedRowsAreOnlyMappingRetirements(): void
     {
         $receipts = [
             $this->receipt('product', 'shop-alpha:product:1', 'created', 10, str_repeat('a', 64), 1),
@@ -30,6 +30,7 @@ final class RollbackPlannerTest extends PluginTestCase
         self::assertFalse($plan->safe);
         self::assertSame(['rollback_target_drift:shop-alpha:order:3'], $plan->conflicts);
         self::assertSame(['shop-alpha:order:3', 'shop-alpha:product:1'], array_column($plan->deletions, 'source_identity'));
+        self::assertSame(['shop-alpha:customer:2'], array_column($plan->mappingRetirements, 'source_identity'));
 
         try {
             $planner->execute($plan, $gateway, static function (): void {});
@@ -64,6 +65,32 @@ final class RollbackPlannerTest extends PluginTestCase
         self::assertSame($gateway->deleted, $marked);
     }
 
+    public function testSafePlanRetiresReusedMappingEvidenceWithoutTouchingItsTarget(): void
+    {
+        $receipts = [
+            $this->receipt('product', 'shop-alpha:product:1', 'created', 10, str_repeat('a', 64), 1),
+            $this->receipt('customer', 'shop-alpha:customer:2', 'reused', 20, str_repeat('b', 64), 2, str_repeat('b', 64)),
+        ];
+        $gateway = new RecordingRollbackGateway([
+            'shop-alpha:product:1' => str_repeat('a', 64),
+            'shop-alpha:customer:2' => str_repeat('b', 64),
+        ]);
+        $marked = [];
+        $planner = new RollbackPlanner();
+        $plan = $planner->plan('run-task-22', 1, $receipts, $gateway);
+
+        $planner->execute($plan, $gateway, static function (TransferReceipt $receipt) use (&$marked): void {
+            $marked[] = $receipt->sourceIdentity;
+        });
+
+        self::assertTrue($plan->safe);
+        self::assertSame(['shop-alpha:product:1'], array_column($plan->deletions, 'source_identity'));
+        self::assertSame(['shop-alpha:customer:2'], array_column($plan->mappingRetirements, 'source_identity'));
+        self::assertSame(['shop-alpha:product:1'], $gateway->deleted);
+        self::assertSame(['shop-alpha:customer:2', 'shop-alpha:product:1'], $marked);
+        self::assertSame(2, $gateway->fingerprintCalls);
+    }
+
     public function testOutOfOrderOrDuplicateReceiptSequenceBlocksBeforeFingerprintingTargets(): void
     {
         $receipts = [
@@ -78,6 +105,7 @@ final class RollbackPlannerTest extends PluginTestCase
         self::assertFalse($plan->safe);
         self::assertSame(['rollback_dependency_order_unproven'], $plan->conflicts);
         self::assertSame([], $plan->deletions);
+        self::assertSame([], $plan->mappingRetirements);
         self::assertSame(0, $gateway->fingerprintCalls);
     }
 

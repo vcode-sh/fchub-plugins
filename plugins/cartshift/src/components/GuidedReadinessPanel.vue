@@ -110,11 +110,11 @@
     <details class="cartshift-process" data-test="cutover">
       <summary>
         <span class="dashicons dashicons-editor-help" aria-hidden="true"></span>
-        <span><strong>How migration works</strong><small>Review the process and cutover safety</small></span>
+        <span><strong>How the move works</strong><small>Review, verify, then activate FluentCart</small></span>
         <span class="dashicons dashicons-arrow-down-alt2" aria-hidden="true"></span>
       </summary>
       <div>
-        <p>CartShift first checks your store, then asks you to review anything that needs a human choice.</p>
+        <p>CartShift checks your store first and asks only about matches it cannot decide safely.</p>
         <p>{{ data.setup?.cutover?.message }}</p>
       </div>
     </details>
@@ -141,7 +141,7 @@ const isBlocked = computed(() => props.blockingChecks.length > 0 || props.data.p
 const showRefreshAction = computed(() => isBlocked.value && !props.currentRun?.mode_changed);
 const journeyStep = computed(() => {
   if (props.currentRun?.phase === 'awaiting_decisions') return 2;
-  if (['completed', 'unsafe_completion'].includes(props.currentRun?.phase)) return 3;
+  if (props.currentRun?.phase === 'completed') return 3;
   return 1;
 });
 
@@ -155,14 +155,16 @@ const tone = computed(() => {
 const heading = computed(() => {
   if (isBlocked.value) return 'Your store needs attention';
   if (needsSetup.value) return 'Ready to check your store?';
+  if (props.currentRun?.phase === 'completed') return 'Migration complete';
   if (props.currentRun?.phase === 'awaiting_decisions') return 'Your review is ready';
-  if (props.currentRun) return 'Migration review in progress';
+  if (props.currentRun) return 'Migration in progress';
   return 'Ready for review';
 });
 
 const introduction = computed(() => {
   if (isBlocked.value) return 'Resolve the items below before CartShift continues. Nothing will be overwritten.';
   if (needsSetup.value) return 'CartShift will securely prepare itself and check what can move to FluentCart.';
+  if (props.currentRun?.phase === 'completed') return 'Your selected records are now in FluentCart. Review any notes below.';
   if (props.currentRun?.phase === 'awaiting_decisions') return 'Check the choices below. CartShift will not decide these for you.';
   if (props.currentRun) return 'CartShift has saved your progress. Continue from the current step below.';
   return 'CartShift found no blockers. Next, review exactly how your store will move.';

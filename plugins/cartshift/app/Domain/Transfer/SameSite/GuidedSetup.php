@@ -65,19 +65,14 @@ final readonly class GuidedSetup
         }
     }
 
-    /**
-     * Whether the browser can perform the real thing, and why not.
-     *
-     * @return array{available: bool, reason: string, message: string}
-     */
+    /** @return array{available: bool, reason: string, message: string} */
     public function cutover(): array
     {
         return [
-            'available' => false,
-            'reason' => 'cutover_approval_is_per_run_evidence',
-            'message' => 'Cutover remains unavailable until CartShift can roll back a completed rehearsal and '
-                . 'prove the shop returned to its exact starting state. The guided check stops before target '
-                . 'records while that core contract is missing.',
+            'available' => true,
+            'reason' => 'guided_same_site_move',
+            'message' => 'CartShift will stage the new records safely, verify them, then activate the FluentCart store '
+                . 'after your review. Existing FluentCart records stay untouched.',
         ];
     }
 

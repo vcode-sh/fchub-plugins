@@ -12,6 +12,8 @@ use CartShift\Domain\Transfer\Order\LoadedFluentCartOrderGateway;
 use CartShift\Domain\Transfer\Product\LoadedFluentCartProductGateway;
 use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
 use CartShift\Domain\Transfer\RecordEnvelope;
+use CartShift\Domain\Transfer\SourceIdentity;
+use CartShift\Domain\Transfer\Subscription\LoadedFluentCartSubscriptionGateway;
 use CartShift\Support\CanonicalJson;
 
 defined('ABSPATH') || exit;
@@ -146,6 +148,42 @@ final class LoadedPreparedTargetBaselineProbe implements PreparedTargetBaselineP
             ];
         }
 
+        foreach ($decisions->decisions as $identity => $decision) {
+            $target = is_array($decision['protected_collision_target'] ?? null)
+                ? $decision['protected_collision_target']
+                : null;
+            if (($decision['action'] ?? null) !== 'excluded_by_policy' || $target === null) {
+                continue;
+            }
+            $source = SourceIdentity::fromCanonical($identity);
+            $record = $recordsByIdentity[$identity] ?? null;
+            $kind = $target['kind'] ?? null;
+            $targetId = $target['target_id'] ?? null;
+            $reviewed = $target['target_fingerprint'] ?? null;
+            if (!in_array($kind, ['order', 'subscription'], true)
+                || $kind !== $source->entityType
+                || !is_int($targetId)
+                || $targetId <= 0
+                || !is_string($reviewed)
+                || preg_match('/\A[a-f0-9]{64}\z/D', $reviewed) !== 1
+                || ($record instanceof RecordEnvelope
+                    && !hash_equals($record->sourceContentDigest, (string) ($decision['source_fingerprint'] ?? '')))) {
+                $blockers[] = 'skipped_collision_target_invalid:' . $identity;
+                continue;
+            }
+            $snapshot = ($this->targetReader)($kind, $targetId);
+            $actual = CanonicalJson::fingerprint($snapshot);
+            if (!hash_equals($reviewed, $actual)) {
+                $blockers[] = 'skipped_collision_target_changed:' . $identity;
+                continue;
+            }
+            $protected[$identity . '|protected_collision_target'] = [
+                'kind' => $kind,
+                'target_id' => $targetId,
+                'fingerprint' => $actual,
+            ];
+        }
+
         $preexisting = ($this->preexistingReader)($sourceKey, $runId);
         foreach ((array) ($preexisting['maps'] ?? []) as $row) {
             $sourceId = (string) ($row['source_id'] ?? $row['wc_id'] ?? '');
@@ -253,20 +291,9 @@ final class LoadedPreparedTargetBaselineProbe implements PreparedTargetBaselineP
             'product' => (new LoadedFluentCartProductGateway())->snapshot($targetId),
             'customer' => (new LoadedFluentCartCustomerGateway())->snapshot($targetId),
             'order' => (new LoadedFluentCartOrderGateway())->snapshot($targetId),
-            'subscription' => $this->subscriptionSnapshot($targetId),
+            'subscription' => (new LoadedFluentCartSubscriptionGateway())->snapshot($targetId),
             default => [],
         };
-    }
-
-    /** @return array<string,mixed> */
-    private function subscriptionSnapshot(int $targetId): array
-    {
-        global $wpdb;
-        $rows = $this->rows($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}fct_subscriptions WHERE id = %d LIMIT 1",
-            $targetId,
-        ));
-        return ['subscription' => $rows[0] ?? null];
     }
 
     /** @return list<array<string,mixed>> */

@@ -131,6 +131,33 @@ final class GuidedRunStateRepositoryTest extends PluginTestCase
         self::assertEquals([$exception], $loaded?->migrationExceptions);
     }
 
+    public function testACompletedSubscriptionMigrationKeepsAllFifteenSteps(): void
+    {
+        $repository = new GuidedRunStateRepository($this->workspace, 'site-0123456789abcdef');
+        $state = GuidedRunState::fromArray([
+            'decided_at_utc' => '2026-08-12T12:00:00Z',
+            'evidence' => [
+                'descriptor' => 'descriptor-0001',
+                'package_path' => $this->workspace . '/package',
+                'selection_fingerprint' => str_repeat('a', 64),
+            ],
+            'failure' => null,
+            'includes_subscriptions' => true,
+            'last_result' => ['state' => 'completed'],
+            'last_verb' => 'complete',
+            'migration_exceptions' => [],
+            'next_step' => 15,
+            'operator' => 'wp-user:7',
+            'phase' => GuidedRunState::COMPLETED,
+            'source_key' => 'site-0123456789abcdef',
+        ]);
+
+        $repository->transaction(static fn (): GuidedRunState => $state);
+
+        self::assertSame(15, $repository->get()?->nextStep);
+        self::assertTrue($repository->get()?->includesSubscriptions);
+    }
+
     public function testLegacyCanonicalStateRemainsReadableAndUpgradesOnTheNextWrite(): void
     {
         $repository = new GuidedRunStateRepository($this->workspace, 'site-0123456789abcdef');

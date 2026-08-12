@@ -12,6 +12,7 @@ use CartShift\Domain\Transfer\Product\ProductRecordFactory;
 use CartShift\Domain\Transfer\Product\ProductTargetFingerprint;
 use CartShift\Domain\Transfer\Product\WooProductRecordSource;
 use CartShift\Domain\Transfer\RecordEnvelope;
+use CartShift\Domain\Transfer\RecordKind;
 use CartShift\Domain\Transfer\TransferSelection;
 
 defined('ABSPATH') || exit;
@@ -27,10 +28,16 @@ final readonly class GuidedProductDecisionBuilder
 
     private GuidedProductQuestionBuilder $questionBuilder;
 
+    /** @var (\Closure(TransferSelection,TransferDecisionSet):iterable<RecordEnvelope>)|null */
+    private ?\Closure $sourceDependencyRecords;
+
+    private bool $usesLoadedProductSource;
+
     /**
      * @param (callable(TransferSelection):iterable<RecordEnvelope>)|null $sourceRecords
      * @param (callable():list<array<string,mixed>>)|null $targetProducts
      * @param (callable(SourceIdentity):array{orders:int,subscriptions:int})|null $dependencyCounts
+     * @param (callable(TransferSelection,TransferDecisionSet):iterable<RecordEnvelope>)|null $sourceDependencyRecords
      */
     public function __construct(
         ?callable $sourceRecords = null,
@@ -39,7 +46,9 @@ final readonly class GuidedProductDecisionBuilder
         ProductMatcher $matcher = new ProductMatcher(),
         VariantResolver $variants = new VariantResolver(),
         ProductTargetFingerprint $targetFingerprint = new ProductTargetFingerprint(),
+        ?callable $sourceDependencyRecords = null,
     ) {
+        $this->usesLoadedProductSource = $sourceRecords === null;
         $this->sourceRecords = $sourceRecords === null
             ? static fn (TransferSelection $selection): iterable => (new WooProductRecordSource(
                 ProductRecordFactory::forLoadedWoo(),
@@ -48,6 +57,9 @@ final readonly class GuidedProductDecisionBuilder
         $this->targetProducts = $targetProducts === null
             ? self::loadedTargetProducts(...)
             : $targetProducts(...);
+        $this->sourceDependencyRecords = $sourceDependencyRecords === null
+            ? null
+            : $sourceDependencyRecords(...);
         $this->questionBuilder = new GuidedProductQuestionBuilder(
             $dependencyCounts,
             $matcher,
@@ -64,8 +76,14 @@ final readonly class GuidedProductDecisionBuilder
             return $proposal + ['product_questions' => []];
         }
 
+        $decisionRows = $this->rows((array) ($proposal['decision_set'] ?? []), 'decisions');
+        $decisions = TransferDecisionSet::fromArray($decisionRows);
+        $dependencyIndex = $this->dependencyIndex($selection, $decisions);
+        $sourceRecords = $this->usesLoadedProductSource && $dependencyIndex instanceof GuidedSourceDependencyIndex
+            ? $dependencyIndex->records(RecordKind::Product)
+            : ($this->sourceRecords)($selection);
         $records = [];
-        foreach (($this->sourceRecords)($selection) as $record) {
+        foreach ($sourceRecords as $record) {
             if (!$record instanceof RecordEnvelope || $record->identity->entityType !== 'product') {
                 throw new \RuntimeException('guided_product_source_invalid');
             }
@@ -73,7 +91,6 @@ final readonly class GuidedProductDecisionBuilder
         }
 
         $proposalRows = $this->rows($proposal, 'proposal_decisions');
-        $decisionRows = $this->rows((array) ($proposal['decision_set'] ?? []), 'decisions');
         $questions = [];
         $productBlockers = [];
         $removed = [];
@@ -88,7 +105,8 @@ final readonly class GuidedProductDecisionBuilder
                 || !hash_equals($record->sourceContentDigest, (string) ($row['source_fingerprint'] ?? ''))) {
                 throw new \RuntimeException('guided_product_source_changed');
             }
-            $question = $this->questionBuilder->build($record, $row, $targets);
+            $closure = $dependencyIndex?->closure($record->identity);
+            $question = $this->questionBuilder->build($record, $row, $targets, $closure);
             if ($question === null) {
                 continue;
             }
@@ -98,12 +116,22 @@ final readonly class GuidedProductDecisionBuilder
                 $questions[] = $question;
             }
             $removed[$identity] = true;
+            if ($this->onlyCascadeSkip($question)) {
+                foreach ($question['closure'] as $evidence) {
+                    if (is_array($evidence) && is_string($evidence['identity'] ?? null)) {
+                        $removed[$evidence['identity']] = true;
+                    }
+                }
+            }
         }
 
         if ($questions === [] && $productBlockers === []) {
             return $proposal + ['product_questions' => []];
         }
 
+        $removedRecordRows = count(array_filter($proposalRows, static fn (array $row): bool =>
+            ($row['scope'] ?? 'record') === 'record'
+            && isset($removed[(string) ($row['identity'] ?? '')])));
         $proposalRows = array_values(array_filter(
             $proposalRows,
             static fn (array $row): bool => !isset($removed[(string) ($row['identity'] ?? '')])
@@ -118,7 +146,7 @@ final readonly class GuidedProductDecisionBuilder
         $counts = is_array($proposal['proposal_counts'] ?? null) ? $proposal['proposal_counts'] : [];
         $counts['records'] = max(
             0,
-            (int) ($counts['records'] ?? 0) - count($questions) - count($productBlockers),
+            (int) ($counts['records'] ?? 0) - $removedRecordRows,
         );
         $counts['product_choices'] = count($questions);
         $counts['product_blockers'] = count($productBlockers);
@@ -196,17 +224,24 @@ final readonly class GuidedProductDecisionBuilder
                 throw new \RuntimeException('guided_product_answers_incomplete');
             }
             unset($answerByReview[$reviewId]);
-            $rows[] = $this->decisionRow($question, $choice, $operator, $decidedAtUtc);
+            foreach ($this->decisionRows($question, $choice, $operator, $decidedAtUtc) as $row) {
+                $identity = (string) $row['identity'];
+                if (isset($rows[$identity]) && $rows[$identity] !== $row) {
+                    throw new \RuntimeException('guided_product_dependency_closure_conflict');
+                }
+                $rows[$identity] = $row;
+            }
         }
         if ($answerByReview !== []) {
             throw new \RuntimeException('guided_product_answers_invalid');
         }
 
         $existing = $this->rows((array) ($proposal['decision_set'] ?? []), 'decisions');
-        $decisions = TransferDecisionSet::fromArray([...$existing, ...$rows]);
-        $proposalRows = [...$this->rows($proposal, 'proposal_decisions'), ...$rows];
+        $resolvedRows = array_values($rows);
+        $decisions = TransferDecisionSet::fromArray([...$existing, ...$resolvedRows]);
+        $proposalRows = [...$this->rows($proposal, 'proposal_decisions'), ...$resolvedRows];
         $counts = is_array($proposal['proposal_counts'] ?? null) ? $proposal['proposal_counts'] : [];
-        $counts['records'] = (int) ($counts['records'] ?? 0) + count($rows);
+        $counts['records'] = (int) ($counts['records'] ?? 0) + count($resolvedRows);
         $counts['total'] = count($decisions->rows());
 
         return array_replace($proposal, [
@@ -217,8 +252,12 @@ final readonly class GuidedProductDecisionBuilder
         ]);
     }
 
-    /** @param array<string,mixed> $question @param array<string,mixed> $choice @return array<string,mixed> */
-    private function decisionRow(array $question, array $choice, string $operator, string $decidedAtUtc): array
+    /**
+     * @param array<string,mixed> $question
+     * @param array<string,mixed> $choice
+     * @return list<array<string,mixed>>
+     */
+    private function decisionRows(array $question, array $choice, string $operator, string $decidedAtUtc): array
     {
         $base = [
             'identity' => (string) $question['identity'],
@@ -228,24 +267,70 @@ final readonly class GuidedProductDecisionBuilder
             'decided_at' => $decidedAtUtc,
         ];
         return match ($choice['action'] ?? null) {
-            'create' => array_replace((array) $question['original_decision'], [
+            'create' => [array_replace((array) $question['original_decision'], [
                 'operator' => $operator,
                 'decided_at' => $decidedAtUtc,
                 'reason' => 'The owner chose to create a separate FluentCart product in the guided review.',
-            ]),
-            'skip' => $base + [
-                'action' => 'excluded_by_policy',
-                'reason' => 'The owner chose to skip this product in the guided review.',
-            ],
-            'link' => $base + [
+            ])],
+            'skip' => $this->skipRows($question, $operator, $decidedAtUtc),
+            'link' => [$base + [
                 'action' => 'link_existing_product',
                 'target_product_id' => (int) $choice['target_product_id'],
                 'target_fingerprint' => (string) $choice['target_fingerprint'],
                 'variation_links' => $choice['variation_links'],
                 'reason' => 'The owner chose an existing FluentCart product in the guided review.',
-            ],
+            ]],
             default => throw new \RuntimeException('guided_product_choice_invalid'),
         };
+    }
+
+    /** @param array<string,mixed> $question @return list<array<string,mixed>> */
+    private function skipRows(array $question, string $operator, string $decidedAtUtc): array
+    {
+        $closure = $question['closure'] ?? [];
+        if (!is_array($closure) || !array_is_list($closure) || $closure === []) {
+            $closure = [[
+                'identity' => $question['identity'] ?? null,
+                'source_fingerprint' => $question['source_fingerprint'] ?? null,
+            ]];
+        }
+        $rows = [];
+        foreach ($closure as $evidence) {
+            if (!is_array($evidence)
+                || !is_string($evidence['identity'] ?? null)
+                || !is_string($evidence['source_fingerprint'] ?? null)) {
+                throw new \RuntimeException('guided_product_dependency_closure_invalid');
+            }
+            $rows[] = [
+                'identity' => $evidence['identity'],
+                'scope' => 'record',
+                'action' => 'excluded_by_policy',
+                'source_fingerprint' => $evidence['source_fingerprint'],
+                'operator' => $operator,
+                'reason' => 'The owner skipped this product and its exact source dependency closure.',
+                'decided_at' => $decidedAtUtc,
+            ];
+        }
+        return $rows;
+    }
+
+    /** @param array<string,mixed> $question */
+    private function onlyCascadeSkip(array $question): bool
+    {
+        $choices = is_array($question['choices'] ?? null) ? $question['choices'] : [];
+        return count($choices) === 1 && ($choices[0]['action'] ?? null) === 'skip';
+    }
+
+    private function dependencyIndex(
+        TransferSelection $selection,
+        TransferDecisionSet $decisions,
+    ): ?GuidedSourceDependencyIndex {
+        if ($this->sourceDependencyRecords instanceof \Closure) {
+            return new GuidedSourceDependencyIndex(($this->sourceDependencyRecords)($selection, $decisions));
+        }
+        return $this->usesLoadedProductSource
+            ? GuidedSourceDependencyIndex::forLoadedSelection($selection, $decisions)
+            : null;
     }
 
     /** @param array<string,mixed> $container @return list<array<string,mixed>> */

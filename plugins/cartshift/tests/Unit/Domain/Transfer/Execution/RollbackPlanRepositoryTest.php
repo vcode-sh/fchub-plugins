@@ -46,10 +46,27 @@ final class RollbackPlanRepositoryTest extends PluginTestCase
             '2026-08-10T12:00:00Z',
             '2026-08-10T12:00:01Z',
         );
+        $reused = new TransferReceipt(
+            'run-task-22',
+            'customer',
+            'shop-alpha:customer:11',
+            1,
+            str_repeat('3', 64),
+            'reused',
+            ['primary' => 701],
+            str_repeat('4', 64),
+            str_repeat('4', 64),
+            2,
+            '2026-08-10T12:00:02Z',
+            '2026-08-10T12:00:03Z',
+        );
         $plan = new RollbackPlan('run-task-22', 1, [[
             'source_identity' => $receipt->sourceIdentity,
             'receipt' => $receipt,
-        ]], [], true);
+        ]], [], true, [[
+            'source_identity' => $reused->sourceIdentity,
+            'receipt' => $reused,
+        ]]);
         $repository = new RollbackPlanRepository($this->directory);
 
         $path = $repository->save($plan);

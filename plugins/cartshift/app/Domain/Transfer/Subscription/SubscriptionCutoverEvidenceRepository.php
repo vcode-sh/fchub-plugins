@@ -87,6 +87,11 @@ final readonly class SubscriptionCutoverEvidenceRepository
         });
     }
 
+    public function createPreparedIfPresent(?SubscriptionCutoverEvidence $evidence): ?SubscriptionCutoverEvidence
+    {
+        return $evidence === null ? null : $this->createPreparedIdempotently($evidence);
+    }
+
     public function replace(SubscriptionCutoverEvidence $before, SubscriptionCutoverEvidence $after): void
     {
         if ($before->runId !== $after->runId) throw new \RuntimeException('subscription_cutover_evidence_run_changed');

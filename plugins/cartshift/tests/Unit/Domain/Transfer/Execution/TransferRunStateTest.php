@@ -19,7 +19,7 @@ final class TransferRunStateTest extends PluginTestCase
             'staged' => ['reconciling'],
             'reconciling' => ['reconciled', 'interrupted', 'failed'],
             'reconciled' => ['promoted'],
-            'promoted' => ['catalogue_activating', 'completed'],
+            'promoted' => ['catalogue_activating', 'completed', 'failed'],
             'catalogue_activating' => ['completed', 'interrupted', 'failed'],
             'interrupted' => ['staging', 'reconciling', 'catalogue_activating', 'failed'],
             'failed' => ['rolling_back'],

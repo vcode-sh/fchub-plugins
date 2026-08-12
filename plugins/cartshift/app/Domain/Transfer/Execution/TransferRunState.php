@@ -33,7 +33,7 @@ enum TransferRunState: string
             self::Staged => [self::Reconciling],
             self::Reconciling => [self::Reconciled, self::Interrupted, self::Failed],
             self::Reconciled => [self::Promoted],
-            self::Promoted => [self::CatalogueActivating, self::Completed],
+            self::Promoted => [self::CatalogueActivating, self::Completed, self::Failed],
             self::CatalogueActivating => [self::Completed, self::Interrupted, self::Failed],
             self::Interrupted => [self::Staging, self::Reconciling, self::CatalogueActivating, self::Failed],
             self::Failed => [self::RollingBack],

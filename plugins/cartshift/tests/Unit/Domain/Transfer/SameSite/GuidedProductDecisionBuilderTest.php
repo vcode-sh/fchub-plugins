@@ -84,9 +84,11 @@ final class GuidedProductDecisionBuilderTest extends PluginTestCase
         self::assertSame('activate_catalogue', $proposal['decision_set']['decisions'][0]['action']);
     }
 
-    public function testStrongButIncompatibleMatchStopsInsteadOfDuplicatingOrBreakingOrders(): void
+    public function testStrongButIncompatibleMatchOffersOneExactCascadeSkip(): void
     {
         $record = $this->productRecord('Store membership', 'MEMBERSHIP');
+        $order = $this->dependentRecord('order', '30', [$record]);
+        $subscription = $this->dependentRecord('subscription', '40', [$record, $order]);
         $target = [
             'product' => ['post_title' => 'Store membership', 'post_status' => 'publish'],
             'detail' => ['variation_type' => 'simple'],
@@ -119,21 +121,100 @@ final class GuidedProductDecisionBuilderTest extends PluginTestCase
                 'snapshot' => $target,
             ]],
             static fn (): array => ['orders' => 3, 'subscriptions' => 0],
+            sourceDependencyRecords: static fn (): iterable => [$record, $order, $subscription],
         );
 
-        try {
-            $proposal = $builder->enrich($this->proposal($record), $this->selection());
-        } catch (\RuntimeException $exception) {
-            self::fail('An incompatible strong match escaped as a technical error.');
-        }
+        $proposal = $builder->enrich($this->proposalWithDependants($record, $order, $subscription), $this->selection());
+        $question = $builder->questions($proposal)[0];
 
-        self::assertSame('blocked', $proposal['status']);
-        self::assertSame([], $proposal['product_questions']);
-        self::assertSame('Store membership', $proposal['blockers'][0]['product_name']);
+        self::assertSame('owner_review_required', $proposal['status']);
+        self::assertSame([], $proposal['blockers']);
+        self::assertSame(['skip'], array_column($question['choices'], 'action'));
+        self::assertSame(1, $question['dependent_orders']);
+        self::assertSame(1, $question['dependent_subscriptions']);
+        self::assertSame([
+            $record->identity->canonical(),
+            $order->identity->canonical(),
+            $subscription->identity->canonical(),
+        ], array_column($question['closure'], 'identity'));
         self::assertSame([], $proposal['proposal_decisions']);
         self::assertSame([], $proposal['decision_set']['decisions']);
         self::assertSame(0, $proposal['proposal_counts']['records']);
-        self::assertSame(1, $proposal['proposal_counts']['product_blockers']);
+        self::assertSame(1, $proposal['proposal_counts']['product_choices']);
+    }
+
+    public function testCascadeSkipEmitsOneExcludedDecisionForEveryExactDependant(): void
+    {
+        $product = $this->productRecord('Store membership', 'MEMBERSHIP');
+        $order = $this->dependentRecord('order', '30', [$product]);
+        $subscription = $this->dependentRecord('subscription', '40', [$product, $order]);
+        $builder = new GuidedProductDecisionBuilder(
+            static fn (): iterable => [$product],
+            fn (): array => $this->targetWithVariations('Store membership', 'MEMBERSHIP', [
+                ['id' => 901, 'sku' => 'OTHER-MONTHLY', 'name' => 'Monthly'],
+                ['id' => 902, 'sku' => 'OTHER-ANNUAL', 'name' => 'Annual'],
+            ]),
+            static fn (): array => ['orders' => 1, 'subscriptions' => 1],
+            sourceDependencyRecords: static fn (): iterable => [$product, $order, $subscription],
+        );
+        $proposal = $builder->enrich(
+            $this->proposalWithDependants($product, $order, $subscription),
+            $this->selection(),
+        );
+        $question = $builder->questions($proposal)[0];
+
+        $resolved = $builder->resolve($proposal, [[
+            'review_id' => $question['review_id'],
+            'choice_id' => $question['choices'][0]['choice_id'],
+        ]], 'wp-user:9', '2026-08-13T12:00:00Z');
+
+        self::assertSame(
+            [$order->identity->canonical(), $product->identity->canonical(), $subscription->identity->canonical()],
+            array_column($resolved['decision_set']['decisions'], 'identity'),
+        );
+        self::assertSame(
+            ['excluded_by_policy', 'excluded_by_policy', 'excluded_by_policy'],
+            array_column($resolved['decision_set']['decisions'], 'action'),
+        );
+        self::assertSame(3, $resolved['proposal_counts']['records']);
+    }
+
+    public function testCascadeQuestionAndChoiceIdsChangeWhenDependantEvidenceChanges(): void
+    {
+        $product = $this->productRecord('Store membership', 'MEMBERSHIP');
+        $firstOrder = $this->dependentRecord('order', '30', [$product], ['status' => 'processing']);
+        $changedOrder = $this->dependentRecord('order', '30', [$product], ['status' => 'completed']);
+        $target = fn (): array => $this->targetWithVariations('Store membership', 'MEMBERSHIP', [
+            ['id' => 901, 'sku' => 'OTHER-MONTHLY', 'name' => 'Monthly'],
+            ['id' => 902, 'sku' => 'OTHER-ANNUAL', 'name' => 'Annual'],
+        ]);
+        $first = new GuidedProductDecisionBuilder(
+            static fn (): iterable => [$product],
+            $target,
+            static fn (): array => ['orders' => 1, 'subscriptions' => 0],
+            sourceDependencyRecords: static fn (): iterable => [$product, $firstOrder],
+        );
+        $changed = new GuidedProductDecisionBuilder(
+            static fn (): iterable => [$product],
+            $target,
+            static fn (): array => ['orders' => 1, 'subscriptions' => 0],
+            sourceDependencyRecords: static fn (): iterable => [$product, $changedOrder],
+        );
+
+        $firstQuestion = $first->questions($first->enrich(
+            $this->proposalWithDependants($product, $firstOrder),
+            $this->selection(),
+        ))[0];
+        $changedQuestion = $changed->questions($changed->enrich(
+            $this->proposalWithDependants($product, $changedOrder),
+            $this->selection(),
+        ))[0];
+
+        self::assertNotSame($firstQuestion['review_id'], $changedQuestion['review_id']);
+        self::assertNotSame(
+            $firstQuestion['choices'][0]['choice_id'],
+            $changedQuestion['choices'][0]['choice_id'],
+        );
     }
 
     public function testEqualVariationCountsCannotTurnUnrelatedVariantsIntoAValidLink(): void
@@ -142,6 +223,7 @@ final class GuidedProductDecisionBuilderTest extends PluginTestCase
             ['id' => '11', 'sku' => 'WOO-MONTHLY', 'name' => 'Monthly'],
             ['id' => '12', 'sku' => 'WOO-ANNUAL', 'name' => 'Annual'],
         ]);
+        $order = $this->dependentRecord('order', '30', [$record]);
         $builder = new GuidedProductDecisionBuilder(
             static fn (): iterable => [$record],
             fn (): array => $this->targetWithVariations('Store membership', 'MEMBERSHIP', [
@@ -149,12 +231,13 @@ final class GuidedProductDecisionBuilderTest extends PluginTestCase
                 ['id' => 902, 'sku' => 'FC-BLUE', 'name' => 'Blue'],
             ]),
             static fn (): array => ['orders' => 3, 'subscriptions' => 0],
+            sourceDependencyRecords: static fn (): iterable => [$record, $order],
         );
 
-        $proposal = $builder->enrich($this->proposal($record), $this->selection());
+        $proposal = $builder->enrich($this->proposalWithDependants($record, $order), $this->selection());
 
-        self::assertSame('blocked', $proposal['status']);
-        self::assertSame([], $proposal['product_questions']);
+        self::assertSame('owner_review_required', $proposal['status']);
+        self::assertSame(['skip'], array_column($proposal['product_questions'][0]['choices'], 'action'));
         self::assertSame([], $proposal['decision_set']['decisions']);
     }
 
@@ -171,16 +254,18 @@ final class GuidedProductDecisionBuilderTest extends PluginTestCase
         $weak['id'] = 502;
         $weak['price'] = 999.0;
         $weak['snapshot']['variations'][0]['post_id'] = 502;
+        $order = $this->dependentRecord('order', '30', [$record]);
         $builder = new GuidedProductDecisionBuilder(
             static fn (): iterable => [$record],
             static fn (): array => [$strong, $weak],
             static fn (): array => ['orders' => 3, 'subscriptions' => 0],
+            sourceDependencyRecords: static fn (): iterable => [$record, $order],
         );
 
-        $proposal = $builder->enrich($this->proposal($record), $this->selection());
+        $proposal = $builder->enrich($this->proposalWithDependants($record, $order), $this->selection());
 
-        self::assertSame('blocked', $proposal['status']);
-        self::assertSame([], $proposal['product_questions']);
+        self::assertSame('owner_review_required', $proposal['status']);
+        self::assertSame(['skip'], array_column($proposal['product_questions'][0]['choices'], 'action'));
         self::assertSame([], $proposal['decision_set']['decisions']);
     }
 
@@ -283,6 +368,20 @@ final class GuidedProductDecisionBuilderTest extends PluginTestCase
         ]);
     }
 
+    /**
+     * @param list<RecordEnvelope> $dependencies
+     * @param array<string,mixed> $extra
+     */
+    private function dependentRecord(string $kind, string $id, array $dependencies, array $extra = []): RecordEnvelope
+    {
+        return RecordEnvelope::forPayload(2, new SourceIdentity('site-alpha', $kind, $id), $extra + [
+            'dependencies' => array_map(
+                static fn (RecordEnvelope $record): string => $record->identity->canonical(),
+                $dependencies,
+            ),
+        ]);
+    }
+
     /** @param list<array{id:string,sku:string,name:string}> $variations */
     private function productRecordWithVariations(string $name, string $sku, array $variations): RecordEnvelope
     {
@@ -353,5 +452,30 @@ final class GuidedProductDecisionBuilderTest extends PluginTestCase
             'decision_set_fingerprint' => TransferDecisionSet::fromArray([$row])->fingerprint(),
             'decision_set' => ['decisions' => [$row]],
         ];
+    }
+
+    /** @param RecordEnvelope ...$dependants @return array<string,mixed> */
+    private function proposalWithDependants(RecordEnvelope $record, RecordEnvelope ...$dependants): array
+    {
+        $proposal = $this->proposal($record);
+        foreach ($dependants as $dependant) {
+            $row = [
+                'identity' => $dependant->identity->canonical(),
+                'scope' => 'record',
+                'action' => 'excluded_by_policy',
+                'source_fingerprint' => $dependant->sourceContentDigest,
+                'operator' => 'wp-user:1',
+                'reason' => 'Proposed from exact source evidence.',
+                'decided_at' => '2026-08-12T20:00:00Z',
+            ];
+            $proposal['proposal_decisions'][] = $row;
+            $proposal['decision_set']['decisions'][] = $row;
+        }
+        $proposal['proposal_counts']['records'] = count($proposal['proposal_decisions']);
+        $proposal['proposal_counts']['total'] = count($proposal['decision_set']['decisions']);
+        $proposal['decision_set_fingerprint'] = TransferDecisionSet::fromArray(
+            $proposal['decision_set']['decisions'],
+        )->fingerprint();
+        return $proposal;
     }
 }

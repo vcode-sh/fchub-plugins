@@ -7,6 +7,7 @@ namespace CartShift\Tests\Unit\Domain\Transfer\SameSite;
 use CartShift\Domain\Transfer\Decision\TransferDecisionSet;
 use CartShift\Domain\Transfer\RecordEnvelope;
 use CartShift\Domain\Transfer\SameSite\GuidedCustomerDecisionBuilder;
+use CartShift\Domain\Transfer\SameSite\GuidedCollisionDecisionBuilder;
 use CartShift\Domain\Transfer\SameSite\GuidedDecisionReview;
 use CartShift\Domain\Transfer\SameSite\GuidedProductDecisionBuilder;
 use CartShift\Domain\Transfer\SourceIdentity;
@@ -148,6 +149,130 @@ final class GuidedDecisionReviewTest extends PluginTestCase
 
         self::assertSame('activate_catalogue', $rows['shop-alpha:product:10']['action']);
         self::assertSame('wp-user:9', $rows['shop-alpha:product:10']['operator']);
+    }
+
+    public function testCustomerReuseAndCollisionSkipShareTheSamePlainChoiceReview(): void
+    {
+        $proposal = $this->proposal();
+        $proposal['blockers'] = [];
+        $proposal['status'] = 'owner_review_required';
+        $proposal['product_questions'] = [];
+        $proposal['customer_questions'] = [[
+            'review_id' => 'customer-0123456789ab',
+            'identity' => 'shop-alpha:customer:7',
+            'name' => 'Ada Lovelace',
+            'email' => 'ada@example.test',
+            'classification' => 'registered',
+            'action' => 'attach_exact_same_site_user',
+            'has_downloads' => false,
+            'source_fingerprint' => RecordEnvelope::forPayload(
+                2,
+                new SourceIdentity('shop-alpha', 'customer', '7'),
+                [
+                    'identity' => 'shop-alpha:customer:7',
+                    'source_user_id' => 7,
+                    'classification' => 'registered',
+                    'first_name' => 'Ada',
+                    'last_name' => 'Lovelace',
+                    'email' => 'ada@example.test',
+                ],
+            )->sourceContentDigest,
+            'choices' => [[
+                'choice_id' => 'choice-333333333333',
+                'action' => 'reuse',
+                'target_id' => 71,
+                'target_fingerprint' => str_repeat('c', 64),
+                'target_label' => 'Ada Lovelace (ada@example.test)',
+            ], [
+                'choice_id' => 'choice-444444444444',
+                'action' => 'create',
+            ]],
+        ]];
+        $proposal['collision_questions'] = [[
+            'review_id' => 'collision-0123456789ab',
+            'identity' => 'shop-alpha:order:88',
+            'record_kind' => 'order',
+            'source_fingerprint' => str_repeat('d', 64),
+            'target_id' => 88,
+            'target_fingerprint' => str_repeat('e', 64),
+            'closure' => [[
+                'identity' => 'shop-alpha:order:88',
+                'source_fingerprint' => str_repeat('d', 64),
+            ]],
+            'dependent_orders' => 0,
+            'dependent_subscriptions' => 0,
+            'choices' => [[
+                'choice_id' => 'skip-555555555555',
+                'action' => 'skip',
+                'label' => 'Keep the existing FluentCart order and skip this WooCommerce copy',
+            ]],
+        ]];
+        $review = new GuidedDecisionReview(
+            $this->customerBuilder(),
+            $this->productBuilder(),
+            new GuidedCollisionDecisionBuilder(static fn (): iterable => [], static fn (): array => []),
+        );
+
+        $presentation = $review->presentation($proposal);
+        $customer = array_values(array_filter(
+            $presentation['items'],
+            static fn (array $item): bool => $item['kind'] === 'customer_match',
+        ))[0];
+        $collision = array_values(array_filter(
+            $presentation['items'],
+            static fn (array $item): bool => $item['kind'] === 'record_collision',
+        ))[0];
+
+        self::assertSame(['Use existing customer', 'Create a separate customer'], array_column($customer['choices'], 'label'));
+        self::assertSame(['Skip this WooCommerce copy'], array_column($collision['choices'], 'label'));
+        self::assertStringNotContainsString('target_id', json_encode($presentation, JSON_THROW_ON_ERROR));
+        self::assertStringNotContainsString('overwrite', strtolower(json_encode($presentation, JSON_THROW_ON_ERROR)));
+
+        $resolved = $review->approve(
+            $proposal,
+            array_column($presentation['items'], 'review_id'),
+            'wp-user:9',
+            '2026-08-12T21:00:00Z',
+            [
+                ['review_id' => $customer['review_id'], 'choice_id' => 'choice-333333333333'],
+                ['review_id' => $collision['review_id'], 'choice_id' => 'skip-555555555555'],
+            ],
+        );
+        $rows = array_column($resolved['decision_set']['decisions'], null, 'identity');
+
+        self::assertSame('reuse_explicit_target_customer', $rows['shop-alpha:customer:7']['action']);
+        self::assertSame('excluded_by_policy', $rows['shop-alpha:order:88']['action']);
+    }
+
+    public function testAnIncompatibleProductExplainsItsCascadeSkipWithoutPretendingNoMatchExists(): void
+    {
+        $proposal = $this->proposal();
+        $proposal['product_questions'] = [[
+            'review_id' => 'product-0123456789ab',
+            'identity' => 'shop-alpha:product:10',
+            'product_name' => 'Store membership',
+            'source_fingerprint' => str_repeat('b', 64),
+            'dependent_orders' => 1,
+            'dependent_subscriptions' => 2,
+            'closure' => [],
+            'original_decision' => $proposal['proposal_decisions'][1],
+            'choices' => [[
+                'choice_id' => 'choice-222222222222',
+                'action' => 'skip',
+            ]],
+        ]];
+        $proposal['proposal_decisions'] = [$proposal['proposal_decisions'][0]];
+        $proposal['decision_set']['decisions'] = [$proposal['decision_set']['decisions'][0]];
+
+        $item = array_values(array_filter(
+            (new GuidedDecisionReview($this->customerBuilder(), $this->productBuilder()))
+                ->presentation($proposal)['items'],
+            static fn (array $item): bool => $item['kind'] === 'product_conflict',
+        ))[0];
+
+        self::assertStringContainsString('variations cannot be linked safely', $item['summary']);
+        self::assertStringContainsString('1 related order and 2 related subscriptions', $item['summary']);
+        self::assertStringNotContainsString('No likely', $item['summary']);
     }
 
     public function testIncompatibleExistingProductExplainsTheSafeStopWithoutInternalCodes(): void

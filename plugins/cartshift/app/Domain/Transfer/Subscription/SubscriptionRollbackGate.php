@@ -24,11 +24,7 @@ final readonly class SubscriptionRollbackGate
             }
             throw $exception;
         }
-        $releaseStarted = array_filter(
-            $evidence->entries,
-            static fn (array $entry): bool => in_array($entry['release_state'] ?? null, ['marked', 'released'], true),
-        ) !== [];
-        if ($evidence->state !== SubscriptionCutoverEvidence::PREPARED || $releaseStarted) {
+        if ($evidence->releaseStarted()) {
             throw new \RuntimeException('rollback_blocked_after_subscription_source_release:' . $runId);
         }
     }

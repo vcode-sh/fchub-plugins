@@ -24,26 +24,18 @@ defined('ABSPATH') || exit;
  * the authority — Exported → Validated → Prepared → Staging → Staged →
  * Reconciling → Reconciled → Promoted → CatalogueActivating → Completed — and
  * the verb sequence below is the walk that produces it. Where that authority is
- * silent, this class refuses rather than guesses; see `assertPlannable()`.
+ * silent, this class emits no extra transition.
  */
 final readonly class GuidedRunPlan
 {
-    private const string CONTEXT_REHEARSAL = 'rehearsal';
+    private const int BASE_STEP_COUNT = 12;
+
+    private const int SUBSCRIPTION_STEP_COUNT = 3;
+
+    private const string CONTEXT_GUIDED = 'guided';
     private const string CONTEXT_CUTOVER = 'cutover';
 
     private const string DECISION_SET = 'decisions.json';
-
-    /**
-     * Verbs that exist and whose position in the sequence is not established by
-     * anything in this repository.
-     *
-     * @var list<string>
-     */
-    private const array UNPLANNED_SUBSCRIPTION_VERBS = [
-        'prepare-subscription-cutover',
-        'release-subscription-source',
-        'activate-subscriptions',
-    ];
 
     private function __construct(
         private string $sourceKey,
@@ -93,7 +85,7 @@ final readonly class GuidedRunPlan
             $decidedAtUtc,
             $evidence,
             $includesSubscriptions,
-            self::CONTEXT_REHEARSAL,
+            self::CONTEXT_GUIDED,
             $clauses,
         );
     }
@@ -152,15 +144,13 @@ final readonly class GuidedRunPlan
      */
     public function steps(): array
     {
-        $this->assertPlannable();
-
         $decisionSet = $this->workspace . '/' . self::DECISION_SET;
         $packageDestination = $this->workspace . '/guided-packages/' . substr(hash(
             'sha256',
             $this->sourceKey . '|' . $this->operator . '|' . $this->decidedAtUtc,
         ), 0, 24);
 
-        return [
+        $steps = [
             $this->step('compatibility', ['role' => 'source']),
             $this->step('compatibility', ['role' => 'target']),
             // THE AUDIT READS THE DECISIONS TOO.
@@ -208,31 +198,51 @@ final readonly class GuidedRunPlan
                     ['package', 'descriptor', 'confirm'],
                     ['execution-context' => $this->executionContext],
                 ),
-                ['stage', 'reconcile', 'promote', 'activate-catalogue', 'complete'],
+                ['stage', 'reconcile', 'promote'],
+            ),
+        ];
+
+        if ($this->includesSubscriptions) {
+            $steps[] = $this->step(
+                'prepare-subscription-cutover',
+                ['role' => 'target'],
+                ['package', 'descriptor', 'confirm'],
+                ['execution-context' => $this->executionContext],
+            );
+            $steps[] = $this->step(
+                'release-subscription-source',
+                ['role' => 'source', 'private-dir' => $this->workspace],
+                ['descriptor'],
+                ['execution-context' => $this->executionContext],
+            );
+            $steps[] = $this->step(
+                'activate-subscriptions',
+                ['role' => 'target'],
+                ['package', 'descriptor', 'confirm'],
+                ['execution-context' => $this->executionContext],
+            );
+        }
+
+        return [
+            ...$steps,
+            $this->step(
+                'activate-catalogue',
+                ['role' => 'target'],
+                ['package', 'descriptor', 'confirm'],
+                ['execution-context' => $this->executionContext],
+            ),
+            $this->step(
+                'complete',
+                ['role' => 'target'],
+                ['package', 'descriptor', 'confirm'],
+                ['execution-context' => $this->executionContext],
             ),
         ];
     }
 
-    /**
-     * Refuse the part that is not written yet, by name.
-     *
-     * The state machine fixes the commerce ordering exactly and says nothing
-     * about where the three subscription verbs belong. Emitting a plausible
-     * order would be an invention that migrates real subscribers; omitting them
-     * quietly would be the empty-dataset defect wearing a wizard. Neither is
-     * available, so a shop with subscriptions stops here with a code that names
-     * the missing work.
-     */
-    private function assertPlannable(): void
+    public static function stepCount(bool $includesSubscriptions): int
     {
-        if ($this->includesSubscriptions) {
-            throw new \RuntimeException(sprintf(
-                'guided_subscription_sequence_unplanned: this shop has WooCommerce Subscriptions, and the '
-                . 'position of %s in the transfer sequence is not established by anything CartShift can read. '
-                . 'Migrate it through the WP-CLI transfer contract until it is.',
-                implode(', ', self::UNPLANNED_SUBSCRIPTION_VERBS),
-            ));
-        }
+        return self::BASE_STEP_COUNT + ($includesSubscriptions ? self::SUBSCRIPTION_STEP_COUNT : 0);
     }
 
     /**

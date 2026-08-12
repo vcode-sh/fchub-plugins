@@ -28,6 +28,14 @@ final class SubscriptionCutoverEvidenceRepositoryTest extends PluginTestCase
         parent::tearDown();
     }
 
+    public function testAbsentSubscriptionCohortNeedsNoCutoverEvidenceFile(): void
+    {
+        $repository = new SubscriptionCutoverEvidenceRepository($this->root);
+
+        self::assertNull($repository->createPreparedIfPresent(null));
+        self::assertFileDoesNotExist($repository->path('run-task-22'));
+    }
+
     public function testPreparedRetryReturnsTheOriginalEvidenceDespiteAClockChange(): void
     {
         $repository = new SubscriptionCutoverEvidenceRepository($this->root);
