@@ -77,6 +77,7 @@ jobs:
 
   cartshift-installed-contracts:
     name: CartShift installed candidate contracts
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -86,18 +87,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Check for CartShift changes
-        id: changes
-        run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "count=1" >> "$GITHUB_OUTPUT"
-          else
-            CHANGED=$(git diff --name-only "${{ github.event.pull_request.base.sha }}"..HEAD -- plugins/cartshift/ build.sh tests/build-reproducibility.sh .github/workflows/ci.yml .github/workflows/release.yml | wc -l)
-            echo "count=$CHANGED" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Setup PHP
-        if: steps.changes.outputs.count > 0
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
@@ -105,20 +95,17 @@ jobs:
           coverage: none
 
       - name: Setup Node.js
-        if: steps.changes.outputs.count > 0
         uses: actions/setup-node@v7
         with:
           node-version: '26'
 
       - name: Install candidate test dependencies
-        if: steps.changes.outputs.count > 0
         working-directory: plugins/cartshift
         run: |
           composer install --no-interaction --prefer-dist
           npm ci
 
       - name: Build checksum-pinned candidate
-        if: steps.changes.outputs.count > 0
         run: |
           SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) ./build.sh cartshift
           VERSION=$(node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync("web-docs/lib/versions.json", "utf8")).plugins.cartshift.version)')
@@ -131,7 +118,6 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Download and verify private vendor artifacts
-        if: steps.changes.outputs.count > 0
         env:
           WOO_URL: ${{ secrets.CARTSHIFT_WOO_ARTIFACT_URL }}
           WOO_SHA256: ${{ vars.CARTSHIFT_WOO_SHA256 }}
@@ -163,14 +149,13 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Run installed candidate contracts
-        if: steps.changes.outputs.count > 0
         working-directory: plugins/cartshift
         env:
           CARTSHIFT_CONTRACT_RETAIN_EVIDENCE_DIR: ${{ runner.temp }}/cartshift-installed-evidence
         run: tests/Integration/scripts/run-installed-contracts.sh
 
       - name: Upload installed-contract evidence
-        if: always() && steps.changes.outputs.count > 0
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: cartshift-installed-contract-evidence-${{ github.sha }}

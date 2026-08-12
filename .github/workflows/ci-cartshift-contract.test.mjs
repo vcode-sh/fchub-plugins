@@ -42,6 +42,13 @@ test('CI installs the checksum-pinned CartShift candidate with every mandatory v
   assert.match(installed, /CARTSHIFT_CONTRACT_RETAIN_EVIDENCE_DIR/)
 })
 
+test('private CartShift vendor artifacts only reach trusted main pushes', () => {
+  const installed = job(ci, 'cartshift-installed-contracts')
+
+  assert.match(ci, /push:\n\s+branches: \[main\]/)
+  assert.match(installed, /^    if: github\.event_name == 'push'$/m)
+})
+
 test('the disposable runtime does not overlay source over the installed candidate', () => {
   assert.doesNotMatch(compose, /wp-content\/plugins\/cartshift:ro/)
   assert.match(compose, /CARTSHIFT_SOURCE_DIR[^\n]*:\/cartshift-source:ro/)

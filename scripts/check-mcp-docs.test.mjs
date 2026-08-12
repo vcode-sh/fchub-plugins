@@ -131,6 +131,7 @@ describe('FluentCart MCP documentation truth gate', () => {
 
 	it('rejects unavailable high-impact writes when documentation presents them as usable', () => {
 		const claims = {
+			'engineering-guidance.md': 'Delete the tests whose subject is gone.',
 			'delete-order.md': 'FluentCart MCP lets you delete an order.',
 			'remove-customer.md': 'FluentCart MCP lets you remove a customer.',
 			'bulk-products.md': 'Use bulk actions to update products.',
@@ -179,6 +180,7 @@ describe('FluentCart MCP documentation truth gate', () => {
 		]) {
 			assert.deepEqual(byFile[name], ['unavailable-high-impact-write-presented-as-available'])
 		}
+		assert.deepEqual(byFile['engineering-guidance.md'], [])
 		assert.deepEqual(byFile['policy.md'], [])
 	})
 

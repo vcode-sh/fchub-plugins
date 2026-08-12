@@ -41,6 +41,8 @@ const HIGH_IMPACT_WRITE_SUBJECT =
 	/\bdelet(?:e|es|ed|ing|ion|ions)\b|\bremov(?:e|es|ed|ing|al)\b[^.]{0,40}\b(?:order|product|customer|coupon|subscription|card|payment)\b|\bbulk(?:[- ](?:action|actions|edit|edits|update|updates|mutation|mutations))?\b|\b(?:change|set|update|mov(?:e|es|ed|ing)|transition(?:s|ed|ing)?)\b[^.]{0,60}\border(?:\s*#\d+)?\b[^.]{0,40}\b(?:status|state|completed|processing|fulfilled|paid|cancelled)\b|\bmark(?:ing)?\b[^.]{0,24}\border paid\b|\b(?:collect(?:s|ed|ing)?|tak(?:e|es|ing)|debit(?:s|ed|ing)?|captur(?:e|es|ed|ing)|charg(?:e|es|ed|ing))\b[^.]{0,40}\b(?:cards?|payments?)\b|\b(?:cards?|payments?)\s+(?:collection|collections|capture|captures|charge|charges|debit|debits)\b|\bmoney-moving\b/i
 const HIGH_IMPACT_IMPERATIVE =
 	/\b(?:delete|remove)\b|\b(?:move|transition)\s+(?:an?\s+)?order\b|\bmark\s+an?\s+order\s+paid\b|\b(?:collect|take|debit|capture|charge)\b[^.]{0,40}\b(?:card|payment)\b/i
+const COMMERCE_WRITE_TARGET =
+	/\b(?:orders?|products?|customers?|coupons?|subscriptions?|cards?|payments?|invoices?)\b/i
 const OFFICIAL_MCP_CONTEXT = /\bofficial\s+(?:FluentCart\s+)?(?:MCP|server)\b/i
 const CERTIFICATION_NEGATION = /\b(not|no)\b[^.]{0,80}\b(certified|certification)\b/i
 const GUARD_MECHANICS =
@@ -343,6 +345,7 @@ export const RULES = [
 				.some(
 					(part) =>
 						HIGH_IMPACT_WRITE_SUBJECT.test(part) &&
+						COMMERCE_WRITE_TARGET.test(part) &&
 						(AVAILABILITY_VERB.test(part) || /\b(?:can|may)\b/i.test(part) || HIGH_IMPACT_IMPERATIVE.test(part)) &&
 						!UNAVAILABLE_MARKER.test(part) &&
 						!/\b(?:does|do|is|are|can|could)\s+not\b/i.test(part) &&
