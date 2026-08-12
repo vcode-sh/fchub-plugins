@@ -6,7 +6,6 @@ namespace CartShift\Domain\Transfer\SameSite;
 
 use CartShift\Domain\Transfer\Execution\ConfiguredTransferEvidence;
 use CartShift\Domain\Transfer\Execution\LoadedTargetPreparePipeline;
-use CartShift\Domain\Transfer\Execution\LoadedTargetRecordPlanFactory;
 use CartShift\Domain\Transfer\Execution\LoadedTargetTransferPipeline;
 use CartShift\Domain\Transfer\Audit\LoadedWooTransferAuditor;
 use CartShift\Domain\Transfer\Decision\LoadedWooDecisionProposalPipeline;
@@ -16,11 +15,9 @@ use CartShift\Domain\Transfer\Graph\TransferDependencyGraph;
 use CartShift\Domain\Transfer\Package\LoadedWooExportPipeline;
 use CartShift\Domain\Transfer\Package\TransferPackageReader;
 use CartShift\Domain\Transfer\Package\TransferPackageValidator;
-use CartShift\Domain\Transfer\RecordKind;
 use CartShift\Domain\Transfer\Runtime\TransferRuntimeProbe;
 use CartShift\Domain\Transfer\SelectionClause;
 use CartShift\Domain\Transfer\TransferSelection;
-use CartShift\Storage\IdMapRepository;
 
 defined('ABSPATH') || exit;
 
@@ -231,98 +228,10 @@ final class GuidedRunner
     /** @return array<string, mixed> */
     private function runPackageValidation(array $input): array
     {
-        $package = (string) $input['package'];
-        $manifest = $this->packageValidator !== null
-            ? ($this->packageValidator)($package)
-            : (new TransferPackageValidator())->assertValid($package);
-        $exceptions = [];
-        if ($this->targetReadiness !== null) {
-            $readiness = ($this->targetReadiness)($package, (string) $input['decision_set']);
-            if (is_array($readiness)) {
-                $exceptions = array_values($readiness);
-            }
-        } else {
-            $exceptions = $this->assertTargetReadiness(
-                $package,
-                (string) $input['decision_set'],
-                $manifest->createdAtUtc,
-            );
-        }
-
-        return [
-            'status' => 'validated',
-            'source_key' => $manifest->sourceKey,
-            'selection_fingerprint' => $manifest->selectionFingerprint,
-            'records_sha256' => $manifest->recordsSha256,
-            'record_counts' => $manifest->recordCounts,
-            'migration_exceptions' => $exceptions,
-        ];
-    }
-
-    /** @return list<array<string,mixed>> */
-    private function assertTargetReadiness(string $package, string $decisionSetPath, string $evaluationUtc): array
-    {
-        $validator = new TransferPackageValidator();
-        $reader = new TransferPackageReader($package, $validator);
-        $records = iterator_to_array($reader->records(), false);
-        $decisions = TransferDecisionSet::fromFile($decisionSetPath);
-        $manifest = $reader->manifest();
-        $decisions->assertSourceKey($manifest->sourceKey);
-        $plans = LoadedTargetRecordPlanFactory::create(
-            $decisions,
-            new IdMapRepository($manifest->sourceKey),
-            $package,
-            $records,
-            $evaluationUtc,
-        );
-        $dependencyBound = false;
-        $exceptions = [];
-        foreach ($records as $record) {
-            match ($record->identity->kind()) {
-                RecordKind::Product => $this->inspectProductPlan($plans->product($record), $exceptions),
-                RecordKind::Customer => $plans->customer($record),
-                RecordKind::Order, RecordKind::Subscription => $dependencyBound = true,
-                RecordKind::TaxonomyGroup,
-                RecordKind::TaxonomyTerm,
-                RecordKind::MediaAsset,
-                RecordKind::DownloadAsset => null,
-            };
-        }
-        if ($dependencyBound) {
-            throw new GuidedRunFailure(
-                'guided_dependency_bound_target_readiness_unavailable',
-                ['migration_exceptions' => $exceptions],
-            );
-        }
-
-        throw new GuidedRunFailure(
-            'guided_completed_rehearsal_rollback_unavailable',
-            ['migration_exceptions' => $exceptions],
-        );
-    }
-
-    /** @param list<array<string,mixed>> $exceptions */
-    private function inspectProductPlan(\CartShift\Domain\Transfer\Product\ProductStagePlan $plan, array &$exceptions): void
-    {
-        foreach ($plan->variations as $variation) {
-            $exception = $variation->targetOtherInfo['stock_migration_exception'] ?? null;
-            if (!is_array($exception)) {
-                continue;
-            }
-            $sourceStock = is_array($exception['source_stock'] ?? null) ? $exception['source_stock'] : [];
-            $exceptions[] = [
-                'kind' => 'shared_parent_stock',
-                'product_name' => $plan->record->name,
-                'variation_name' => $variation->targetTitle,
-                'sku' => (string) ($variation->targetFields['sku'] ?? ''),
-                'source_variation' => (string) ($exception['source_variation'] ?? ''),
-                'source_owner' => (string) ($sourceStock['owner'] ?? ''),
-                'source_quantity' => is_int($sourceStock['quantity'] ?? null) ? $sourceStock['quantity'] : null,
-                'source_status' => (string) ($sourceStock['status'] ?? ''),
-                'source_backorders' => (string) ($sourceStock['backorders'] ?? ''),
-                'source_stock' => $sourceStock,
-            ];
-        }
+        return (new GuidedTargetReadinessInspector(
+            $this->packageValidator,
+            $this->targetReadiness,
+        ))->inspect($input);
     }
 
     /**
@@ -431,68 +340,7 @@ final class GuidedRunner
      */
     public function acceptProposal(array $proposal, string $decisionSetPath): array
     {
-        if (($proposal['status'] ?? null) !== 'owner_review_required'
-            || ($proposal['blockers'] ?? []) !== []) {
-            throw new \RuntimeException('guided_decision_proposal_blocked');
-        }
-        $rows = $proposal['decision_set']['decisions'] ?? null;
-
-        if (!is_array($rows)) {
-            throw new \RuntimeException('guided_decision_proposal_missing: there is nothing to accept.');
-        }
-
-        $baseFingerprint = $proposal['base_decision_fingerprint'] ?? null;
-        if (!is_string($baseFingerprint) || preg_match('/\A[a-f0-9]{64}\z/D', $baseFingerprint) !== 1) {
-            throw new \RuntimeException('guided_decision_proposal_base_invalid');
-        }
-
-        $decisions = TransferDecisionSet::fromArray($rows);
-        $current = is_file($decisionSetPath)
-            ? TransferDecisionSet::fromFile($decisionSetPath)
-            : TransferDecisionSet::empty();
-        if (hash_equals($decisions->fingerprint(), $current->fingerprint())) {
-            return ['accepted' => count($rows)];
-        }
-        if (!hash_equals($baseFingerprint, $current->fingerprint())) {
-            throw new \RuntimeException('guided_decision_set_changed');
-        }
-
-        $bytes = $decisions->canonicalJson();
-        $directory = PrivateTransferFile::directory(dirname($decisionSetPath));
-        $temporary = $decisionSetPath . '.tmp-' . bin2hex(random_bytes(8));
-        $stream = fopen($temporary, 'x+b');
-        if (!is_resource($stream)) {
-            throw new \RuntimeException('guided_decision_set_not_written');
-        }
-        chmod($temporary, 0600);
-        try {
-            if (fwrite($stream, $bytes) !== strlen($bytes)
-                || !fflush($stream)
-                || !function_exists('fsync')
-                || !fsync($stream)) {
-                throw new \RuntimeException('guided_decision_set_not_written');
-            }
-        } catch (\Throwable $failure) {
-            fclose($stream);
-            unlink($temporary);
-            throw $failure;
-        }
-        fclose($stream);
-        if (!rename($temporary, $decisionSetPath)) {
-            unlink($temporary);
-            throw new \RuntimeException('guided_decision_set_not_written');
-        }
-        chmod($decisionSetPath, 0600);
-        PrivateTransferFile::syncDirectory($directory);
-
-        // Read it back through the validator the rest of the run uses. A file
-        // this process wrote and cannot itself load is worse than no file: the
-        // failure would surface three steps later, inside `prepare`.
-        TransferDecisionSet::fromFile($decisionSetPath);
-
-        return [
-            'accepted' => count($rows),
-        ];
+        return (new GuidedDecisionSetAcceptor())->accept($proposal, $decisionSetPath);
     }
 
     /**

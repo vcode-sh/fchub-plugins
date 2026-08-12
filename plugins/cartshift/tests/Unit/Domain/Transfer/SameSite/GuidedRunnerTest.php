@@ -284,6 +284,44 @@ final class GuidedRunnerTest extends PluginTestCase
         );
     }
 
+    public function testPrepareReadsTheValidatedPackageBeforeDispatchingItsPayload(): void
+    {
+        $product = ProductAssessmentFixture::product();
+        [$root, $package, $decisionPath] = $this->package(
+            [$product->envelope()],
+            [$this->recordDecision($product->identity, $product->envelope()->sourceContentDigest)],
+        );
+        $received = null;
+        $runner = new GuidedRunner(
+            new GuidedSetup('lapka-web', self::OPERATOR),
+            preparePipeline: static function (array $payload) use (&$received): array {
+                $received = $payload;
+
+                return ['descriptor' => 'prepared-001'];
+            },
+        );
+
+        try {
+            $result = $runner->run(new GuidedStep('prepare', [
+                'role' => 'target',
+                'package' => $package,
+                'decision-set' => $decisionPath,
+                'private-dir' => $root,
+                'execution-context' => 'rehearsal',
+            ]));
+
+            self::assertSame(['descriptor' => 'prepared-001'], $result);
+            self::assertIsArray($received);
+            self::assertSame(realpath($package), $received['package']);
+            self::assertSame(realpath($decisionPath), $received['decision_set']);
+            self::assertSame(realpath($root), $received['private_dir']);
+            self::assertSame('rehearsal', $received['execution_context']);
+            self::assertSame('lapka-web', $received['source_key']);
+        } finally {
+            $this->removeTree($root);
+        }
+    }
+
     public function testTargetReadinessPropagatesAnUnrepresentableProductBeforePrepare(): void
     {
         $checked = 0;
@@ -583,6 +621,41 @@ final class GuidedRunnerTest extends PluginTestCase
         string $expected,
         ?string $expectedException = null,
     ): void {
+        [$root, $package, $decisionPath] = $this->package($records, $decisions);
+        $prepareCalls = 0;
+        $runner = new GuidedRunner(
+            new GuidedSetup('lapka-web', self::OPERATOR),
+            preparePipeline: static function () use (&$prepareCalls): array {
+                ++$prepareCalls;
+                return [];
+            },
+        );
+
+        try {
+            $runner->run(new GuidedStep('validate-package', [
+                'role' => 'target',
+                'package' => $package,
+                'decision-set' => $decisionPath,
+            ]));
+            self::fail('Target readiness advanced into prepare.');
+        } catch (\RuntimeException $failure) {
+            self::assertStringContainsString($expected, $failure->getMessage());
+            if ($expectedException !== null) {
+                self::assertInstanceOf(\CartShift\Domain\Transfer\SameSite\GuidedRunFailure::class, $failure);
+                self::assertSame(
+                    $expectedException,
+                    $failure->context['migration_exceptions'][0]['kind'] ?? null,
+                );
+            }
+            self::assertSame(0, $prepareCalls);
+        } finally {
+            $this->removeTree($root);
+        }
+    }
+
+    /** @param list<\CartShift\Domain\Transfer\RecordEnvelope> $records @param list<array<string,mixed>> $decisions @return array{string,string,string} */
+    private function package(array $records, array $decisions): array
+    {
         $root = sys_get_temp_dir() . '/cartshift-guided-readiness-' . bin2hex(random_bytes(8));
         mkdir($root, 0700);
         $selection = new TransferSelection(
@@ -614,35 +687,8 @@ final class GuidedRunnerTest extends PluginTestCase
         chmod($decisionPath, 0600);
         $GLOBALS['_cartshift_test_get_col_callback'] = static fn (): array => ['standard'];
         $GLOBALS['_cartshift_test_get_results_callback'] = static fn (): array => [];
-        $prepareCalls = 0;
-        $runner = new GuidedRunner(
-            new GuidedSetup('lapka-web', self::OPERATOR),
-            preparePipeline: static function () use (&$prepareCalls): array {
-                ++$prepareCalls;
-                return [];
-            },
-        );
 
-        try {
-            $runner->run(new GuidedStep('validate-package', [
-                'role' => 'target',
-                'package' => $package,
-                'decision-set' => $decisionPath,
-            ]));
-            self::fail('Target readiness advanced into prepare.');
-        } catch (\RuntimeException $failure) {
-            self::assertStringContainsString($expected, $failure->getMessage());
-            if ($expectedException !== null) {
-                self::assertInstanceOf(\CartShift\Domain\Transfer\SameSite\GuidedRunFailure::class, $failure);
-                self::assertSame(
-                    $expectedException,
-                    $failure->context['migration_exceptions'][0]['kind'] ?? null,
-                );
-            }
-            self::assertSame(0, $prepareCalls);
-        } finally {
-            $this->removeTree($root);
-        }
+        return [$root, $package, $decisionPath];
     }
 
     /** @return array<string,mixed> */
